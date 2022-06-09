@@ -1,0 +1,13 @@
+{
+  "Author": "your name here",
+  "Name": "Mare Synchronos",
+  "Punchline": "",
+  "Description": "",
+  "InternalName": "mareSynchronos",
+  "ApplicableVersion": "any",
+  "Tags": [
+    "sample",
+    "plugin",
+    "goats"
+  ]
+}
