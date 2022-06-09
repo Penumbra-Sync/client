@@ -35,7 +35,7 @@ namespace MareSynchronos.Factories
         private string GetHash(string filePath)
         {
             using SHA1CryptoServiceProvider cryptoProvider = new();
-            return BitConverter.ToString(cryptoProvider.ComputeHash(File.ReadAllBytes(filePath)));
+            return BitConverter.ToString(cryptoProvider.ComputeHash(File.ReadAllBytes(filePath))).Replace("-", "");
         }
     }
 }
