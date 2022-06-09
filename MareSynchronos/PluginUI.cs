@@ -59,8 +59,6 @@ namespace SamplePlugin
             ImGui.SetNextWindowSizeConstraints(new Vector2(375, 330), new Vector2(float.MaxValue, float.MaxValue));
             if (ImGui.Begin("My Amazing Window", ref this.visible, ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse))
             {
-                ImGui.Text($"The random config bool is {this.configuration.SomePropertyToBeSavedAndWithADefault}");
-
                 if (ImGui.Button("Show Settings"))
                 {
                     SettingsVisible = true;
@@ -78,16 +76,14 @@ namespace SamplePlugin
                 return;
             }
 
-            ImGui.SetNextWindowSize(new Vector2(232, 75), ImGuiCond.Always);
-            if (ImGui.Begin("A Wonderful Configuration Window", ref this.settingsVisible,
+            ImGui.SetNextWindowSize(new Vector2(500, 75), ImGuiCond.Always);
+            if (ImGui.Begin("QUALITY UI DEVELOPMENT", ref this.settingsVisible,
                 ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse))
             {
                 // can't ref a property, so use a local copy
-                var configValue = this.configuration.SomePropertyToBeSavedAndWithADefault;
-                if (ImGui.Checkbox("Random Config Bool", ref configValue))
-                {
-                    this.configuration.SomePropertyToBeSavedAndWithADefault = configValue;
-                    // can save immediately on change, if you don't want to provide a "Save and Close" button
+                string penumbraFolder = configuration.PenumbraFolder;
+                if(ImGui.InputText("Penumbra mod folder", ref penumbraFolder, 255)) {
+                    this.configuration.PenumbraFolder = penumbraFolder;
                     this.configuration.Save();
                 }
             }
