@@ -162,70 +162,12 @@ namespace SamplePlugin
         {
             var equipment = playerWatch.UpdatePlayerWithoutEvent(actor);
             var customization = new CharacterCustomization(actor);
-            DebugCustomization(customization);
+            //DebugCustomization(customization);
             //PluginLog.Debug(customization.Gender.ToString());
             if (equipment != null)
             {
                 PluginLog.Debug(equipment.ToString());
             }
-        }
-
-        private void DebugCustomization(CharacterCustomization customization)
-        {
-            StringBuilder sb = new StringBuilder();
-            sb.AppendLine("Gender: " + customization[CustomizationId.Gender].ToString() + ":" + customization.Gender.ToName());
-            sb.AppendLine("Race: " + customization[CustomizationId.Race].ToString() + ":" + GetBodyRaceCode(customization));
-            sb.AppendLine("Face: " + customization.Face.ToString());
-
-            PluginLog.Debug(sb.ToString());
-        }
-
-        private string GetBodyRaceMdlPath(CharacterCustomization customization)
-        {
-            return "";
-        }
-
-        private string GetBodyRaceCode(CharacterCustomization customization)
-        {
-            return Names.CombinedRace(customization.Gender, GetBodyRace(FromSubRace(customization.Clan))).ToRaceCode();
-        }
-
-        private ModelRace GetBodyRace(ModelRace modelRace)
-        {
-            return modelRace switch
-            {
-                ModelRace.AuRa => ModelRace.AuRa,
-                ModelRace.Miqote => ModelRace.Midlander,
-                ModelRace.Highlander => ModelRace.Highlander,
-                ModelRace.Lalafell => ModelRace.Lalafell,
-                ModelRace.Midlander => ModelRace.Midlander,
-                ModelRace.Elezen => ModelRace.Midlander,
-                ModelRace.Hrothgar => ModelRace.Hrothgar,
-            };
-        }
-
-        private ModelRace FromSubRace(SubRace race)
-        {
-            return race switch
-            {
-                SubRace.Xaela => ModelRace.AuRa,
-                SubRace.Raen => ModelRace.AuRa,
-                SubRace.Highlander => ModelRace.Highlander,
-                SubRace.Midlander => ModelRace.Midlander,
-                SubRace.Plainsfolk => ModelRace.Lalafell,
-                SubRace.Dunesfolk => ModelRace.Lalafell,
-                SubRace.SeekerOfTheSun => ModelRace.Miqote,
-                SubRace.KeeperOfTheMoon => ModelRace.Miqote,
-                SubRace.Seawolf => ModelRace.Roegadyn,
-                SubRace.Hellsguard => ModelRace.Roegadyn,
-                SubRace.Rava => ModelRace.Viera,
-                SubRace.Veena => ModelRace.Viera,
-                SubRace.Wildwood => ModelRace.Elezen,
-                SubRace.Duskwight => ModelRace.Elezen,
-                SubRace.Helion => ModelRace.Hrothgar,
-                SubRace.Lost => ModelRace.Hrothgar,
-                _ => ModelRace.Unknown
-            };
         }
 
         private void StartScan()
