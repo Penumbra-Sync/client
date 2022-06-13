@@ -11,6 +11,18 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using MareSynchronos.Hooks;
+using Penumbra.PlayerWatch;
+using Dalamud.Game;
+using Dalamud.Game.ClientState.Objects;
+using Dalamud.Game.ClientState;
+using Dalamud.Data;
+using Lumina.Excel.GeneratedSheets;
+using Glamourer.Customization;
+using System.Text;
+using Penumbra.GameData.Enums;
+using System;
+using MareSynchronos.Models;
 
 namespace SamplePlugin
 {
@@ -25,12 +37,15 @@ namespace SamplePlugin
         private Configuration Configuration { get; init; }
         private PluginUI PluginUi { get; init; }
         private FileCacheFactory FileCacheFactory { get; init; }
+        private DrawHooks drawHooks;
 
         private CancellationTokenSource cts;
+        private IPlayerWatcher playerWatch;
 
         public Plugin(
             [RequiredVersion("1.0")] DalamudPluginInterface pluginInterface,
-            [RequiredVersion("1.0")] CommandManager commandManager)
+            [RequiredVersion("1.0")] CommandManager commandManager,
+            Framework framework, ObjectTable objectTable, ClientState clientState, DataManager dataManager)
         {
             this.PluginInterface = pluginInterface;
             this.CommandManager = commandManager;
@@ -50,12 +65,18 @@ namespace SamplePlugin
 
             this.PluginInterface.UiBuilder.Draw += DrawUI;
             this.PluginInterface.UiBuilder.OpenConfigUi += DrawConfigUI;
+
+            playerWatch = PlayerWatchFactory.Create(framework, clientState, objectTable);
+            drawHooks = new DrawHooks(pluginInterface, clientState, objectTable, new MareSynchronos.Models.FileReplacementFactory(pluginInterface, clientState));
         }
 
         public void Dispose()
         {
             this.PluginUi.Dispose();
             this.CommandManager.RemoveHandler(commandName);
+            playerWatch.PlayerChanged -= PlayerWatch_PlayerChanged;
+            playerWatch.RemovePlayerFromWatch("Ilya Zhelmo");
+            drawHooks.Dispose();
         }
 
         private void OnCommand(string command, string args)
@@ -72,6 +93,139 @@ namespace SamplePlugin
 
                 Task.Run(() => StartScan(), cts.Token);
             }
+
+            if (args == "watch")
+            {
+                playerWatch.AddPlayerToWatch("Ilya Zhelmo");
+                playerWatch.PlayerChanged += PlayerWatch_PlayerChanged;
+            }
+
+            if (args == "stopwatch")
+            {
+                playerWatch.PlayerChanged -= PlayerWatch_PlayerChanged;
+                playerWatch.RemovePlayerFromWatch("Ilya Zhelmo");
+            }
+
+            if (args == "hook")
+            {
+                drawHooks.StartHooks();
+            }
+
+            if (args == "print")
+            {
+                var resources = drawHooks.PrintRequestedResources();
+            }
+
+            if (args == "copy")
+            {
+                var resources = drawHooks.PrintRequestedResources();
+                Task.Run(() =>
+                {
+                    PluginLog.Debug("Copying files");
+                    foreach (var file in Directory.GetFiles(@"G:\Penumbra\TestMod\files"))
+                    {
+                        File.Delete(file);
+                    }
+                    File.Delete(@"G:\Penumbra\testmod\filelist.txt");
+                    using FileCacheContext db = new FileCacheContext();
+                    foreach (var resource in resources)
+                    {
+                        CopyRecursive(resource, db);
+                    }
+                });
+            }
+        }
+
+        private void CopyRecursive(FileReplacement replacement, FileCacheContext db)
+        {
+            if (replacement.HasFileReplacement)
+            {
+                PluginLog.Debug("Copying file \"" + replacement.ReplacedPath + "\"");
+
+                var fileCache = db.FileCaches.Single(f => f.Filepath.Contains(replacement.ReplacedPath.Replace('/', '\\')));
+                try
+                {
+                    var ext = new FileInfo(fileCache.Filepath).Extension;
+                    File.Copy(fileCache.Filepath, Path.Combine(@"G:\Penumbra\TestMod\files", fileCache.Hash.ToLower() + ext));
+                    File.AppendAllLines(Path.Combine(@"G:\Penumbra\TestMod", "filelist.txt"), new[] { $"\"{replacement.GamePath}\": \"files\\\\{fileCache.Hash.ToLower() + ext}\"," });
+                }
+                catch { }
+            }
+
+            foreach (var associated in replacement.Associated)
+            {
+                CopyRecursive(associated, db);
+            }
+        }
+
+        private void PlayerWatch_PlayerChanged(Dalamud.Game.ClientState.Objects.Types.Character actor)
+        {
+            var equipment = playerWatch.UpdatePlayerWithoutEvent(actor);
+            var customization = new CharacterCustomization(actor);
+            DebugCustomization(customization);
+            //PluginLog.Debug(customization.Gender.ToString());
+            if (equipment != null)
+            {
+                PluginLog.Debug(equipment.ToString());
+            }
+        }
+
+        private void DebugCustomization(CharacterCustomization customization)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("Gender: " + customization[CustomizationId.Gender].ToString() + ":" + customization.Gender.ToName());
+            sb.AppendLine("Race: " + customization[CustomizationId.Race].ToString() + ":" + GetBodyRaceCode(customization));
+            sb.AppendLine("Face: " + customization.Face.ToString());
+
+            PluginLog.Debug(sb.ToString());
+        }
+
+        private string GetBodyRaceMdlPath(CharacterCustomization customization)
+        {
+            return "";
+        }
+
+        private string GetBodyRaceCode(CharacterCustomization customization)
+        {
+            return Names.CombinedRace(customization.Gender, GetBodyRace(FromSubRace(customization.Clan))).ToRaceCode();
+        }
+
+        private ModelRace GetBodyRace(ModelRace modelRace)
+        {
+            return modelRace switch
+            {
+                ModelRace.AuRa => ModelRace.AuRa,
+                ModelRace.Miqote => ModelRace.Midlander,
+                ModelRace.Highlander => ModelRace.Highlander,
+                ModelRace.Lalafell => ModelRace.Lalafell,
+                ModelRace.Midlander => ModelRace.Midlander,
+                ModelRace.Elezen => ModelRace.Midlander,
+                ModelRace.Hrothgar => ModelRace.Hrothgar,
+            };
+        }
+
+        private ModelRace FromSubRace(SubRace race)
+        {
+            return race switch
+            {
+                SubRace.Xaela => ModelRace.AuRa,
+                SubRace.Raen => ModelRace.AuRa,
+                SubRace.Highlander => ModelRace.Highlander,
+                SubRace.Midlander => ModelRace.Midlander,
+                SubRace.Plainsfolk => ModelRace.Lalafell,
+                SubRace.Dunesfolk => ModelRace.Lalafell,
+                SubRace.SeekerOfTheSun => ModelRace.Miqote,
+                SubRace.KeeperOfTheMoon => ModelRace.Miqote,
+                SubRace.Seawolf => ModelRace.Roegadyn,
+                SubRace.Hellsguard => ModelRace.Roegadyn,
+                SubRace.Rava => ModelRace.Viera,
+                SubRace.Veena => ModelRace.Viera,
+                SubRace.Wildwood => ModelRace.Elezen,
+                SubRace.Duskwight => ModelRace.Elezen,
+                SubRace.Helion => ModelRace.Hrothgar,
+                SubRace.Lost => ModelRace.Hrothgar,
+                _ => ModelRace.Unknown
+            };
         }
 
         private void StartScan()

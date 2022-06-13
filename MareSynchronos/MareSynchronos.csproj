@@ -35,9 +35,17 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\Penumbra\Penumbra.GameData\Penumbra.GameData.csproj" />
+    <ProjectReference Include="..\..\..\Penumbra\Penumbra.PlayerWatch\Penumbra.PlayerWatch.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="FFXIVClientStructs">
       <HintPath>$(DalamudLibPath)FFXIVClientStructs.dll</HintPath>
       <Private>false</Private>
+    </Reference>
+    <Reference Include="Glamourer.GameData">
+      <HintPath>..\..\..\..\..\AppData\Roaming\XIVLauncher\installedPlugins\Glamourer\0.0.9.0\Glamourer.GameData.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>$(DalamudLibPath)Newtonsoft.Json.dll</HintPath>
@@ -62,6 +70,12 @@
     <Reference Include="Lumina.Excel">
       <HintPath>$(DalamudLibPath)Lumina.Excel.dll</HintPath>
       <Private>false</Private>
+    </Reference>
+    <Reference Include="Penumbra.GameData">
+      <HintPath>..\..\..\..\..\AppData\Roaming\XIVLauncher\installedPlugins\Penumbra\0.5.0.5\Penumbra.GameData.dll</HintPath>
+    </Reference>
+    <Reference Include="Penumbra.PlayerWatch">
+      <HintPath>..\..\..\..\..\AppData\Roaming\XIVLauncher\installedPlugins\Penumbra\0.5.0.5\Penumbra.PlayerWatch.dll</HintPath>
     </Reference>
   </ItemGroup>
 
