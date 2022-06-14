@@ -83,6 +83,7 @@ namespace MareSynchronos.Hooks
             {
                 resource.Value.IsInUse = false;
                 resource.Value.ImcData = string.Empty;
+                resource.Value.Associated.Clear();
             }
 
             PluginLog.Verbose("Invaldated resource cache");
@@ -106,8 +107,8 @@ namespace MareSynchronos.Hooks
                     var imc = (ResourceHandle*)model->IMCArray[idx];
                     if (imc != null)
                     {
-                        byte[] imcData = new byte[imc->Data->DataLength];
-                        Marshal.Copy((IntPtr)imc->Data->DataPtr, imcData, 0, (int)imc->Data->DataLength);
+                        byte[] imcData = new byte[imc->Data->DataLength / sizeof(long)];
+                        Marshal.Copy((IntPtr)imc->Data->DataPtr, imcData, 0, (int)imc->Data->DataLength / sizeof(long));
                         string imcDataStr = BitConverter.ToString(imcData).Replace("-", "");
                         cachedMdlResource.ImcData = imcDataStr;
                     }
@@ -155,7 +156,7 @@ namespace MareSynchronos.Hooks
 
             foreach (var resource in cachedResources.Where(r => !r.Value.IsInUse).OrderBy(a => a.Value.GamePath))
             {
-                PluginLog.Verbose(resource.ToString());
+                PluginLog.Verbose(resource.Value.ToString());
             }
 
             return cache.FileReplacements;
@@ -201,7 +202,7 @@ namespace MareSynchronos.Hooks
                 var gameObj = GetGameObjectFromDrawObject(drawBase, idx);
                 if (clientState.LocalPlayer != null && gameObj == (GameObject*)clientState.LocalPlayer!.Address)
                 {
-                    PluginLog.Verbose("Clearing resources");
+                    //PluginLog.Verbose("Clearing resources");
                     //cachedResources.Clear();
                     DrawObjectToObject.Clear();
                 }
@@ -357,7 +358,6 @@ namespace MareSynchronos.Hooks
 
         private byte LoadMtrlTexDetour(IntPtr mtrlResourceHandle)
         {
-            //if (clientState.LocalPlayer != null)
             LoadMtrlHelper(mtrlResourceHandle);
             var ret = LoadMtrlTexHook!.Original(mtrlResourceHandle);
             return ret;
