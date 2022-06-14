@@ -8,11 +8,13 @@ namespace MareSynchronos.Factories
     {
         private readonly IpcManager ipcManager;
         private readonly ClientState clientState;
+        private string playerName;
 
         public FileReplacementFactory(IpcManager ipcManager, ClientState clientState)
         {
             this.ipcManager = ipcManager;
             this.clientState = clientState;
+            playerName = null!;
         }
 
         public FileReplacement Create(string gamePath, bool resolve = true)
@@ -20,7 +22,10 @@ namespace MareSynchronos.Factories
             var fileReplacement = new FileReplacement(gamePath, ipcManager.PenumbraModDirectory()!);
             if (!resolve) return fileReplacement;
 
-            string playerName = clientState.LocalPlayer!.Name.ToString();
+            if(clientState.LocalPlayer != null)
+            {
+                playerName = clientState.LocalPlayer.Name.ToString();
+            }
             fileReplacement.SetResolvedPath(ipcManager.PenumbraResolvePath(gamePath, playerName)!);
             if (!fileReplacement.HasFileReplacement)
             {

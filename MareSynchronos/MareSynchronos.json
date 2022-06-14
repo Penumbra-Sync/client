@@ -1,5 +1,5 @@
 {
-  "Author": "your name here",
+  "Author": "darkarchon",
   "Name": "Mare Synchronos",
   "Punchline": "",
   "Description": "",
@@ -9,5 +9,7 @@
     "sample",
     "plugin",
     "goats"
-  ]
+  ],
+  "IconUrl": "https://raw.githubusercontent.com/Penumbra-Sync/client/main/MareSynchronos/images/logo.png",
+  "RepoUrl": "https://github.com/Penumbra-Sync/client"
 }

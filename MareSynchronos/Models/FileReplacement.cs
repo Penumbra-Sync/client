@@ -142,5 +142,16 @@ namespace MareSynchronos.Models
 
             return base.Equals(obj);
         }
+
+        public override int GetHashCode()
+        {
+            int result = 13;
+            result *= 397;
+            result += Hash.GetHashCode();
+            result += GamePath.GetHashCode();
+            result += ImcData.GetHashCode();
+
+            return result;
+        }
     }
 }

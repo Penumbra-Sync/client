@@ -32,6 +32,7 @@ using Newtonsoft.Json.Serialization;
 using System.Reflection;
 using MareSynchronos.Managers;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using MareSynchronos.Utils;
 
 namespace MareSynchronos
 {
@@ -132,10 +133,12 @@ namespace MareSynchronos
             var obj = (GameObject*)(IntPtr)sender;
             drawHookTask = Task.Run(() =>
             {
+                PluginLog.Debug("Waiting for charater to be drawn");
                 while ((obj->RenderFlags & 0b100000000000) == 0b100000000000) // 0b100000000000 is "still rendering" or something
                 {
                     Thread.Sleep(10);
                 }
+                PluginLog.Debug("Character finished drawing");
 
                 // we should recalculate cache here
                 // probably needs a different method
@@ -174,6 +177,10 @@ namespace MareSynchronos
                         await Task.Delay(50);
                     }
                     var json = JsonConvert.SerializeObject(cache, Formatting.Indented);
+
+                    cache.CacheHash = Crypto.GetHash(json);
+                    
+                    json = JsonConvert.SerializeObject(cache, Formatting.Indented);
                     PluginLog.Debug(json);
                 });
             }

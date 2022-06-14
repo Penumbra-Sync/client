@@ -50,7 +50,7 @@ namespace MareSynchronos.Hooks
         private readonly GameGui gameGui;
         private readonly ObjectTable objectTable;
         private readonly DalamudPluginInterface pluginInterface;
-        private ConcurrentBag<FileReplacement> cachedResources = new();
+        private ConcurrentDictionary<string, FileReplacement> cachedResources = new();
         private GameObject* lastGameObject = null;
         private ConcurrentBag<FileReplacement> loadedMaterials = new();
 
@@ -81,57 +81,63 @@ namespace MareSynchronos.Hooks
         {
             foreach (var resource in cachedResources)
             {
-                resource.IsInUse = false;
-                resource.ImcData = string.Empty;
+                resource.Value.IsInUse = false;
+                resource.Value.ImcData = string.Empty;
             }
 
-            PluginLog.Debug("Invaldated resource cache");
+            PluginLog.Verbose("Invaldated resource cache");
 
             var cache = new CharacterCache();
 
-            var model = (CharacterBase*)((Character*)clientState.LocalPlayer!.Address)->GameObject.GetDrawObject();
-            for (var idx = 0; idx < model->SlotCount; ++idx)
+            try
             {
-                var mdl = (RenderModel*)model->ModelArray[idx];
-                if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
+                var model = (CharacterBase*)((Character*)clientState.LocalPlayer!.Address)->GameObject.GetDrawObject();
+                for (var idx = 0; idx < model->SlotCount; ++idx)
                 {
-                    continue;
-                }
-
-                var mdlResource = factory.Create(new Utf8String(mdl->ResourceHandle->FileName()).ToString());
-                var cachedMdlResource = cachedResources.First(r => r.IsReplacedByThis(mdlResource));
-
-                var imc = (ResourceHandle*)model->IMCArray[idx];
-                if (imc != null)
-                {
-                    byte[] imcData = new byte[imc->Data->DataLength];
-                    Marshal.Copy((IntPtr)imc->Data->DataPtr, imcData, 0, (int)imc->Data->DataLength);
-                    string imcDataStr = BitConverter.ToString(imcData).Replace("-", "");
-                    cachedMdlResource.ImcData = imcDataStr;
-                }
-                cache.AddAssociatedResource(cachedMdlResource, null!, null!);
-
-                for (int mtrlIdx = 0; mtrlIdx < mdl->MaterialCount; mtrlIdx++)
-                {
-                    var mtrl = (Material*)mdl->Materials[mtrlIdx];
-                    if (mtrl == null) continue;
-
-                    var mtrlFileResource = factory.Create(new Utf8String(mtrl->ResourceHandle->FileName()).ToString().Split("|")[2]);
-                    var cachedMtrlResource = cachedResources.First(r => r.IsReplacedByThis(mtrlFileResource));
-                    cache.AddAssociatedResource(cachedMtrlResource, cachedMdlResource, null!);
-
-                    var mtrlResource = (MtrlResource*)mtrl->ResourceHandle;
-                    for (int resIdx = 0; resIdx < mtrlResource->NumTex; resIdx++)
+                    var mdl = (RenderModel*)model->ModelArray[idx];
+                    if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
                     {
-                        var texPath = new Utf8String(mtrlResource->TexString(resIdx));
+                        continue;
+                    }
 
-                        if (string.IsNullOrEmpty(texPath.ToString())) continue;
+                    var mdlResource = factory.Create(new Utf8String(mdl->ResourceHandle->FileName()).ToString());
+                    var cachedMdlResource = cachedResources.First(r => r.Value.IsReplacedByThis(mdlResource)).Value;
 
-                        var texResource = factory.Create(texPath.ToString());
-                        var cachedTexResource = cachedResources.First(r => r.IsReplacedByThis(texResource));
-                        cache.AddAssociatedResource(cachedTexResource, cachedMdlResource, cachedMtrlResource);
+                    var imc = (ResourceHandle*)model->IMCArray[idx];
+                    if (imc != null)
+                    {
+                        byte[] imcData = new byte[imc->Data->DataLength];
+                        Marshal.Copy((IntPtr)imc->Data->DataPtr, imcData, 0, (int)imc->Data->DataLength);
+                        string imcDataStr = BitConverter.ToString(imcData).Replace("-", "");
+                        cachedMdlResource.ImcData = imcDataStr;
+                    }
+                    cache.AddAssociatedResource(cachedMdlResource, null!, null!);
+
+                    for (int mtrlIdx = 0; mtrlIdx < mdl->MaterialCount; mtrlIdx++)
+                    {
+                        var mtrl = (Material*)mdl->Materials[mtrlIdx];
+                        if (mtrl == null) continue;
+
+                        var mtrlFileResource = factory.Create(new Utf8String(mtrl->ResourceHandle->FileName()).ToString().Split("|")[2]);
+                        var cachedMtrlResource = cachedResources.First(r => r.Value.IsReplacedByThis(mtrlFileResource)).Value;
+                        cache.AddAssociatedResource(cachedMtrlResource, cachedMdlResource, null!);
+
+                        var mtrlResource = (MtrlResource*)mtrl->ResourceHandle;
+                        for (int resIdx = 0; resIdx < mtrlResource->NumTex; resIdx++)
+                        {
+                            var texPath = new Utf8String(mtrlResource->TexString(resIdx));
+
+                            if (string.IsNullOrEmpty(texPath.ToString())) continue;
+
+                            var texResource = factory.Create(texPath.ToString());
+                            var cachedTexResource = cachedResources.First(r => r.Value.IsReplacedByThis(texResource)).Value;
+                            cache.AddAssociatedResource(cachedTexResource, cachedMdlResource, cachedMtrlResource);
+                        }
                     }
                 }
+            } catch (Exception ex)
+            {
+                PluginLog.Error(ex, ex.Message);
             }
 
             return cache;
@@ -141,15 +147,15 @@ namespace MareSynchronos.Hooks
         {
             var cache = BuildCharacterCache();
 
-            PluginLog.Debug("--- CURRENTLY LOADED FILES ---");
+            PluginLog.Verbose("--- CURRENTLY LOADED FILES ---");
 
-            PluginLog.Debug(cache.ToString());
+            PluginLog.Verbose(cache.ToString());
 
-            PluginLog.Debug("--- LOOSE FILES ---");
+            PluginLog.Verbose("--- LOOSE FILES ---");
 
-            foreach (var resource in cachedResources.Where(r => !r.IsInUse).OrderBy(a => a.GamePath))
+            foreach (var resource in cachedResources.Where(r => !r.Value.IsInUse).OrderBy(a => a.Value.GamePath))
             {
-                PluginLog.Debug(resource.ToString());
+                PluginLog.Verbose(resource.ToString());
             }
 
             return cache.FileReplacements;
@@ -160,7 +166,7 @@ namespace MareSynchronos.Hooks
             cachedResources.Clear();
             SetupHumanHooks();
             EnableHumanHooks();
-            PluginLog.Debug("Hooks enabled");
+            PluginLog.Verbose("Hooks enabled");
         }
 
         public void StopHooks()
@@ -171,9 +177,9 @@ namespace MareSynchronos.Hooks
 
         private void AddRequestedResource(FileReplacement replacement)
         {
-            if (!cachedResources.Any(a => a.IsReplacedByThis(replacement)))
+            if (!cachedResources.Any(a => a.Value.IsReplacedByThis(replacement)) || cachedResources.Any(c => c.Key == replacement.GamePath))
             {
-                cachedResources.Add(replacement);
+                cachedResources[replacement.GamePath] = replacement;
             }
         }
 
@@ -195,8 +201,8 @@ namespace MareSynchronos.Hooks
                 var gameObj = GetGameObjectFromDrawObject(drawBase, idx);
                 if (clientState.LocalPlayer != null && gameObj == (GameObject*)clientState.LocalPlayer!.Address)
                 {
-                    PluginLog.Debug("Clearing resources");
-                    cachedResources.Clear();
+                    PluginLog.Verbose("Clearing resources");
+                    //cachedResources.Clear();
                     DrawObjectToObject.Clear();
                 }
             }
@@ -326,13 +332,17 @@ namespace MareSynchronos.Hooks
             {
                 var mtrl = (MtrlResource*)mtrlResourceHandle;
                 var mtrlPath = Utf8String.FromSpanUnsafe(mtrl->Handle.FileNameSpan(), true, null, true);
+                PluginLog.Verbose("Attempting to resolve: " + mtrlPath.ToString());
                 var mtrlResource = factory.Create(mtrlPath.ToString());
                 var existingMat = loadedMaterials.FirstOrDefault(m => m.IsReplacedByThis(mtrlResource));
                 if (existingMat != null)
                 {
+                    PluginLog.Verbose("Resolving material: " + existingMat.GamePath);
                     for (int i = 0; i < mtrl->NumTex; i++)
                     {
                         var texPath = new Utf8String(mtrl->TexString(i));
+                        PluginLog.Verbose("Resolving tex: " + texPath.ToString());
+
                         AddRequestedResource(factory.Create(texPath.ToString()));
                     }
 
@@ -347,8 +357,8 @@ namespace MareSynchronos.Hooks
 
         private byte LoadMtrlTexDetour(IntPtr mtrlResourceHandle)
         {
-            if (clientState.LocalPlayer != null)
-                LoadMtrlHelper(mtrlResourceHandle);
+            //if (clientState.LocalPlayer != null)
+            LoadMtrlHelper(mtrlResourceHandle);
             var ret = LoadMtrlTexHook!.Original(mtrlResourceHandle);
             return ret;
         }
@@ -394,6 +404,7 @@ namespace MareSynchronos.Hooks
                     return path;
                 }
 
+                PluginLog.Verbose("Resolving resource: " + gamepath.ToString());
                 PlayerLoadEvent?.Invoke((IntPtr)gameObject, new EventArgs());
 
                 var resource = factory.Create(gamepath.ToString());

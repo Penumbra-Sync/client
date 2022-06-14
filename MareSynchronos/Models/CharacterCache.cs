@@ -16,7 +16,7 @@ namespace MareSynchronos.Models
             FileReplacements.Where(x => x.HasFileReplacement)
             .Concat(FileReplacements.SelectMany(f => f.Associated).Where(f => f.HasFileReplacement))
             .Concat(FileReplacements.SelectMany(f => f.Associated).SelectMany(f => f.Associated).Where(f => f.HasFileReplacement))
-            .Distinct()
+            .Distinct().OrderBy(f => f.GamePath)
             .ToList();
 
         public List<FileReplacement> FileReplacements { get; set; } = new List<FileReplacement>();
@@ -25,6 +25,9 @@ namespace MareSynchronos.Models
         public string GlamourerString { get; private set; } = string.Empty;
 
         public bool IsReady => FileReplacements.All(f => f.Computed);
+
+        [JsonProperty]
+        public string CacheHash { get; set; } = string.Empty;
 
         [JsonProperty]
         public uint JobId { get; set; } = 0;
