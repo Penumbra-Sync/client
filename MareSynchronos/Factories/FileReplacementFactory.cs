@@ -1,8 +1,10 @@
 ﻿using Dalamud.Game.ClientState;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
+using MareSynchronos.FileCacheDB;
+using MareSynchronos.Models;
 
-namespace MareSynchronos.Models
+namespace MareSynchronos.Factories
 {
     public class FileReplacementFactory
     {
@@ -16,20 +18,22 @@ namespace MareSynchronos.Models
             penumbraDirectory = pluginInterface.GetIpcSubscriber<string>("Penumbra.GetModDirectory").InvokeFunc().ToLower() + '\\';
             this.clientState = clientState;
         }
-        public FileReplacement Create(string gamePath)
+        public FileReplacement Create(string gamePath, bool resolve = true)
         {
             var fileReplacement = new FileReplacement(gamePath, penumbraDirectory);
-            fileReplacement.SetReplacedPath(resolvePath.InvokeFunc(gamePath, clientState.LocalPlayer!.Name.ToString()));
+            if (!resolve) return fileReplacement;
+
+            fileReplacement.SetResolvedPath(resolvePath.InvokeFunc(gamePath, clientState.LocalPlayer!.Name.ToString()));
             if (!fileReplacement.HasFileReplacement)
             {
-                // try to resolve path with -- instead?
+                // try to resolve path with --filename instead?
                 string[] tempGamePath = gamePath.Split('/');
                 tempGamePath[tempGamePath.Length - 1] = "--" + tempGamePath[tempGamePath.Length - 1];
                 string newTempGamePath = string.Join('/', tempGamePath);
                 var resolvedPath = resolvePath.InvokeFunc(newTempGamePath, clientState.LocalPlayer!.Name.ToString());
                 if (resolvedPath != newTempGamePath)
                 {
-                    fileReplacement.SetReplacedPath(resolvedPath);
+                    fileReplacement.SetResolvedPath(resolvedPath);
                     fileReplacement.SetGamePath(newTempGamePath);
                 }
             }

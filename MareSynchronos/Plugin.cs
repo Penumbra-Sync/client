@@ -23,6 +23,14 @@ using System.Text;
 using Penumbra.GameData.Enums;
 using System;
 using MareSynchronos.Models;
+using Dalamud.Game.Gui;
+using MareSynchronos.PenumbraMod;
+using System.Text.Json;
+using System.Text.Encodings.Web;
+using System.Text.Unicode;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
+using System.Reflection;
 
 namespace SamplePlugin
 {
@@ -30,7 +38,8 @@ namespace SamplePlugin
     {
         public string Name => "Mare Synchronos";
 
-        private const string commandName = "/pscan";
+        private const string commandName = "/mare";
+        private readonly ClientState clientState;
 
         private DalamudPluginInterface PluginInterface { get; init; }
         private CommandManager CommandManager { get; init; }
@@ -45,11 +54,11 @@ namespace SamplePlugin
         public Plugin(
             [RequiredVersion("1.0")] DalamudPluginInterface pluginInterface,
             [RequiredVersion("1.0")] CommandManager commandManager,
-            Framework framework, ObjectTable objectTable, ClientState clientState, DataManager dataManager)
+            Framework framework, ObjectTable objectTable, ClientState clientState, DataManager dataManager, GameGui gameGui)
         {
             this.PluginInterface = pluginInterface;
             this.CommandManager = commandManager;
-
+            this.clientState = clientState;
             this.Configuration = this.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
             this.Configuration.Initialize(this.PluginInterface);
 
@@ -67,7 +76,7 @@ namespace SamplePlugin
             this.PluginInterface.UiBuilder.OpenConfigUi += DrawConfigUI;
 
             playerWatch = PlayerWatchFactory.Create(framework, clientState, objectTable);
-            drawHooks = new DrawHooks(pluginInterface, clientState, objectTable, new MareSynchronos.Models.FileReplacementFactory(pluginInterface, clientState));
+            drawHooks = new DrawHooks(pluginInterface, clientState, objectTable, new FileReplacementFactory(pluginInterface, clientState), gameGui);
         }
 
         public void Dispose()
@@ -85,6 +94,17 @@ namespace SamplePlugin
             {
                 cts?.Cancel();
                 return;
+            }
+
+            if(args == "playerdata")
+            {
+                PluginLog.Debug(PluginInterface.GetIpcSubscriber<string>("Glamourer.GetCharacterCustomization").InvokeFunc());
+            }
+
+            if(args == "applyglam")
+            {
+                PluginInterface.GetIpcSubscriber<string, string, object>("Glamourer.ApplyCharacterCustomization")
+                    .InvokeAction("Ah3/DwQBAR4IBHOABIOceTIIApkDAgADQmQBZJqepQZlAAEAAAAAAAAAAACcEwEAyxcBbrAXAUnKFwJIuBcBBkYAAQBIAAEANQABADUAAQACAAQAAQAAAIA/Eg==", "Ilya Zhelmo");
             }
 
             if (args == "scan")
@@ -116,45 +136,81 @@ namespace SamplePlugin
                 var resources = drawHooks.PrintRequestedResources();
             }
 
-            if (args == "copy")
+            if (args == "printjson")
             {
-                var resources = drawHooks.PrintRequestedResources();
+                var cache = drawHooks.BuildCharacterCache();
+                var json = JsonConvert.SerializeObject(cache, Formatting.Indented);
+                PluginLog.Debug(json);
+            }
+
+            if (args == "createtestmod")
+            {
                 Task.Run(() =>
                 {
-                    PluginLog.Debug("Copying files");
-                    foreach (var file in Directory.GetFiles(@"G:\Penumbra\TestMod\files"))
+                    var playerName = clientState.LocalPlayer!.Name.ToString();
+                    var modName = $"Mare Synchronos Test Mod {playerName}";
+                    var modDirectory = PluginInterface.GetIpcSubscriber<string>("Penumbra.GetModDirectory").InvokeFunc();
+                    string modDirectoryPath = Path.Combine(modDirectory, modName);
+                    if (Directory.Exists(modDirectoryPath))
                     {
-                        File.Delete(file);
+                        Directory.Delete(modDirectoryPath, true);
                     }
-                    File.Delete(@"G:\Penumbra\testmod\filelist.txt");
-                    using FileCacheContext db = new FileCacheContext();
+
+                    Directory.CreateDirectory(modDirectoryPath);
+                    Directory.CreateDirectory(Path.Combine(modDirectoryPath, "files"));
+                    Meta meta = new Meta()
+                    {
+                        Name = modName,
+                        Author = playerName,
+                        Description = "Mare Synchronous Test Mod Export",
+                    };
+
+                    var resources = drawHooks.PrintRequestedResources();
+                    var metaJson = JsonConvert.SerializeObject(meta);
+                    File.WriteAllText(Path.Combine(modDirectoryPath, "meta.json"), metaJson);
+
+                    DefaultMod defaultMod = new DefaultMod();
+
+                    using var db = new FileCacheContext();
                     foreach (var resource in resources)
                     {
-                        CopyRecursive(resource, db);
+                        CopyRecursive(resource, modDirectoryPath, db, defaultMod.Files);
                     }
+
+                    var defaultModJson = JsonConvert.SerializeObject(defaultMod);
+                    File.WriteAllText(Path.Combine(modDirectoryPath, "default_mod.json"), defaultModJson);
+
+                    PluginLog.Debug("Mod created to " + modDirectoryPath);
                 });
             }
         }
 
-        private void CopyRecursive(FileReplacement replacement, FileCacheContext db)
+        private void CopyRecursive(FileReplacement replacement, string targetDirectory, FileCacheContext db, Dictionary<string, string>? resourceDict = null)
         {
             if (replacement.HasFileReplacement)
             {
-                PluginLog.Debug("Copying file \"" + replacement.ReplacedPath + "\"");
+                PluginLog.Debug("Copying file \"" + replacement.ResolvedPath + "\"");
 
-                var fileCache = db.FileCaches.Single(f => f.Filepath.Contains(replacement.ReplacedPath.Replace('/', '\\')));
+                var fileCache = db.FileCaches.Single(f => f.Filepath.Contains(replacement.ResolvedPath.Replace('/', '\\')));
                 try
                 {
                     var ext = new FileInfo(fileCache.Filepath).Extension;
-                    File.Copy(fileCache.Filepath, Path.Combine(@"G:\Penumbra\TestMod\files", fileCache.Hash.ToLower() + ext));
-                    File.AppendAllLines(Path.Combine(@"G:\Penumbra\TestMod", "filelist.txt"), new[] { $"\"{replacement.GamePath}\": \"files\\\\{fileCache.Hash.ToLower() + ext}\"," });
+                    File.Copy(fileCache.Filepath, Path.Combine(targetDirectory, "files", fileCache.Hash.ToLower() + ext));
+                    if (resourceDict != null)
+                    {
+                        resourceDict[replacement.GamePath] = $"files\\{fileCache.Hash.ToLower() + ext}";
+                    }
+                    else
+                    {
+                        File.AppendAllLines(Path.Combine(targetDirectory, "filelist.txt"), new[] { $"\"{replacement.GamePath}\": \"files\\\\{fileCache.Hash.ToLower() + ext}\"," });
+                    }
                 }
                 catch { }
             }
 
             foreach (var associated in replacement.Associated)
             {
-                CopyRecursive(associated, db);
+                CopyRecursive(associated, targetDirectory, db, resourceDict);
             }
         }
 
@@ -174,7 +230,7 @@ namespace SamplePlugin
         {
             Stopwatch st = Stopwatch.StartNew();
 
-            string penumbraDir = Configuration.PenumbraFolder;
+            string penumbraDir = PluginInterface.GetIpcSubscriber<string>("Penumbra.GetModDirectory").InvokeFunc();
             PluginLog.Debug("Getting files from " + penumbraDir);
             ConcurrentDictionary<string, bool> charaFiles = new ConcurrentDictionary<string, bool>(
                 Directory.GetFiles(penumbraDir, "*.*", SearchOption.AllDirectories)
