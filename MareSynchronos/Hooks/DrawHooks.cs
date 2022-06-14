@@ -40,6 +40,8 @@ namespace MareSynchronos.Hooks
         [Signature("4C 8B DC 49 89 5B ?? 49 89 73 ?? 55 57 41 55", DetourName = "LoadMtrlTexDetour")]
         public Hook<LoadMtrlFilesDelegate>? LoadMtrlTexHook;
 
+        public event EventHandler? PlayerLoadEvent;
+
         public Hook<GeneralResolveDelegate>? ResolveMdlPathHook;
         public Hook<MaterialResolveDetour>? ResolveMtrlPathHook;
         private readonly ClientState clientState;
@@ -51,7 +53,6 @@ namespace MareSynchronos.Hooks
         private ConcurrentBag<FileReplacement> cachedResources = new();
         private GameObject* lastGameObject = null;
         private ConcurrentBag<FileReplacement> loadedMaterials = new();
-        private CharacterCache characterCache;
 
         public DrawHooks(DalamudPluginInterface pluginInterface, ClientState clientState, ObjectTable objectTable, FileReplacementFactory factory, GameGui gameGui)
         {
@@ -60,7 +61,6 @@ namespace MareSynchronos.Hooks
             this.objectTable = objectTable;
             this.factory = factory;
             this.gameGui = gameGui;
-            characterCache = new CharacterCache();
             SignatureHelper.Initialise(this);
         }
 
@@ -85,9 +85,9 @@ namespace MareSynchronos.Hooks
                 resource.ImcData = string.Empty;
             }
 
-            var cache = new CharacterCache();
+            PluginLog.Debug("Invaldated resource cache");
 
-            PluginLog.Debug("Invaldated character cache");
+            var cache = new CharacterCache();
 
             var model = (CharacterBase*)((Character*)clientState.LocalPlayer!.Address)->GameObject.GetDrawObject();
             for (var idx = 0; idx < model->SlotCount; ++idx)
@@ -100,6 +100,7 @@ namespace MareSynchronos.Hooks
 
                 var mdlResource = factory.Create(new Utf8String(mdl->ResourceHandle->FileName()).ToString());
                 var cachedMdlResource = cachedResources.First(r => r.IsReplacedByThis(mdlResource));
+
                 var imc = (ResourceHandle*)model->IMCArray[idx];
                 if (imc != null)
                 {
@@ -178,7 +179,6 @@ namespace MareSynchronos.Hooks
 
         private IntPtr CharacterBaseCreateDetour(uint a, IntPtr b, IntPtr c, byte d)
         {
-            PluginLog.Debug("Character base detour");
             var ret = CharacterBaseCreateHook!.Original(a, b, c, d);
             if (lastGameObject != null)
             {
@@ -193,7 +193,7 @@ namespace MareSynchronos.Hooks
             if (DrawObjectToObject.TryGetValue(drawBase, out ushort idx))
             {
                 var gameObj = GetGameObjectFromDrawObject(drawBase, idx);
-                if (gameObj == (GameObject*)clientState.LocalPlayer!.Address)
+                if (clientState.LocalPlayer != null && gameObj == (GameObject*)clientState.LocalPlayer!.Address)
                 {
                     PluginLog.Debug("Clearing resources");
                     cachedResources.Clear();
@@ -347,7 +347,8 @@ namespace MareSynchronos.Hooks
 
         private byte LoadMtrlTexDetour(IntPtr mtrlResourceHandle)
         {
-            LoadMtrlHelper(mtrlResourceHandle);
+            if (clientState.LocalPlayer != null)
+                LoadMtrlHelper(mtrlResourceHandle);
             var ret = LoadMtrlTexHook!.Original(mtrlResourceHandle);
             return ret;
         }
@@ -360,7 +361,7 @@ namespace MareSynchronos.Hooks
 
         private unsafe IntPtr ResolvePathDetour(IntPtr drawObject, IntPtr path)
         {
-            if (path == IntPtr.Zero)
+            if (path == IntPtr.Zero || clientState.LocalPlayer == null)
             {
                 return path;
             }
@@ -392,6 +393,8 @@ namespace MareSynchronos.Hooks
                 {
                     return path;
                 }
+
+                PlayerLoadEvent?.Invoke((IntPtr)gameObject, new EventArgs());
 
                 var resource = factory.Create(gamepath.ToString());
 

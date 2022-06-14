@@ -37,6 +37,8 @@ namespace MareSynchronos.FileCacheDB
                 entity.HasKey(e => new { e.Hash, e.Filepath });
 
                 entity.ToTable("FileCache");
+
+                entity.Property(c => c.Version).HasDefaultValue(0).IsRowVersion();
             });
 
             OnModelCreatingPartial(modelBuilder);

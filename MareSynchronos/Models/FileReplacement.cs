@@ -6,6 +6,8 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using MareSynchronos.FileCacheDB;
+using System.IO;
+using MareSynchronos.Utils;
 
 namespace MareSynchronos.Models
 {
@@ -24,6 +26,9 @@ namespace MareSynchronos.Models
         [JsonProperty]
         public string ImcData { get; set; } = string.Empty;
         public bool HasFileReplacement => GamePath != ResolvedPath;
+
+        public bool Computed => (computationTask == null || (computationTask?.IsCompleted ?? true)) && Associated.All(f => f.Computed);
+        private Task? computationTask = null;
         public FileReplacement(string gamePath, string penumbraDirectory)
         {
             GamePath = gamePath;
@@ -50,13 +55,56 @@ namespace MareSynchronos.Models
             ResolvedPath = path.ToLower().Replace('/', '\\').Replace(penumbraDirectory, "").Replace('\\', '/');
             if (!HasFileReplacement) return;
 
-            Task.Run(() =>
+            computationTask = Task.Run(() =>
             {
-                using FileCacheContext db = new FileCacheContext();
-                var fileCache = db.FileCaches.SingleOrDefault(f => f.Filepath == path.ToLower());
+                FileCache? fileCache;
+                using (FileCacheContext db = new())
+                {
+                    fileCache = db.FileCaches.SingleOrDefault(f => f.Filepath == path.ToLower());
+                }
+
                 if (fileCache != null)
-                    Hash = fileCache.Hash;
+                {
+                    FileInfo fi = new(fileCache.Filepath);
+                    if (fi.LastWriteTimeUtc.Ticks == long.Parse(fileCache.LastModifiedDate))
+                    {
+                        Hash = fileCache.Hash;
+                    }
+                    else
+                    {
+                        Hash = ComputeHash(fi);
+                        using var db = new FileCacheContext();
+                        var newTempCache = db.FileCaches.Single(f => f.Filepath == path.ToLower());
+                        newTempCache.Hash = Hash;
+                        db.Update(newTempCache);
+                        db.SaveChanges();
+                    }
+                }
+                else
+                {
+                    Hash = ComputeHash(new FileInfo(path));
+                }
             });
+        }
+
+        private string ComputeHash(FileInfo fi)
+        {
+            // compute hash if hash is not present
+            string hash = Crypto.GetFileHash(fi.FullName);
+
+            using FileCacheContext db = new();
+            var fileAddedDuringCompute = db.FileCaches.SingleOrDefault(f => f.Filepath == fi.FullName.ToLower());
+            if (fileAddedDuringCompute != null) return fileAddedDuringCompute.Hash;
+
+            db.Add(new FileCache()
+            {
+                Hash = hash,
+                Filepath = fi.FullName.ToLower(),
+                LastModifiedDate = fi.LastWriteTimeUtc.Ticks.ToString()
+            });
+            db.SaveChanges();
+
+            return hash;
         }
 
         public bool IsReplacedByThis(string path)
@@ -82,6 +130,17 @@ namespace MareSynchronos.Models
                 }
             }
             return builder.ToString();
+        }
+
+        public override bool Equals(object? obj)
+        {
+            if (obj == null) return true;
+            if (obj.GetType() == typeof(FileReplacement))
+            {
+                return Hash == ((FileReplacement)obj).Hash && GamePath == ((FileReplacement)obj).GamePath;
+            }
+
+            return base.Equals(obj);
         }
     }
 }
