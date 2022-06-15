@@ -9,7 +9,9 @@ namespace MareSynchronos
     {
         public int Version { get; set; } = 0;
 
-        public string PenumbraFolder { get; set; } = string.Empty;
+        public string CacheFolder { get; set; } = string.Empty;
+        public string ClientSecret { get; internal set; } = string.Empty;
+        public string ApiUri { get; internal set; } = string.Empty;
 
         // the below exist just to make saving less cumbersome
 

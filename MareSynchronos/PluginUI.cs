@@ -81,9 +81,9 @@ namespace MareSynchronos
                 ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse))
             {
                 // can't ref a property, so use a local copy
-                string penumbraFolder = configuration.PenumbraFolder;
+                string penumbraFolder = configuration.CacheFolder;
                 if(ImGui.InputText("Penumbra mod folder", ref penumbraFolder, 255)) {
-                    this.configuration.PenumbraFolder = penumbraFolder;
+                    this.configuration.CacheFolder = penumbraFolder;
                     this.configuration.Save();
                 }
             }

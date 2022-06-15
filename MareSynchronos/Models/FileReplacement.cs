@@ -119,7 +119,7 @@ namespace MareSynchronos.Models
 
         public override string ToString()
         {
-            StringBuilder builder = new StringBuilder();
+            StringBuilder builder = new();
             builder.AppendLine($"Modded: {HasFileReplacement} - {GamePath} => {ResolvedPath}");
             foreach (var l1 in Associated)
             {

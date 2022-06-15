@@ -88,7 +88,7 @@ namespace MareSynchronos.Models
         }
         public override string ToString()
         {
-            StringBuilder stringBuilder = new StringBuilder();
+            StringBuilder stringBuilder = new();
             foreach (var fileReplacement in FileReplacements.OrderBy(a => a.GamePath))
             {
                 stringBuilder.AppendLine(fileReplacement.ToString());

@@ -31,7 +31,7 @@ namespace MareSynchronos.Factories
             {
                 // try to resolve path with --filename instead?
                 string[] tempGamePath = gamePath.Split('/');
-                tempGamePath[tempGamePath.Length - 1] = "--" + tempGamePath[tempGamePath.Length - 1];
+                tempGamePath[^1] = "--" + tempGamePath[^1];
                 string newTempGamePath = string.Join('/', tempGamePath);
                 var resolvedPath = ipcManager.PenumbraResolvePath(newTempGamePath, playerName)!;
                 if (resolvedPath != newTempGamePath)

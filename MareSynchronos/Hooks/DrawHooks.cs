@@ -144,7 +144,7 @@ namespace MareSynchronos.Hooks
             return cache;
         }
 
-        public List<FileReplacement> PrintRequestedResources()
+        public void PrintRequestedResources()
         {
             var cache = BuildCharacterCache();
 
@@ -158,8 +158,6 @@ namespace MareSynchronos.Hooks
             {
                 PluginLog.Verbose(resource.Value.ToString());
             }
-
-            return cache.FileReplacements;
         }
 
         public void StartHooks()
