@@ -8,7 +8,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using MareSynchronos.Hooks;
 using Dalamud.Game;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState;
@@ -29,21 +28,19 @@ namespace MareSynchronos
         private const string commandName = "/mare";
         private readonly ClientState clientState;
         private readonly Framework framework;
-        private readonly GameGui gameGui;
         private readonly ObjectTable objectTable;
         private readonly WindowSystem windowSystem;
         private readonly ApiController apiController;
         private CharacterManager? characterManager;
         private IpcManager ipcManager;
         public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager,
-            Framework framework, ObjectTable objectTable, ClientState clientState, GameGui gameGui)
+            Framework framework, ObjectTable objectTable, ClientState clientState)
         {
             this.PluginInterface = pluginInterface;
             this.CommandManager = commandManager;
             this.framework = framework;
             this.objectTable = objectTable;
             this.clientState = clientState;
-            this.gameGui = gameGui;
             Configuration = this.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
             Configuration.Initialize(this.PluginInterface);
 
@@ -94,8 +91,8 @@ namespace MareSynchronos
                 }
 
                 characterManager = new CharacterManager(
-                    new DrawHooks(PluginInterface, clientState, objectTable, new FileReplacementFactory(ipcManager, clientState), gameGui),
-                    clientState, framework, apiController, objectTable, ipcManager);
+                    clientState, framework, apiController, objectTable, ipcManager, new FileReplacementFactory(ipcManager));
+                characterManager.StartWatchingPlayer();
                 ipcManager.PenumbraRedraw(clientState.LocalPlayer!.Name.ToString());
             });
 
@@ -140,11 +137,14 @@ namespace MareSynchronos
                         File.Copy(fileCache.Filepath, newFilePath);
                         if (resourceDict != null)
                         {
-                            resourceDict[replacement.GamePath] = $"files\\{fileCache.Hash.ToLower() + ext}";
+                            foreach(var path in replacement.GamePaths)
+                            {
+                                resourceDict[path] = $"files\\{fileCache.Hash.ToLower() + ext}";
+                            }
                         }
                         else
                         {
-                            File.AppendAllLines(Path.Combine(targetDirectory, "filelist.txt"), new[] { $"\"{replacement.GamePath}\": \"files\\\\{fileCache.Hash.ToLower() + ext}\"," });
+                            //File.AppendAllLines(Path.Combine(targetDirectory, "filelist.txt"), new[] { $"\"{replacement.GamePath}\": \"files\\\\{fileCache.Hash.ToLower() + ext}\"," });
                         }
                     }
                 }
@@ -167,14 +167,21 @@ namespace MareSynchronos
 
         private void OnCommand(string command, string args)
         {
-            if (args == "print")
-            {
-                characterManager?.PrintRequestedResources();
-            }
-
             if (args == "printjson")
             {
-                characterManager?.DebugJson();
+                _ = characterManager?.DebugJson();
+            }
+
+            if (args.StartsWith("watch"))
+            {
+                var playerName = args.Replace("watch", "").Trim();
+                characterManager!.WatchPlayer(playerName);
+            }
+
+            if (args.StartsWith("stop"))
+            {
+                var playerName = args.Replace("watch", "").Trim();
+                characterManager!.StopWatchPlayer(playerName);
             }
 
             if (args == "createtestmod")
@@ -199,7 +206,7 @@ namespace MareSynchronos
                         Description = "Mare Synchronous Test Mod Export",
                     };
 
-                    var resources = characterManager!.GetCharacterCache();
+                    var resources = characterManager!.BuildCharacterCache();
                     var metaJson = JsonConvert.SerializeObject(meta);
                     File.WriteAllText(Path.Combine(modDirectoryPath, "meta.json"), metaJson);
 

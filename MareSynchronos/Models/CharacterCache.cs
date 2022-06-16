@@ -13,10 +13,10 @@ namespace MareSynchronos.Models
     {
         [JsonProperty]
         public List<FileReplacement> AllReplacements =>
-            FileReplacements.Where(x => x.HasFileReplacement)
-            .Concat(FileReplacements.SelectMany(f => f.Associated).Where(f => f.HasFileReplacement))
-            .Concat(FileReplacements.SelectMany(f => f.Associated).SelectMany(f => f.Associated).Where(f => f.HasFileReplacement))
-            .Distinct().OrderBy(f => f.GamePath)
+            FileReplacements.Where(f => f.HasFileReplacement)
+            .Concat(FileReplacements.SelectMany(f => f.Associated)).Where(f => f.HasFileReplacement)
+            .Concat(FileReplacements.SelectMany(f => f.Associated).SelectMany(f => f.Associated)).Where(f => f.HasFileReplacement)
+            .Distinct().OrderBy(f => f.GamePaths[0])
             .ToList();
 
         public List<FileReplacement> FileReplacements { get; set; } = new List<FileReplacement>();
@@ -31,11 +31,10 @@ namespace MareSynchronos.Models
 
         [JsonProperty]
         public uint JobId { get; set; } = 0;
-        public void AddAssociatedResource(FileReplacement resource, FileReplacement mdlParent, FileReplacement mtrlParent)
+        public void AddAssociatedResource(FileReplacement resource, FileReplacement? mdlParent, FileReplacement? mtrlParent)
         {
             try
             {
-                if (resource == null) return;
                 if (mdlParent == null)
                 {
                     resource.IsInUse = true;
@@ -43,16 +42,16 @@ namespace MareSynchronos.Models
                     return;
                 }
 
-                FileReplacement replacement;
-
-                if (mtrlParent == null && (replacement = FileReplacements.SingleOrDefault(f => f == mdlParent)!) != null)
+                var mdlReplacements = FileReplacements.Where(f => f == mdlParent && mtrlParent == null);
+                foreach (var mdlReplacement in mdlReplacements)
                 {
-                    replacement.AddAssociated(resource);
+                    mdlReplacement.AddAssociated(resource);
                 }
 
-                if ((replacement = FileReplacements.SingleOrDefault(f => f == mdlParent)?.Associated.SingleOrDefault(f => f == mtrlParent)!) != null)
+                var mtrlReplacements = FileReplacements.Where(f => f == mdlParent).SelectMany(a => a.Associated).Where(f => f == mtrlParent);
+                foreach (var mtrlReplacement in mtrlReplacements)
                 {
-                    replacement.AddAssociated(resource);
+                    mtrlReplacement.AddAssociated(resource);
                 }
             }
             catch (Exception ex)
@@ -89,7 +88,7 @@ namespace MareSynchronos.Models
         public override string ToString()
         {
             StringBuilder stringBuilder = new();
-            foreach (var fileReplacement in FileReplacements.OrderBy(a => a.GamePath))
+            foreach (var fileReplacement in FileReplacements.OrderBy(a => a.GamePaths[0]))
             {
                 stringBuilder.AppendLine(fileReplacement.ToString());
             }

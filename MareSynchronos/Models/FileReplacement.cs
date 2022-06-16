@@ -17,21 +17,21 @@ namespace MareSynchronos.Models
         private readonly string penumbraDirectory;
 
         [JsonProperty]
-        public string GamePath { get; private set; }
-        public string ResolvedPath { get; private set; } = string.Empty;
+        public string[] GamePaths { get; set; } = Array.Empty<string>();
+        [JsonProperty]
+        public string ResolvedPath { get; set; } = string.Empty;
         [JsonProperty]
         public string Hash { get; set; } = string.Empty;
         public bool IsInUse { get; set; } = false;
         public List<FileReplacement> Associated { get; set; } = new List<FileReplacement>();
         [JsonProperty]
         public string ImcData { get; set; } = string.Empty;
-        public bool HasFileReplacement => GamePath != ResolvedPath;
+        public bool HasFileReplacement => GamePaths.Length >= 1 && GamePaths[0] != ResolvedPath;
 
         public bool Computed => (computationTask == null || (computationTask?.IsCompleted ?? true)) && Associated.All(f => f.Computed);
         private Task? computationTask = null;
-        public FileReplacement(string gamePath, string penumbraDirectory)
+        public FileReplacement(string penumbraDirectory)
         {
-            GamePath = gamePath;
             this.penumbraDirectory = penumbraDirectory;
         }
 
@@ -39,15 +39,7 @@ namespace MareSynchronos.Models
         {
             fileReplacement.IsInUse = true;
 
-            if (!Associated.Any(a => a.IsReplacedByThis(fileReplacement)))
-            {
-                Associated.Add(fileReplacement);
-            }
-        }
-
-        public void SetGamePath(string path)
-        {
-            GamePath = path;
+            Associated.Add(fileReplacement);
         }
 
         public void SetResolvedPath(string path)
@@ -107,26 +99,16 @@ namespace MareSynchronos.Models
             return hash;
         }
 
-        public bool IsReplacedByThis(string path)
-        {
-            return GamePath.ToLower() == path.ToLower() || ResolvedPath.ToLower() == path.ToLower();
-        }
-
-        public bool IsReplacedByThis(FileReplacement replacement)
-        {
-            return IsReplacedByThis(replacement.GamePath) || IsReplacedByThis(replacement.ResolvedPath);
-        }
-
         public override string ToString()
         {
             StringBuilder builder = new();
-            builder.AppendLine($"Modded: {HasFileReplacement} - {GamePath} => {ResolvedPath}");
+            builder.AppendLine($"Modded: {HasFileReplacement} - {string.Join(",", GamePaths)} => {ResolvedPath}");
             foreach (var l1 in Associated)
             {
-                builder.AppendLine($"  + Modded: {l1.HasFileReplacement} - {l1.GamePath} => {l1.ResolvedPath}");
+                builder.AppendLine($"  + Modded: {l1.HasFileReplacement} - {string.Join(",", l1.GamePaths)} => {l1.ResolvedPath}");
                 foreach (var l2 in l1.Associated)
                 {
-                    builder.AppendLine($"    + Modded: {l2.HasFileReplacement} - {l2.GamePath} => {l2.ResolvedPath}");
+                    builder.AppendLine($"    + Modded: {l2.HasFileReplacement} - {string.Join(",", l2.GamePaths)} => {l2.ResolvedPath}");
                 }
             }
             return builder.ToString();
@@ -137,7 +119,7 @@ namespace MareSynchronos.Models
             if (obj == null) return true;
             if (obj.GetType() == typeof(FileReplacement))
             {
-                return Hash == ((FileReplacement)obj).Hash && GamePath == ((FileReplacement)obj).GamePath;
+                return Hash == ((FileReplacement)obj).Hash;
             }
 
             return base.Equals(obj);
@@ -148,8 +130,7 @@ namespace MareSynchronos.Models
             int result = 13;
             result *= 397;
             result += Hash.GetHashCode();
-            result += GamePath.GetHashCode();
-            result += ImcData.GetHashCode();
+            result += ResolvedPath.GetHashCode();
 
             return result;
         }

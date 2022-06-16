@@ -15,9 +15,13 @@ namespace MareSynchronos.Managers
         private ICallGateSubscriber<string, string, object>? glamourerApplyCharacterCustomization;
         private ICallGateSubscriber<int> penumbraApiVersion;
         private ICallGateSubscriber<int> glamourerApiVersion;
+        private ICallGateSubscriber<string, string> penumbraObjectIsRedrawn;
         private ICallGateSubscriber<string, int, object>? penumbraRedraw;
+        private ICallGateSubscriber<string, string, string[]>? penumbraReverseResolvePath;
 
         public bool Initialized { get; private set; } = false;
+
+        public event EventHandler? PenumbraRedrawEvent;
 
         public IpcManager(DalamudPluginInterface pi)
         {
@@ -29,9 +33,12 @@ namespace MareSynchronos.Managers
             penumbraRedraw = pluginInterface.GetIpcSubscriber<string, int, object>("Penumbra.RedrawObjectByName");
             glamourerGetCharacterCustomization = pluginInterface.GetIpcSubscriber<string>("Glamourer.GetCharacterCustomization");
             glamourerApplyCharacterCustomization = pluginInterface.GetIpcSubscriber<string, string, object>("Glamourer.ApplyCharacterCustomization");
+            penumbraReverseResolvePath = pluginInterface.GetIpcSubscriber<string, string, string[]>("Penumbra.ReverseResolvePath");
             penumbraApiVersion = pluginInterface.GetIpcSubscriber<int>("Penumbra.ApiVersion");
             glamourerApiVersion = pluginInterface.GetIpcSubscriber<int>("Glamourer.ApiVersion");
-            penumbraInit.Subscribe(() => penumbraRedraw!.InvokeAction("self", 0));
+            penumbraObjectIsRedrawn = pluginInterface.GetIpcSubscriber<string, string>("Penumbra.ObjectIsRedrawn");
+            penumbraObjectIsRedrawn.Subscribe(RedrawEvent);
+            penumbraInit.Subscribe(RedrawSelf);
 
             Initialized = true;
         }
@@ -60,14 +67,33 @@ namespace MareSynchronos.Managers
             }
         }
 
+        private void RedrawEvent(string actorName)
+        {
+            PenumbraRedrawEvent?.Invoke(actorName, EventArgs.Empty);
+        }
+
+        private void RedrawSelf()
+        {
+            penumbraRedraw!.InvokeAction("self", 0);
+        }
+
         private void Uninitialize()
         {
+            penumbraInit.Unsubscribe(RedrawSelf);
+            penumbraObjectIsRedrawn.Unsubscribe(RedrawEvent);
             penumbraResolvePath = null;
             penumbraResolveModDir = null;
             glamourerGetCharacterCustomization = null;
             glamourerApplyCharacterCustomization = null;
+            penumbraReverseResolvePath = null;
             Initialized = false;
             PluginLog.Debug("IPC Manager disposed");
+        }
+
+        public string[] PenumbraReverseResolvePath(string path, string characterName)
+        {
+            if (!CheckPenumbraAPI()) return new[] { path };
+            return penumbraReverseResolvePath!.InvokeFunc(path, characterName);
         }
 
         public string? PenumbraResolvePath(string path, string characterName)
