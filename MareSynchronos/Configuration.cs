@@ -1,6 +1,7 @@
 ﻿using Dalamud.Configuration;
 using Dalamud.Plugin;
 using System;
+using System.Collections.Generic;
 
 namespace MareSynchronos
 {
@@ -10,8 +11,9 @@ namespace MareSynchronos
         public int Version { get; set; } = 0;
 
         public string CacheFolder { get; set; } = string.Empty;
-        public string ClientSecret { get; internal set; } = string.Empty;
+        public Dictionary<string, string> ClientSecret { get; internal set; } = new();
         public string ApiUri { get; internal set; } = string.Empty;
+        public bool UseCustomService { get; internal set; }
 
         // the below exist just to make saving less cumbersome
 

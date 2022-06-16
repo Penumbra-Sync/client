@@ -12,6 +12,7 @@ using FFXIVClientStructs.FFXIV.Client.System.Resource;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using MareSynchronos.Factories;
+using MareSynchronos.Managers;
 using MareSynchronos.Models;
 using Penumbra.GameData.ByteString;
 using Penumbra.Interop.Structs;
@@ -20,6 +21,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace MareSynchronos.Hooks
 {
@@ -136,7 +139,8 @@ namespace MareSynchronos.Hooks
                         }
                     }
                 }
-            } catch (Exception ex)
+            }
+            catch (Exception ex)
             {
                 PluginLog.Error(ex, ex.Message);
             }

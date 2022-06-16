@@ -112,7 +112,13 @@ namespace MareSynchronos.Managers
                 // wait one more second just in case
                 Thread.Sleep(1000);
 
-                apiController.SendCharacterData(drawHooks.BuildCharacterCache()).RunSynchronously();
+                var cache = CreateFullCharacterCache();
+                while (!cache.IsCompleted)
+                {
+                    Task.Delay(50);
+                }
+
+                _ = apiController.SendCharacterData(cache.Result);
             });
         }
 
@@ -120,12 +126,12 @@ namespace MareSynchronos.Managers
 
         public void PrintRequestedResources() => drawHooks.PrintRequestedResources();
 
-        public void DebugJson()
+        private async Task<CharacterCache> CreateFullCharacterCache()
         {
             var cache = drawHooks.BuildCharacterCache();
             cache.SetGlamourerData(ipcManager.GlamourerGetCharacterCustomization()!);
             cache.JobId = clientState.LocalPlayer!.ClassJob.Id;
-            Task.Run(async () =>
+            await Task.Run(async () =>
             {
                 while (!cache.IsReady)
                 {
@@ -134,10 +140,20 @@ namespace MareSynchronos.Managers
                 var json = JsonConvert.SerializeObject(cache, Formatting.Indented);
 
                 cache.CacheHash = Crypto.GetHash(json);
-
-                json = JsonConvert.SerializeObject(cache, Formatting.Indented);
-                PluginLog.Debug(json);
             });
+
+            return cache;
+        }
+
+        public void DebugJson()
+        {
+            var cache = CreateFullCharacterCache();
+            while (!cache.IsCompleted)
+            {
+                Task.Delay(50);
+            }
+
+            PluginLog.Debug(JsonConvert.SerializeObject(cache.Result, Formatting.Indented));
         }
     }
 }

@@ -5,32 +5,74 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace MareSynchronos.WebAPI
 {
-    public class ApiController
+    public class ApiController : IDisposable
     {
         private readonly Configuration pluginConfiguration;
-
-        private string SecretKey => pluginConfiguration.ClientSecret;
+        private const string mainService = "https://localhost:6591";
+        public string UID { get; private set; } = string.Empty;
+        public string SecretKey => pluginConfiguration.ClientSecret.ContainsKey(ApiUri) ? pluginConfiguration.ClientSecret[ApiUri] : string.Empty;
         private string CacheFolder => pluginConfiguration.CacheFolder;
-        private string ApiUri => pluginConfiguration.ApiUri;
+        public bool UseCustomService
+        {
+            get => pluginConfiguration.UseCustomService;
+            set
+            {
+                pluginConfiguration.UseCustomService = value;
+                _ = Heartbeat();
+                pluginConfiguration.Save();
+            }
+        }
+        private string ApiUri => UseCustomService ? pluginConfiguration.ApiUri : mainService;
+
+        public bool IsConnected { get; set; }
+
+        Task heartbeatTask;
+        CancellationTokenSource cts;
 
         public ApiController(Configuration pluginConfiguration)
         {
             this.pluginConfiguration = pluginConfiguration;
+            cts = new CancellationTokenSource();
+
+            heartbeatTask = Task.Run(async () =>
+            {
+                PluginLog.Debug("Starting heartbeat to " + ApiUri);
+                while (true && !cts.IsCancellationRequested)
+                {
+                    await Heartbeat();
+                    await Task.Delay(TimeSpan.FromSeconds(15), cts.Token);
+                }
+                PluginLog.Debug("Stopping heartbeat");
+            }, cts.Token);
         }
 
         public async Task Heartbeat()
         {
-            PluginLog.Debug("Sending heartbeat to " + ApiUri);
+            try
+            {
+                PluginLog.Debug("Sending heartbeat to " + ApiUri);
+                if (ApiUri != mainService) throw new Exception();
+                IsConnected = true;
+            }
+            catch
+            {
+                IsConnected = false;
+            }
         }
 
-        public async Task<(string, string)> Register()
+        public async Task Register()
         {
             PluginLog.Debug("Registering at service " + ApiUri);
-            return (string.Empty, string.Empty);
+            var response = ("RandomSecretKey", "RandomUID");
+            pluginConfiguration.ClientSecret[ApiUri] = response.Item1;
+            UID = response.Item2;
+            PluginLog.Debug(pluginConfiguration.ClientSecret[ApiUri]);
+            // pluginConfiguration.Save();
         }
 
         public async Task UploadFile(string filePath)
@@ -72,6 +114,11 @@ namespace MareSynchronos.WebAPI
 
             List<string> whitelist = new();
             return whitelist;
+        }
+
+        public void Dispose()
+        {
+            cts?.Cancel();
         }
     }
 }

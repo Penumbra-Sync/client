@@ -20,6 +20,7 @@ using Newtonsoft.Json;
 using MareSynchronos.Managers;
 using LZ4;
 using MareSynchronos.WebAPI;
+using Dalamud.Interface.Windowing;
 
 namespace MareSynchronos
 {
@@ -30,9 +31,10 @@ namespace MareSynchronos
         private readonly Framework framework;
         private readonly GameGui gameGui;
         private readonly ObjectTable objectTable;
+        private readonly WindowSystem windowSystem;
         private readonly ApiController apiController;
         private CharacterManager? characterManager;
-        private IpcManager? ipcManager;
+        private IpcManager ipcManager;
         public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager,
             Framework framework, ObjectTable objectTable, ClientState clientState, GameGui gameGui)
         {
@@ -45,10 +47,13 @@ namespace MareSynchronos
             Configuration = this.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
             Configuration.Initialize(this.PluginInterface);
 
+            windowSystem = new WindowSystem("MareSynchronos");
+
             apiController = new ApiController(Configuration);
+            ipcManager = new IpcManager(PluginInterface);
 
             // you might normally want to embed resources and load them from the manifest stream
-            this.PluginUi = new PluginUI(this.Configuration);
+            this.PluginUi = new PluginUI(this.Configuration, windowSystem, apiController, ipcManager);
 
             new FileCacheContext().Dispose(); // make sure db is initialized I guess
 
@@ -59,9 +64,6 @@ namespace MareSynchronos
             {
                 ClientState_Login(null, null!);
             }
-
-            this.PluginInterface.UiBuilder.Draw += DrawUI;
-            this.PluginInterface.UiBuilder.OpenConfigUi += DrawConfigUI;
         }
 
         public string Name => "Mare Synchronos";
@@ -77,14 +79,28 @@ namespace MareSynchronos
             clientState.Logout -= ClientState_Logout;
             ipcManager?.Dispose();
             characterManager?.Dispose();
+            apiController?.Dispose();
         }
 
         private void ClientState_Login(object? sender, EventArgs e)
         {
             PluginLog.Debug("Client login");
-            ipcManager = new IpcManager(PluginInterface);
-            ipcManager.IpcManagerInitialized += IpcManager_IpcManagerInitialized;
-            ipcManager.Initialize();
+
+            Task.Run(async () =>
+            {
+                while (clientState.LocalPlayer == null)
+                {
+                    await Task.Delay(50);
+                }
+
+                characterManager = new CharacterManager(
+                    new DrawHooks(PluginInterface, clientState, objectTable, new FileReplacementFactory(ipcManager, clientState), gameGui),
+                    clientState, framework, apiController, objectTable, ipcManager);
+                ipcManager.PenumbraRedraw(clientState.LocalPlayer!.Name.ToString());
+            });
+
+            PluginInterface.UiBuilder.Draw += Draw;
+            PluginInterface.UiBuilder.OpenConfigUi += OpenConfigUI;
 
             CommandManager.AddHandler(commandName, new CommandInfo(OnCommand)
             {
@@ -96,8 +112,8 @@ namespace MareSynchronos
         {
             PluginLog.Debug("Client logout");
             characterManager?.Dispose();
-            ipcManager?.Dispose();
-            ipcManager = null!;
+            PluginInterface.UiBuilder.Draw -= Draw;
+            PluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUI;
             CommandManager.RemoveHandler(commandName);
         }
 
@@ -139,32 +155,14 @@ namespace MareSynchronos
             }
         }
 
-        private void DrawConfigUI()
+        private void Draw()
         {
-            this.PluginUi.SettingsVisible = true;
+            windowSystem.Draw();
         }
 
-        private void DrawUI()
+        private void OpenConfigUI()
         {
-            this.PluginUi.Draw();
-        }
-
-        private void IpcManager_IpcManagerInitialized(object? sender, EventArgs e)
-        {
-            PluginLog.Debug("IPC Manager initialized event");
-            ipcManager!.IpcManagerInitialized -= IpcManager_IpcManagerInitialized;
-            Task.Run(async () =>
-            {
-                while (clientState.LocalPlayer == null)
-                {
-                    await Task.Delay(500);
-                }
-
-                characterManager = new CharacterManager(
-                    new DrawHooks(PluginInterface, clientState, objectTable, new FileReplacementFactory(ipcManager, clientState), gameGui),
-                    clientState, framework, apiController, objectTable, ipcManager);
-                ipcManager.PenumbraRedraw(clientState.LocalPlayer!.Name.ToString());
-            });
+            this.PluginUi.Toggle();
         }
 
         private void OnCommand(string command, string args)

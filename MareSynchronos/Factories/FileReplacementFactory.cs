@@ -19,10 +19,15 @@ namespace MareSynchronos.Factories
 
         public FileReplacement Create(string gamePath, bool resolve = true)
         {
+            if (!ipcManager.CheckPenumbraAPI())
+            {
+                throw new System.Exception();
+            }
+
             var fileReplacement = new FileReplacement(gamePath, ipcManager.PenumbraModDirectory()!);
             if (!resolve) return fileReplacement;
 
-            if(clientState.LocalPlayer != null)
+            if (clientState.LocalPlayer != null)
             {
                 playerName = clientState.LocalPlayer.Name.ToString();
             }
