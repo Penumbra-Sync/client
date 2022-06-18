@@ -18,5 +18,11 @@ namespace MareSynchronos.Utils
             using SHA1CryptoServiceProvider cryptoProvider = new();
             return BitConverter.ToString(cryptoProvider.ComputeHash(Encoding.UTF8.GetBytes(stringToHash))).Replace("-", "");
         }
+
+        public static string GetHash256(string stringToHash)
+        {
+            using SHA256CryptoServiceProvider cryptoProvider = new();
+            return BitConverter.ToString(cryptoProvider.ComputeHash(Encoding.UTF8.GetBytes(stringToHash))).Replace("-", "");
+        }
     }
 }

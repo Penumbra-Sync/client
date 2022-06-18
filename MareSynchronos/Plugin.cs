@@ -91,7 +91,7 @@ namespace MareSynchronos
                 }
 
                 characterManager = new CharacterManager(
-                    clientState, framework, apiController, objectTable, ipcManager, new FileReplacementFactory(ipcManager));
+                    clientState, framework, apiController, objectTable, ipcManager, new FileReplacementFactory(ipcManager), Configuration);
                 characterManager.StartWatchingPlayer();
                 ipcManager.PenumbraRedraw(clientState.LocalPlayer!.Name.ToString());
             });
@@ -131,7 +131,7 @@ namespace MareSynchronos
                     {
 
                         Stopwatch st = Stopwatch.StartNew();
-                        File.WriteAllBytes(lc4hcPath, LZ4Codec.Encode(File.ReadAllBytes(fileCache.Filepath), 0, (int)new FileInfo(fileCache.Filepath).Length));
+                        File.WriteAllBytes(lc4hcPath, LZ4Codec.WrapHC(File.ReadAllBytes(fileCache.Filepath), 0, (int)new FileInfo(fileCache.Filepath).Length));
                         st.Stop();
                         PluginLog.Debug("Compressed " + new FileInfo(fileCache.Filepath).Length + " bytes to " + new FileInfo(lc4hcPath).Length + " bytes in " + st.Elapsed);
                         File.Copy(fileCache.Filepath, newFilePath);
@@ -225,6 +225,11 @@ namespace MareSynchronos
 
                     PluginLog.Debug("Mod created to " + modDirectoryPath);
                 });
+            }
+
+            if (string.IsNullOrEmpty(args))
+            {
+                PluginUi.Toggle();
             }
         }
     }

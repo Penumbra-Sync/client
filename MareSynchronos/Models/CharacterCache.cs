@@ -5,12 +5,24 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using MareSynchronos.API;
 
 namespace MareSynchronos.Models
 {
     [JsonObject(MemberSerialization.OptIn)]
     public class CharacterCache
     {
+        public CharacterCacheDto ToCharacterCacheDto()
+        {
+            return new CharacterCacheDto()
+            {
+                FileReplacements = AllReplacements.Select(f => f.ToFileReplacementDto()).ToList(),
+                GlamourerData = GlamourerString,
+                Hash = CacheHash,
+                JobId = (int)JobId
+            };
+        }
+
         [JsonProperty]
         public List<FileReplacement> AllReplacements =>
             FileReplacements.Where(f => f.HasFileReplacement)

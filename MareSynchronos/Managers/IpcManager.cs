@@ -15,9 +15,10 @@ namespace MareSynchronos.Managers
         private ICallGateSubscriber<string, string, object>? glamourerApplyCharacterCustomization;
         private ICallGateSubscriber<int> penumbraApiVersion;
         private ICallGateSubscriber<int> glamourerApiVersion;
-        private ICallGateSubscriber<string, string> penumbraObjectIsRedrawn;
+        private ICallGateSubscriber<IntPtr, int, object?> penumbraObjectIsRedrawn;
         private ICallGateSubscriber<string, int, object>? penumbraRedraw;
         private ICallGateSubscriber<string, string, string[]>? penumbraReverseResolvePath;
+        private ICallGateSubscriber<string, object> glamourerRevertCustomization;
 
         public bool Initialized { get; private set; } = false;
 
@@ -36,7 +37,8 @@ namespace MareSynchronos.Managers
             penumbraReverseResolvePath = pluginInterface.GetIpcSubscriber<string, string, string[]>("Penumbra.ReverseResolvePath");
             penumbraApiVersion = pluginInterface.GetIpcSubscriber<int>("Penumbra.ApiVersion");
             glamourerApiVersion = pluginInterface.GetIpcSubscriber<int>("Glamourer.ApiVersion");
-            penumbraObjectIsRedrawn = pluginInterface.GetIpcSubscriber<string, string>("Penumbra.ObjectIsRedrawn");
+            glamourerRevertCustomization = pluginInterface.GetIpcSubscriber<string, object>("Glamourer.RevertCharacterCustomization");
+            penumbraObjectIsRedrawn = pluginInterface.GetIpcSubscriber<IntPtr, int, object?>("Penumbra.GameObjectRedrawn");
             penumbraObjectIsRedrawn.Subscribe(RedrawEvent);
             penumbraInit.Subscribe(RedrawSelf);
 
@@ -67,9 +69,9 @@ namespace MareSynchronos.Managers
             }
         }
 
-        private void RedrawEvent(string actorName)
+        private void RedrawEvent(IntPtr objectAddress, int objectTableIndex)
         {
-            PenumbraRedrawEvent?.Invoke(actorName, EventArgs.Empty);
+            PenumbraRedrawEvent?.Invoke(objectTableIndex, EventArgs.Empty);
         }
 
         private void RedrawSelf()
@@ -118,6 +120,12 @@ namespace MareSynchronos.Managers
         {
             if (!CheckGlamourerAPI()) return;
             glamourerApplyCharacterCustomization!.InvokeAction(customization, characterName);
+        }
+
+        public void GlamourerRevertCharacterCustomization(string characterName)
+        {
+            if (!CheckGlamourerAPI()) return;
+            glamourerRevertCustomization!.InvokeAction(characterName);
         }
 
         public void PenumbraRedraw(string actorName)

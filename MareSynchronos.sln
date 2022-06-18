@@ -9,6 +9,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Penumbra.GameData", "..\..\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Penumbra.PlayerWatch", "..\..\Penumbra\Penumbra.PlayerWatch\Penumbra.PlayerWatch.csproj", "{2F26FC2D-03DF-445F-A87B-8708D621E86C}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MareSynchronos.API", "..\server\MareSynchronosServer\MareSynchronos.API\MareSynchronos.API.csproj", "{4C92F86D-9C84-4F58-9C1A-671AEBACA256}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +43,14 @@ Global
 		{2F26FC2D-03DF-445F-A87B-8708D621E86C}.Release|Any CPU.Build.0 = Release|Any CPU
 		{2F26FC2D-03DF-445F-A87B-8708D621E86C}.Release|x64.ActiveCfg = Release|Any CPU
 		{2F26FC2D-03DF-445F-A87B-8708D621E86C}.Release|x64.Build.0 = Release|Any CPU
+		{4C92F86D-9C84-4F58-9C1A-671AEBACA256}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4C92F86D-9C84-4F58-9C1A-671AEBACA256}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4C92F86D-9C84-4F58-9C1A-671AEBACA256}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4C92F86D-9C84-4F58-9C1A-671AEBACA256}.Debug|x64.Build.0 = Debug|Any CPU
+		{4C92F86D-9C84-4F58-9C1A-671AEBACA256}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4C92F86D-9C84-4F58-9C1A-671AEBACA256}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4C92F86D-9C84-4F58-9C1A-671AEBACA256}.Release|x64.ActiveCfg = Release|Any CPU
+		{4C92F86D-9C84-4F58-9C1A-671AEBACA256}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

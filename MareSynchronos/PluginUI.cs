@@ -6,7 +6,10 @@ using ImGuiNET;
 using MareSynchronos.Managers;
 using MareSynchronos.WebAPI;
 using System;
+using System.Linq;
 using System.Numerics;
+using Dalamud.Configuration;
+using MareSynchronos.API;
 
 namespace MareSynchronos
 {
@@ -49,7 +52,17 @@ namespace MareSynchronos
                 return;
             }
 
-            if (string.IsNullOrEmpty(apiController.SecretKey))
+
+            if (apiController.SecretKey != "-" && !apiController.IsConnected && apiController.ServerAlive)
+            {
+                if (ImGui.Button("Reset Secret Key"))
+                {
+                    configuration.ClientSecret.Clear();
+                    configuration.Save();
+                    apiController.RestartHeartbeat();
+                }
+            }
+            else if (apiController.SecretKey == "-")
             {
                 DrawIntroContent();
             }
@@ -67,14 +80,94 @@ namespace MareSynchronos
             ImGui.Separator();
             ImGui.Text("Your UID");
             ImGui.SameLine();
-            ImGui.TextColored(ImGuiColors.ParsedGreen, apiController.UID);
-            ImGui.SameLine();
-            if (ImGui.Button("Copy UID"))
+            if (apiController.ServerAlive)
             {
-                ImGui.SetClipboardText(apiController.UID);
+                ImGui.TextColored(ImGuiColors.ParsedGreen, apiController.UID);
+                ImGui.SameLine();
+                if (ImGui.Button("Copy UID"))
+                {
+                    ImGui.SetClipboardText(apiController.UID);
+                }
+                ImGui.Text("Share this UID to other Mare users so they can add you to their whitelist.");
+                ImGui.Separator();
+                DrawWhiteListContent();
+                ImGui.Separator();
+                string cachePath = configuration.CacheFolder;
+                if (ImGui.InputText("CachePath", ref cachePath, 255))
+                {
+                    configuration.CacheFolder = cachePath;
+                    configuration.Save();
+                }
             }
-            ImGui.Text("Share this UID to other Mare users so they can add you to their whitelist.");
+            else
+            {
+                ImGui.TextColored(ImGuiColors.DalamudRed, "Service unavailable");
+            }
         }
+
+        private void DrawWhiteListContent()
+        {
+            if (!apiController.ServerAlive) return;
+            ImGui.Text("Whitelists");
+            if (ImGui.BeginTable("WhitelistTable", 5))
+            {
+                ImGui.TableSetupColumn("Pause");
+                ImGui.TableSetupColumn("UID");
+                ImGui.TableSetupColumn("Sync");
+                ImGui.TableSetupColumn("Paused (you/other)");
+                ImGui.TableSetupColumn("");
+                ImGui.TableHeadersRow();
+                foreach (var item in apiController.WhitelistEntries.ToList())
+                {
+                    ImGui.TableNextColumn();
+                    bool isPaused = item.IsPaused;
+                    if (ImGui.Checkbox("Paused##" + item.OtherUID, ref isPaused))
+                    {
+                        _ = apiController.SendWhitelistPauseChange(item.OtherUID, isPaused);
+                    }
+
+                    ImGui.TableNextColumn();
+                    ImGui.TextColored(GetBoolColor(item.IsSynced && !item.IsPausedFromOthers && !item.IsPaused),
+                        item.OtherUID);
+                    ImGui.TableNextColumn();
+                    ImGui.TextColored(GetBoolColor(item.IsSynced), !item.IsSynced ? "Has not added you" : "On both whitelists");
+                    ImGui.TableNextColumn();
+                    ImGui.TextColored(GetBoolColor((!item.IsPausedFromOthers && !item.IsPaused)), item.IsPaused + " / " + item.IsPausedFromOthers);
+                    ImGui.TableNextColumn();
+                    if (ImGui.Button("Delete##" + item.OtherUID))
+                    {
+                        _ = apiController.SendWhitelistRemoval(item.OtherUID);
+                        apiController.WhitelistEntries.Remove(item);
+                    }
+                    ImGui.TableNextRow();
+                }
+                ImGui.EndTable();
+            }
+
+            var whitelistEntry = tempDto.OtherUID;
+            if (ImGui.InputText("Add new whitelist entry", ref whitelistEntry, 20))
+            {
+                tempDto.OtherUID = whitelistEntry;
+            }
+
+            ImGui.SameLine();
+            if (ImGui.Button("Add"))
+            {
+                if (apiController.WhitelistEntries.All(w => w.OtherUID != tempDto.OtherUID))
+                {
+                    apiController.WhitelistEntries.Add(new WhitelistDto()
+                    {
+                        OtherUID = tempDto.OtherUID
+                    });
+
+                    _ = apiController.SendWhitelistAddition(tempDto.OtherUID);
+
+                    tempDto.OtherUID = string.Empty;
+                }
+            }
+        }
+
+        private WhitelistDto tempDto = new WhitelistDto() { OtherUID = string.Empty };
 
         private int serverSelectionIndex = 0;
 
@@ -141,13 +234,19 @@ namespace MareSynchronos
             if (apiController.UseCustomService)
             {
                 string serviceAddress = configuration.ApiUri;
-                ImGui.InputText("Service address", ref serviceAddress, 255);
-                configuration.ApiUri = serviceAddress;
-                configuration.Save();
+                if (ImGui.InputText("Service address", ref serviceAddress, 255))
+                {
+                    if (configuration.ApiUri != serviceAddress)
+                    {
+                        configuration.ApiUri = serviceAddress;
+                        apiController.RestartHeartbeat();
+                        configuration.Save();
+                    }
+                }
             }
 
             PrintServerState();
-            if (apiController.IsConnected)
+            if (apiController.ServerAlive)
             {
                 if (ImGui.Button("Register"))
                 {
@@ -158,6 +257,8 @@ namespace MareSynchronos
                 }
             }
         }
+
+        private Vector4 GetBoolColor(bool input) => input ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
 
         private bool OtherPluginStateOk()
         {
@@ -186,8 +287,8 @@ namespace MareSynchronos
         {
             ImGui.Text("Service status of " + (string.IsNullOrEmpty(configuration.ApiUri) ? mainServer : configuration.ApiUri));
             ImGui.SameLine();
-            var color = apiController.IsConnected ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
-            ImGui.TextColored(color, apiController.IsConnected ? "Available" : "Unavailable");
+            var color = apiController.ServerAlive ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
+            ImGui.TextColored(color, apiController.ServerAlive ? "Available" : "Unavailable");
         }
     }
 }

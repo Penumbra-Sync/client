@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using MareSynchronos.FileCacheDB;
 using System.IO;
+using MareSynchronos.API;
 using MareSynchronos.Utils;
 
 namespace MareSynchronos.Models
@@ -14,6 +15,16 @@ namespace MareSynchronos.Models
     [JsonObject(MemberSerialization.OptIn)]
     public class FileReplacement
     {
+        public FileReplacementDto ToFileReplacementDto()
+        {
+            return new FileReplacementDto
+            {
+                GamePaths = GamePaths,
+                Hash = Hash,
+                ImcData = ImcData
+            };
+        }
+
         private readonly string penumbraDirectory;
 
         [JsonProperty]
@@ -88,13 +99,20 @@ namespace MareSynchronos.Models
             var fileAddedDuringCompute = db.FileCaches.SingleOrDefault(f => f.Filepath == fi.FullName.ToLower());
             if (fileAddedDuringCompute != null) return fileAddedDuringCompute.Hash;
 
-            db.Add(new FileCache()
+            try
             {
-                Hash = hash,
-                Filepath = fi.FullName.ToLower(),
-                LastModifiedDate = fi.LastWriteTimeUtc.Ticks.ToString()
-            });
-            db.SaveChanges();
+                db.Add(new FileCache()
+                {
+                    Hash = hash,
+                    Filepath = fi.FullName.ToLower(),
+                    LastModifiedDate = fi.LastWriteTimeUtc.Ticks.ToString()
+                });
+                db.SaveChanges();
+            }
+            catch (Exception ex)
+            {
+                PluginLog.Error(ex, "Error adding files to database. Most likely not an issue though.");
+            }
 
             return hash;
         }
