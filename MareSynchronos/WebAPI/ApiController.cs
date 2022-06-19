@@ -4,6 +4,7 @@ using MareSynchronos.Models;
 using System;
 using System.Buffers.Text;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
@@ -13,12 +14,14 @@ using System.Runtime.InteropServices.ComTypes;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Objects.Types;
 using LZ4;
 using MareSynchronos.API;
 using MareSynchronos.FileCacheDB;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.VisualBasic;
 
 namespace MareSynchronos.WebAPI
 {
@@ -35,6 +38,11 @@ namespace MareSynchronos.WebAPI
         public string UID { get; private set; } = string.Empty;
         public string SecretKey => pluginConfiguration.ClientSecret.ContainsKey(ApiUri) ? pluginConfiguration.ClientSecret[ApiUri] : "-";
         private string CacheFolder => pluginConfiguration.CacheFolder;
+        public ConcurrentDictionary<string, (long, long)> CurrentUploads { get; private set; } = new();
+        public ConcurrentDictionary<string, (long, long)> CurrentDownloads { get; private set; } = new();
+        public bool IsDownloading { get; private set; } = false;
+        public bool IsUploading { get; private set; } = false;
+        public int TotalTransfersPending { get; set; } = 0;
         public bool UseCustomService
         {
             get => pluginConfiguration.UseCustomService;
@@ -55,14 +63,16 @@ namespace MareSynchronos.WebAPI
         public event EventHandler<CharacterReceivedEventArgs>? CharacterReceived;
         public event EventHandler? RemovedFromWhitelist;
         public event EventHandler? AddedToWhitelist;
+        public event EventHandler? WhitelistedPlayerOnline;
+        public event EventHandler? WhitelistedPlayerOffline;
 
         public List<WhitelistDto> WhitelistEntries { get; set; } = new List<WhitelistDto>();
 
         readonly CancellationTokenSource cts;
         private HubConnection? _heartbeatHub;
-        private IDisposable? _fileUploadRequest;
         private HubConnection? _fileHub;
         private HubConnection? _userHub;
+        private CancellationTokenSource? uploadCancellationTokenSource;
 
         public ApiController(Configuration pluginConfiguration)
         {
@@ -164,7 +174,7 @@ namespace MareSynchronos.WebAPI
             if (_fileHub != null)
             {
                 PluginLog.Debug("Disposing File Hub");
-                _fileUploadRequest?.Dispose();
+                CancelUpload();
                 await _fileHub!.StopAsync();
                 await _fileHub!.DisposeAsync();
             }
@@ -200,6 +210,8 @@ namespace MareSynchronos.WebAPI
             await _userHub.StartAsync();
             _userHub.On<WhitelistDto, string>("UpdateWhitelist", UpdateLocalWhitelist);
             _userHub.On<CharacterCacheDto, string>("ReceiveCharacterData", ReceiveCharacterData);
+            _userHub.On<string>("RemoveOnlineWhitelistedPlayer", (s) => WhitelistedPlayerOffline?.Invoke(s, EventArgs.Empty));
+            _userHub.On<string>("AddOnlineWhitelistedPlayer", (s) => WhitelistedPlayerOnline?.Invoke(s, EventArgs.Empty));
 
             PluginLog.Debug("Creating File Hub");
             _fileHub = new HubConnectionBuilder()
@@ -218,8 +230,6 @@ namespace MareSynchronos.WebAPI
                 })
                 .Build();
             await _fileHub.StartAsync(cts.Token);
-
-            _fileUploadRequest = _fileHub!.On<string>("FileRequest", UploadFile);
         }
 
         private void UpdateLocalWhitelist(WhitelistDto dto, string characterIdentifier)
@@ -247,16 +257,36 @@ namespace MareSynchronos.WebAPI
             }
         }
 
-        private async Task UploadFile(string fileHash)
+        private async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)
         {
-            PluginLog.Debug("Requested fileHash: " + fileHash);
-
             await using var db = new FileCacheContext();
             var fileCache = db.FileCaches.First(f => f.Hash == fileHash);
-            var compressedFile = LZ4Codec.WrapHC(await File.ReadAllBytesAsync(fileCache.Filepath), 0,
-                (int)new FileInfo(fileCache.Filepath).Length);
-            var response = await _fileHub!.InvokeAsync<bool>("UploadFile", fileHash, compressedFile, cts.Token);
-            PluginLog.Debug("Success: " + response);
+            return (fileHash, LZ4Codec.WrapHC(await File.ReadAllBytesAsync(fileCache.Filepath, uploadToken), 0,
+                (int)new FileInfo(fileCache.Filepath).Length));
+        }
+
+        private async Task UploadFile(byte[] compressedFile, string fileHash, CancellationToken uploadToken)
+        {
+            if (uploadToken.IsCancellationRequested) return;
+            var chunkSize = 1024 * 512; // 512kb
+            var chunks = (int)Math.Ceiling(compressedFile.Length / (double)chunkSize);
+            var channel = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(chunkSize)
+            {
+                FullMode = BoundedChannelFullMode.Wait,
+                AllowSynchronousContinuations = true,
+                SingleReader = true,
+                SingleWriter = true
+            });
+            await _fileHub!.SendAsync("UploadFile", fileHash, channel.Reader, uploadToken);
+            for (var i = 0; i < chunks; i++)
+            {
+                var uploadChunk = compressedFile.Skip(i * chunkSize).Take(chunkSize).ToArray();
+                channel.Writer.TryWrite(uploadChunk);
+                CurrentUploads[fileHash] = (CurrentUploads[fileHash].Item1 + uploadChunk.Length, CurrentUploads[fileHash].Item2);
+                if (uploadToken.IsCancellationRequested) break;
+            }
+
+            channel.Writer.Complete();
         }
 
         public async Task Register()
@@ -269,20 +299,74 @@ namespace MareSynchronos.WebAPI
             RestartHeartbeat();
         }
 
+        public void CancelUpload()
+        {
+            if (uploadCancellationTokenSource != null)
+            {
+                PluginLog.Warning("Cancelling upload");
+                uploadCancellationTokenSource?.Cancel();
+                _fileHub!.InvokeAsync("AbortUpload");
+            }
+        }
+
         public async Task SendCharacterData(CharacterCacheDto character, List<string> visibleCharacterIds)
         {
             if (!IsConnected || SecretKey == "-") return;
             PluginLog.Debug("Sending Character data to service " + ApiUri);
 
-            await _fileHub!.InvokeAsync("SendFiles", character.FileReplacements, cts.Token);
+            CancelUpload();
+            uploadCancellationTokenSource = new CancellationTokenSource();
+            var uploadToken = uploadCancellationTokenSource.Token;
+            PluginLog.Warning("New Token Created");
 
-            while (await _fileHub!.InvokeAsync<bool>("IsUploadFinished"))
+            var filesToUpload = await _fileHub!.InvokeAsync<List<string>>("SendFiles", character.FileReplacements, uploadToken);
+
+            IsUploading = true;
+
+            PluginLog.Debug("Compressing files");
+            Dictionary<string, byte[]> compressedFileData = new();
+            foreach (var file in filesToUpload)
             {
-                await Task.Delay(TimeSpan.FromSeconds(0.5));
+                var data = await GetCompressedFileData(file, uploadToken);
+                compressedFileData.Add(data.Item1, data.Item2);
+                CurrentUploads[data.Item1] = (0, data.Item2.Length);
+            }
+            PluginLog.Debug("Files compressed, uploading files");
+            foreach (var data in compressedFileData)
+            {
+                await UploadFile(data.Value, data.Key, uploadToken);
+                if (uploadToken.IsCancellationRequested)
+                {
+                    PluginLog.Warning("Cancel in filesToUpload loop detected");
+                    CurrentUploads.Clear();
+                    break;
+                }
+            }
+            PluginLog.Debug("Upload tasks complete, waiting for server to confirm");
+            var anyUploadsOpen = await _fileHub!.InvokeAsync<bool>("IsUploadFinished", uploadToken);
+            PluginLog.Warning("Uploads open: " + anyUploadsOpen);
+            while (anyUploadsOpen && !uploadToken.IsCancellationRequested)
+            {
+                anyUploadsOpen = await _fileHub!.InvokeAsync<bool>("IsUploadFinished", uploadToken);
+                await Task.Delay(TimeSpan.FromSeconds(0.5), uploadToken);
                 PluginLog.Debug("Waiting for uploads to finish");
             }
 
-            await _userHub!.InvokeAsync("PushCharacterData", character, visibleCharacterIds);
+            CurrentUploads.Clear();
+            IsUploading = false;
+
+            if (!uploadToken.IsCancellationRequested)
+            {
+                PluginLog.Warning("=== Pushing character data ===");
+                await _userHub!.InvokeAsync("PushCharacterData", character, visibleCharacterIds, uploadToken);
+            }
+            else
+            {
+                PluginLog.Warning("=== Upload operation was cancelled ===");
+            }
+
+            PluginLog.Debug("== Upload complete for " + character.JobId);
+            uploadCancellationTokenSource = null;
         }
 
         public Task ReceiveCharacterData(CharacterCacheDto character, string characterHash)
@@ -296,9 +380,60 @@ namespace MareSynchronos.WebAPI
             return Task.CompletedTask;
         }
 
-        public async Task<byte[]> DownloadData(string hash)
+        public async Task UpdateCurrentDownloadSize(string hash)
         {
-            return await _fileHub!.InvokeAsync<byte[]>("DownloadFile", hash);
+            long fileSize = await _fileHub!.InvokeAsync<long>("GetFileSize", hash);
+        }
+
+        public async Task DownloadFiles(List<FileReplacementDto> fileReplacementDto, string cacheFolder)
+        {
+            foreach (var file in fileReplacementDto)
+            {
+                var fileSize = await _fileHub!.InvokeAsync<long>("GetFileSize", file.Hash);
+                CurrentDownloads[file.Hash] = (0, fileSize);
+            }
+
+            foreach (var file in fileReplacementDto.Where(f => CurrentDownloads[f.Hash].Item2 > 0))
+            {
+                var hash = file.Hash;
+                var data = await DownloadFile(hash);
+                var extractedFile = LZ4.LZ4Codec.Unwrap(data);
+                var ext = file.GamePaths.First().Split(".", StringSplitOptions.None).Last();
+                var filePath = Path.Combine(cacheFolder, file.Hash + "." + ext);
+                await File.WriteAllBytesAsync(filePath, extractedFile);
+                await using (var db = new FileCacheContext())
+                {
+                    db.Add(new FileCache
+                    {
+                        Filepath = filePath.ToLower(),
+                        Hash = file.Hash,
+                        LastModifiedDate = DateTime.Now.Ticks.ToString(),
+                    });
+                    await db.SaveChangesAsync();
+                }
+                PluginLog.Debug("File downloaded to " + filePath);
+            }
+
+            CurrentDownloads.Clear();
+        }
+
+        public async Task<byte[]> DownloadFile(string hash)
+        {
+            IsDownloading = true;
+            var reader = await _fileHub!.StreamAsChannelAsync<byte[]>("DownloadFile", hash);
+            List<byte> downloadedData = new();
+            while (await reader.WaitToReadAsync())
+            {
+                while (reader.TryRead(out var data))
+                {
+                    CurrentDownloads[hash] = (CurrentDownloads[hash].Item1 + data.Length, CurrentDownloads[hash].Item2);
+                    downloadedData.AddRange(data);
+                    //await Task.Delay(25);
+                }
+            }
+
+            IsDownloading = false;
+            return downloadedData.ToArray();
         }
 
         public async Task GetCharacterData(Dictionary<string, int> hashedCharacterNames)
@@ -346,9 +481,9 @@ namespace MareSynchronos.WebAPI
             _ = DisposeHubConnections();
         }
 
-        public async Task SendCharacterName(string hashedName)
+        public async Task<List<string>> SendCharacterName(string hashedName)
         {
-            await _userHub!.SendAsync("SendCharacterNameHash", hashedName);
+            return await _userHub!.InvokeAsync<List<string>>("SendCharacterNameHash", hashedName);
         }
 
         public async Task SendVisibilityData(List<string> visibilities)

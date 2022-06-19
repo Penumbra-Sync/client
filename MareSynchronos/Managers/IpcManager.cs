@@ -2,6 +2,9 @@
 using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Reflection.Metadata;
 
 namespace MareSynchronos.Managers
 {
@@ -19,6 +22,11 @@ namespace MareSynchronos.Managers
         private ICallGateSubscriber<string, int, object>? penumbraRedraw;
         private ICallGateSubscriber<string, string, string[]>? penumbraReverseResolvePath;
         private ICallGateSubscriber<string, object> glamourerRevertCustomization;
+
+        private ICallGateSubscriber<string, string, IReadOnlyDictionary<string, string>, List<string>, int, int>
+            penumbraSetTemporaryMod;
+        private ICallGateSubscriber<string, string, bool, (int, string)> penumbraCreateTemporaryCollection;
+        private ICallGateSubscriber<string, int> penumbraRemoveTemporaryCollection;
 
         public bool Initialized { get; private set; } = false;
 
@@ -39,8 +47,19 @@ namespace MareSynchronos.Managers
             glamourerApiVersion = pluginInterface.GetIpcSubscriber<int>("Glamourer.ApiVersion");
             glamourerRevertCustomization = pluginInterface.GetIpcSubscriber<string, object>("Glamourer.RevertCharacterCustomization");
             penumbraObjectIsRedrawn = pluginInterface.GetIpcSubscriber<IntPtr, int, object?>("Penumbra.GameObjectRedrawn");
+
             penumbraObjectIsRedrawn.Subscribe(RedrawEvent);
             penumbraInit.Subscribe(RedrawSelf);
+
+            penumbraSetTemporaryMod =
+                pluginInterface
+                    .GetIpcSubscriber<string, string, IReadOnlyDictionary<string, string>, List<string>, int,
+                        int>("Penumbra.AddTemporaryMod");
+
+            penumbraCreateTemporaryCollection =
+                pluginInterface.GetIpcSubscriber<string, string, bool, (int, string)>("Penumbra.CreateTemporaryCollection");
+            penumbraRemoveTemporaryCollection =
+                pluginInterface.GetIpcSubscriber<string, int>("Penumbra.RemoveTemporaryCollection");
 
             Initialized = true;
         }
@@ -132,6 +151,35 @@ namespace MareSynchronos.Managers
         {
             if (!CheckPenumbraAPI()) return;
             penumbraRedraw!.InvokeAction(actorName, 0);
+        }
+
+        public void PenumbraCreateTemporaryCollection(string characterName)
+        {
+            if (!CheckPenumbraAPI()) return;
+            PluginLog.Debug("Creating temp collection for " + characterName);
+            //penumbraCreateTemporaryCollection.InvokeFunc("MareSynchronos", characterName, true);
+        }
+
+        public void PenumbraRemoveTemporaryCollection(string characterName)
+        {
+            if (!CheckPenumbraAPI()) return;
+            PluginLog.Debug("Removing temp collection for " + characterName);
+            //penumbraRemoveTemporaryCollection.InvokeFunc(characterName);
+        }
+
+        public void PenumbraSetTemporaryMods(string characterName, IReadOnlyDictionary<string, string> modPaths)
+        {
+            if (!CheckPenumbraAPI()) return;
+            PluginLog.Debug("Assigning temp mods for " + characterName);
+            try
+            {
+                //var result = penumbraSetTemporaryMod.InvokeFunc("MareSynchronos", characterName, modPaths, new List<string>(), 0);
+                //PluginLog.Debug("Success: " + result);
+            }
+            catch (Exception ex)
+            {
+                PluginLog.Error(ex, "Error during IPC call");
+            }
         }
 
         public void Dispose()

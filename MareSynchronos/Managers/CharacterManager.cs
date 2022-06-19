@@ -31,156 +31,45 @@ namespace MareSynchronos.Managers
 {
     public class CharacterManager : IDisposable
     {
-        private readonly ClientState clientState;
+        private readonly ApiController _apiController;
+        readonly Dictionary<string, string> _cachedLocalPlayers = new();
+        private readonly Dictionary<(string, int), CharacterCacheDto> _characterCache = new();
+        private readonly ClientState _clientState;
+        private readonly FileReplacementFactory _factory;
         private readonly Framework _framework;
-        private readonly ApiController apiController;
-        private readonly ObjectTable objectTable;
-        private readonly IpcManager ipcManager;
-        private readonly FileReplacementFactory factory;
+        private readonly IpcManager _ipcManager;
+        private readonly ObjectTable _objectTable;
         private readonly Configuration _pluginConfiguration;
-        private readonly IPlayerWatcher watcher;
-        private Task? playerChangedTask = null;
+        private readonly IPlayerWatcher _watcher;
+        private DateTime _lastPlayerObjectCheck = DateTime.Now;
+        private string _lastSentHash = string.Empty;
+        private Task? _playerChangedTask = null;
+
+        private HashSet<string> onlineWhitelistedUsers = new();
 
         public CharacterManager(ClientState clientState, Framework framework, ApiController apiController, ObjectTable objectTable, IpcManager ipcManager, FileReplacementFactory factory,
-            Configuration pluginConfiguration)
+                    Configuration pluginConfiguration)
         {
-            this.clientState = clientState;
+            this._clientState = clientState;
             this._framework = framework;
-            this.apiController = apiController;
-            this.objectTable = objectTable;
-            this.ipcManager = ipcManager;
-            this.factory = factory;
+            this._apiController = apiController;
+            this._objectTable = objectTable;
+            this._ipcManager = ipcManager;
+            this._factory = factory;
             _pluginConfiguration = pluginConfiguration;
-            watcher = PlayerWatchFactory.Create(framework, clientState, objectTable);
-        }
-
-        private void IpcManager_PenumbraRedrawEvent(object? objectTableIndex, EventArgs e)
-        {
-            var objTableObj = objectTable[(int)objectTableIndex!];
-            if (objTableObj!.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player)
-            {
-                if (objTableObj.Name.ToString() == GetPlayerName())
-                {
-                    PluginLog.Debug("Penumbra Redraw Event");
-                    PlayerChanged(GetPlayerName());
-                }
-            }
-        }
-
-        private readonly Dictionary<(string, int), CharacterCacheDto> _characterCache = new();
-
-        Dictionary<string, string> localPlayers = new();
-        private DateTime lastCheck = DateTime.Now;
-
-        private unsafe void Framework_Update(Framework framework)
-        {
-            try
-            {
-                if (clientState.LocalPlayer == null) return;
-
-                if (DateTime.Now < lastCheck.AddSeconds(5)) return;
-
-                List<string> localPlayersList = new();
-                foreach (var obj in objectTable)
-                {
-                    if (obj.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) continue;
-                    string playerName = obj.Name.ToString();
-                    if (playerName == GetPlayerName()) continue;
-                    var pObj = (PlayerCharacter)obj;
-                    var hashedName = Crypto.GetHash256(pObj.Name.ToString() + pObj.HomeWorld.Id.ToString());
-                    localPlayersList.Add(hashedName);
-                    localPlayers[hashedName] = pObj.Name.ToString();
-                }
-
-                foreach (var item in localPlayers.ToList())
-                {
-                    if (!localPlayersList.Contains(item.Key))
-                    {
-                        localPlayers.Remove(item.Key);
-                    }
-                }
-
-                lastCheck = DateTime.Now;
-            }
-            catch (Exception ex)
-            {
-                PluginLog.Error(ex, "error");
-            }
-        }
-
-        private string GetPlayerName()
-        {
-            return clientState.LocalPlayer!.Name.ToString();
-        }
-
-        private void Watcher_PlayerChanged(Dalamud.Game.ClientState.Objects.Types.Character actor)
-        {
-            if (actor.Name.ToString() == clientState.LocalPlayer!.Name.ToString())
-            {
-                PlayerChanged(actor.Name.ToString());
-            }
-            else
-            {
-                PluginLog.Debug("PlayerChanged: " + actor.Name.ToString());
-            }
-        }
-
-        private unsafe void PlayerChanged(string name)
-        {
-            //if (sender == null) return;
-            PluginLog.Debug("Player changed: " + name);
-            if (playerChangedTask is { IsCompleted: false }) return;
-
-            playerChangedTask = Task.Run(() =>
-            {
-                var obj = (GameObject*)clientState.LocalPlayer!.Address;
-
-                PluginLog.Debug("Waiting for charater to be drawn");
-                while ((obj->RenderFlags & 0b100000000000) == 0b100000000000) // 0b100000000000 is "still rendering" or something
-                {
-                    //PluginLog.Debug("Waiting for character to finish drawing");
-                    Thread.Sleep(10);
-                }
-                PluginLog.Debug("Character finished drawing");
-
-                // wait half a second just in case
-                Thread.Sleep(500);
-
-                var cache = CreateFullCharacterCache();
-                while (!cache.IsCompleted)
-                {
-                    Thread.Sleep(50);
-                }
-
-                _ = apiController.SendCharacterData(cache.Result.ToCharacterCacheDto(), GetLocalPlayers().Select(d => d.Key).ToList());
-            });
-        }
-
-        private Dictionary<string, PlayerCharacter> GetLocalPlayers()
-        {
-            Dictionary<string, PlayerCharacter> allLocalPlayers = new();
-            foreach (var obj in objectTable)
-            {
-                if (obj.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) continue;
-                string playerName = obj.Name.ToString();
-                if (playerName == GetPlayerName()) continue;
-                var playerObject = (PlayerCharacter)obj;
-                allLocalPlayers.Add(Crypto.GetHash256(playerObject.Name.ToString() + playerObject.HomeWorld.Id.ToString()), playerObject);
-            }
-
-            return allLocalPlayers;
+            _watcher = PlayerWatchFactory.Create(framework, clientState, objectTable);
         }
 
         public unsafe CharacterCache BuildCharacterCache()
         {
             var cache = new CharacterCache();
 
-            while (clientState.LocalPlayer == null)
+            while (_clientState.LocalPlayer == null)
             {
                 PluginLog.Debug("Character is null but it shouldn't be, waiting");
                 Thread.Sleep(50);
             }
-            var model = (CharacterBase*)((Character*)clientState.LocalPlayer!.Address)->GameObject.GetDrawObject();
+            var model = (CharacterBase*)((Character*)_clientState.LocalPlayer!.Address)->GameObject.GetDrawObject();
             for (var idx = 0; idx < model->SlotCount; ++idx)
             {
                 var mdl = (RenderModel*)model->ModelArray[idx];
@@ -191,8 +80,8 @@ namespace MareSynchronos.Managers
 
                 var mdlPath = new Utf8String(mdl->ResourceHandle->FileName()).ToString();
 
-                FileReplacement cachedMdlResource = factory.Create();
-                cachedMdlResource.GamePaths = ipcManager.PenumbraReverseResolvePath(mdlPath, GetPlayerName());
+                FileReplacement cachedMdlResource = _factory.Create();
+                cachedMdlResource.GamePaths = _ipcManager.PenumbraReverseResolvePath(mdlPath, GetPlayerName());
                 cachedMdlResource.SetResolvedPath(mdlPath);
                 PluginLog.Verbose("Resolving for model " + mdlPath);
 
@@ -216,8 +105,8 @@ namespace MareSynchronos.Managers
                     //var mtrlFileResource = factory.Create();
                     var mtrlPath = new Utf8String(mtrl->ResourceHandle->FileName()).ToString().Split("|")[2];
                     PluginLog.Verbose("Resolving for material " + mtrlPath);
-                    var cachedMtrlResource = factory.Create();
-                    cachedMtrlResource.GamePaths = ipcManager.PenumbraReverseResolvePath(mtrlPath, GetPlayerName());
+                    var cachedMtrlResource = _factory.Create();
+                    cachedMtrlResource.GamePaths = _ipcManager.PenumbraReverseResolvePath(mtrlPath, GetPlayerName());
                     cachedMtrlResource.SetResolvedPath(mtrlPath);
                     cache.AddAssociatedResource(cachedMtrlResource, cachedMdlResource, null!);
 
@@ -229,9 +118,9 @@ namespace MareSynchronos.Managers
                         if (string.IsNullOrEmpty(texPath.ToString())) continue;
                         PluginLog.Verbose("Resolving for texture " + texPath);
 
-                        var cachedTexResource = factory.Create();
+                        var cachedTexResource = _factory.Create();
                         cachedTexResource.GamePaths = new[] { texPath };
-                        cachedTexResource.SetResolvedPath(ipcManager.PenumbraResolvePath(texPath, GetPlayerName())!);
+                        cachedTexResource.SetResolvedPath(_ipcManager.PenumbraResolvePath(texPath, GetPlayerName())!);
                         cache.AddAssociatedResource(cachedTexResource, cachedMdlResource, cachedMtrlResource);
                     }
                 }
@@ -240,92 +129,98 @@ namespace MareSynchronos.Managers
             return cache;
         }
 
-        private void ClientState_TerritoryChanged(object? sender, ushort e)
+        public async Task DebugJson()
         {
-            localPlayers.Clear();
-            _ = Task.Run(async () =>
+            var cache = CreateFullCharacterCache();
+            while (!cache.IsCompleted)
             {
-                while (clientState.LocalPlayer == null)
-                {
-                    await Task.Delay(250);
-                }
-
-                await AssignLocalPlayersData();
-            });
-        }
-
-        private async Task AssignLocalPlayersData()
-        {
-            PluginLog.Debug("Temp assigning local players from cache");
-            var currentLocalPlayers = GetLocalPlayers();
-            foreach (var player in _characterCache)
-            {
-                if (currentLocalPlayers.ContainsKey(player.Key.Item1))
-                {
-                    await Task.Run(() => ApiControllerOnCharacterReceived(null, new CharacterReceivedEventArgs
-                    {
-                        CharacterNameHash = player.Key.Item1,
-                        CharacterData = player.Value
-                    }));
-                }
+                await Task.Delay(50);
             }
 
+            PluginLog.Debug(JsonConvert.SerializeObject(cache.Result, Formatting.Indented));
+        }
+
+        public void Dispose()
+        {
+            _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
+            _framework.Update -= Framework_Update;
+            _clientState.TerritoryChanged -= ClientState_TerritoryChanged;
+            _apiController.Connected -= ApiController_Connected;
+            _apiController.Disconnected -= ApiController_Disconnected;
+            _apiController.CharacterReceived -= ApiControllerOnCharacterReceived;
+            _apiController.RemovedFromWhitelist -= ApiControllerOnRemovedFromWhitelist;
+            _apiController.AddedToWhitelist -= ApiControllerOnAddedToWhitelist;
+            _apiController.WhitelistedPlayerOffline -= ApiControllerOnWhitelistedPlayerOffline;
+            _watcher.Disable();
+            _watcher.PlayerChanged -= Watcher_PlayerChanged;
+            _watcher?.Dispose();
+        }
+
+        public void StopWatchPlayer(string name)
+        {
+            _watcher.RemovePlayerFromWatch(name);
+        }
+
+        public async Task UpdatePlayersFromService(Dictionary<string, PlayerCharacter> currentLocalPlayers)
+        {
             PluginLog.Debug("Updating local players from service");
-            await apiController.GetCharacterData(currentLocalPlayers
+            currentLocalPlayers = currentLocalPlayers.Where(k => onlineWhitelistedUsers.Contains(k.Key))
+                .ToDictionary(k => k.Key, k => k.Value);
+            await _apiController.GetCharacterData(currentLocalPlayers
                 .ToDictionary(
                     k => k.Key,
                     k => (int)k.Value.ClassJob.Id));
         }
 
-        public void Dispose()
+        public void WatchPlayer(string name)
         {
-            ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
-            _framework.Update -= Framework_Update;
-            clientState.TerritoryChanged -= ClientState_TerritoryChanged;
-            apiController.Connected -= ApiController_Connected;
-            apiController.Disconnected -= ApiController_Disconnected;
-            apiController.CharacterReceived -= ApiControllerOnCharacterReceived;
-            apiController.RemovedFromWhitelist -= ApiControllerOnRemovedFromWhitelist;
-            apiController.AddedToWhitelist -= ApiControllerOnAddedToWhitelist;
-            watcher.Disable();
-            watcher.PlayerChanged -= Watcher_PlayerChanged;
-            watcher?.Dispose();
+            _watcher.AddPlayerToWatch(name);
         }
 
         internal void StartWatchingPlayer()
         {
-            watcher.AddPlayerToWatch(GetPlayerName());
-            watcher.PlayerChanged += Watcher_PlayerChanged;
-            watcher.Enable();
-            apiController.Connected += ApiController_Connected;
-            apiController.Disconnected += ApiController_Disconnected;
-            apiController.CharacterReceived += ApiControllerOnCharacterReceived;
-            apiController.RemovedFromWhitelist += ApiControllerOnRemovedFromWhitelist;
-            apiController.AddedToWhitelist += ApiControllerOnAddedToWhitelist;
+            _watcher.AddPlayerToWatch(GetPlayerName());
+            _watcher.PlayerChanged += Watcher_PlayerChanged;
+            _watcher.Enable();
+            _apiController.Connected += ApiController_Connected;
+            _apiController.Disconnected += ApiController_Disconnected;
+            _apiController.CharacterReceived += ApiControllerOnCharacterReceived;
+            _apiController.RemovedFromWhitelist += ApiControllerOnRemovedFromWhitelist;
+            _apiController.AddedToWhitelist += ApiControllerOnAddedToWhitelist;
+            _apiController.WhitelistedPlayerOffline += ApiControllerOnWhitelistedPlayerOffline;
+            _apiController.WhitelistedPlayerOnline += ApiControllerOnWhitelistedPlayerOnline;
 
-            PluginLog.Debug("Watching Player, ApiController is Connected: " + apiController.IsConnected);
-            if (apiController.IsConnected)
+            PluginLog.Debug("Watching Player, ApiController is Connected: " + _apiController.IsConnected);
+            if (_apiController.IsConnected)
             {
                 ApiController_Connected(null, EventArgs.Empty);
             }
         }
 
-        private void ApiControllerOnRemovedFromWhitelist(object? sender, EventArgs e)
+        private void ApiController_Connected(object? sender, EventArgs args)
         {
-            var characterHash = (string?)sender;
-            if (string.IsNullOrEmpty(characterHash)) return;
-            var players = GetLocalPlayers();
-            foreach (var entry in _characterCache.Where(c => c.Key.Item1 == characterHash))
-            {
-                _characterCache.Remove(entry.Key);
-            }
+            PluginLog.Debug(nameof(ApiController_Connected));
+            PluginLog.Debug("MyHashedName:" + Crypto.GetHash256(GetPlayerName() + _clientState.LocalPlayer!.HomeWorld.Id));
+            var apiTask = _apiController.SendCharacterName(Crypto.GetHash256(GetPlayerName() + _clientState.LocalPlayer!.HomeWorld.Id));
 
-            var playerName = players.SingleOrDefault(p => p.Key == characterHash).Value.Name.ToString() ?? null;
-            if (playerName != null)
-            {
-                PluginLog.Debug("You got removed from whitelist, restoring glamourer state for " + playerName);
-                ipcManager.GlamourerRevertCharacterCustomization(playerName);
-            }
+            Task.WaitAll(apiTask);
+
+            onlineWhitelistedUsers = new HashSet<string>(apiTask.Result);
+            var assignTask = AssignLocalPlayersData();
+            Task.WaitAll(assignTask);
+            PluginLog.Debug("Online and whitelisted users: " + string.Join(",", onlineWhitelistedUsers));
+
+            _framework.Update += Framework_Update;
+            _ipcManager.PenumbraRedrawEvent += IpcManager_PenumbraRedrawEvent;
+            _clientState.TerritoryChanged += ClientState_TerritoryChanged;
+        }
+
+        private void ApiController_Disconnected(object? sender, EventArgs args)
+        {
+            PluginLog.Debug(nameof(ApiController_Disconnected));
+            _framework.Update -= Framework_Update;
+            _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
+            _clientState.TerritoryChanged -= ClientState_TerritoryChanged;
         }
 
         private void ApiControllerOnAddedToWhitelist(object? sender, EventArgs e)
@@ -336,7 +231,7 @@ namespace MareSynchronos.Managers
             if (players.ContainsKey(characterHash))
             {
                 PluginLog.Debug("You got added to a whitelist, restoring data for " + characterHash);
-                _ = apiController.GetCharacterData(new Dictionary<string, int> { { characterHash, (int)players[characterHash].ClassJob.Id } });
+                _ = _apiController.GetCharacterData(new Dictionary<string, int> { { characterHash, (int)players[characterHash].ClassJob.Id } });
             }
         }
 
@@ -344,7 +239,7 @@ namespace MareSynchronos.Managers
         {
             PlayerCharacter? playerObject = null;
             PluginLog.Debug("Received hash for " + e.CharacterNameHash);
-            foreach (var obj in objectTable)
+            foreach (var obj in _objectTable)
             {
                 if (obj.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) continue;
                 string playerName = obj.Name.ToString();
@@ -369,84 +264,122 @@ namespace MareSynchronos.Managers
                 PluginLog.Debug("Found suitable player for hash: " + playerObject.Name.ToString());
             }
 
+            var otherPlayerName = playerObject.Name.ToString();
+
             _characterCache[(e.CharacterNameHash, e.CharacterData.JobId)] = e.CharacterData;
 
-            foreach (var file in e.CharacterData.FileReplacements)
+            List<FileReplacementDto> toDownloadReplacements;
+            using (var db = new FileCacheContext())
             {
-                var hash = file.Hash;
-                bool hasLocalFile;
-                using (var db = new FileCacheContext())
-                {
-                    hasLocalFile = db.FileCaches.Any(f => f.Hash == hash);
-                }
-
-                if (hasLocalFile) continue;
-                PluginLog.Debug("Downloading file for " + hash);
-                var task = apiController.DownloadData(hash);
-                while (!task.IsCompleted)
-                {
-                    Thread.Sleep(TimeSpan.FromSeconds(0.5));
-                }
-                PluginLog.Debug("Download finished: " + hash);
-                var extractedFile = LZ4.LZ4Codec.Unwrap(task.Result);
-                var ext = file.GamePaths.First().Split(".", StringSplitOptions.None).Last();
-                var filePath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash + "." + ext);
-                File.WriteAllBytes(filePath, extractedFile);
-                PluginLog.Debug("File written to : " + filePath);
-                using (var db = new FileCacheContext())
-                {
-                    db.Add(new FileCache
-                    {
-                        Filepath = filePath.ToLower(),
-                        Hash = file.Hash,
-                        LastModifiedDate = DateTime.Now.Ticks.ToString(),
-                    });
-                    db.SaveChanges();
-                }
-                PluginLog.Debug("Added hash to db: " + hash);
+                PluginLog.Debug("Checking for files to download for player " + otherPlayerName);
+                PluginLog.Debug("Received total " + e.CharacterData.FileReplacements.Count + " file replacement data");
+                PluginLog.Debug("Hash for data is " + e.CharacterData.Hash);
+                toDownloadReplacements =
+                    e.CharacterData.FileReplacements.Where(f => !db.FileCaches.Any(c => c.Hash == f.Hash))
+                        .ToList();
             }
 
-            PluginLog.Debug("Assigned hash to visible player: " + playerObject.Name.ToString());
-            ipcManager.GlamourerApplyCharacterCustomization(e.CharacterData.GlamourerData, playerObject.Name.ToString());
+            PluginLog.Debug("Downloading missing files for player " + otherPlayerName);
+            var downloadTask = _apiController.DownloadFiles(toDownloadReplacements, _pluginConfiguration.CacheFolder);
+            while (!downloadTask.IsCompleted)
+            {
+                Thread.Sleep(100);
+            }
+
+            PluginLog.Debug("Assigned hash to visible player: " + otherPlayerName);
+            /*ipcManager.PenumbraRemoveTemporaryCollection(otherPlayerName);
+            ipcManager.PenumbraCreateTemporaryCollection(otherPlayerName);
+            Dictionary<string, string> moddedPaths = new();
+            using (var db = new FileCacheContext())
+            {
+                foreach (var item in e.CharacterData.FileReplacements)
+                {
+                    foreach (var gamePath in item.GamePaths)
+                    {
+                        var fileCache = db.FileCaches.FirstOrDefault(f => f.Hash == item.Hash);
+                        if (fileCache != null)
+                        {
+                            PluginLog.Debug("Modifying: " + gamePath + " => " + fileCache.Filepath);
+                            moddedPaths.Add(gamePath, fileCache.Filepath);
+                        }
+                    }
+                }
+            }
+
+            ipcManager.PenumbraSetTemporaryMods(otherPlayerName, moddedPaths);*/
+            _ipcManager.GlamourerApplyCharacterCustomization(e.CharacterData.GlamourerData, otherPlayerName);
+            //ipcManager.PenumbraRedraw(otherPlayerName);
         }
 
-        private void ApiController_Disconnected(object? sender, EventArgs args)
+        private void ApiControllerOnRemovedFromWhitelist(object? sender, EventArgs e)
         {
-            PluginLog.Debug(nameof(ApiController_Disconnected));
-            _framework.Update -= Framework_Update;
-            ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
-            clientState.TerritoryChanged -= ClientState_TerritoryChanged;
+            var characterHash = (string?)sender;
+            if (string.IsNullOrEmpty(characterHash)) return;
+            var players = GetLocalPlayers();
+            foreach (var entry in _characterCache.Where(c => c.Key.Item1 == characterHash))
+            {
+                _characterCache.Remove(entry.Key);
+            }
+
+            var playerName = players.SingleOrDefault(p => p.Key == characterHash).Value.Name.ToString() ?? null;
+            if (playerName != null)
+            {
+                RestorePreviousCharacter(playerName);
+                PluginLog.Debug("Removed from whitelist, restoring glamourer state for " + playerName);
+                _ipcManager.PenumbraRemoveTemporaryCollection(playerName);
+                _ipcManager.GlamourerRevertCharacterCustomization(playerName);
+            }
         }
 
-        private void ApiController_Connected(object? sender, EventArgs args)
+        private void ApiControllerOnWhitelistedPlayerOffline(object? sender, EventArgs e)
         {
-            PluginLog.Debug(nameof(ApiController_Connected));
-            PluginLog.Debug("MyHashedName:" + Crypto.GetHash256(GetPlayerName() + clientState.LocalPlayer!.HomeWorld.Id));
-            var apiTask = apiController.SendCharacterName(Crypto.GetHash256(GetPlayerName() + clientState.LocalPlayer!.HomeWorld.Id));
-            var assignTask = AssignLocalPlayersData();
-
-            Task.WaitAll(apiTask, assignTask);
-
-            _framework.Update += Framework_Update;
-            ipcManager.PenumbraRedrawEvent += IpcManager_PenumbraRedrawEvent;
-            clientState.TerritoryChanged += ClientState_TerritoryChanged;
+            PluginLog.Debug("Player offline: " + sender!);
+            onlineWhitelistedUsers.Remove((string)sender!);
         }
 
-        public void StopWatchPlayer(string name)
+        private void ApiControllerOnWhitelistedPlayerOnline(object? sender, EventArgs e)
         {
-            watcher.RemovePlayerFromWatch(name);
+            PluginLog.Debug("Player online: " + sender!);
+            onlineWhitelistedUsers.Add((string)sender!);
         }
 
-        public void WatchPlayer(string name)
+        private async Task AssignLocalPlayersData()
         {
-            watcher.AddPlayerToWatch(name);
+            PluginLog.Debug("Temp assigning local players from cache");
+            var currentLocalPlayers = GetLocalPlayers();
+            foreach (var player in _characterCache)
+            {
+                if (currentLocalPlayers.ContainsKey(player.Key.Item1))
+                {
+                    await Task.Run(() => ApiControllerOnCharacterReceived(null, new CharacterReceivedEventArgs
+                    {
+                        CharacterNameHash = player.Key.Item1,
+                        CharacterData = player.Value
+                    }));
+                }
+            }
+
+            await UpdatePlayersFromService(currentLocalPlayers);
+        }
+
+        private void ClientState_TerritoryChanged(object? sender, ushort e)
+        {
+            _ = Task.Run(async () =>
+            {
+                while (_clientState.LocalPlayer == null)
+                {
+                    await Task.Delay(250);
+                }
+
+                await AssignLocalPlayersData();
+            });
         }
 
         private async Task<CharacterCache> CreateFullCharacterCache()
         {
             var cache = BuildCharacterCache();
-            cache.SetGlamourerData(ipcManager.GlamourerGetCharacterCustomization()!);
-            cache.JobId = clientState.LocalPlayer!.ClassJob.Id;
+            cache.SetGlamourerData(_ipcManager.GlamourerGetCharacterCustomization()!);
+            cache.JobId = _clientState.LocalPlayer!.ClassJob.Id;
             await Task.Run(async () =>
             {
                 while (!cache.IsReady)
@@ -462,15 +395,146 @@ namespace MareSynchronos.Managers
             return cache;
         }
 
-        public async Task DebugJson()
+        private unsafe void Framework_Update(Framework framework)
         {
-            var cache = CreateFullCharacterCache();
-            while (!cache.IsCompleted)
+            try
             {
-                await Task.Delay(50);
+                if (_clientState.LocalPlayer == null) return;
+
+                if (DateTime.Now < _lastPlayerObjectCheck.AddSeconds(2)) return;
+
+                List<string> localPlayersList = new();
+                Dictionary<string, PlayerCharacter> newPlayers = new();
+                foreach (var obj in _objectTable)
+                {
+                    if (obj.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) continue;
+                    string playerName = obj.Name.ToString();
+                    if (playerName == GetPlayerName()) continue;
+                    var pObj = (PlayerCharacter)obj;
+                    var hashedName = Crypto.GetHash256(pObj.Name.ToString() + pObj.HomeWorld.Id.ToString());
+
+                    if (!onlineWhitelistedUsers.Contains(hashedName)) continue;
+
+                    localPlayersList.Add(hashedName);
+                    if (!_cachedLocalPlayers.ContainsKey(hashedName)) newPlayers[hashedName] = pObj;
+                    _cachedLocalPlayers[hashedName] = pObj.Name.ToString();
+                }
+
+                foreach (var item in _cachedLocalPlayers.ToList().Where(item => !localPlayersList.Contains(item.Key)))
+                {
+                    foreach (var cachedPlayerNameJobId in _characterCache.Keys.ToList().Where(cachedPlayerNameJobId => cachedPlayerNameJobId.Item1 == item.Key))
+                    {
+                        PluginLog.Debug("Player not visible anymore: " + cachedPlayerNameJobId.Item1);
+                        RestorePreviousCharacter(_cachedLocalPlayers[cachedPlayerNameJobId.Item1]);
+                        _characterCache.Remove(cachedPlayerNameJobId);
+                    }
+
+                    _cachedLocalPlayers.Remove(item.Key);
+                }
+
+                if (newPlayers.Any())
+                {
+                    PluginLog.Debug("Getting data for new players: " + string.Join(Environment.NewLine, newPlayers));
+                    _ = UpdatePlayersFromService(newPlayers);
+                }
+
+                _lastPlayerObjectCheck = DateTime.Now;
+            }
+            catch (Exception ex)
+            {
+                PluginLog.Error(ex, "error");
+            }
+        }
+
+        private Dictionary<string, PlayerCharacter> GetLocalPlayers()
+        {
+            Dictionary<string, PlayerCharacter> allLocalPlayers = new();
+            foreach (var obj in _objectTable)
+            {
+                if (obj.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) continue;
+                string playerName = obj.Name.ToString();
+                if (playerName == GetPlayerName()) continue;
+                var playerObject = (PlayerCharacter)obj;
+                allLocalPlayers.Add(Crypto.GetHash256(playerObject.Name.ToString() + playerObject.HomeWorld.Id.ToString()), playerObject);
             }
 
-            PluginLog.Debug(JsonConvert.SerializeObject(cache.Result, Formatting.Indented));
+            return allLocalPlayers;
+        }
+
+        private string GetPlayerName()
+        {
+            return _clientState.LocalPlayer!.Name.ToString();
+        }
+
+        private void IpcManager_PenumbraRedrawEvent(object? objectTableIndex, EventArgs e)
+        {
+            var objTableObj = _objectTable[(int)objectTableIndex!];
+            if (objTableObj!.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player)
+            {
+                if (objTableObj.Name.ToString() == GetPlayerName())
+                {
+                    PluginLog.Debug("Penumbra Redraw Event");
+                    PlayerChanged(GetPlayerName());
+                }
+            }
+        }
+        private unsafe void PlayerChanged(string name)
+        {
+            //if (sender == null) return;
+            PluginLog.Debug("Player changed: " + name);
+            if (_playerChangedTask is { IsCompleted: false })
+            {
+                PluginLog.Warning("PlayerChanged Task still running");
+                return;
+            }
+
+            _playerChangedTask = Task.Run(() =>
+            {
+                var obj = (GameObject*)_clientState.LocalPlayer!.Address;
+
+                PluginLog.Debug("Waiting for charater to be drawn");
+                while ((obj->RenderFlags & 0b100000000000) == 0b100000000000) // 0b100000000000 is "still rendering" or something
+                {
+                    //PluginLog.Debug("Waiting for character to finish drawing");
+                    Thread.Sleep(10);
+                }
+                PluginLog.Debug("Character finished drawing");
+
+                // wait half a second just in case
+                Thread.Sleep(500);
+
+                var characterCacheTask = CreateFullCharacterCache();
+                Task.WaitAll(characterCacheTask);
+
+                var cacheDto = characterCacheTask.Result.ToCharacterCacheDto();
+                if (cacheDto.Hash == _lastSentHash)
+                {
+                    PluginLog.Warning("Not sending data, already sent");
+                    return;
+                }
+                Task.WaitAll(_apiController.SendCharacterData(cacheDto, GetLocalPlayers().Select(d => d.Key).ToList()));
+                _lastSentHash = cacheDto.Hash;
+            });
+        }
+
+        private void RestorePreviousCharacter(string playerName)
+        {
+            PluginLog.Debug("Restoring state for " + playerName);
+            _ipcManager.PenumbraRemoveTemporaryCollection(playerName);
+            _ipcManager.GlamourerRevertCharacterCustomization(playerName);
+        }
+
+        private void Watcher_PlayerChanged(Dalamud.Game.ClientState.Objects.Types.Character actor)
+        {
+            if (actor.Name.ToString() == _clientState.LocalPlayer!.Name.ToString())
+            {
+                PluginLog.Debug("Watcher: PlayerChanged");
+                PlayerChanged(actor.Name.ToString());
+            }
+            else
+            {
+                PluginLog.Debug("PlayerChanged: " + actor.Name.ToString());
+            }
         }
     }
 }

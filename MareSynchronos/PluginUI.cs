@@ -98,12 +98,66 @@ namespace MareSynchronos
                     configuration.CacheFolder = cachePath;
                     configuration.Save();
                 }
+                ImGui.Separator();
+                ImGui.Text("Pending uploads");
+                ImGui.Text($"Total: {ByteToKiB(apiController.CurrentUploads.Sum(a => a.Value.Item1))} / {ByteToKiB(apiController.CurrentUploads.Sum(a => a.Value.Item2))}");
+                if (ImGui.BeginTable("Uploads", 3))
+                {
+                    ImGui.TableSetupColumn("File");
+                    ImGui.TableSetupColumn("Uploaded");
+                    ImGui.TableSetupColumn("Size");
+                    ImGui.TableHeadersRow();
+                    foreach (var hash in apiController.CurrentUploads.Keys)
+                    {
+                        var color = UploadColor(apiController.CurrentUploads[hash]);
+                        ImGui.PushStyleColor(ImGuiCol.Text, color);
+                        ImGui.TableNextColumn();
+                        ImGui.Text(hash);
+                        ImGui.TableNextColumn();
+                        ImGui.Text(ByteToKiB(apiController.CurrentUploads[hash].Item1));
+                        ImGui.TableNextColumn();
+                        ImGui.Text(ByteToKiB(apiController.CurrentUploads[hash].Item2));
+                        ImGui.PopStyleColor();
+                        ImGui.TableNextRow();
+                    }
+                    ImGui.EndTable();
+                }
+                ImGui.Separator();
+                ImGui.Text("Pending Downloads");
+                ImGui.Text($"Total: {ByteToKiB(apiController.CurrentDownloads.Sum(a => a.Value.Item1))} / {ByteToKiB(apiController.CurrentDownloads.Sum(a => a.Value.Item2))}");
+                if (ImGui.BeginTable("Downloads", 3))
+                {
+                    ImGui.TableSetupColumn("File");
+                    ImGui.TableSetupColumn("Downloaded");
+                    ImGui.TableSetupColumn("Size");
+                    ImGui.TableHeadersRow();
+                    foreach (var hash in apiController.CurrentDownloads.Keys)
+                    {
+                        var color = UploadColor(apiController.CurrentDownloads[hash]);
+                        ImGui.PushStyleColor(ImGuiCol.Text, color);
+                        ImGui.TableNextColumn();
+                        ImGui.Text(hash);
+                        ImGui.TableNextColumn();
+                        ImGui.Text(ByteToKiB(apiController.CurrentDownloads[hash].Item1));
+                        ImGui.TableNextColumn();
+                        ImGui.Text(ByteToKiB(apiController.CurrentDownloads[hash].Item2));
+                        ImGui.PopStyleColor();
+                        ImGui.TableNextRow();
+                    }
+                    ImGui.EndTable();
+                }
+
             }
             else
             {
                 ImGui.TextColored(ImGuiColors.DalamudRed, "Service unavailable");
             }
         }
+
+        private Vector4 UploadColor((long, long) data) => data.Item1 == 0 ? ImGuiColors.DalamudGrey :
+            data.Item1 == data.Item2 ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudYellow;
+
+        private string ByteToKiB(long bytes) => (bytes / 1024.0).ToString("0.00") + " KiB";
 
         private void DrawWhiteListContent()
         {
