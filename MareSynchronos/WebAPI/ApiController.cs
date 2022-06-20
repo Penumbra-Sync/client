@@ -27,32 +27,39 @@ namespace MareSynchronos.WebAPI
 {
     public class CharacterReceivedEventArgs : EventArgs
     {
+        public CharacterReceivedEventArgs(string characterNameHash, CharacterCacheDto characterData)
+        {
+            CharacterData = characterData;
+            CharacterNameHash = characterNameHash;
+        }
+
         public CharacterCacheDto CharacterData { get; set; }
         public string CharacterNameHash { get; set; }
     }
 
     public class ApiController : IDisposable
     {
-        private readonly Configuration pluginConfiguration;
-        private const string MainService = "https://darkarchon.internet-box.ch:5001";
+        public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
+
+        private readonly Configuration _pluginConfiguration;
+        public const string MainServiceUri = "https://darkarchon.internet-box.ch:5001";
         public string UID { get; private set; } = string.Empty;
-        public string SecretKey => pluginConfiguration.ClientSecret.ContainsKey(ApiUri) ? pluginConfiguration.ClientSecret[ApiUri] : "-";
-        private string CacheFolder => pluginConfiguration.CacheFolder;
-        public ConcurrentDictionary<string, (long, long)> CurrentUploads { get; private set; } = new();
-        public ConcurrentDictionary<string, (long, long)> CurrentDownloads { get; private set; } = new();
+        public string SecretKey => _pluginConfiguration.ClientSecret.ContainsKey(ApiUri) ? _pluginConfiguration.ClientSecret[ApiUri] : "-";
+        private string CacheFolder => _pluginConfiguration.CacheFolder;
+        public ConcurrentDictionary<string, (long, long)> CurrentUploads { get; } = new();
+        public ConcurrentDictionary<string, (long, long)> CurrentDownloads { get; } = new();
         public bool IsDownloading { get; private set; } = false;
         public bool IsUploading { get; private set; } = false;
-        public int TotalTransfersPending { get; set; } = 0;
         public bool UseCustomService
         {
-            get => pluginConfiguration.UseCustomService;
+            get => _pluginConfiguration.UseCustomService;
             set
             {
-                pluginConfiguration.UseCustomService = value;
-                pluginConfiguration.Save();
+                _pluginConfiguration.UseCustomService = value;
+                _pluginConfiguration.Save();
             }
         }
-        private string ApiUri => UseCustomService ? pluginConfiguration.ApiUri : MainService;
+        private string ApiUri => UseCustomService ? _pluginConfiguration.ApiUri : MainServiceUri;
 
         public bool ServerAlive =>
             (_heartbeatHub?.State ?? HubConnectionState.Disconnected) == HubConnectionState.Connected;
@@ -76,7 +83,7 @@ namespace MareSynchronos.WebAPI
 
         public ApiController(Configuration pluginConfiguration)
         {
-            this.pluginConfiguration = pluginConfiguration;
+            this._pluginConfiguration = pluginConfiguration;
             cts = new CancellationTokenSource();
 
             _ = Heartbeat();
@@ -294,8 +301,8 @@ namespace MareSynchronos.WebAPI
             if (!ServerAlive) return;
             PluginLog.Debug("Registering at service " + ApiUri);
             var response = await _userHub!.InvokeAsync<string>("Register");
-            pluginConfiguration.ClientSecret[ApiUri] = response;
-            pluginConfiguration.Save();
+            _pluginConfiguration.ClientSecret[ApiUri] = response;
+            _pluginConfiguration.Save();
             RestartHeartbeat();
         }
 
@@ -317,7 +324,7 @@ namespace MareSynchronos.WebAPI
             CancelUpload();
             uploadCancellationTokenSource = new CancellationTokenSource();
             var uploadToken = uploadCancellationTokenSource.Token;
-            PluginLog.Warning("New Token Created");
+            PluginLog.Debug("New Token Created");
 
             var filesToUpload = await _fileHub!.InvokeAsync<List<string>>("SendFiles", character.FileReplacements, uploadToken);
 
@@ -344,7 +351,7 @@ namespace MareSynchronos.WebAPI
             }
             PluginLog.Debug("Upload tasks complete, waiting for server to confirm");
             var anyUploadsOpen = await _fileHub!.InvokeAsync<bool>("IsUploadFinished", uploadToken);
-            PluginLog.Warning("Uploads open: " + anyUploadsOpen);
+            PluginLog.Debug("Uploads open: " + anyUploadsOpen);
             while (anyUploadsOpen && !uploadToken.IsCancellationRequested)
             {
                 anyUploadsOpen = await _fileHub!.InvokeAsync<bool>("IsUploadFinished", uploadToken);
@@ -357,7 +364,7 @@ namespace MareSynchronos.WebAPI
 
             if (!uploadToken.IsCancellationRequested)
             {
-                PluginLog.Warning("=== Pushing character data ===");
+                PluginLog.Debug("=== Pushing character data ===");
                 await _userHub!.InvokeAsync("PushCharacterData", character, visibleCharacterIds, uploadToken);
             }
             else
@@ -372,11 +379,7 @@ namespace MareSynchronos.WebAPI
         public Task ReceiveCharacterData(CharacterCacheDto character, string characterHash)
         {
             PluginLog.Debug("Received DTO for " + characterHash);
-            CharacterReceived?.Invoke(null, new CharacterReceivedEventArgs()
-            {
-                CharacterData = character,
-                CharacterNameHash = characterHash
-            });
+            CharacterReceived?.Invoke(null, new CharacterReceivedEventArgs(characterHash, character));
             return Task.CompletedTask;
         }
 

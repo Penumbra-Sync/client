@@ -13,44 +13,61 @@ using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState;
 using System;
 using MareSynchronos.Models;
-using Dalamud.Game.Gui;
 using MareSynchronos.PenumbraMod;
 using Newtonsoft.Json;
 using MareSynchronos.Managers;
 using LZ4;
 using MareSynchronos.WebAPI;
 using Dalamud.Interface.Windowing;
+using MareSynchronos.UI;
 
 namespace MareSynchronos
 {
     public sealed class Plugin : IDalamudPlugin
     {
-        private const string commandName = "/mare";
-        private readonly ClientState clientState;
-        private readonly Framework framework;
-        private readonly ObjectTable objectTable;
-        private readonly WindowSystem windowSystem;
-        private readonly ApiController apiController;
-        private CharacterManager? characterManager;
-        private IpcManager ipcManager;
+        private const string CommandName = "/mare";
+        private readonly ApiController _apiController;
+        private readonly ClientState _clientState;
+        private readonly CommandManager _commandManager;
+        private readonly Configuration _configuration;
+        private readonly FileCacheManager _fileCacheManager;
+        private readonly Framework _framework;
+        private readonly IntroUI _introUi;
+        private readonly IpcManager _ipcManager;
+        private readonly ObjectTable _objectTable;
+        private readonly DalamudPluginInterface _pluginInterface;
+        private readonly PluginUi _pluginUi;
+        private readonly WindowSystem _windowSystem;
+        private CharacterManager? _characterManager;
         public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager,
             Framework framework, ObjectTable objectTable, ClientState clientState)
         {
-            this.PluginInterface = pluginInterface;
-            this.CommandManager = commandManager;
-            this.framework = framework;
-            this.objectTable = objectTable;
-            this.clientState = clientState;
-            Configuration = this.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-            Configuration.Initialize(this.PluginInterface);
+            _pluginInterface = pluginInterface;
+            _commandManager = commandManager;
+            _framework = framework;
+            _objectTable = objectTable;
+            _clientState = clientState;
+            _configuration = _pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+            _configuration.Initialize(_pluginInterface);
 
-            windowSystem = new WindowSystem("MareSynchronos");
+            _windowSystem = new WindowSystem("MareSynchronos");
 
-            apiController = new ApiController(Configuration);
-            ipcManager = new IpcManager(PluginInterface);
+            _apiController = new ApiController(_configuration);
+            _ipcManager = new IpcManager(_pluginInterface);
+            _fileCacheManager = new FileCacheManager(new FileCacheFactory(), _ipcManager, _configuration);
+
+            var uiSharedComponent =
+                new UIShared(_ipcManager, _apiController, _fileCacheManager, _configuration);
 
             // you might normally want to embed resources and load them from the manifest stream
-            this.PluginUi = new PluginUI(this.Configuration, windowSystem, apiController, ipcManager);
+            _pluginUi = new PluginUi(_windowSystem, uiSharedComponent, _configuration, _apiController);
+            _introUi = new IntroUI(_windowSystem, uiSharedComponent, _configuration, _fileCacheManager);
+            _introUi.FinishedRegistration += (_, _) =>
+            {
+                _pluginUi.IsOpen = true;
+                _introUi?.Dispose();
+                ClientState_Login(null, EventArgs.Empty);
+            };
 
             new FileCacheContext().Dispose(); // make sure db is initialized I guess
 
@@ -64,54 +81,64 @@ namespace MareSynchronos
         }
 
         public string Name => "Mare Synchronos";
-        private CommandManager CommandManager { get; init; }
-        private Configuration Configuration { get; init; }
-        private DalamudPluginInterface PluginInterface { get; init; }
-        private PluginUI PluginUi { get; init; }
         public void Dispose()
         {
-            this.PluginUi?.Dispose();
-            this.CommandManager.RemoveHandler(commandName);
-            clientState.Login -= ClientState_Login;
-            clientState.Logout -= ClientState_Logout;
-            ipcManager?.Dispose();
-            characterManager?.Dispose();
-            apiController?.Dispose();
+            _commandManager.RemoveHandler(CommandName);
+            _clientState.Login -= ClientState_Login;
+            _clientState.Logout -= ClientState_Logout;
+
+            _pluginUi?.Dispose();
+            _introUi?.Dispose();
+
+            _fileCacheManager?.Dispose();
+            _ipcManager?.Dispose();
+            _characterManager?.Dispose();
+            _apiController?.Dispose();
         }
 
         private void ClientState_Login(object? sender, EventArgs e)
         {
             PluginLog.Debug("Client login");
 
+            if (!_configuration.HasValidSetup)
+            {
+                _introUi.IsOpen = true;
+                return;
+            }
+            else
+            {
+                _introUi.IsOpen = false;
+                _pluginInterface.UiBuilder.Draw += Draw;
+            }
+
             Task.Run(async () =>
             {
-                while (clientState.LocalPlayer == null)
+                while (_clientState.LocalPlayer == null)
                 {
                     await Task.Delay(50);
                 }
 
-                characterManager = new CharacterManager(
-                    clientState, framework, apiController, objectTable, ipcManager, new FileReplacementFactory(ipcManager), Configuration);
-                characterManager.StartWatchingPlayer();
-                ipcManager.PenumbraRedraw(clientState.LocalPlayer!.Name.ToString());
+                _characterManager = new CharacterManager(
+                    _clientState, _framework, _apiController, _objectTable, _ipcManager, new FileReplacementFactory(_ipcManager), _configuration);
+                _characterManager.StartWatchingPlayer();
+                _ipcManager.PenumbraRedraw(_clientState.LocalPlayer!.Name.ToString());
             });
 
-            PluginInterface.UiBuilder.Draw += Draw;
-            PluginInterface.UiBuilder.OpenConfigUi += OpenConfigUI;
+            _pluginInterface.UiBuilder.OpenConfigUi += OpenConfigUi;
 
-            CommandManager.AddHandler(commandName, new CommandInfo(OnCommand)
+            _commandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
             {
-                HelpMessage = "pass 'scan' to initialize or rescan files into the database"
+                HelpMessage = "Opens the Mare Synchronos UI"
             });
         }
 
         private void ClientState_Logout(object? sender, EventArgs e)
         {
             PluginLog.Debug("Client logout");
-            characterManager?.Dispose();
-            PluginInterface.UiBuilder.Draw -= Draw;
-            PluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUI;
-            CommandManager.RemoveHandler(commandName);
+            _characterManager?.Dispose();
+            _pluginInterface.UiBuilder.Draw -= Draw;
+            _pluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;
+            _commandManager.RemoveHandler(CommandName);
         }
 
         private void CopyFile(FileReplacement replacement, string targetDirectory, Dictionary<string, string>? resourceDict = null)
@@ -126,18 +153,18 @@ namespace MareSynchronos
                 {
                     var ext = new FileInfo(fileCache.Filepath).Extension;
                     var newFilePath = Path.Combine(targetDirectory, "files", fileCache.Hash.ToLower() + ext);
-                    string lc4hcPath = Path.Combine(targetDirectory, "files", "lz4hc." + fileCache.Hash.ToLower() + ext);
-                    if (!File.Exists(lc4hcPath))
+                    string lc4HcPath = Path.Combine(targetDirectory, "files", "lz4hc." + fileCache.Hash.ToLower() + ext);
+                    if (!File.Exists(lc4HcPath))
                     {
 
                         Stopwatch st = Stopwatch.StartNew();
-                        File.WriteAllBytes(lc4hcPath, LZ4Codec.WrapHC(File.ReadAllBytes(fileCache.Filepath), 0, (int)new FileInfo(fileCache.Filepath).Length));
+                        File.WriteAllBytes(lc4HcPath, LZ4Codec.WrapHC(File.ReadAllBytes(fileCache.Filepath), 0, (int)new FileInfo(fileCache.Filepath).Length));
                         st.Stop();
-                        PluginLog.Debug("Compressed " + new FileInfo(fileCache.Filepath).Length + " bytes to " + new FileInfo(lc4hcPath).Length + " bytes in " + st.Elapsed);
+                        PluginLog.Debug("Compressed " + new FileInfo(fileCache.Filepath).Length + " bytes to " + new FileInfo(lc4HcPath).Length + " bytes in " + st.Elapsed);
                         File.Copy(fileCache.Filepath, newFilePath);
                         if (resourceDict != null)
                         {
-                            foreach(var path in replacement.GamePaths)
+                            foreach (var path in replacement.GamePaths)
                             {
                                 resourceDict[path] = $"files\\{fileCache.Hash.ToLower() + ext}";
                             }
@@ -157,40 +184,35 @@ namespace MareSynchronos
 
         private void Draw()
         {
-            windowSystem.Draw();
-        }
-
-        private void OpenConfigUI()
-        {
-            this.PluginUi.Toggle();
+            _windowSystem.Draw();
         }
 
         private void OnCommand(string command, string args)
         {
             if (args == "printjson")
             {
-                _ = characterManager?.DebugJson();
+                _ = _characterManager?.DebugJson();
             }
 
             if (args.StartsWith("watch"))
             {
                 var playerName = args.Replace("watch", "").Trim();
-                characterManager!.WatchPlayer(playerName);
+                _characterManager!.WatchPlayer(playerName);
             }
 
             if (args.StartsWith("stop"))
             {
                 var playerName = args.Replace("watch", "").Trim();
-                characterManager!.StopWatchPlayer(playerName);
+                _characterManager!.StopWatchPlayer(playerName);
             }
 
             if (args == "createtestmod")
             {
                 Task.Run(() =>
                 {
-                    var playerName = clientState.LocalPlayer!.Name.ToString();
+                    var playerName = _clientState.LocalPlayer!.Name.ToString();
                     var modName = $"Mare Synchronos Test Mod {playerName}";
-                    var modDirectory = ipcManager!.PenumbraModDirectory()!;
+                    var modDirectory = _ipcManager!.PenumbraModDirectory()!;
                     string modDirectoryPath = Path.Combine(modDirectory, modName);
                     if (Directory.Exists(modDirectoryPath))
                     {
@@ -206,7 +228,7 @@ namespace MareSynchronos
                         Description = "Mare Synchronous Test Mod Export",
                     };
 
-                    var resources = characterManager!.BuildCharacterCache();
+                    var resources = _characterManager!.BuildCharacterCache();
                     var metaJson = JsonConvert.SerializeObject(meta);
                     File.WriteAllText(Path.Combine(modDirectoryPath, "meta.json"), metaJson);
 
@@ -229,8 +251,13 @@ namespace MareSynchronos
 
             if (string.IsNullOrEmpty(args))
             {
-                PluginUi.Toggle();
+                _pluginUi.Toggle();
             }
+        }
+
+        private void OpenConfigUi()
+        {
+            _pluginUi.Toggle();
         }
     }
 }

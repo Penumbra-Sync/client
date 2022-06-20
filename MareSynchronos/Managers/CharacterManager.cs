@@ -45,7 +45,7 @@ namespace MareSynchronos.Managers
         private string _lastSentHash = string.Empty;
         private Task? _playerChangedTask = null;
 
-        private HashSet<string> onlineWhitelistedUsers = new();
+        private HashSet<string> _onlineWhitelistedUsers = new();
 
         public CharacterManager(ClientState clientState, Framework framework, ApiController apiController, ObjectTable objectTable, IpcManager ipcManager, FileReplacementFactory factory,
                     Configuration pluginConfiguration)
@@ -154,6 +154,11 @@ namespace MareSynchronos.Managers
             _watcher.Disable();
             _watcher.PlayerChanged -= Watcher_PlayerChanged;
             _watcher?.Dispose();
+
+            foreach (var character in _onlineWhitelistedUsers)
+            {
+                RestoreCharacter(character);
+            }
         }
 
         public void StopWatchPlayer(string name)
@@ -164,7 +169,7 @@ namespace MareSynchronos.Managers
         public async Task UpdatePlayersFromService(Dictionary<string, PlayerCharacter> currentLocalPlayers)
         {
             PluginLog.Debug("Updating local players from service");
-            currentLocalPlayers = currentLocalPlayers.Where(k => onlineWhitelistedUsers.Contains(k.Key))
+            currentLocalPlayers = currentLocalPlayers.Where(k => _onlineWhitelistedUsers.Contains(k.Key))
                 .ToDictionary(k => k.Key, k => k.Value);
             await _apiController.GetCharacterData(currentLocalPlayers
                 .ToDictionary(
@@ -205,10 +210,10 @@ namespace MareSynchronos.Managers
 
             Task.WaitAll(apiTask);
 
-            onlineWhitelistedUsers = new HashSet<string>(apiTask.Result);
+            _onlineWhitelistedUsers = new HashSet<string>(apiTask.Result);
             var assignTask = AssignLocalPlayersData();
             Task.WaitAll(assignTask);
-            PluginLog.Debug("Online and whitelisted users: " + string.Join(",", onlineWhitelistedUsers));
+            PluginLog.Debug("Online and whitelisted users: " + string.Join(",", _onlineWhitelistedUsers));
 
             _framework.Update += Framework_Update;
             _ipcManager.PenumbraRedrawEvent += IpcManager_PenumbraRedrawEvent;
@@ -221,6 +226,12 @@ namespace MareSynchronos.Managers
             _framework.Update -= Framework_Update;
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
             _clientState.TerritoryChanged -= ClientState_TerritoryChanged;
+            foreach (var character in _onlineWhitelistedUsers)
+            {
+                RestoreCharacter(character);
+            }
+
+            _lastSentHash = string.Empty;
         }
 
         private void ApiControllerOnAddedToWhitelist(object? sender, EventArgs e)
@@ -230,7 +241,7 @@ namespace MareSynchronos.Managers
             var players = GetLocalPlayers();
             if (players.ContainsKey(characterHash))
             {
-                PluginLog.Debug("You got added to a whitelist, restoring data for " + characterHash);
+                PluginLog.Debug("Removed from whitelist, restoring data for " + characterHash);
                 _ = _apiController.GetCharacterData(new Dictionary<string, int> { { characterHash, (int)players[characterHash].ClassJob.Id } });
             }
         }
@@ -287,8 +298,8 @@ namespace MareSynchronos.Managers
             }
 
             PluginLog.Debug("Assigned hash to visible player: " + otherPlayerName);
-            /*ipcManager.PenumbraRemoveTemporaryCollection(otherPlayerName);
-            ipcManager.PenumbraCreateTemporaryCollection(otherPlayerName);
+            _ipcManager.PenumbraRemoveTemporaryCollection(otherPlayerName);
+            _ipcManager.PenumbraCreateTemporaryCollection(otherPlayerName);
             Dictionary<string, string> moddedPaths = new();
             using (var db = new FileCacheContext())
             {
@@ -306,41 +317,49 @@ namespace MareSynchronos.Managers
                 }
             }
 
-            ipcManager.PenumbraSetTemporaryMods(otherPlayerName, moddedPaths);*/
+            _ipcManager.PenumbraSetTemporaryMods(otherPlayerName, moddedPaths);
             _ipcManager.GlamourerApplyCharacterCustomization(e.CharacterData.GlamourerData, otherPlayerName);
-            //ipcManager.PenumbraRedraw(otherPlayerName);
+            _ipcManager.PenumbraRedraw(otherPlayerName);
         }
 
         private void ApiControllerOnRemovedFromWhitelist(object? sender, EventArgs e)
         {
             var characterHash = (string?)sender;
             if (string.IsNullOrEmpty(characterHash)) return;
+            RestoreCharacter(characterHash);
+        }
+
+        private void RestoreCharacter(string characterHash)
+        {
             var players = GetLocalPlayers();
+
             foreach (var entry in _characterCache.Where(c => c.Key.Item1 == characterHash))
             {
                 _characterCache.Remove(entry.Key);
             }
 
-            var playerName = players.SingleOrDefault(p => p.Key == characterHash).Value.Name.ToString() ?? null;
-            if (playerName != null)
+            foreach (var player in players)
             {
+                if (player.Key != characterHash) continue;
+                var playerName = player.Value.Name.ToString();
                 RestorePreviousCharacter(playerName);
                 PluginLog.Debug("Removed from whitelist, restoring glamourer state for " + playerName);
                 _ipcManager.PenumbraRemoveTemporaryCollection(playerName);
                 _ipcManager.GlamourerRevertCharacterCustomization(playerName);
+                break;
             }
         }
 
         private void ApiControllerOnWhitelistedPlayerOffline(object? sender, EventArgs e)
         {
             PluginLog.Debug("Player offline: " + sender!);
-            onlineWhitelistedUsers.Remove((string)sender!);
+            _onlineWhitelistedUsers.Remove((string)sender!);
         }
 
         private void ApiControllerOnWhitelistedPlayerOnline(object? sender, EventArgs e)
         {
             PluginLog.Debug("Player online: " + sender!);
-            onlineWhitelistedUsers.Add((string)sender!);
+            _onlineWhitelistedUsers.Add((string)sender!);
         }
 
         private async Task AssignLocalPlayersData()
@@ -351,11 +370,7 @@ namespace MareSynchronos.Managers
             {
                 if (currentLocalPlayers.ContainsKey(player.Key.Item1))
                 {
-                    await Task.Run(() => ApiControllerOnCharacterReceived(null, new CharacterReceivedEventArgs
-                    {
-                        CharacterNameHash = player.Key.Item1,
-                        CharacterData = player.Value
-                    }));
+                    await Task.Run(() => ApiControllerOnCharacterReceived(null, new CharacterReceivedEventArgs(player.Key.Item1, player.Value)));
                 }
             }
 
@@ -413,7 +428,7 @@ namespace MareSynchronos.Managers
                     var pObj = (PlayerCharacter)obj;
                     var hashedName = Crypto.GetHash256(pObj.Name.ToString() + pObj.HomeWorld.Id.ToString());
 
-                    if (!onlineWhitelistedUsers.Contains(hashedName)) continue;
+                    if (!_onlineWhitelistedUsers.Contains(hashedName)) continue;
 
                     localPlayersList.Add(hashedName);
                     if (!_cachedLocalPlayers.ContainsKey(hashedName)) newPlayers[hashedName] = pObj;
@@ -455,7 +470,7 @@ namespace MareSynchronos.Managers
                 string playerName = obj.Name.ToString();
                 if (playerName == GetPlayerName()) continue;
                 var playerObject = (PlayerCharacter)obj;
-                allLocalPlayers.Add(Crypto.GetHash256(playerObject.Name.ToString() + playerObject.HomeWorld.Id.ToString()), playerObject);
+                allLocalPlayers[Crypto.GetHash256(playerObject.Name.ToString() + playerObject.HomeWorld.Id.ToString())] = playerObject;
             }
 
             return allLocalPlayers;
@@ -509,7 +524,7 @@ namespace MareSynchronos.Managers
                 var cacheDto = characterCacheTask.Result.ToCharacterCacheDto();
                 if (cacheDto.Hash == _lastSentHash)
                 {
-                    PluginLog.Warning("Not sending data, already sent");
+                    PluginLog.Debug("Not sending data, already sent");
                     return;
                 }
                 Task.WaitAll(_apiController.SendCharacterData(cacheDto, GetLocalPlayers().Select(d => d.Key).ToList()));

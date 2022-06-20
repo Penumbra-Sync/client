@@ -10,23 +10,23 @@ namespace MareSynchronos.Managers
 {
     public class IpcManager : IDisposable
     {
-        private readonly DalamudPluginInterface pluginInterface;
-        private ICallGateSubscriber<object> penumbraInit;
-        private ICallGateSubscriber<string, string, string>? penumbraResolvePath;
-        private ICallGateSubscriber<string>? penumbraResolveModDir;
-        private ICallGateSubscriber<string>? glamourerGetCharacterCustomization;
-        private ICallGateSubscriber<string, string, object>? glamourerApplyCharacterCustomization;
-        private ICallGateSubscriber<int> penumbraApiVersion;
-        private ICallGateSubscriber<int> glamourerApiVersion;
-        private ICallGateSubscriber<IntPtr, int, object?> penumbraObjectIsRedrawn;
-        private ICallGateSubscriber<string, int, object>? penumbraRedraw;
-        private ICallGateSubscriber<string, string, string[]>? penumbraReverseResolvePath;
-        private ICallGateSubscriber<string, object> glamourerRevertCustomization;
+        private readonly DalamudPluginInterface _pluginInterface;
+        private readonly ICallGateSubscriber<object> _penumbraInit;
+        private readonly ICallGateSubscriber<string, string, string>? _penumbraResolvePath;
+        private readonly ICallGateSubscriber<string>? _penumbraResolveModDir;
+        private readonly ICallGateSubscriber<string>? _glamourerGetCharacterCustomization;
+        private readonly ICallGateSubscriber<string, string, object>? _glamourerApplyCharacterCustomization;
+        private readonly ICallGateSubscriber<int> _penumbraApiVersion;
+        private readonly ICallGateSubscriber<int> _glamourerApiVersion;
+        private readonly ICallGateSubscriber<IntPtr, int, object?> _penumbraObjectIsRedrawn;
+        private readonly ICallGateSubscriber<string, int, object>? _penumbraRedraw;
+        private readonly ICallGateSubscriber<string, string, string[]>? _penumbraReverseResolvePath;
+        private readonly ICallGateSubscriber<string, object> _glamourerRevertCustomization;
 
-        private ICallGateSubscriber<string, string, IReadOnlyDictionary<string, string>, List<string>, int, int>
-            penumbraSetTemporaryMod;
-        private ICallGateSubscriber<string, string, bool, (int, string)> penumbraCreateTemporaryCollection;
-        private ICallGateSubscriber<string, int> penumbraRemoveTemporaryCollection;
+        private readonly ICallGateSubscriber<string, string, IReadOnlyDictionary<string, string>, List<string>, int, int>
+            _penumbraSetTemporaryMod;
+        private readonly ICallGateSubscriber<string, string, bool, (int, string)> _penumbraCreateTemporaryCollection;
+        private readonly ICallGateSubscriber<string, int> _penumbraRemoveTemporaryCollection;
 
         public bool Initialized { get; private set; } = false;
 
@@ -34,41 +34,41 @@ namespace MareSynchronos.Managers
 
         public IpcManager(DalamudPluginInterface pi)
         {
-            pluginInterface = pi;
+            _pluginInterface = pi;
 
-            penumbraInit = pluginInterface.GetIpcSubscriber<object>("Penumbra.Initialized");
-            penumbraResolvePath = pluginInterface.GetIpcSubscriber<string, string, string>("Penumbra.ResolveCharacterPath");
-            penumbraResolveModDir = pluginInterface.GetIpcSubscriber<string>("Penumbra.GetModDirectory");
-            penumbraRedraw = pluginInterface.GetIpcSubscriber<string, int, object>("Penumbra.RedrawObjectByName");
-            glamourerGetCharacterCustomization = pluginInterface.GetIpcSubscriber<string>("Glamourer.GetCharacterCustomization");
-            glamourerApplyCharacterCustomization = pluginInterface.GetIpcSubscriber<string, string, object>("Glamourer.ApplyCharacterCustomization");
-            penumbraReverseResolvePath = pluginInterface.GetIpcSubscriber<string, string, string[]>("Penumbra.ReverseResolvePath");
-            penumbraApiVersion = pluginInterface.GetIpcSubscriber<int>("Penumbra.ApiVersion");
-            glamourerApiVersion = pluginInterface.GetIpcSubscriber<int>("Glamourer.ApiVersion");
-            glamourerRevertCustomization = pluginInterface.GetIpcSubscriber<string, object>("Glamourer.RevertCharacterCustomization");
-            penumbraObjectIsRedrawn = pluginInterface.GetIpcSubscriber<IntPtr, int, object?>("Penumbra.GameObjectRedrawn");
+            _penumbraInit = _pluginInterface.GetIpcSubscriber<object>("Penumbra.Initialized");
+            _penumbraResolvePath = _pluginInterface.GetIpcSubscriber<string, string, string>("Penumbra.ResolveCharacterPath");
+            _penumbraResolveModDir = _pluginInterface.GetIpcSubscriber<string>("Penumbra.GetModDirectory");
+            _penumbraRedraw = _pluginInterface.GetIpcSubscriber<string, int, object>("Penumbra.RedrawObjectByName");
+            _glamourerGetCharacterCustomization = _pluginInterface.GetIpcSubscriber<string>("Glamourer.GetCharacterCustomization");
+            _glamourerApplyCharacterCustomization = _pluginInterface.GetIpcSubscriber<string, string, object>("Glamourer.ApplyCharacterCustomization");
+            _penumbraReverseResolvePath = _pluginInterface.GetIpcSubscriber<string, string, string[]>("Penumbra.ReverseResolvePath");
+            _penumbraApiVersion = _pluginInterface.GetIpcSubscriber<int>("Penumbra.ApiVersion");
+            _glamourerApiVersion = _pluginInterface.GetIpcSubscriber<int>("Glamourer.ApiVersion");
+            _glamourerRevertCustomization = _pluginInterface.GetIpcSubscriber<string, object>("Glamourer.RevertCharacterCustomization");
+            _penumbraObjectIsRedrawn = _pluginInterface.GetIpcSubscriber<IntPtr, int, object?>("Penumbra.GameObjectRedrawn");
 
-            penumbraObjectIsRedrawn.Subscribe(RedrawEvent);
-            penumbraInit.Subscribe(RedrawSelf);
+            _penumbraObjectIsRedrawn.Subscribe(RedrawEvent);
+            _penumbraInit.Subscribe(RedrawSelf);
 
-            penumbraSetTemporaryMod =
-                pluginInterface
+            _penumbraSetTemporaryMod =
+                _pluginInterface
                     .GetIpcSubscriber<string, string, IReadOnlyDictionary<string, string>, List<string>, int,
                         int>("Penumbra.AddTemporaryMod");
 
-            penumbraCreateTemporaryCollection =
-                pluginInterface.GetIpcSubscriber<string, string, bool, (int, string)>("Penumbra.CreateTemporaryCollection");
-            penumbraRemoveTemporaryCollection =
-                pluginInterface.GetIpcSubscriber<string, int>("Penumbra.RemoveTemporaryCollection");
+            _penumbraCreateTemporaryCollection =
+                _pluginInterface.GetIpcSubscriber<string, string, bool, (int, string)>("Penumbra.CreateTemporaryCollection");
+            _penumbraRemoveTemporaryCollection =
+                _pluginInterface.GetIpcSubscriber<string, int>("Penumbra.RemoveTemporaryCollection");
 
             Initialized = true;
         }
 
-        public bool CheckPenumbraAPI()
+        public bool CheckPenumbraApi()
         {
             try
             {
-                return penumbraApiVersion.InvokeFunc() >= 4;
+                return _penumbraApiVersion.InvokeFunc() >= 4;
             }
             catch
             {
@@ -76,11 +76,11 @@ namespace MareSynchronos.Managers
             }
         }
 
-        public bool CheckGlamourerAPI()
+        public bool CheckGlamourerApi()
         {
             try
             {
-                return glamourerApiVersion.InvokeFunc() >= 0;
+                return _glamourerApiVersion.InvokeFunc() >= 0;
             }
             catch
             {
@@ -95,91 +95,78 @@ namespace MareSynchronos.Managers
 
         private void RedrawSelf()
         {
-            penumbraRedraw!.InvokeAction("self", 0);
+            _penumbraRedraw!.InvokeAction("self", 0);
         }
 
         private void Uninitialize()
         {
-            penumbraInit.Unsubscribe(RedrawSelf);
-            penumbraObjectIsRedrawn.Unsubscribe(RedrawEvent);
-            penumbraResolvePath = null;
-            penumbraResolveModDir = null;
-            glamourerGetCharacterCustomization = null;
-            glamourerApplyCharacterCustomization = null;
-            penumbraReverseResolvePath = null;
+            _penumbraInit.Unsubscribe(RedrawSelf);
+            _penumbraObjectIsRedrawn.Unsubscribe(RedrawEvent);
             Initialized = false;
             PluginLog.Debug("IPC Manager disposed");
         }
 
         public string[] PenumbraReverseResolvePath(string path, string characterName)
         {
-            if (!CheckPenumbraAPI()) return new[] { path };
-            return penumbraReverseResolvePath!.InvokeFunc(path, characterName);
+            if (!CheckPenumbraApi()) return new[] { path };
+            return _penumbraReverseResolvePath!.InvokeFunc(path, characterName);
         }
 
         public string? PenumbraResolvePath(string path, string characterName)
         {
-            if (!CheckPenumbraAPI()) return null;
-            return penumbraResolvePath!.InvokeFunc(path, characterName);
+            if (!CheckPenumbraApi()) return null;
+            return _penumbraResolvePath!.InvokeFunc(path, characterName);
         }
 
         public string? PenumbraModDirectory()
         {
-            if (!CheckPenumbraAPI()) return null;
-            return penumbraResolveModDir!.InvokeFunc();
+            if (!CheckPenumbraApi()) return null;
+            return _penumbraResolveModDir!.InvokeFunc();
         }
 
         public string? GlamourerGetCharacterCustomization()
         {
-            if (!CheckGlamourerAPI()) return null;
-            return glamourerGetCharacterCustomization!.InvokeFunc();
+            if (!CheckGlamourerApi()) return null;
+            return _glamourerGetCharacterCustomization!.InvokeFunc();
         }
 
         public void GlamourerApplyCharacterCustomization(string customization, string characterName)
         {
-            if (!CheckGlamourerAPI()) return;
-            glamourerApplyCharacterCustomization!.InvokeAction(customization, characterName);
+            if (!CheckGlamourerApi()) return;
+            _glamourerApplyCharacterCustomization!.InvokeAction(customization, characterName);
         }
 
         public void GlamourerRevertCharacterCustomization(string characterName)
         {
-            if (!CheckGlamourerAPI()) return;
-            glamourerRevertCustomization!.InvokeAction(characterName);
+            if (!CheckGlamourerApi()) return;
+            _glamourerRevertCustomization!.InvokeAction(characterName);
         }
 
         public void PenumbraRedraw(string actorName)
         {
-            if (!CheckPenumbraAPI()) return;
-            penumbraRedraw!.InvokeAction(actorName, 0);
+            if (!CheckPenumbraApi()) return;
+            _penumbraRedraw!.InvokeAction(actorName, 0);
         }
 
         public void PenumbraCreateTemporaryCollection(string characterName)
         {
-            if (!CheckPenumbraAPI()) return;
+            if (!CheckPenumbraApi()) return;
             PluginLog.Debug("Creating temp collection for " + characterName);
             //penumbraCreateTemporaryCollection.InvokeFunc("MareSynchronos", characterName, true);
         }
 
         public void PenumbraRemoveTemporaryCollection(string characterName)
         {
-            if (!CheckPenumbraAPI()) return;
+            if (!CheckPenumbraApi()) return;
             PluginLog.Debug("Removing temp collection for " + characterName);
             //penumbraRemoveTemporaryCollection.InvokeFunc(characterName);
         }
 
         public void PenumbraSetTemporaryMods(string characterName, IReadOnlyDictionary<string, string> modPaths)
         {
-            if (!CheckPenumbraAPI()) return;
+            if (!CheckPenumbraApi()) return;
             PluginLog.Debug("Assigning temp mods for " + characterName);
-            try
-            {
-                //var result = penumbraSetTemporaryMod.InvokeFunc("MareSynchronos", characterName, modPaths, new List<string>(), 0);
-                //PluginLog.Debug("Success: " + result);
-            }
-            catch (Exception ex)
-            {
-                PluginLog.Error(ex, "Error during IPC call");
-            }
+            //penumbraSetTemporaryMod.InvokeFunc("MareSynchronos", characterName, modPaths, new List<string>(), 0);
         }
 
         public void Dispose()

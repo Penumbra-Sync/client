@@ -15,7 +15,7 @@ namespace MareSynchronos.Factories
 
         public FileReplacement Create()
         {
-            if (!ipcManager.CheckPenumbraAPI())
+            if (!ipcManager.CheckPenumbraApi())
             {
                 throw new System.Exception();
             }
