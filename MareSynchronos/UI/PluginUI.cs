@@ -202,15 +202,6 @@ namespace MareSynchronos.UI
                             ? "Has not added you"
                             : ((item.IsPaused || item.IsPausedFromOthers) ? "Unpaired" : "Paired");
                         ImGui.TextColored(UIShared.GetBoolColor(item.IsSynced && !item.IsPaused && !item.IsPausedFromOthers), pairString);
-                        /*string pauseYou = item.IsPaused ? "You paused them" : "";
-                        string pauseThey = item.IsPausedFromOthers ? "They paused you" : "";
-                        string separator = (item.IsPaused && item.IsPausedFromOthers) ? Environment.NewLine : "";
-                        string entry = pauseYou + separator + pauseThey;
-                        if (!string.IsNullOrEmpty(entry))
-                        {
-                            ImGui.TextColored(UIShared.GetBoolColor(!item.IsPausedFromOthers && !item.IsPaused), entry);
-                        }*/
-
                         ImGui.TableNextColumn();
                         string charComment = _configuration.UidComments.ContainsKey(item.OtherUID) ? _configuration.UidComments[item.OtherUID] : string.Empty;
                         ImGui.SetNextItemWidth(400);
