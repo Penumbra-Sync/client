@@ -100,6 +100,8 @@ namespace MareSynchronos
         {
             PluginLog.Debug("Client login");
 
+            _pluginInterface.UiBuilder.Draw += Draw;
+
             if (!_configuration.HasValidSetup)
             {
                 _introUi.IsOpen = true;
@@ -108,7 +110,6 @@ namespace MareSynchronos
             else
             {
                 _introUi.IsOpen = false;
-                _pluginInterface.UiBuilder.Draw += Draw;
             }
 
             Task.Run(async () =>

@@ -55,7 +55,7 @@ namespace MareSynchronos.Managers
         public void StartInitialScan()
         {
             _scanCancellationTokenSource = new CancellationTokenSource();
-            _scanTask = StartFileScan(_scanCancellationTokenSource.Token);
+            _scanTask = Task.Run(() => StartFileScan(_scanCancellationTokenSource.Token));
         }
 
         private async Task StartFileScan(CancellationToken ct)
@@ -172,12 +172,12 @@ namespace MareSynchronos.Managers
                 _timerStopWatch?.Stop();
                 if (_scanTask?.IsCompleted ?? false)
                 {
-                    PluginLog.Warning("Scanning task is still running, not reinitiating.");
+                    PluginLog.Warning("Scanning task is still running, not re-initiating.");
                     return;
                 }
 
                 PluginLog.Debug("Initiating periodic scan for mod changes");
-                _scanTask = StartFileScan(_scanCancellationTokenSource!.Token);
+                Task.Run(() => _scanTask = StartFileScan(_scanCancellationTokenSource!.Token));
                 _timerStopWatch = Stopwatch.StartNew();
             };
 

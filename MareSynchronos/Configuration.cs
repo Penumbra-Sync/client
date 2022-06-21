@@ -22,9 +22,10 @@ namespace MareSynchronos
             get => string.IsNullOrEmpty(_apiUri) ? ApiController.MainServiceUri : _apiUri;
             set => _apiUri = value;
         }
-        public bool UseCustomService { get; set; }
-        public bool InitialScanComplete { get; set; }
-        public bool AcceptedAgreement { get; set; }
+
+        public bool UseCustomService { get; set; } = false;
+        public bool InitialScanComplete { get; set; } = false;
+        public bool AcceptedAgreement { get; set; } = false;
         private int _maxParallelScan = 10;
         public int MaxParallelScan
         {

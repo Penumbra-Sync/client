@@ -63,6 +63,10 @@ namespace MareSynchronos.UI
                                   "Note that you will have to have Penumbra as well as Glamourer installed to use this plugin.");
                 UIShared.TextWrapped("We will have to setup a few things first before you can start using this plugin. Click on next to continue.");
 
+                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
+                UIShared.TextWrapped("Note: Any modifications you have applied through anything but Penumbra cannot be shared and your character state on other clients " +
+                                     "might look broken because of this. If you want to use this plugin you will have to move your mods to Penumbra.");
+                ImGui.PopStyleColor();
                 if (!_uiShared.DrawOtherPluginState()) return;
                 ImGui.Separator();
                 if (ImGui.Button("Next##toAgreement"))

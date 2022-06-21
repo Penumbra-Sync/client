@@ -109,12 +109,11 @@ namespace MareSynchronos.WebAPI
                             {
                                 if (message is HttpClientHandler clientHandler)
                                     clientHandler.ServerCertificateCustomValidationCallback +=
-                                        (sender, certificate, chain, sslPolicyErrors) => true;
+                                        (_, _, _, _) => true;
                                 return message;
                             };
 #endif
                         }).Build();
-                    PluginLog.Debug("Heartbeat service built to: " + ApiUri);
 
                     await _heartbeatHub.StartAsync(cts.Token);
                     UID = await _heartbeatHub!.InvokeAsync<string>("Heartbeat");
@@ -125,9 +124,9 @@ namespace MareSynchronos.WebAPI
                         await LoadInitialData();
                         Connected?.Invoke(this, EventArgs.Empty);
                     }
-                    catch (Exception ex)
+                    catch 
                     {
-                        PluginLog.Error(ex, "Error during Heartbeat initialization");
+                        //PluginLog.Error(ex, "Error during Heartbeat initialization");
                     }
 
                     _heartbeatHub.Closed += OnHeartbeatHubOnClosed;

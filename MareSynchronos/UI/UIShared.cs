@@ -68,6 +68,7 @@ namespace MareSynchronos.UI
             {
                 ImGui.Text("Scan not started");
             }
+            else
             {
                 ImGui.Text("Next scan in " + _fileCacheManager.TimeToNextScan.ToString(@"mm\:ss") + " minutes");
             }
