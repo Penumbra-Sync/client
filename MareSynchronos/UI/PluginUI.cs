@@ -20,8 +20,8 @@ namespace MareSynchronos.UI
         {
             SizeConstraints = new WindowSizeConstraints()
             {
-                MinimumSize = new(1000, 400),
-                MaximumSize = new(1000, 2000),
+                MinimumSize = new(800, 400),
+                MaximumSize = new(800, 2000),
             };
 
             this._configuration = configuration;
@@ -171,14 +171,13 @@ namespace MareSynchronos.UI
         private void DrawPairedClientsContent()
         {
             if (!_apiController.ServerAlive) return;
-            if (ImGui.TreeNode("PairedWithOther Clients"))
+            if (ImGui.TreeNode("Pairing Configuration"))
             {
-                if (ImGui.BeginTable("PairedClientsTable", 6))
+                if (ImGui.BeginTable("PairedClientsTable", 5))
                 {
                     ImGui.TableSetupColumn("Pause", ImGuiTableColumnFlags.WidthFixed, 50);
                     ImGui.TableSetupColumn("UID", ImGuiTableColumnFlags.WidthFixed, 110);
-                    ImGui.TableSetupColumn("Status", ImGuiTableColumnFlags.WidthFixed, 120);
-                    ImGui.TableSetupColumn("Paused", ImGuiTableColumnFlags.WidthFixed, 140);
+                    ImGui.TableSetupColumn("Status", ImGuiTableColumnFlags.WidthFixed, 140);
                     ImGui.TableSetupColumn("Comment", ImGuiTableColumnFlags.WidthFixed, 400);
                     ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 70);
 
@@ -199,15 +198,19 @@ namespace MareSynchronos.UI
                             UIShared.GetBoolColor(item.IsSynced && !item.IsPausedFromOthers && !item.IsPaused),
                             item.OtherUID);
                         ImGui.TableNextColumn();
-                        ImGui.TextColored(UIShared.GetBoolColor(item.IsSynced),
-                            !item.IsSynced ? "Has not added you" : "PairedWithOther");
-                        ImGui.TableNextColumn();
-                        string pauseYou = item.IsPaused ? "You paused them" : "";
+                        string pairString = !item.IsSynced
+                            ? "Has not added you"
+                            : ((item.IsPaused || item.IsPausedFromOthers) ? "Unpaired" : "Paired");
+                        ImGui.TextColored(UIShared.GetBoolColor(item.IsSynced && !item.IsPaused && !item.IsPausedFromOthers), pairString);
+                        /*string pauseYou = item.IsPaused ? "You paused them" : "";
                         string pauseThey = item.IsPausedFromOthers ? "They paused you" : "";
                         string separator = (item.IsPaused && item.IsPausedFromOthers) ? Environment.NewLine : "";
                         string entry = pauseYou + separator + pauseThey;
-                        ImGui.TextColored(UIShared.GetBoolColor(!item.IsPausedFromOthers && !item.IsPaused),
-                            string.IsNullOrEmpty(entry) ? "No" : entry);
+                        if (!string.IsNullOrEmpty(entry))
+                        {
+                            ImGui.TextColored(UIShared.GetBoolColor(!item.IsPausedFromOthers && !item.IsPaused), entry);
+                        }*/
+
                         ImGui.TableNextColumn();
                         string charComment = _configuration.UidComments.ContainsKey(item.OtherUID) ? _configuration.UidComments[item.OtherUID] : string.Empty;
                         ImGui.SetNextItemWidth(400);
@@ -240,7 +243,7 @@ namespace MareSynchronos.UI
 
                 ImGui.SameLine();
                 ImGui.PushFont(UiBuilder.IconFont);
-                if (ImGui.Button(FontAwesomeIcon.Plus.ToIconString()+"##addToPairedClients"))
+                if (ImGui.Button(FontAwesomeIcon.Plus.ToIconString() + "##addToPairedClients"))
                 {
                     if (_apiController.PairedClients.All(w => w.OtherUID != tempNameUID))
                     {
@@ -249,6 +252,7 @@ namespace MareSynchronos.UI
                         tempNameUID = string.Empty;
                     }
                 }
+                ImGui.PopFont();
 
                 ImGui.TreePop();
             }
