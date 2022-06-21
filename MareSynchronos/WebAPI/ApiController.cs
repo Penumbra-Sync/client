@@ -68,12 +68,12 @@ namespace MareSynchronos.WebAPI
         public event EventHandler? Connected;
         public event EventHandler? Disconnected;
         public event EventHandler<CharacterReceivedEventArgs>? CharacterReceived;
-        public event EventHandler? RemovedFromWhitelist;
-        public event EventHandler? AddedToWhitelist;
-        public event EventHandler? WhitelistedPlayerOnline;
-        public event EventHandler? WhitelistedPlayerOffline;
+        public event EventHandler? UnpairedFromOther;
+        public event EventHandler? PairedWithOther;
+        public event EventHandler? PairedClientOnline;
+        public event EventHandler? PairedClientOffline;
 
-        public List<WhitelistDto> WhitelistEntries { get; set; } = new List<WhitelistDto>();
+        public List<ClientPairDto> PairedClients { get; set; } = new();
 
         readonly CancellationTokenSource cts;
         private HubConnection? _heartbeatHub;
@@ -143,8 +143,8 @@ namespace MareSynchronos.WebAPI
 
         private async Task LoadInitialData()
         {
-            var whiteList = await _userHub!.InvokeAsync<List<WhitelistDto>>("GetWhitelist");
-            WhitelistEntries = whiteList.ToList();
+            var pairedClients = await _userHub!.InvokeAsync<List<ClientPairDto>>("GetPairedClients");
+            PairedClients = pairedClients.ToList();
         }
 
         public void RestartHeartbeat()
@@ -215,10 +215,10 @@ namespace MareSynchronos.WebAPI
                 })
                 .Build();
             await _userHub.StartAsync();
-            _userHub.On<WhitelistDto, string>("UpdateWhitelist", UpdateLocalWhitelist);
+            _userHub.On<ClientPairDto, string>("UpdateClientPairs", UpdateLocalClientPairs);
             _userHub.On<CharacterCacheDto, string>("ReceiveCharacterData", ReceiveCharacterData);
-            _userHub.On<string>("RemoveOnlineWhitelistedPlayer", (s) => WhitelistedPlayerOffline?.Invoke(s, EventArgs.Empty));
-            _userHub.On<string>("AddOnlineWhitelistedPlayer", (s) => WhitelistedPlayerOnline?.Invoke(s, EventArgs.Empty));
+            _userHub.On<string>("RemoveOnlinePairedPlayer", (s) => PairedClientOffline?.Invoke(s, EventArgs.Empty));
+            _userHub.On<string>("AddOnlinePairedPlayer", (s) => PairedClientOnline?.Invoke(s, EventArgs.Empty));
 
             PluginLog.Debug("Creating File Hub");
             _fileHub = new HubConnectionBuilder()
@@ -239,19 +239,19 @@ namespace MareSynchronos.WebAPI
             await _fileHub.StartAsync(cts.Token);
         }
 
-        private void UpdateLocalWhitelist(WhitelistDto dto, string characterIdentifier)
+        private void UpdateLocalClientPairs(ClientPairDto dto, string characterIdentifier)
         {
-            var entry = WhitelistEntries.SingleOrDefault(e => e.OtherUID == dto.OtherUID);
+            var entry = PairedClients.SingleOrDefault(e => e.OtherUID == dto.OtherUID);
             if (entry == null)
             {
-                RemovedFromWhitelist?.Invoke(characterIdentifier, EventArgs.Empty);
+                UnpairedFromOther?.Invoke(characterIdentifier, EventArgs.Empty);
                 return;
             }
 
             if ((entry.IsPausedFromOthers != dto.IsPausedFromOthers || entry.IsSynced != dto.IsSynced || entry.IsPaused != dto.IsPaused)
                 && !dto.IsPaused && dto.IsSynced && !dto.IsPausedFromOthers)
             {
-                AddedToWhitelist?.Invoke(characterIdentifier, EventArgs.Empty);
+                PairedWithOther?.Invoke(characterIdentifier, EventArgs.Empty);
             }
 
             entry.IsPaused = dto.IsPaused;
@@ -260,7 +260,7 @@ namespace MareSynchronos.WebAPI
 
             if (dto.IsPaused || dto.IsPausedFromOthers || !dto.IsSynced)
             {
-                RemovedFromWhitelist?.Invoke(characterIdentifier, EventArgs.Empty);
+                UnpairedFromOther?.Invoke(characterIdentifier, EventArgs.Empty);
             }
         }
 
@@ -445,37 +445,22 @@ namespace MareSynchronos.WebAPI
                 hashedCharacterNames);
         }
 
-        public async Task SendWhitelistPauseChange(string uid, bool paused)
+        public async Task SendPairedClientPauseChange(string uid, bool paused)
         {
             if (!IsConnected || SecretKey == "-") return;
-            await _userHub!.SendAsync("SendWhitelistPauseChange", uid, paused);
+            await _userHub!.SendAsync("SendPairedClientPauseChange", uid, paused);
         }
 
-        public async Task SendWhitelistAddition(string uid)
+        public async Task SendPairedClientAddition(string uid)
         {
             if (!IsConnected || SecretKey == "-") return;
-            await _userHub!.SendAsync("SendWhitelistAddition", uid);
+            await _userHub!.SendAsync("SendPairedClientAddition", uid);
         }
 
-        public async Task SendWhitelistRemoval(string uid)
+        public async Task SendPairedClientRemoval(string uid)
         {
             if (!IsConnected || SecretKey == "-") return;
-            await _userHub!.SendAsync("SendWhitelistRemoval", uid);
-        }
-
-        public async Task SendWhitelist()
-        {
-            if (!IsConnected || SecretKey == "-") return;
-            await _userHub!.SendAsync("SendWhitelist", WhitelistEntries.ToList());
-            WhitelistEntries = (await _userHub!.InvokeAsync<List<WhitelistDto>>("GetWhitelist")).ToList();
-        }
-
-        public async Task<List<string>> GetWhitelist()
-        {
-            PluginLog.Debug("Getting whitelist from service " + ApiUri);
-
-            List<string> whitelist = new();
-            return whitelist;
+            await _userHub!.SendAsync("SendPairedClientRemoval", uid);
         }
 
         public void Dispose()
@@ -487,12 +472,6 @@ namespace MareSynchronos.WebAPI
         public async Task<List<string>> SendCharacterName(string hashedName)
         {
             return await _userHub!.InvokeAsync<List<string>>("SendCharacterNameHash", hashedName);
-        }
-
-        public async Task SendVisibilityData(List<string> visibilities)
-        {
-            if (!IsConnected) return;
-            await _userHub!.SendAsync("SendVisibilityList", visibilities);
         }
     }
 }

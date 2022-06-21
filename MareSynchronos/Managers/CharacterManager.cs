@@ -45,7 +45,7 @@ namespace MareSynchronos.Managers
         private string _lastSentHash = string.Empty;
         private Task? _playerChangedTask = null;
 
-        private HashSet<string> _onlineWhitelistedUsers = new();
+        private HashSet<string> _onlinePairedUsers = new();
 
         public CharacterManager(ClientState clientState, Framework framework, ApiController apiController, ObjectTable objectTable, IpcManager ipcManager, FileReplacementFactory factory,
                     Configuration pluginConfiguration)
@@ -148,14 +148,14 @@ namespace MareSynchronos.Managers
             _apiController.Connected -= ApiController_Connected;
             _apiController.Disconnected -= ApiController_Disconnected;
             _apiController.CharacterReceived -= ApiControllerOnCharacterReceived;
-            _apiController.RemovedFromWhitelist -= ApiControllerOnRemovedFromWhitelist;
-            _apiController.AddedToWhitelist -= ApiControllerOnAddedToWhitelist;
-            _apiController.WhitelistedPlayerOffline -= ApiControllerOnWhitelistedPlayerOffline;
+            _apiController.UnpairedFromOther -= ApiControllerOnUnpairedFromOther;
+            _apiController.PairedWithOther -= ApiControllerOnPairedWithOther;
+            _apiController.PairedClientOffline -= ApiControllerOnPairedClientOffline;
             _watcher.Disable();
             _watcher.PlayerChanged -= Watcher_PlayerChanged;
             _watcher?.Dispose();
 
-            foreach (var character in _onlineWhitelistedUsers)
+            foreach (var character in _onlinePairedUsers)
             {
                 RestoreCharacter(character);
             }
@@ -169,7 +169,7 @@ namespace MareSynchronos.Managers
         public async Task UpdatePlayersFromService(Dictionary<string, PlayerCharacter> currentLocalPlayers)
         {
             PluginLog.Debug("Updating local players from service");
-            currentLocalPlayers = currentLocalPlayers.Where(k => _onlineWhitelistedUsers.Contains(k.Key))
+            currentLocalPlayers = currentLocalPlayers.Where(k => _onlinePairedUsers.Contains(k.Key))
                 .ToDictionary(k => k.Key, k => k.Value);
             await _apiController.GetCharacterData(currentLocalPlayers
                 .ToDictionary(
@@ -190,10 +190,10 @@ namespace MareSynchronos.Managers
             _apiController.Connected += ApiController_Connected;
             _apiController.Disconnected += ApiController_Disconnected;
             _apiController.CharacterReceived += ApiControllerOnCharacterReceived;
-            _apiController.RemovedFromWhitelist += ApiControllerOnRemovedFromWhitelist;
-            _apiController.AddedToWhitelist += ApiControllerOnAddedToWhitelist;
-            _apiController.WhitelistedPlayerOffline += ApiControllerOnWhitelistedPlayerOffline;
-            _apiController.WhitelistedPlayerOnline += ApiControllerOnWhitelistedPlayerOnline;
+            _apiController.UnpairedFromOther += ApiControllerOnUnpairedFromOther;
+            _apiController.PairedWithOther += ApiControllerOnPairedWithOther;
+            _apiController.PairedClientOffline += ApiControllerOnPairedClientOffline;
+            _apiController.PairedClientOnline += ApiControllerOnPairedClientOnline;
 
             PluginLog.Debug("Watching Player, ApiController is Connected: " + _apiController.IsConnected);
             if (_apiController.IsConnected)
@@ -210,10 +210,10 @@ namespace MareSynchronos.Managers
 
             Task.WaitAll(apiTask);
 
-            _onlineWhitelistedUsers = new HashSet<string>(apiTask.Result);
+            _onlinePairedUsers = new HashSet<string>(apiTask.Result);
             var assignTask = AssignLocalPlayersData();
             Task.WaitAll(assignTask);
-            PluginLog.Debug("Online and whitelisted users: " + string.Join(",", _onlineWhitelistedUsers));
+            PluginLog.Debug("Online and paired users: " + string.Join(",", _onlinePairedUsers));
 
             _framework.Update += Framework_Update;
             _ipcManager.PenumbraRedrawEvent += IpcManager_PenumbraRedrawEvent;
@@ -226,7 +226,7 @@ namespace MareSynchronos.Managers
             _framework.Update -= Framework_Update;
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
             _clientState.TerritoryChanged -= ClientState_TerritoryChanged;
-            foreach (var character in _onlineWhitelistedUsers)
+            foreach (var character in _onlinePairedUsers)
             {
                 RestoreCharacter(character);
             }
@@ -234,14 +234,14 @@ namespace MareSynchronos.Managers
             _lastSentHash = string.Empty;
         }
 
-        private void ApiControllerOnAddedToWhitelist(object? sender, EventArgs e)
+        private void ApiControllerOnPairedWithOther(object? sender, EventArgs e)
         {
             var characterHash = (string?)sender;
             if (string.IsNullOrEmpty(characterHash)) return;
             var players = GetLocalPlayers();
             if (players.ContainsKey(characterHash))
             {
-                PluginLog.Debug("Removed from whitelist, restoring data for " + characterHash);
+                PluginLog.Debug("Removed pairing, restoring data for " + characterHash);
                 _ = _apiController.GetCharacterData(new Dictionary<string, int> { { characterHash, (int)players[characterHash].ClassJob.Id } });
             }
         }
@@ -322,7 +322,7 @@ namespace MareSynchronos.Managers
             _ipcManager.PenumbraRedraw(otherPlayerName);
         }
 
-        private void ApiControllerOnRemovedFromWhitelist(object? sender, EventArgs e)
+        private void ApiControllerOnUnpairedFromOther(object? sender, EventArgs e)
         {
             var characterHash = (string?)sender;
             if (string.IsNullOrEmpty(characterHash)) return;
@@ -343,23 +343,23 @@ namespace MareSynchronos.Managers
                 if (player.Key != characterHash) continue;
                 var playerName = player.Value.Name.ToString();
                 RestorePreviousCharacter(playerName);
-                PluginLog.Debug("Removed from whitelist, restoring glamourer state for " + playerName);
+                PluginLog.Debug("Removed from pairing, restoring glamourer state for " + playerName);
                 _ipcManager.PenumbraRemoveTemporaryCollection(playerName);
                 _ipcManager.GlamourerRevertCharacterCustomization(playerName);
                 break;
             }
         }
 
-        private void ApiControllerOnWhitelistedPlayerOffline(object? sender, EventArgs e)
+        private void ApiControllerOnPairedClientOffline(object? sender, EventArgs e)
         {
             PluginLog.Debug("Player offline: " + sender!);
-            _onlineWhitelistedUsers.Remove((string)sender!);
+            _onlinePairedUsers.Remove((string)sender!);
         }
 
-        private void ApiControllerOnWhitelistedPlayerOnline(object? sender, EventArgs e)
+        private void ApiControllerOnPairedClientOnline(object? sender, EventArgs e)
         {
             PluginLog.Debug("Player online: " + sender!);
-            _onlineWhitelistedUsers.Add((string)sender!);
+            _onlinePairedUsers.Add((string)sender!);
         }
 
         private async Task AssignLocalPlayersData()
@@ -428,7 +428,7 @@ namespace MareSynchronos.Managers
                     var pObj = (PlayerCharacter)obj;
                     var hashedName = Crypto.GetHash256(pObj.Name.ToString() + pObj.HomeWorld.Id.ToString());
 
-                    if (!_onlineWhitelistedUsers.Contains(hashedName)) continue;
+                    if (!_onlinePairedUsers.Contains(hashedName)) continue;
 
                     localPlayersList.Add(hashedName);
                     if (!_cachedLocalPlayers.ContainsKey(hashedName)) newPlayers[hashedName] = pObj;

@@ -59,7 +59,7 @@ namespace MareSynchronos.UI
                 ImGui.Text("Welcome to Mare Synchronos!");
                 ImGui.SetWindowFontScale(1.0f);
                 ImGui.Separator();
-                UIShared.TextWrapped("Mare Synchronos is a plugin that will replicate your full current character state including all Penumbra mods to other whitelisted Mare Synchronos users. " +
+                UIShared.TextWrapped("Mare Synchronos is a plugin that will replicate your full current character state including all Penumbra mods to other paired Mare Synchronos users. " +
                                   "Note that you will have to have Penumbra as well as Glamourer installed to use this plugin.");
                 UIShared.TextWrapped("We will have to setup a few things first before you can start using this plugin. Click on next to continue.");
 
@@ -90,11 +90,11 @@ namespace MareSynchronos.UI
                     "Files present on the service that already represent your active mod files will not be uploaded again.");
                 ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
                 UIShared.TextWrapped("The mod files you are uploading are confidential and will not be distributed to parties other than the ones who are requesting the exact same mod files. " +
-                    "Please think about who you are going to whitelist since it is unavoidable that they will receive and locally cache the necessary mod files that you have currently in use. " +
+                    "Please think about who you are going to pair since it is unavoidable that they will receive and locally cache the necessary mod files that you have currently in use. " +
                     "Locally cached mod files will have arbitrary file names to discourage attempts at replicating the original mod.");
                 ImGui.PopStyleColor();
                 ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
-                UIShared.TextWrapped("The plugin creator tried their best to keep you secure. However, there is no guarantee for 100% security. Do not blindly add everyone to your whitelist.");
+                UIShared.TextWrapped("The plugin creator tried their best to keep you secure. However, there is no guarantee for 100% security. Do not blindly pair your client with everyone.");
                 ImGui.PopStyleColor();
                 UIShared.TextWrapped("Mod files that are saved on the service will remain on the service as long as there are requests for the files from clients. " +
                                   "After a period of not being used, the mod files will be automatically deleted. " +

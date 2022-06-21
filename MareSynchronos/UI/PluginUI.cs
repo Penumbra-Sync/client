@@ -1,14 +1,10 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
-using Dalamud.Logging;
 using ImGuiNET;
 using MareSynchronos.WebAPI;
 using System;
 using System.Linq;
-using System.Numerics;
-using Dalamud.Configuration;
-using MareSynchronos.API;
 
 namespace MareSynchronos.UI
 {
@@ -80,9 +76,9 @@ namespace MareSynchronos.UI
                 {
                     ImGui.SetClipboardText(_apiController.UID);
                 }
-                ImGui.Text("Share this UID to other Mare users so they can add you to their whitelist.");
+                ImGui.Text("Share this UID to other Mare users so they pair their client with yours.");
                 ImGui.Separator();
-                DrawWhiteListContent();
+                DrawPairedClientsContent();
                 DrawFileCacheSettings();
                 DrawCurrentTransfers();
             }
@@ -172,12 +168,12 @@ namespace MareSynchronos.UI
             }
         }
 
-        private void DrawWhiteListContent()
+        private void DrawPairedClientsContent()
         {
             if (!_apiController.ServerAlive) return;
-            if (ImGui.TreeNode("Whitelist Configuration"))
+            if (ImGui.TreeNode("PairedWithOther Clients"))
             {
-                if (ImGui.BeginTable("WhitelistTable", 6))
+                if (ImGui.BeginTable("PairedClientsTable", 6))
                 {
                     ImGui.TableSetupColumn("Pause", ImGuiTableColumnFlags.WidthFixed, 50);
                     ImGui.TableSetupColumn("UID", ImGuiTableColumnFlags.WidthFixed, 110);
@@ -187,14 +183,16 @@ namespace MareSynchronos.UI
                     ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 70);
 
                     ImGui.TableHeadersRow();
-                    foreach (var item in _apiController.WhitelistEntries.ToList())
+                    foreach (var item in _apiController.PairedClients.ToList())
                     {
                         ImGui.TableNextColumn();
-                        bool isPaused = item.IsPaused;
-                        if (ImGui.Checkbox("##paused" + item.OtherUID, ref isPaused))
+                        ImGui.PushFont(UiBuilder.IconFont);
+                        string pauseIcon = item.IsPaused ? FontAwesomeIcon.Play.ToIconString() : FontAwesomeIcon.Pause.ToIconString();
+                        if (ImGui.Button(pauseIcon + "##paused" + item.OtherUID))
                         {
-                            _ = _apiController.SendWhitelistPauseChange(item.OtherUID, isPaused);
+                            _ = _apiController.SendPairedClientPauseChange(item.OtherUID, !item.IsPaused);
                         }
+                        ImGui.PopFont();
 
                         ImGui.TableNextColumn();
                         ImGui.TextColored(
@@ -202,7 +200,7 @@ namespace MareSynchronos.UI
                             item.OtherUID);
                         ImGui.TableNextColumn();
                         ImGui.TextColored(UIShared.GetBoolColor(item.IsSynced),
-                            !item.IsSynced ? "Has not added you" : "Whitelisted");
+                            !item.IsSynced ? "Has not added you" : "PairedWithOther");
                         ImGui.TableNextColumn();
                         string pauseYou = item.IsPaused ? "You paused them" : "";
                         string pauseThey = item.IsPausedFromOthers ? "They paused you" : "";
@@ -219,11 +217,13 @@ namespace MareSynchronos.UI
                             _configuration.Save();
                         }
                         ImGui.TableNextColumn();
-                        if (ImGui.Button("Delete##" + item.OtherUID))
+                        ImGui.PushFont(UiBuilder.IconFont);
+                        if (ImGui.Button(FontAwesomeIcon.Trash.ToIconString() + "##" + item.OtherUID))
                         {
-                            _ = _apiController.SendWhitelistRemoval(item.OtherUID);
-                            _apiController.WhitelistEntries.Remove(item);
+                            _ = _apiController.SendPairedClientRemoval(item.OtherUID);
+                            _apiController.PairedClients.Remove(item);
                         }
+                        ImGui.PopFont();
 
                         ImGui.TableNextRow();
                     }
@@ -231,26 +231,22 @@ namespace MareSynchronos.UI
                     ImGui.EndTable();
                 }
 
-                var whitelistEntry = tempDto.OtherUID;
+                var pairedClientEntry = tempNameUID;
                 ImGui.SetNextItemWidth(200);
-                if (ImGui.InputText("UID", ref whitelistEntry, 20))
+                if (ImGui.InputText("UID", ref pairedClientEntry, 20))
                 {
-                    tempDto.OtherUID = whitelistEntry;
+                    tempNameUID = pairedClientEntry;
                 }
 
                 ImGui.SameLine();
-                if (ImGui.Button("Add to whitelist"))
+                ImGui.PushFont(UiBuilder.IconFont);
+                if (ImGui.Button(FontAwesomeIcon.Plus.ToIconString()+"##addToPairedClients"))
                 {
-                    if (_apiController.WhitelistEntries.All(w => w.OtherUID != tempDto.OtherUID))
+                    if (_apiController.PairedClients.All(w => w.OtherUID != tempNameUID))
                     {
-                        _apiController.WhitelistEntries.Add(new WhitelistDto()
-                        {
-                            OtherUID = tempDto.OtherUID
-                        });
+                        _ = _apiController.SendPairedClientAddition(tempNameUID);
 
-                        _ = _apiController.SendWhitelistAddition(tempDto.OtherUID);
-
-                        tempDto.OtherUID = string.Empty;
+                        tempNameUID = string.Empty;
                     }
                 }
 
@@ -258,6 +254,6 @@ namespace MareSynchronos.UI
             }
         }
 
-        private WhitelistDto tempDto = new WhitelistDto() { OtherUID = string.Empty };
+        private string tempNameUID = string.Empty;
     }
 }
