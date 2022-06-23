@@ -1,27 +1,17 @@
-﻿using Dalamud.Configuration;
-using Dalamud.Logging;
-using MareSynchronos.Models;
+﻿using Dalamud.Logging;
 using System;
-using System.Buffers.Text;
-using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
-using System.Runtime.InteropServices.ComTypes;
-using System.Security.Cryptography;
-using System.Text;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
-using Dalamud.Game.ClientState.Objects.Types;
 using LZ4;
 using MareSynchronos.API;
 using MareSynchronos.FileCacheDB;
 using Microsoft.AspNetCore.SignalR.Client;
-using Microsoft.VisualBasic;
 
 namespace MareSynchronos.WebAPI
 {
@@ -124,7 +114,7 @@ namespace MareSynchronos.WebAPI
                         await LoadInitialData();
                         Connected?.Invoke(this, EventArgs.Empty);
                     }
-                    catch 
+                    catch
                     {
                         //PluginLog.Error(ex, "Error during Heartbeat initialization");
                     }
@@ -241,9 +231,15 @@ namespace MareSynchronos.WebAPI
         private void UpdateLocalClientPairs(ClientPairDto dto, string characterIdentifier)
         {
             var entry = PairedClients.SingleOrDefault(e => e.OtherUID == dto.OtherUID);
+            if (dto.IsRemoved)
+            {
+                PairedClients.RemoveAll(p => p.OtherUID == dto.OtherUID);
+                UnpairedFromOther?.Invoke(characterIdentifier, EventArgs.Empty);
+                return;
+            }
             if (entry == null)
             {
-                UnpairedFromOther?.Invoke(characterIdentifier, EventArgs.Empty);
+                PairedClients.Add(dto);
                 return;
             }
 
@@ -325,7 +321,7 @@ namespace MareSynchronos.WebAPI
             var uploadToken = uploadCancellationTokenSource.Token;
             PluginLog.Debug("New Token Created");
 
-            var filesToUpload = await _fileHub!.InvokeAsync<List<string>>("SendFiles", character.FileReplacements, uploadToken);
+            var filesToUpload = await _fileHub!.InvokeAsync<List<string>>("SendFiles", character.FileReplacements.Select(c => c.Hash).Distinct(), uploadToken);
 
             IsUploading = true;
 
@@ -333,6 +329,7 @@ namespace MareSynchronos.WebAPI
             Dictionary<string, byte[]> compressedFileData = new();
             foreach (var file in filesToUpload)
             {
+                PluginLog.Debug(file);
                 var data = await GetCompressedFileData(file, uploadToken);
                 compressedFileData.Add(data.Item1, data.Item2);
                 CurrentUploads[data.Item1] = (0, data.Item2.Length);

@@ -19,7 +19,8 @@ namespace MareSynchronos.Models
                 FileReplacements = AllReplacements.Select(f => f.ToFileReplacementDto()).ToList(),
                 GlamourerData = GlamourerString,
                 Hash = CacheHash,
-                JobId = (int)JobId
+                JobId = (int)JobId,
+                ManipulationData = ManipulationString
             };
         }
 
@@ -34,12 +35,14 @@ namespace MareSynchronos.Models
         public List<FileReplacement> FileReplacements { get; set; } = new List<FileReplacement>();
 
         [JsonProperty]
-        public string GlamourerString { get; private set; } = string.Empty;
+        public string GlamourerString { get; set; } = string.Empty;
 
         public bool IsReady => FileReplacements.All(f => f.Computed);
 
         [JsonProperty]
         public string CacheHash { get; set; } = string.Empty;
+
+        public string ManipulationString { get; set; } = string.Empty;
 
         [JsonProperty]
         public uint JobId { get; set; } = 0;
@@ -93,10 +96,6 @@ namespace MareSynchronos.Models
             }
         }
 
-        public void SetGlamourerData(string glamourerString)
-        {
-            GlamourerString = glamourerString;
-        }
         public override string ToString()
         {
             StringBuilder stringBuilder = new();

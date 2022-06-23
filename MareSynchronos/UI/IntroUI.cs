@@ -43,7 +43,6 @@ namespace MareSynchronos.UI
             };
 
             _windowSystem.AddWindow(this);
-            IsOpen = true;
         }
 
         public override void Draw()
@@ -164,7 +163,10 @@ namespace MareSynchronos.UI
                     ImGui.Separator();
                     UIShared.TextWrapped(_pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri]);
                     ImGui.Separator();
-                    ImGui.Button("Copy secret key to clipboard");
+                    if (ImGui.Button("Copy secret key to clipboard"))
+                    {
+                        ImGui.SetClipboardText(_pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri]);
+                    }
                     ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
                     UIShared.TextWrapped("This is the only time you will be able to see this key in the UI. You can copy it to make a backup somewhere.");
                     ImGui.PopStyleColor();

@@ -21,7 +21,6 @@ namespace MareSynchronos.Models
             {
                 GamePaths = GamePaths,
                 Hash = Hash,
-                ImcData = ImcData
             };
         }
 
