@@ -1,15 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
-using MareSynchronos.FileCacheDB;
 using MareSynchronos.Managers;
-using MareSynchronos.WebAPI;
+using MareSynchronos.Utils;
 
 namespace MareSynchronos.UI
 {
@@ -25,6 +19,8 @@ namespace MareSynchronos.UI
 
         public void Dispose()
         {
+            Logger.Debug("Disposing " + nameof(IntroUI));
+
             _windowSystem.RemoveWindow(this);
         }
 

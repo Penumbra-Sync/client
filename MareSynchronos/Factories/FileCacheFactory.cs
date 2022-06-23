@@ -9,7 +9,7 @@ namespace MareSynchronos.Factories
         public FileCache Create(string file)
         {
             FileInfo fileInfo = new(file);
-            string sha1Hash = Crypto.GetFileHash(fileInfo.FullName);
+            var sha1Hash = Crypto.GetFileHash(fileInfo.FullName);
             return new FileCache()
             {
                 Filepath = fileInfo.FullName,

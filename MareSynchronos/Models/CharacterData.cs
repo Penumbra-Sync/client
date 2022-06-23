@@ -1,29 +1,16 @@
-﻿using Dalamud.Logging;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using MareSynchronos.API;
+using MareSynchronos.Utils;
 
 namespace MareSynchronos.Models
 {
     [JsonObject(MemberSerialization.OptIn)]
-    public class CharacterCache
+    public class CharacterData
     {
-        public CharacterCacheDto ToCharacterCacheDto()
-        {
-            return new CharacterCacheDto()
-            {
-                FileReplacements = AllReplacements.Select(f => f.ToFileReplacementDto()).ToList(),
-                GlamourerData = GlamourerString,
-                Hash = CacheHash,
-                JobId = (int)JobId,
-                ManipulationData = ManipulationString
-            };
-        }
-
         [JsonProperty]
         public List<FileReplacement> AllReplacements =>
             FileReplacements.Where(f => f.HasFileReplacement)
@@ -31,6 +18,9 @@ namespace MareSynchronos.Models
             .Concat(FileReplacements.SelectMany(f => f.Associated).SelectMany(f => f.Associated)).Where(f => f.HasFileReplacement)
             .Distinct().OrderBy(f => f.GamePaths[0])
             .ToList();
+
+        [JsonProperty]
+        public string CacheHash { get; set; } = string.Empty;
 
         public List<FileReplacement> FileReplacements { get; set; } = new List<FileReplacement>();
 
@@ -40,12 +30,10 @@ namespace MareSynchronos.Models
         public bool IsReady => FileReplacements.All(f => f.Computed);
 
         [JsonProperty]
-        public string CacheHash { get; set; } = string.Empty;
+        public uint JobId { get; set; } = 0;
 
         public string ManipulationString { get; set; } = string.Empty;
 
-        [JsonProperty]
-        public uint JobId { get; set; } = 0;
         public void AddAssociatedResource(FileReplacement resource, FileReplacement? mdlParent, FileReplacement? mtrlParent)
         {
             try
@@ -71,7 +59,7 @@ namespace MareSynchronos.Models
             }
             catch (Exception ex)
             {
-                PluginLog.Debug(ex.Message);
+                Logger.Debug(ex.Message);
             }
         }
 
@@ -92,10 +80,21 @@ namespace MareSynchronos.Models
             }
             catch (Exception ex)
             {
-                PluginLog.Debug(ex.Message);
+                Logger.Debug(ex.Message);
             }
         }
 
+        public CharacterCacheDto ToCharacterCacheDto()
+        {
+            return new CharacterCacheDto()
+            {
+                FileReplacements = AllReplacements.Select(f => f.ToFileReplacementDto()).ToList(),
+                GlamourerData = GlamourerString,
+                Hash = CacheHash,
+                JobId = (int)JobId,
+                ManipulationData = ManipulationString
+            };
+        }
         public override string ToString()
         {
             StringBuilder stringBuilder = new();

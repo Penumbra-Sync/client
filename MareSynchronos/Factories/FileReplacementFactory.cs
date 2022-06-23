@@ -1,26 +1,28 @@
-﻿using Dalamud.Game.ClientState;
-using MareSynchronos.Managers;
+﻿using MareSynchronos.Managers;
 using MareSynchronos.Models;
+using MareSynchronos.Utils;
 
 namespace MareSynchronos.Factories
 {
     public class FileReplacementFactory
     {
-        private readonly IpcManager ipcManager;
+        private readonly IpcManager _ipcManager;
 
         public FileReplacementFactory(IpcManager ipcManager)
         {
-            this.ipcManager = ipcManager;
+            Logger.Debug("Creating " + nameof(FileReplacementFactory));
+
+            this._ipcManager = ipcManager;
         }
 
         public FileReplacement Create()
         {
-            if (!ipcManager.CheckPenumbraApi())
+            if (!_ipcManager.CheckPenumbraApi())
             {
                 throw new System.Exception();
             }
 
-            return new FileReplacement(ipcManager.PenumbraModDirectory()!);
+            return new FileReplacement(_ipcManager.PenumbraModDirectory()!);
         }
     }
 }

@@ -4,12 +4,12 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Logging;
 using MareSynchronos.Factories;
 using MareSynchronos.FileCacheDB;
+using MareSynchronos.Utils;
 
 namespace MareSynchronos.Managers
 {
@@ -25,6 +25,8 @@ namespace MareSynchronos.Managers
         private Stopwatch? _timerStopWatch;
         public FileCacheManager(FileCacheFactory fileCacheFactory, IpcManager ipcManager, Configuration pluginConfiguration)
         {
+            Logger.Debug("Creating " + nameof(FileCacheManager));
+
             _fileCacheFactory = fileCacheFactory;
             _ipcManager = ipcManager;
             _pluginConfiguration = pluginConfiguration;
@@ -47,7 +49,8 @@ namespace MareSynchronos.Managers
 
         public void Dispose()
         {
-            PluginLog.Debug("Disposing File Cache Manager");
+            Logger.Debug("Disposing " + nameof(FileCacheManager));
+
             _scanScheduler?.Stop();
             _scanCancellationTokenSource?.Cancel();
         }
@@ -62,7 +65,7 @@ namespace MareSynchronos.Managers
         {
             _scanCancellationTokenSource = new CancellationTokenSource();
             var penumbraDir = _ipcManager.PenumbraModDirectory()!;
-            PluginLog.Debug("Getting files from " + penumbraDir);
+            Logger.Debug("Getting files from " + penumbraDir);
             var scannedFiles = new ConcurrentDictionary<string, bool>(
                 Directory.EnumerateFiles(penumbraDir, "*.*", SearchOption.AllDirectories)
                                 .Select(s => s.ToLowerInvariant())
@@ -80,7 +83,7 @@ namespace MareSynchronos.Managers
             var fileCachesToDelete = new ConcurrentBag<FileCache>();
             var fileCachesToAdd = new ConcurrentBag<FileCache>();
 
-            PluginLog.Debug("Getting file list from Database");
+            Logger.Debug("Getting file list from Database");
             // scan files from database
             Parallel.ForEach(fileCaches, new ParallelOptions()
             {
@@ -140,7 +143,7 @@ namespace MareSynchronos.Managers
                 }
             }
 
-            PluginLog.Debug("Scan complete");
+            Logger.Debug("Scan complete");
             TotalFiles = 0;
             CurrentFileProgress = 0;
 
@@ -160,7 +163,7 @@ namespace MareSynchronos.Managers
 
         private void StartScheduler()
         {
-            PluginLog.Debug("Scheduling next scan for in " + MinutesForScan + " minutes");
+            Logger.Debug("Scheduling next scan for in " + MinutesForScan + " minutes");
             _scanScheduler = new System.Timers.Timer(TimeSpan.FromMinutes(MinutesForScan).TotalMilliseconds)
             {
                 AutoReset = false,
@@ -176,7 +179,7 @@ namespace MareSynchronos.Managers
                     return;
                 }
 
-                PluginLog.Debug("Initiating periodic scan for mod changes");
+                Logger.Debug("Initiating periodic scan for mod changes");
                 Task.Run(() => _scanTask = StartFileScan(_scanCancellationTokenSource!.Token));
                 _timerStopWatch = Stopwatch.StartNew();
             };

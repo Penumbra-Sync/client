@@ -1,13 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+﻿using System.IO;
 using System.Numerics;
-using System.Text;
 using System.Threading.Tasks;
 using Dalamud.Interface.Colors;
 using ImGuiNET;
-using MareSynchronos.FileCacheDB;
 using MareSynchronos.Managers;
 using MareSynchronos.WebAPI;
 
@@ -167,7 +162,7 @@ namespace MareSynchronos.UI
             if (!Directory.Exists(cacheDirectory))
             {
                 ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
-                UIShared.TextWrapped("The folder you selected does not exist. Please provide a valid path.");
+                TextWrapped("The folder you selected does not exist. Please provide a valid path.");
                 ImGui.PopStyleColor();
             }
         }

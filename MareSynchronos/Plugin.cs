@@ -1,25 +1,18 @@
 ﻿using Dalamud.Game.Command;
-using Dalamud.Logging;
 using Dalamud.Plugin;
 using MareSynchronos.FileCacheDB;
 using MareSynchronos.Factories;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using Dalamud.Game;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState;
 using System;
-using MareSynchronos.Models;
-using MareSynchronos.PenumbraMod;
-using Newtonsoft.Json;
 using MareSynchronos.Managers;
-using LZ4;
 using MareSynchronos.WebAPI;
 using Dalamud.Interface.Windowing;
 using MareSynchronos.UI;
+using MareSynchronos.Utils;
+using Penumbra.PlayerWatch;
 
 namespace MareSynchronos
 {
@@ -31,7 +24,6 @@ namespace MareSynchronos
         private readonly CommandManager _commandManager;
         private readonly Configuration _configuration;
         private readonly FileCacheManager _fileCacheManager;
-        private readonly Framework _framework;
         private readonly IntroUI _introUi;
         private readonly IpcManager _ipcManager;
         private readonly ObjectTable _objectTable;
@@ -39,13 +31,16 @@ namespace MareSynchronos
         private readonly PluginUi _pluginUi;
         private readonly WindowSystem _windowSystem;
         private CharacterManager? _characterManager;
+        private readonly DalamudUtil _dalamudUtil;
+        private readonly CharacterCacheManager _characterCacheManager;
+        private readonly IPlayerWatcher _playerWatcher;
 
         public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager,
             Framework framework, ObjectTable objectTable, ClientState clientState)
         {
+            Logger.Debug("Launching " + Name);
             _pluginInterface = pluginInterface;
             _commandManager = commandManager;
-            _framework = framework;
             _objectTable = objectTable;
             _clientState = clientState;
             _configuration = _pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
@@ -56,6 +51,11 @@ namespace MareSynchronos
             _apiController = new ApiController(_configuration);
             _ipcManager = new IpcManager(_pluginInterface);
             _fileCacheManager = new FileCacheManager(new FileCacheFactory(), _ipcManager, _configuration);
+            _dalamudUtil = new DalamudUtil(_clientState, _objectTable);
+            _characterCacheManager = new CharacterCacheManager(_clientState, framework, _objectTable, _apiController,
+                _dalamudUtil, _ipcManager);
+            _playerWatcher = PlayerWatchFactory.Create(framework, _clientState, _objectTable);
+            _playerWatcher.Enable();
 
             var uiSharedComponent =
                 new UIShared(_ipcManager, _apiController, _fileCacheManager, _configuration);
@@ -83,6 +83,8 @@ namespace MareSynchronos
         public string Name => "Mare Synchronos";
         public void Dispose()
         {
+            Logger.Debug("Disposing " + Name);
+
             _commandManager.RemoveHandler(CommandName);
             _clientState.Login -= ClientState_Login;
             _clientState.Logout -= ClientState_Logout;
@@ -93,13 +95,16 @@ namespace MareSynchronos
             _fileCacheManager?.Dispose();
             _ipcManager?.Dispose();
             _characterManager?.Dispose();
+            _characterCacheManager.Dispose();
             _apiController?.Dispose();
+            _playerWatcher.Disable();
+            _playerWatcher.Dispose();
         }
 
 
         private void ClientState_Login(object? sender, EventArgs e)
         {
-            PluginLog.Debug("Client login");
+            Logger.Debug("Client login");
 
             _pluginInterface.UiBuilder.Draw += Draw;
             _pluginInterface.UiBuilder.OpenConfigUi += OpenConfigUi;
@@ -119,7 +124,7 @@ namespace MareSynchronos
 
         private void ClientState_Logout(object? sender, EventArgs e)
         {
-            PluginLog.Debug("Client logout");
+            Logger.Debug("Client logout");
             _characterManager?.Dispose();
             _pluginInterface.UiBuilder.Draw -= Draw;
             _pluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;
@@ -132,17 +137,23 @@ namespace MareSynchronos
 
             Task.Run(async () =>
             {
-                while (_clientState.LocalPlayer == null)
+                while (!_dalamudUtil.IsPlayerPresent)
                 {
-                    await Task.Delay(50);
+                    await Task.Delay(100);
                 }
 
-                var characterCacheFactory =
-                    new CharacterCacheFactory(_clientState, _ipcManager, new FileReplacementFactory(_ipcManager));
-                _characterManager = new CharacterManager(
-                    _clientState, _framework, _apiController, _objectTable, _ipcManager, _configuration, characterCacheFactory);
-                _characterManager.StartWatchingPlayer();
-                _ipcManager.PenumbraRedraw(_clientState.LocalPlayer!.Name.ToString());
+                try
+                {
+                    var characterCacheFactory =
+                        new CharacterDataFactory(_clientState, _ipcManager, new FileReplacementFactory(_ipcManager));
+                    _characterManager = new CharacterManager(_apiController, _objectTable, _ipcManager,
+                        characterCacheFactory, _characterCacheManager, _dalamudUtil, _playerWatcher);
+                    _characterManager.StartWatchingPlayer();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug(ex.Message);
+                }
             });
         }
         

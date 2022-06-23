@@ -15,41 +15,61 @@ namespace MareSynchronos.Models
     [JsonObject(MemberSerialization.OptIn)]
     public class FileReplacement
     {
-        public FileReplacementDto ToFileReplacementDto()
-        {
-            return new FileReplacementDto
-            {
-                GamePaths = GamePaths,
-                Hash = Hash,
-            };
-        }
-
         private readonly string penumbraDirectory;
 
-        [JsonProperty]
-        public string[] GamePaths { get; set; } = Array.Empty<string>();
-        [JsonProperty]
-        public string ResolvedPath { get; set; } = string.Empty;
-        [JsonProperty]
-        public string Hash { get; set; } = string.Empty;
-        public bool IsInUse { get; set; } = false;
-        public List<FileReplacement> Associated { get; set; } = new List<FileReplacement>();
-        [JsonProperty]
-        public string ImcData { get; set; } = string.Empty;
-        public bool HasFileReplacement => GamePaths.Length >= 1 && GamePaths[0] != ResolvedPath;
-
-        public bool Computed => (computationTask == null || (computationTask?.IsCompleted ?? true)) && Associated.All(f => f.Computed);
         private Task? computationTask = null;
+
         public FileReplacement(string penumbraDirectory)
         {
             this.penumbraDirectory = penumbraDirectory;
         }
+
+        public List<FileReplacement> Associated { get; set; } = new List<FileReplacement>();
+
+        public bool Computed => (computationTask == null || (computationTask?.IsCompleted ?? true)) && Associated.All(f => f.Computed);
+
+        [JsonProperty]
+        public string[] GamePaths { get; set; } = Array.Empty<string>();
+
+        public bool HasFileReplacement => GamePaths.Length >= 1 && GamePaths[0] != ResolvedPath;
+
+        [JsonProperty]
+        public string Hash { get; set; } = string.Empty;
+
+        [JsonProperty]
+        public string ImcData { get; set; } = string.Empty;
+
+        public bool IsInUse { get; set; } = false;
+
+        [JsonProperty]
+        public string ResolvedPath { get; set; } = string.Empty;
 
         public void AddAssociated(FileReplacement fileReplacement)
         {
             fileReplacement.IsInUse = true;
 
             Associated.Add(fileReplacement);
+        }
+
+        public override bool Equals(object? obj)
+        {
+            if (obj == null) return true;
+            if (obj.GetType() == typeof(FileReplacement))
+            {
+                return Hash == ((FileReplacement)obj).Hash;
+            }
+
+            return base.Equals(obj);
+        }
+
+        public override int GetHashCode()
+        {
+            int result = 13;
+            result *= 397;
+            result += Hash.GetHashCode();
+            result += ResolvedPath.GetHashCode();
+
+            return result;
         }
 
         public void SetResolvedPath(string path)
@@ -89,6 +109,29 @@ namespace MareSynchronos.Models
             });
         }
 
+        public FileReplacementDto ToFileReplacementDto()
+        {
+            return new FileReplacementDto
+            {
+                GamePaths = GamePaths,
+                Hash = Hash,
+            };
+        }
+        public override string ToString()
+        {
+            StringBuilder builder = new();
+            builder.AppendLine($"Modded: {HasFileReplacement} - {string.Join(",", GamePaths)} => {ResolvedPath}");
+            foreach (var l1 in Associated)
+            {
+                builder.AppendLine($"  + Modded: {l1.HasFileReplacement} - {string.Join(",", l1.GamePaths)} => {l1.ResolvedPath}");
+                foreach (var l2 in l1.Associated)
+                {
+                    builder.AppendLine($"    + Modded: {l2.HasFileReplacement} - {string.Join(",", l2.GamePaths)} => {l2.ResolvedPath}");
+                }
+            }
+            return builder.ToString();
+        }
+
         private string ComputeHash(FileInfo fi)
         {
             // compute hash if hash is not present
@@ -114,42 +157,6 @@ namespace MareSynchronos.Models
             }
 
             return hash;
-        }
-
-        public override string ToString()
-        {
-            StringBuilder builder = new();
-            builder.AppendLine($"Modded: {HasFileReplacement} - {string.Join(",", GamePaths)} => {ResolvedPath}");
-            foreach (var l1 in Associated)
-            {
-                builder.AppendLine($"  + Modded: {l1.HasFileReplacement} - {string.Join(",", l1.GamePaths)} => {l1.ResolvedPath}");
-                foreach (var l2 in l1.Associated)
-                {
-                    builder.AppendLine($"    + Modded: {l2.HasFileReplacement} - {string.Join(",", l2.GamePaths)} => {l2.ResolvedPath}");
-                }
-            }
-            return builder.ToString();
-        }
-
-        public override bool Equals(object? obj)
-        {
-            if (obj == null) return true;
-            if (obj.GetType() == typeof(FileReplacement))
-            {
-                return Hash == ((FileReplacement)obj).Hash;
-            }
-
-            return base.Equals(obj);
-        }
-
-        public override int GetHashCode()
-        {
-            int result = 13;
-            result *= 397;
-            result += Hash.GetHashCode();
-            result += ResolvedPath.GetHashCode();
-
-            return result;
         }
     }
 }

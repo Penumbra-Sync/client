@@ -11,22 +11,25 @@ namespace MareSynchronos
     [Serializable]
     public class Configuration : IPluginConfiguration
     {
-        public int Version { get; set; } = 0;
-
-        public string CacheFolder { get; set; } = string.Empty;
-        public Dictionary<string, string> ClientSecret { get; set; } = new();
-        public Dictionary<string, string> UidComments { get; set; } = new();
         private string _apiUri = string.Empty;
+        private int _maxParallelScan = 10;
+        [NonSerialized]
+        private DalamudPluginInterface? _pluginInterface;
+
+        public bool AcceptedAgreement { get; set; } = false;
         public string ApiUri
         {
             get => string.IsNullOrEmpty(_apiUri) ? ApiController.MainServiceUri : _apiUri;
             set => _apiUri = value;
         }
 
-        public bool UseCustomService { get; set; } = false;
+        public string CacheFolder { get; set; } = string.Empty;
+        public Dictionary<string, string> ClientSecret { get; set; } = new();
+        [JsonIgnore]
+        public bool HasValidSetup => AcceptedAgreement && InitialScanComplete && !string.IsNullOrEmpty(CacheFolder) &&
+                                     Directory.Exists(CacheFolder) && ClientSecret.ContainsKey(ApiUri);
+
         public bool InitialScanComplete { get; set; } = false;
-        public bool AcceptedAgreement { get; set; } = false;
-        private int _maxParallelScan = 10;
         public int MaxParallelScan
         {
             get => _maxParallelScan;
@@ -41,23 +44,18 @@ namespace MareSynchronos
             }
         }
 
-        [JsonIgnore]
-        public bool HasValidSetup => AcceptedAgreement && InitialScanComplete && !string.IsNullOrEmpty(CacheFolder) &&
-                                     Directory.Exists(CacheFolder) && ClientSecret.ContainsKey(ApiUri);
-
+        public Dictionary<string, string> UidComments { get; set; } = new();
+        public bool UseCustomService { get; set; } = false;
+        public int Version { get; set; } = 0;
         // the below exist just to make saving less cumbersome
-
-        [NonSerialized]
-        private DalamudPluginInterface? _pluginInterface;
-
         public void Initialize(DalamudPluginInterface pluginInterface)
         {
-            this._pluginInterface = pluginInterface;
+            _pluginInterface = pluginInterface;
         }
 
         public void Save()
         {
-            this._pluginInterface!.SavePluginConfig(this);
+            _pluginInterface!.SavePluginConfig(this);
         }
     }
 }

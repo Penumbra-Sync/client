@@ -1,29 +1,27 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System.Diagnostics;
 using System.Threading;
-using System.Threading.Tasks;
 using Dalamud.Game.ClientState;
-using Dalamud.Logging;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Client.System.Resource;
 using MareSynchronos.Managers;
 using MareSynchronos.Models;
+using MareSynchronos.Utils;
 using Penumbra.GameData.ByteString;
 using Penumbra.Interop.Structs;
 
 namespace MareSynchronos.Factories
 {
-    public class CharacterCacheFactory
+    public class CharacterDataFactory
     {
         private readonly ClientState _clientState;
         private readonly IpcManager _ipcManager;
         private readonly FileReplacementFactory _factory;
 
-        public CharacterCacheFactory(ClientState clientState, IpcManager ipcManager, FileReplacementFactory factory)
+        public CharacterDataFactory(ClientState clientState, IpcManager ipcManager, FileReplacementFactory factory)
         {
+            Logger.Debug("Creating " + nameof(CharacterDataFactory));
+
             _clientState = clientState;
             _ipcManager = ipcManager;
             _factory = factory;
@@ -34,13 +32,14 @@ namespace MareSynchronos.Factories
             return _clientState.LocalPlayer!.Name.ToString();
         }
 
-        public unsafe CharacterCache BuildCharacterCache()
+        public unsafe CharacterData BuildCharacterData()
         {
-            var cache = new CharacterCache();
+            Stopwatch st = Stopwatch.StartNew();
+            var cache = new CharacterData();
 
             while (_clientState.LocalPlayer == null)
             {
-                PluginLog.Debug("Character is null but it shouldn't be, waiting");
+                Logger.Debug("Character is null but it shouldn't be, waiting");
                 Thread.Sleep(50);
             }
             var model = (CharacterBase*)((Character*)_clientState.LocalPlayer!.Address)->GameObject.GetDrawObject();
@@ -99,6 +98,13 @@ namespace MareSynchronos.Factories
                     }
                 }
             }
+
+            cache.GlamourerString = _ipcManager.GlamourerGetCharacterCustomization()!;
+            cache.ManipulationString = _ipcManager.PenumbraGetMetaManipulations(_clientState.LocalPlayer!.Name.ToString());
+            cache.JobId = _clientState.LocalPlayer!.ClassJob.Id;
+
+            st.Stop();
+            Logger.Debug("Building Character Data took " + st.Elapsed);
 
             return cache;
         }

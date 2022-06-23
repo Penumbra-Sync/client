@@ -5,6 +5,8 @@ using ImGuiNET;
 using MareSynchronos.WebAPI;
 using System;
 using System.Linq;
+using MareSynchronos.Managers;
+using MareSynchronos.Utils;
 
 namespace MareSynchronos.UI
 {
@@ -24,15 +26,17 @@ namespace MareSynchronos.UI
                 MaximumSize = new(800, 2000),
             };
 
-            this._configuration = configuration;
-            this._windowSystem = windowSystem;
-            this._apiController = apiController;
+            _configuration = configuration;
+            _windowSystem = windowSystem;
+            _apiController = apiController;
             _uiShared = uiShared;
             windowSystem.AddWindow(this);
         }
 
         public void Dispose()
         {
+            Logger.Debug("Disposing " + nameof(PluginUi));
+
             _windowSystem.RemoveWindow(this);
         }
 
