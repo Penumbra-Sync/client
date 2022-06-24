@@ -86,6 +86,7 @@ namespace MareSynchronos
         public void Dispose()
         {
             Logger.Debug("Disposing " + Name);
+            _apiController?.Dispose();
 
             _commandManager.RemoveHandler(CommandName);
             _clientState.Login -= ClientState_Login;
@@ -99,7 +100,6 @@ namespace MareSynchronos
             _ipcManager?.Dispose();
             _characterManager?.Dispose();
             _characterCacheManager.Dispose();
-            _apiController?.Dispose();
             _playerWatcher.Disable();
             _playerWatcher.Dispose();
         }

@@ -66,6 +66,8 @@ public class CharacterCacheManager : IDisposable
 
     public void Initialize()
     {
+        _onlineCachedPlayers.Clear();
+
         _apiController.CharacterReceived += ApiControllerOnCharacterReceived;
         _apiController.PairedClientOnline += ApiControllerOnPairedClientOnline;
         _apiController.PairedClientOffline += ApiControllerOnPairedClientOffline;
@@ -150,6 +152,7 @@ public class CharacterCacheManager : IDisposable
     private void ApiControllerOnPairedClientOffline(object? sender, EventArgs e)
     {
         Logger.Debug("Player offline: " + sender!);
+        RestoreCharacter(_onlineCachedPlayers.SingleOrDefault(f => f.PlayerNameHash == (string)sender!));
         _onlineCachedPlayers.RemoveAll(p => p.PlayerNameHash == ((string)sender!));
     }
 
@@ -237,9 +240,10 @@ public class CharacterCacheManager : IDisposable
             PluginLog.Error(ex, "error");
         }
     }
-    private void RestoreCharacter(CachedPlayer character)
+
+    private void RestoreCharacter(CachedPlayer? character)
     {
-        if (string.IsNullOrEmpty(character.PlayerName)) return;
+        if (character == null || string.IsNullOrEmpty(character.PlayerName)) return;
 
         Logger.Debug("Restoring state for " + character.PlayerName);
         _ipcManager.PenumbraRemoveTemporaryCollection(character.PlayerName);
