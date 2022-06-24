@@ -15,18 +15,18 @@ namespace MareSynchronos.Models
     [JsonObject(MemberSerialization.OptIn)]
     public class FileReplacement
     {
-        private readonly string penumbraDirectory;
+        private readonly string _penumbraDirectory;
 
-        private Task? computationTask = null;
+        private Task? _computationTask = null;
 
         public FileReplacement(string penumbraDirectory)
         {
-            this.penumbraDirectory = penumbraDirectory;
+            this._penumbraDirectory = penumbraDirectory;
         }
 
         public List<FileReplacement> Associated { get; set; } = new List<FileReplacement>();
 
-        public bool Computed => (computationTask == null || (computationTask?.IsCompleted ?? true)) && Associated.All(f => f.Computed);
+        public bool Computed => (_computationTask == null || (_computationTask?.IsCompleted ?? true)) && Associated.All(f => f.Computed);
 
         [JsonProperty]
         public string[] GamePaths { get; set; } = Array.Empty<string>();
@@ -74,10 +74,10 @@ namespace MareSynchronos.Models
 
         public void SetResolvedPath(string path)
         {
-            ResolvedPath = path.ToLower().Replace('/', '\\').Replace(penumbraDirectory, "").Replace('\\', '/');
+            ResolvedPath = path.ToLower().Replace('/', '\\').Replace(_penumbraDirectory, "").Replace('\\', '/');
             if (!HasFileReplacement) return;
 
-            computationTask = Task.Run(() =>
+            _computationTask = Task.Run(() =>
             {
                 FileCache? fileCache;
                 using (FileCacheContext db = new())

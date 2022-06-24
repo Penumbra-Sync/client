@@ -23,6 +23,10 @@ namespace MareSynchronos.Utils
 
         public string PlayerName => _clientState.LocalPlayer!.Name.ToString();
 
+        public int PlayerJobId => (int)_clientState.LocalPlayer!.ClassJob.Id;
+
+        public IntPtr PlayerPointer => _clientState.LocalPlayer!.Address;
+
         public string PlayerNameHashed => Crypto.GetHash256(PlayerName + _clientState.LocalPlayer!.HomeWorld.Id);
 
         public Dictionary<string, PlayerCharacter> GetLocalPlayers()
@@ -44,6 +48,7 @@ namespace MareSynchronos.Utils
         {
             var obj = (GameObject*)characterAddress;
 
+            // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
             while ((obj->RenderFlags & 0b100000000000) == 0b100000000000) // 0b100000000000 is "still rendering" or something
             {
                 Logger.Debug("Waiting for character to finish drawing");

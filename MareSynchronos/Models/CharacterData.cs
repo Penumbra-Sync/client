@@ -30,7 +30,7 @@ namespace MareSynchronos.Models
         public bool IsReady => FileReplacements.All(f => f.Computed);
 
         [JsonProperty]
-        public uint JobId { get; set; } = 0;
+        public int JobId { get; set; } = 0;
 
         public string ManipulationString { get; set; } = string.Empty;
 

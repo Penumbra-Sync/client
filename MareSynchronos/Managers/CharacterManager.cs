@@ -75,7 +75,7 @@ namespace MareSynchronos.Managers
             Task.WaitAll(apiTask);
 
             _characterCacheManager.AddInitialPairs(apiTask.Result);
-            
+
             _ipcManager.PenumbraRedrawEvent += IpcManager_PenumbraRedrawEvent;
         }
 
@@ -142,7 +142,7 @@ namespace MareSynchronos.Managers
                     Logger.Debug("Not sending data, already sent");
                     return;
                 }
-                await _apiController.SendCharacterData(cacheDto, _dalamudUtil.GetLocalPlayers().Select(d => d.Key).ToList());
+                _ = _apiController.SendCharacterData(cacheDto, _dalamudUtil.GetLocalPlayers().Select(d => d.Key).ToList());
                 _lastSentHash = cacheDto.Hash;
             });
         }

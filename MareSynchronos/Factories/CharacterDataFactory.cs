@@ -14,22 +14,17 @@ namespace MareSynchronos.Factories
 {
     public class CharacterDataFactory
     {
-        private readonly ClientState _clientState;
+        private readonly DalamudUtil _dalamudUtil;
         private readonly IpcManager _ipcManager;
         private readonly FileReplacementFactory _factory;
 
-        public CharacterDataFactory(ClientState clientState, IpcManager ipcManager, FileReplacementFactory factory)
+        public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager, FileReplacementFactory factory)
         {
             Logger.Debug("Creating " + nameof(CharacterDataFactory));
 
-            _clientState = clientState;
+            _dalamudUtil = dalamudUtil;
             _ipcManager = ipcManager;
             _factory = factory;
-        }
-
-        private string GetPlayerName()
-        {
-            return _clientState.LocalPlayer!.Name.ToString();
         }
 
         public unsafe CharacterData BuildCharacterData()
@@ -37,12 +32,12 @@ namespace MareSynchronos.Factories
             Stopwatch st = Stopwatch.StartNew();
             var cache = new CharacterData();
 
-            while (_clientState.LocalPlayer == null)
+            while (!_dalamudUtil.IsPlayerPresent)
             {
                 Logger.Debug("Character is null but it shouldn't be, waiting");
                 Thread.Sleep(50);
             }
-            var model = (CharacterBase*)((Character*)_clientState.LocalPlayer!.Address)->GameObject.GetDrawObject();
+            var model = (CharacterBase*)((Character*)_dalamudUtil.PlayerPointer)->GameObject.GetDrawObject();
             for (var idx = 0; idx < model->SlotCount; ++idx)
             {
                 var mdl = (RenderModel*)model->ModelArray[idx];
@@ -54,7 +49,7 @@ namespace MareSynchronos.Factories
                 var mdlPath = new Utf8String(mdl->ResourceHandle->FileName()).ToString();
 
                 FileReplacement cachedMdlResource = _factory.Create();
-                cachedMdlResource.GamePaths = _ipcManager.PenumbraReverseResolvePath(mdlPath, GetPlayerName());
+                cachedMdlResource.GamePaths = _ipcManager.PenumbraReverseResolvePath(mdlPath, _dalamudUtil.PlayerName);
                 cachedMdlResource.SetResolvedPath(mdlPath);
                 //PluginLog.Verbose("Resolving for model " + mdlPath);
 
@@ -69,7 +64,7 @@ namespace MareSynchronos.Factories
                     var mtrlPath = new Utf8String(mtrl->ResourceHandle->FileName()).ToString().Split("|")[2];
                     //PluginLog.Verbose("Resolving for material " + mtrlPath);
                     var cachedMtrlResource = _factory.Create();
-                    cachedMtrlResource.GamePaths = _ipcManager.PenumbraReverseResolvePath(mtrlPath, GetPlayerName());
+                    cachedMtrlResource.GamePaths = _ipcManager.PenumbraReverseResolvePath(mtrlPath, _dalamudUtil.PlayerName);
                     cachedMtrlResource.SetResolvedPath(mtrlPath);
                     cache.AddAssociatedResource(cachedMtrlResource, cachedMdlResource, null!);
 
@@ -82,12 +77,12 @@ namespace MareSynchronos.Factories
 
                         var cachedTexResource = _factory.Create();
                         cachedTexResource.GamePaths = new[] { texPath };
-                        cachedTexResource.SetResolvedPath(_ipcManager.PenumbraResolvePath(texPath, GetPlayerName())!);
+                        cachedTexResource.SetResolvedPath(_ipcManager.PenumbraResolvePath(texPath, _dalamudUtil.PlayerName)!);
                         if (!cachedTexResource.HasFileReplacement)
                         {
                             // try resolving tex with -- in name instead
                             texPath = texPath.Insert(texPath.LastIndexOf('/') + 1, "--");
-                            var reResolvedPath = _ipcManager.PenumbraResolvePath(texPath, GetPlayerName())!;
+                            var reResolvedPath = _ipcManager.PenumbraResolvePath(texPath, _dalamudUtil.PlayerName)!;
                             if (reResolvedPath != texPath)
                             {
                                 cachedTexResource.GamePaths = new[] { texPath };
@@ -100,8 +95,8 @@ namespace MareSynchronos.Factories
             }
 
             cache.GlamourerString = _ipcManager.GlamourerGetCharacterCustomization()!;
-            cache.ManipulationString = _ipcManager.PenumbraGetMetaManipulations(_clientState.LocalPlayer!.Name.ToString());
-            cache.JobId = _clientState.LocalPlayer!.ClassJob.Id;
+            cache.ManipulationString = _ipcManager.PenumbraGetMetaManipulations(_dalamudUtil.PlayerName);
+            cache.JobId = _dalamudUtil.PlayerJobId;
 
             st.Stop();
             Logger.Debug("Building Character Data took " + st.Elapsed);

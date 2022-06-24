@@ -242,8 +242,9 @@ namespace MareSynchronos.UI
                 {
                     if (_apiController.PairedClients.All(w => w.OtherUID != tempNameUID))
                     {
+                        var nameToSend = tempNameUID;
                         tempNameUID = string.Empty;
-                        _ = _apiController.SendPairedClientAddition(tempNameUID);
+                        _ = _apiController.SendPairedClientAddition(nameToSend);
                     }
                 }
                 ImGui.PopFont();

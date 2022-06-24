@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Numerics;
 using System.Threading.Tasks;
 using Dalamud.Interface.Colors;
@@ -59,13 +60,10 @@ namespace MareSynchronos.UI
                     ? "Collecting files"
                     : $"Processing {_fileCacheManager.CurrentFileProgress} / {_fileCacheManager.TotalFiles} files");
             }
-            else if (_fileCacheManager.TimeToNextScan.TotalSeconds == 0)
-            {
-                ImGui.Text("Scan not started");
-            }
             else
             {
-                ImGui.Text("Next scan in " + _fileCacheManager.TimeToNextScan.ToString(@"mm\:ss") + " minutes");
+                ImGui.Text("Watching Penumbra Directory: " + _fileCacheManager.WatchedPenumbraDirectory);
+                ImGui.Text("Watching Cache Directory: " + _fileCacheManager.WatchedCacheDirectory);
             }
         }
 
@@ -156,6 +154,7 @@ namespace MareSynchronos.UI
                 if (!string.IsNullOrEmpty(_pluginConfiguration.CacheFolder) && Directory.Exists(_pluginConfiguration.CacheFolder))
                 {
                     _pluginConfiguration.Save();
+                    _fileCacheManager.StartWatchers();
                 }
             }
 

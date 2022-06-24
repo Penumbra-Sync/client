@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -15,14 +14,14 @@ namespace MareSynchronos.Managers
 {
     internal class FileCacheManager : IDisposable
     {
-        private const int MinutesForScan = 10;
         private readonly FileCacheFactory _fileCacheFactory;
         private readonly IpcManager _ipcManager;
         private readonly Configuration _pluginConfiguration;
         private CancellationTokenSource? _scanCancellationTokenSource;
-        private System.Timers.Timer? _scanScheduler;
         private Task? _scanTask;
-        private Stopwatch? _timerStopWatch;
+        private FileSystemWatcher? _penumbraDirWatcher;
+        private FileSystemWatcher? _cacheDirWatcher;
+
         public FileCacheManager(FileCacheFactory fileCacheFactory, IpcManager ipcManager, Configuration pluginConfiguration)
         {
             Logger.Debug("Creating " + nameof(FileCacheManager));
@@ -41,17 +40,82 @@ namespace MareSynchronos.Managers
             }
         }
 
+        private void OnCreated(object sender, FileSystemEventArgs e)
+        {
+            var fi = new FileInfo(e.FullPath);
+            using var db = new FileCacheContext();
+            if (fi.Extension.ToLower() is not ".mdl" or ".tex" or ".mtrl")
+            {
+                // this is most likely a folder
+                Logger.Debug("Folder added: " + e.FullPath);
+                var newFiles = Directory.EnumerateFiles(e.FullPath, "*.*", SearchOption.AllDirectories)
+                    .Where(f => f.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) ||
+                                f.EndsWith(".mdl", StringComparison.OrdinalIgnoreCase) ||
+                                f.EndsWith(".mtrl", StringComparison.OrdinalIgnoreCase)).ToList();
+                foreach (var file in newFiles)
+                {
+                    Logger.Debug("Adding " + file);
+                    db.Add(_fileCacheFactory.Create(file));
+                }
+            }
+            else
+            {
+                Logger.Debug("File created: " + e.FullPath);
+                var createdFileCache = _fileCacheFactory.Create(fi.FullName);
+                db.Add(createdFileCache);
+            }
+
+            db.SaveChanges();
+        }
+
+        private void OnDeleted(object sender, FileSystemEventArgs e)
+        {
+            var fi = new FileInfo(e.FullPath);
+            using var db = new FileCacheContext();
+            if (fi.Extension.ToLower() is not ".mdl" or ".tex" or ".mtrl")
+            {
+                // this is most likely a folder
+                var filesToRemove = db.FileCaches.Where(f => f.Filepath.StartsWith(e.FullPath.ToLower())).ToList();
+                Logger.Debug($"Folder deleted: {e.FullPath}, removing {filesToRemove.Count} files");
+                db.RemoveRange(filesToRemove);
+            }
+            else
+            {
+                Logger.Debug("File deleted: " + e.FullPath);
+                var fileInDb = db.FileCaches.SingleOrDefault(f => f.Filepath == fi.FullName.ToLower());
+                if (fileInDb == null) return;
+                db.Remove(fileInDb);
+            }
+            db.SaveChanges();
+        }
+
+        private void OnModified(object sender, FileSystemEventArgs e)
+        {
+            Logger.Debug("OnModified: " + e.FullPath);
+            var fi = new FileInfo(e.FullPath);
+            if (fi.Extension.ToLower() is not ".mdl" or ".tex" or ".mtrl") return;
+            Logger.Debug("File changed: " + e.FullPath);
+            using var db = new FileCacheContext();
+            var modifiedFile = _fileCacheFactory.Create(fi.FullName);
+            var fileInDb = db.FileCaches.SingleOrDefault(f => f.Filepath == fi.FullName.ToLower() || modifiedFile.Hash == f.Hash);
+            if (fileInDb == null) return;
+            db.Remove(fileInDb);
+            db.Add(modifiedFile);
+            db.SaveChanges();
+        }
+
         public long CurrentFileProgress { get; private set; }
         public bool IsScanRunning => !_scanTask?.IsCompleted ?? false;
-
-        public TimeSpan TimeToNextScan => TimeSpan.FromMinutes(MinutesForScan).Subtract(_timerStopWatch?.Elapsed ?? TimeSpan.FromMinutes(MinutesForScan));
         public long TotalFiles { get; private set; }
+        public string WatchedPenumbraDirectory => (!_penumbraDirWatcher?.EnableRaisingEvents ?? false) ? "Not watched" : _penumbraDirWatcher!.Path;
+        public string WatchedCacheDirectory => (!_cacheDirWatcher?.EnableRaisingEvents ?? false) ? "Not watched" : _cacheDirWatcher!.Path;
 
         public void Dispose()
         {
             Logger.Debug("Disposing " + nameof(FileCacheManager));
 
-            _scanScheduler?.Stop();
+            _cacheDirWatcher?.Dispose();
+            _penumbraDirWatcher?.Dispose();
             _scanCancellationTokenSource?.Cancel();
         }
 
@@ -65,21 +129,20 @@ namespace MareSynchronos.Managers
         {
             _scanCancellationTokenSource = new CancellationTokenSource();
             var penumbraDir = _ipcManager.PenumbraModDirectory()!;
-            Logger.Debug("Getting files from " + penumbraDir);
+            Logger.Debug("Getting files from " + penumbraDir + " and " + _pluginConfiguration.CacheFolder);
             var scannedFiles = new ConcurrentDictionary<string, bool>(
                 Directory.EnumerateFiles(penumbraDir, "*.*", SearchOption.AllDirectories)
                                 .Select(s => s.ToLowerInvariant())
-                                .Where(f => f.Contains(@"\chara\") && (f.EndsWith(".tex") || f.EndsWith(".mdl") || f.EndsWith(".mtrl")))
+                                .Where(f => f.Contains(@"\chara\"))
+                                .Concat(Directory.EnumerateFiles(_pluginConfiguration.CacheFolder, "*.*", SearchOption.AllDirectories)
+                                    .Select(s => s.ToLowerInvariant()))
+                                .Where(f => (f.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".mdl", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".mtrl", StringComparison.OrdinalIgnoreCase)))
                                 .Select(p => new KeyValuePair<string, bool>(p, false)));
-            List<FileCache> fileCaches;
-            await using (FileCacheContext db = new())
-            {
-                fileCaches = db.FileCaches.ToList();
-            }
+            await using FileCacheContext db = new();
+            List<FileCache> fileCaches = db.FileCaches.ToList();
 
             TotalFiles = scannedFiles.Count;
 
-            var fileCachesToUpdate = new ConcurrentBag<FileCache>();
             var fileCachesToDelete = new ConcurrentBag<FileCache>();
             var fileCachesToAdd = new ConcurrentBag<FileCache>();
 
@@ -105,8 +168,8 @@ namespace MareSynchronos.Managers
                     }
                     FileInfo fileInfo = new(cache.Filepath);
                     if (fileInfo.LastWriteTimeUtc.Ticks == long.Parse(cache.LastModifiedDate)) return;
-                    _fileCacheFactory.UpdateFileCache(cache);
-                    fileCachesToUpdate.Add(cache);
+                    fileCachesToAdd.Add(_fileCacheFactory.Create(cache.Filepath));
+                    fileCachesToDelete.Add(cache);
                 }
 
                 var files = CurrentFileProgress;
@@ -131,15 +194,18 @@ namespace MareSynchronos.Managers
                 CurrentFileProgress = files;
             });
 
-            await using (FileCacheContext db = new())
+            if (fileCachesToAdd.Any() || fileCachesToDelete.Any())
             {
-                if (fileCachesToAdd.Any() || fileCachesToUpdate.Any() || fileCachesToDelete.Any())
+                Logger.Debug("Found " + fileCachesToAdd.Count + " additions and " + fileCachesToDelete.Count + " deletions");
+                try
                 {
-                    db.FileCaches.AddRange(fileCachesToAdd);
-                    db.FileCaches.UpdateRange(fileCachesToUpdate);
                     db.FileCaches.RemoveRange(fileCachesToDelete);
-
-                    await db.SaveChangesAsync(ct);
+                    db.FileCaches.AddRange(fileCachesToAdd);
+                    db.SaveChanges();
+                }
+                catch (Exception ex)
+                {
+                    PluginLog.Error(ex, ex.Message);
                 }
             }
 
@@ -151,40 +217,41 @@ namespace MareSynchronos.Managers
             {
                 _pluginConfiguration.InitialScanComplete = true;
                 _pluginConfiguration.Save();
-                _timerStopWatch = Stopwatch.StartNew();
-                StartScheduler();
             }
-            else if (_timerStopWatch == null)
-            {
-                StartScheduler();
-                _timerStopWatch = Stopwatch.StartNew();
-            }
+
+            StartWatchers();
         }
 
-        private void StartScheduler()
+        public void StartWatchers()
         {
-            Logger.Debug("Scheduling next scan for in " + MinutesForScan + " minutes");
-            _scanScheduler = new System.Timers.Timer(TimeSpan.FromMinutes(MinutesForScan).TotalMilliseconds)
-            {
-                AutoReset = false,
-                Enabled = false,
-            };
-            _scanScheduler.AutoReset = true;
-            _scanScheduler.Elapsed += (_, _) =>
-            {
-                _timerStopWatch?.Stop();
-                if (_scanTask?.IsCompleted ?? false)
-                {
-                    PluginLog.Warning("Scanning task is still running, not re-initiating.");
-                    return;
-                }
+            Logger.Debug("Starting File System Watchers");
+            _penumbraDirWatcher?.Dispose();
+            _cacheDirWatcher?.Dispose();
 
-                Logger.Debug("Initiating periodic scan for mod changes");
-                Task.Run(() => _scanTask = StartFileScan(_scanCancellationTokenSource!.Token));
-                _timerStopWatch = Stopwatch.StartNew();
+            _penumbraDirWatcher = new FileSystemWatcher(_ipcManager.PenumbraModDirectory()!)
+            {
+                EnableRaisingEvents = true,
+                Filter = "*.*",
+                IncludeSubdirectories = true,
             };
+            _penumbraDirWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.Size;
+            _penumbraDirWatcher.Created += OnCreated;
+            _penumbraDirWatcher.Deleted += OnDeleted;
+            _penumbraDirWatcher.Changed += OnModified;
+            _penumbraDirWatcher.Error += (sender, args) => PluginLog.Error(args.GetException(), "Error in Penumbra Dir Watcher");
 
-            _scanScheduler.Start();
+            _cacheDirWatcher = new FileSystemWatcher(_pluginConfiguration.CacheFolder)
+            {
+                EnableRaisingEvents = true,
+                Filter = "*.*",
+                IncludeSubdirectories = true,
+            };
+            _cacheDirWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.Size;
+            _cacheDirWatcher.Created += OnCreated;
+            _cacheDirWatcher.Deleted += OnDeleted;
+            _cacheDirWatcher.Changed += OnModified;
+            _cacheDirWatcher.Error +=
+                (sender, args) => PluginLog.Error(args.GetException(), "Error in Cache Dir Watcher");
         }
     }
 }

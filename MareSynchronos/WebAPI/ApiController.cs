@@ -87,7 +87,7 @@ namespace MareSynchronos.WebAPI
         public void Dispose()
         {
             Logger.Debug("Disposing " + nameof(ApiController));
-
+            
             _cts?.Cancel();
             _ = DisposeHubConnections();
         }
@@ -124,19 +124,9 @@ namespace MareSynchronos.WebAPI
                 var hash = file.Hash;
                 var data = await DownloadFile(hash);
                 var extractedFile = LZ4Codec.Unwrap(data);
-                var ext = file.GamePaths.First().Split(".", StringSplitOptions.None).Last();
+                var ext = file.GamePaths.First().Split(".").Last();
                 var filePath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash + "." + ext);
                 await File.WriteAllBytesAsync(filePath, extractedFile);
-                await using (var db = new FileCacheContext())
-                {
-                    db.Add(new FileCache
-                    {
-                        Filepath = filePath.ToLower(),
-                        Hash = file.Hash,
-                        LastModifiedDate = DateTime.Now.Ticks.ToString(),
-                    });
-                    await db.SaveChangesAsync();
-                }
                 Logger.Debug("File downloaded to " + filePath);
             }
 
