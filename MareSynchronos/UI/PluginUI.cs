@@ -4,6 +4,7 @@ using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using MareSynchronos.WebAPI;
 using System;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using MareSynchronos.Utils;
@@ -190,7 +191,18 @@ namespace MareSynchronos.UI
             {
                 _uiShared.DrawFileScanState();
                 _uiShared.DrawCacheDirectorySetting();
-                _uiShared.DrawParallelScansSetting();
+                ImGui.Text($"Local cache size: {UiShared.ByteToString(_uiShared.FileCacheSize)}");
+                ImGui.SameLine();
+                if (ImGui.Button("Clear local cache"))
+                {
+                    Task.Run(() =>
+                    {
+                        foreach (var file in Directory.GetFiles(_configuration.CacheFolder))
+                        {
+                            File.Delete(file);
+                        }
+                    });
+                }
                 ImGui.TreePop();
             }
         }

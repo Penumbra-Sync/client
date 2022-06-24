@@ -51,7 +51,7 @@ namespace MareSynchronos
 
             _apiController = new ApiController(_configuration);
             _ipcManager = new IpcManager(_pluginInterface);
-            _fileCacheManager = new FileCacheManager(new FileCacheFactory(), _ipcManager, _configuration);
+            _fileCacheManager = new FileCacheManager(_ipcManager, _configuration);
             _dalamudUtil = new DalamudUtil(_clientState, _objectTable);
             _characterCacheManager = new CharacterCacheManager(_clientState, framework, _objectTable, _apiController,
                 _dalamudUtil, _ipcManager);

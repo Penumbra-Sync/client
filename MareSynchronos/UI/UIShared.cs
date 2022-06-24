@@ -15,6 +15,7 @@ namespace MareSynchronos.UI
         private readonly ApiController _apiController;
         private readonly FileCacheManager _fileCacheManager;
         private readonly Configuration _pluginConfiguration;
+        public long FileCacheSize => _fileCacheManager.FileCacheSize;
 
         public UiShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, Configuration pluginConfiguration)
         {
@@ -115,16 +116,15 @@ namespace MareSynchronos.UI
 
         public static string ByteToString(long bytes)
         {
-            double output = bytes;
-            var suffix = new[] { "B", "KiB", "MiB", "GiB" };
-            var suffixIdx = 0;
-            while (output / 1024.0 > 1024)
+            string[] suffix = { "B", "KiB", "MiB", "GiB", "TiB" };
+            int i;
+            double dblSByte = bytes;
+            for (i = 0; i < suffix.Length && bytes >= 1024; i++, bytes /= 1024)
             {
-                output /= 1024.0;
-                suffixIdx++;
+                dblSByte = bytes / 1024.0;
             }
 
-            return output.ToString("0.00") + " " + suffix[suffixIdx];
+            return $"{dblSByte:0.00} {suffix[i]}";
         }
 
         private int _serverSelectionIndex = 0;

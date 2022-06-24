@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using System.Threading;
-using Dalamud.Game.ClientState;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Client.System.Resource;

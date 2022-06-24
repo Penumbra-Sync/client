@@ -6,7 +6,6 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Logging;
-using MareSynchronos.Factories;
 using MareSynchronos.FileCacheDB;
 using MareSynchronos.Utils;
 
@@ -14,19 +13,18 @@ namespace MareSynchronos.Managers
 {
     public class FileCacheManager : IDisposable
     {
-        private readonly FileCacheFactory _fileCacheFactory;
         private readonly IpcManager _ipcManager;
         private readonly Configuration _pluginConfiguration;
         private CancellationTokenSource? _scanCancellationTokenSource;
         private Task? _scanTask;
         private FileSystemWatcher? _penumbraDirWatcher;
         private FileSystemWatcher? _cacheDirWatcher;
+        public long FileCacheSize { get; set; }
 
-        public FileCacheManager(FileCacheFactory fileCacheFactory, IpcManager ipcManager, Configuration pluginConfiguration)
+        public FileCacheManager(IpcManager ipcManager, Configuration pluginConfiguration)
         {
             Logger.Debug("Creating " + nameof(FileCacheManager));
 
-            _fileCacheFactory = fileCacheFactory;
             _ipcManager = ipcManager;
             _pluginConfiguration = pluginConfiguration;
 
@@ -50,12 +48,12 @@ namespace MareSynchronos.Managers
                 Logger.Debug("File created: " + e.FullPath);
                 try
                 {
-                    var createdFileCache = _fileCacheFactory.Create(fi.FullName);
+                    var createdFileCache = Create(fi.FullName);
                     db.Add(createdFileCache);
                 }
                 catch (FileLoadException)
                 {
-                    Logger.Debug("File was still being written to");
+                    Logger.Debug("File was still being written to.");
                 }
 
             }
@@ -71,12 +69,17 @@ namespace MareSynchronos.Managers
                     foreach (var file in newFiles)
                     {
                         Logger.Debug("Adding " + file);
-                        db.Add(_fileCacheFactory.Create(file));
+                        db.Add(Create(file));
                     }
                 }
             }
 
             db.SaveChanges();
+
+            if (e.FullPath.Contains(_pluginConfiguration.CacheFolder, StringComparison.OrdinalIgnoreCase))
+            {
+                Task.Run(RecalculateFileCacheSize);
+            }
         }
 
         private void OnDeleted(object sender, FileSystemEventArgs e)
@@ -104,6 +107,11 @@ namespace MareSynchronos.Managers
             }
 
             db.SaveChanges();
+
+            if (e.FullPath.Contains(_pluginConfiguration.CacheFolder, StringComparison.OrdinalIgnoreCase))
+            {
+                Task.Run(RecalculateFileCacheSize);
+            }
         }
 
         private void OnModified(object sender, FileSystemEventArgs e)
@@ -113,12 +121,17 @@ namespace MareSynchronos.Managers
             if (fi.Extension.ToLower() is not ".mdl" or ".tex" or ".mtrl") return;
             Logger.Debug("File changed: " + e.FullPath);
             using var db = new FileCacheContext();
-            var modifiedFile = _fileCacheFactory.Create(fi.FullName);
+            var modifiedFile = Create(fi.FullName);
             var fileInDb = db.FileCaches.SingleOrDefault(f => f.Filepath == fi.FullName.ToLower() || modifiedFile.Hash == f.Hash);
             if (fileInDb == null) return;
             db.Remove(fileInDb);
             db.Add(modifiedFile);
             db.SaveChanges();
+
+            if (e.FullPath.Contains(_pluginConfiguration.CacheFolder, StringComparison.OrdinalIgnoreCase))
+            {
+                Task.Run(RecalculateFileCacheSize);
+            }
         }
 
         public long CurrentFileProgress { get; private set; }
@@ -185,7 +198,7 @@ namespace MareSynchronos.Managers
                     }
                     FileInfo fileInfo = new(cache.Filepath);
                     if (fileInfo.LastWriteTimeUtc.Ticks == long.Parse(cache.LastModifiedDate)) return;
-                    fileCachesToAdd.Add(_fileCacheFactory.Create(cache.Filepath));
+                    fileCachesToAdd.Add(Create(cache.Filepath));
                     fileCachesToDelete.Add(cache);
                 }
 
@@ -204,7 +217,7 @@ namespace MareSynchronos.Managers
             },
             file =>
             {
-                fileCachesToAdd.Add(_fileCacheFactory.Create(file.Key));
+                fileCachesToAdd.Add(Create(file.Key));
 
                 var files = CurrentFileProgress;
                 Interlocked.Increment(ref files);
@@ -275,6 +288,47 @@ namespace MareSynchronos.Managers
             _cacheDirWatcher.Filters.Add("*.tex");
             _cacheDirWatcher.Error +=
                 (sender, args) => PluginLog.Error(args.GetException(), "Error in Cache Dir Watcher");
+
+            Task.Run(RecalculateFileCacheSize);
+        }
+
+        private void RecalculateFileCacheSize()
+        {
+            FileCacheSize = 0;
+            foreach (var file in Directory.EnumerateFiles(_pluginConfiguration.CacheFolder))
+            {
+                FileCacheSize += new FileInfo(file).Length;
+            }
+        }
+
+        private bool IsFileLocked(FileInfo file)
+        {
+            try
+            {
+                using var fs = file.Open(FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        public FileCache Create(string file)
+        {
+            FileInfo fileInfo = new(file);
+            if (IsFileLocked(fileInfo))
+            {
+                throw new FileLoadException();
+            }
+            var sha1Hash = Crypto.GetFileHash(fileInfo.FullName);
+            return new FileCache()
+            {
+                Filepath = fileInfo.FullName,
+                Hash = sha1Hash,
+                LastModifiedDate = fileInfo.LastWriteTimeUtc.Ticks.ToString(),
+            };
         }
     }
 }
