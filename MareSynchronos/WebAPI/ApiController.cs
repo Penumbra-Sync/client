@@ -133,6 +133,17 @@ namespace MareSynchronos.WebAPI
                 downloadedHashes.Add(hash);
             }
 
+            bool allFilesInDb = false;
+            while (!allFilesInDb)
+            {
+                await using (var db = new FileCacheContext())
+                {
+                    allFilesInDb = downloadedHashes.All(h => db.FileCaches.Any(f => f.Hash == h));
+                }
+
+                await Task.Delay(250);
+            }
+
             CurrentDownloads.Clear();
         }
 

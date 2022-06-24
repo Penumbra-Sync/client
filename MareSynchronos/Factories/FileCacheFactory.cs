@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿using System;
+using System.IO;
 using System.Threading;
 using MareSynchronos.FileCacheDB;
 using MareSynchronos.Utils;
@@ -10,10 +11,9 @@ namespace MareSynchronos.Factories
         public FileCache Create(string file)
         {
             FileInfo fileInfo = new(file);
-            while (IsFileLocked(fileInfo))
+            if (IsFileLocked(fileInfo))
             {
-                Thread.Sleep(100);
-                Logger.Debug("File is locked, waiting for release: " + fileInfo.FullName);
+                throw new FileLoadException();
             }
             var sha1Hash = Crypto.GetFileHash(fileInfo.FullName);
             return new FileCache()

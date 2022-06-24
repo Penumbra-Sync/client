@@ -44,25 +44,36 @@ namespace MareSynchronos.Managers
         {
             var fi = new FileInfo(e.FullPath);
             using var db = new FileCacheContext();
-            if (fi.Extension.ToLower() is not ".mdl" or ".tex" or ".mtrl")
+            var ext = fi.Extension.ToLower();
+            if (ext is ".mdl" or ".tex" or ".mtrl")
             {
-                // this is most likely a folder
-                Logger.Debug("Folder added: " + e.FullPath);
-                var newFiles = Directory.EnumerateFiles(e.FullPath, "*.*", SearchOption.AllDirectories)
-                    .Where(f => f.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) ||
-                                f.EndsWith(".mdl", StringComparison.OrdinalIgnoreCase) ||
-                                f.EndsWith(".mtrl", StringComparison.OrdinalIgnoreCase)).ToList();
-                foreach (var file in newFiles)
+                Logger.Debug("File created: " + e.FullPath);
+                try
                 {
-                    Logger.Debug("Adding " + file);
-                    db.Add(_fileCacheFactory.Create(file));
+                    var createdFileCache = _fileCacheFactory.Create(fi.FullName);
+                    db.Add(createdFileCache);
                 }
+                catch (FileLoadException)
+                {
+                    Logger.Debug("File was still being written to");
+                }
+
             }
             else
             {
-                Logger.Debug("File created: " + e.FullPath);
-                var createdFileCache = _fileCacheFactory.Create(fi.FullName);
-                db.Add(createdFileCache);
+                if (Directory.Exists(e.FullPath))
+                {
+                    Logger.Debug("Folder added: " + e.FullPath);
+                    var newFiles = Directory.EnumerateFiles(e.FullPath, "*.*", SearchOption.AllDirectories)
+                        .Where(f => f.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) ||
+                                    f.EndsWith(".mdl", StringComparison.OrdinalIgnoreCase) ||
+                                    f.EndsWith(".mtrl", StringComparison.OrdinalIgnoreCase)).ToList();
+                    foreach (var file in newFiles)
+                    {
+                        Logger.Debug("Adding " + file);
+                        db.Add(_fileCacheFactory.Create(file));
+                    }
+                }
             }
 
             db.SaveChanges();
@@ -72,20 +83,26 @@ namespace MareSynchronos.Managers
         {
             var fi = new FileInfo(e.FullPath);
             using var db = new FileCacheContext();
-            if (fi.Extension.ToLower() is not ".mdl" or ".tex" or ".mtrl")
-            {
-                // this is most likely a folder
-                var filesToRemove = db.FileCaches.Where(f => f.Filepath.StartsWith(e.FullPath.ToLower())).ToList();
-                Logger.Debug($"Folder deleted: {e.FullPath}, removing {filesToRemove.Count} files");
-                db.RemoveRange(filesToRemove);
-            }
-            else
+            var ext = fi.Extension.ToLower();
+            if (ext is ".mdl" or ".tex" or ".mtrl")
             {
                 Logger.Debug("File deleted: " + e.FullPath);
                 var fileInDb = db.FileCaches.SingleOrDefault(f => f.Filepath == fi.FullName.ToLower());
                 if (fileInDb == null) return;
                 db.Remove(fileInDb);
+
             }
+            else
+            {
+                if (fi.Extension == string.Empty)
+                {
+                    // this is most likely a folder
+                    var filesToRemove = db.FileCaches.Where(f => f.Filepath.StartsWith(e.FullPath.ToLower())).ToList();
+                    Logger.Debug($"Folder deleted: {e.FullPath}, removing {filesToRemove.Count} files");
+                    db.RemoveRange(filesToRemove);
+                }
+            }
+
             db.SaveChanges();
         }
 
@@ -231,25 +248,31 @@ namespace MareSynchronos.Managers
             _penumbraDirWatcher = new FileSystemWatcher(_ipcManager.PenumbraModDirectory()!)
             {
                 EnableRaisingEvents = true,
-                Filter = "*.*",
                 IncludeSubdirectories = true,
+                InternalBufferSize = 65536
             };
-            _penumbraDirWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.Size;
+            _penumbraDirWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size;
             _penumbraDirWatcher.Created += OnCreated;
             _penumbraDirWatcher.Deleted += OnDeleted;
             _penumbraDirWatcher.Changed += OnModified;
+            _penumbraDirWatcher.Filters.Add("*.mtrl");
+            _penumbraDirWatcher.Filters.Add("*.mdl");
+            _penumbraDirWatcher.Filters.Add("*.tex");
             _penumbraDirWatcher.Error += (sender, args) => PluginLog.Error(args.GetException(), "Error in Penumbra Dir Watcher");
 
             _cacheDirWatcher = new FileSystemWatcher(_pluginConfiguration.CacheFolder)
             {
                 EnableRaisingEvents = true,
-                Filter = "*.*",
                 IncludeSubdirectories = true,
+                InternalBufferSize = 65536
             };
-            _cacheDirWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.Size;
+            _cacheDirWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size;
             _cacheDirWatcher.Created += OnCreated;
             _cacheDirWatcher.Deleted += OnDeleted;
             _cacheDirWatcher.Changed += OnModified;
+            _cacheDirWatcher.Filters.Add("*.mtrl");
+            _cacheDirWatcher.Filters.Add("*.mdl");
+            _cacheDirWatcher.Filters.Add("*.tex");
             _cacheDirWatcher.Error +=
                 (sender, args) => PluginLog.Error(args.GetException(), "Error in Cache Dir Watcher");
         }
