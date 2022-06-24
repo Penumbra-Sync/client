@@ -24,7 +24,7 @@ namespace MareSynchronos
         private readonly CommandManager _commandManager;
         private readonly Configuration _configuration;
         private readonly FileCacheManager _fileCacheManager;
-        private readonly IntroUI _introUi;
+        private readonly IntroUi _introUi;
         private readonly IpcManager _ipcManager;
         private readonly ObjectTable _objectTable;
         private readonly DalamudPluginInterface _pluginInterface;
@@ -34,6 +34,7 @@ namespace MareSynchronos
         private readonly DalamudUtil _dalamudUtil;
         private readonly CharacterCacheManager _characterCacheManager;
         private readonly IPlayerWatcher _playerWatcher;
+        private readonly DownloadUi _downloadUi;
 
         public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager,
             Framework framework, ObjectTable objectTable, ClientState clientState)
@@ -58,16 +59,17 @@ namespace MareSynchronos
             _playerWatcher.Enable();
 
             var uiSharedComponent =
-                new UIShared(_ipcManager, _apiController, _fileCacheManager, _configuration);
+                new UiShared(_ipcManager, _apiController, _fileCacheManager, _configuration);
 
             _pluginUi = new PluginUi(_windowSystem, uiSharedComponent, _configuration, _apiController);
-            _introUi = new IntroUI(_windowSystem, uiSharedComponent, _configuration, _fileCacheManager);
+            _introUi = new IntroUi(_windowSystem, uiSharedComponent, _configuration, _fileCacheManager);
             _introUi.FinishedRegistration += (_, _) =>
             {
                 _introUi.IsOpen = false;
                 _pluginUi.IsOpen = true;
                 ReLaunchCharacterManager();
             };
+            _downloadUi = new DownloadUi(_windowSystem, _configuration, _apiController);
 
             new FileCacheContext().Dispose(); // make sure db is initialized I guess
 
@@ -91,6 +93,7 @@ namespace MareSynchronos
 
             _pluginUi?.Dispose();
             _introUi?.Dispose();
+            _downloadUi?.Dispose();
 
             _fileCacheManager?.Dispose();
             _ipcManager?.Dispose();
@@ -156,7 +159,7 @@ namespace MareSynchronos
                 }
             });
         }
-        
+
         private void Draw()
         {
             _windowSystem.Draw();
@@ -172,7 +175,7 @@ namespace MareSynchronos
 
         private void OpenConfigUi()
         {
-            if(_configuration.HasValidSetup)
+            if (_configuration.HasValidSetup)
                 _pluginUi.Toggle();
             else
                 _introUi.Toggle();

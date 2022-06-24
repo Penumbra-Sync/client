@@ -9,14 +9,14 @@ using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.UI
 {
-    internal class UIShared
+    public class UiShared
     {
         private readonly IpcManager _ipcManager;
         private readonly ApiController _apiController;
         private readonly FileCacheManager _fileCacheManager;
         private readonly Configuration _pluginConfiguration;
 
-        public UIShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, Configuration pluginConfiguration)
+        public UiShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, Configuration pluginConfiguration)
         {
             _ipcManager = ipcManager;
             _apiController = apiController;
@@ -87,7 +87,45 @@ namespace MareSynchronos.UI
         public static Vector4 UploadColor((long, long) data) => data.Item1 == 0 ? ImGuiColors.DalamudGrey :
             data.Item1 == data.Item2 ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudYellow;
 
-        public static string ByteToKiB(long bytes) => (bytes / 1024.0).ToString("0.00") + " KiB";
+        public static uint Color(byte r, byte g, byte b, byte a)
+        { uint ret = a; ret <<= 8; ret += b; ret <<= 8; ret += g; ret <<= 8; ret += r; return ret; }
+
+        public static void DrawOutlinedFont(ImDrawListPtr drawList, string text, Vector2 textPos, uint fontColor, uint outlineColor, int thickness)
+        {
+            drawList.AddText(textPos with { Y = textPos.Y - thickness },
+                outlineColor, text);
+            drawList.AddText(textPos with { X = textPos.X - thickness },
+                outlineColor, text);
+            drawList.AddText(textPos with { Y = textPos.Y + thickness },
+                outlineColor, text);
+            drawList.AddText(textPos with { X = textPos.X + thickness },
+                outlineColor, text);
+            drawList.AddText(new Vector2(textPos.X - thickness, textPos.Y - thickness),
+                outlineColor, text);
+            drawList.AddText(new Vector2(textPos.X + thickness, textPos.Y + thickness),
+                outlineColor, text);
+            drawList.AddText(new Vector2(textPos.X - thickness, textPos.Y + thickness),
+                outlineColor, text);
+            drawList.AddText(new Vector2(textPos.X + thickness, textPos.Y - thickness),
+                outlineColor, text);
+
+            drawList.AddText(textPos, fontColor, text);
+            drawList.AddText(textPos, fontColor, text);
+        }
+
+        public static string ByteToString(long bytes)
+        {
+            double output = bytes;
+            var suffix = new[] { "B", "KiB", "MiB", "GiB" };
+            var suffixIdx = 0;
+            while (output / 1024.0 > 1024)
+            {
+                output /= 1024.0;
+                suffixIdx++;
+            }
+
+            return output.ToString("0.00") + " " + suffix[suffixIdx];
+        }
 
         private int _serverSelectionIndex = 0;
 

@@ -12,7 +12,7 @@ using MareSynchronos.Utils;
 
 namespace MareSynchronos.Managers
 {
-    internal class FileCacheManager : IDisposable
+    public class FileCacheManager : IDisposable
     {
         private readonly FileCacheFactory _fileCacheFactory;
         private readonly IpcManager _ipcManager;

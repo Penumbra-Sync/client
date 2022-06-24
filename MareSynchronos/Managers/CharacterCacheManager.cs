@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Game;
 using Dalamud.Game.ClientState;
@@ -14,7 +12,6 @@ using MareSynchronos.FileCacheDB;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using Microsoft.EntityFrameworkCore;
 
 namespace MareSynchronos.Managers;
 
@@ -63,6 +60,8 @@ public class CharacterCacheManager : IDisposable
         {
             RestoreCharacter(character);
         }
+
+        _onlineCachedPlayers.Clear();
     }
 
     public void Initialize()
@@ -74,6 +73,7 @@ public class CharacterCacheManager : IDisposable
         _apiController.UnpairedFromOther += ApiControllerOnUnpairedFromOther;
         _framework.Update += FrameworkOnUpdate;
     }
+
     public async Task UpdatePlayersFromService(Dictionary<string, int> playerJobIds)
     {
         await _apiController.GetCharacterData(playerJobIds);

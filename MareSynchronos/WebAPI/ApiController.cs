@@ -87,7 +87,7 @@ namespace MareSynchronos.WebAPI
         public void Dispose()
         {
             Logger.Debug("Disposing " + nameof(ApiController));
-            
+
             _cts?.Cancel();
             _ = DisposeHubConnections();
         }
@@ -119,8 +119,10 @@ namespace MareSynchronos.WebAPI
                 CurrentDownloads[file.Hash] = (0, fileSize);
             }
 
+            List<string> downloadedHashes = new();
             foreach (var file in fileReplacementDto.Where(f => CurrentDownloads[f.Hash].Item2 > 0))
             {
+                if (downloadedHashes.Contains(file.Hash)) continue;
                 var hash = file.Hash;
                 var data = await DownloadFile(hash);
                 var extractedFile = LZ4Codec.Unwrap(data);
@@ -128,6 +130,7 @@ namespace MareSynchronos.WebAPI
                 var filePath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash + "." + ext);
                 await File.WriteAllBytesAsync(filePath, extractedFile);
                 Logger.Debug("File downloaded to " + filePath);
+                downloadedHashes.Add(hash);
             }
 
             CurrentDownloads.Clear();
@@ -311,6 +314,11 @@ namespace MareSynchronos.WebAPI
             long fileSize = await _fileHub!.InvokeAsync<long>("GetFileSize", hash);
         }
 
+        public async Task DeleteAllMyFiles()
+        {
+            await _fileHub!.SendAsync("DeleteAllFiles");
+        }
+
         private async Task DisposeHubConnections()
         {
             if (_fileHub != null)
@@ -430,6 +438,7 @@ namespace MareSynchronos.WebAPI
                 UnpairedFromOther?.Invoke(characterIdentifier, EventArgs.Empty);
             }
         }
+
         private async Task UploadFile(byte[] compressedFile, string fileHash, CancellationToken uploadToken)
         {
             if (uploadToken.IsCancellationRequested) return;

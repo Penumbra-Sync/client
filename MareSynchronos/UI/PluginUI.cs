@@ -5,21 +5,23 @@ using ImGuiNET;
 using MareSynchronos.WebAPI;
 using System;
 using System.Linq;
-using MareSynchronos.Managers;
+using System.Threading.Tasks;
 using MareSynchronos.Utils;
 
 namespace MareSynchronos.UI
 {
-    class PluginUi : Window, IDisposable
+    public class PluginUi : Window, IDisposable
     {
         private readonly Configuration _configuration;
         private readonly WindowSystem _windowSystem;
         private readonly ApiController _apiController;
-        private readonly UIShared _uiShared;
+        private readonly UiShared _uiShared;
 
         public PluginUi(WindowSystem windowSystem,
-            UIShared uiShared, Configuration configuration, ApiController apiController) : base("Mare Synchronos Settings", ImGuiWindowFlags.None)
+            UiShared uiShared, Configuration configuration, ApiController apiController) : base("Mare Synchronos Settings", ImGuiWindowFlags.None)
         {
+            Logger.Debug("Creating " + nameof(PluginUi));
+
             SizeConstraints = new WindowSizeConstraints()
             {
                 MinimumSize = new(800, 400),
@@ -85,6 +87,7 @@ namespace MareSynchronos.UI
                 DrawPairedClientsContent();
                 DrawFileCacheSettings();
                 DrawCurrentTransfers();
+                DrawAdministration();
             }
             else
             {
@@ -93,16 +96,36 @@ namespace MareSynchronos.UI
             }
         }
 
+        private void DrawAdministration()
+        {
+            if (ImGui.TreeNode(
+                    $"User Administration"))
+            {
+                if (ImGui.Button("Delete all my files"))
+                {
+                    Task.Run(() => _apiController.DeleteAllMyFiles());
+                }
+                ImGui.TreePop();
+            }
+        }
+
         private void DrawCurrentTransfers()
         {
             if (ImGui.TreeNode(
                     $"Current Transfers"))
             {
+                bool showTransferWindow = _configuration.ShowTransferWindow;
+                if (ImGui.Checkbox("Show separate Transfer window while transfers are active", ref showTransferWindow))
+                {
+                    _configuration.ShowTransferWindow = showTransferWindow;
+                    _configuration.Save();
+                }
+
                 if (ImGui.BeginTable("TransfersTable", 2))
                 {
                     ImGui.TableSetupColumn(
-                        $"Uploads ({UIShared.ByteToKiB(_apiController.CurrentUploads.Sum(a => a.Value.Item1))} / {UIShared.ByteToKiB(_apiController.CurrentUploads.Sum(a => a.Value.Item2))})");
-                    ImGui.TableSetupColumn($"Downloads ({UIShared.ByteToKiB(_apiController.CurrentDownloads.Sum(a => a.Value.Item1))} / {UIShared.ByteToKiB(_apiController.CurrentDownloads.Sum(a => a.Value.Item2))})");
+                        $"Uploads ({UiShared.ByteToString(_apiController.CurrentUploads.Sum(a => a.Value.Item1))} / {UiShared.ByteToString(_apiController.CurrentUploads.Sum(a => a.Value.Item2))})");
+                    ImGui.TableSetupColumn($"Downloads ({UiShared.ByteToString(_apiController.CurrentDownloads.Sum(a => a.Value.Item1))} / {UiShared.ByteToString(_apiController.CurrentDownloads.Sum(a => a.Value.Item2))})");
 
                     ImGui.TableHeadersRow();
 
@@ -115,14 +138,14 @@ namespace MareSynchronos.UI
                         ImGui.TableHeadersRow();
                         foreach (var hash in _apiController.CurrentUploads.Keys)
                         {
-                            var color = UIShared.UploadColor(_apiController.CurrentUploads[hash]);
+                            var color = UiShared.UploadColor(_apiController.CurrentUploads[hash]);
                             ImGui.PushStyleColor(ImGuiCol.Text, color);
                             ImGui.TableNextColumn();
                             ImGui.Text(hash);
                             ImGui.TableNextColumn();
-                            ImGui.Text(UIShared.ByteToKiB(_apiController.CurrentUploads[hash].Item1));
+                            ImGui.Text(UiShared.ByteToString(_apiController.CurrentUploads[hash].Item1));
                             ImGui.TableNextColumn();
-                            ImGui.Text(UIShared.ByteToKiB(_apiController.CurrentUploads[hash].Item2));
+                            ImGui.Text(UiShared.ByteToString(_apiController.CurrentUploads[hash].Item2));
                             ImGui.PopStyleColor();
                             ImGui.TableNextRow();
                         }
@@ -139,14 +162,14 @@ namespace MareSynchronos.UI
                         ImGui.TableHeadersRow();
                         foreach (var hash in _apiController.CurrentDownloads.Keys)
                         {
-                            var color = UIShared.UploadColor(_apiController.CurrentDownloads[hash]);
+                            var color = UiShared.UploadColor(_apiController.CurrentDownloads[hash]);
                             ImGui.PushStyleColor(ImGuiCol.Text, color);
                             ImGui.TableNextColumn();
                             ImGui.Text(hash);
                             ImGui.TableNextColumn();
-                            ImGui.Text(UIShared.ByteToKiB(_apiController.CurrentDownloads[hash].Item1));
+                            ImGui.Text(UiShared.ByteToString(_apiController.CurrentDownloads[hash].Item1));
                             ImGui.TableNextColumn();
-                            ImGui.Text(UIShared.ByteToKiB(_apiController.CurrentDownloads[hash].Item2));
+                            ImGui.Text(UiShared.ByteToString(_apiController.CurrentDownloads[hash].Item2));
                             ImGui.PopStyleColor();
                             ImGui.TableNextRow();
                         }
@@ -199,13 +222,13 @@ namespace MareSynchronos.UI
 
                         ImGui.TableNextColumn();
                         ImGui.TextColored(
-                            UIShared.GetBoolColor(item.IsSynced && !item.IsPausedFromOthers && !item.IsPaused),
+                            UiShared.GetBoolColor(item.IsSynced && !item.IsPausedFromOthers && !item.IsPaused),
                             item.OtherUID);
                         ImGui.TableNextColumn();
                         string pairString = !item.IsSynced
                             ? "Has not added you"
                             : ((item.IsPaused || item.IsPausedFromOthers) ? "Unpaired" : "Paired");
-                        ImGui.TextColored(UIShared.GetBoolColor(item.IsSynced && !item.IsPaused && !item.IsPausedFromOthers), pairString);
+                        ImGui.TextColored(UiShared.GetBoolColor(item.IsSynced && !item.IsPaused && !item.IsPausedFromOthers), pairString);
                         ImGui.TableNextColumn();
                         string charComment = _configuration.UidComments.ContainsKey(item.OtherUID) ? _configuration.UidComments[item.OtherUID] : string.Empty;
                         ImGui.SetNextItemWidth(400);
