@@ -70,7 +70,6 @@ namespace MareSynchronos.Managers
         {
             var apiTask = _apiController.SendCharacterName(_dalamudUtil.PlayerNameHashed);
             _lastSentHash = string.Empty;
-            _characterCacheManager.Initialize();
 
             Task.WaitAll(apiTask);
 
@@ -81,8 +80,6 @@ namespace MareSynchronos.Managers
 
         private void ApiController_Disconnected(object? sender, EventArgs args)
         {
-            _characterCacheManager.Dispose();
-
             Logger.Debug(nameof(ApiController_Disconnected));
 
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
@@ -126,6 +123,12 @@ namespace MareSynchronos.Managers
                 return;
             }
 
+            if (!_ipcManager.Initialized)
+            {
+                PluginLog.Warning("Penumbra not active, doing nothing.");
+                return;
+            }
+
             _playerChangedTask = Task.Run(async () =>
             {
                 Stopwatch st = Stopwatch.StartNew();
@@ -152,28 +155,21 @@ namespace MareSynchronos.Managers
             Logger.Debug("Watcher Player Changed");
             Task.Run(() =>
             {
-                try
+                // fix for redraw from anamnesis
+                while (!_dalamudUtil.IsPlayerPresent)
                 {
-                    // fix for redraw from anamnesis
-                    while (!_dalamudUtil.IsPlayerPresent)
-                    {
-                        Logger.Debug("Waiting Until Player is Present");
-                        Thread.Sleep(100);
-                    }
-
-                    if (actor.Name.ToString() == _dalamudUtil.PlayerName)
-                    {
-                        Logger.Debug("Watcher: PlayerChanged");
-                        PlayerChanged(actor.Name.ToString());
-                    }
-                    else
-                    {
-                        Logger.Debug("PlayerChanged: " + actor.Name.ToString());
-                    }
+                    Logger.Debug("Waiting Until Player is Present");
+                    Thread.Sleep(100);
                 }
-                catch (Exception ex)
+
+                if (actor.Name.ToString() == _dalamudUtil.PlayerName)
                 {
-                    PluginLog.Error(ex, "Actor was null or broken " + actor);
+                    Logger.Debug("Watcher: PlayerChanged");
+                    PlayerChanged(actor.Name.ToString());
+                }
+                else
+                {
+                    Logger.Debug("PlayerChanged: " + actor.Name.ToString());
                 }
             });
         }

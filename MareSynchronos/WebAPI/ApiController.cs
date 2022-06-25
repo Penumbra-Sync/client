@@ -55,8 +55,8 @@ namespace MareSynchronos.WebAPI
         public ConcurrentDictionary<string, (long, long)> CurrentDownloads { get; } = new();
         public ConcurrentDictionary<string, (long, long)> CurrentUploads { get; } = new();
         public bool IsConnected => !string.IsNullOrEmpty(UID);
-        public bool IsDownloading { get; private set; } = false;
-        public bool IsUploading { get; private set; } = false;
+        public bool IsDownloading { get; private set; }
+        public bool IsUploading { get; private set; }
         public List<ClientPairDto> PairedClients { get; set; } = new();
         public string SecretKey => _pluginConfiguration.ClientSecret.ContainsKey(ApiUri) ? _pluginConfiguration.ClientSecret[ApiUri] : "-";
         public bool ServerAlive =>
@@ -95,7 +95,6 @@ namespace MareSynchronos.WebAPI
 
         public async Task<byte[]> DownloadFile(string hash)
         {
-            IsDownloading = true;
             var reader = await _fileHub!.StreamAsChannelAsync<byte[]>("DownloadFile", hash);
             List<byte> downloadedData = new();
             int i = 0;
@@ -108,12 +107,13 @@ namespace MareSynchronos.WebAPI
                 }
             }
 
-            IsDownloading = false;
             return downloadedData.ToArray();
         }
 
         public async Task DownloadFiles(List<FileReplacementDto> fileReplacementDto)
         {
+            IsDownloading = true;
+
             foreach (var file in fileReplacementDto)
             {
                 var fileSize = await _fileHub!.InvokeAsync<long>("GetFileSize", file.Hash);
@@ -149,6 +149,7 @@ namespace MareSynchronos.WebAPI
             }
 
             CurrentDownloads.Clear();
+            IsDownloading = false;
         }
 
         public async Task GetCharacterData(Dictionary<string, int> hashedCharacterNames)

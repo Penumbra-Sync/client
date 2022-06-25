@@ -26,15 +26,30 @@ namespace MareSynchronos.Managers
             _ipcManager = ipcManager;
             _pluginConfiguration = pluginConfiguration;
 
-            if (_ipcManager.CheckPenumbraApi()
-               && _pluginConfiguration.AcceptedAgreement
-               && !string.IsNullOrEmpty(_pluginConfiguration.CacheFolder)
-               && _pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri)
-               && !string.IsNullOrEmpty(_ipcManager.PenumbraModDirectory()))
+            StartWatchersAndScan();
+
+            _ipcManager.PenumbraInitialized += IpcManagerOnPenumbraInitialized;
+            _ipcManager.PenumbraDisposed += IpcManagerOnPenumbraDisposed;
+        }
+
+        private void StartWatchersAndScan()
+        {
+            if (_ipcManager.Initialized && _pluginConfiguration.HasValidSetup)
             {
+                Logger.Debug("Penumbra is active, configuration is valid, starting watchers and scan");
                 StartWatchers();
                 StartInitialScan();
             }
+        }
+
+        private void IpcManagerOnPenumbraInitialized(object? sender, EventArgs e)
+        {
+            StartWatchersAndScan();
+        }
+
+        private void IpcManagerOnPenumbraDisposed(object? sender, EventArgs e)
+        {
+            StopWatchersAndScan();
         }
 
         public long CurrentFileProgress { get; private set; }
@@ -68,6 +83,14 @@ namespace MareSynchronos.Managers
         {
             Logger.Debug("Disposing " + nameof(FileCacheManager));
 
+            _ipcManager.PenumbraInitialized -= IpcManagerOnPenumbraInitialized;
+            _ipcManager.PenumbraDisposed -= IpcManagerOnPenumbraDisposed;
+
+            StopWatchersAndScan();
+        }
+
+        private void StopWatchersAndScan()
+        {
             _cacheDirWatcher?.Dispose();
             _penumbraDirWatcher?.Dispose();
             _scanCancellationTokenSource?.Cancel();
@@ -81,6 +104,7 @@ namespace MareSynchronos.Managers
 
         public void StartWatchers()
         {
+            if (!_ipcManager.Initialized || !_pluginConfiguration.HasValidSetup) return;
             Logger.Debug("Starting File System Watchers");
             _penumbraDirWatcher?.Dispose();
             _cacheDirWatcher?.Dispose();
@@ -91,7 +115,6 @@ namespace MareSynchronos.Managers
                 InternalBufferSize = 65536
             };
             _penumbraDirWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size;
-            //_penumbraDirWatcher.Created += OnCreated;
             _penumbraDirWatcher.Deleted += OnDeleted;
             _penumbraDirWatcher.Changed += OnModified;
             _penumbraDirWatcher.Filters.Add("*.mtrl");
@@ -107,7 +130,6 @@ namespace MareSynchronos.Managers
                 InternalBufferSize = 65536
             };
             _cacheDirWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size;
-            //_cacheDirWatcher.Created += OnCreated;
             _cacheDirWatcher.Deleted += OnDeleted;
             _cacheDirWatcher.Changed += OnModified;
             _cacheDirWatcher.Filters.Add("*.mtrl");
@@ -132,49 +154,6 @@ namespace MareSynchronos.Managers
             }
 
             return false;
-        }
-
-        private void OnCreated(object sender, FileSystemEventArgs e)
-        {
-            var fi = new FileInfo(e.FullPath);
-            using var db = new FileCacheContext();
-            var ext = fi.Extension.ToLower();
-            if (ext is ".mdl" or ".tex" or ".mtrl")
-            {
-                Logger.Debug("File created: " + e.FullPath);
-                try
-                {
-                    var createdFileCache = Create(fi.FullName.ToLower());
-                    db.Add(createdFileCache);
-                }
-                catch (FileLoadException)
-                {
-                    Logger.Debug("File was still being written to.");
-                }
-            }
-            else
-            {
-                if (Directory.Exists(e.FullPath))
-                {
-                    Logger.Debug("Folder added: " + e.FullPath);
-                    var newFiles = Directory.EnumerateFiles(e.FullPath, "*.*", SearchOption.AllDirectories)
-                        .Where(f => f.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) ||
-                                    f.EndsWith(".mdl", StringComparison.OrdinalIgnoreCase) ||
-                                    f.EndsWith(".mtrl", StringComparison.OrdinalIgnoreCase)).ToList();
-                    foreach (var file in newFiles)
-                    {
-                        Logger.Debug("Adding " + file);
-                        db.Add(Create(file));
-                    }
-                }
-            }
-
-            db.SaveChanges();
-
-            if (e.FullPath.Contains(_pluginConfiguration.CacheFolder, StringComparison.OrdinalIgnoreCase))
-            {
-                Task.Run(RecalculateFileCacheSize);
-            }
         }
 
         private void OnDeleted(object sender, FileSystemEventArgs e)

@@ -22,6 +22,7 @@ namespace MareSynchronos
         private readonly ApiController _apiController;
         private readonly ClientState _clientState;
         private readonly CommandManager _commandManager;
+        private readonly Framework _framework;
         private readonly Configuration _configuration;
         private readonly FileCacheManager _fileCacheManager;
         private readonly IntroUi _introUi;
@@ -32,7 +33,7 @@ namespace MareSynchronos
         private readonly WindowSystem _windowSystem;
         private CharacterManager? _characterManager;
         private readonly DalamudUtil _dalamudUtil;
-        private readonly CharacterCacheManager _characterCacheManager;
+        private CharacterCacheManager? _characterCacheManager;
         private readonly IPlayerWatcher _playerWatcher;
         private readonly DownloadUi _downloadUi;
 
@@ -42,6 +43,7 @@ namespace MareSynchronos
             Logger.Debug("Launching " + Name);
             _pluginInterface = pluginInterface;
             _commandManager = commandManager;
+            _framework = framework;
             _objectTable = objectTable;
             _clientState = clientState;
             _configuration = _pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
@@ -49,18 +51,16 @@ namespace MareSynchronos
 
             _windowSystem = new WindowSystem("MareSynchronos");
 
+            new FileCacheContext().Dispose(); // make sure db is initialized I guess
+
+            // those can be initialized outside of game login
             _apiController = new ApiController(_configuration);
             _ipcManager = new IpcManager(_pluginInterface);
+
             _fileCacheManager = new FileCacheManager(_ipcManager, _configuration);
-            _dalamudUtil = new DalamudUtil(_clientState, _objectTable);
-            _characterCacheManager = new CharacterCacheManager(_clientState, framework, _objectTable, _apiController,
-                _dalamudUtil, _ipcManager);
-            _playerWatcher = PlayerWatchFactory.Create(framework, _clientState, _objectTable);
-            _playerWatcher.Enable();
 
             var uiSharedComponent =
                 new UiShared(_ipcManager, _apiController, _fileCacheManager, _configuration);
-
             _pluginUi = new PluginUi(_windowSystem, uiSharedComponent, _configuration, _apiController);
             _introUi = new IntroUi(_windowSystem, uiSharedComponent, _configuration, _fileCacheManager);
             _introUi.FinishedRegistration += (_, _) =>
@@ -71,7 +71,9 @@ namespace MareSynchronos
             };
             _downloadUi = new DownloadUi(_windowSystem, _configuration, _apiController);
 
-            new FileCacheContext().Dispose(); // make sure db is initialized I guess
+            _dalamudUtil = new DalamudUtil(_clientState, _objectTable);
+            _playerWatcher = PlayerWatchFactory.Create(framework, _clientState, _objectTable);
+            _playerWatcher.Enable();
 
             clientState.Login += ClientState_Login;
             clientState.Logout += ClientState_Logout;
@@ -87,8 +89,8 @@ namespace MareSynchronos
         {
             _pluginUi.IsOpen = false;
             _introUi.IsOpen = true;
-            _characterCacheManager.Dispose();
-            _characterManager!.Dispose();
+            _characterCacheManager?.Dispose();
+            _characterManager?.Dispose();
         }
 
         public string Name => "Mare Synchronos";
@@ -102,7 +104,6 @@ namespace MareSynchronos
             _clientState.Login -= ClientState_Login;
             _clientState.Logout -= ClientState_Logout;
 
-
             _pluginUi?.Dispose();
             _introUi?.Dispose();
             _downloadUi?.Dispose();
@@ -110,7 +111,7 @@ namespace MareSynchronos
             _fileCacheManager?.Dispose();
             _ipcManager?.Dispose();
             _characterManager?.Dispose();
-            _characterCacheManager.Dispose();
+            _characterCacheManager?.Dispose();
             _playerWatcher.Disable();
             _playerWatcher.Dispose();
         }
@@ -139,6 +140,7 @@ namespace MareSynchronos
         private void ClientState_Logout(object? sender, EventArgs e)
         {
             Logger.Debug("Client logout");
+            _characterCacheManager?.Dispose();
             _characterManager?.Dispose();
             _pluginInterface.UiBuilder.Draw -= Draw;
             _pluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;
@@ -159,7 +161,9 @@ namespace MareSynchronos
                 try
                 {
                     var characterCacheFactory =
-                        new CharacterDataFactory(_dalamudUtil, _ipcManager, new FileReplacementFactory(_ipcManager));
+                        new CharacterDataFactory(_dalamudUtil, _ipcManager);
+                    _characterCacheManager = new CharacterCacheManager(_clientState, _framework, _objectTable,
+                        _apiController, _dalamudUtil, _ipcManager);
                     _characterManager = new CharacterManager(_apiController, _objectTable, _ipcManager,
                         characterCacheFactory, _characterCacheManager, _dalamudUtil, _playerWatcher);
                     _characterManager.StartWatchingPlayer();

@@ -17,6 +17,7 @@ namespace MareSynchronos.Managers
         private readonly ICallGateSubscriber<string, string, bool, (int, string)> _penumbraCreateTemporaryCollection;
         private readonly ICallGateSubscriber<string, string> _penumbraGetMetaManipulations;
         private readonly ICallGateSubscriber<object> _penumbraInit;
+        private readonly ICallGateSubscriber<object> _penumbraDispose;
         private readonly ICallGateSubscriber<IntPtr, int, object?> _penumbraObjectIsRedrawn;
         private readonly ICallGateSubscriber<string, int, object>? _penumbraRedraw;
         private readonly ICallGateSubscriber<string, int> _penumbraRemoveTemporaryCollection;
@@ -30,6 +31,7 @@ namespace MareSynchronos.Managers
             Logger.Debug("Creating " + nameof(IpcManager));
 
             _penumbraInit = pi.GetIpcSubscriber<object>("Penumbra.Initialized");
+            _penumbraDispose = pi.GetIpcSubscriber<object>("Penumbra.Disposed");
             _penumbraResolvePath = pi.GetIpcSubscriber<string, string, string>("Penumbra.ResolveCharacterPath");
             _penumbraResolveModDir = pi.GetIpcSubscriber<string>("Penumbra.GetModDirectory");
             _penumbraRedraw = pi.GetIpcSubscriber<string, int, object>("Penumbra.RedrawObjectByName");
@@ -44,7 +46,8 @@ namespace MareSynchronos.Managers
                 pi.GetIpcSubscriber<string, string>("Penumbra.GetMetaManipulations");
 
             _penumbraObjectIsRedrawn.Subscribe(RedrawEvent);
-            _penumbraInit.Subscribe(RedrawSelf);
+            _penumbraInit.Subscribe(PenumbraInit);
+            _penumbraDispose.Subscribe(PenumbraDispose);
 
             _penumbraSetTemporaryMod =
                 pi
@@ -56,12 +59,17 @@ namespace MareSynchronos.Managers
             _penumbraRemoveTemporaryCollection =
                 pi.GetIpcSubscriber<string, int>("Penumbra.RemoveTemporaryCollection");
 
-            Initialized = true;
+            if (Initialized)
+            {
+                PenumbraInitialized?.Invoke(null, EventArgs.Empty);
+            }
         }
 
+        public event EventHandler? PenumbraInitialized;
+        public event EventHandler? PenumbraDisposed;
         public event EventHandler? PenumbraRedrawEvent;
 
-        public bool Initialized { get; private set; } = false;
+        public bool Initialized => CheckPenumbraApi();
         public bool CheckGlamourerApi()
         {
             try
@@ -78,18 +86,22 @@ namespace MareSynchronos.Managers
         {
             try
             {
-                return _penumbraApiVersion.InvokeFunc() >= 4;
+                return _penumbraApiVersion.InvokeFunc() >= 5;
             }
             catch
             {
                 return false;
             }
         }
+
         public void Dispose()
         {
             Logger.Debug("Disposing " + nameof(IpcManager));
 
-            Uninitialize();
+            _penumbraDispose.Unsubscribe(PenumbraDispose);
+            _penumbraInit.Unsubscribe(PenumbraInit);
+            _penumbraObjectIsRedrawn.Unsubscribe(RedrawEvent);
+            Logger.Debug("IPC Manager disposed");
         }
 
         public void GlamourerApplyCharacterCustomization(string customization, string characterName)
@@ -174,17 +186,15 @@ namespace MareSynchronos.Managers
             PenumbraRedrawEvent?.Invoke(objectTableIndex, EventArgs.Empty);
         }
 
-        private void RedrawSelf()
+        private void PenumbraInit()
         {
+            PenumbraInitialized?.Invoke(null, EventArgs.Empty);
             _penumbraRedraw!.InvokeAction("self", 0);
         }
 
-        private void Uninitialize()
+        private void PenumbraDispose()
         {
-            _penumbraInit.Unsubscribe(RedrawSelf);
-            _penumbraObjectIsRedrawn.Unsubscribe(RedrawEvent);
-            Initialized = false;
-            Logger.Debug("IPC Manager disposed");
+            PenumbraDisposed?.Invoke(null, EventArgs.Empty);
         }
     }
 }

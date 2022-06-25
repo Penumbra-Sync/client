@@ -31,6 +31,11 @@ namespace MareSynchronos.Utils
 
         public Dictionary<string, PlayerCharacter> GetLocalPlayers()
         {
+            if (!_clientState.IsLoggedIn)
+            {
+                return new Dictionary<string, PlayerCharacter>();
+            }
+
             Dictionary<string, PlayerCharacter> allLocalPlayers = new();
             foreach (var obj in _objectTable)
             {
@@ -46,6 +51,8 @@ namespace MareSynchronos.Utils
 
         public unsafe void WaitWhileCharacterIsDrawing(IntPtr characterAddress)
         {
+            if (!_clientState.IsLoggedIn) return;
+
             var obj = (GameObject*)characterAddress;
 
             // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
@@ -59,6 +66,6 @@ namespace MareSynchronos.Utils
             Thread.Sleep(500);
         }
 
-        public void WaitWhileSelfIsDrawing() => WaitWhileCharacterIsDrawing(_clientState.LocalPlayer!.Address);
+        public void WaitWhileSelfIsDrawing() => WaitWhileCharacterIsDrawing(_clientState.LocalPlayer?.Address ?? new IntPtr());
     }
 }

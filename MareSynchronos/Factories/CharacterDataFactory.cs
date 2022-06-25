@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 using System.Threading;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
@@ -15,18 +16,31 @@ namespace MareSynchronos.Factories
     {
         private readonly DalamudUtil _dalamudUtil;
         private readonly IpcManager _ipcManager;
-        private readonly FileReplacementFactory _factory;
 
-        public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager, FileReplacementFactory factory)
+        public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager)
         {
             Logger.Debug("Creating " + nameof(CharacterDataFactory));
 
             _dalamudUtil = dalamudUtil;
             _ipcManager = ipcManager;
-            _factory = factory;
         }
 
-        public unsafe CharacterData BuildCharacterData()
+        private FileReplacement CreateBaseFileReplacement()
+        {
+            return new FileReplacement(_ipcManager.PenumbraModDirectory()!);
+        }
+
+        public CharacterData BuildCharacterData()
+        {
+            if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized)
+            {
+                throw new ArgumentException("Player is not present or Penumbra is not connected");
+            }
+
+            return CreateCharacterData();
+        }
+
+        private unsafe CharacterData CreateCharacterData()
         {
             Stopwatch st = Stopwatch.StartNew();
             var cache = new CharacterData();
@@ -47,7 +61,7 @@ namespace MareSynchronos.Factories
 
                 var mdlPath = new Utf8String(mdl->ResourceHandle->FileName()).ToString();
 
-                FileReplacement cachedMdlResource = _factory.Create();
+                FileReplacement cachedMdlResource = CreateBaseFileReplacement();
                 cachedMdlResource.GamePaths = _ipcManager.PenumbraReverseResolvePath(mdlPath, _dalamudUtil.PlayerName);
                 cachedMdlResource.SetResolvedPath(mdlPath);
                 //PluginLog.Verbose("Resolving for model " + mdlPath);
@@ -59,10 +73,10 @@ namespace MareSynchronos.Factories
                     var mtrl = (Material*)mdl->Materials[mtrlIdx];
                     if (mtrl == null) continue;
 
-                    //var mtrlFileResource = factory.Create();
+                    //var mtrlFileResource = factory.CreateBaseFileReplacement();
                     var mtrlPath = new Utf8String(mtrl->ResourceHandle->FileName()).ToString().Split("|")[2];
                     //PluginLog.Verbose("Resolving for material " + mtrlPath);
-                    var cachedMtrlResource = _factory.Create();
+                    var cachedMtrlResource = CreateBaseFileReplacement();
                     cachedMtrlResource.GamePaths = _ipcManager.PenumbraReverseResolvePath(mtrlPath, _dalamudUtil.PlayerName);
                     cachedMtrlResource.SetResolvedPath(mtrlPath);
                     cache.AddAssociatedResource(cachedMtrlResource, cachedMdlResource, null!);
@@ -74,7 +88,7 @@ namespace MareSynchronos.Factories
 
                         if (string.IsNullOrEmpty(texPath.ToString())) continue;
 
-                        var cachedTexResource = _factory.Create();
+                        var cachedTexResource = CreateBaseFileReplacement();
                         cachedTexResource.GamePaths = new[] { texPath };
                         cachedTexResource.SetResolvedPath(_ipcManager.PenumbraResolvePath(texPath, _dalamudUtil.PlayerName)!);
                         if (!cachedTexResource.HasFileReplacement)

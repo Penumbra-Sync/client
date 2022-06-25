@@ -37,6 +37,46 @@ public class CharacterCacheManager : IDisposable
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
         _ipcManager = ipcManager;
+
+        _clientState.Login += ClientStateOnLogin;
+        _clientState.Logout += ClientStateOnLogout;
+
+        _apiController.CharacterReceived += ApiControllerOnCharacterReceived;
+        _apiController.PairedClientOnline += ApiControllerOnPairedClientOnline;
+        _apiController.PairedClientOffline += ApiControllerOnPairedClientOffline;
+        _apiController.PairedWithOther += ApiControllerOnPairedWithOther;
+        _apiController.UnpairedFromOther += ApiControllerOnUnpairedFromOther;
+        _apiController.Disconnected += ApiControllerOnDisconnected;
+        _ipcManager.PenumbraDisposed += IpcManagerOnPenumbraDisposed;
+
+        if (clientState.IsLoggedIn)
+        {
+            ClientStateOnLogin(null, EventArgs.Empty);
+        }
+    }
+
+    private void IpcManagerOnPenumbraDisposed(object? sender, EventArgs e)
+    {
+        foreach (var character in _onlineCachedPlayers.ToList())
+        {
+            RestoreCharacter(character);
+            character.IsVisible = false;
+        }
+    }
+
+    private void ApiControllerOnDisconnected(object? sender, EventArgs e)
+    {
+        RestoreAllCharacters();
+    }
+
+    private void ClientStateOnLogin(object? sender, EventArgs e)
+    {
+        _framework.Update += FrameworkOnUpdate;
+    }
+
+    private void ClientStateOnLogout(object? sender, EventArgs e)
+    {
+        _framework.Update -= FrameworkOnUpdate;
     }
 
     public void AddInitialPairs(List<string> apiTaskResult)
@@ -55,26 +95,21 @@ public class CharacterCacheManager : IDisposable
         _apiController.PairedClientOffline -= ApiControllerOnPairedClientOffline;
         _apiController.PairedWithOther -= ApiControllerOnPairedWithOther;
         _apiController.UnpairedFromOther -= ApiControllerOnUnpairedFromOther;
+        _ipcManager.PenumbraDisposed -= ApiControllerOnDisconnected;
         _framework.Update -= FrameworkOnUpdate;
+        _clientState.Login -= ClientStateOnLogin;
+        _clientState.Logout -= ClientStateOnLogout;
+        RestoreAllCharacters();
+    }
 
+    private void RestoreAllCharacters()
+    {
         foreach (var character in _onlineCachedPlayers.ToList())
         {
             RestoreCharacter(character);
         }
 
         _onlineCachedPlayers.Clear();
-    }
-
-    public void Initialize()
-    {
-        _onlineCachedPlayers.Clear();
-
-        _apiController.CharacterReceived += ApiControllerOnCharacterReceived;
-        _apiController.PairedClientOnline += ApiControllerOnPairedClientOnline;
-        _apiController.PairedClientOffline += ApiControllerOnPairedClientOffline;
-        _apiController.PairedWithOther += ApiControllerOnPairedWithOther;
-        _apiController.UnpairedFromOther += ApiControllerOnUnpairedFromOther;
-        _framework.Update += FrameworkOnUpdate;
     }
 
     public async Task UpdatePlayersFromService(Dictionary<string, int> playerJobIds)
@@ -190,6 +225,7 @@ public class CharacterCacheManager : IDisposable
             if (DateTime.Now < _lastPlayerObjectCheck.AddSeconds(2)) return;
 
             _localVisiblePlayers.Clear();
+            if (!_ipcManager.Initialized) return;
             foreach (var obj in _objectTable)
             {
                 if (obj.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) continue;
