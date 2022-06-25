@@ -317,9 +317,15 @@ namespace MareSynchronos.Managers
                 Logger.Debug("Found " + fileCachesToAdd.Count + " additions and " + fileCachesToDelete.Count + " deletions");
                 try
                 {
-                    db.FileCaches.RemoveRange(fileCachesToDelete);
+                    foreach (var deletion in fileCachesToDelete)
+                    {
+                        var entry = db.FileCaches.SingleOrDefault(f =>
+                            f.Hash == deletion.Hash && f.Filepath == deletion.Filepath);
+                        if (entry != null)
+                            db.FileCaches.Remove(entry);
+                    }
                     db.FileCaches.AddRange(fileCachesToAdd);
-                    db.SaveChanges();
+                    await db.SaveChangesAsync(ct);
                 }
                 catch (Exception ex)
                 {

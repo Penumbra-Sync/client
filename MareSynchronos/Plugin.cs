@@ -75,6 +75,7 @@ namespace MareSynchronos
 
             clientState.Login += ClientState_Login;
             clientState.Logout += ClientState_Logout;
+            _apiController.AccountDeleted += ApiControllerOnAccountDeleted;
 
             if (clientState.IsLoggedIn)
             {
@@ -82,15 +83,25 @@ namespace MareSynchronos
             }
         }
 
+        private void ApiControllerOnAccountDeleted(object? sender, EventArgs e)
+        {
+            _pluginUi.IsOpen = false;
+            _introUi.IsOpen = true;
+            _characterCacheManager.Dispose();
+            _characterManager!.Dispose();
+        }
+
         public string Name => "Mare Synchronos";
         public void Dispose()
         {
             Logger.Debug("Disposing " + Name);
+            _apiController.AccountDeleted -= ApiControllerOnAccountDeleted;
             _apiController?.Dispose();
 
             _commandManager.RemoveHandler(CommandName);
             _clientState.Login -= ClientState_Login;
             _clientState.Logout -= ClientState_Logout;
+
 
             _pluginUi?.Dispose();
             _introUi?.Dispose();

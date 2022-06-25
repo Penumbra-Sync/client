@@ -41,6 +41,7 @@ public class CharacterCacheManager : IDisposable
 
     public void AddInitialPairs(List<string> apiTaskResult)
     {
+        _onlineCachedPlayers.Clear();
         _onlineCachedPlayers.AddRange(apiTaskResult.Select(a => new CachedPlayer(a)));
         Logger.Debug("Online and paired users: " + string.Join(",", _onlineCachedPlayers));
     }
@@ -159,6 +160,7 @@ public class CharacterCacheManager : IDisposable
     private void ApiControllerOnPairedClientOnline(object? sender, EventArgs e)
     {
         Logger.Debug("Player online: " + sender!);
+        if (_onlineCachedPlayers.Any(c => c.PlayerNameHash == (string)sender!)) return;
         _onlineCachedPlayers.Add(new CachedPlayer((string)sender!));
     }
 

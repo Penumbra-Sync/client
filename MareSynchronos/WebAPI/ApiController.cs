@@ -50,6 +50,7 @@ namespace MareSynchronos.WebAPI
         public event EventHandler? PairedWithOther;
 
         public event EventHandler? UnpairedFromOther;
+        public event EventHandler? AccountDeleted;
 
         public ConcurrentDictionary<string, (long, long)> CurrentDownloads { get; } = new();
         public ConcurrentDictionary<string, (long, long)> CurrentUploads { get; } = new();
@@ -97,13 +98,13 @@ namespace MareSynchronos.WebAPI
             IsDownloading = true;
             var reader = await _fileHub!.StreamAsChannelAsync<byte[]>("DownloadFile", hash);
             List<byte> downloadedData = new();
+            int i = 0;
             while (await reader.WaitToReadAsync())
             {
                 while (reader.TryRead(out var data))
                 {
                     CurrentDownloads[hash] = (CurrentDownloads[hash].Item1 + data.Length, CurrentDownloads[hash].Item2);
                     downloadedData.AddRange(data);
-                    //await Task.Delay(25);
                 }
             }
 
@@ -122,7 +123,10 @@ namespace MareSynchronos.WebAPI
             List<string> downloadedHashes = new();
             foreach (var file in fileReplacementDto.Where(f => CurrentDownloads[f.Hash].Item2 > 0))
             {
-                if (downloadedHashes.Contains(file.Hash)) continue;
+                if (downloadedHashes.Contains(file.Hash))
+                {
+                    continue;
+                }
                 var hash = file.Hash;
                 var data = await DownloadFile(hash);
                 var extractedFile = LZ4Codec.Unwrap(data);
@@ -330,6 +334,15 @@ namespace MareSynchronos.WebAPI
             await _fileHub!.SendAsync("DeleteAllFiles");
         }
 
+        public async Task DeleteAccount()
+        {
+            _pluginConfiguration.ClientSecret.Remove(ApiUri);
+            await _fileHub!.SendAsync("DeleteAllFiles");
+            await _userHub!.SendAsync("DeleteAccount");
+            _ = OnHeartbeatHubOnClosed(null);
+            AccountDeleted?.Invoke(null, EventArgs.Empty);
+        }
+
         private async Task DisposeHubConnections()
         {
             if (_fileHub != null)
@@ -406,6 +419,7 @@ namespace MareSynchronos.WebAPI
             var pairedClients = await _userHub!.InvokeAsync<List<ClientPairDto>>("GetPairedClients");
             PairedClients = pairedClients.ToList();
         }
+
         private Task OnHeartbeatHubOnClosed(Exception? exception)
         {
             Logger.Debug("Connection closed: " + ApiUri);
@@ -419,6 +433,7 @@ namespace MareSynchronos.WebAPI
             Logger.Debug("Reconnected: " + ApiUri);
             UID = await _heartbeatHub!.InvokeAsync<string>("Heartbeat");
         }
+
         private void UpdateLocalClientPairs(ClientPairDto dto, string characterIdentifier)
         {
             var entry = PairedClients.SingleOrDefault(e => e.OtherUID == dto.OtherUID);
