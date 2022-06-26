@@ -93,21 +93,22 @@ namespace MareSynchronos.WebAPI
             _ = DisposeHubConnections();
         }
 
-        public async Task<byte[]> DownloadFile(string hash)
+        public async Task<string> DownloadFile(string hash)
         {
             var reader = await _fileHub!.StreamAsChannelAsync<byte[]>("DownloadFile", hash);
-            List<byte> downloadedData = new();
             int i = 0;
+            string fileName = Path.GetTempFileName();
+            await using var fs = File.OpenWrite(fileName);
             while (await reader.WaitToReadAsync())
             {
                 while (reader.TryRead(out var data))
                 {
                     CurrentDownloads[hash] = (CurrentDownloads[hash].Item1 + data.Length, CurrentDownloads[hash].Item2);
-                    downloadedData.AddRange(data);
+                    await fs.WriteAsync(data);
                 }
             }
 
-            return downloadedData.ToArray();
+            return fileName;
         }
 
         public async Task DownloadFiles(List<FileReplacementDto> fileReplacementDto)
@@ -128,8 +129,11 @@ namespace MareSynchronos.WebAPI
                     continue;
                 }
                 var hash = file.Hash;
-                var data = await DownloadFile(hash);
-                var extractedFile = LZ4Codec.Unwrap(data);
+                var tempFile = await DownloadFile(hash);
+                var tempFileData = await File.ReadAllBytesAsync(tempFile);
+                var extractedFile = LZ4Codec.Unwrap(tempFileData);
+                File.Delete(tempFile);
+                tempFileData = null;
                 var ext = file.GamePaths.First().Split(".").Last();
                 var filePath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash + "." + ext);
                 await File.WriteAllBytesAsync(filePath, extractedFile);

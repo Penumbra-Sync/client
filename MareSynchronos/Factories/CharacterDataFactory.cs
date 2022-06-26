@@ -107,7 +107,7 @@ namespace MareSynchronos.Factories
                 }
             }
 
-            cache.GlamourerString = _ipcManager.GlamourerGetCharacterCustomization()!;
+            cache.GlamourerString = _ipcManager.GlamourerGetCharacterCustomization(_dalamudUtil.PlayerName)!;
             cache.ManipulationString = _ipcManager.PenumbraGetMetaManipulations(_dalamudUtil.PlayerName);
             cache.JobId = _dalamudUtil.PlayerJobId;
 

@@ -6,12 +6,14 @@ using Dalamud.Game;
 using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
+using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Logging;
 using MareSynchronos.API;
 using MareSynchronos.FileCacheDB;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
+using Penumbra.PlayerWatch;
 
 namespace MareSynchronos.Managers;
 
@@ -22,12 +24,13 @@ public class CharacterCacheManager : IDisposable
     private readonly DalamudUtil _dalamudUtil;
     private readonly Framework _framework;
     private readonly IpcManager _ipcManager;
+    private readonly IPlayerWatcher _watcher;
     private readonly ObjectTable _objectTable;
     private readonly List<CachedPlayer> _onlineCachedPlayers = new();
     private readonly List<string> _localVisiblePlayers = new();
     private DateTime _lastPlayerObjectCheck = DateTime.Now;
 
-    public CharacterCacheManager(ClientState clientState, Framework framework, ObjectTable objectTable, ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager)
+    public CharacterCacheManager(ClientState clientState, Framework framework, ObjectTable objectTable, ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager, IPlayerWatcher watcher)
     {
         Logger.Debug("Creating " + nameof(CharacterCacheManager));
 
@@ -37,6 +40,7 @@ public class CharacterCacheManager : IDisposable
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
         _ipcManager = ipcManager;
+        _watcher = watcher;
 
         _clientState.Login += ClientStateOnLogin;
         _clientState.Logout += ClientStateOnLogout;
@@ -48,10 +52,44 @@ public class CharacterCacheManager : IDisposable
         _apiController.UnpairedFromOther += ApiControllerOnUnpairedFromOther;
         _apiController.Disconnected += ApiControllerOnDisconnected;
         _ipcManager.PenumbraDisposed += IpcManagerOnPenumbraDisposed;
+        _ipcManager.PenumbraRedrawEvent += IpcManagerOnPenumbraRedrawEvent;
+        _watcher.PlayerChanged += WatcherOnPlayerChanged;
 
         if (clientState.IsLoggedIn)
         {
             ClientStateOnLogin(null, EventArgs.Empty);
+        }
+    }
+
+    private void IpcManagerOnPenumbraRedrawEvent(object? objectTableIndex, EventArgs e)
+    {
+        var objTableObj = _objectTable[(int)objectTableIndex!];
+        if (objTableObj!.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) return;
+        string objTableObjName = objTableObj.Name.ToString();
+        var cachedPlayer = _onlineCachedPlayers.SingleOrDefault(p => p.PlayerName == objTableObjName);
+        if (cachedPlayer != null)
+        {
+            Task.Run(() =>
+            {
+                cachedPlayer.PlayerCharacter = (PlayerCharacter)objTableObj;
+                _dalamudUtil.WaitWhileCharacterIsDrawing(cachedPlayer.PlayerCharacter.Address);
+
+                cachedPlayer.RequestedRedraws--;
+                Logger.Warn(
+                    $"Penumbra Redraw for {cachedPlayer.PlayerName}: RequestedRedraws now {cachedPlayer.RequestedRedraws}");
+            });
+        }
+    }
+
+    private void WatcherOnPlayerChanged(Character actor)
+    {
+        var cachedChar = _onlineCachedPlayers.SingleOrDefault(p => p.PlayerName == actor.Name.ToString());
+        if (cachedChar == null) return;
+        Logger.Warn($"Player {cachedChar.PlayerName} changed, RequestedRedraws {cachedChar.RequestedRedraws}");
+        if (cachedChar.RequestedRedraws == 0)
+        {
+            Logger.Warn($"Saving new Glamourer data for job " + cachedChar.JobId);
+            cachedChar.LastGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(cachedChar.PlayerName!);
         }
     }
 
@@ -60,6 +98,8 @@ public class CharacterCacheManager : IDisposable
         foreach (var character in _onlineCachedPlayers.ToList())
         {
             RestoreCharacter(character);
+            if (!string.IsNullOrEmpty(character.PlayerName))
+                _watcher.RemovePlayerFromWatch(character.PlayerName);
             character.IsVisible = false;
         }
     }
@@ -99,6 +139,7 @@ public class CharacterCacheManager : IDisposable
         _framework.Update -= FrameworkOnUpdate;
         _clientState.Login -= ClientStateOnLogin;
         _clientState.Logout -= ClientStateOnLogout;
+        _watcher.PlayerChanged -= WatcherOnPlayerChanged;
         RestoreAllCharacters();
     }
 
@@ -107,6 +148,8 @@ public class CharacterCacheManager : IDisposable
         foreach (var character in _onlineCachedPlayers.ToList())
         {
             RestoreCharacter(character);
+            if (!string.IsNullOrEmpty(character.PlayerName))
+                _watcher.RemovePlayerFromWatch(character.PlayerName);
         }
 
         _onlineCachedPlayers.Clear();
@@ -121,7 +164,6 @@ public class CharacterCacheManager : IDisposable
     {
         Logger.Debug("Received hash for " + e.CharacterNameHash);
         string otherPlayerName;
-
         var localPlayers = _dalamudUtil.GetLocalPlayers();
         if (localPlayers.ContainsKey(e.CharacterNameHash))
         {
@@ -134,8 +176,9 @@ public class CharacterCacheManager : IDisposable
             return;
         }
 
-        _onlineCachedPlayers.Single(p => p.PlayerNameHash == e.CharacterNameHash)
-            .CharacterCache[e.CharacterData.JobId] = e.CharacterData;
+        var cachedPlayer = _onlineCachedPlayers.Single(p => p.PlayerNameHash == e.CharacterNameHash);
+
+        cachedPlayer.CharacterCache[e.CharacterData.JobId] = e.CharacterData;
 
         List<FileReplacementDto> toDownloadReplacements;
         using (var db = new FileCacheContext())
@@ -179,9 +222,12 @@ public class CharacterCacheManager : IDisposable
             }
 
             _dalamudUtil.WaitWhileCharacterIsDrawing(localPlayers[e.CharacterNameHash].Address);
-
+            cachedPlayer.RequestedRedraws++;
+            Logger.Warn(
+                $"Request Redraw for {cachedPlayer.PlayerName}: RequestedRedraws now {cachedPlayer.RequestedRedraws}");
             _ipcManager.PenumbraSetTemporaryMods(tempCollection, moddedPaths, e.CharacterData.ManipulationData);
-            _ipcManager.GlamourerApplyCharacterCustomization(e.CharacterData.GlamourerData, otherPlayerName);
+            _ipcManager.GlamourerRevertCharacterCustomization(otherPlayerName);
+            _ipcManager.GlamourerApplyAll(e.CharacterData.GlamourerData, otherPlayerName);
         });
     }
 
@@ -260,12 +306,20 @@ public class CharacterCacheManager : IDisposable
             foreach (var item in _onlineCachedPlayers.Where(p => !string.IsNullOrEmpty(p.PlayerName) && !p.IsVisible && p.WasVisible))
             {
                 Logger.Debug("Player not visible anymore: " + item.PlayerName);
+                _watcher.RemovePlayerFromWatch(item.PlayerName!);
                 RestoreCharacter(item);
             }
 
-            var newVisiblePlayers = _onlineCachedPlayers.Where(p => p.IsVisible && !p.WasVisible).ToList();
+            var newVisiblePlayers = _onlineCachedPlayers.Where(p => p.IsVisible && !p.WasVisible && p.PlayerCharacter != null).ToList();
             if (newVisiblePlayers.Any())
             {
+                foreach (var player in newVisiblePlayers)
+                {
+                    Logger.Debug("New watched player, adding to watch and getting glamourer data: " + player.PlayerName);
+                    _watcher.AddPlayerToWatch(player.PlayerName!);
+                    player.OriginalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(player.PlayerName!);
+                }
+
                 Logger.Debug("Getting data for new players: " + string.Join(Environment.NewLine, newVisiblePlayers));
                 Task.Run(async () => await UpdatePlayersFromService(newVisiblePlayers
                     .ToDictionary(k => k.PlayerNameHash, k => (int)k.PlayerCharacter!.ClassJob.Id)));
@@ -282,10 +336,18 @@ public class CharacterCacheManager : IDisposable
     private void RestoreCharacter(CachedPlayer? character)
     {
         if (character == null || string.IsNullOrEmpty(character.PlayerName)) return;
-
-        Logger.Debug("Restoring state for " + character.PlayerName);
-        _ipcManager.PenumbraRemoveTemporaryCollection(character.PlayerName);
-        _ipcManager.GlamourerRevertCharacterCustomization(character.PlayerName);
+        try
+        {
+            Logger.Debug("Restoring state for " + character.PlayerName);
+            _ipcManager.PenumbraRemoveTemporaryCollection(character.PlayerName);
+            _ipcManager.GlamourerRevertCharacterCustomization(character.PlayerName);
+            _ipcManager.GlamourerApplyOnlyCustomization(character.OriginalGlamourerData, character.PlayerName);
+            _ipcManager.GlamourerApplyOnlyEquipment(character.LastGlamourerData, character.PlayerName);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn(ex.Message + Environment.NewLine + ex.StackTrace);
+        }
 
         character.Reset();
     }

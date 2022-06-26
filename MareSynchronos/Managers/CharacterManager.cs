@@ -167,10 +167,6 @@ namespace MareSynchronos.Managers
                     Logger.Debug("Watcher: PlayerChanged");
                     PlayerChanged(actor.Name.ToString());
                 }
-                else
-                {
-                    Logger.Debug("PlayerChanged: " + actor.Name.ToString());
-                }
             });
         }
 

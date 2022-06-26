@@ -24,15 +24,23 @@ public class CachedPlayer
         }
     }
 
-    public int? JobId { get; set; }
+    public string OriginalGlamourerData { get; set; }
+    public string LastGlamourerData { get; set; }
+    public int? JobId => (int?)PlayerCharacter?.ClassJob.Id;
     public PlayerCharacter? PlayerCharacter { get; set; }
     public string? PlayerName { get; set; }
     public string PlayerNameHash { get; }
     public bool WasVisible { get; private set; }
+    public int RequestedRedraws
+    {
+        get => _requestedRedraws;
+        set => _requestedRedraws = value < 0 ? 0 : value;
+    }
+
+    private int _requestedRedraws;
     public void Reset()
     {
         PlayerName = string.Empty;
-        JobId = null;
         PlayerCharacter = null;
     }
 

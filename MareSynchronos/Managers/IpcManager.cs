@@ -10,9 +10,11 @@ namespace MareSynchronos.Managers
     public class IpcManager : IDisposable
     {
         private readonly ICallGateSubscriber<int> _glamourerApiVersion;
-        private readonly ICallGateSubscriber<string, string, object>? _glamourerApplyCharacterCustomization;
-        private readonly ICallGateSubscriber<string>? _glamourerGetCharacterCustomization;
+        private readonly ICallGateSubscriber<string, string, object>? _glamourerApplyAll;
+        private readonly ICallGateSubscriber<string, string>? _glamourerGetAllCustomization;
         private readonly ICallGateSubscriber<string, object> _glamourerRevertCustomization;
+        private readonly ICallGateSubscriber<string, string, object>? _glamourerApplyOnlyEquipment;
+        private readonly ICallGateSubscriber<string, string, object>? _glamourerApplyOnlyCustomization;
         private readonly ICallGateSubscriber<int> _penumbraApiVersion;
         private readonly ICallGateSubscriber<string, string, bool, (int, string)> _penumbraCreateTemporaryCollection;
         private readonly ICallGateSubscriber<string, string> _penumbraGetMetaManipulations;
@@ -35,15 +37,18 @@ namespace MareSynchronos.Managers
             _penumbraResolvePath = pi.GetIpcSubscriber<string, string, string>("Penumbra.ResolveCharacterPath");
             _penumbraResolveModDir = pi.GetIpcSubscriber<string>("Penumbra.GetModDirectory");
             _penumbraRedraw = pi.GetIpcSubscriber<string, int, object>("Penumbra.RedrawObjectByName");
-            _glamourerGetCharacterCustomization = pi.GetIpcSubscriber<string>("Glamourer.GetCharacterCustomization");
-            _glamourerApplyCharacterCustomization = pi.GetIpcSubscriber<string, string, object>("Glamourer.ApplyCharacterCustomization");
             _penumbraReverseResolvePath = pi.GetIpcSubscriber<string, string, string[]>("Penumbra.ReverseResolvePath");
             _penumbraApiVersion = pi.GetIpcSubscriber<int>("Penumbra.ApiVersion");
-            _glamourerApiVersion = pi.GetIpcSubscriber<int>("Glamourer.ApiVersion");
-            _glamourerRevertCustomization = pi.GetIpcSubscriber<string, object>("Glamourer.RevertCharacterCustomization");
             _penumbraObjectIsRedrawn = pi.GetIpcSubscriber<IntPtr, int, object?>("Penumbra.GameObjectRedrawn");
             _penumbraGetMetaManipulations =
                 pi.GetIpcSubscriber<string, string>("Penumbra.GetMetaManipulations");
+
+            _glamourerApiVersion = pi.GetIpcSubscriber<int>("Glamourer.ApiVersion");
+            _glamourerGetAllCustomization = pi.GetIpcSubscriber<string, string>("Glamourer.GetAllCustomization");
+            _glamourerApplyAll = pi.GetIpcSubscriber<string, string, object>("Glamourer.ApplyAll");
+            _glamourerApplyOnlyCustomization = pi.GetIpcSubscriber<string, string, object>("Glamourer.ApplyOnlyCustomization");
+            _glamourerApplyOnlyEquipment = pi.GetIpcSubscriber<string, string, object>("Glamourer.ApplyOnlyEquipment");
+            _glamourerRevertCustomization = pi.GetIpcSubscriber<string, object>("Glamourer.Revert");
 
             _penumbraObjectIsRedrawn.Subscribe(RedrawEvent);
             _penumbraInit.Subscribe(PenumbraInit);
@@ -104,17 +109,31 @@ namespace MareSynchronos.Managers
             Logger.Debug("IPC Manager disposed");
         }
 
-        public void GlamourerApplyCharacterCustomization(string customization, string characterName)
+        public void GlamourerApplyAll(string customization, string characterName)
         {
             if (!CheckGlamourerApi()) return;
             Logger.Debug("GlamourerString: " + customization);
-            _glamourerApplyCharacterCustomization!.InvokeAction(customization, characterName);
+            _glamourerApplyAll!.InvokeAction(customization, characterName);
         }
 
-        public string? GlamourerGetCharacterCustomization()
+        public void GlamourerApplyOnlyEquipment(string customization, string characterName)
         {
-            if (!CheckGlamourerApi()) return null;
-            return _glamourerGetCharacterCustomization!.InvokeFunc();
+            if (!CheckGlamourerApi()) return;
+            Logger.Debug("GlamourerString: " + customization);
+            _glamourerApplyOnlyEquipment!.InvokeAction(customization, characterName);
+        }
+
+        public void GlamourerApplyOnlyCustomization(string customization, string characterName)
+        {
+            if (!CheckGlamourerApi()) return;
+            Logger.Debug("GlamourerString: " + customization);
+            _glamourerApplyOnlyCustomization!.InvokeAction(customization, characterName);
+        }
+
+        public string GlamourerGetCharacterCustomization(string characterName)
+        {
+            if (!CheckGlamourerApi()) return string.Empty;
+            return _glamourerGetAllCustomization!.InvokeFunc(characterName);
         }
 
         public void GlamourerRevertCharacterCustomization(string characterName)

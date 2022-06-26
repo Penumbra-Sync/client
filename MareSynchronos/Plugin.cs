@@ -163,7 +163,7 @@ namespace MareSynchronos
                     var characterCacheFactory =
                         new CharacterDataFactory(_dalamudUtil, _ipcManager);
                     _characterCacheManager = new CharacterCacheManager(_clientState, _framework, _objectTable,
-                        _apiController, _dalamudUtil, _ipcManager);
+                        _apiController, _dalamudUtil, _ipcManager, _playerWatcher);
                     _characterManager = new CharacterManager(_apiController, _objectTable, _ipcManager,
                         characterCacheFactory, _characterCacheManager, _dalamudUtil, _playerWatcher);
                     _characterManager.StartWatchingPlayer();

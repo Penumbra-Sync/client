@@ -235,8 +235,9 @@ namespace MareSynchronos.Managers
                                     .Select(s => s.ToLowerInvariant()))
                                 .Where(f => (f.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".mdl", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".mtrl", StringComparison.OrdinalIgnoreCase)))
                                 .Select(p => new KeyValuePair<string, bool>(p, false)));
-            await using FileCacheContext db = new();
-            List<FileCache> fileCaches = db.FileCaches.ToList();
+            List<FileCache> fileCaches;
+            await using (var db = new FileCacheContext())
+                fileCaches = db.FileCaches.ToList();
 
             TotalFiles = scannedFiles.Count;
 
@@ -293,6 +294,8 @@ namespace MareSynchronos.Managers
 
             if (fileCachesToAdd.Any() || fileCachesToDelete.Any())
             {
+                await using FileCacheContext db = new();
+
                 Logger.Debug("Found " + fileCachesToAdd.Count + " additions and " + fileCachesToDelete.Count + " deletions");
                 try
                 {
@@ -303,6 +306,7 @@ namespace MareSynchronos.Managers
                         if (entry != null)
                             db.FileCaches.Remove(entry);
                     }
+                    await db.SaveChangesAsync(ct);
                     db.FileCaches.AddRange(fileCachesToAdd);
                     await db.SaveChangesAsync(ct);
                 }
