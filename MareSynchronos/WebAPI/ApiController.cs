@@ -93,31 +93,31 @@ namespace MareSynchronos.WebAPI
             _ = DisposeHubConnections();
         }
 
-        public async Task<string> DownloadFile(string hash)
+        public async Task<string> DownloadFile(string hash, CancellationToken ct)
         {
-            var reader = await _fileHub!.StreamAsChannelAsync<byte[]>("DownloadFile", hash);
+            var reader = await _fileHub!.StreamAsChannelAsync<byte[]>("DownloadFile", hash, ct);
             int i = 0;
             string fileName = Path.GetTempFileName();
             await using var fs = File.OpenWrite(fileName);
-            while (await reader.WaitToReadAsync())
+            while (await reader.WaitToReadAsync(ct) && !ct.IsCancellationRequested)
             {
-                while (reader.TryRead(out var data))
+                while (reader.TryRead(out var data) && !ct.IsCancellationRequested)
                 {
                     CurrentDownloads[hash] = (CurrentDownloads[hash].Item1 + data.Length, CurrentDownloads[hash].Item2);
-                    await fs.WriteAsync(data);
+                    await fs.WriteAsync(data, ct);
                 }
             }
 
             return fileName;
         }
 
-        public async Task DownloadFiles(List<FileReplacementDto> fileReplacementDto)
+        public async Task DownloadFiles(List<FileReplacementDto> fileReplacementDto, CancellationToken ct)
         {
             IsDownloading = true;
 
             foreach (var file in fileReplacementDto)
             {
-                var fileSize = await _fileHub!.InvokeAsync<long>("GetFileSize", file.Hash);
+                var fileSize = await _fileHub!.InvokeAsync<long>("GetFileSize", file.Hash, ct);
                 CurrentDownloads[file.Hash] = (0, fileSize);
             }
 
@@ -128,28 +128,34 @@ namespace MareSynchronos.WebAPI
                 {
                     continue;
                 }
+
                 var hash = file.Hash;
-                var tempFile = await DownloadFile(hash);
-                var tempFileData = await File.ReadAllBytesAsync(tempFile);
+                var tempFile = await DownloadFile(hash, ct);
+                if (ct.IsCancellationRequested)
+                {
+                    File.Delete(tempFile);
+                    break;
+                }
+
+                var tempFileData = await File.ReadAllBytesAsync(tempFile, ct);
                 var extractedFile = LZ4Codec.Unwrap(tempFileData);
                 File.Delete(tempFile);
-                tempFileData = null;
                 var ext = file.GamePaths.First().Split(".").Last();
                 var filePath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash + "." + ext);
-                await File.WriteAllBytesAsync(filePath, extractedFile);
+                await File.WriteAllBytesAsync(filePath, extractedFile, ct);
                 Logger.Debug("File downloaded to " + filePath);
                 downloadedHashes.Add(hash);
             }
 
-            bool allFilesInDb = false;
-            while (!allFilesInDb)
+            var allFilesInDb = false;
+            while (!allFilesInDb && !ct.IsCancellationRequested)
             {
                 await using (var db = new FileCacheContext())
                 {
                     allFilesInDb = downloadedHashes.All(h => db.FileCaches.Any(f => f.Hash == h));
                 }
 
-                await Task.Delay(250);
+                await Task.Delay(250, ct);
             }
 
             CurrentDownloads.Clear();

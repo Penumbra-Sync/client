@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
@@ -42,6 +43,8 @@ public class CachedPlayer
         }
     }
 
+    private CancellationTokenSource _downloadCancellationTokenSource = new();
+
     private string _lastGlamourerData = string.Empty;
 
     private string _originalGlamourerData = string.Empty;
@@ -63,34 +66,37 @@ public class CachedPlayer
         if (string.IsNullOrEmpty(PlayerName) || e.CharacterNameHash != PlayerNameHash) return;
         Logger.Debug("Received data for " + this);
 
-        List<FileReplacementDto> toDownloadReplacements;
-        using (var db = new FileCacheContext())
+        _downloadCancellationTokenSource?.Cancel();
+        _downloadCancellationTokenSource = new CancellationTokenSource();
+        var downloadToken = _downloadCancellationTokenSource.Token;
+
+        Logger.Debug("Checking for files to download for player " + PlayerName);
+        Logger.Debug("Hash for data is " + e.CharacterData.Hash);
+        if (!_cache.ContainsKey(e.CharacterData.Hash))
         {
-            Logger.Debug("Checking for files to download for player " + PlayerName);
-            Logger.Debug("Hash for data is " + e.CharacterData.Hash);
-            if (!_cache.ContainsKey(e.CharacterData.Hash))
-            {
-                Logger.Debug("Received total " + e.CharacterData.FileReplacements.Count + " file replacement data");
-                _cache[e.CharacterData.Hash] = e.CharacterData;
-            }
-            else
-            {
-                Logger.Debug("Had valid local cache for " + PlayerName);
-            }
+            Logger.Debug("Received total " + e.CharacterData.FileReplacements.Count + " file replacement data");
+            _cache[e.CharacterData.Hash] = e.CharacterData;
+        }
+        else
+        {
+            Logger.Debug("Had valid local cache for " + PlayerName);
         }
 
-        // todo: make this cancellable
         Task.Run(async () =>
         {
+            List<FileReplacementDto> toDownloadReplacements;
+
             Dictionary<string, string> moddedPaths;
             while ((toDownloadReplacements = TryCalculateModdedDictionary(_cache[e.CharacterData.Hash], out moddedPaths)).Count > 0)
             {
                 Logger.Debug("Downloading missing files for player " + PlayerName);
-                await _apiController.DownloadFiles(toDownloadReplacements);
+                await _apiController.DownloadFiles(toDownloadReplacements, downloadToken);
             }
 
-            ApplyCharacterData(e.CharacterData, moddedPaths);
-        });
+            if (_downloadCancellationTokenSource.Token.IsCancellationRequested)
+
+                ApplyCharacterData(e.CharacterData, moddedPaths);
+        }, downloadToken);
     }
 
     private List<FileReplacementDto> TryCalculateModdedDictionary(CharacterCacheDto cache,
