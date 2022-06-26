@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Dalamud.Game;
@@ -155,12 +154,11 @@ public class CachedPlayersManager : IDisposable
 
     private void FrameworkOnUpdate(Framework framework)
     {
-        if (_clientState.LocalPlayer == null) return;
+        if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized || !_apiController.IsConnected) return;
 
         if (DateTime.Now < _lastPlayerObjectCheck.AddSeconds(0.25)) return;
 
         _localVisiblePlayers.Clear();
-        if (!_ipcManager.Initialized) return;
         string ownName = _dalamudUtil.PlayerName;
         var playerCharacters = _objectTable.Where(obj =>
             obj.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player &&

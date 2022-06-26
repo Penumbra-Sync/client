@@ -1,5 +1,4 @@
-﻿using Dalamud.Game.ClientState.Objects;
-using Dalamud.Logging;
+﻿using Dalamud.Logging;
 using MareSynchronos.Factories;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
@@ -21,23 +20,31 @@ namespace MareSynchronos.Managers
         private readonly CharacterDataFactory _characterDataFactory;
         private readonly DalamudUtil _dalamudUtil;
         private readonly IpcManager _ipcManager;
-        private readonly ObjectTable _objectTable;
         private readonly IPlayerWatcher _watcher;
         private string _lastSentHash = string.Empty;
         private Task? _playerChangedTask;
 
-        public PlayerManager(ApiController apiController, ObjectTable objectTable, IpcManager ipcManager,
+        public PlayerManager(ApiController apiController, IpcManager ipcManager,
             CharacterDataFactory characterDataFactory, CachedPlayersManager cachedPlayersManager, DalamudUtil dalamudUtil, IPlayerWatcher watcher)
         {
             Logger.Debug("Creating " + nameof(PlayerManager));
 
             _apiController = apiController;
-            _objectTable = objectTable;
             _ipcManager = ipcManager;
             _characterDataFactory = characterDataFactory;
             _cachedPlayersManager = cachedPlayersManager;
             _dalamudUtil = dalamudUtil;
             _watcher = watcher;
+
+            _watcher.AddPlayerToWatch(_dalamudUtil.PlayerName);
+            _apiController.Connected += ApiController_Connected;
+            _apiController.Disconnected += ApiController_Disconnected;
+
+            Logger.Debug("Watching Player, ApiController is Connected: " + _apiController.IsConnected);
+            if (_apiController.IsConnected)
+            {
+                ApiController_Connected(null, EventArgs.Empty);
+            }
         }
 
         public void Dispose()
@@ -48,19 +55,6 @@ namespace MareSynchronos.Managers
             _apiController.Connected -= ApiController_Connected;
             _apiController.Disconnected -= ApiController_Disconnected;
             _watcher.PlayerChanged -= Watcher_PlayerChanged;
-        }
-
-        internal void StartWatchingPlayer()
-        {
-            _watcher.AddPlayerToWatch(_dalamudUtil.PlayerName);
-            _apiController.Connected += ApiController_Connected;
-            _apiController.Disconnected += ApiController_Disconnected;
-
-            Logger.Debug("Watching Player, ApiController is Connected: " + _apiController.IsConnected);
-            if (_apiController.IsConnected)
-            {
-                ApiController_Connected(null, EventArgs.Empty);
-            }
         }
 
         private void ApiController_Connected(object? sender, EventArgs args)

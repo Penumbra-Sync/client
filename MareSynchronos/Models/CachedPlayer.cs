@@ -155,7 +155,9 @@ public class CachedPlayer
         {
             Logger.Debug("Restoring state for " + PlayerName);
             IsVisible = false;
+            _downloadCancellationTokenSource?.Cancel();
             _downloadCancellationTokenSource?.Dispose();
+            _downloadCancellationTokenSource = null;
             _watcher.RemovePlayerFromWatch(PlayerName);
             _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName);
             _ipcManager.GlamourerRevertCharacterCustomization(PlayerName);

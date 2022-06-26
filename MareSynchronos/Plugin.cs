@@ -31,7 +31,7 @@ namespace MareSynchronos
         public static DalamudPluginInterface PluginInterface { get; set; }
         private readonly PluginUi _pluginUi;
         private readonly WindowSystem _windowSystem;
-        private PlayerManager? _characterManager;
+        private PlayerManager? _playerManager;
         private readonly DalamudUtil _dalamudUtil;
         private CachedPlayersManager? _characterCacheManager;
         private readonly IPlayerWatcher _playerWatcher;
@@ -90,7 +90,7 @@ namespace MareSynchronos
             _pluginUi.IsOpen = false;
             _introUi.IsOpen = true;
             _characterCacheManager?.Dispose();
-            _characterManager?.Dispose();
+            _playerManager?.Dispose();
         }
 
         public string Name => "Mare Synchronos";
@@ -110,7 +110,7 @@ namespace MareSynchronos
 
             _fileCacheManager?.Dispose();
             _ipcManager?.Dispose();
-            _characterManager?.Dispose();
+            _playerManager?.Dispose();
             _characterCacheManager?.Dispose();
             _playerWatcher.Disable();
             _playerWatcher.Dispose();
@@ -141,7 +141,7 @@ namespace MareSynchronos
         {
             Logger.Debug("Client logout");
             _characterCacheManager?.Dispose();
-            _characterManager?.Dispose();
+            _playerManager?.Dispose();
             PluginInterface.UiBuilder.Draw -= Draw;
             PluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;
             _commandManager.RemoveHandler(CommandName);
@@ -149,7 +149,8 @@ namespace MareSynchronos
 
         public void ReLaunchCharacterManager()
         {
-            _characterManager?.Dispose();
+            _playerManager?.Dispose();
+            _characterCacheManager?.Dispose();
 
             Task.Run(async () =>
             {
@@ -164,9 +165,8 @@ namespace MareSynchronos
                         new CharacterDataFactory(_dalamudUtil, _ipcManager);
                     _characterCacheManager = new CachedPlayersManager(_clientState, _framework, _objectTable,
                         _apiController, _dalamudUtil, _ipcManager, _playerWatcher);
-                    _characterManager = new PlayerManager(_apiController, _objectTable, _ipcManager,
+                    _playerManager = new PlayerManager(_apiController, _ipcManager,
                         characterCacheFactory, _characterCacheManager, _dalamudUtil, _playerWatcher);
-                    _characterManager.StartWatchingPlayer();
                 }
                 catch (Exception ex)
                 {
