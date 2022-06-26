@@ -26,8 +26,8 @@ namespace MareSynchronos.UI
 
             SizeConstraints = new WindowSizeConstraints()
             {
-                MinimumSize = new(800, 400),
-                MaximumSize = new(800, 2000),
+                MinimumSize = new Vector2(800, 400),
+                MaximumSize = new Vector2(800, 2000),
             };
 
             _configuration = configuration;
@@ -62,13 +62,13 @@ namespace MareSynchronos.UI
             }
             else
             {
-                if (!_uiShared.DrawOtherPluginState()) return;
+                var pluginState = _uiShared.DrawOtherPluginState();
 
-                DrawSettingsContent();
+                DrawSettingsContent(pluginState);
             }
         }
 
-        private void DrawSettingsContent()
+        private void DrawSettingsContent(bool pluginState)
         {
             _uiShared.PrintServerState();
             ImGui.Separator();
@@ -84,86 +84,112 @@ namespace MareSynchronos.UI
                 {
                     ImGui.SetClipboardText(_apiController.UID);
                 }
+
                 ImGui.Text("Share this UID to other Mare users so they pair their client with yours.");
-                ImGui.Separator();
-                DrawPairedClientsContent();
-                DrawFileCacheSettings();
-                DrawCurrentTransfers();
-                DrawAdministration();
             }
             else
             {
                 ImGui.TextColored(ImGuiColors.DalamudRed, "No UID (Service unavailable)");
                 ImGui.SetWindowFontScale(1.0f);
             }
+
+            ImGui.Separator();
+            if (_apiController.ServerAlive)
+                DrawPairedClientsContent();
+            DrawFileCacheSettings();
+            if (_apiController.ServerAlive)
+                DrawCurrentTransfers();
+            DrawAdministration(_apiController.ServerAlive);
+
         }
 
         private bool _deleteFilesPopupModalShown = false;
         private bool _deleteAccountPopupModalShown = false;
 
-        private void DrawAdministration()
+        private void DrawAdministration(bool serverAlive)
         {
             if (ImGui.TreeNode(
                     $"User Administration"))
             {
-                if (ImGui.Button("Delete all my files"))
+                if (serverAlive)
                 {
-                    _deleteFilesPopupModalShown = true;
-                    ImGui.OpenPopup("Delete all your files?");
-                }
-
-                if (ImGui.BeginPopupModal("Delete all your files?", ref _deleteFilesPopupModalShown, ImGuiWindowFlags.AlwaysAutoResize))
-                {
-                    UiShared.TextWrapped("All your own uploaded files on the service will be deleted.\nThis operation cannot be undone.");
-                    ImGui.Text("Are you sure you want to continue?");
-                    ImGui.Separator();
-                    if (ImGui.Button("Delete everything", new Vector2(150, 0)))
+                    if (ImGui.Button("Delete all my files"))
                     {
-                        Task.Run(() => _apiController.DeleteAllMyFiles());
-                        ImGui.CloseCurrentPopup();
-                        _deleteFilesPopupModalShown = false;
+                        _deleteFilesPopupModalShown = true;
+                        ImGui.OpenPopup("Delete all your files?");
                     }
 
-                    ImGui.SameLine();
+                    UiShared.DrawHelpText("Completely deletes all your uploaded files on the service.");
 
-                    if (ImGui.Button("Cancel##cancelDelete", new Vector2(150, 0)))
+                    if (ImGui.BeginPopupModal("Delete all your files?", ref _deleteFilesPopupModalShown,
+                            ImGuiWindowFlags.AlwaysAutoResize))
                     {
-                        ImGui.CloseCurrentPopup();
-                        _deleteFilesPopupModalShown = false;
+                        UiShared.TextWrapped(
+                            "All your own uploaded files on the service will be deleted.\nThis operation cannot be undone.");
+                        ImGui.Text("Are you sure you want to continue?");
+                        ImGui.Separator();
+                        if (ImGui.Button("Delete everything", new Vector2(150, 0)))
+                        {
+                            Task.Run(() => _apiController.DeleteAllMyFiles());
+                            ImGui.CloseCurrentPopup();
+                            _deleteFilesPopupModalShown = false;
+                        }
+
+                        ImGui.SameLine();
+
+                        if (ImGui.Button("Cancel##cancelDelete", new Vector2(150, 0)))
+                        {
+                            ImGui.CloseCurrentPopup();
+                            _deleteFilesPopupModalShown = false;
+                        }
+
+                        ImGui.EndPopup();
                     }
 
-                    ImGui.EndPopup();
+                    if (ImGui.Button("Delete account"))
+                    {
+                        _deleteAccountPopupModalShown = true;
+                        ImGui.OpenPopup("Delete your account?");
+                    }
+
+                    UiShared.DrawHelpText("Completely deletes your account and all uploaded files to the service.");
+
+                    if (ImGui.BeginPopupModal("Delete your account?", ref _deleteAccountPopupModalShown,
+                            ImGuiWindowFlags.AlwaysAutoResize))
+                    {
+                        UiShared.TextWrapped(
+                            "Your account and all associated files and data on the service will be deleted.");
+                        UiShared.TextWrapped("Your UID will be removed from all pairing lists.");
+                        ImGui.Text("Are you sure you want to continue?");
+                        ImGui.Separator();
+                        if (ImGui.Button("Delete account", new Vector2(150, 0)))
+                        {
+                            Task.Run(() => _apiController.DeleteAccount());
+                            ImGui.CloseCurrentPopup();
+                            _deleteAccountPopupModalShown = false;
+                        }
+
+                        ImGui.SameLine();
+
+                        if (ImGui.Button("Cancel##cancelDelete", new Vector2(150, 0)))
+                        {
+                            ImGui.CloseCurrentPopup();
+                            _deleteAccountPopupModalShown = false;
+                        }
+
+                        ImGui.EndPopup();
+                    }
                 }
 
-                if (ImGui.Button("Delete account"))
+                var marePaused = _configuration.FullPause;
+                if (ImGui.Checkbox("Pause Mare Synchronos", ref marePaused))
                 {
-                    _deleteAccountPopupModalShown = true;
-                    ImGui.OpenPopup("Delete your account?");
+                    _configuration.FullPause = marePaused;
+                    _configuration.Save();
+                    _apiController.RestartHeartbeat();
                 }
 
-                if (ImGui.BeginPopupModal("Delete your account?", ref _deleteAccountPopupModalShown, ImGuiWindowFlags.AlwaysAutoResize))
-                {
-                    UiShared.TextWrapped("Your account and all associated files and data on the service will be deleted.");
-                    UiShared.TextWrapped("Your UID will be removed from all pairing lists.");
-                    ImGui.Text("Are you sure you want to continue?");
-                    ImGui.Separator();
-                    if (ImGui.Button("Delete account", new Vector2(150, 0)))
-                    {
-                        Task.Run(() => _apiController.DeleteAccount());
-                        ImGui.CloseCurrentPopup();
-                        _deleteAccountPopupModalShown = false;
-                    }
-
-                    ImGui.SameLine();
-
-                    if (ImGui.Button("Cancel##cancelDelete", new Vector2(150, 0)))
-                    {
-                        ImGui.CloseCurrentPopup();
-                        _deleteAccountPopupModalShown = false;
-                    }
-
-                    ImGui.EndPopup();
-                }
+                UiShared.DrawHelpText("Completely pauses the sync and clear your current data (not uploaded files) on the service.");
 
                 ImGui.TreePop();
             }

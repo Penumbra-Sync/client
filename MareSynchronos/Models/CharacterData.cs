@@ -22,7 +22,7 @@ namespace MareSynchronos.Models
         [JsonProperty]
         public string CacheHash { get; set; } = string.Empty;
 
-        public List<FileReplacement> FileReplacements { get; set; } = new List<FileReplacement>();
+        public List<FileReplacement> FileReplacements { get; set; } = new();
 
         [JsonProperty]
         public string GlamourerString { get; set; } = string.Empty;
@@ -91,7 +91,7 @@ namespace MareSynchronos.Models
                 FileReplacements = AllReplacements.Select(f => f.ToFileReplacementDto()).ToList(),
                 GlamourerData = GlamourerString,
                 Hash = CacheHash,
-                JobId = (int)JobId,
+                JobId = JobId,
                 ManipulationData = ManipulationString
             };
         }

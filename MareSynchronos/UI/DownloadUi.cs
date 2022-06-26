@@ -29,8 +29,8 @@ public class DownloadUi : Window, IDisposable
 
         SizeConstraints = new WindowSizeConstraints()
         {
-            MaximumSize = new(300, 90),
-            MinimumSize = new(300, 90)
+            MaximumSize = new Vector2(300, 90),
+            MinimumSize = new Vector2(300, 90)
         };
 
         Flags = ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoBackground;

@@ -213,6 +213,7 @@ namespace MareSynchronos.Managers
                 Task.Run(RecalculateFileCacheSize);
             }
         }
+
         private void RecalculateFileCacheSize()
         {
             FileCacheSize = 0;

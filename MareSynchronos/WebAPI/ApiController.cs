@@ -74,7 +74,6 @@ namespace MareSynchronos.WebAPI
         }
 
         private string ApiUri => UseCustomService ? _pluginConfiguration.ApiUri : MainServiceUri;
-        private string CacheFolder => _pluginConfiguration.CacheFolder;
         public void CancelUpload()
         {
             if (_uploadCancellationTokenSource != null)
@@ -174,25 +173,9 @@ namespace MareSynchronos.WebAPI
             {
                 try
                 {
+                    if (_pluginConfiguration.FullPause) return;
                     Logger.Debug("Attempting to establish heartbeat connection to " + ApiUri);
-                    _heartbeatHub = new HubConnectionBuilder()
-                        .WithUrl(ApiUri + "/heartbeat", options =>
-                        {
-                            if (!string.IsNullOrEmpty(SecretKey))
-                            {
-                                options.Headers.Add("Authorization", SecretKey);
-                            }
-
-#if DEBUG
-                            options.HttpMessageHandlerFactory = (message) =>
-                            {
-                                if (message is HttpClientHandler clientHandler)
-                                    clientHandler.ServerCertificateCustomValidationCallback +=
-                                        (_, _, _, _) => true;
-                                return message;
-                            };
-#endif
-                        }).Build();
+                    _heartbeatHub = BuildHubConnection("heartbeat");
 
                     await _heartbeatHub.StartAsync(_cts.Token);
                     UID = await _heartbeatHub!.InvokeAsync<string>("Heartbeat");
@@ -240,13 +223,18 @@ namespace MareSynchronos.WebAPI
         {
             Logger.Debug("Restarting heartbeat");
 
-            _heartbeatHub!.Closed -= OnHeartbeatHubOnClosed;
-            _heartbeatHub!.Reconnected -= OnHeartbeatHubOnReconnected;
             Task.Run(async () =>
             {
-                await _heartbeatHub.StopAsync(_cts.Token);
-                await _heartbeatHub.DisposeAsync();
-                _heartbeatHub = null!;
+                if (_heartbeatHub != null)
+                {
+                    _heartbeatHub.Closed -= OnHeartbeatHubOnClosed;
+                    _heartbeatHub.Reconnected -= OnHeartbeatHubOnReconnected;
+                    await _heartbeatHub.StopAsync(_cts.Token);
+                    await _heartbeatHub.DisposeAsync();
+                    await OnHeartbeatHubOnClosed(null);
+                    _heartbeatHub = null!;
+                }
+
                 _ = Heartbeat();
             });
         }
@@ -335,11 +323,6 @@ namespace MareSynchronos.WebAPI
             await _userHub!.SendAsync("SendPairedClientRemoval", uid);
         }
 
-        public async Task UpdateCurrentDownloadSize(string hash)
-        {
-            long fileSize = await _fileHub!.InvokeAsync<long>("GetFileSize", hash);
-        }
-
         public async Task DeleteAllMyFiles()
         {
             await _fileHub!.SendAsync("DeleteAllFiles");
@@ -362,6 +345,7 @@ namespace MareSynchronos.WebAPI
                 CancelUpload();
                 await _fileHub!.StopAsync();
                 await _fileHub!.DisposeAsync();
+                _fileHub = null;
             }
 
             if (_userHub != null)
@@ -369,6 +353,7 @@ namespace MareSynchronos.WebAPI
                 Logger.Debug("Disposing User Hub");
                 await _userHub.StopAsync();
                 await _userHub.DisposeAsync();
+                _userHub = null;
             }
         }
 
@@ -385,21 +370,7 @@ namespace MareSynchronos.WebAPI
             await DisposeHubConnections();
 
             Logger.Debug("Creating User Hub");
-            _userHub = new HubConnectionBuilder()
-                .WithUrl(ApiUri + "/user", options =>
-                {
-                    options.Headers.Add("Authorization", SecretKey);
-#if DEBUG
-                    options.HttpMessageHandlerFactory = (message) =>
-                    {
-                        if (message is HttpClientHandler clientHandler)
-                            clientHandler.ServerCertificateCustomValidationCallback +=
-                                (sender, certificate, chain, sslPolicyErrors) => true;
-                        return message;
-                    };
-#endif
-                })
-                .Build();
+            _userHub = BuildHubConnection("user");
             await _userHub.StartAsync();
             _userHub.On<ClientPairDto, string>("UpdateClientPairs", UpdateLocalClientPairs);
             _userHub.On<CharacterCacheDto, string>("ReceiveCharacterData", ReceiveCharacterData);
@@ -407,10 +378,19 @@ namespace MareSynchronos.WebAPI
             _userHub.On<string>("AddOnlinePairedPlayer", (s) => PairedClientOnline?.Invoke(s, EventArgs.Empty));
 
             Logger.Debug("Creating File Hub");
-            _fileHub = new HubConnectionBuilder()
-                .WithUrl(ApiUri + "/files", options =>
+            _fileHub = BuildHubConnection("files");
+            await _fileHub.StartAsync(_cts.Token);
+        }
+
+        private HubConnection BuildHubConnection(string hubName)
+        {
+            return new HubConnectionBuilder()
+                .WithUrl(ApiUri + "/" + hubName, options =>
                 {
-                    options.Headers.Add("Authorization", SecretKey);
+                    if (!string.IsNullOrEmpty(SecretKey) && !_pluginConfiguration.FullPause)
+                    {
+                        options.Headers.Add("Authorization", SecretKey);
+                    }
 #if DEBUG
                     options.HttpMessageHandlerFactory = (message) =>
                     {
@@ -422,7 +402,6 @@ namespace MareSynchronos.WebAPI
 #endif
                 })
                 .Build();
-            await _fileHub.StartAsync(_cts.Token);
         }
 
         private async Task LoadInitialData()
@@ -435,6 +414,7 @@ namespace MareSynchronos.WebAPI
         {
             Logger.Debug("Connection closed: " + ApiUri);
             Disconnected?.Invoke(null, EventArgs.Empty);
+            Task.Run(DisposeHubConnections);
             RestartHeartbeat();
             return Task.CompletedTask;
         }

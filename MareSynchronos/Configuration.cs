@@ -44,6 +44,7 @@ namespace MareSynchronos
             }
         }
 
+        public bool FullPause { get; set; } = false;
         public Dictionary<string, string> UidComments { get; set; } = new();
         public bool UseCustomService { get; set; } = false;
         public int Version { get; set; } = 0;

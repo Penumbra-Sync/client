@@ -140,8 +140,8 @@ public class CachedPlayer
         var tempCollection = _ipcManager.PenumbraCreateTemporaryCollection(PlayerName!);
         _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerCharacter!.Address);
         RequestedPenumbraRedraw = true;
-        Logger.Warn(
-            $"Request Redraw for {PlayerName}: RequestedRedraws now {RequestedPenumbraRedraw}");
+        Logger.Debug(
+            $"Request Redraw for {PlayerName}");
         _ipcManager.PenumbraSetTemporaryMods(tempCollection, moddedPaths, cache.ManipulationData);
         _ipcManager.GlamourerRevertCharacterCustomization(PlayerName!);
         _ipcManager.GlamourerApplyAll(cache.GlamourerData, PlayerName!);
@@ -205,14 +205,14 @@ public class CachedPlayer
 
             RequestedPenumbraRedraw = false;
             Logger.Debug(
-                $"Penumbra Redraw for {PlayerName}: RequestedRedraws now {RequestedPenumbraRedraw}");
+                $"Penumbra Redraw done for {PlayerName}");
         });
     }
 
     private void WatcherOnPlayerChanged(Character actor)
     {
         if (actor.Name.ToString() != PlayerName) return;
-        Logger.Debug($"Player {PlayerName} changed, RequestedRedraws {RequestedPenumbraRedraw}");
+        Logger.Debug($"Player {PlayerName} changed, PenumbraRedraw is {RequestedPenumbraRedraw}");
         PlayerCharacter = _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName!);
         if (PlayerCharacter is null)
         {

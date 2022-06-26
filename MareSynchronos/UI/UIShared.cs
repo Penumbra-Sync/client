@@ -183,6 +183,20 @@ namespace MareSynchronos.UI
             }
         }
 
+        public static void DrawHelpText(string helpText)
+        {
+            ImGui.SameLine();
+            ImGui.TextDisabled("(?)");
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.BeginTooltip();
+                ImGui.PushTextWrapPos(ImGui.GetFontSize() * 35.0f);
+                ImGui.TextUnformatted(helpText);
+                ImGui.PopTextWrapPos();
+                ImGui.EndTooltip();
+            }
+        }
+
         public void DrawCacheDirectorySetting()
         {
             var cacheDirectory = _pluginConfiguration.CacheFolder;

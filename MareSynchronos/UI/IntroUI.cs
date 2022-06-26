@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Numerics;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
@@ -36,8 +37,8 @@ namespace MareSynchronos.UI
 
             SizeConstraints = new WindowSizeConstraints()
             {
-                MinimumSize = new(600, 400),
-                MaximumSize = new(600, 2000)
+                MinimumSize = new Vector2(600, 400),
+                MaximumSize = new Vector2(600, 2000)
             };
 
             _windowSystem.AddWindow(this);

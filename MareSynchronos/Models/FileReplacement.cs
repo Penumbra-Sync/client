@@ -24,7 +24,7 @@ namespace MareSynchronos.Models
             this._penumbraDirectory = penumbraDirectory;
         }
 
-        public List<FileReplacement> Associated { get; set; } = new List<FileReplacement>();
+        public List<FileReplacement> Associated { get; set; } = new();
 
         public bool Computed => (_computationTask == null || (_computationTask?.IsCompleted ?? true)) && Associated.All(f => f.Computed);
 

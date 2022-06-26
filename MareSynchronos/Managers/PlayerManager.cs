@@ -53,7 +53,6 @@ namespace MareSynchronos.Managers
         internal void StartWatchingPlayer()
         {
             _watcher.AddPlayerToWatch(_dalamudUtil.PlayerName);
-            _watcher.PlayerChanged += Watcher_PlayerChanged;
             _apiController.Connected += ApiController_Connected;
             _apiController.Disconnected += ApiController_Disconnected;
 
@@ -62,12 +61,11 @@ namespace MareSynchronos.Managers
             {
                 ApiController_Connected(null, EventArgs.Empty);
             }
-
-            _ipcManager.PenumbraRedraw(_dalamudUtil.PlayerName);
         }
 
         private void ApiController_Connected(object? sender, EventArgs args)
         {
+            Logger.Debug("ApiController Connected");
             var apiTask = _apiController.SendCharacterName(_dalamudUtil.PlayerNameHashed);
             _lastSentHash = string.Empty;
 
@@ -76,6 +74,8 @@ namespace MareSynchronos.Managers
             _cachedPlayersManager.AddInitialPairs(apiTask.Result);
 
             _ipcManager.PenumbraRedrawEvent += IpcManager_PenumbraRedrawEvent;
+            _ipcManager.PenumbraRedraw(_dalamudUtil.PlayerName);
+            _watcher.PlayerChanged += Watcher_PlayerChanged;
         }
 
         private void ApiController_Disconnected(object? sender, EventArgs args)
@@ -83,6 +83,7 @@ namespace MareSynchronos.Managers
             Logger.Debug(nameof(ApiController_Disconnected));
 
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
+            _watcher.PlayerChanged -= Watcher_PlayerChanged;
         }
 
         private async Task<CharacterData> CreateFullCharacterCache()
@@ -106,10 +107,9 @@ namespace MareSynchronos.Managers
 
         private void IpcManager_PenumbraRedrawEvent(object? objectTableIndex, EventArgs e)
         {
-            var objTableObj = _objectTable[(int)objectTableIndex!];
-            if (objTableObj!.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) return;
-            if (objTableObj.Name.ToString() != _dalamudUtil.PlayerName) return;
-            Logger.Debug("Penumbra Redraw Event");
+            var player = _dalamudUtil.GetPlayerCharacterFromObjectTableIndex((int)objectTableIndex!);
+            if (player != null && player.Name.ToString() != _dalamudUtil.PlayerName) return;
+            Logger.Debug("Penumbra Redraw Event for " + _dalamudUtil.PlayerName);
             PlayerChanged(_dalamudUtil.PlayerName);
         }
 
@@ -131,6 +131,16 @@ namespace MareSynchronos.Managers
 
             _playerChangedTask = Task.Run(async () =>
             {
+                int attempts = 0;
+                while (!_apiController.IsConnected && attempts < 10)
+                {
+                    Logger.Warn("No connection to the API");
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+                    attempts++;
+                }
+
+                if (attempts == 10) return;
+
                 Stopwatch st = Stopwatch.StartNew();
                 _dalamudUtil.WaitWhileSelfIsDrawing();
 
@@ -152,7 +162,6 @@ namespace MareSynchronos.Managers
 
         private void Watcher_PlayerChanged(Dalamud.Game.ClientState.Objects.Types.Character actor)
         {
-            Logger.Debug("Watcher Player Changed");
             Task.Run(() =>
             {
                 // fix for redraw from anamnesis
