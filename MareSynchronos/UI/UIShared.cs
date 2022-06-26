@@ -2,7 +2,9 @@
 using System.IO;
 using System.Numerics;
 using System.Threading.Tasks;
+using Dalamud.Interface;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.ImGuiFileDialog;
 using ImGuiNET;
 using MareSynchronos.Managers;
 using MareSynchronos.WebAPI;
@@ -14,14 +16,16 @@ namespace MareSynchronos.UI
         private readonly IpcManager _ipcManager;
         private readonly ApiController _apiController;
         private readonly FileCacheManager _fileCacheManager;
+        private readonly FileDialogManager _fileDialogManager;
         private readonly Configuration _pluginConfiguration;
         public long FileCacheSize => _fileCacheManager.FileCacheSize;
 
-        public UiShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, Configuration pluginConfiguration)
+        public UiShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, FileDialogManager fileDialogManager, Configuration pluginConfiguration)
         {
             _ipcManager = ipcManager;
             _apiController = apiController;
             _fileCacheManager = fileCacheManager;
+            _fileDialogManager = fileDialogManager;
             _pluginConfiguration = pluginConfiguration;
         }
 
@@ -186,7 +190,11 @@ namespace MareSynchronos.UI
         public static void DrawHelpText(string helpText)
         {
             ImGui.SameLine();
-            ImGui.TextDisabled("(?)");
+            ImGui.PushFont(UiBuilder.IconFont);
+            ImGui.SetWindowFontScale(0.8f);
+            ImGui.TextDisabled(FontAwesomeIcon.Question.ToIconString());
+            ImGui.SetWindowFontScale(1.0f);
+            ImGui.PopFont();
             if (ImGui.IsItemHovered())
             {
                 ImGui.BeginTooltip();
@@ -210,11 +218,51 @@ namespace MareSynchronos.UI
                 }
             }
 
-            if (!Directory.Exists(cacheDirectory))
+            ImGui.SameLine();
+            ImGui.PushFont(UiBuilder.IconFont);
+            string folderIcon = FontAwesomeIcon.Folder.ToIconString();
+            if (ImGui.Button(folderIcon + "##chooseCacheFolder"))
+            {
+                _fileDialogManager.OpenFolderDialog("Pick Mare Synchronos Cache Folder", (success, path) =>
+                {
+                    if (!success) return;
+
+                    _pluginConfiguration.CacheFolder = path;
+                    _pluginConfiguration.Save();
+                    _fileCacheManager.StartWatchers();
+                });
+            }
+            ImGui.PopFont();
+
+            if (!Directory.Exists(cacheDirectory) || !IsDirectoryWritable(cacheDirectory))
             {
                 ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
                 TextWrapped("The folder you selected does not exist. Please provide a valid path.");
                 ImGui.PopStyleColor();
+            }
+        }
+
+        public bool IsDirectoryWritable(string dirPath, bool throwIfFails = false)
+        {
+            try
+            {
+                using (FileStream fs = File.Create(
+                           Path.Combine(
+                               dirPath,
+                               Path.GetRandomFileName()
+                           ),
+                           1,
+                           FileOptions.DeleteOnClose)
+                      )
+                { }
+                return true;
+            }
+            catch
+            {
+                if (throwIfFails)
+                    throw;
+                else
+                    return false;
             }
         }
 

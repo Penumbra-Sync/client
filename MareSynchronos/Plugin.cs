@@ -7,6 +7,7 @@ using Dalamud.Game;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState;
 using System;
+using Dalamud.Interface.ImGuiFileDialog;
 using MareSynchronos.Managers;
 using MareSynchronos.WebAPI;
 using Dalamud.Interface.Windowing;
@@ -36,6 +37,7 @@ namespace MareSynchronos
         private CachedPlayersManager? _characterCacheManager;
         private readonly IPlayerWatcher _playerWatcher;
         private readonly DownloadUi _downloadUi;
+        private readonly FileDialogManager _fileDialogManager;
 
         public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager,
             Framework framework, ObjectTable objectTable, ClientState clientState)
@@ -58,9 +60,10 @@ namespace MareSynchronos
             _ipcManager = new IpcManager(PluginInterface);
 
             _fileCacheManager = new FileCacheManager(_ipcManager, _configuration);
+            _fileDialogManager = new FileDialogManager();
 
             var uiSharedComponent =
-                new UiShared(_ipcManager, _apiController, _fileCacheManager, _configuration);
+                new UiShared(_ipcManager, _apiController, _fileCacheManager, _fileDialogManager, _configuration);
             _pluginUi = new PluginUi(_windowSystem, uiSharedComponent, _configuration, _apiController);
             _introUi = new IntroUi(_windowSystem, uiSharedComponent, _configuration, _fileCacheManager);
             _introUi.FinishedRegistration += (_, _) =>
@@ -178,6 +181,7 @@ namespace MareSynchronos
         private void Draw()
         {
             _windowSystem.Draw();
+            _fileDialogManager.Draw();
         }
 
         private void OnCommand(string command, string args)

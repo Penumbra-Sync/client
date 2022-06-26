@@ -308,7 +308,17 @@ namespace MareSynchronos.Managers
                             db.FileCaches.Remove(entry);
                     }
                     await db.SaveChangesAsync(ct);
-                    db.FileCaches.AddRange(fileCachesToAdd);
+                    foreach (var entry in fileCachesToAdd)
+                    {
+                        try
+                        {
+                            db.FileCaches.Add(entry);
+                        }
+                        catch
+                        {
+                            // ignored
+                        }
+                    }
                     await db.SaveChangesAsync(ct);
                 }
                 catch (Exception ex)

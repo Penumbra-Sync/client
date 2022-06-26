@@ -54,6 +54,7 @@ public class CachedPlayer
     public string? PlayerName { get; private set; }
 
     public string PlayerNameHash { get; }
+    private string _lastAppliedEquipmentHash = string.Empty;
 
     public bool RequestedPenumbraRedraw { get; set; }
 
@@ -66,28 +67,34 @@ public class CachedPlayer
         if (string.IsNullOrEmpty(PlayerName) || e.CharacterNameHash != PlayerNameHash) return;
         Logger.Debug("Received data for " + this);
 
-        _downloadCancellationTokenSource?.Cancel();
-        _downloadCancellationTokenSource = new CancellationTokenSource();
-        var downloadToken = _downloadCancellationTokenSource.Token;
-
         Logger.Debug("Checking for files to download for player " + PlayerName);
         Logger.Debug("Hash for data is " + e.CharacterData.Hash);
         if (!_cache.ContainsKey(e.CharacterData.Hash))
         {
             Logger.Debug("Received total " + e.CharacterData.FileReplacements.Count + " file replacement data");
             _cache[e.CharacterData.Hash] = e.CharacterData;
+            _lastAppliedEquipmentHash = e.CharacterData.Hash;
         }
         else
         {
             Logger.Debug("Had valid local cache for " + PlayerName);
         }
 
+        DownloadAndApplyCharacter();
+    }
+
+    private void DownloadAndApplyCharacter()
+    {
+        _downloadCancellationTokenSource?.Cancel();
+        _downloadCancellationTokenSource = new CancellationTokenSource();
+        var downloadToken = _downloadCancellationTokenSource.Token;
+
         Task.Run(async () =>
         {
             List<FileReplacementDto> toDownloadReplacements;
 
             Dictionary<string, string> moddedPaths;
-            while ((toDownloadReplacements = TryCalculateModdedDictionary(_cache[e.CharacterData.Hash], out moddedPaths)).Count > 0)
+            while ((toDownloadReplacements = TryCalculateModdedDictionary(_cache[_lastAppliedEquipmentHash], out moddedPaths)).Count > 0)
             {
                 Logger.Debug("Downloading missing files for player " + PlayerName);
                 await _apiController.DownloadFiles(toDownloadReplacements, downloadToken);
@@ -98,7 +105,7 @@ public class CachedPlayer
                 return;
             }
 
-            ApplyCharacterData(e.CharacterData, moddedPaths);
+            ApplyCharacterData(_cache[_lastAppliedEquipmentHash], moddedPaths);
         }, downloadToken);
     }
 
@@ -196,18 +203,29 @@ public class CachedPlayer
         return PlayerNameHash + ":" + PlayerName + ":HasChar " + (PlayerCharacter != null);
     }
 
+    private Task? penumbraRedrawEventTask;
+
     private void IpcManagerOnPenumbraRedrawEvent(object? sender, EventArgs e)
     {
         var player = _dalamudUtil.GetPlayerCharacterFromObjectTableIndex((int)sender!);
         if (player == null || player.Name.ToString() != PlayerName) return;
-        Task.Run(() =>
+        if (!penumbraRedrawEventTask?.IsCompleted ?? false) return;
+
+        penumbraRedrawEventTask = Task.Run(() =>
         {
             PlayerCharacter = player;
             _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerCharacter.Address);
 
-            RequestedPenumbraRedraw = false;
-            Logger.Debug(
-                $"Penumbra Redraw done for {PlayerName}");
+            if (RequestedPenumbraRedraw == false && !string.IsNullOrEmpty(_lastAppliedEquipmentHash))
+            {
+                DownloadAndApplyCharacter();
+            }
+            else
+            {
+                RequestedPenumbraRedraw = false;
+                Logger.Debug(
+                    $"Penumbra Redraw done for {PlayerName}");
+            }
         });
     }
 
