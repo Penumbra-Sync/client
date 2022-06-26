@@ -28,7 +28,7 @@ namespace MareSynchronos
         private readonly IntroUi _introUi;
         private readonly IpcManager _ipcManager;
         private readonly ObjectTable _objectTable;
-        private readonly DalamudPluginInterface _pluginInterface;
+        public static DalamudPluginInterface PluginInterface { get; set; }
         private readonly PluginUi _pluginUi;
         private readonly WindowSystem _windowSystem;
         private PlayerManager? _characterManager;
@@ -41,13 +41,13 @@ namespace MareSynchronos
             Framework framework, ObjectTable objectTable, ClientState clientState)
         {
             Logger.Debug("Launching " + Name);
-            _pluginInterface = pluginInterface;
+            PluginInterface = pluginInterface;
             _commandManager = commandManager;
             _framework = framework;
             _objectTable = objectTable;
             _clientState = clientState;
-            _configuration = _pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-            _configuration.Initialize(_pluginInterface);
+            _configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+            _configuration.Initialize(PluginInterface);
 
             _windowSystem = new WindowSystem("MareSynchronos");
 
@@ -55,7 +55,7 @@ namespace MareSynchronos
 
             // those can be initialized outside of game login
             _apiController = new ApiController(_configuration);
-            _ipcManager = new IpcManager(_pluginInterface);
+            _ipcManager = new IpcManager(PluginInterface);
 
             _fileCacheManager = new FileCacheManager(_ipcManager, _configuration);
 
@@ -121,8 +121,8 @@ namespace MareSynchronos
         {
             Logger.Debug("Client login");
 
-            _pluginInterface.UiBuilder.Draw += Draw;
-            _pluginInterface.UiBuilder.OpenConfigUi += OpenConfigUi;
+            PluginInterface.UiBuilder.Draw += Draw;
+            PluginInterface.UiBuilder.OpenConfigUi += OpenConfigUi;
             _commandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
             {
                 HelpMessage = "Opens the Mare Synchronos UI"
@@ -142,8 +142,8 @@ namespace MareSynchronos
             Logger.Debug("Client logout");
             _characterCacheManager?.Dispose();
             _characterManager?.Dispose();
-            _pluginInterface.UiBuilder.Draw -= Draw;
-            _pluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;
+            PluginInterface.UiBuilder.Draw -= Draw;
+            PluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;
             _commandManager.RemoveHandler(CommandName);
         }
 

@@ -43,7 +43,7 @@ public class CachedPlayer
         }
     }
 
-    private CancellationTokenSource _downloadCancellationTokenSource = new();
+    private CancellationTokenSource? _downloadCancellationTokenSource;
 
     private string _lastGlamourerData = string.Empty;
 
@@ -93,9 +93,12 @@ public class CachedPlayer
                 await _apiController.DownloadFiles(toDownloadReplacements, downloadToken);
             }
 
-            if (_downloadCancellationTokenSource.Token.IsCancellationRequested)
+            if (downloadToken.IsCancellationRequested)
+            {
+                return;
+            }
 
-                ApplyCharacterData(e.CharacterData, moddedPaths);
+            ApplyCharacterData(e.CharacterData, moddedPaths);
         }, downloadToken);
     }
 
@@ -152,6 +155,7 @@ public class CachedPlayer
         {
             Logger.Debug("Restoring state for " + PlayerName);
             IsVisible = false;
+            _downloadCancellationTokenSource?.Dispose();
             _watcher.RemovePlayerFromWatch(PlayerName);
             _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName);
             _ipcManager.GlamourerRevertCharacterCustomization(PlayerName);

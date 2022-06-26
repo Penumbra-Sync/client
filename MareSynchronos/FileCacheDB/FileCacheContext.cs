@@ -1,5 +1,7 @@
 ﻿using System;
 using System.IO;
+using Dalamud.Logging;
+using MareSynchronos.Utils;
 using Microsoft.EntityFrameworkCore;
 
 #nullable disable
@@ -24,7 +26,18 @@ namespace MareSynchronos.FileCacheDB
         {
             if (!optionsBuilder.IsConfigured)
             {
-                string dbPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "XIVLauncher", "pluginConfigs", "FileCacheDebug.db");
+                string dbPath = Path.Combine(Plugin.PluginInterface.ConfigDirectory.FullName, "FileCacheDebug.db");
+                if(!Directory.Exists(Plugin.PluginInterface.ConfigDirectory.FullName))
+                {
+                    Directory.CreateDirectory(Plugin.PluginInterface.ConfigDirectory.FullName);
+                }
+                var oldDbPath = Path.Combine(Plugin.PluginInterface.ConfigDirectory.FullName, "..", "FileCacheDebug.db");
+                if (File.Exists(oldDbPath))
+                {
+                    Logger.Debug("Migrated old path to new path");
+                    File.Move(oldDbPath, dbPath, true);
+                }
+                //PluginLog.Debug("Using Database " + dbPath);
                 optionsBuilder.UseSqlite("Data Source=" + dbPath);
             }
         }
