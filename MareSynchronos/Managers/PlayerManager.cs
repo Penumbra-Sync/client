@@ -4,7 +4,6 @@ using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using Newtonsoft.Json;
-using Penumbra.PlayerWatch;
 using System;
 using System.Diagnostics;
 using System.Linq;
@@ -20,12 +19,11 @@ namespace MareSynchronos.Managers
         private readonly CharacterDataFactory _characterDataFactory;
         private readonly DalamudUtil _dalamudUtil;
         private readonly IpcManager _ipcManager;
-        private readonly IPlayerWatcher _watcher;
         private string _lastSentHash = string.Empty;
         private Task? _playerChangedTask;
 
         public PlayerManager(ApiController apiController, IpcManager ipcManager,
-            CharacterDataFactory characterDataFactory, CachedPlayersManager cachedPlayersManager, DalamudUtil dalamudUtil, IPlayerWatcher watcher)
+            CharacterDataFactory characterDataFactory, CachedPlayersManager cachedPlayersManager, DalamudUtil dalamudUtil)
         {
             Logger.Debug("Creating " + nameof(PlayerManager));
 
@@ -34,9 +32,8 @@ namespace MareSynchronos.Managers
             _characterDataFactory = characterDataFactory;
             _cachedPlayersManager = cachedPlayersManager;
             _dalamudUtil = dalamudUtil;
-            _watcher = watcher;
 
-            _watcher.AddPlayerToWatch(_dalamudUtil.PlayerName);
+            _dalamudUtil.AddPlayerToWatch(_dalamudUtil.PlayerName);
             _apiController.Connected += ApiController_Connected;
             _apiController.Disconnected += ApiController_Disconnected;
 
@@ -54,7 +51,7 @@ namespace MareSynchronos.Managers
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
             _apiController.Connected -= ApiController_Connected;
             _apiController.Disconnected -= ApiController_Disconnected;
-            _watcher.PlayerChanged -= Watcher_PlayerChanged;
+            _dalamudUtil.PlayerChanged -= Watcher_PlayerChanged;
         }
 
         private void ApiController_Connected(object? sender, EventArgs args)
@@ -69,7 +66,7 @@ namespace MareSynchronos.Managers
 
             _ipcManager.PenumbraRedrawEvent += IpcManager_PenumbraRedrawEvent;
             _ipcManager.PenumbraRedraw(_dalamudUtil.PlayerName);
-            _watcher.PlayerChanged += Watcher_PlayerChanged;
+            _dalamudUtil.PlayerChanged += Watcher_PlayerChanged;
         }
 
         private void ApiController_Disconnected(object? sender, EventArgs args)
@@ -77,7 +74,7 @@ namespace MareSynchronos.Managers
             Logger.Debug(nameof(ApiController_Disconnected));
 
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
-            _watcher.PlayerChanged -= Watcher_PlayerChanged;
+            _dalamudUtil.PlayerChanged -= Watcher_PlayerChanged;
         }
 
         private async Task<CharacterData> CreateFullCharacterCache()

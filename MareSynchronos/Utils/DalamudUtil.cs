@@ -1,22 +1,48 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
-using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using Dalamud.Game.ClientState.Objects.Types;
+using Penumbra.PlayerWatch;
+using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 namespace MareSynchronos.Utils
 {
-    public class DalamudUtil
+    public delegate void PlayerChange(Character actor);
+
+    public class DalamudUtil : IDisposable
     {
         private readonly ClientState _clientState;
         private readonly ObjectTable _objectTable;
+        private readonly IPlayerWatcher _watcher;
+        public event PlayerChange? PlayerChanged;
 
-        public DalamudUtil(ClientState clientState, ObjectTable objectTable)
+        public DalamudUtil(ClientState clientState, ObjectTable objectTable, IPlayerWatcher watcher)
         {
             _clientState = clientState;
             _objectTable = objectTable;
+            _watcher = watcher;
+            _watcher.Enable();
+            _watcher.PlayerChanged += WatcherOnPlayerChanged;
+        }
+
+        private void WatcherOnPlayerChanged(Character actor)
+        {
+            PlayerChanged?.Invoke(actor);
+        }
+
+
+        public void AddPlayerToWatch(string playerName)
+        {
+            _watcher.AddPlayerToWatch(playerName);
+        }
+
+        public void RemovePlayerFromWatch(string playerName)
+        {
+            _watcher.RemovePlayerFromWatch(playerName);
         }
 
         public bool IsPlayerPresent => _clientState.LocalPlayer != null;
@@ -47,6 +73,13 @@ namespace MareSynchronos.Utils
             }
 
             return allLocalPlayers;
+        }
+
+        public List<PlayerCharacter> GetPlayerCharacters()
+        {
+            return _objectTable.Where(obj =>
+                obj.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player &&
+                obj.Name.ToString() != PlayerName).Select(p => (PlayerCharacter)p).ToList();
         }
 
         public PlayerCharacter? GetPlayerCharacterFromObjectTableIndex(int index)
@@ -85,5 +118,11 @@ namespace MareSynchronos.Utils
         }
 
         public void WaitWhileSelfIsDrawing() => WaitWhileCharacterIsDrawing(_clientState.LocalPlayer?.Address ?? new IntPtr());
+
+        public void Dispose()
+        {
+            _watcher.Disable();
+            _watcher.Dispose();
+        }
     }
 }

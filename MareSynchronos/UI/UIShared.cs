@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
 using Dalamud.Interface;
@@ -74,7 +75,10 @@ namespace MareSynchronos.UI
 
         public void PrintServerState()
         {
-            ImGui.Text("Service status of " + (string.IsNullOrEmpty(_pluginConfiguration.ApiUri) ? ApiController.MainServer : _pluginConfiguration.ApiUri));
+            var serverName = _apiController.ServerDictionary.ContainsKey(_pluginConfiguration.ApiUri)
+                ? _apiController.ServerDictionary[_pluginConfiguration.ApiUri]
+                : _pluginConfiguration.ApiUri;
+            ImGui.Text("Service status of " + serverName);
             ImGui.SameLine();
             var color = _apiController.ServerAlive ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
             ImGui.TextColored(color, _apiController.ServerAlive ? "Available" : "Unavailable");
@@ -132,58 +136,90 @@ namespace MareSynchronos.UI
         }
 
         private int _serverSelectionIndex = 0;
+        private string _customServerName = "";
+        private string _customServerUri = "";
 
         public void DrawServiceSelection()
         {
-            string[] comboEntries = new[] { ApiController.MainServer, "Custom Service" };
-            if (ImGui.BeginCombo("Service", comboEntries[_serverSelectionIndex]))
+            string[] comboEntries = _apiController.ServerDictionary.Values.ToArray();
+            _serverSelectionIndex = Array.IndexOf(_apiController.ServerDictionary.Keys.ToArray(), _pluginConfiguration.ApiUri);
+            if (ImGui.BeginCombo("Select Service", comboEntries[_serverSelectionIndex]))
             {
-                for (int n = 0; n < comboEntries.Length; n++)
+                for (int i = 0; i < comboEntries.Length; i++)
                 {
-                    bool isSelected = _serverSelectionIndex == n;
-                    if (ImGui.Selectable(comboEntries[n], isSelected))
+                    bool isSelected = _serverSelectionIndex == i;
+                    if (ImGui.Selectable(comboEntries[i], isSelected))
                     {
-                        _serverSelectionIndex = n;
+                        _pluginConfiguration.ApiUri = _apiController.ServerDictionary.Single(k => k.Value == comboEntries[i]).Key;
+                        _pluginConfiguration.Save();
                     }
 
                     if (isSelected)
                     {
                         ImGui.SetItemDefaultFocus();
                     }
-
-                    bool useCustomService = _serverSelectionIndex != 0;
-
-                    if (_apiController.UseCustomService != useCustomService)
-                    {
-                        _apiController.UseCustomService = useCustomService;
-                        _pluginConfiguration.Save();
-                    }
                 }
 
                 ImGui.EndCombo();
             }
 
-            if (_apiController.UseCustomService)
+            if (_serverSelectionIndex != 0)
             {
-                string serviceAddress = _pluginConfiguration.ApiUri;
-                if (ImGui.InputText("Service address", ref serviceAddress, 255))
+                ImGui.SameLine();
+                ImGui.PushFont(UiBuilder.IconFont);
+                if (ImGui.Button(FontAwesomeIcon.Trash.ToIconString() + "##deleteService"))
                 {
-                    if (_pluginConfiguration.ApiUri != serviceAddress)
-                    {
-                        _pluginConfiguration.ApiUri = serviceAddress;
-                        _apiController.RestartHeartbeat();
-                        _pluginConfiguration.Save();
-                    }
+                    _pluginConfiguration.CustomServerList.Remove(_pluginConfiguration.ApiUri);
+                    _pluginConfiguration.ApiUri = ApiController.MainServiceUri;
+                    _pluginConfiguration.Save();
                 }
+                ImGui.PopFont();
             }
 
             PrintServerState();
-            if (_apiController.ServerAlive)
+
+            if (_apiController.ServerAlive && !_pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri))
             {
                 if (ImGui.Button("Register"))
                 {
+                    _pluginConfiguration.FullPause = false;
+                    _pluginConfiguration.Save();
                     Task.WaitAll(_apiController.Register());
                 }
+            }
+            else
+            {
+                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
+                TextWrapped("You already have an account on this server.");
+                ImGui.PopStyleColor();
+                ImGui.SameLine();
+                if (ImGui.Button("Connect##connectToService"))
+                {
+                    _pluginConfiguration.FullPause = false;
+                    _pluginConfiguration.Save();
+                    Task.Run(_apiController.CreateConnections);
+                }
+            }
+
+            if (ImGui.TreeNode("Custom Service"))
+            {
+                ImGui.SetNextItemWidth(250);
+                ImGui.InputText("Custom Service Name", ref _customServerName, 255);
+                ImGui.SetNextItemWidth(250);
+                ImGui.InputText("Custom Service Address", ref _customServerUri, 255);
+                if (ImGui.Button("Add Custom Service"))
+                {
+                    if (!string.IsNullOrEmpty(_customServerUri) 
+                        && !string.IsNullOrEmpty(_customServerName)
+                        && !_pluginConfiguration.CustomServerList.ContainsValue(_customServerName))
+                    {
+                        _pluginConfiguration.CustomServerList[_customServerUri] = _customServerName;
+                        _customServerUri = string.Empty;
+                        _customServerName = string.Empty;
+                        _pluginConfiguration.Save();
+                    }
+                }
+                ImGui.TreePop();
             }
         }
 

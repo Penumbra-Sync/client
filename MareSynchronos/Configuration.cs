@@ -25,6 +25,7 @@ namespace MareSynchronos
 
         public string CacheFolder { get; set; } = string.Empty;
         public Dictionary<string, string> ClientSecret { get; set; } = new();
+        public Dictionary<string, string> CustomServerList { get; set; } = new();
         [JsonIgnore]
         public bool HasValidSetup => AcceptedAgreement && InitialScanComplete && !string.IsNullOrEmpty(CacheFolder) &&
                                      Directory.Exists(CacheFolder) && ClientSecret.ContainsKey(ApiUri);
@@ -46,7 +47,6 @@ namespace MareSynchronos
 
         public bool FullPause { get; set; } = false;
         public Dictionary<string, string> UidComments { get; set; } = new();
-        public bool UseCustomService { get; set; } = false;
         public int Version { get; set; } = 0;
 
         public bool ShowTransferWindow { get; set; } = true;

@@ -34,12 +34,10 @@ namespace MareSynchronos.Managers
 
         private void StartWatchersAndScan()
         {
-            if (_ipcManager.Initialized && _pluginConfiguration.HasValidSetup)
-            {
-                Logger.Debug("Penumbra is active, configuration is valid, starting watchers and scan");
-                StartWatchers();
-                StartInitialScan();
-            }
+            if (!_ipcManager.Initialized || !_pluginConfiguration.HasValidSetup) return;
+            Logger.Debug("Penumbra is active, configuration is valid, starting watchers and scan");
+            StartWatchers();
+            StartInitialScan();
         }
 
         private void IpcManagerOnPenumbraInitialized(object? sender, EventArgs e)

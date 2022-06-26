@@ -51,31 +51,20 @@ namespace MareSynchronos.UI
                 return;
             }
 
-            if (_apiController.SecretKey != "-" && !_apiController.IsConnected && _apiController.ServerAlive)
-            {
-                if (ImGui.Button("Reset Secret Key"))
-                {
-                    _configuration.ClientSecret.Clear();
-                    _configuration.Save();
-                    _apiController.RestartHeartbeat();
-                }
-            }
-            else
-            {
-                var pluginState = _uiShared.DrawOtherPluginState();
+            var pluginState = _uiShared.DrawOtherPluginState();
 
-                DrawSettingsContent(pluginState);
-            }
+            if (pluginState)
+                DrawSettingsContent();
         }
 
-        private void DrawSettingsContent(bool pluginState)
+        private void DrawSettingsContent()
         {
             _uiShared.PrintServerState();
             ImGui.Separator();
             ImGui.SetWindowFontScale(1.2f);
             ImGui.Text("Your UID");
             ImGui.SameLine();
-            if (_apiController.ServerAlive)
+            if (_apiController.IsConnected)
             {
                 ImGui.TextColored(ImGuiColors.ParsedGreen, _apiController.UID);
                 ImGui.SameLine();
@@ -89,18 +78,18 @@ namespace MareSynchronos.UI
             }
             else
             {
-                ImGui.TextColored(ImGuiColors.DalamudRed, "No UID (Service unavailable)");
+                string error = _configuration.FullPause ? "Fully Paused" : "Service unavailable";
+                ImGui.TextColored(ImGuiColors.DalamudRed, $"No UID ({error})");
                 ImGui.SetWindowFontScale(1.0f);
             }
 
             ImGui.Separator();
-            if (_apiController.ServerAlive)
+            if (_apiController.IsConnected)
                 DrawPairedClientsContent();
             DrawFileCacheSettings();
-            if (_apiController.ServerAlive)
+            if (_apiController.IsConnected)
                 DrawCurrentTransfers();
-            DrawAdministration(_apiController.ServerAlive);
-
+            DrawAdministration(_apiController.IsConnected);
         }
 
         private bool _deleteFilesPopupModalShown = false;
@@ -181,15 +170,39 @@ namespace MareSynchronos.UI
                     }
                 }
 
-                var marePaused = _configuration.FullPause;
-                if (ImGui.Checkbox("Pause Mare Synchronos", ref marePaused))
+                if (!_configuration.FullPause)
                 {
-                    _configuration.FullPause = marePaused;
-                    _configuration.Save();
-                    _apiController.RestartHeartbeat();
+                    ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
+                    UiShared.TextWrapped("Note: to change servers you need to pause Mare Synchronos.");
+                    ImGui.PopStyleColor();
                 }
 
-                UiShared.DrawHelpText("Completely pauses the sync and clear your current data (not uploaded files) on the service.");
+                var marePaused = _configuration.FullPause;
+
+                if (_configuration.HasValidSetup)
+                {
+                    if (ImGui.Checkbox("Pause Mare Synchronos", ref marePaused))
+                    {
+                        _configuration.FullPause = marePaused;
+                        _configuration.Save();
+                        Task.Run(_apiController.CreateConnections);
+                    }
+
+                    UiShared.DrawHelpText("Completely pauses the sync and clear your current data (not uploaded files) on the service.");
+                }
+                else
+                {
+                    ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
+                    ImGui.TextUnformatted("You cannot resume pause without a valid account on the service.");
+                    ImGui.PopStyleColor();
+                }
+
+
+                if (marePaused)
+                {
+                    _uiShared.DrawServiceSelection();
+                }
+
 
                 ImGui.TreePop();
             }

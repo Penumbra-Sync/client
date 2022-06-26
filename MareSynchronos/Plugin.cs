@@ -28,14 +28,12 @@ namespace MareSynchronos
         private readonly FileCacheManager _fileCacheManager;
         private readonly IntroUi _introUi;
         private readonly IpcManager _ipcManager;
-        private readonly ObjectTable _objectTable;
         public static DalamudPluginInterface PluginInterface { get; set; }
         private readonly PluginUi _pluginUi;
         private readonly WindowSystem _windowSystem;
         private PlayerManager? _playerManager;
         private readonly DalamudUtil _dalamudUtil;
         private CachedPlayersManager? _characterCacheManager;
-        private readonly IPlayerWatcher _playerWatcher;
         private readonly DownloadUi _downloadUi;
         private readonly FileDialogManager _fileDialogManager;
 
@@ -46,7 +44,6 @@ namespace MareSynchronos
             PluginInterface = pluginInterface;
             _commandManager = commandManager;
             _framework = framework;
-            _objectTable = objectTable;
             _clientState = clientState;
             _configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
             _configuration.Initialize(PluginInterface);
@@ -74,13 +71,11 @@ namespace MareSynchronos
             };
             _downloadUi = new DownloadUi(_windowSystem, _configuration, _apiController);
 
-            _dalamudUtil = new DalamudUtil(_clientState, _objectTable);
-            _playerWatcher = PlayerWatchFactory.Create(framework, _clientState, _objectTable);
-            _playerWatcher.Enable();
+            _dalamudUtil = new DalamudUtil(_clientState, objectTable, PlayerWatchFactory.Create(framework, _clientState, objectTable));
 
             clientState.Login += ClientState_Login;
             clientState.Logout += ClientState_Logout;
-            _apiController.AccountDeleted += ApiControllerOnAccountDeleted;
+            _apiController.ChangingServers += ApiControllerOnChangingServers;
 
             if (clientState.IsLoggedIn)
             {
@@ -88,19 +83,17 @@ namespace MareSynchronos
             }
         }
 
-        private void ApiControllerOnAccountDeleted(object? sender, EventArgs e)
+        private void ApiControllerOnChangingServers(object? sender, EventArgs e)
         {
             _pluginUi.IsOpen = false;
             _introUi.IsOpen = true;
-            _characterCacheManager?.Dispose();
-            _playerManager?.Dispose();
         }
 
         public string Name => "Mare Synchronos";
         public void Dispose()
         {
             Logger.Debug("Disposing " + Name);
-            _apiController.AccountDeleted -= ApiControllerOnAccountDeleted;
+            _apiController.ChangingServers -= ApiControllerOnChangingServers;
             _apiController?.Dispose();
 
             _commandManager.RemoveHandler(CommandName);
@@ -115,8 +108,7 @@ namespace MareSynchronos
             _ipcManager?.Dispose();
             _playerManager?.Dispose();
             _characterCacheManager?.Dispose();
-            _playerWatcher.Disable();
-            _playerWatcher.Dispose();
+            _dalamudUtil.Dispose();
         }
 
 
@@ -152,30 +144,32 @@ namespace MareSynchronos
 
         public void ReLaunchCharacterManager()
         {
-            _playerManager?.Dispose();
             _characterCacheManager?.Dispose();
+            _playerManager?.Dispose();
 
-            Task.Run(async () =>
+            Task.Run(WaitForPlayerAndLaunchCharacterManager);
+        }
+
+        private async Task WaitForPlayerAndLaunchCharacterManager()
+        {
+            while (!_dalamudUtil.IsPlayerPresent)
             {
-                while (!_dalamudUtil.IsPlayerPresent)
-                {
-                    await Task.Delay(100);
-                }
+                await Task.Delay(100);
+            }
 
-                try
-                {
-                    var characterCacheFactory =
-                        new CharacterDataFactory(_dalamudUtil, _ipcManager);
-                    _characterCacheManager = new CachedPlayersManager(_clientState, _framework, _objectTable,
-                        _apiController, _dalamudUtil, _ipcManager, _playerWatcher);
-                    _playerManager = new PlayerManager(_apiController, _ipcManager,
-                        characterCacheFactory, _characterCacheManager, _dalamudUtil, _playerWatcher);
-                }
-                catch (Exception ex)
-                {
-                    Logger.Debug(ex.Message);
-                }
-            });
+            try
+            {
+                var characterCacheFactory =
+                    new CharacterDataFactory(_dalamudUtil, _ipcManager);
+                _characterCacheManager = new CachedPlayersManager(_clientState, _framework,
+                    _apiController, _dalamudUtil, _ipcManager);
+                _playerManager = new PlayerManager(_apiController, _ipcManager,
+                    characterCacheFactory, _characterCacheManager, _dalamudUtil);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug(ex.Message);
+            }
         }
 
         private void Draw()

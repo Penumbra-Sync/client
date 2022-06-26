@@ -146,7 +146,9 @@ namespace MareSynchronos.Managers
         {
             if (!CheckPenumbraApi()) return string.Empty;
             Logger.Debug("Creating temp collection for " + characterName);
-            return _penumbraCreateTemporaryCollection.InvokeFunc("MareSynchronos", characterName, true).Item2;
+            var ret = _penumbraCreateTemporaryCollection.InvokeFunc("MareSynchronos", characterName, true);
+            Logger.Debug("Penumbra ret: " + ret.Item1);
+            return ret.Item2;
         }
 
         public string PenumbraGetMetaManipulations(string characterName)

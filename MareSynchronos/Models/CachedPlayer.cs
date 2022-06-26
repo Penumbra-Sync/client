@@ -11,7 +11,6 @@ using MareSynchronos.FileCacheDB;
 using MareSynchronos.Managers;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using Penumbra.PlayerWatch;
 
 namespace MareSynchronos.Models;
 
@@ -20,16 +19,14 @@ public class CachedPlayer
     private readonly DalamudUtil _dalamudUtil;
     private readonly IpcManager _ipcManager;
     private readonly ApiController _apiController;
-    private readonly IPlayerWatcher _watcher;
     private bool _isVisible;
 
-    public CachedPlayer(string nameHash, IpcManager ipcManager, ApiController apiController, DalamudUtil dalamudUtil, IPlayerWatcher watcher)
+    public CachedPlayer(string nameHash, IpcManager ipcManager, ApiController apiController, DalamudUtil dalamudUtil)
     {
         PlayerNameHash = nameHash;
         _ipcManager = ipcManager;
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
-        _watcher = watcher;
     }
 
     public bool IsVisible
@@ -165,7 +162,7 @@ public class CachedPlayer
             _downloadCancellationTokenSource?.Cancel();
             _downloadCancellationTokenSource?.Dispose();
             _downloadCancellationTokenSource = null;
-            _watcher.RemovePlayerFromWatch(PlayerName);
+            _dalamudUtil.RemovePlayerFromWatch(PlayerName);
             _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName);
             _ipcManager.GlamourerRevertCharacterCustomization(PlayerName);
             _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerName);
@@ -177,7 +174,7 @@ public class CachedPlayer
         }
         finally
         {
-            _watcher.PlayerChanged -= WatcherOnPlayerChanged;
+            _dalamudUtil.PlayerChanged -= WatcherOnPlayerChanged;
             _ipcManager.PenumbraRedrawEvent -= IpcManagerOnPenumbraRedrawEvent;
             _apiController.CharacterReceived -= ApiControllerOnCharacterReceived;
             PlayerName = string.Empty;
@@ -191,8 +188,8 @@ public class CachedPlayer
         PlayerName = character.Name.ToString();
         PlayerCharacter = character;
         Logger.Debug("Initializing Player " + this);
-        _watcher.AddPlayerToWatch(PlayerName!);
-        _watcher.PlayerChanged += WatcherOnPlayerChanged;
+        _dalamudUtil.AddPlayerToWatch(PlayerName!);
+        _dalamudUtil.PlayerChanged += WatcherOnPlayerChanged;
         _ipcManager.PenumbraRedrawEvent += IpcManagerOnPenumbraRedrawEvent;
         _apiController.CharacterReceived += ApiControllerOnCharacterReceived;
         _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerName);
@@ -203,15 +200,15 @@ public class CachedPlayer
         return PlayerNameHash + ":" + PlayerName + ":HasChar " + (PlayerCharacter != null);
     }
 
-    private Task? penumbraRedrawEventTask;
+    private Task? _penumbraRedrawEventTask;
 
     private void IpcManagerOnPenumbraRedrawEvent(object? sender, EventArgs e)
     {
         var player = _dalamudUtil.GetPlayerCharacterFromObjectTableIndex((int)sender!);
         if (player == null || player.Name.ToString() != PlayerName) return;
-        if (!penumbraRedrawEventTask?.IsCompleted ?? false) return;
+        if (!_penumbraRedrawEventTask?.IsCompleted ?? false) return;
 
-        penumbraRedrawEventTask = Task.Run(() =>
+        _penumbraRedrawEventTask = Task.Run(() =>
         {
             PlayerCharacter = player;
             _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerCharacter.Address);

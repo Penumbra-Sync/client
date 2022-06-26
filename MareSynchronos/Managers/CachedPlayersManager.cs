@@ -4,12 +4,9 @@ using System.Linq;
 using System.Threading.Tasks;
 using Dalamud.Game;
 using Dalamud.Game.ClientState;
-using Dalamud.Game.ClientState.Objects;
-using Dalamud.Game.ClientState.Objects.SubKinds;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using Penumbra.PlayerWatch;
 
 namespace MareSynchronos.Managers;
 
@@ -20,23 +17,20 @@ public class CachedPlayersManager : IDisposable
     private readonly DalamudUtil _dalamudUtil;
     private readonly Framework _framework;
     private readonly IpcManager _ipcManager;
-    private readonly IPlayerWatcher _watcher;
-    private readonly ObjectTable _objectTable;
     private readonly List<CachedPlayer> _onlineCachedPlayers = new();
     private readonly List<string> _localVisiblePlayers = new();
     private DateTime _lastPlayerObjectCheck = DateTime.Now;
 
-    public CachedPlayersManager(ClientState clientState, Framework framework, ObjectTable objectTable, ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager, IPlayerWatcher watcher)
+    public CachedPlayersManager(ClientState clientState, Framework framework,
+        ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager)
     {
         Logger.Debug("Creating " + nameof(CachedPlayersManager));
 
         _clientState = clientState;
         _framework = framework;
-        _objectTable = objectTable;
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
         _ipcManager = ipcManager;
-        _watcher = watcher;
 
         _clientState.Login += ClientStateOnLogin;
         _clientState.Logout += ClientStateOnLogout;
@@ -53,7 +47,7 @@ public class CachedPlayersManager : IDisposable
             ClientStateOnLogin(null, EventArgs.Empty);
         }
     }
-
+    
     private void IpcManagerOnPenumbraDisposed(object? sender, EventArgs e)
     {
         _onlineCachedPlayers.ForEach(p => p.DisposePlayer());
@@ -159,14 +153,10 @@ public class CachedPlayersManager : IDisposable
         if (DateTime.Now < _lastPlayerObjectCheck.AddSeconds(0.25)) return;
 
         _localVisiblePlayers.Clear();
-        string ownName = _dalamudUtil.PlayerName;
-        var playerCharacters = _objectTable.Where(obj =>
-            obj.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player &&
-            obj.Name.ToString() != ownName).ToList();
-        foreach (var obj in playerCharacters)
+        var playerCharacters = _dalamudUtil.GetPlayerCharacters();
+        foreach (var pChar in playerCharacters)
         {
-            var pObj = (PlayerCharacter)obj;
-            var pObjName = pObj.Name.ToString();
+            var pObjName = pChar.Name.ToString();
             _localVisiblePlayers.Add(pObjName);
             var existingCachedPlayer = _onlineCachedPlayers.SingleOrDefault(p => p.PlayerName == pObjName);
             if (existingCachedPlayer != null)
@@ -175,8 +165,8 @@ public class CachedPlayersManager : IDisposable
                 continue;
             }
 
-            var hashedName = Crypto.GetHash256(pObj.Name.ToString() + pObj.HomeWorld.Id.ToString());
-            _onlineCachedPlayers.SingleOrDefault(p => p.PlayerNameHash == hashedName)?.InitializePlayer(pObj);
+            var hashedName = Crypto.GetHash256(pChar);
+            _onlineCachedPlayers.SingleOrDefault(p => p.PlayerNameHash == hashedName)?.InitializePlayer(pChar);
         }
 
         _onlineCachedPlayers.Where(p => !string.IsNullOrEmpty(p.PlayerName) && !_localVisiblePlayers.Contains(p.PlayerName))
@@ -191,6 +181,6 @@ public class CachedPlayersManager : IDisposable
 
     private CachedPlayer CreateCachedPlayer(string hashedName)
     {
-        return new CachedPlayer(hashedName, _ipcManager, _apiController, _dalamudUtil, _watcher);
+        return new CachedPlayer(hashedName, _ipcManager, _apiController, _dalamudUtil);
     }
 }

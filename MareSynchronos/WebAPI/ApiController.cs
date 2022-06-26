@@ -16,17 +16,28 @@ using Microsoft.AspNetCore.SignalR.Client;
 
 namespace MareSynchronos.WebAPI
 {
-    public class ApiController : IDisposable
+    public partial class ApiController : IDisposable
     {
-        public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
-
+#if DEBUG
+        public const string MainServer = "darkarchons Debug Server (Dev Server (CH))";
         public const string MainServiceUri = "https://darkarchon.internet-box.ch:5001";
-        readonly CancellationTokenSource _cts;
+#else
+        public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
+        public const string MainServiceUri = "to be defined";
+#endif
+
         private readonly Configuration _pluginConfiguration;
+
+        private CancellationTokenSource _cts;
+
         private HubConnection? _fileHub;
+
         private HubConnection? _heartbeatHub;
+
         private CancellationTokenSource? _uploadCancellationTokenSource;
+
         private HubConnection? _userHub;
+
         public ApiController(Configuration pluginConfiguration)
         {
             Logger.Debug("Creating " + nameof(ApiController));
@@ -34,8 +45,10 @@ namespace MareSynchronos.WebAPI
             _pluginConfiguration = pluginConfiguration;
             _cts = new CancellationTokenSource();
 
-            _ = Heartbeat();
+            Task.Run(CreateConnections);
         }
+
+        public event EventHandler? ChangingServers;
 
         public event EventHandler<CharacterReceivedEventArgs>? CharacterReceived;
 
@@ -50,30 +63,165 @@ namespace MareSynchronos.WebAPI
         public event EventHandler? PairedWithOther;
 
         public event EventHandler? UnpairedFromOther;
-        public event EventHandler? AccountDeleted;
 
         public ConcurrentDictionary<string, (long, long)> CurrentDownloads { get; } = new();
+
         public ConcurrentDictionary<string, (long, long)> CurrentUploads { get; } = new();
+
         public bool IsConnected => !string.IsNullOrEmpty(UID);
+
         public bool IsDownloading { get; private set; }
+
         public bool IsUploading { get; private set; }
+
         public List<ClientPairDto> PairedClients { get; set; } = new();
+
         public string SecretKey => _pluginConfiguration.ClientSecret.ContainsKey(ApiUri) ? _pluginConfiguration.ClientSecret[ApiUri] : "-";
+
         public bool ServerAlive =>
             (_heartbeatHub?.State ?? HubConnectionState.Disconnected) == HubConnectionState.Connected;
 
+        public Dictionary<string, string> ServerDictionary => new Dictionary<string, string>() { { MainServiceUri, MainServer } }
+            .Concat(_pluginConfiguration.CustomServerList)
+            .ToDictionary(k => k.Key, k => k.Value);
         public string UID { get; private set; } = string.Empty;
-        public bool UseCustomService
+
+        private string ApiUri => _pluginConfiguration.ApiUri;
+
+        public async Task CreateConnections()
         {
-            get => _pluginConfiguration.UseCustomService;
-            set
+            _cts = new CancellationTokenSource();
+            var token = _cts.Token;
+            await StopAllConnections(token);
+
+            while (!ServerAlive && !token.IsCancellationRequested)
             {
-                _pluginConfiguration.UseCustomService = value;
-                _pluginConfiguration.Save();
+                await StopAllConnections(token);
+
+                try
+                {
+                    Logger.Debug("Building connection");
+                    _heartbeatHub = BuildHubConnection("heartbeat");
+                    _userHub = BuildHubConnection("user");
+                    _fileHub = BuildHubConnection("files");
+
+                    await _heartbeatHub.StartAsync(token);
+                    await _userHub.StartAsync(token);
+                    await _fileHub.StartAsync(token);
+
+                    if (_pluginConfiguration.FullPause)
+                    {
+                        UID = string.Empty;
+                        return;
+                    }
+                    UID = await _heartbeatHub.InvokeAsync<string>("Heartbeat", token);
+                    if (!string.IsNullOrEmpty(UID) && !token.IsCancellationRequested) // user is authorized
+                    {
+                        Logger.Debug("Initializing data");
+                        _userHub.On<ClientPairDto, string>("UpdateClientPairs", UpdateLocalClientPairs);
+                        _userHub.On<CharacterCacheDto, string>("ReceiveCharacterData", ReceiveCharacterData);
+                        _userHub.On<string>("RemoveOnlinePairedPlayer",
+                            (s) => PairedClientOffline?.Invoke(s, EventArgs.Empty));
+                        _userHub.On<string>("AddOnlinePairedPlayer",
+                            (s) => PairedClientOnline?.Invoke(s, EventArgs.Empty));
+
+                        PairedClients = await _userHub!.InvokeAsync<List<ClientPairDto>>("GetPairedClients", token);
+
+                        _heartbeatHub.Closed += HeartbeatHubOnClosed;
+                        _heartbeatHub.Reconnected += HeartbeatHubOnReconnected;
+                        _heartbeatHub.Reconnecting += HeartbeatHubOnReconnecting;
+                        Connected?.Invoke(this, EventArgs.Empty);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex.Message);
+                    Logger.Warn(ex.StackTrace);
+                    Logger.Debug("Failed to establish connection, retrying");
+                    await Task.Delay(TimeSpan.FromSeconds(5), token);
+                }
             }
         }
 
-        private string ApiUri => UseCustomService ? _pluginConfiguration.ApiUri : MainServiceUri;
+        public void Dispose()
+        {
+            Logger.Debug("Disposing " + nameof(ApiController));
+
+            Task.Run(async () => await StopAllConnections(_cts.Token));
+            _cts?.Cancel();
+        }
+
+        private HubConnection BuildHubConnection(string hubName)
+        {
+            return new HubConnectionBuilder()
+                .WithUrl(ApiUri + "/" + hubName, options =>
+                {
+                    if (!string.IsNullOrEmpty(SecretKey) && !_pluginConfiguration.FullPause)
+                    {
+                        options.Headers.Add("Authorization", SecretKey);
+                    }
+#if DEBUG
+                    options.HttpMessageHandlerFactory = (message) =>
+                    {
+                        if (message is HttpClientHandler clientHandler)
+                            clientHandler.ServerCertificateCustomValidationCallback +=
+                                (sender, certificate, chain, sslPolicyErrors) => true;
+                        return message;
+                    };
+#endif
+                })
+                .WithAutomaticReconnect(new ForeverRetryPolicy())
+                .Build();
+        }
+
+        private Task HeartbeatHubOnClosed(Exception? arg)
+        {
+            Logger.Debug("Connection closed");
+            Disconnected?.Invoke(null, EventArgs.Empty);
+            return Task.CompletedTask;
+        }
+
+        private Task HeartbeatHubOnReconnected(string? arg)
+        {
+            Logger.Debug("Connection restored");
+            Connected?.Invoke(this, EventArgs.Empty);
+            return Task.CompletedTask;
+        }
+
+        private Task HeartbeatHubOnReconnecting(Exception? arg)
+        {
+            Logger.Debug("Connection closed... Reconnecting…");
+            Disconnected?.Invoke(null, EventArgs.Empty);
+            return Task.CompletedTask;
+        }
+
+        private async Task StopAllConnections(CancellationToken token)
+        {
+            if (_heartbeatHub is { State: HubConnectionState.Connected })
+            {
+                await _heartbeatHub.StopAsync(token);
+                _heartbeatHub.Closed -= HeartbeatHubOnClosed;
+                _heartbeatHub.Reconnected -= HeartbeatHubOnReconnected;
+                _heartbeatHub.Reconnecting += HeartbeatHubOnReconnecting;
+                await _heartbeatHub.DisposeAsync();
+            }
+
+            if (_fileHub is { State: HubConnectionState.Connected })
+            {
+                await _fileHub.StopAsync(token);
+                await _fileHub.DisposeAsync();
+            }
+
+            if (_userHub is { State: HubConnectionState.Connected })
+            {
+                await _userHub.StopAsync(token);
+                await _userHub.DisposeAsync();
+            }
+        }
+    }
+
+    public partial class ApiController
+    {
         public void CancelUpload()
         {
             if (_uploadCancellationTokenSource != null)
@@ -84,12 +232,17 @@ namespace MareSynchronos.WebAPI
             }
         }
 
-        public void Dispose()
+        public async Task DeleteAccount()
         {
-            Logger.Debug("Disposing " + nameof(ApiController));
+            _pluginConfiguration.ClientSecret.Remove(ApiUri);
+            await _fileHub!.SendAsync("DeleteAllFiles");
+            await _userHub!.SendAsync("DeleteAccount");
+            await CreateConnections();
+        }
 
-            _cts?.Cancel();
-            _ = DisposeHubConnections();
+        public async Task DeleteAllMyFiles()
+        {
+            await _fileHub!.SendAsync("DeleteAllFiles");
         }
 
         public async Task<string> DownloadFile(string hash, CancellationToken ct)
@@ -167,41 +320,6 @@ namespace MareSynchronos.WebAPI
                 hashedCharacterNames);
         }
 
-        public async Task Heartbeat()
-        {
-            while (!ServerAlive && !_cts.Token.IsCancellationRequested)
-            {
-                try
-                {
-                    if (_pluginConfiguration.FullPause) return;
-                    Logger.Debug("Attempting to establish heartbeat connection to " + ApiUri);
-                    _heartbeatHub = BuildHubConnection("heartbeat");
-
-                    await _heartbeatHub.StartAsync(_cts.Token);
-                    UID = await _heartbeatHub!.InvokeAsync<string>("Heartbeat");
-                    Logger.Debug("Heartbeat started: " + ApiUri);
-                    try
-                    {
-                        await InitializeHubConnections();
-                        await LoadInitialData();
-                        Connected?.Invoke(this, EventArgs.Empty);
-                    }
-                    catch
-                    {
-                        //PluginLog.Error(ex, "Error during Heartbeat initialization");
-                    }
-
-                    _heartbeatHub.Closed += OnHeartbeatHubOnClosed;
-                    _heartbeatHub.Reconnected += OnHeartbeatHubOnReconnected;
-                    Logger.Debug("Heartbeat established to: " + ApiUri);
-                }
-                catch (Exception ex)
-                {
-                    PluginLog.Error(ex, "Creating heartbeat failure");
-                }
-            }
-        }
-
         public Task ReceiveCharacterData(CharacterCacheDto character, string characterHash)
         {
             Logger.Debug("Received DTO for " + characterHash);
@@ -216,29 +334,9 @@ namespace MareSynchronos.WebAPI
             var response = await _userHub!.InvokeAsync<string>("Register");
             _pluginConfiguration.ClientSecret[ApiUri] = response;
             _pluginConfiguration.Save();
-            RestartHeartbeat();
+            ChangingServers?.Invoke(null, EventArgs.Empty);
+            await CreateConnections();
         }
-
-        public void RestartHeartbeat()
-        {
-            Logger.Debug("Restarting heartbeat");
-
-            Task.Run(async () =>
-            {
-                if (_heartbeatHub != null)
-                {
-                    _heartbeatHub.Closed -= OnHeartbeatHubOnClosed;
-                    _heartbeatHub.Reconnected -= OnHeartbeatHubOnReconnected;
-                    await _heartbeatHub.StopAsync(_cts.Token);
-                    await _heartbeatHub.DisposeAsync();
-                    await OnHeartbeatHubOnClosed(null);
-                    _heartbeatHub = null!;
-                }
-
-                _ = Heartbeat();
-            });
-        }
-
         public async Task SendCharacterData(CharacterCacheDto character, List<string> visibleCharacterIds)
         {
             if (!IsConnected || SecretKey == "-") return;
@@ -323,40 +421,6 @@ namespace MareSynchronos.WebAPI
             await _userHub!.SendAsync("SendPairedClientRemoval", uid);
         }
 
-        public async Task DeleteAllMyFiles()
-        {
-            await _fileHub!.SendAsync("DeleteAllFiles");
-        }
-
-        public async Task DeleteAccount()
-        {
-            _pluginConfiguration.ClientSecret.Remove(ApiUri);
-            await _fileHub!.SendAsync("DeleteAllFiles");
-            await _userHub!.SendAsync("DeleteAccount");
-            _ = OnHeartbeatHubOnClosed(null);
-            AccountDeleted?.Invoke(null, EventArgs.Empty);
-        }
-
-        private async Task DisposeHubConnections()
-        {
-            if (_fileHub != null)
-            {
-                Logger.Debug("Disposing File Hub");
-                CancelUpload();
-                await _fileHub!.StopAsync();
-                await _fileHub!.DisposeAsync();
-                _fileHub = null;
-            }
-
-            if (_userHub != null)
-            {
-                Logger.Debug("Disposing User Hub");
-                await _userHub.StopAsync();
-                await _userHub.DisposeAsync();
-                _userHub = null;
-            }
-        }
-
         private async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)
         {
             await using var db = new FileCacheContext();
@@ -364,67 +428,6 @@ namespace MareSynchronos.WebAPI
             return (fileHash, LZ4Codec.WrapHC(await File.ReadAllBytesAsync(fileCache.Filepath, uploadToken), 0,
                 (int)new FileInfo(fileCache.Filepath).Length));
         }
-
-        private async Task InitializeHubConnections()
-        {
-            await DisposeHubConnections();
-
-            Logger.Debug("Creating User Hub");
-            _userHub = BuildHubConnection("user");
-            await _userHub.StartAsync();
-            _userHub.On<ClientPairDto, string>("UpdateClientPairs", UpdateLocalClientPairs);
-            _userHub.On<CharacterCacheDto, string>("ReceiveCharacterData", ReceiveCharacterData);
-            _userHub.On<string>("RemoveOnlinePairedPlayer", (s) => PairedClientOffline?.Invoke(s, EventArgs.Empty));
-            _userHub.On<string>("AddOnlinePairedPlayer", (s) => PairedClientOnline?.Invoke(s, EventArgs.Empty));
-
-            Logger.Debug("Creating File Hub");
-            _fileHub = BuildHubConnection("files");
-            await _fileHub.StartAsync(_cts.Token);
-        }
-
-        private HubConnection BuildHubConnection(string hubName)
-        {
-            return new HubConnectionBuilder()
-                .WithUrl(ApiUri + "/" + hubName, options =>
-                {
-                    if (!string.IsNullOrEmpty(SecretKey) && !_pluginConfiguration.FullPause)
-                    {
-                        options.Headers.Add("Authorization", SecretKey);
-                    }
-#if DEBUG
-                    options.HttpMessageHandlerFactory = (message) =>
-                    {
-                        if (message is HttpClientHandler clientHandler)
-                            clientHandler.ServerCertificateCustomValidationCallback +=
-                                (sender, certificate, chain, sslPolicyErrors) => true;
-                        return message;
-                    };
-#endif
-                })
-                .Build();
-        }
-
-        private async Task LoadInitialData()
-        {
-            var pairedClients = await _userHub!.InvokeAsync<List<ClientPairDto>>("GetPairedClients");
-            PairedClients = pairedClients.ToList();
-        }
-
-        private Task OnHeartbeatHubOnClosed(Exception? exception)
-        {
-            Logger.Debug("Connection closed: " + ApiUri);
-            Disconnected?.Invoke(null, EventArgs.Empty);
-            Task.Run(DisposeHubConnections);
-            RestartHeartbeat();
-            return Task.CompletedTask;
-        }
-
-        private async Task OnHeartbeatHubOnReconnected(string? s)
-        {
-            Logger.Debug("Reconnected: " + ApiUri);
-            UID = await _heartbeatHub!.InvokeAsync<string>("Heartbeat");
-        }
-
         private void UpdateLocalClientPairs(ClientPairDto dto, string characterIdentifier)
         {
             var entry = PairedClients.SingleOrDefault(e => e.OtherUID == dto.OtherUID);
@@ -491,5 +494,13 @@ namespace MareSynchronos.WebAPI
 
         public CharacterCacheDto CharacterData { get; set; }
         public string CharacterNameHash { get; set; }
+    }
+
+    public class ForeverRetryPolicy : IRetryPolicy
+    {
+        public TimeSpan? NextRetryDelay(RetryContext retryContext)
+        {
+            return TimeSpan.FromSeconds(5);
+        }
     }
 }
