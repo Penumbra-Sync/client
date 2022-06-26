@@ -21,7 +21,7 @@ namespace MareSynchronos.Utils
 
         public bool IsPlayerPresent => _clientState.LocalPlayer != null;
 
-        public string PlayerName => _clientState.LocalPlayer!.Name.ToString();
+        public string PlayerName => _clientState.LocalPlayer?.Name.ToString() ?? "--";
 
         public int PlayerJobId => (int)_clientState.LocalPlayer!.ClassJob.Id;
 
@@ -47,6 +47,24 @@ namespace MareSynchronos.Utils
             }
 
             return allLocalPlayers;
+        }
+
+        public PlayerCharacter? GetPlayerCharacterFromObjectTableIndex(int index)
+        {
+            var objTableObj = _objectTable[index];
+            if (objTableObj!.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) return null;
+            return (PlayerCharacter)objTableObj;
+        }
+
+        public PlayerCharacter? GetPlayerCharacterFromObjectTableByName(string characterName)
+        {
+            foreach (var item in _objectTable)
+            {
+                if (item.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) continue;
+                if (item.Name.ToString() == characterName) return (PlayerCharacter)item;
+            }
+
+            return null;
         }
 
         public unsafe void WaitWhileCharacterIsDrawing(IntPtr characterAddress)

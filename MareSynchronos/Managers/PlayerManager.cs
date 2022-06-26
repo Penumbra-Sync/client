@@ -14,10 +14,10 @@ using System.Threading.Tasks;
 
 namespace MareSynchronos.Managers
 {
-    public class CharacterManager : IDisposable
+    public class PlayerManager : IDisposable
     {
         private readonly ApiController _apiController;
-        private readonly CharacterCacheManager _characterCacheManager;
+        private readonly CachedPlayersManager _cachedPlayersManager;
         private readonly CharacterDataFactory _characterDataFactory;
         private readonly DalamudUtil _dalamudUtil;
         private readonly IpcManager _ipcManager;
@@ -26,23 +26,23 @@ namespace MareSynchronos.Managers
         private string _lastSentHash = string.Empty;
         private Task? _playerChangedTask;
 
-        public CharacterManager(ApiController apiController, ObjectTable objectTable, IpcManager ipcManager,
-            CharacterDataFactory characterDataFactory, CharacterCacheManager characterCacheManager, DalamudUtil dalamudUtil, IPlayerWatcher watcher)
+        public PlayerManager(ApiController apiController, ObjectTable objectTable, IpcManager ipcManager,
+            CharacterDataFactory characterDataFactory, CachedPlayersManager cachedPlayersManager, DalamudUtil dalamudUtil, IPlayerWatcher watcher)
         {
-            Logger.Debug("Creating " + nameof(CharacterManager));
+            Logger.Debug("Creating " + nameof(PlayerManager));
 
             _apiController = apiController;
             _objectTable = objectTable;
             _ipcManager = ipcManager;
             _characterDataFactory = characterDataFactory;
-            _characterCacheManager = characterCacheManager;
+            _cachedPlayersManager = cachedPlayersManager;
             _dalamudUtil = dalamudUtil;
             _watcher = watcher;
         }
 
         public void Dispose()
         {
-            Logger.Debug("Disposing " + nameof(CharacterManager));
+            Logger.Debug("Disposing " + nameof(PlayerManager));
 
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
             _apiController.Connected -= ApiController_Connected;
@@ -73,7 +73,7 @@ namespace MareSynchronos.Managers
 
             Task.WaitAll(apiTask);
 
-            _characterCacheManager.AddInitialPairs(apiTask.Result);
+            _cachedPlayersManager.AddInitialPairs(apiTask.Result);
 
             _ipcManager.PenumbraRedrawEvent += IpcManager_PenumbraRedrawEvent;
         }

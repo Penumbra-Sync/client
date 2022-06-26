@@ -31,9 +31,9 @@ namespace MareSynchronos
         private readonly DalamudPluginInterface _pluginInterface;
         private readonly PluginUi _pluginUi;
         private readonly WindowSystem _windowSystem;
-        private CharacterManager? _characterManager;
+        private PlayerManager? _characterManager;
         private readonly DalamudUtil _dalamudUtil;
-        private CharacterCacheManager? _characterCacheManager;
+        private CachedPlayersManager? _characterCacheManager;
         private readonly IPlayerWatcher _playerWatcher;
         private readonly DownloadUi _downloadUi;
 
@@ -162,9 +162,9 @@ namespace MareSynchronos
                 {
                     var characterCacheFactory =
                         new CharacterDataFactory(_dalamudUtil, _ipcManager);
-                    _characterCacheManager = new CharacterCacheManager(_clientState, _framework, _objectTable,
+                    _characterCacheManager = new CachedPlayersManager(_clientState, _framework, _objectTable,
                         _apiController, _dalamudUtil, _ipcManager, _playerWatcher);
-                    _characterManager = new CharacterManager(_apiController, _objectTable, _ipcManager,
+                    _characterManager = new PlayerManager(_apiController, _objectTable, _ipcManager,
                         characterCacheFactory, _characterCacheManager, _dalamudUtil, _playerWatcher);
                     _characterManager.StartWatchingPlayer();
                 }
