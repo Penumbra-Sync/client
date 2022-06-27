@@ -40,6 +40,7 @@ public class CachedPlayersManager : IDisposable
         _apiController.PairedWithOther += ApiControllerOnPairedWithOther;
         _apiController.UnpairedFromOther += ApiControllerOnUnpairedFromOther;
         _apiController.Disconnected += ApiControllerOnDisconnected;
+
         _ipcManager.PenumbraDisposed += IpcManagerOnPenumbraDisposed;
 
         if (clientState.IsLoggedIn)
@@ -85,8 +86,12 @@ public class CachedPlayersManager : IDisposable
         _apiController.PairedClientOffline -= ApiControllerOnPairedClientOffline;
         _apiController.PairedWithOther -= ApiControllerOnPairedWithOther;
         _apiController.UnpairedFromOther -= ApiControllerOnUnpairedFromOther;
+        _apiController.Disconnected -= ApiControllerOnDisconnected;
+
         _ipcManager.PenumbraDisposed -= ApiControllerOnDisconnected;
+
         _framework.Update -= FrameworkOnUpdate;
+
         _clientState.Login -= ClientStateOnLogin;
         _clientState.Logout -= ClientStateOnLogout;
     }

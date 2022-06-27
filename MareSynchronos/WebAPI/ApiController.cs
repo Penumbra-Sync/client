@@ -6,7 +6,6 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 using LZ4;
 using MareSynchronos.API;
@@ -347,25 +346,18 @@ namespace MareSynchronos.WebAPI
             IsUploading = true;
 
             Logger.Debug("Compressing files");
-            Dictionary<string, byte[]> compressedFileData = new();
             foreach (var file in filesToUpload)
             {
                 Logger.Debug(file);
                 var data = await GetCompressedFileData(file, uploadToken);
-                compressedFileData.Add(data.Item1, data.Item2);
                 CurrentUploads[data.Item1] = (0, data.Item2.Length);
+                _ = UploadFile(data.Item2, file, uploadToken);
+                if (!uploadToken.IsCancellationRequested) continue;
+                PluginLog.Warning("Cancel in filesToUpload loop detected");
+                CurrentUploads.Clear();
+                break;
             }
-            Logger.Debug("Files compressed, uploading files");
-            foreach (var data in compressedFileData)
-            {
-                await UploadFile(data.Value, data.Key, uploadToken);
-                if (uploadToken.IsCancellationRequested)
-                {
-                    PluginLog.Warning("Cancel in filesToUpload loop detected");
-                    CurrentUploads.Clear();
-                    break;
-                }
-            }
+
             Logger.Debug("Upload tasks complete, waiting for server to confirm");
             var anyUploadsOpen = await _fileHub!.InvokeAsync<bool>("IsUploadFinished", uploadToken);
             Logger.Debug("Uploads open: " + anyUploadsOpen);
@@ -423,6 +415,7 @@ namespace MareSynchronos.WebAPI
             return (fileHash, LZ4Codec.WrapHC(await File.ReadAllBytesAsync(fileCache.Filepath, uploadToken), 0,
                 (int)new FileInfo(fileCache.Filepath).Length));
         }
+
         private void UpdateLocalClientPairs(ClientPairDto dto, string characterIdentifier)
         {
             var entry = PairedClients.SingleOrDefault(e => e.OtherUID == dto.OtherUID);
@@ -457,25 +450,22 @@ namespace MareSynchronos.WebAPI
         private async Task UploadFile(byte[] compressedFile, string fileHash, CancellationToken uploadToken)
         {
             if (uploadToken.IsCancellationRequested) return;
-            var chunkSize = 1024 * 512; // 512kb
-            var chunks = (int)Math.Ceiling(compressedFile.Length / (double)chunkSize);
-            var channel = Channel.CreateBounded<byte[]>(new BoundedChannelOptions(chunkSize)
+
+            async IAsyncEnumerable<byte[]> AsyncFileData()
             {
-                FullMode = BoundedChannelFullMode.Wait,
-                AllowSynchronousContinuations = true,
-                SingleReader = true,
-                SingleWriter = true
-            });
-            await _fileHub!.SendAsync("UploadFile", fileHash, channel.Reader, uploadToken);
-            for (var i = 0; i < chunks; i++)
-            {
-                var uploadChunk = compressedFile.Skip(i * chunkSize).Take(chunkSize).ToArray();
-                channel.Writer.TryWrite(uploadChunk);
-                CurrentUploads[fileHash] = (CurrentUploads[fileHash].Item1 + uploadChunk.Length, CurrentUploads[fileHash].Item2);
-                if (uploadToken.IsCancellationRequested) break;
+                var chunkSize = 1024 * 512; // 512kb
+                using var ms = new MemoryStream(compressedFile);
+                var buffer = new byte[chunkSize];
+                int bytesRead;
+                while ((bytesRead = await ms.ReadAsync(buffer, 0, chunkSize, uploadToken)) > 0)
+                {
+                    CurrentUploads[fileHash] = (CurrentUploads[fileHash].Item1 + bytesRead, CurrentUploads[fileHash].Item2);
+                    uploadToken.ThrowIfCancellationRequested();
+                    yield return bytesRead == chunkSize ? buffer.ToArray() : buffer.Take(bytesRead).ToArray();
+                }
             }
 
-            channel.Writer.Complete();
+            await _fileHub!.SendAsync("UploadFileStreamAsync", fileHash, AsyncFileData(), uploadToken);
         }
     }
 

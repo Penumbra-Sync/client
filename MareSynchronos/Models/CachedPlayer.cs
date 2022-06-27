@@ -169,8 +169,6 @@ public class CachedPlayer
                 _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerName);
                 _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerName);
             }
-
-            IsVisible = false;
         }
         catch (Exception ex)
         {
@@ -183,6 +181,7 @@ public class CachedPlayer
             _apiController.CharacterReceived -= ApiControllerOnCharacterReceived;
             PlayerName = string.Empty;
             PlayerCharacter = null;
+            IsVisible = false;
         }
     }
 

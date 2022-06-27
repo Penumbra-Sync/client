@@ -49,9 +49,11 @@ namespace MareSynchronos.Managers
         {
             Logger.Debug("Disposing " + nameof(PlayerManager));
 
-            _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
+            _dalamudUtil.RemovePlayerFromWatch(_dalamudUtil.PlayerName);
             _apiController.Connected -= ApiController_Connected;
             _apiController.Disconnected -= ApiController_Disconnected;
+
+            _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
             _dalamudUtil.PlayerChanged -= Watcher_PlayerChanged;
         }
 
