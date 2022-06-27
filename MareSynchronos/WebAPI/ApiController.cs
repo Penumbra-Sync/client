@@ -247,19 +247,14 @@ namespace MareSynchronos.WebAPI
 
         public async Task<string> DownloadFile(string hash, CancellationToken ct)
         {
-            var reader = await _fileHub!.StreamAsChannelAsync<byte[]>("DownloadFile", hash, ct);
-            int i = 0;
+            var reader = _fileHub!.StreamAsync<byte[]>("DownloadFileAsync", hash, ct);
             string fileName = Path.GetTempFileName();
             await using var fs = File.OpenWrite(fileName);
-            while (await reader.WaitToReadAsync(ct) && !ct.IsCancellationRequested)
+            await foreach (var data in reader.WithCancellation(ct))
             {
-                while (reader.TryRead(out var data) && !ct.IsCancellationRequested)
-                {
-                    CurrentDownloads[hash] = (CurrentDownloads[hash].Item1 + data.Length, CurrentDownloads[hash].Item2);
-                    await fs.WriteAsync(data, ct);
-                }
+                CurrentDownloads[hash] = (CurrentDownloads[hash].Item1 + data.Length, CurrentDownloads[hash].Item2);
+                await fs.WriteAsync(data, ct);
             }
-
             return fileName;
         }
 

@@ -100,24 +100,25 @@ namespace MareSynchronos.Utils
             return null;
         }
 
-        public unsafe void WaitWhileCharacterIsDrawing(IntPtr characterAddress)
+        public unsafe void WaitWhileCharacterIsDrawing(IntPtr characterAddress, CancellationToken? ct = null)
         {
             if (!_clientState.IsLoggedIn) return;
 
             var obj = (GameObject*)characterAddress;
 
             // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
-            while ((obj->RenderFlags & 0b100000000000) == 0b100000000000) // 0b100000000000 is "still rendering" or something
+            while ((obj->RenderFlags & 0b100000000000) == 0b100000000000 && (!ct?.IsCancellationRequested ?? true)) // 0b100000000000 is "still rendering" or something
             {
                 Logger.Debug("Waiting for character to finish drawing");
                 Thread.Sleep(1000);
             }
 
+            if (ct?.IsCancellationRequested ?? false) return;
             // wait half a second just in case
             Thread.Sleep(500);
         }
 
-        public void WaitWhileSelfIsDrawing() => WaitWhileCharacterIsDrawing(_clientState.LocalPlayer?.Address ?? new IntPtr());
+        public void WaitWhileSelfIsDrawing(CancellationToken token) => WaitWhileCharacterIsDrawing(_clientState.LocalPlayer?.Address ?? new IntPtr(), token);
 
         public void Dispose()
         {

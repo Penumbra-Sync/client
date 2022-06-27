@@ -50,7 +50,7 @@ public class DownloadUi : Window, IDisposable
 
         var basePosition = ImGui.GetWindowPos() + ImGui.GetWindowContentRegionMin();
 
-        if (_apiController.IsUploading)
+        if (_apiController.CurrentUploads.Any())
         {
             var doneUploads = _apiController.CurrentUploads.Count(c => c.Value.Item1 == c.Value.Item2);
             var totalUploads = _apiController.CurrentUploads.Keys.Count;
@@ -67,9 +67,9 @@ public class DownloadUi : Window, IDisposable
                 UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
         }
 
-        if (_apiController.IsDownloading)
+        if (_apiController.CurrentDownloads.Any())
         {
-            var multBase = _apiController.IsDownloading ? 0 : 2;
+            var multBase = _apiController.CurrentUploads.Any() ? 0 : 2;
             var doneDownloads = _apiController.CurrentDownloads.Count(c => c.Value.Item1 == c.Value.Item2);
             var totalDownloads = _apiController.CurrentDownloads.Keys.Count;
             var totalDownloaded = _apiController.CurrentDownloads.Sum(c => c.Value.Item1);

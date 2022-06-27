@@ -21,6 +21,7 @@ namespace MareSynchronos.Managers
         private readonly IpcManager _ipcManager;
         private string _lastSentHash = string.Empty;
         private Task? _playerChangedTask;
+        private CancellationTokenSource? _playerChangedCts;
 
         public PlayerManager(ApiController apiController, IpcManager ipcManager,
             CharacterDataFactory characterDataFactory, CachedPlayersManager cachedPlayersManager, DalamudUtil dalamudUtil)
@@ -77,21 +78,23 @@ namespace MareSynchronos.Managers
             _dalamudUtil.PlayerChanged -= Watcher_PlayerChanged;
         }
 
-        private async Task<CharacterData> CreateFullCharacterCache()
+        private async Task<CharacterData> CreateFullCharacterCache(CancellationToken token)
         {
             var cache = _characterDataFactory.BuildCharacterData();
 
             await Task.Run(async () =>
             {
-                while (!cache.IsReady)
+                while (!cache.IsReady && !token.IsCancellationRequested)
                 {
-                    await Task.Delay(50);
+                    await Task.Delay(50, token);
                 }
+
+                if (token.IsCancellationRequested) return;
 
                 var json = JsonConvert.SerializeObject(cache, Formatting.Indented);
 
                 cache.CacheHash = Crypto.GetHash(json);
-            });
+            }, token);
 
             return cache;
         }
@@ -108,11 +111,14 @@ namespace MareSynchronos.Managers
         {
             //if (sender == null) return;
             Logger.Debug("Player changed: " + name);
+            _playerChangedCts?.Cancel();
+            _playerChangedCts = new CancellationTokenSource();
+            var token = _playerChangedCts.Token;/*
             if (_playerChangedTask is { IsCompleted: false })
             {
                 PluginLog.Warning("PlayerChanged Task still running");
                 return;
-            }
+            }*/
 
             if (!_ipcManager.Initialized)
             {
@@ -123,23 +129,30 @@ namespace MareSynchronos.Managers
             _playerChangedTask = Task.Run(async () =>
             {
                 int attempts = 0;
-                while (!_apiController.IsConnected && attempts < 10)
+                while (!_apiController.IsConnected && attempts < 10 && !token.IsCancellationRequested)
                 {
                     Logger.Warn("No connection to the API");
-                    await Task.Delay(TimeSpan.FromSeconds(1));
+                    await Task.Delay(TimeSpan.FromSeconds(1), token);
                     attempts++;
                 }
 
-                if (attempts == 10) return;
+                if (attempts == 10 || token.IsCancellationRequested) return;
 
                 Stopwatch st = Stopwatch.StartNew();
-                _dalamudUtil.WaitWhileSelfIsDrawing();
+                _dalamudUtil.WaitWhileSelfIsDrawing(token);
 
-                var characterCacheTask = await CreateFullCharacterCache();
+                var characterCacheTask = await CreateFullCharacterCache(token);
+
+                if (token.IsCancellationRequested) return;
 
                 var cacheDto = characterCacheTask.ToCharacterCacheDto();
-
                 st.Stop();
+
+                if (token.IsCancellationRequested)
+                {
+                    return;
+                }
+
                 Logger.Debug("Elapsed time PlayerChangedTask: " + st.Elapsed);
                 if (cacheDto.Hash == _lastSentHash)
                 {
@@ -148,7 +161,7 @@ namespace MareSynchronos.Managers
                 }
                 _ = _apiController.SendCharacterData(cacheDto, _dalamudUtil.GetLocalPlayers().Select(d => d.Key).ToList());
                 _lastSentHash = cacheDto.Hash;
-            });
+            }, token);
         }
 
         private void Watcher_PlayerChanged(Dalamud.Game.ClientState.Objects.Types.Character actor)

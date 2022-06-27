@@ -144,7 +144,7 @@ namespace MareSynchronos.Managers
         {
             try
             {
-                using var fs = file.Open(FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                using var fs = file.Open(FileMode.Open, FileAccess.Read, FileShare.Read);
             }
             catch
             {

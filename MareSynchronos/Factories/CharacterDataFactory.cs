@@ -43,13 +43,17 @@ namespace MareSynchronos.Factories
         private unsafe CharacterData CreateCharacterData()
         {
             Stopwatch st = Stopwatch.StartNew();
-            var cache = new CharacterData();
-
             while (!_dalamudUtil.IsPlayerPresent)
             {
                 Logger.Debug("Character is null but it shouldn't be, waiting");
                 Thread.Sleep(50);
             }
+            var cache = new CharacterData
+            {
+                JobId = _dalamudUtil.PlayerJobId,
+                GlamourerString = _ipcManager.GlamourerGetCharacterCustomization(_dalamudUtil.PlayerName),
+                ManipulationString = _ipcManager.PenumbraGetMetaManipulations(_dalamudUtil.PlayerName)
+            };
             var model = (CharacterBase*)((Character*)_dalamudUtil.PlayerPointer)->GameObject.GetDrawObject();
             for (var idx = 0; idx < model->SlotCount; ++idx)
             {
@@ -106,10 +110,6 @@ namespace MareSynchronos.Factories
                     }
                 }
             }
-
-            cache.GlamourerString = _ipcManager.GlamourerGetCharacterCustomization(_dalamudUtil.PlayerName)!;
-            cache.ManipulationString = _ipcManager.PenumbraGetMetaManipulations(_dalamudUtil.PlayerName);
-            cache.JobId = _dalamudUtil.PlayerJobId;
 
             st.Stop();
             Logger.Debug("Building Character Data took " + st.Elapsed);

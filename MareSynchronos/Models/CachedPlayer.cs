@@ -70,12 +70,12 @@ public class CachedPlayer
         {
             Logger.Debug("Received total " + e.CharacterData.FileReplacements.Count + " file replacement data");
             _cache[e.CharacterData.Hash] = e.CharacterData;
-            _lastAppliedEquipmentHash = e.CharacterData.Hash;
         }
         else
         {
             Logger.Debug("Had valid local cache for " + PlayerName);
         }
+        _lastAppliedEquipmentHash = e.CharacterData.Hash;
 
         DownloadAndApplyCharacter();
     }
@@ -158,15 +158,19 @@ public class CachedPlayer
         try
         {
             Logger.Debug("Restoring state for " + PlayerName);
-            IsVisible = false;
             _downloadCancellationTokenSource?.Cancel();
             _downloadCancellationTokenSource?.Dispose();
             _downloadCancellationTokenSource = null;
             _dalamudUtil.RemovePlayerFromWatch(PlayerName);
             _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName);
-            _ipcManager.GlamourerRevertCharacterCustomization(PlayerName);
-            _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerName);
-            _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerName);
+            if (IsVisible)
+            {
+                _ipcManager.GlamourerRevertCharacterCustomization(PlayerName);
+                _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerName);
+                _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerName);
+            }
+
+            IsVisible = false;
         }
         catch (Exception ex)
         {
@@ -215,6 +219,7 @@ public class CachedPlayer
 
             if (RequestedPenumbraRedraw == false && !string.IsNullOrEmpty(_lastAppliedEquipmentHash))
             {
+                Logger.Warn("Unauthorized character change detected");
                 DownloadAndApplyCharacter();
             }
             else
