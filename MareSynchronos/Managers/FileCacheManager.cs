@@ -114,9 +114,7 @@ namespace MareSynchronos.Managers
             _cacheDirWatcher.Deleted += OnModified;
             _cacheDirWatcher.Changed += OnModified;
             _cacheDirWatcher.Renamed += OnModified;
-            _cacheDirWatcher.Filters.Add("*.mtrl");
-            _cacheDirWatcher.Filters.Add("*.mdl");
-            _cacheDirWatcher.Filters.Add("*.tex");
+            _cacheDirWatcher.Filters.Add("*");
             _cacheDirWatcher.Error +=
                 (sender, args) => PluginLog.Error(args.GetException(), "Error in Cache Dir Watcher");
             _cacheDirWatcher.EnableRaisingEvents = true;

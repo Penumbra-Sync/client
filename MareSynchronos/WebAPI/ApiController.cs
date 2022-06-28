@@ -296,10 +296,20 @@ namespace MareSynchronos.WebAPI
                 var tempFileData = await File.ReadAllBytesAsync(tempFile, ct);
                 var extractedFile = LZ4Codec.Unwrap(tempFileData);
                 File.Delete(tempFile);
-                var ext = file.GamePaths.First().Split(".").Last();
-                var filePath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash + "." + ext);
+                var filePath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash);
                 await File.WriteAllBytesAsync(filePath, extractedFile, ct);
-                Logger.Debug("File downloaded to " + filePath);
+                var fi = new FileInfo(filePath);
+                Func<DateTime> RandomDayFunc()
+                {
+                    DateTime start = new DateTime(1995, 1, 1);
+                    Random gen = new Random();
+                    int range = (DateTime.Today - start).Days;
+                    return () => start.AddDays(gen.Next(range));
+                }
+
+                fi.CreationTime = RandomDayFunc().Invoke();
+                fi.LastAccessTime = RandomDayFunc().Invoke();
+                fi.LastWriteTime = RandomDayFunc().Invoke();
                 downloadedHashes.Add(hash);
             }
 
