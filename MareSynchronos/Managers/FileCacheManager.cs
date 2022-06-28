@@ -14,9 +14,13 @@ namespace MareSynchronos.Managers
     public class FileCacheManager : IDisposable
     {
         private readonly IpcManager _ipcManager;
+        private readonly ConcurrentBag<string> _modifiedFiles = new();
         private readonly Configuration _pluginConfiguration;
         private FileSystemWatcher? _cacheDirWatcher;
         private FileSystemWatcher? _penumbraDirWatcher;
+        private Task? _rescanTask;
+        private CancellationTokenSource? _rescanTaskCancellationTokenSource;
+        private CancellationTokenSource? _rescanTaskRunCancellationTokenSource;
         private CancellationTokenSource? _scanCancellationTokenSource;
         private Task? _scanTask;
         public FileCacheManager(IpcManager ipcManager, Configuration pluginConfiguration)
@@ -32,26 +36,10 @@ namespace MareSynchronos.Managers
             _ipcManager.PenumbraDisposed += IpcManagerOnPenumbraDisposed;
         }
 
-        private void StartWatchersAndScan()
-        {
-            if (!_ipcManager.Initialized || !_pluginConfiguration.HasValidSetup) return;
-            Logger.Debug("Penumbra is active, configuration is valid, starting watchers and scan");
-            StartWatchers();
-            StartInitialScan();
-        }
-
-        private void IpcManagerOnPenumbraInitialized(object? sender, EventArgs e)
-        {
-            StartWatchersAndScan();
-        }
-
-        private void IpcManagerOnPenumbraDisposed(object? sender, EventArgs e)
-        {
-            StopWatchersAndScan();
-        }
-
         public long CurrentFileProgress { get; private set; }
+
         public long FileCacheSize { get; set; }
+
         public bool IsScanRunning => !_scanTask?.IsCompleted ?? false;
 
         public long TotalFiles { get; private set; }
@@ -83,15 +71,10 @@ namespace MareSynchronos.Managers
 
             _ipcManager.PenumbraInitialized -= IpcManagerOnPenumbraInitialized;
             _ipcManager.PenumbraDisposed -= IpcManagerOnPenumbraDisposed;
+            _rescanTaskCancellationTokenSource?.Cancel();
+            _rescanTaskRunCancellationTokenSource?.Cancel();
 
             StopWatchersAndScan();
-        }
-
-        private void StopWatchersAndScan()
-        {
-            _cacheDirWatcher?.Dispose();
-            _penumbraDirWatcher?.Dispose();
-            _scanCancellationTokenSource?.Cancel();
         }
 
         public void StartInitialScan()
@@ -102,8 +85,8 @@ namespace MareSynchronos.Managers
 
         public void StartWatchers()
         {
-            if (!_ipcManager.Initialized || !_pluginConfiguration.HasValidSetup) return;
-            Logger.Debug("Starting File System Watchers");
+            if (!_ipcManager.Initialized || !_pluginConfiguration.HasValidSetup()) return;
+            Logger.Verbose("Starting File System Watchers");
             _penumbraDirWatcher?.Dispose();
             _cacheDirWatcher?.Dispose();
 
@@ -113,8 +96,9 @@ namespace MareSynchronos.Managers
                 InternalBufferSize = 1048576
             };
             _penumbraDirWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size;
-            _penumbraDirWatcher.Deleted += OnDeleted;
+            _penumbraDirWatcher.Deleted += OnModified;
             _penumbraDirWatcher.Changed += OnModified;
+            _penumbraDirWatcher.Renamed += OnModified;
             _penumbraDirWatcher.Filters.Add("*.mtrl");
             _penumbraDirWatcher.Filters.Add("*.mdl");
             _penumbraDirWatcher.Filters.Add("*.tex");
@@ -127,8 +111,9 @@ namespace MareSynchronos.Managers
                 InternalBufferSize = 1048576
             };
             _cacheDirWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size;
-            _cacheDirWatcher.Deleted += OnDeleted;
+            _cacheDirWatcher.Deleted += OnModified;
             _cacheDirWatcher.Changed += OnModified;
+            _cacheDirWatcher.Renamed += OnModified;
             _cacheDirWatcher.Filters.Add("*.mtrl");
             _cacheDirWatcher.Filters.Add("*.mdl");
             _cacheDirWatcher.Filters.Add("*.tex");
@@ -137,6 +122,16 @@ namespace MareSynchronos.Managers
             _cacheDirWatcher.EnableRaisingEvents = true;
 
             Task.Run(RecalculateFileCacheSize);
+        }
+
+        private void IpcManagerOnPenumbraDisposed(object? sender, EventArgs e)
+        {
+            StopWatchersAndScan();
+        }
+
+        private void IpcManagerOnPenumbraInitialized(object? sender, EventArgs e)
+        {
+            StartWatchersAndScan();
         }
 
         private bool IsFileLocked(FileInfo file)
@@ -153,62 +148,10 @@ namespace MareSynchronos.Managers
             return false;
         }
 
-        private void OnDeleted(object sender, FileSystemEventArgs e)
-        {
-            var fi = new FileInfo(e.FullPath);
-            using var db = new FileCacheContext();
-            var ext = fi.Extension.ToLower();
-            if (ext is ".mdl" or ".tex" or ".mtrl")
-            {
-                Logger.Debug("File deleted: " + e.FullPath);
-                var fileInDb = db.FileCaches.SingleOrDefault(f => f.Filepath == fi.FullName.ToLower());
-                if (fileInDb == null) return;
-                db.Remove(fileInDb);
-
-            }
-            else
-            {
-                if (fi.Extension == string.Empty)
-                {
-                    // this is most likely a folder
-                    var filesToRemove = db.FileCaches.Where(f => f.Filepath.StartsWith(e.FullPath.ToLower())).ToList();
-                    Logger.Debug($"Folder deleted: {e.FullPath}, removing {filesToRemove.Count} files");
-                    db.RemoveRange(filesToRemove);
-                }
-            }
-
-            db.SaveChanges();
-
-            if (e.FullPath.Contains(_pluginConfiguration.CacheFolder, StringComparison.OrdinalIgnoreCase))
-            {
-                Task.Run(RecalculateFileCacheSize);
-            }
-        }
-
         private void OnModified(object sender, FileSystemEventArgs e)
         {
-            var fi = new FileInfo(e.FullPath);
-            Logger.Debug("File changed: " + e.FullPath);
-            using var db = new FileCacheContext();
-            var modifiedFile = Create(fi.FullName);
-            var fileInDb = db.FileCaches.SingleOrDefault(f => f.Filepath == fi.FullName.ToLower());
-            if (fileInDb != null)
-                db.Remove(fileInDb);
-            else
-            {
-                var files = db.FileCaches.Where(f => f.Hash == modifiedFile.Hash);
-                foreach (var file in files)
-                {
-                    if (!File.Exists(file.Filepath)) db.Remove(file.Filepath);
-                }
-            }
-            db.Add(modifiedFile);
-            db.SaveChanges();
-
-            if (e.FullPath.Contains(_pluginConfiguration.CacheFolder, StringComparison.OrdinalIgnoreCase))
-            {
-                Task.Run(RecalculateFileCacheSize);
-            }
+            _modifiedFiles.Add(e.FullPath);
+            Task.Run(() => _ = RescanTask());
         }
 
         private void RecalculateFileCacheSize()
@@ -225,6 +168,55 @@ namespace MareSynchronos.Managers
                     // whatever
                 }
             }
+        }
+
+        public async Task RescanTask(bool force = false)
+        {
+            _rescanTaskRunCancellationTokenSource?.Cancel();
+            _rescanTaskRunCancellationTokenSource = new CancellationTokenSource();
+            var token = _rescanTaskRunCancellationTokenSource.Token;
+            if(!force)
+                await Task.Delay(TimeSpan.FromSeconds(1), token);
+            while ((!_rescanTask?.IsCompleted ?? false) && !token.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), token);
+            }
+
+            if (token.IsCancellationRequested) return;
+
+            PluginLog.Debug("File changes detected, scanning the changes");
+
+            if (!_modifiedFiles.Any()) return;
+
+            _rescanTaskCancellationTokenSource = new CancellationTokenSource();
+            _rescanTask = Task.Run(async () =>
+            {
+                var listCopy = _modifiedFiles.ToList();
+                _modifiedFiles.Clear();
+                await using var db = new FileCacheContext();
+                foreach (var item in listCopy.Distinct())
+                {
+
+                    var fi = new FileInfo(item);
+                    if (!fi.Exists)
+                    {
+                        PluginLog.Verbose("Removed: " + item);
+
+                        db.RemoveRange(db.FileCaches.Where(f => f.Filepath.ToLower() == item.ToLower()));
+                    }
+                    else
+                    {
+                        PluginLog.Verbose("Changed :" + item);
+                        var fileCache = Create(item);
+                        db.RemoveRange(db.FileCaches.Where(f => f.Hash == fileCache.Hash));
+                        await db.AddAsync(fileCache, _rescanTaskCancellationTokenSource.Token);
+                    }
+                }
+
+                await db.SaveChangesAsync(_rescanTaskCancellationTokenSource.Token);
+
+                RecalculateFileCacheSize();
+            }, _rescanTaskCancellationTokenSource.Token);
         }
 
         private async Task StartFileScan(CancellationToken ct)
@@ -340,6 +332,18 @@ namespace MareSynchronos.Managers
                 _pluginConfiguration.InitialScanComplete = true;
                 _pluginConfiguration.Save();
             }
+        }
+
+        private void StartWatchersAndScan()
+        {
+            if (!_ipcManager.Initialized || !_pluginConfiguration.HasValidSetup()) return;
+            Logger.Verbose("Penumbra is active, configuration is valid, starting watchers and scan");
+            StartWatchers();
+            StartInitialScan();
+        }
+        private void StopWatchersAndScan()
+        {
+            _cacheDirWatcher?.Dispose();
         }
     }
 }

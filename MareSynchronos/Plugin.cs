@@ -47,6 +47,7 @@ namespace MareSynchronos
             _clientState = clientState;
             _configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
             _configuration.Initialize(PluginInterface);
+            _configuration.Migrate();
 
             _windowSystem = new WindowSystem("MareSynchronos");
 
@@ -123,7 +124,7 @@ namespace MareSynchronos
                 HelpMessage = "Opens the Mare Synchronos UI"
             });
 
-            if (!_configuration.HasValidSetup)
+            if (!_configuration.HasValidSetup())
             {
                 _introUi.IsOpen = true;
                 return;
@@ -188,7 +189,7 @@ namespace MareSynchronos
 
         private void OpenConfigUi()
         {
-            if (_configuration.HasValidSetup)
+            if (_configuration.HasValidSetup())
                 _pluginUi.Toggle();
             else
                 _introUi.Toggle();

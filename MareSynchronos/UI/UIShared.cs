@@ -54,6 +54,11 @@ namespace MareSynchronos.UI
             return true;
         }
 
+        public void ForceRescan()
+        {
+            Task.Run(() => _ = _fileCacheManager.RescanTask(true));
+        }
+
         public void DrawFileScanState()
         {
             ImGui.Text("File Scanner Status");
@@ -78,10 +83,21 @@ namespace MareSynchronos.UI
             var serverName = _apiController.ServerDictionary.ContainsKey(_pluginConfiguration.ApiUri)
                 ? _apiController.ServerDictionary[_pluginConfiguration.ApiUri]
                 : _pluginConfiguration.ApiUri;
-            ImGui.Text("Service status of " + serverName);
+            ImGui.Text("Service status of \"" + serverName + "\":");
             ImGui.SameLine();
             var color = _apiController.ServerAlive ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
             ImGui.TextColored(color, _apiController.ServerAlive ? "Available" : "Unavailable");
+            if (_apiController.ServerAlive)
+            {
+                ImGui.SameLine();
+                ImGui.TextUnformatted("(");
+                ImGui.SameLine();
+                ImGui.TextColored(ImGuiColors.ParsedGreen, _apiController.OnlineUsers.ToString());
+                ImGui.SameLine();
+                ImGui.Text("Users Online (server-wide)");
+                ImGui.SameLine();
+                ImGui.Text(")");
+            }
         }
 
         public static void TextWrapped(string text)
@@ -209,7 +225,7 @@ namespace MareSynchronos.UI
                 ImGui.InputText("Custom Service Address", ref _customServerUri, 255);
                 if (ImGui.Button("Add Custom Service"))
                 {
-                    if (!string.IsNullOrEmpty(_customServerUri) 
+                    if (!string.IsNullOrEmpty(_customServerUri)
                         && !string.IsNullOrEmpty(_customServerName)
                         && !_pluginConfiguration.CustomServerList.ContainsValue(_customServerName))
                     {

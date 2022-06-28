@@ -1,5 +1,4 @@
-﻿using Dalamud.Logging;
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -12,8 +11,8 @@ using LZ4;
 using MareSynchronos.API;
 using MareSynchronos.FileCacheDB;
 using MareSynchronos.Utils;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
-using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 
 namespace MareSynchronos.WebAPI
 {
@@ -21,7 +20,7 @@ namespace MareSynchronos.WebAPI
     {
 #if DEBUG
         public const string MainServer = "darkarchons Debug Server (Dev Server (CH))";
-        public const string MainServiceUri = "https://darkarchon.internet-box.ch:5001";
+        public const string MainServiceUri = "wss://darkarchon.internet-box.ch:5001";
 #else
         public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
         public const string MainServiceUri = "to be defined";
@@ -88,12 +87,14 @@ namespace MareSynchronos.WebAPI
         public string UID { get; private set; } = string.Empty;
 
         private string ApiUri => _pluginConfiguration.ApiUri;
+        public int OnlineUsers { get; private set; }
 
         public async Task CreateConnections()
         {
+            await StopAllConnections(_cts.Token);
+
             _cts = new CancellationTokenSource();
             var token = _cts.Token;
-            await StopAllConnections(token);
 
             while (!ServerAlive && !token.IsCancellationRequested)
             {
@@ -110,11 +111,14 @@ namespace MareSynchronos.WebAPI
                     await _userHub.StartAsync(token);
                     await _fileHub.StartAsync(token);
 
+                    OnlineUsers = await _userHub.InvokeAsync<int>("GetOnlineUsers", token);
+
                     if (_pluginConfiguration.FullPause)
                     {
                         UID = string.Empty;
                         return;
                     }
+
                     UID = await _heartbeatHub.InvokeAsync<string>("Heartbeat", token);
                     if (!string.IsNullOrEmpty(UID) && !token.IsCancellationRequested) // user is authorized
                     {
@@ -125,6 +129,7 @@ namespace MareSynchronos.WebAPI
                             (s) => PairedClientOffline?.Invoke(s, EventArgs.Empty));
                         _userHub.On<string>("AddOnlinePairedPlayer",
                             (s) => PairedClientOnline?.Invoke(s, EventArgs.Empty));
+                        _userHub.On<int>("UsersOnline", (count) => OnlineUsers = count);
 
                         PairedClients = await _userHub!.InvokeAsync<List<ClientPairDto>>("GetPairedClients", token);
 
@@ -161,13 +166,12 @@ namespace MareSynchronos.WebAPI
                     {
                         options.Headers.Add("Authorization", SecretKey);
                     }
+
+                    options.Transports = HttpTransportType.WebSockets;
 #if DEBUG
-                    options.HttpMessageHandlerFactory = (message) =>
+                    options.HttpMessageHandlerFactory = (message) => new HttpClientHandler()
                     {
-                        if (message is HttpClientHandler clientHandler)
-                            clientHandler.ServerCertificateCustomValidationCallback +=
-                                (sender, certificate, chain, sslPolicyErrors) => true;
-                        return message;
+                        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
                     };
 #endif
                 })
@@ -185,6 +189,8 @@ namespace MareSynchronos.WebAPI
         private Task HeartbeatHubOnReconnected(string? arg)
         {
             Logger.Debug("Connection restored");
+            OnlineUsers = _userHub!.InvokeAsync<int>("GetOnlineUsers").Result;
+            UID = _heartbeatHub!.InvokeAsync<string>("Heartbeat").Result;
             Connected?.Invoke(this, EventArgs.Empty);
             return Task.CompletedTask;
         }
@@ -198,7 +204,7 @@ namespace MareSynchronos.WebAPI
 
         private async Task StopAllConnections(CancellationToken token)
         {
-            if (_heartbeatHub is { State: HubConnectionState.Connected })
+            if (_heartbeatHub is { State: HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting })
             {
                 await _heartbeatHub.StopAsync(token);
                 _heartbeatHub.Closed -= HeartbeatHubOnClosed;
@@ -207,13 +213,13 @@ namespace MareSynchronos.WebAPI
                 await _heartbeatHub.DisposeAsync();
             }
 
-            if (_fileHub is { State: HubConnectionState.Connected })
+            if (_fileHub is { State: HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting })
             {
                 await _fileHub.StopAsync(token);
                 await _fileHub.DisposeAsync();
             }
 
-            if (_userHub is { State: HubConnectionState.Connected })
+            if (_userHub is { State: HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting })
             {
                 await _userHub.StopAsync(token);
                 await _userHub.DisposeAsync();

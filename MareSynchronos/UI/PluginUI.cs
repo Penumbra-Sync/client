@@ -4,6 +4,7 @@ using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using MareSynchronos.WebAPI;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -179,7 +180,7 @@ namespace MareSynchronos.UI
 
                 var marePaused = _configuration.FullPause;
 
-                if (_configuration.HasValidSetup)
+                if (_configuration.HasValidSetup())
                 {
                     if (ImGui.Checkbox("Pause Mare Synchronos", ref marePaused))
                     {
@@ -299,6 +300,8 @@ namespace MareSynchronos.UI
                         {
                             File.Delete(file);
                         }
+
+                        _uiShared.ForceRescan();
                     });
                 }
                 ImGui.TreePop();
@@ -340,11 +343,16 @@ namespace MareSynchronos.UI
                             : ((item.IsPaused || item.IsPausedFromOthers) ? "Unpaired" : "Paired");
                         ImGui.TextColored(UiShared.GetBoolColor(item.IsSynced && !item.IsPaused && !item.IsPausedFromOthers), pairString);
                         ImGui.TableNextColumn();
-                        string charComment = _configuration.UidComments.ContainsKey(item.OtherUID) ? _configuration.UidComments[item.OtherUID] : string.Empty;
+                        string charComment = _configuration.GetCurrentServerUidComments().ContainsKey(item.OtherUID) ? _configuration.GetCurrentServerUidComments()[item.OtherUID] : string.Empty;
                         ImGui.SetNextItemWidth(400);
                         if (ImGui.InputTextWithHint("##comment" + item.OtherUID, "Add your comment here (comments will not be synced)", ref charComment, 255))
                         {
-                            _configuration.UidComments[item.OtherUID] = charComment;
+                            if (_configuration.GetCurrentServerUidComments().Count == 0)
+                            {
+                                _configuration.UidServerComments[_configuration.ApiUri] =
+                                    new Dictionary<string, string>();
+                            }
+                            _configuration.SetCurrentServerUidComment(item.OtherUID, charComment);
                             _configuration.Save();
                         }
                         ImGui.TableNextColumn();
@@ -362,21 +370,21 @@ namespace MareSynchronos.UI
                     ImGui.EndTable();
                 }
 
-                var pairedClientEntry = tempNameUID;
+                var pairedClientEntry = _tempNameUID;
                 ImGui.SetNextItemWidth(200);
                 if (ImGui.InputText("UID", ref pairedClientEntry, 20))
                 {
-                    tempNameUID = pairedClientEntry;
+                    _tempNameUID = pairedClientEntry;
                 }
 
                 ImGui.SameLine();
                 ImGui.PushFont(UiBuilder.IconFont);
                 if (ImGui.Button(FontAwesomeIcon.Plus.ToIconString() + "##addToPairedClients"))
                 {
-                    if (_apiController.PairedClients.All(w => w.OtherUID != tempNameUID))
+                    if (_apiController.PairedClients.All(w => w.OtherUID != _tempNameUID))
                     {
-                        var nameToSend = tempNameUID;
-                        tempNameUID = string.Empty;
+                        var nameToSend = _tempNameUID;
+                        _tempNameUID = string.Empty;
                         _ = _apiController.SendPairedClientAddition(nameToSend);
                     }
                 }
@@ -386,6 +394,6 @@ namespace MareSynchronos.UI
             }
         }
 
-        private string tempNameUID = string.Empty;
+        private string _tempNameUID = string.Empty;
     }
 }

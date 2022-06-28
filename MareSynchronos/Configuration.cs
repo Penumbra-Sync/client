@@ -3,11 +3,40 @@ using Dalamud.Plugin;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using Newtonsoft.Json;
 
 namespace MareSynchronos
 {
+    public static class ConfigurationExtensions
+    {
+        public static bool HasValidSetup(this Configuration configuration)
+        {
+            return configuration.AcceptedAgreement && configuration.InitialScanComplete
+                        && !string.IsNullOrEmpty(configuration.CacheFolder)
+                        && Directory.Exists(configuration.CacheFolder)
+                        && configuration.ClientSecret.ContainsKey(configuration.ApiUri);
+        }
+
+        public static Dictionary<string, string> GetCurrentServerUidComments(this Configuration configuration)
+        {
+            return configuration.UidServerComments.ContainsKey(configuration.ApiUri)
+                ? configuration.UidServerComments[configuration.ApiUri]
+                : new Dictionary<string, string>();
+        }
+
+        public static void SetCurrentServerUidComment(this Configuration configuration, string uid, string comment)
+        {
+            if (!configuration.UidServerComments.ContainsKey(configuration.ApiUri))
+            {
+                configuration.UidServerComments[configuration.ApiUri] = new Dictionary<string, string>();
+            }
+
+            configuration.UidServerComments[configuration.ApiUri][uid] = comment;
+        }
+    }
+
     [Serializable]
     public class Configuration : IPluginConfiguration
     {
@@ -26,9 +55,6 @@ namespace MareSynchronos
         public string CacheFolder { get; set; } = string.Empty;
         public Dictionary<string, string> ClientSecret { get; set; } = new();
         public Dictionary<string, string> CustomServerList { get; set; } = new();
-        [JsonIgnore]
-        public bool HasValidSetup => AcceptedAgreement && InitialScanComplete && !string.IsNullOrEmpty(CacheFolder) &&
-                                     Directory.Exists(CacheFolder) && ClientSecret.ContainsKey(ApiUri);
 
         public bool InitialScanComplete { get; set; } = false;
         public int MaxParallelScan
@@ -46,8 +72,10 @@ namespace MareSynchronos
         }
 
         public bool FullPause { get; set; } = false;
+        public Dictionary<string, Dictionary<string, string>> UidServerComments { get; set; } = new();
+
         public Dictionary<string, string> UidComments { get; set; } = new();
-        public int Version { get; set; } = 0;
+        public int Version { get; set; } = 1;
 
         public bool ShowTransferWindow { get; set; } = true;
 
@@ -60,6 +88,32 @@ namespace MareSynchronos
         public void Save()
         {
             _pluginInterface!.SavePluginConfig(this);
+        }
+
+        public void Migrate()
+        {
+            if (Version == 0)
+            {
+                Logger.Debug("Migrating Configuration from V0 to V1");
+                Version = 1;
+                ApiUri = ApiUri.Replace("https", "wss");
+                foreach (var kvp in ClientSecret.ToList())
+                {
+                    var newKey = kvp.Key.Replace("https", "wss");
+                    ClientSecret.Remove(kvp.Key);
+                    if (ClientSecret.ContainsKey(newKey))
+                    {
+                        ClientSecret[newKey] = kvp.Value;
+                    }
+                    else
+                    {
+                        ClientSecret.Add(newKey, kvp.Value);
+                    }
+                }
+                UidServerComments.Add(ApiUri, UidComments.ToDictionary(k => k.Key, k => k.Value));
+                UidComments.Clear();
+                Save();
+            }
         }
     }
 }
