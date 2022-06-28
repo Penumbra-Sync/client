@@ -65,7 +65,7 @@ namespace MareSynchronos.Managers
             FileInfo fileInfo = new(file);
             while (IsFileLocked(fileInfo))
             {
-                Thread.Sleep(100);
+                Thread.Sleep(1000);
                 Logger.Debug("Waiting for file release " + fileInfo.FullName);
             }
             var sha1Hash = Crypto.GetFileHash(fileInfo.FullName);
@@ -110,7 +110,7 @@ namespace MareSynchronos.Managers
             _penumbraDirWatcher = new FileSystemWatcher(_ipcManager.PenumbraModDirectory()!)
             {
                 IncludeSubdirectories = true,
-                InternalBufferSize = 65536
+                InternalBufferSize = 1048576
             };
             _penumbraDirWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size;
             _penumbraDirWatcher.Deleted += OnDeleted;
@@ -123,9 +123,8 @@ namespace MareSynchronos.Managers
 
             _cacheDirWatcher = new FileSystemWatcher(_pluginConfiguration.CacheFolder)
             {
-                EnableRaisingEvents = true,
                 IncludeSubdirectories = true,
-                InternalBufferSize = 65536
+                InternalBufferSize = 1048576
             };
             _cacheDirWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size;
             _cacheDirWatcher.Deleted += OnDeleted;
@@ -217,7 +216,14 @@ namespace MareSynchronos.Managers
             FileCacheSize = 0;
             foreach (var file in Directory.EnumerateFiles(_pluginConfiguration.CacheFolder))
             {
-                FileCacheSize += new FileInfo(file).Length;
+                try
+                {
+                    FileCacheSize += new FileInfo(file).Length;
+                }
+                catch
+                {
+                    // whatever
+                }
             }
         }
 

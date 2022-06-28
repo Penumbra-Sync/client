@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -251,8 +252,10 @@ namespace MareSynchronos.WebAPI
             await using var fs = File.OpenWrite(fileName);
             await foreach (var data in reader.WithCancellation(ct))
             {
+                //Logger.Debug("Getting chunk of " + hash);
                 CurrentDownloads[hash] = (CurrentDownloads[hash].Item1 + data.Length, CurrentDownloads[hash].Item2);
                 await fs.WriteAsync(data, ct);
+                Debug.WriteLine("Wrote chunk " + data.Length + " into " + fileName);
             }
             return fileName;
         }

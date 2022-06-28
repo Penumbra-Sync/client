@@ -67,8 +67,9 @@ namespace MareSynchronos.Factories
 
                 FileReplacement cachedMdlResource = CreateBaseFileReplacement();
                 cachedMdlResource.GamePaths = _ipcManager.PenumbraReverseResolvePath(mdlPath, _dalamudUtil.PlayerName);
+                //Logger.Debug("Model " + string.Join(", ", cachedMdlResource.GamePaths));
                 cachedMdlResource.SetResolvedPath(mdlPath);
-                //PluginLog.Verbose("Resolving for model " + mdlPath);
+                //Logger.Debug("\t\t=> " + cachedMdlResource.ResolvedPath);
 
                 cache.AddAssociatedResource(cachedMdlResource, null!, null!);
 
@@ -79,11 +80,12 @@ namespace MareSynchronos.Factories
 
                     //var mtrlFileResource = factory.CreateBaseFileReplacement();
                     var mtrlPath = new Utf8String(mtrl->ResourceHandle->FileName()).ToString().Split("|")[2];
-                    //PluginLog.Verbose("Resolving for material " + mtrlPath);
                     var cachedMtrlResource = CreateBaseFileReplacement();
                     cachedMtrlResource.GamePaths = _ipcManager.PenumbraReverseResolvePath(mtrlPath, _dalamudUtil.PlayerName);
+                    //Logger.Debug("\tMaterial " + string.Join(", ", cachedMtrlResource.GamePaths));
                     cachedMtrlResource.SetResolvedPath(mtrlPath);
                     cache.AddAssociatedResource(cachedMtrlResource, cachedMdlResource, null!);
+                    //Logger.Debug("\t\t\t=> " + cachedMtrlResource.ResolvedPath);
 
                     var mtrlResource = (MtrlResource*)mtrl->ResourceHandle;
                     for (int resIdx = 0; resIdx < mtrlResource->NumTex; resIdx++)
@@ -106,6 +108,8 @@ namespace MareSynchronos.Factories
                                 cachedTexResource.SetResolvedPath(reResolvedPath);
                             }
                         }
+                        //Logger.Debug("\t\tTexture " + string.Join(", ", cachedTexResource.GamePaths));
+                        //Logger.Debug("\t\t\t\t=> " + cachedTexResource.ResolvedPath);
                         cache.AddAssociatedResource(cachedTexResource, cachedMdlResource, cachedMtrlResource);
                     }
                 }

@@ -95,11 +95,10 @@ public class CachedPlayer
             {
                 Logger.Debug("Downloading missing files for player " + PlayerName);
                 await _apiController.DownloadFiles(toDownloadReplacements, downloadToken);
-            }
-
-            if (downloadToken.IsCancellationRequested)
-            {
-                return;
+                if (downloadToken.IsCancellationRequested)
+                {
+                    return;
+                }
             }
 
             ApplyCharacterData(_cache[_lastAppliedEquipmentHash], moddedPaths);

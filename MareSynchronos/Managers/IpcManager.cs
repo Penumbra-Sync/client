@@ -3,6 +3,7 @@ using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using MareSynchronos.Utils;
 
 namespace MareSynchronos.Managers
@@ -198,6 +199,12 @@ namespace MareSynchronos.Managers
 
             Logger.Debug("Assigning temp mods for " + collectionName);
             Logger.Debug("ManipulationString: " + manipulationData);
+            var orderedModPaths = modPaths.OrderBy(p => p.Key.EndsWith(".mdl") ? 0 : p.Key.EndsWith(".mtrl") ? 1 : 2)
+                .ToDictionary(k => k.Key, k => k.Value);
+            foreach (var item in orderedModPaths)
+            {
+                //Logger.Debug(item.Key + " => " + item.Value);
+            }
             var ret = _penumbraSetTemporaryMod.InvokeFunc("MareSynchronos", collectionName, modPaths, manipulationData, 0);
             Logger.Debug("Penumbra Ret: " + ret.ToString());
         }
