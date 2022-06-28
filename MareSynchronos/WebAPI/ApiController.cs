@@ -13,6 +13,7 @@ using MareSynchronos.API;
 using MareSynchronos.FileCacheDB;
 using MareSynchronos.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 
 namespace MareSynchronos.WebAPI
 {
@@ -226,7 +227,7 @@ namespace MareSynchronos.WebAPI
         {
             if (_uploadCancellationTokenSource != null)
             {
-                PluginLog.Warning("Cancelling upload");
+                Logger.Warn("Cancelling upload");
                 _uploadCancellationTokenSource?.Cancel();
                 _fileHub!.InvokeAsync("AbortUpload");
             }
@@ -319,7 +320,7 @@ namespace MareSynchronos.WebAPI
 
         public Task ReceiveCharacterData(CharacterCacheDto character, string characterHash)
         {
-            Logger.Debug("Received DTO for " + characterHash);
+            Logger.Verbose("Received DTO for " + characterHash);
             CharacterReceived?.Invoke(null, new CharacterReceivedEventArgs(characterHash, character));
             return Task.CompletedTask;
         }
@@ -342,33 +343,39 @@ namespace MareSynchronos.WebAPI
             CancelUpload();
             _uploadCancellationTokenSource = new CancellationTokenSource();
             var uploadToken = _uploadCancellationTokenSource.Token;
-            Logger.Debug("New Token Created");
+            Logger.Verbose("New Token Created");
 
             var filesToUpload = await _fileHub!.InvokeAsync<List<string>>("SendFiles", character.FileReplacements.Select(c => c.Hash).Distinct(), uploadToken);
 
             IsUploading = true;
 
-            Logger.Debug("Compressing files");
             foreach (var file in filesToUpload)
             {
-                Logger.Debug(file);
+                await using var db = new FileCacheContext();
+                CurrentUploads[file] = (0, new FileInfo(db.FileCaches.First(f => f.Hash == file).Filepath).Length);
+            }
+
+            Logger.Verbose("Compressing and uploading files");
+            foreach (var file in filesToUpload)
+            {
+                Logger.Verbose("Compressing and uploading " + file);
                 var data = await GetCompressedFileData(file, uploadToken);
                 CurrentUploads[data.Item1] = (0, data.Item2.Length);
                 _ = UploadFile(data.Item2, file, uploadToken);
                 if (!uploadToken.IsCancellationRequested) continue;
-                PluginLog.Warning("Cancel in filesToUpload loop detected");
+                Logger.Warn("Cancel in filesToUpload loop detected");
                 CurrentUploads.Clear();
                 break;
             }
 
-            Logger.Debug("Upload tasks complete, waiting for server to confirm");
+            Logger.Verbose("Upload tasks complete, waiting for server to confirm");
             var anyUploadsOpen = await _fileHub!.InvokeAsync<bool>("IsUploadFinished", uploadToken);
-            Logger.Debug("Uploads open: " + anyUploadsOpen);
+            Logger.Verbose("Uploads open: " + anyUploadsOpen);
             while (anyUploadsOpen && !uploadToken.IsCancellationRequested)
             {
                 anyUploadsOpen = await _fileHub!.InvokeAsync<bool>("IsUploadFinished", uploadToken);
                 await Task.Delay(TimeSpan.FromSeconds(0.5), uploadToken);
-                Logger.Debug("Waiting for uploads to finish");
+                Logger.Verbose("Waiting for uploads to finish");
             }
 
             CurrentUploads.Clear();
@@ -376,15 +383,15 @@ namespace MareSynchronos.WebAPI
 
             if (!uploadToken.IsCancellationRequested)
             {
-                Logger.Debug("=== Pushing character data ===");
+                Logger.Verbose("=== Pushing character data ===");
                 await _userHub!.InvokeAsync("PushCharacterData", character, visibleCharacterIds, uploadToken);
             }
             else
             {
-                PluginLog.Warning("=== Upload operation was cancelled ===");
+                Logger.Warn("=== Upload operation was cancelled ===");
             }
 
-            Logger.Debug("== Upload complete for " + character.JobId);
+            Logger.Verbose("Upload complete for " + character.Hash);
             _uploadCancellationTokenSource = null;
         }
 

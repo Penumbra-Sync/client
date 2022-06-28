@@ -113,21 +113,21 @@ namespace MareSynchronos.Managers
         public void GlamourerApplyAll(string customization, string characterName)
         {
             if (!CheckGlamourerApi()) return;
-            Logger.Debug("GlamourerString: " + customization);
+            Logger.Debug("Glamourer apply all to " + characterName);
             _glamourerApplyAll!.InvokeAction(customization, characterName);
         }
 
         public void GlamourerApplyOnlyEquipment(string customization, string characterName)
         {
             if (!CheckGlamourerApi()) return;
-            Logger.Debug("GlamourerString: " + customization);
+            Logger.Debug("Glamourer apply only equipment to " + characterName);
             _glamourerApplyOnlyEquipment!.InvokeAction(customization, characterName);
         }
 
         public void GlamourerApplyOnlyCustomization(string customization, string characterName)
         {
             if (!CheckGlamourerApi()) return;
-            Logger.Debug("GlamourerString: " + customization);
+            Logger.Debug("Glamourer apply only customization to " + characterName);
             _glamourerApplyOnlyCustomization!.InvokeAction(customization, characterName);
         }
 
@@ -148,7 +148,6 @@ namespace MareSynchronos.Managers
             if (!CheckPenumbraApi()) return string.Empty;
             Logger.Debug("Creating temp collection for " + characterName);
             var ret = _penumbraCreateTemporaryCollection.InvokeFunc("MareSynchronos", characterName, true);
-            Logger.Debug("Penumbra ret: " + ret.Item1);
             return ret.Item2;
         }
 
@@ -198,13 +197,6 @@ namespace MareSynchronos.Managers
             if (!CheckPenumbraApi()) return;
 
             Logger.Debug("Assigning temp mods for " + collectionName);
-            Logger.Debug("ManipulationString: " + manipulationData);
-            var orderedModPaths = modPaths.OrderBy(p => p.Key.EndsWith(".mdl") ? 0 : p.Key.EndsWith(".mtrl") ? 1 : 2)
-                .ToDictionary(k => k.Key, k => k.Value);
-            foreach (var item in orderedModPaths)
-            {
-                //Logger.Debug(item.Key + " => " + item.Value);
-            }
             var ret = _penumbraSetTemporaryMod.InvokeFunc("MareSynchronos", collectionName, modPaths, manipulationData, 0);
             Logger.Debug("Penumbra Ret: " + ret.ToString());
         }

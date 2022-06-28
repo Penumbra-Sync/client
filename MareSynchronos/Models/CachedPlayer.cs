@@ -146,7 +146,6 @@ public class CachedPlayer
         Logger.Debug(
             $"Request Redraw for {PlayerName}");
         _ipcManager.PenumbraSetTemporaryMods(tempCollection, moddedPaths, cache.ManipulationData);
-        _ipcManager.GlamourerRevertCharacterCustomization(PlayerName!);
         _ipcManager.GlamourerApplyAll(cache.GlamourerData, PlayerName!);
     }
 
@@ -164,7 +163,6 @@ public class CachedPlayer
             _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName);
             if (IsVisible)
             {
-                _ipcManager.GlamourerRevertCharacterCustomization(PlayerName);
                 _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerName);
                 _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerName);
             }

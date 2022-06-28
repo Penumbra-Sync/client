@@ -24,14 +24,12 @@ namespace MareSynchronos.Models
             this._penumbraDirectory = penumbraDirectory;
         }
 
-        public List<FileReplacement> Associated { get; set; } = new();
-
-        public bool Computed => (_computationTask == null || (_computationTask?.IsCompleted ?? true)) && Associated.All(f => f.Computed);
+        public bool Computed => (_computationTask == null || (_computationTask?.IsCompleted ?? true));
 
         [JsonProperty]
-        public string[] GamePaths { get; set; } = Array.Empty<string>();
+        public List<string> GamePaths { get; set; } = new();
 
-        public bool HasFileReplacement => GamePaths.Length >= 1 && GamePaths[0] != ResolvedPath;
+        public bool HasFileReplacement => GamePaths.Count >= 1 && GamePaths.Any(p => p != ResolvedPath);
 
         [JsonProperty]
         public string Hash { get; set; } = string.Empty;
@@ -43,35 +41,7 @@ namespace MareSynchronos.Models
 
         [JsonProperty]
         public string ResolvedPath { get; set; } = string.Empty;
-
-        public void AddAssociated(FileReplacement fileReplacement)
-        {
-            fileReplacement.IsInUse = true;
-
-            Associated.Add(fileReplacement);
-        }
-
-        public override bool Equals(object? obj)
-        {
-            if (obj == null) return true;
-            if (obj.GetType() == typeof(FileReplacement))
-            {
-                return Hash == ((FileReplacement)obj).Hash;
-            }
-
-            return base.Equals(obj);
-        }
-
-        public override int GetHashCode()
-        {
-            int result = 13;
-            result *= 397;
-            result += Hash.GetHashCode();
-            result += ResolvedPath.GetHashCode();
-
-            return result;
-        }
-
+        
         public void SetResolvedPath(string path)
         {
             ResolvedPath = path.ToLower().Replace('/', '\\').Replace(_penumbraDirectory, "").Replace('\\', '/');
@@ -113,7 +83,7 @@ namespace MareSynchronos.Models
         {
             return new FileReplacementDto
             {
-                GamePaths = GamePaths,
+                GamePaths = GamePaths.ToArray(),
                 Hash = Hash,
             };
         }
@@ -121,14 +91,6 @@ namespace MareSynchronos.Models
         {
             StringBuilder builder = new();
             builder.AppendLine($"Modded: {HasFileReplacement} - {string.Join(",", GamePaths)} => {ResolvedPath}");
-            foreach (var l1 in Associated)
-            {
-                builder.AppendLine($"  + Modded: {l1.HasFileReplacement} - {string.Join(",", l1.GamePaths)} => {l1.ResolvedPath}");
-                foreach (var l2 in l1.Associated)
-                {
-                    builder.AppendLine($"    + Modded: {l2.HasFileReplacement} - {string.Join(",", l2.GamePaths)} => {l2.ResolvedPath}");
-                }
-            }
             return builder.ToString();
         }
 

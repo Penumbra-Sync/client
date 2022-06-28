@@ -184,7 +184,7 @@ namespace MareSynchronos.UI
                 {
                     _pluginConfiguration.FullPause = false;
                     _pluginConfiguration.Save();
-                    Task.WaitAll(_apiController.Register());
+                    Task.Run(_apiController.Register);
                 }
             }
             else

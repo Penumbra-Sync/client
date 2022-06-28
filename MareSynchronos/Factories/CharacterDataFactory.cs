@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
@@ -25,9 +27,33 @@ namespace MareSynchronos.Factories
             _ipcManager = ipcManager;
         }
 
-        private FileReplacement CreateBaseFileReplacement()
+        private FileReplacement CreateFileReplacement(string path)
         {
-            return new FileReplacement(_ipcManager.PenumbraModDirectory()!);
+            var fileReplacement = new FileReplacement(_ipcManager.PenumbraModDirectory()!);
+            if (!path.Contains(".tex", StringComparison.OrdinalIgnoreCase))
+            {
+                fileReplacement.GamePaths =
+                    _ipcManager.PenumbraReverseResolvePath(path, _dalamudUtil.PlayerName).ToList();
+                fileReplacement.SetResolvedPath(path);
+            }
+            else
+            {
+                fileReplacement.GamePaths = new List<string> { path };
+                fileReplacement.SetResolvedPath(_ipcManager.PenumbraResolvePath(path, _dalamudUtil.PlayerName)!);
+                if (!fileReplacement.HasFileReplacement)
+                {
+                    // try resolving tex with -- in name instead
+                    path = path.Insert(path.LastIndexOf('/') + 1, "--");
+                    var reResolvedPath = _ipcManager.PenumbraResolvePath(path, _dalamudUtil.PlayerName)!;
+                    if (reResolvedPath != path)
+                    {
+                        fileReplacement.GamePaths = new List<string>() { path };
+                        fileReplacement.SetResolvedPath(reResolvedPath);
+                    }
+                }
+            }
+
+            return fileReplacement;
         }
 
         public CharacterData BuildCharacterData()
@@ -55,9 +81,9 @@ namespace MareSynchronos.Factories
                 ManipulationString = _ipcManager.PenumbraGetMetaManipulations(_dalamudUtil.PlayerName)
             };
             var model = (CharacterBase*)((Character*)_dalamudUtil.PlayerPointer)->GameObject.GetDrawObject();
-            for (var idx = 0; idx < model->SlotCount; ++idx)
+            for (var mdlIdx = 0; mdlIdx < model->SlotCount; ++mdlIdx)
             {
-                var mdl = (RenderModel*)model->ModelArray[idx];
+                var mdl = (RenderModel*)model->ModelArray[mdlIdx];
                 if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
                 {
                     continue;
@@ -65,58 +91,40 @@ namespace MareSynchronos.Factories
 
                 var mdlPath = new Utf8String(mdl->ResourceHandle->FileName()).ToString();
 
-                FileReplacement cachedMdlResource = CreateBaseFileReplacement();
-                cachedMdlResource.GamePaths = _ipcManager.PenumbraReverseResolvePath(mdlPath, _dalamudUtil.PlayerName);
-                //Logger.Debug("Model " + string.Join(", ", cachedMdlResource.GamePaths));
-                cachedMdlResource.SetResolvedPath(mdlPath);
-                //Logger.Debug("\t\t=> " + cachedMdlResource.ResolvedPath);
+                FileReplacement mdlFileReplacement = CreateFileReplacement(mdlPath);
+                Logger.Verbose("Model " + string.Join(", ", mdlFileReplacement.GamePaths));
+                Logger.Verbose("\t\t=> " + mdlFileReplacement.ResolvedPath);
 
-                cache.AddAssociatedResource(cachedMdlResource, null!, null!);
+                cache.AddFileReplacement(mdlFileReplacement);
 
-                for (int mtrlIdx = 0; mtrlIdx < mdl->MaterialCount; mtrlIdx++)
+                for (var mtrlIdx = 0; mtrlIdx < mdl->MaterialCount; mtrlIdx++)
                 {
                     var mtrl = (Material*)mdl->Materials[mtrlIdx];
                     if (mtrl == null) continue;
 
-                    //var mtrlFileResource = factory.CreateBaseFileReplacement();
                     var mtrlPath = new Utf8String(mtrl->ResourceHandle->FileName()).ToString().Split("|")[2];
-                    var cachedMtrlResource = CreateBaseFileReplacement();
-                    cachedMtrlResource.GamePaths = _ipcManager.PenumbraReverseResolvePath(mtrlPath, _dalamudUtil.PlayerName);
-                    //Logger.Debug("\tMaterial " + string.Join(", ", cachedMtrlResource.GamePaths));
-                    cachedMtrlResource.SetResolvedPath(mtrlPath);
-                    cache.AddAssociatedResource(cachedMtrlResource, cachedMdlResource, null!);
-                    //Logger.Debug("\t\t\t=> " + cachedMtrlResource.ResolvedPath);
+                    var mtrlFileReplacement = CreateFileReplacement(mtrlPath);
+                    Logger.Verbose("\tMaterial " + string.Join(", ", mtrlFileReplacement.GamePaths));
+                    Logger.Verbose("\t\t\t=> " + mtrlFileReplacement.ResolvedPath);
+                    cache.AddFileReplacement(mtrlFileReplacement);
 
-                    var mtrlResource = (MtrlResource*)mtrl->ResourceHandle;
-                    for (int resIdx = 0; resIdx < mtrlResource->NumTex; resIdx++)
+                    var mtrlResourceHandle = (MtrlResource*)mtrl->ResourceHandle;
+                    for (var resIdx = 0; resIdx < mtrlResourceHandle->NumTex; resIdx++)
                     {
-                        var texPath = new Utf8String(mtrlResource->TexString(resIdx)).ToString();
+                        var texPath = new Utf8String(mtrlResourceHandle->TexString(resIdx)).ToString();
 
-                        if (string.IsNullOrEmpty(texPath.ToString())) continue;
+                        if (string.IsNullOrEmpty(texPath)) continue;
 
-                        var cachedTexResource = CreateBaseFileReplacement();
-                        cachedTexResource.GamePaths = new[] { texPath };
-                        cachedTexResource.SetResolvedPath(_ipcManager.PenumbraResolvePath(texPath, _dalamudUtil.PlayerName)!);
-                        if (!cachedTexResource.HasFileReplacement)
-                        {
-                            // try resolving tex with -- in name instead
-                            texPath = texPath.Insert(texPath.LastIndexOf('/') + 1, "--");
-                            var reResolvedPath = _ipcManager.PenumbraResolvePath(texPath, _dalamudUtil.PlayerName)!;
-                            if (reResolvedPath != texPath)
-                            {
-                                cachedTexResource.GamePaths = new[] { texPath };
-                                cachedTexResource.SetResolvedPath(reResolvedPath);
-                            }
-                        }
-                        //Logger.Debug("\t\tTexture " + string.Join(", ", cachedTexResource.GamePaths));
-                        //Logger.Debug("\t\t\t\t=> " + cachedTexResource.ResolvedPath);
-                        cache.AddAssociatedResource(cachedTexResource, cachedMdlResource, cachedMtrlResource);
+                        var texFileReplacement = CreateFileReplacement(texPath);
+                        Logger.Verbose("\t\tTexture " + string.Join(", ", texFileReplacement.GamePaths));
+                        Logger.Verbose("\t\t\t\t=> " + texFileReplacement.ResolvedPath);
+                        cache.AddFileReplacement(texFileReplacement);
                     }
                 }
             }
 
             st.Stop();
-            Logger.Debug("Building Character Data took " + st.Elapsed);
+            Logger.Verbose("Building Character Data took " + st.Elapsed);
 
             return cache;
         }

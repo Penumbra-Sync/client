@@ -20,7 +20,6 @@ namespace MareSynchronos.Managers
         private readonly DalamudUtil _dalamudUtil;
         private readonly IpcManager _ipcManager;
         private string _lastSentHash = string.Empty;
-        private Task? _playerChangedTask;
         private CancellationTokenSource? _playerChangedCts;
 
         public PlayerManager(ApiController apiController, IpcManager ipcManager,
@@ -68,8 +67,8 @@ namespace MareSynchronos.Managers
             _cachedPlayersManager.AddInitialPairs(apiTask.Result);
 
             _ipcManager.PenumbraRedrawEvent += IpcManager_PenumbraRedrawEvent;
-            _ipcManager.PenumbraRedraw(_dalamudUtil.PlayerName);
             _dalamudUtil.PlayerChanged += Watcher_PlayerChanged;
+            PlayerChanged(_dalamudUtil.PlayerName);
         }
 
         private void ApiController_Disconnected(object? sender, EventArgs args)
@@ -111,24 +110,18 @@ namespace MareSynchronos.Managers
 
         private void PlayerChanged(string name)
         {
-            //if (sender == null) return;
             Logger.Debug("Player changed: " + name);
             _playerChangedCts?.Cancel();
             _playerChangedCts = new CancellationTokenSource();
-            var token = _playerChangedCts.Token;/*
-            if (_playerChangedTask is { IsCompleted: false })
-            {
-                PluginLog.Warning("PlayerChanged Task still running");
-                return;
-            }*/
+            var token = _playerChangedCts.Token;
 
             if (!_ipcManager.Initialized)
             {
-                PluginLog.Warning("Penumbra not active, doing nothing.");
+                Logger.Warn("Penumbra not active, doing nothing.");
                 return;
             }
 
-            _playerChangedTask = Task.Run(async () =>
+            Task.Run(async () =>
             {
                 int attempts = 0;
                 while (!_apiController.IsConnected && attempts < 10 && !token.IsCancellationRequested)

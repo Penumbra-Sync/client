@@ -1,10 +1,8 @@
 ﻿using Newtonsoft.Json;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using MareSynchronos.API;
-using MareSynchronos.Utils;
 
 namespace MareSynchronos.Models
 {
@@ -12,12 +10,7 @@ namespace MareSynchronos.Models
     public class CharacterData
     {
         [JsonProperty]
-        public List<FileReplacement> AllReplacements =>
-            FileReplacements.Where(f => f.HasFileReplacement)
-            .Concat(FileReplacements.SelectMany(f => f.Associated)).Where(f => f.HasFileReplacement)
-            .Concat(FileReplacements.SelectMany(f => f.Associated).SelectMany(f => f.Associated)).Where(f => f.HasFileReplacement)
-            .Distinct().OrderBy(f => f.GamePaths[0])
-            .ToList();
+        public List<FileReplacement> AllReplacements => FileReplacements.Where(f => f.HasFileReplacement).GroupBy(f => f.Hash).Select(g => g.First()).ToList();
 
         [JsonProperty]
         public string CacheHash { get; set; } = string.Empty;
@@ -34,53 +27,18 @@ namespace MareSynchronos.Models
 
         public string ManipulationString { get; set; } = string.Empty;
 
-        public void AddAssociatedResource(FileReplacement resource, FileReplacement? mdlParent, FileReplacement? mtrlParent)
+        public void AddFileReplacement(FileReplacement fileReplacement)
         {
-            try
-            {
-                if (mdlParent == null)
-                {
-                    resource.IsInUse = true;
-                    FileReplacements.Add(resource);
-                    return;
-                }
+            if (!fileReplacement.HasFileReplacement) return;
 
-                var mdlReplacements = FileReplacements.Where(f => f == mdlParent && mtrlParent == null);
-                foreach (var mdlReplacement in mdlReplacements)
-                {
-                    mdlReplacement.AddAssociated(resource);
-                }
-
-                var mtrlReplacements = FileReplacements.Where(f => f == mdlParent).SelectMany(a => a.Associated).Where(f => f == mtrlParent);
-                foreach (var mtrlReplacement in mtrlReplacements)
-                {
-                    mtrlReplacement.AddAssociated(resource);
-                }
-            }
-            catch (Exception ex)
+            var existingReplacement = FileReplacements.SingleOrDefault(f => f.ResolvedPath == fileReplacement.ResolvedPath);
+            if (existingReplacement != null)
             {
-                Logger.Debug(ex.Message);
+                existingReplacement.GamePaths.AddRange(fileReplacement.GamePaths.Where(e => !existingReplacement.GamePaths.Contains(e)));
             }
-        }
-
-        public void Invalidate(List<FileReplacement>? fileReplacements = null)
-        {
-            try
+            else
             {
-                var fileReplacement = fileReplacements ?? FileReplacements.ToList();
-                foreach (var item in fileReplacement)
-                {
-                    item.IsInUse = false;
-                    Invalidate(item.Associated);
-                    if (FileReplacements.Contains(item))
-                    {
-                        FileReplacements.Remove(item);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.Debug(ex.Message);
+                FileReplacements.Add(fileReplacement);
             }
         }
 
@@ -95,6 +53,7 @@ namespace MareSynchronos.Models
                 ManipulationData = ManipulationString
             };
         }
+
         public override string ToString()
         {
             StringBuilder stringBuilder = new();
