@@ -16,7 +16,7 @@ namespace MareSynchronos.UI
         private readonly WindowSystem _windowSystem;
         private bool _readFirstPage = false;
 
-        public event EventHandler? FinishedRegistration;
+        public event SwitchUi? SwitchFromIntroToMainUi;
 
         public void Dispose()
         {
@@ -157,7 +157,7 @@ namespace MareSynchronos.UI
                 ImGui.Text("Service registration");
                 ImGui.SetWindowFontScale(1.0f);
                 ImGui.Separator();
-                if (_pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri))
+                if (_pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri) && _uiShared.ShowClientSecret)
                 {
                     ImGui.Separator();
                     UiShared.TextWrapped(_pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri]);
@@ -176,7 +176,7 @@ namespace MareSynchronos.UI
                     ImGui.Separator();
                     if (ImGui.Button("Finish##finishIntro"))
                     {
-                        FinishedRegistration?.Invoke(null, EventArgs.Empty);
+                        SwitchFromIntroToMainUi?.Invoke();
                         IsOpen = false;
                     }
                 }
@@ -190,7 +190,7 @@ namespace MareSynchronos.UI
                                          "to verify who you are. It is directly tied to the UID you will be receiving. In case of loss, you will have to re-register an account.");
                     UiShared.TextWrapped("Do not ever, under any circumstances, share your secret key to anyone! Likewise do not share your Mare Synchronos plugin configuration to anyone!");
                     ImGui.PopStyleColor();
-                    _uiShared.DrawServiceSelection();
+                    _uiShared.DrawServiceSelection(() => SwitchFromIntroToMainUi?.Invoke(), true);
                 }
             }
         }

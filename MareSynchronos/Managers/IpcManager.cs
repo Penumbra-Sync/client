@@ -198,7 +198,6 @@ namespace MareSynchronos.Managers
 
             Logger.Debug("Assigning temp mods for " + collectionName);
             var ret = _penumbraSetTemporaryMod.InvokeFunc("MareSynchronos", collectionName, modPaths, manipulationData, 0);
-            Logger.Debug("Penumbra Ret: " + ret.ToString());
         }
 
         private void RedrawEvent(IntPtr objectAddress, int objectTableIndex)

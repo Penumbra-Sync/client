@@ -13,17 +13,19 @@ using MareSynchronos.Utils;
 
 namespace MareSynchronos.UI
 {
-    public class PluginUi : Window, IDisposable
+    public delegate void SwitchUi();
+    public class MainUi : Window, IDisposable
     {
         private readonly Configuration _configuration;
         private readonly WindowSystem _windowSystem;
         private readonly ApiController _apiController;
         private readonly UiShared _uiShared;
+        public event SwitchUi? SwitchFromMainUiToIntro;
 
-        public PluginUi(WindowSystem windowSystem,
+        public MainUi(WindowSystem windowSystem,
             UiShared uiShared, Configuration configuration, ApiController apiController) : base("Mare Synchronos Settings", ImGuiWindowFlags.None)
         {
-            Logger.Debug("Creating " + nameof(PluginUi));
+            Logger.Debug("Creating " + nameof(MainUi));
 
             SizeConstraints = new WindowSizeConstraints()
             {
@@ -40,7 +42,7 @@ namespace MareSynchronos.UI
 
         public void Dispose()
         {
-            Logger.Debug("Disposing " + nameof(PluginUi));
+            Logger.Debug("Disposing " + nameof(MainUi));
 
             _windowSystem.RemoveWindow(this);
         }
@@ -79,9 +81,24 @@ namespace MareSynchronos.UI
             }
             else
             {
-                string error = _configuration.FullPause ? "Fully Paused" : "Service unavailable";
+                string error = _configuration.FullPause ? "Fully Paused" : _apiController.ServerAlive ? "Unauthorized" : "Service unavailable";
                 ImGui.TextColored(ImGuiColors.DalamudRed, $"No UID ({error})");
                 ImGui.SetWindowFontScale(1.0f);
+                if (_apiController.ServerAlive && !_configuration.FullPause)
+                {
+                    ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
+                    UiShared.TextWrapped("Your account is not present on the service anymore or you are banned.");
+                    ImGui.PopStyleColor();
+                    ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
+                    UiShared.TextWrapped("If you think your secret key is just invalid, use the following button to reset the local secret key to be able to re-register. If you continue to see this message after registering, tough luck, asshole.");
+                    ImGui.PopStyleColor();
+                    if (ImGui.Button("Reset Secret Key"))
+                    {
+                        _configuration.ClientSecret.Remove(_configuration.ApiUri);
+                        _configuration.Save();
+                        SwitchFromMainUiToIntro?.Invoke();
+                    }
+                }
             }
 
             ImGui.Separator();
@@ -157,6 +174,7 @@ namespace MareSynchronos.UI
                             Task.Run(() => _apiController.DeleteAccount());
                             ImGui.CloseCurrentPopup();
                             _deleteAccountPopupModalShown = false;
+                            SwitchFromMainUiToIntro?.Invoke();
                         }
 
                         ImGui.SameLine();
@@ -201,7 +219,7 @@ namespace MareSynchronos.UI
 
                 if (marePaused)
                 {
-                    _uiShared.DrawServiceSelection();
+                    _uiShared.DrawServiceSelection(() => SwitchFromMainUiToIntro?.Invoke());
                 }
 
 

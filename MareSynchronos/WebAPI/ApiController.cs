@@ -27,6 +27,7 @@ namespace MareSynchronos.WebAPI
 #endif
 
         private readonly Configuration _pluginConfiguration;
+        private readonly DalamudUtil _dalamudUtil;
 
         private CancellationTokenSource _cts;
 
@@ -38,15 +39,32 @@ namespace MareSynchronos.WebAPI
 
         private HubConnection? _userHub;
 
-        public ApiController(Configuration pluginConfiguration)
+        public ApiController(Configuration pluginConfiguration, DalamudUtil dalamudUtil)
         {
             Logger.Debug("Creating " + nameof(ApiController));
 
             _pluginConfiguration = pluginConfiguration;
+            _dalamudUtil = dalamudUtil;
             _cts = new CancellationTokenSource();
+            _dalamudUtil.LogIn += DalamudUtilOnLogIn;
+            _dalamudUtil.LogOut += DalamudUtilOnLogOut;
 
+            if (_dalamudUtil.IsLoggedIn)
+            {
+                DalamudUtilOnLogIn();
+            }
+        }
+
+        private void DalamudUtilOnLogOut()
+        {
+            Task.Run(async () => await StopAllConnections(_cts.Token));
+        }
+
+        private void DalamudUtilOnLogIn()
+        {
             Task.Run(CreateConnections);
         }
+
 
         public event EventHandler? ChangingServers;
 
@@ -153,6 +171,9 @@ namespace MareSynchronos.WebAPI
         {
             Logger.Debug("Disposing " + nameof(ApiController));
 
+            _dalamudUtil.LogIn -= DalamudUtilOnLogIn;
+            _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
+
             Task.Run(async () => await StopAllConnections(_cts.Token));
             _cts?.Cancel();
         }
@@ -165,6 +186,7 @@ namespace MareSynchronos.WebAPI
                     if (!string.IsNullOrEmpty(SecretKey) && !_pluginConfiguration.FullPause)
                     {
                         options.Headers.Add("Authorization", SecretKey);
+                        options.Headers.Add("CharacterNameHash", _dalamudUtil.PlayerNameHashed);
                     }
 
                     options.Transports = HttpTransportType.WebSockets;
@@ -211,18 +233,21 @@ namespace MareSynchronos.WebAPI
                 _heartbeatHub.Reconnected -= HeartbeatHubOnReconnected;
                 _heartbeatHub.Reconnecting += HeartbeatHubOnReconnecting;
                 await _heartbeatHub.DisposeAsync();
+                _heartbeatHub = null;
             }
 
             if (_fileHub is { State: HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting })
             {
                 await _fileHub.StopAsync(token);
                 await _fileHub.DisposeAsync();
+                _fileHub = null;
             }
 
             if (_userHub is { State: HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting })
             {
                 await _userHub.StopAsync(token);
                 await _userHub.DisposeAsync();
+                _userHub = null;
             }
         }
     }
@@ -242,6 +267,7 @@ namespace MareSynchronos.WebAPI
         public async Task DeleteAccount()
         {
             _pluginConfiguration.ClientSecret.Remove(ApiUri);
+            _pluginConfiguration.Save();
             await _fileHub!.SendAsync("DeleteAllFiles");
             await _userHub!.SendAsync("DeleteAccount");
             await CreateConnections();
@@ -273,8 +299,8 @@ namespace MareSynchronos.WebAPI
 
             foreach (var file in fileReplacementDto)
             {
-                var fileSize = await _fileHub!.InvokeAsync<long>("GetFileSize", file.Hash, ct);
-                CurrentDownloads[file.Hash] = (0, fileSize);
+                var downloadFileDto = await _fileHub!.InvokeAsync<DownloadFileDto>("GetFileSize", file.Hash, ct);
+                CurrentDownloads[file.Hash] = (0, downloadFileDto.Size);
             }
 
             List<string> downloadedHashes = new();
@@ -361,23 +387,23 @@ namespace MareSynchronos.WebAPI
             var uploadToken = _uploadCancellationTokenSource.Token;
             Logger.Verbose("New Token Created");
 
-            var filesToUpload = await _fileHub!.InvokeAsync<List<string>>("SendFiles", character.FileReplacements.Select(c => c.Hash).Distinct(), uploadToken);
+            var filesToUpload = await _fileHub!.InvokeAsync<List<UploadFileDto>>("SendFiles", character.FileReplacements.Select(c => c.Hash).Distinct(), uploadToken);
 
             IsUploading = true;
 
-            foreach (var file in filesToUpload)
+            foreach (var file in filesToUpload.Where(f => f.IsForbidden == false))
             {
                 await using var db = new FileCacheContext();
-                CurrentUploads[file] = (0, new FileInfo(db.FileCaches.First(f => f.Hash == file).Filepath).Length);
+                CurrentUploads[file.Hash] = (0, new FileInfo(db.FileCaches.First(f => f.Hash == file.Hash).Filepath).Length);
             }
 
             Logger.Verbose("Compressing and uploading files");
             foreach (var file in filesToUpload)
             {
                 Logger.Verbose("Compressing and uploading " + file);
-                var data = await GetCompressedFileData(file, uploadToken);
+                var data = await GetCompressedFileData(file.Hash, uploadToken);
                 CurrentUploads[data.Item1] = (0, data.Item2.Length);
-                _ = UploadFile(data.Item2, file, uploadToken);
+                _ = UploadFile(data.Item2, file.Hash, uploadToken);
                 if (!uploadToken.IsCancellationRequested) continue;
                 Logger.Warn("Cancel in filesToUpload loop detected");
                 CurrentUploads.Clear();
@@ -411,9 +437,9 @@ namespace MareSynchronos.WebAPI
             _uploadCancellationTokenSource = null;
         }
 
-        public async Task<List<string>> SendCharacterName(string hashedName)
+        public async Task<List<string>> GetOnlineCharacters()
         {
-            return await _userHub!.InvokeAsync<List<string>>("SendCharacterNameHash", hashedName);
+            return await _userHub!.InvokeAsync<List<string>>("GetOnlineCharacters");
         }
 
         public async Task SendPairedClientAddition(string uid)

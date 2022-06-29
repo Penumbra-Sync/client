@@ -13,12 +13,17 @@ namespace MareSynchronos.Utils
 {
     public delegate void PlayerChange(Character actor);
 
+    public delegate void LogIn();
+    public delegate void LogOut();
+
     public class DalamudUtil : IDisposable
     {
         private readonly ClientState _clientState;
         private readonly ObjectTable _objectTable;
         private readonly IPlayerWatcher _watcher;
         public event PlayerChange? PlayerChanged;
+        public event LogIn? LogIn;
+        public event LogOut? LogOut;
 
         public DalamudUtil(ClientState clientState, ObjectTable objectTable, IPlayerWatcher watcher)
         {
@@ -27,7 +32,25 @@ namespace MareSynchronos.Utils
             _watcher = watcher;
             _watcher.Enable();
             _watcher.PlayerChanged += WatcherOnPlayerChanged;
+            _clientState.Login += ClientStateOnLogin;
+            _clientState.Logout += ClientStateOnLogout;
+            if (IsLoggedIn)
+            {
+                ClientStateOnLogin(null, EventArgs.Empty);
+            }
         }
+
+        private void ClientStateOnLogout(object? sender, EventArgs e)
+        {
+            LogOut?.Invoke();
+        }
+
+        private void ClientStateOnLogin(object? sender, EventArgs e)
+        {
+            LogIn?.Invoke();
+        }
+
+        public bool IsLoggedIn => _clientState.IsLoggedIn;
 
         private void WatcherOnPlayerChanged(Character actor)
         {

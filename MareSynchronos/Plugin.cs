@@ -21,7 +21,6 @@ namespace MareSynchronos
     {
         private const string CommandName = "/mare";
         private readonly ApiController _apiController;
-        private readonly ClientState _clientState;
         private readonly CommandManager _commandManager;
         private readonly Framework _framework;
         private readonly Configuration _configuration;
@@ -29,7 +28,7 @@ namespace MareSynchronos
         private readonly IntroUi _introUi;
         private readonly IpcManager _ipcManager;
         public static DalamudPluginInterface PluginInterface { get; set; }
-        private readonly PluginUi _pluginUi;
+        private readonly MainUi _mainUi;
         private readonly WindowSystem _windowSystem;
         private PlayerManager? _playerManager;
         private readonly DalamudUtil _dalamudUtil;
@@ -44,7 +43,6 @@ namespace MareSynchronos
             PluginInterface = pluginInterface;
             _commandManager = commandManager;
             _framework = framework;
-            _clientState = clientState;
             _configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
             _configuration.Initialize(PluginInterface);
             _configuration.Migrate();
@@ -54,7 +52,9 @@ namespace MareSynchronos
             new FileCacheContext().Dispose(); // make sure db is initialized I guess
 
             // those can be initialized outside of game login
-            _apiController = new ApiController(_configuration);
+            _dalamudUtil = new DalamudUtil(clientState, objectTable, PlayerWatchFactory.Create(framework, clientState, objectTable));
+
+            _apiController = new ApiController(_configuration, _dalamudUtil);
             _ipcManager = new IpcManager(PluginInterface);
 
             _fileCacheManager = new FileCacheManager(_ipcManager, _configuration);
@@ -62,31 +62,37 @@ namespace MareSynchronos
 
             var uiSharedComponent =
                 new UiShared(_ipcManager, _apiController, _fileCacheManager, _fileDialogManager, _configuration);
-            _pluginUi = new PluginUi(_windowSystem, uiSharedComponent, _configuration, _apiController);
+            _mainUi = new MainUi(_windowSystem, uiSharedComponent, _configuration, _apiController);
+
             _introUi = new IntroUi(_windowSystem, uiSharedComponent, _configuration, _fileCacheManager);
-            _introUi.FinishedRegistration += (_, _) =>
+            _mainUi.SwitchFromMainUiToIntro += () =>
+            {
+                _introUi.IsOpen = true;
+                _mainUi.IsOpen = false;
+            };
+            _introUi.SwitchFromIntroToMainUi += () =>
             {
                 _introUi.IsOpen = false;
-                _pluginUi.IsOpen = true;
+                _mainUi.IsOpen = true;
+                _fileCacheManager.StartWatchers();
                 ReLaunchCharacterManager();
             };
             _downloadUi = new DownloadUi(_windowSystem, _configuration, _apiController);
 
-            _dalamudUtil = new DalamudUtil(_clientState, objectTable, PlayerWatchFactory.Create(framework, _clientState, objectTable));
 
-            clientState.Login += ClientState_Login;
-            clientState.Logout += ClientState_Logout;
+            _dalamudUtil.LogIn += DalamudUtilOnLogIn;
+            _dalamudUtil.LogOut += DalamudUtilOnLogOut;
             _apiController.ChangingServers += ApiControllerOnChangingServers;
 
-            if (clientState.IsLoggedIn)
+            if (_dalamudUtil.IsLoggedIn)
             {
-                ClientState_Login(null, null!);
+                DalamudUtilOnLogIn();
             }
         }
 
         private void ApiControllerOnChangingServers(object? sender, EventArgs e)
         {
-            _pluginUi.IsOpen = false;
+            _mainUi.IsOpen = false;
             _introUi.IsOpen = true;
         }
 
@@ -98,10 +104,10 @@ namespace MareSynchronos
             _apiController?.Dispose();
 
             _commandManager.RemoveHandler(CommandName);
-            _clientState.Login -= ClientState_Login;
-            _clientState.Logout -= ClientState_Logout;
+            _dalamudUtil.LogIn -= DalamudUtilOnLogIn;
+            _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
 
-            _pluginUi?.Dispose();
+            _mainUi?.Dispose();
             _introUi?.Dispose();
             _downloadUi?.Dispose();
 
@@ -113,7 +119,7 @@ namespace MareSynchronos
         }
 
 
-        private void ClientState_Login(object? sender, EventArgs e)
+        private void DalamudUtilOnLogIn()
         {
             Logger.Debug("Client login");
 
@@ -127,13 +133,15 @@ namespace MareSynchronos
             if (!_configuration.HasValidSetup())
             {
                 _introUi.IsOpen = true;
+                _configuration.FullPause = false;
+                _configuration.Save();
                 return;
             }
 
             ReLaunchCharacterManager();
         }
 
-        private void ClientState_Logout(object? sender, EventArgs e)
+        private void DalamudUtilOnLogOut()
         {
             Logger.Debug("Client logout");
             _characterCacheManager?.Dispose();
@@ -162,7 +170,7 @@ namespace MareSynchronos
             {
                 var characterCacheFactory =
                     new CharacterDataFactory(_dalamudUtil, _ipcManager);
-                _characterCacheManager = new CachedPlayersManager(_clientState, _framework,
+                _characterCacheManager = new CachedPlayersManager(_framework,
                     _apiController, _dalamudUtil, _ipcManager);
                 _playerManager = new PlayerManager(_apiController, _ipcManager,
                     characterCacheFactory, _characterCacheManager, _dalamudUtil);
@@ -183,14 +191,14 @@ namespace MareSynchronos
         {
             if (string.IsNullOrEmpty(args))
             {
-                _pluginUi.Toggle();
+                _mainUi.Toggle();
             }
         }
 
         private void OpenConfigUi()
         {
             if (_configuration.HasValidSetup())
-                _pluginUi.Toggle();
+                _mainUi.Toggle();
             else
                 _introUi.Toggle();
         }

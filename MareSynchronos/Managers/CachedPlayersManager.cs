@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Dalamud.Game;
-using Dalamud.Game.ClientState;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
@@ -13,7 +12,6 @@ namespace MareSynchronos.Managers;
 public class CachedPlayersManager : IDisposable
 {
     private readonly ApiController _apiController;
-    private readonly ClientState _clientState;
     private readonly DalamudUtil _dalamudUtil;
     private readonly Framework _framework;
     private readonly IpcManager _ipcManager;
@@ -21,19 +19,14 @@ public class CachedPlayersManager : IDisposable
     private readonly List<string> _localVisiblePlayers = new();
     private DateTime _lastPlayerObjectCheck = DateTime.Now;
 
-    public CachedPlayersManager(ClientState clientState, Framework framework,
-        ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager)
+    public CachedPlayersManager(Framework framework, ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager)
     {
         Logger.Debug("Creating " + nameof(CachedPlayersManager));
 
-        _clientState = clientState;
         _framework = framework;
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
         _ipcManager = ipcManager;
-
-        _clientState.Login += ClientStateOnLogin;
-        _clientState.Logout += ClientStateOnLogout;
 
         _apiController.PairedClientOnline += ApiControllerOnPairedClientOnline;
         _apiController.PairedClientOffline += ApiControllerOnPairedClientOffline;
@@ -43,12 +36,25 @@ public class CachedPlayersManager : IDisposable
 
         _ipcManager.PenumbraDisposed += IpcManagerOnPenumbraDisposed;
 
-        if (clientState.IsLoggedIn)
+        _dalamudUtil.LogIn += DalamudUtilOnLogIn;
+        _dalamudUtil.LogOut += DalamudUtilOnLogOut;
+
+        if (_dalamudUtil.IsLoggedIn)
         {
-            ClientStateOnLogin(null, EventArgs.Empty);
+            DalamudUtilOnLogIn();
         }
     }
-    
+
+    private void DalamudUtilOnLogOut()
+    {
+        _framework.Update -= FrameworkOnUpdate;
+    }
+
+    private void DalamudUtilOnLogIn()
+    {
+        _framework.Update += FrameworkOnUpdate;
+    }
+
     private void IpcManagerOnPenumbraDisposed(object? sender, EventArgs e)
     {
         _onlineCachedPlayers.ForEach(p => p.DisposePlayer());
@@ -57,16 +63,6 @@ public class CachedPlayersManager : IDisposable
     private void ApiControllerOnDisconnected(object? sender, EventArgs e)
     {
         RestoreAllCharacters();
-    }
-
-    private void ClientStateOnLogin(object? sender, EventArgs e)
-    {
-        _framework.Update += FrameworkOnUpdate;
-    }
-
-    private void ClientStateOnLogout(object? sender, EventArgs e)
-    {
-        _framework.Update -= FrameworkOnUpdate;
     }
 
     public void AddInitialPairs(List<string> apiTaskResult)
@@ -92,8 +88,8 @@ public class CachedPlayersManager : IDisposable
 
         _framework.Update -= FrameworkOnUpdate;
 
-        _clientState.Login -= ClientStateOnLogin;
-        _clientState.Logout -= ClientStateOnLogout;
+        _dalamudUtil.LogIn -= DalamudUtilOnLogIn;
+        _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
     }
 
     private void RestoreAllCharacters()

@@ -10,7 +10,15 @@ namespace MareSynchronos.Models
     public class CharacterData
     {
         [JsonProperty]
-        public List<FileReplacement> AllReplacements => FileReplacements.Where(f => f.HasFileReplacement).GroupBy(f => f.Hash).Select(g => g.First()).ToList();
+        public List<FileReplacement> AllReplacements => FileReplacements.Where(f => f.HasFileReplacement).GroupBy(f => f.Hash).Select(g =>
+        {
+            return new FileReplacement("")
+            {
+                ResolvedPath = g.First().ResolvedPath,
+                GamePaths = g.SelectMany(g => g.GamePaths).Distinct().ToList(),
+                Hash = g.First().Hash
+            };
+        }).ToList();
 
         [JsonProperty]
         public string CacheHash { get; set; } = string.Empty;

@@ -73,6 +73,7 @@ namespace MareSynchronos.Managers
             _ipcManager.PenumbraDisposed -= IpcManagerOnPenumbraDisposed;
             _rescanTaskCancellationTokenSource?.Cancel();
             _rescanTaskRunCancellationTokenSource?.Cancel();
+            _scanCancellationTokenSource?.Cancel();
 
             StopWatchersAndScan();
         }

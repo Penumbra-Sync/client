@@ -20,6 +20,7 @@ namespace MareSynchronos.UI
         private readonly FileDialogManager _fileDialogManager;
         private readonly Configuration _pluginConfiguration;
         public long FileCacheSize => _fileCacheManager.FileCacheSize;
+        public bool ShowClientSecret = true;
 
         public UiShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, FileDialogManager fileDialogManager, Configuration pluginConfiguration)
         {
@@ -78,12 +79,12 @@ namespace MareSynchronos.UI
             }
         }
 
-        public void PrintServerState()
+        public void PrintServerState(bool isIntroUi = false)
         {
             var serverName = _apiController.ServerDictionary.ContainsKey(_pluginConfiguration.ApiUri)
                 ? _apiController.ServerDictionary[_pluginConfiguration.ApiUri]
                 : _pluginConfiguration.ApiUri;
-            ImGui.Text("Service status of \"" + serverName + "\":");
+            ImGui.Text("Service " + serverName + ":");
             ImGui.SameLine();
             var color = _apiController.ServerAlive ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
             ImGui.TextColored(color, _apiController.ServerAlive ? "Available" : "Unavailable");
@@ -94,7 +95,7 @@ namespace MareSynchronos.UI
                 ImGui.SameLine();
                 ImGui.TextColored(ImGuiColors.ParsedGreen, _apiController.OnlineUsers.ToString());
                 ImGui.SameLine();
-                ImGui.Text("Users Online (server-wide)");
+                ImGui.Text("Users Online" + (!isIntroUi ? " (server-wide)" : string.Empty));
                 ImGui.SameLine();
                 ImGui.Text(")");
             }
@@ -154,8 +155,9 @@ namespace MareSynchronos.UI
         private int _serverSelectionIndex = 0;
         private string _customServerName = "";
         private string _customServerUri = "";
+        private bool _enterSecretKey = false;
 
-        public void DrawServiceSelection()
+        public void DrawServiceSelection(Action? callBackOnExit = null, bool isIntroUi = false)
         {
             string[] comboEntries = _apiController.ServerDictionary.Values.ToArray();
             _serverSelectionIndex = Array.IndexOf(_apiController.ServerDictionary.Keys.ToArray(), _pluginConfiguration.ApiUri);
@@ -186,21 +188,50 @@ namespace MareSynchronos.UI
                 if (ImGui.Button(FontAwesomeIcon.Trash.ToIconString() + "##deleteService"))
                 {
                     _pluginConfiguration.CustomServerList.Remove(_pluginConfiguration.ApiUri);
-                    _pluginConfiguration.ApiUri = ApiController.MainServiceUri;
+                    _pluginConfiguration.ApiUri = _apiController.ServerDictionary.First().Key;
                     _pluginConfiguration.Save();
                 }
                 ImGui.PopFont();
             }
 
-            PrintServerState();
+            if (ImGui.TreeNode("Add Custom Service"))
+            {
+                ImGui.SetNextItemWidth(250);
+                ImGui.InputText("Custom Service Name", ref _customServerName, 255);
+                ImGui.SetNextItemWidth(250);
+                ImGui.InputText("Custom Service Address", ref _customServerUri, 255);
+                if (ImGui.Button("Add Custom Service"))
+                {
+                    if (!string.IsNullOrEmpty(_customServerUri)
+                        && !string.IsNullOrEmpty(_customServerName)
+                        && !_pluginConfiguration.CustomServerList.ContainsValue(_customServerName)
+                        && !_pluginConfiguration.CustomServerList.ContainsKey(_customServerUri))
+                    {
+                        _pluginConfiguration.CustomServerList[_customServerUri] = _customServerName;
+                        _customServerUri = string.Empty;
+                        _customServerName = string.Empty;
+                        _pluginConfiguration.Save();
+                    }
+                }
+                ImGui.TreePop();
+            }
+
+            PrintServerState(isIntroUi);
 
             if (_apiController.ServerAlive && !_pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri))
             {
-                if (ImGui.Button("Register"))
+                if (!_enterSecretKey)
                 {
-                    _pluginConfiguration.FullPause = false;
-                    _pluginConfiguration.Save();
-                    Task.Run(_apiController.Register);
+                    if (ImGui.Button("Register"))
+                    {
+                        _pluginConfiguration.FullPause = false;
+                        _pluginConfiguration.Save();
+                        Task.Run(_apiController.Register);
+                        ShowClientSecret = true;
+                        callBackOnExit?.Invoke();
+                    }
+
+                    ImGui.SameLine();
                 }
             }
             else
@@ -217,27 +248,30 @@ namespace MareSynchronos.UI
                 }
             }
 
-            if (ImGui.TreeNode("Custom Service"))
+            string checkboxText = _pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri)
+                ? "I want to switch accounts"
+                : "I already have an account";
+            ImGui.Checkbox(checkboxText, ref _enterSecretKey);
+
+            if (_enterSecretKey)
             {
-                ImGui.SetNextItemWidth(250);
-                ImGui.InputText("Custom Service Name", ref _customServerName, 255);
-                ImGui.SetNextItemWidth(250);
-                ImGui.InputText("Custom Service Address", ref _customServerUri, 255);
-                if (ImGui.Button("Add Custom Service"))
+                ImGui.SetNextItemWidth(400);
+                ImGui.InputText("Enter Secret Key", ref _secretKey, 255);
+                ImGui.SameLine();
+                if (ImGui.Button("Save"))
                 {
-                    if (!string.IsNullOrEmpty(_customServerUri)
-                        && !string.IsNullOrEmpty(_customServerName)
-                        && !_pluginConfiguration.CustomServerList.ContainsValue(_customServerName))
-                    {
-                        _pluginConfiguration.CustomServerList[_customServerUri] = _customServerName;
-                        _customServerUri = string.Empty;
-                        _customServerName = string.Empty;
-                        _pluginConfiguration.Save();
-                    }
+                    _pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri] = _secretKey;
+                    _pluginConfiguration.Save();
+                    _secretKey = string.Empty;
+                    Task.Run(_apiController.CreateConnections);
+                    ShowClientSecret = false;
+                    _enterSecretKey = false;
+                    callBackOnExit?.Invoke();
                 }
-                ImGui.TreePop();
             }
         }
+
+        private string _secretKey = "";
 
         public static void DrawHelpText(string helpText)
         {

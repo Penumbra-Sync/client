@@ -59,7 +59,7 @@ namespace MareSynchronos.Managers
         private void ApiController_Connected(object? sender, EventArgs args)
         {
             Logger.Debug("ApiController Connected");
-            var apiTask = _apiController.SendCharacterName(_dalamudUtil.PlayerNameHashed);
+            var apiTask = _apiController.GetOnlineCharacters();
             _lastSentHash = string.Empty;
 
             Task.WaitAll(apiTask);
