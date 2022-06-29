@@ -61,7 +61,7 @@ namespace MareSynchronos
             _fileDialogManager = new FileDialogManager();
 
             var uiSharedComponent =
-                new UiShared(_ipcManager, _apiController, _fileCacheManager, _fileDialogManager, _configuration);
+                new UiShared(_ipcManager, _apiController, _fileCacheManager, _fileDialogManager, _configuration, _dalamudUtil);
             _mainUi = new MainUi(_windowSystem, uiSharedComponent, _configuration, _apiController);
 
             _introUi = new IntroUi(_windowSystem, uiSharedComponent, _configuration, _fileCacheManager);

@@ -8,6 +8,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.ImGuiFileDialog;
 using ImGuiNET;
 using MareSynchronos.Managers;
+using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.UI
@@ -19,16 +20,18 @@ namespace MareSynchronos.UI
         private readonly FileCacheManager _fileCacheManager;
         private readonly FileDialogManager _fileDialogManager;
         private readonly Configuration _pluginConfiguration;
+        private readonly DalamudUtil _dalamudUtil;
         public long FileCacheSize => _fileCacheManager.FileCacheSize;
         public bool ShowClientSecret = true;
-
-        public UiShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, FileDialogManager fileDialogManager, Configuration pluginConfiguration)
+        public string PlayerName => _dalamudUtil.PlayerName;
+        public UiShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, FileDialogManager fileDialogManager, Configuration pluginConfiguration, DalamudUtil dalamudUtil)
         {
             _ipcManager = ipcManager;
             _apiController = apiController;
             _fileCacheManager = fileCacheManager;
             _fileDialogManager = fileDialogManager;
             _pluginConfiguration = pluginConfiguration;
+            _dalamudUtil = dalamudUtil;
         }
 
         public bool DrawOtherPluginState()

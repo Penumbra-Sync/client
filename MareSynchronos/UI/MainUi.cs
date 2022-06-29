@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Threading.Tasks;
+using MareSynchronos.API;
 using MareSynchronos.Utils;
 
 namespace MareSynchronos.UI
@@ -107,13 +108,274 @@ namespace MareSynchronos.UI
             DrawFileCacheSettings();
             if (_apiController.IsConnected)
                 DrawCurrentTransfers();
-            DrawAdministration(_apiController.IsConnected);
+            DrawUserAdministration(_apiController.IsConnected);
+            if (_apiController.IsConnected && _apiController.IsModerator)
+                DrawAdministration();
+        }
+
+        private string _forbiddenFileHashEntry = string.Empty;
+        private string _forbiddenFileHashForbiddenBy = string.Empty;
+        private string _bannedUserHashEntry = string.Empty;
+        private string _bannedUserReasonEntry = string.Empty;
+
+        private void DrawAdministration()
+        {
+            if (ImGui.TreeNode("Administrative Actions"))
+            {
+                if (ImGui.TreeNode("Forbidden Files Changes"))
+                {
+                    if (ImGui.BeginTable("ForbiddenFilesTable", 3, ImGuiTableFlags.RowBg))
+                    {
+                        ImGui.TableSetupColumn("File Hash", ImGuiTableColumnFlags.None, 290);
+                        ImGui.TableSetupColumn("Forbidden By", ImGuiTableColumnFlags.None, 290);
+                        ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.None, 70);
+
+                        ImGui.TableHeadersRow();
+
+                        foreach (var forbiddenFile in _apiController.ForbiddenFiles)
+                        {
+                            ImGui.TableNextColumn();
+
+                            ImGui.Text(forbiddenFile.Hash);
+                            ImGui.TableNextColumn();
+                            string by = forbiddenFile.ForbiddenBy;
+                            if (ImGui.InputText("##forbiddenBy" + forbiddenFile.Hash, ref by, 255))
+                            {
+                                forbiddenFile.ForbiddenBy = by;
+                            }
+
+                            ImGui.TableNextColumn();
+                            if (_apiController.IsAdmin)
+                            {
+                                ImGui.PushFont(UiBuilder.IconFont);
+                                if (ImGui.Button(
+                                        FontAwesomeIcon.Upload.ToIconString() + "##updateFile" + forbiddenFile.Hash))
+                                {
+                                    _ = _apiController.AddOrUpdateForbiddenFileEntry(forbiddenFile);
+                                }
+
+                                ImGui.SameLine();
+                                if (ImGui.Button(FontAwesomeIcon.Trash.ToIconString() + "##deleteFile" +
+                                                 forbiddenFile.Hash))
+                                {
+                                    _ = _apiController.DeleteForbiddenFileEntry(forbiddenFile);
+                                }
+
+                                ImGui.PopFont();
+                            }
+
+                        }
+
+                        if (_apiController.IsAdmin)
+                        {
+                            ImGui.TableNextColumn();
+                            ImGui.InputText("##addFileHash", ref _forbiddenFileHashEntry, 255);
+                            ImGui.TableNextColumn();
+                            ImGui.InputText("##addForbiddenBy", ref _forbiddenFileHashForbiddenBy, 255);
+                            ImGui.TableNextColumn();
+                            ImGui.PushFont(UiBuilder.IconFont);
+                            if (ImGui.Button(FontAwesomeIcon.Plus.ToIconString() + "##addForbiddenFile"))
+                            {
+                                _ = _apiController.AddOrUpdateForbiddenFileEntry(new ForbiddenFileDto()
+                                {
+                                    ForbiddenBy = _forbiddenFileHashForbiddenBy,
+                                    Hash = _forbiddenFileHashEntry
+                                });
+                            }
+
+                            ImGui.PopFont();
+                            ImGui.NextColumn();
+                        }
+
+                        ImGui.EndTable();
+                    }
+
+                    ImGui.TreePop();
+                }
+
+                if (ImGui.TreeNode("Banned Users"))
+                {
+                    if (ImGui.BeginTable("BannedUsersTable", 3, ImGuiTableFlags.RowBg))
+                    {
+                        ImGui.TableSetupColumn("Character Hash", ImGuiTableColumnFlags.None, 290);
+                        ImGui.TableSetupColumn("Reason", ImGuiTableColumnFlags.None, 290);
+                        ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.None, 70);
+
+                        ImGui.TableHeadersRow();
+
+                        foreach (var bannedUser in _apiController.BannedUsers)
+                        {
+                            ImGui.TableNextColumn();
+                            ImGui.Text(bannedUser.CharacterHash);
+
+                            ImGui.TableNextColumn();
+                            string reason = bannedUser.Reason;
+                            ImGuiInputTextFlags moderatorFlags = _apiController.IsModerator
+                                ? ImGuiInputTextFlags.ReadOnly
+                                : ImGuiInputTextFlags.None;
+                            if (ImGui.InputText("##bannedReason" + bannedUser.CharacterHash, ref reason, 255,
+                                    moderatorFlags))
+                            {
+                                bannedUser.Reason = reason;
+                            }
+
+                            ImGui.TableNextColumn();
+                            ImGui.PushFont(UiBuilder.IconFont);
+                            if (_apiController.IsAdmin)
+                            {
+                                if (ImGui.Button(FontAwesomeIcon.Upload.ToIconString() + "##updateUser" +
+                                                 bannedUser.CharacterHash))
+                                {
+                                    _ = _apiController.AddOrUpdateBannedUserEntry(bannedUser);
+                                }
+
+                                ImGui.SameLine();
+                            }
+
+                            if (ImGui.Button(FontAwesomeIcon.Trash.ToIconString() + "##deleteUser" +
+                                             bannedUser.CharacterHash))
+                            {
+                                _ = _apiController.DeleteBannedUserEntry(bannedUser);
+                            }
+
+                            ImGui.PopFont();
+                        }
+
+                        ImGui.TableNextColumn();
+                        ImGui.InputText("##addUserHash", ref _bannedUserHashEntry, 255);
+
+                        ImGui.TableNextColumn();
+                        if (_apiController.IsAdmin)
+                        {
+                            ImGui.InputText("##addUserReason", ref _bannedUserReasonEntry, 255);
+                        }
+                        else
+                        {
+                            _bannedUserReasonEntry = "Banned by " + _uiShared.PlayerName;
+                            ImGui.InputText("##addUserReason", ref _bannedUserReasonEntry, 255,
+                                ImGuiInputTextFlags.ReadOnly);
+                        }
+
+                        ImGui.TableNextColumn();
+                        ImGui.PushFont(UiBuilder.IconFont);
+                        if (ImGui.Button(FontAwesomeIcon.Plus.ToIconString() + "##addForbiddenFile"))
+                        {
+                            _ = _apiController.AddOrUpdateBannedUserEntry(new BannedUserDto()
+                            {
+                                CharacterHash = _forbiddenFileHashForbiddenBy,
+                                Reason = _forbiddenFileHashEntry
+                            });
+                        }
+
+                        ImGui.PopFont();
+
+                        ImGui.EndTable();
+                    }
+
+                    ImGui.TreePop();
+                }
+
+                if (ImGui.TreeNode("Online Users"))
+                {
+                    if (ImGui.Button("Refresh Online Users"))
+                    {
+                        _ = _apiController.RefreshOnlineUsers();
+                    }
+
+                    if (ImGui.BeginTable("OnlineUsersTable", 3, ImGuiTableFlags.RowBg))
+                    {
+                        ImGui.TableSetupColumn("UID", ImGuiTableColumnFlags.None, 100);
+                        ImGui.TableSetupColumn("Character Hash", ImGuiTableColumnFlags.None, 300);
+                        ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.None, 70);
+
+                        ImGui.TableHeadersRow();
+
+                        foreach (var onlineUser in _apiController.AdminOnlineUsers)
+                        {
+                            ImGui.TableNextColumn();
+                            ImGui.PushFont(UiBuilder.IconFont);
+                            string icon = onlineUser.IsModerator
+                                ? FontAwesomeIcon.ChessKing.ToIconString()
+                                : onlineUser.IsAdmin
+                                    ? FontAwesomeIcon.Crown.ToIconString()
+                                    : FontAwesomeIcon.User.ToIconString();
+                            ImGui.Text(icon);
+                            ImGui.PopFont();
+                            ImGui.SameLine();
+
+                            ImGui.Text(onlineUser.UID);
+                            ImGui.SameLine();
+                            ImGui.PushFont(UiBuilder.IconFont);
+                            if (ImGui.Button(FontAwesomeIcon.Copy.ToIconString() + "##onlineUserCopyUID" +
+                                             onlineUser.CharacterNameHash))
+                            {
+                                ImGui.SetClipboardText(onlineUser.UID);
+                            }
+
+                            ImGui.PopFont();
+
+                            ImGui.TableNextColumn();
+                            string charNameHash = onlineUser.CharacterNameHash;
+                            ImGui.InputText("##onlineUserHash" + onlineUser.CharacterNameHash, ref charNameHash, 255,
+                                ImGuiInputTextFlags.ReadOnly);
+                            ImGui.SameLine();
+                            ImGui.PushFont(UiBuilder.IconFont);
+                            if (ImGui.Button(FontAwesomeIcon.Copy.ToIconString() + "##onlineUserCopyHash" +
+                                             onlineUser.CharacterNameHash))
+                            {
+                                ImGui.SetClipboardText(onlineUser.UID);
+                            }
+
+                            ImGui.PopFont();
+
+                            ImGui.TableNextColumn();
+                            ImGui.PushFont(UiBuilder.IconFont);
+                            if (ImGui.Button(FontAwesomeIcon.SkullCrossbones.ToIconString() + "##onlineUserBan" +
+                                             onlineUser.CharacterNameHash))
+                            {
+                                _ = _apiController.AddOrUpdateBannedUserEntry(new BannedUserDto
+                                {
+                                    CharacterHash = onlineUser.CharacterNameHash,
+                                    Reason = "Banned by " + _uiShared.PlayerName
+                                });
+                            }
+                            ImGui.SameLine();
+                            if (onlineUser.UID != _apiController.UID && _apiController.IsAdmin)
+                            {
+                                if (!onlineUser.IsModerator)
+                                {
+                                    if (ImGui.Button(FontAwesomeIcon.ChessKing.ToIconString() +
+                                                     "##onlineUserModerator" +
+                                                     onlineUser.CharacterNameHash))
+                                    {
+                                        _apiController.PromoteToModerator(onlineUser.UID);
+                                    }
+                                }
+                                else
+                                {
+                                    if (ImGui.Button(FontAwesomeIcon.User.ToIconString() +
+                                                     "##onlineUserNonModerator" +
+                                                     onlineUser.CharacterNameHash))
+                                    {
+                                        _apiController.DemoteFromModerator(onlineUser.UID);
+                                    }
+                                }
+                            }
+
+                            ImGui.PopFont();
+                        }
+                        ImGui.EndTable();
+                    }
+                    ImGui.TreePop();
+                }
+                ImGui.TreePop();
+            }
         }
 
         private bool _deleteFilesPopupModalShown = false;
         private bool _deleteAccountPopupModalShown = false;
 
-        private void DrawAdministration(bool serverAlive)
+        private void DrawUserAdministration(bool serverAlive)
         {
             if (ImGui.TreeNode(
                     $"User Administration"))
@@ -242,8 +504,8 @@ namespace MareSynchronos.UI
                 if (ImGui.BeginTable("TransfersTable", 2))
                 {
                     ImGui.TableSetupColumn(
-                        $"Uploads ({UiShared.ByteToString(_apiController.CurrentUploads.Sum(a => a.Value.Item1))} / {UiShared.ByteToString(_apiController.CurrentUploads.Sum(a => a.Value.Item2))})");
-                    ImGui.TableSetupColumn($"Downloads ({UiShared.ByteToString(_apiController.CurrentDownloads.Sum(a => a.Value.Item1))} / {UiShared.ByteToString(_apiController.CurrentDownloads.Sum(a => a.Value.Item2))})");
+                        $"Uploads ({UiShared.ByteToString(_apiController.CurrentUploads.Sum(a => a.Transferred))} / {UiShared.ByteToString(_apiController.CurrentUploads.Sum(a => a.Total))})");
+                    ImGui.TableSetupColumn($"Downloads ({UiShared.ByteToString(_apiController.CurrentDownloads.Sum(a => a.Transferred))} / {UiShared.ByteToString(_apiController.CurrentDownloads.Sum(a => a.Total))})");
 
                     ImGui.TableHeadersRow();
 
@@ -254,16 +516,16 @@ namespace MareSynchronos.UI
                         ImGui.TableSetupColumn("Uploaded");
                         ImGui.TableSetupColumn("Size");
                         ImGui.TableHeadersRow();
-                        foreach (var hash in _apiController.CurrentUploads.Keys)
+                        foreach (var transfer in _apiController.CurrentUploads)
                         {
-                            var color = UiShared.UploadColor(_apiController.CurrentUploads[hash]);
+                            var color = UiShared.UploadColor((transfer.Transferred, transfer.Total));
                             ImGui.PushStyleColor(ImGuiCol.Text, color);
                             ImGui.TableNextColumn();
-                            ImGui.Text(hash);
+                            ImGui.Text(transfer.Hash);
                             ImGui.TableNextColumn();
-                            ImGui.Text(UiShared.ByteToString(_apiController.CurrentUploads[hash].Item1));
+                            ImGui.Text(UiShared.ByteToString(transfer.Transferred));
                             ImGui.TableNextColumn();
-                            ImGui.Text(UiShared.ByteToString(_apiController.CurrentUploads[hash].Item2));
+                            ImGui.Text(UiShared.ByteToString(transfer.Total));
                             ImGui.PopStyleColor();
                             ImGui.TableNextRow();
                         }
@@ -278,16 +540,16 @@ namespace MareSynchronos.UI
                         ImGui.TableSetupColumn("Downloaded");
                         ImGui.TableSetupColumn("Size");
                         ImGui.TableHeadersRow();
-                        foreach (var hash in _apiController.CurrentDownloads.Keys)
+                        foreach (var transfer in _apiController.CurrentDownloads)
                         {
-                            var color = UiShared.UploadColor(_apiController.CurrentDownloads[hash]);
+                            var color = UiShared.UploadColor((transfer.Transferred, transfer.Total));
                             ImGui.PushStyleColor(ImGuiCol.Text, color);
                             ImGui.TableNextColumn();
-                            ImGui.Text(hash);
+                            ImGui.Text(transfer.Hash);
                             ImGui.TableNextColumn();
-                            ImGui.Text(UiShared.ByteToString(_apiController.CurrentDownloads[hash].Item1));
+                            ImGui.Text(UiShared.ByteToString(transfer.Transferred));
                             ImGui.TableNextColumn();
-                            ImGui.Text(UiShared.ByteToString(_apiController.CurrentDownloads[hash].Item2));
+                            ImGui.Text(UiShared.ByteToString(transfer.Total));
                             ImGui.PopStyleColor();
                             ImGui.TableNextRow();
                         }
