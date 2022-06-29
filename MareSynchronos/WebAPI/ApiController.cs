@@ -38,6 +38,7 @@ namespace MareSynchronos.WebAPI
         private CancellationTokenSource? _uploadCancellationTokenSource;
 
         private HubConnection? _userHub;
+        public bool IsAdmin { private set; get; }
 
         public ApiController(Configuration pluginConfiguration, DalamudUtil dalamudUtil)
         {
@@ -137,7 +138,9 @@ namespace MareSynchronos.WebAPI
                         return;
                     }
 
-                    UID = await _heartbeatHub.InvokeAsync<string>("Heartbeat", token);
+                    var userDto = await _heartbeatHub.InvokeAsync<UserDto>("Heartbeat", token);
+                    UID = userDto.UID;
+                    IsAdmin = userDto.IsAdmin;
                     if (!string.IsNullOrEmpty(UID) && !token.IsCancellationRequested) // user is authorized
                     {
                         Logger.Debug("Initializing data");
@@ -212,7 +215,9 @@ namespace MareSynchronos.WebAPI
         {
             Logger.Debug("Connection restored");
             OnlineUsers = _userHub!.InvokeAsync<int>("GetOnlineUsers").Result;
-            UID = _heartbeatHub!.InvokeAsync<string>("Heartbeat").Result;
+            var userDto = _heartbeatHub!.InvokeAsync<UserDto>("Heartbeat").Result;
+            IsAdmin = userDto.IsAdmin;
+            UID = userDto.UID;
             Connected?.Invoke(this, EventArgs.Empty);
             return Task.CompletedTask;
         }
