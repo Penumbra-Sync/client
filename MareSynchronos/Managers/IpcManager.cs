@@ -4,6 +4,7 @@ using Dalamud.Plugin.Ipc;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Dalamud.Game.ClientState.Objects.Types;
 using MareSynchronos.Utils;
 
 namespace MareSynchronos.Managers
@@ -11,11 +12,11 @@ namespace MareSynchronos.Managers
     public class IpcManager : IDisposable
     {
         private readonly ICallGateSubscriber<int> _glamourerApiVersion;
-        private readonly ICallGateSubscriber<string, string, object>? _glamourerApplyAll;
-        private readonly ICallGateSubscriber<string, string>? _glamourerGetAllCustomization;
-        private readonly ICallGateSubscriber<string, object> _glamourerRevertCustomization;
-        private readonly ICallGateSubscriber<string, string, object>? _glamourerApplyOnlyEquipment;
-        private readonly ICallGateSubscriber<string, string, object>? _glamourerApplyOnlyCustomization;
+        private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyAll;
+        private readonly ICallGateSubscriber<GameObject?, string>? _glamourerGetAllCustomization;
+        private readonly ICallGateSubscriber<GameObject?, object> _glamourerRevertCustomization;
+        private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyOnlyEquipment;
+        private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyOnlyCustomization;
         private readonly ICallGateSubscriber<int> _penumbraApiVersion;
         private readonly ICallGateSubscriber<string, string, bool, (int, string)> _penumbraCreateTemporaryCollection;
         private readonly ICallGateSubscriber<string, string> _penumbraGetMetaManipulations;
@@ -45,11 +46,11 @@ namespace MareSynchronos.Managers
                 pi.GetIpcSubscriber<string, string>("Penumbra.GetMetaManipulations");
 
             _glamourerApiVersion = pi.GetIpcSubscriber<int>("Glamourer.ApiVersion");
-            _glamourerGetAllCustomization = pi.GetIpcSubscriber<string, string>("Glamourer.GetAllCustomization");
-            _glamourerApplyAll = pi.GetIpcSubscriber<string, string, object>("Glamourer.ApplyAll");
-            _glamourerApplyOnlyCustomization = pi.GetIpcSubscriber<string, string, object>("Glamourer.ApplyOnlyCustomization");
-            _glamourerApplyOnlyEquipment = pi.GetIpcSubscriber<string, string, object>("Glamourer.ApplyOnlyEquipment");
-            _glamourerRevertCustomization = pi.GetIpcSubscriber<string, object>("Glamourer.Revert");
+            _glamourerGetAllCustomization = pi.GetIpcSubscriber<GameObject?, string>("Glamourer.GetAllCustomizationFromCharacter");
+            _glamourerApplyAll = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyAllToCharacter");
+            _glamourerApplyOnlyCustomization = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyOnlyCustomizationToCharacter");
+            _glamourerApplyOnlyEquipment = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyOnlyEquipmentToCharacter");
+            _glamourerRevertCustomization = pi.GetIpcSubscriber<GameObject?, object>("Glamourer.RevertCharacter");
 
             _penumbraObjectIsRedrawn.Subscribe(RedrawEvent);
             _penumbraInit.Subscribe(PenumbraInit);
@@ -110,37 +111,37 @@ namespace MareSynchronos.Managers
             Logger.Debug("IPC Manager disposed");
         }
 
-        public void GlamourerApplyAll(string customization, string characterName)
+        public void GlamourerApplyAll(string customization, GameObject character)
         {
             if (!CheckGlamourerApi()) return;
-            Logger.Debug("Glamourer apply all to " + characterName);
-            _glamourerApplyAll!.InvokeAction(customization, characterName);
+            Logger.Debug("Glamourer apply all to " + character);
+            _glamourerApplyAll!.InvokeAction(customization, character);
         }
 
-        public void GlamourerApplyOnlyEquipment(string customization, string characterName)
+        public void GlamourerApplyOnlyEquipment(string customization, GameObject character)
         {
             if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
-            Logger.Debug("Glamourer apply only equipment to " + characterName);
-            _glamourerApplyOnlyEquipment!.InvokeAction(customization, characterName);
+            Logger.Debug("Glamourer apply only equipment to " + character);
+            _glamourerApplyOnlyEquipment!.InvokeAction(customization, character);
         }
 
-        public void GlamourerApplyOnlyCustomization(string customization, string characterName)
+        public void GlamourerApplyOnlyCustomization(string customization, GameObject character)
         {
             if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
-            Logger.Debug("Glamourer apply only customization to " + characterName);
-            _glamourerApplyOnlyCustomization!.InvokeAction(customization, characterName);
+            Logger.Debug("Glamourer apply only customization to " + character);
+            _glamourerApplyOnlyCustomization!.InvokeAction(customization, character);
         }
 
-        public string GlamourerGetCharacterCustomization(string characterName)
+        public string GlamourerGetCharacterCustomization(GameObject character)
         {
             if (!CheckGlamourerApi()) return string.Empty;
-            return _glamourerGetAllCustomization!.InvokeFunc(characterName);
+            return _glamourerGetAllCustomization!.InvokeFunc(character);
         }
 
-        public void GlamourerRevertCharacterCustomization(string characterName)
+        public void GlamourerRevertCharacterCustomization(GameObject character)
         {
             if (!CheckGlamourerApi()) return;
-            _glamourerRevertCustomization!.InvokeAction(characterName);
+            _glamourerRevertCustomization!.InvokeAction(character);
         }
 
         public string PenumbraCreateTemporaryCollection(string characterName)

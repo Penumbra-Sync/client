@@ -56,23 +56,6 @@ namespace MareSynchronos.WebAPI
             foreach (var file in fileReplacementDto)
             {
                 downloadFiles.Add(await _fileHub!.InvokeAsync<DownloadFileDto>("GetFileSize", file.Hash, ct));
-                /*var downloadFileDto = ;
-                var downloadFileTransfer = new DownloadFileTransfer(downloadFileDto);
-                if (CurrentDownloads.Any(f => f.Hash == downloadFileTransfer.Hash))
-                {
-                    if (fileTransferList.All(f => f.Hash != downloadFileTransfer.Hash))
-                    {
-                        fileTransferList.Add(downloadFileTransfer);
-                    }
-
-                    continue;
-                }
-
-                if (fileTransferList.All(f => f.Hash != downloadFileTransfer.Hash))
-                {
-                    fileTransferList.Add(downloadFileTransfer);
-                }
-                CurrentDownloads.Add(new DownloadFileTransfer(downloadFileDto));*/
             }
 
             downloadFiles = downloadFiles.Distinct().ToList();
@@ -140,7 +123,7 @@ namespace MareSynchronos.WebAPI
             CurrentDownloads.RemoveAll(d => d.Transferred == d.Total);
         }
 
-        public async Task SendCharacterData(CharacterCacheDto character, List<string> visibleCharacterIds)
+        public async Task PushCharacterData(CharacterCacheDto character, List<string> visibleCharacterIds)
         {
             if (!IsConnected || SecretKey == "-") return;
             Logger.Debug("Sending Character data to service " + ApiUri);
@@ -155,10 +138,19 @@ namespace MareSynchronos.WebAPI
             foreach (var file in filesToUpload.Where(f => !f.IsForbidden))
             {
                 await using var db = new FileCacheContext();
-                CurrentUploads.Add(new UploadFileTransfer(file)
+                try
                 {
-                    Total = new FileInfo(db.FileCaches.First(f => f.Hash == file.Hash).Filepath).Length
-                });
+                    CurrentUploads.Add(new UploadFileTransfer(file)
+                    {
+                        Total = new FileInfo(db.FileCaches.FirstOrDefault(f => f.Hash.ToLower() == file.Hash.ToLower())
+                            ?.Filepath ?? string.Empty).Length
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn("Tried to request file " + file.Hash + " but file was not present");
+                    Logger.Warn(ex.StackTrace!);
+                }
             }
 
             foreach (var file in CurrentUploads.Where(c => c.IsForbidden))
@@ -197,7 +189,7 @@ namespace MareSynchronos.WebAPI
             if (!uploadToken.IsCancellationRequested)
             {
                 Logger.Verbose("=== Pushing character data ===");
-                await _userHub!.InvokeAsync("PushCharacterData", character, visibleCharacterIds, uploadToken);
+                await _userHub!.InvokeAsync("PushCharacterDataToVisibleClients", character, visibleCharacterIds, uploadToken);
             }
             else
             {

@@ -1,40 +1,41 @@
-﻿using Dalamud.Logging;
-using MareSynchronos.Factories;
+﻿using MareSynchronos.Factories;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using Newtonsoft.Json;
 using System;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Dalamud.Game.ClientState.Objects;
+using MareSynchronos.API;
 using Penumbra.GameData.Structs;
 
 namespace MareSynchronos.Managers
 {
+    public delegate void PlayerHasChanged(CharacterCacheDto characterCache);
+
     public class PlayerManager : IDisposable
     {
         private readonly ApiController _apiController;
-        private readonly OnlinePlayerManager _onlinePlayerManager;
         private readonly CharacterDataFactory _characterDataFactory;
         private readonly DalamudUtil _dalamudUtil;
         private readonly IpcManager _ipcManager;
-        private string _lastSentHash = string.Empty;
+        public event PlayerHasChanged? PlayerHasChanged;
+        public bool SendingData { get; private set; }
+        public CharacterData? LastSentCharacterData { get; private set; }
+
         private CancellationTokenSource? _playerChangedCts;
         private DateTime _lastPlayerObjectCheck;
-        private CharacterEquipment _currentCharacterEquipment;
+        private CharacterEquipment? _currentCharacterEquipment;
 
         public PlayerManager(ApiController apiController, IpcManager ipcManager,
-            CharacterDataFactory characterDataFactory, OnlinePlayerManager onlinePlayerManager, DalamudUtil dalamudUtil)
+            CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil)
         {
             Logger.Debug("Creating " + nameof(PlayerManager));
 
             _apiController = apiController;
             _ipcManager = ipcManager;
             _characterDataFactory = characterDataFactory;
-            _onlinePlayerManager = onlinePlayerManager;
             _dalamudUtil = dalamudUtil;
 
             _apiController.Connected += ApiController_Connected;
@@ -75,12 +76,6 @@ namespace MareSynchronos.Managers
         private void ApiController_Connected(object? sender, EventArgs args)
         {
             Logger.Debug("ApiController Connected");
-            var apiTask = _apiController.GetOnlineCharacters();
-            _lastSentHash = string.Empty;
-
-            Task.WaitAll(apiTask);
-
-            _onlinePlayerManager.AddInitialPairs(apiTask.Result);
 
             _ipcManager.PenumbraRedrawEvent += IpcManager_PenumbraRedrawEvent;
             _dalamudUtil.FrameworkUpdate += DalamudUtilOnFrameworkUpdate;
@@ -154,6 +149,7 @@ namespace MareSynchronos.Managers
 
             Task.Run(async () =>
             {
+                SendingData = true;
                 int attempts = 0;
                 while (!_apiController.IsConnected && attempts < 10 && !token.IsCancellationRequested)
                 {
@@ -167,11 +163,11 @@ namespace MareSynchronos.Managers
                 Stopwatch st = Stopwatch.StartNew();
                 _dalamudUtil.WaitWhileSelfIsDrawing(token);
 
-                var characterCacheTask = await CreateFullCharacterCache(token);
+                var characterCache = await CreateFullCharacterCache(token);
 
                 if (token.IsCancellationRequested) return;
 
-                var cacheDto = characterCacheTask.ToCharacterCacheDto();
+                var cacheDto = characterCache.ToCharacterCacheDto();
                 st.Stop();
 
                 if (token.IsCancellationRequested)
@@ -180,13 +176,16 @@ namespace MareSynchronos.Managers
                 }
 
                 Logger.Debug("Elapsed time PlayerChangedTask: " + st.Elapsed);
-                if (cacheDto.Hash == _lastSentHash)
+                if (cacheDto.Hash == (LastSentCharacterData?.CacheHash ?? "-"))
                 {
                     Logger.Debug("Not sending data, already sent");
                     return;
                 }
-                _ = _apiController.SendCharacterData(cacheDto, _dalamudUtil.GetLocalPlayers().Select(d => d.Key).ToList());
-                _lastSentHash = cacheDto.Hash;
+
+                LastSentCharacterData = characterCache;
+                PlayerHasChanged?.Invoke(cacheDto);
+                SendingData = false;
+
             }, token);
         }
 

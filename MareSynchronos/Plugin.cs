@@ -168,10 +168,10 @@ namespace MareSynchronos
             {
                 var characterCacheFactory =
                     new CharacterDataFactory(_dalamudUtil, _ipcManager);
-                _characterCacheManager = new OnlinePlayerManager(_framework,
-                    _apiController, _dalamudUtil, _ipcManager);
                 _playerManager = new PlayerManager(_apiController, _ipcManager,
-                    characterCacheFactory, _characterCacheManager, _dalamudUtil);
+                    characterCacheFactory, _dalamudUtil);
+                _characterCacheManager = new OnlinePlayerManager(_framework,
+                    _apiController, _dalamudUtil, _ipcManager, _playerManager);
             }
             catch (Exception ex)
             {

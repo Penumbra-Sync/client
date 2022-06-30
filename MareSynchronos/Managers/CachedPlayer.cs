@@ -60,6 +60,26 @@ public class CachedPlayer
 
     private CharacterEquipment? _currentCharacterEquipment;
 
+    public void ApplyCharacterData(CharacterCacheDto characterData)
+    {
+        Logger.Debug("Received data for " + this);
+
+        Logger.Debug("Checking for files to download for player " + PlayerName);
+        Logger.Debug("Hash for data is " + characterData.Hash);
+        if (!_cache.ContainsKey(characterData.Hash))
+        {
+            Logger.Debug("Received total " + characterData.FileReplacements.Count + " file replacement data");
+            _cache[characterData.Hash] = characterData;
+        }
+        else
+        {
+            Logger.Debug("Had valid local cache for " + PlayerName);
+        }
+        _lastAppliedEquipmentHash = characterData.Hash;
+
+        DownloadAndApplyCharacter();
+    }
+
     private void ApiControllerOnCharacterReceived(object? sender, CharacterReceivedEventArgs e)
     {
         if (string.IsNullOrEmpty(PlayerName) || e.CharacterNameHash != PlayerNameHash) return;
@@ -147,7 +167,7 @@ public class CachedPlayer
         Logger.Debug(
             $"Request Redraw for {PlayerName}");
         _ipcManager.PenumbraSetTemporaryMods(tempCollection, moddedPaths, cache.ManipulationData);
-        _ipcManager.GlamourerApplyAll(cache.GlamourerData, PlayerName!);
+        _ipcManager.GlamourerApplyAll(cache.GlamourerData, PlayerCharacter!);
     }
 
     public void DisposePlayer()
@@ -166,8 +186,8 @@ public class CachedPlayer
             _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName);
             if (PlayerCharacter != null)
             {
-                _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerName);
-                _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerName);
+                _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerCharacter);
+                _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerCharacter);
             }
         }
         catch (Exception ex)
@@ -182,7 +202,7 @@ public class CachedPlayer
         }
     }
 
-    public void InitializePlayer(PlayerCharacter character)
+    public void InitializePlayer(PlayerCharacter character, CharacterCacheDto? cache)
     {
         IsVisible = true;
         PlayerName = character.Name.ToString();
@@ -190,10 +210,12 @@ public class CachedPlayer
         Logger.Debug("Initializing Player " + this);
         _dalamudUtil.FrameworkUpdate += DalamudUtilOnFrameworkUpdate;
         _ipcManager.PenumbraRedrawEvent += IpcManagerOnPenumbraRedrawEvent;
-        _apiController.CharacterReceived += ApiControllerOnCharacterReceived;
-        _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerName);
+        _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
         _currentCharacterEquipment = new CharacterEquipment(PlayerCharacter);
-        _lastPlayerObjectCheck = DateTime.Now;
+        if (cache != null)
+        {
+            ApplyCharacterData(cache);
+        }
     }
 
     private void DalamudUtilOnFrameworkUpdate()
@@ -250,11 +272,10 @@ public class CachedPlayer
     private void OnPlayerChanged()
     {
         Logger.Debug($"Player {PlayerName} changed, PenumbraRedraw is {RequestedPenumbraRedraw}");
-        PlayerCharacter = _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName!);
         if (!RequestedPenumbraRedraw && PlayerCharacter is not null)
         {
             Logger.Debug($"Saving new Glamourer data");
-            _lastGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerName!);
+            _lastGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter!);
         }
     }
 }

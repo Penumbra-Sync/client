@@ -3,8 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Dalamud.Game;
+using MareSynchronos.API;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
+using MareSynchronos.WebAPI.Utils;
 
 namespace MareSynchronos.Managers;
 
@@ -14,10 +16,15 @@ public class OnlinePlayerManager : IDisposable
     private readonly DalamudUtil _dalamudUtil;
     private readonly Framework _framework;
     private readonly IpcManager _ipcManager;
+    private readonly PlayerManager _playerManager;
     private readonly List<CachedPlayer> _onlineCachedPlayers = new();
+    private readonly Dictionary<string, CharacterCacheDto> _temporaryStoredCharacterCache = new();
+
+    private List<string> OnlineVisiblePlayerHashes => _onlineCachedPlayers.Where(p => p.PlayerCharacter != null)
+        .Select(p => p.PlayerNameHash).ToList();
     private DateTime _lastPlayerObjectCheck = DateTime.Now;
 
-    public OnlinePlayerManager(Framework framework, ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager)
+    public OnlinePlayerManager(Framework framework, ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager, PlayerManager playerManager)
     {
         Logger.Debug("Creating " + nameof(OnlinePlayerManager));
 
@@ -25,12 +32,15 @@ public class OnlinePlayerManager : IDisposable
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
         _ipcManager = ipcManager;
+        _playerManager = playerManager;
 
         _apiController.PairedClientOnline += ApiControllerOnPairedClientOnline;
         _apiController.PairedClientOffline += ApiControllerOnPairedClientOffline;
         _apiController.PairedWithOther += ApiControllerOnPairedWithOther;
         _apiController.UnpairedFromOther += ApiControllerOnUnpairedFromOther;
+        _apiController.Connected += ApiControllerOnConnected;
         _apiController.Disconnected += ApiControllerOnDisconnected;
+        _apiController.CharacterReceived += ApiControllerOnCharacterReceived;
 
         _ipcManager.PenumbraDisposed += IpcManagerOnPenumbraDisposed;
 
@@ -41,6 +51,37 @@ public class OnlinePlayerManager : IDisposable
         {
             DalamudUtilOnLogIn();
         }
+    }
+
+    private void ApiControllerOnCharacterReceived(object? sender, CharacterReceivedEventArgs e)
+    {
+        var visiblePlayer = _onlineCachedPlayers.SingleOrDefault(c => c.IsVisible && c.PlayerNameHash == e.CharacterNameHash);
+        if (visiblePlayer != null)
+        {
+            Logger.Debug("Received data and applying to " + e.CharacterNameHash);
+            visiblePlayer.ApplyCharacterData(e.CharacterData);
+        }
+        else
+        {
+            Logger.Debug("Received data but no fitting character visible for " + e.CharacterNameHash);
+            _temporaryStoredCharacterCache[e.CharacterNameHash] = e.CharacterData;
+        }
+    }
+
+    private void PlayerManagerOnPlayerHasChanged(CharacterCacheDto characterCache)
+    {
+        _ = _apiController.PushCharacterData(characterCache, OnlineVisiblePlayerHashes);
+    }
+
+    private void ApiControllerOnConnected(object? sender, EventArgs e)
+    {
+        var apiTask = _apiController.GetOnlineCharacters();
+
+        Task.WaitAll(apiTask);
+
+        AddInitialPairs(apiTask.Result);
+
+        _playerManager.PlayerHasChanged += PlayerManagerOnPlayerHasChanged;
     }
 
     private void DalamudUtilOnLogOut()
@@ -61,6 +102,7 @@ public class OnlinePlayerManager : IDisposable
     private void ApiControllerOnDisconnected(object? sender, EventArgs e)
     {
         RestoreAllCharacters();
+        _playerManager.PlayerHasChanged -= PlayerManagerOnPlayerHasChanged;
     }
 
     public void AddInitialPairs(List<string> apiTaskResult)
@@ -163,12 +205,24 @@ public class OnlinePlayerManager : IDisposable
                 continue;
             }
 
-            _onlineCachedPlayers.SingleOrDefault(p => p.PlayerNameHash == hashedName)?.InitializePlayer(pChar);
+            if (_temporaryStoredCharacterCache.TryGetValue(hashedName, out var cache))
+            {
+                _temporaryStoredCharacterCache.Remove(hashedName);
+            }
+            _onlineCachedPlayers.SingleOrDefault(p => p.PlayerNameHash == hashedName)?.InitializePlayer(pChar, cache);
         }
 
-        Task.Run(async () => await UpdatePlayersFromService(_onlineCachedPlayers
-            .Where(p => p.PlayerCharacter != null && p.IsVisible && !p.WasVisible)
-            .ToDictionary(k => k.PlayerNameHash, k => (int)k.PlayerCharacter!.ClassJob.Id)));
+        var newlyVisiblePlayers = _onlineCachedPlayers
+            .Where(p => p.PlayerCharacter != null && p.IsVisible && !p.WasVisible).Select(p => p.PlayerNameHash)
+            .ToList();
+        if (newlyVisiblePlayers.Any() && _playerManager.LastSentCharacterData != null)
+        {
+            Task.Run(async () =>
+            {
+                await _apiController.PushCharacterData(_playerManager.LastSentCharacterData.ToCharacterCacheDto(),
+                    newlyVisiblePlayers);
+            });
+        }
 
         _lastPlayerObjectCheck = DateTime.Now;
     }
