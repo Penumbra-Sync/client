@@ -40,17 +40,6 @@ namespace MareSynchronos.Factories
             {
                 fileReplacement.GamePaths = new List<string> { path };
                 fileReplacement.SetResolvedPath(_ipcManager.PenumbraResolvePath(path, _dalamudUtil.PlayerName)!);
-                if (!fileReplacement.HasFileReplacement)
-                {
-                    // try resolving tex with -- in name instead
-                    path = path.Insert(path.LastIndexOf('/') + 1, "--");
-                    var reResolvedPath = _ipcManager.PenumbraResolvePath(path, _dalamudUtil.PlayerName)!;
-                    if (reResolvedPath != path)
-                    {
-                        fileReplacement.GamePaths = new List<string>() { path };
-                        fileReplacement.SetResolvedPath(reResolvedPath);
-                    }
-                }
             }
 
             return fileReplacement;
@@ -93,8 +82,8 @@ namespace MareSynchronos.Factories
                 var mdlPath = new Utf8String(mdl->ResourceHandle->FileName()).ToString();
 
                 FileReplacement mdlFileReplacement = CreateFileReplacement(mdlPath);
-                Logger.Verbose("Model " + string.Join(", ", mdlFileReplacement.GamePaths));
-                Logger.Verbose("\t\t=> " + mdlFileReplacement.ResolvedPath);
+                Logger.Debug("Model " + string.Join(", ", mdlFileReplacement.GamePaths));
+                Logger.Debug("\t\t=> " + mdlFileReplacement.ResolvedPath);
 
                 cache.AddFileReplacement(mdlFileReplacement);
 
@@ -104,9 +93,11 @@ namespace MareSynchronos.Factories
                     if (mtrl == null) continue;
 
                     var mtrlPath = new Utf8String(mtrl->ResourceHandle->FileName()).ToString().Split("|")[2];
+
                     var mtrlFileReplacement = CreateFileReplacement(mtrlPath);
-                    Logger.Verbose("\tMaterial " + string.Join(", ", mtrlFileReplacement.GamePaths));
-                    Logger.Verbose("\t\t\t=> " + mtrlFileReplacement.ResolvedPath);
+                    Logger.Debug("\tMaterial " + string.Join(", ", mtrlFileReplacement.GamePaths));
+                    Logger.Debug("\t\t\t=> " + mtrlFileReplacement.ResolvedPath);
+
                     cache.AddFileReplacement(mtrlFileReplacement);
 
                     var mtrlResourceHandle = (MtrlResource*)mtrl->ResourceHandle;
@@ -117,9 +108,19 @@ namespace MareSynchronos.Factories
                         if (string.IsNullOrEmpty(texPath)) continue;
 
                         var texFileReplacement = CreateFileReplacement(texPath);
-                        Logger.Verbose("\t\tTexture " + string.Join(", ", texFileReplacement.GamePaths));
-                        Logger.Verbose("\t\t\t\t=> " + texFileReplacement.ResolvedPath);
+                        Logger.Debug("\t\tTexture " + string.Join(", ", texFileReplacement.GamePaths));
+                        Logger.Debug("\t\t\t\t=> " + texFileReplacement.ResolvedPath);
+
                         cache.AddFileReplacement(texFileReplacement);
+
+                        if (texPath.Contains("/--")) continue;
+
+                        var texDoubleMinusFileReplacement =
+                            CreateFileReplacement(texPath.Insert(texPath.LastIndexOf('/') + 1, "--"));
+
+                        Logger.Debug("\t\tTexture-- " + string.Join(", ", texDoubleMinusFileReplacement.GamePaths));
+                        Logger.Debug("\t\t\t\t=> " + texDoubleMinusFileReplacement.ResolvedPath);
+                        cache.AddFileReplacement(texDoubleMinusFileReplacement);
                     }
                 }
             }

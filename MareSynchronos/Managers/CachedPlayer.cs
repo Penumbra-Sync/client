@@ -39,6 +39,7 @@ public class CachedPlayer
         }
     }
 
+    private bool _isDisposed = false;
     private CancellationTokenSource? _downloadCancellationTokenSource;
 
     private string _lastGlamourerData = string.Empty;
@@ -172,7 +173,8 @@ public class CachedPlayer
 
     public void DisposePlayer()
     {
-        Logger.Debug("Disposing " + PlayerNameHash);
+        Logger.Debug("Disposing " + PlayerName + " (" + PlayerNameHash + ")");
+        if (_isDisposed) return;
         if (string.IsNullOrEmpty(PlayerName)) return;
         try
         {
@@ -199,6 +201,7 @@ public class CachedPlayer
             PlayerName = string.Empty;
             PlayerCharacter = null;
             IsVisible = false;
+            _isDisposed = true;
         }
     }
 
@@ -212,6 +215,7 @@ public class CachedPlayer
         _ipcManager.PenumbraRedrawEvent += IpcManagerOnPenumbraRedrawEvent;
         _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
         _currentCharacterEquipment = new CharacterEquipment(PlayerCharacter);
+        _isDisposed = false;
         if (cache != null)
         {
             ApplyCharacterData(cache);

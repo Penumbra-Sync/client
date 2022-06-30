@@ -7,6 +7,7 @@ using MareSynchronos.API;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Utils;
+using Newtonsoft.Json;
 
 namespace MareSynchronos.Managers;
 
@@ -70,7 +71,7 @@ public class OnlinePlayerManager : IDisposable
 
     private void PlayerManagerOnPlayerHasChanged(CharacterCacheDto characterCache)
     {
-        _ = _apiController.PushCharacterData(characterCache, OnlineVisiblePlayerHashes);
+        PushCharacterData(OnlineVisiblePlayerHashes);
     }
 
     private void ApiControllerOnConnected(object? sender, EventArgs e)
@@ -215,16 +216,22 @@ public class OnlinePlayerManager : IDisposable
         var newlyVisiblePlayers = _onlineCachedPlayers
             .Where(p => p.PlayerCharacter != null && p.IsVisible && !p.WasVisible).Select(p => p.PlayerNameHash)
             .ToList();
-        if (newlyVisiblePlayers.Any() && _playerManager.LastSentCharacterData != null)
+        PushCharacterData(newlyVisiblePlayers);
+
+        _lastPlayerObjectCheck = DateTime.Now;
+    }
+
+    private void PushCharacterData(List<string> visiblePlayers)
+    {
+        if (visiblePlayers.Any() && _playerManager.LastSentCharacterData != null)
         {
             Task.Run(async () =>
             {
+                Logger.Verbose(JsonConvert.SerializeObject(_playerManager.LastSentCharacterData!.ToCharacterCacheDto(), Formatting.Indented));
                 await _apiController.PushCharacterData(_playerManager.LastSentCharacterData.ToCharacterCacheDto(),
-                    newlyVisiblePlayers);
+                    visiblePlayers);
             });
         }
-
-        _lastPlayerObjectCheck = DateTime.Now;
     }
 
     private CachedPlayer CreateCachedPlayer(string hashedName)

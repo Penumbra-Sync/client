@@ -33,12 +33,7 @@ namespace MareSynchronos.Models
 
         [JsonProperty]
         public string Hash { get; set; } = string.Empty;
-
-        [JsonProperty]
-        public string ImcData { get; set; } = string.Empty;
-
-        public bool IsInUse { get; set; } = false;
-
+        
         [JsonProperty]
         public string ResolvedPath { get; set; } = string.Empty;
         
