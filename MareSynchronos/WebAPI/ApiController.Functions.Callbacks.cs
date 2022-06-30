@@ -54,10 +54,10 @@ namespace MareSynchronos.WebAPI
 
         private void UpdateOrAddBannedUserCallback(BannedUserDto obj)
         {
-            var user = BannedUsers.SingleOrDefault(b => b.CharacterHash == obj.CharacterHash);
+            var user = AdminBannedUsers.SingleOrDefault(b => b.CharacterHash == obj.CharacterHash);
             if (user == null)
             {
-                BannedUsers.Add(obj);
+                AdminBannedUsers.Add(obj);
             }
             else
             {
@@ -67,15 +67,15 @@ namespace MareSynchronos.WebAPI
 
         private void DeleteBannedUserCallback(BannedUserDto obj)
         {
-            BannedUsers.RemoveAll(a => a.CharacterHash == obj.CharacterHash);
+            AdminBannedUsers.RemoveAll(a => a.CharacterHash == obj.CharacterHash);
         }
 
         private void UpdateOrAddForbiddenFileCallback(ForbiddenFileDto obj)
         {
-            var user = ForbiddenFiles.SingleOrDefault(b => b.Hash == obj.Hash);
+            var user = AdminForbiddenFiles.SingleOrDefault(b => b.Hash == obj.Hash);
             if (user == null)
             {
-                ForbiddenFiles.Add(obj);
+                AdminForbiddenFiles.Add(obj);
             }
             else
             {
@@ -85,7 +85,7 @@ namespace MareSynchronos.WebAPI
 
         private void DeleteForbiddenFileCallback(ForbiddenFileDto obj)
         {
-            ForbiddenFiles.RemoveAll(f => f.Hash == obj.Hash);
+            AdminForbiddenFiles.RemoveAll(f => f.Hash == obj.Hash);
         }
     }
 }

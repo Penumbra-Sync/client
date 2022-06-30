@@ -32,6 +32,7 @@ namespace MareSynchronos.UI
             _fileDialogManager = fileDialogManager;
             _pluginConfiguration = pluginConfiguration;
             _dalamudUtil = dalamudUtil;
+            isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder);
         }
 
         public bool DrawOtherPluginState()
@@ -56,11 +57,6 @@ namespace MareSynchronos.UI
             }
 
             return true;
-        }
-
-        public void ForceRescan()
-        {
-            Task.Run(() => _ = _fileCacheManager.RescanTask(true));
         }
 
         public void DrawFileScanState()
@@ -300,7 +296,9 @@ namespace MareSynchronos.UI
             if (ImGui.InputText("Cache Folder##cache", ref cacheDirectory, 255))
             {
                 _pluginConfiguration.CacheFolder = cacheDirectory;
-                if (!string.IsNullOrEmpty(_pluginConfiguration.CacheFolder) && Directory.Exists(_pluginConfiguration.CacheFolder))
+                if (!string.IsNullOrEmpty(_pluginConfiguration.CacheFolder)
+                    && Directory.Exists(_pluginConfiguration.CacheFolder)
+                    && (isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder)))
                 {
                     _pluginConfiguration.Save();
                     _fileCacheManager.StartWatchers();
@@ -317,19 +315,25 @@ namespace MareSynchronos.UI
                     if (!success) return;
 
                     _pluginConfiguration.CacheFolder = path;
-                    _pluginConfiguration.Save();
-                    _fileCacheManager.StartWatchers();
+                    isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder);
+                    if (isDirectoryWritable)
+                    {
+                        _pluginConfiguration.Save();
+                        _fileCacheManager.StartWatchers();
+                    }
                 });
             }
             ImGui.PopFont();
 
-            if (!Directory.Exists(cacheDirectory) || !IsDirectoryWritable(cacheDirectory))
+            if (!Directory.Exists(cacheDirectory) || !isDirectoryWritable)
             {
                 ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
-                TextWrapped("The folder you selected does not exist. Please provide a valid path.");
+                TextWrapped("The folder you selected does not exist or cannot be written to. Please provide a valid path.");
                 ImGui.PopStyleColor();
             }
         }
+
+        private bool isDirectoryWritable = false;
 
         public bool IsDirectoryWritable(string dirPath, bool throwIfFails = false)
         {

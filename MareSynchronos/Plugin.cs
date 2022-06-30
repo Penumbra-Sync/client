@@ -13,7 +13,6 @@ using MareSynchronos.WebAPI;
 using Dalamud.Interface.Windowing;
 using MareSynchronos.UI;
 using MareSynchronos.Utils;
-using Penumbra.PlayerWatch;
 
 namespace MareSynchronos
 {
@@ -32,7 +31,7 @@ namespace MareSynchronos
         private readonly WindowSystem _windowSystem;
         private PlayerManager? _playerManager;
         private readonly DalamudUtil _dalamudUtil;
-        private CachedPlayersManager? _characterCacheManager;
+        private OnlinePlayerManager? _characterCacheManager;
         private readonly DownloadUi _downloadUi;
         private readonly FileDialogManager _fileDialogManager;
 
@@ -52,7 +51,7 @@ namespace MareSynchronos
             new FileCacheContext().Dispose(); // make sure db is initialized I guess
 
             // those can be initialized outside of game login
-            _dalamudUtil = new DalamudUtil(clientState, objectTable, PlayerWatchFactory.Create(framework, clientState, objectTable));
+            _dalamudUtil = new DalamudUtil(clientState, objectTable, framework);
 
             _apiController = new ApiController(_configuration, _dalamudUtil);
             _ipcManager = new IpcManager(PluginInterface);
@@ -115,7 +114,6 @@ namespace MareSynchronos
             _ipcManager?.Dispose();
             _playerManager?.Dispose();
             _characterCacheManager?.Dispose();
-            _dalamudUtil.Dispose();
         }
 
 
@@ -170,7 +168,7 @@ namespace MareSynchronos
             {
                 var characterCacheFactory =
                     new CharacterDataFactory(_dalamudUtil, _ipcManager);
-                _characterCacheManager = new CachedPlayersManager(_framework,
+                _characterCacheManager = new OnlinePlayerManager(_framework,
                     _apiController, _dalamudUtil, _ipcManager);
                 _playerManager = new PlayerManager(_apiController, _ipcManager,
                     characterCacheFactory, _characterCacheManager, _dalamudUtil);

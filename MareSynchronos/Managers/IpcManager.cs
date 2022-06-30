@@ -119,14 +119,14 @@ namespace MareSynchronos.Managers
 
         public void GlamourerApplyOnlyEquipment(string customization, string characterName)
         {
-            if (!CheckGlamourerApi()) return;
+            if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
             Logger.Debug("Glamourer apply only equipment to " + characterName);
             _glamourerApplyOnlyEquipment!.InvokeAction(customization, characterName);
         }
 
         public void GlamourerApplyOnlyCustomization(string customization, string characterName)
         {
-            if (!CheckGlamourerApi()) return;
+            if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
             Logger.Debug("Glamourer apply only customization to " + characterName);
             _glamourerApplyOnlyCustomization!.InvokeAction(customization, characterName);
         }

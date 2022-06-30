@@ -52,10 +52,11 @@ public class DownloadUi : Window, IDisposable
 
         if (_apiController.CurrentUploads.Any())
         {
-            var doneUploads = _apiController.CurrentUploads.Count(c => c.Total == c.Transferred);
-            var totalUploads = _apiController.CurrentUploads.Count;
-            var totalUploaded = _apiController.CurrentUploads.Sum(c => c.Transferred);
-            var totalToUpload = _apiController.CurrentUploads.Sum(c => c.Total);
+            var currentUploads = _apiController.CurrentUploads.ToList();
+            var doneUploads = currentUploads.Count(c => c.IsTransferred);
+            var totalUploads = currentUploads.Count;
+            var totalUploaded = currentUploads.Sum(c => c.Transferred);
+            var totalToUpload = currentUploads.Sum(c => c.Total);
             UiShared.DrawOutlinedFont(drawList, "▲",
                 new Vector2(basePosition.X + 0, basePosition.Y + (int)(yDistance * 0.5)),
                 UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
@@ -69,11 +70,12 @@ public class DownloadUi : Window, IDisposable
 
         if (_apiController.CurrentDownloads.Any())
         {
-            var multBase = _apiController.CurrentUploads.Any() ? 0 : 2;
-            var doneDownloads = _apiController.CurrentDownloads.Count(c => c.Total == c.Transferred);
-            var totalDownloads = _apiController.CurrentDownloads.Count;
-            var totalDownloaded = _apiController.CurrentDownloads.Sum(c => c.Transferred);
-            var totalToDownload = _apiController.CurrentDownloads.Sum(c => c.Total);
+            var currentDownloads = _apiController.CurrentDownloads.ToList();
+            var multBase = currentDownloads.Any() ? 0 : 2;
+            var doneDownloads = currentDownloads.Count(c => c.IsTransferred);
+            var totalDownloads = currentDownloads.Count;
+            var totalDownloaded = currentDownloads.Sum(c => c.Transferred);
+            var totalToDownload = currentDownloads.Sum(c => c.Total);
             UiShared.DrawOutlinedFont(drawList, "▼",
                 new Vector2(basePosition.X + 0, basePosition.Y + (int)(yDistance * multBase + (yDistance * 0.5))),
                 UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);

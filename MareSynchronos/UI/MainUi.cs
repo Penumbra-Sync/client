@@ -132,7 +132,7 @@ namespace MareSynchronos.UI
 
                         ImGui.TableHeadersRow();
 
-                        foreach (var forbiddenFile in _apiController.ForbiddenFiles)
+                        foreach (var forbiddenFile in _apiController.AdminForbiddenFiles)
                         {
                             ImGui.TableNextColumn();
 
@@ -203,7 +203,7 @@ namespace MareSynchronos.UI
 
                         ImGui.TableHeadersRow();
 
-                        foreach (var bannedUser in _apiController.BannedUsers)
+                        foreach (var bannedUser in _apiController.AdminBannedUsers)
                         {
                             ImGui.TableNextColumn();
                             ImGui.Text(bannedUser.CharacterHash);
@@ -581,7 +581,7 @@ namespace MareSynchronos.UI
                             File.Delete(file);
                         }
 
-                        _uiShared.ForceRescan();
+                        //_uiShared.ForceRescan();
                     });
                 }
                 ImGui.TreePop();

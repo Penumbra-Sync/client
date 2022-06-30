@@ -58,9 +58,9 @@ namespace MareSynchronos.Factories
 
         public CharacterData BuildCharacterData()
         {
-            if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized)
+            if (!_ipcManager.Initialized)
             {
-                throw new ArgumentException("Player is not present or Penumbra is not connected");
+                throw new ArgumentException("Penumbra is not connected");
             }
 
             return CreateCharacterData();
@@ -74,6 +74,7 @@ namespace MareSynchronos.Factories
                 Logger.Debug("Character is null but it shouldn't be, waiting");
                 Thread.Sleep(50);
             }
+            _dalamudUtil.WaitWhileCharacterIsDrawing(_dalamudUtil.PlayerPointer);
             var cache = new CharacterData
             {
                 JobId = _dalamudUtil.PlayerJobId,

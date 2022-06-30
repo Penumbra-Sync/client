@@ -19,8 +19,8 @@ namespace MareSynchronos.Managers
         private FileSystemWatcher? _cacheDirWatcher;
         private FileSystemWatcher? _penumbraDirWatcher;
         private Task? _rescanTask;
-        private CancellationTokenSource? _rescanTaskCancellationTokenSource;
-        private CancellationTokenSource? _rescanTaskRunCancellationTokenSource;
+        private CancellationTokenSource _rescanTaskCancellationTokenSource = new CancellationTokenSource();
+        private CancellationTokenSource _rescanTaskRunCancellationTokenSource = new CancellationTokenSource();
         private CancellationTokenSource? _scanCancellationTokenSource;
         private Task? _scanTask;
         public FileCacheManager(IpcManager ipcManager, Configuration pluginConfiguration)
@@ -94,7 +94,6 @@ namespace MareSynchronos.Managers
             _penumbraDirWatcher = new FileSystemWatcher(_ipcManager.PenumbraModDirectory()!)
             {
                 IncludeSubdirectories = true,
-                InternalBufferSize = 1048576
             };
             _penumbraDirWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size;
             _penumbraDirWatcher.Deleted += OnModified;
@@ -108,8 +107,7 @@ namespace MareSynchronos.Managers
 
             _cacheDirWatcher = new FileSystemWatcher(_pluginConfiguration.CacheFolder)
             {
-                IncludeSubdirectories = true,
-                InternalBufferSize = 1048576
+                IncludeSubdirectories = false,
             };
             _cacheDirWatcher.NotifyFilter = NotifyFilters.FileName | NotifyFilters.Size;
             _cacheDirWatcher.Deleted += OnModified;
@@ -150,7 +148,7 @@ namespace MareSynchronos.Managers
         private void OnModified(object sender, FileSystemEventArgs e)
         {
             _modifiedFiles.Add(e.FullPath);
-            Task.Run(() => _ = RescanTask());
+            _ = StartRescan();
         }
 
         private void RecalculateFileCacheSize()
@@ -169,12 +167,12 @@ namespace MareSynchronos.Managers
             }
         }
 
-        public async Task RescanTask(bool force = false)
+        public async Task StartRescan(bool force = false)
         {
-            _rescanTaskRunCancellationTokenSource?.Cancel();
+            _rescanTaskRunCancellationTokenSource.Cancel();
             _rescanTaskRunCancellationTokenSource = new CancellationTokenSource();
             var token = _rescanTaskRunCancellationTokenSource.Token;
-            if(!force)
+            if (!force)
                 await Task.Delay(TimeSpan.FromSeconds(1), token);
             while ((!_rescanTask?.IsCompleted ?? false) && !token.IsCancellationRequested)
             {
@@ -183,11 +181,10 @@ namespace MareSynchronos.Managers
 
             if (token.IsCancellationRequested) return;
 
-            PluginLog.Debug("File changes detected, scanning the changes");
+            PluginLog.Debug("File changes detected, scanning the changes ");
 
             if (!_modifiedFiles.Any()) return;
 
-            _rescanTaskCancellationTokenSource = new CancellationTokenSource();
             _rescanTask = Task.Run(async () =>
             {
                 var listCopy = _modifiedFiles.ToList();

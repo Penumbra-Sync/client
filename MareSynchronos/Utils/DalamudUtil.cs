@@ -2,11 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using Dalamud.Game;
 using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
-using Penumbra.PlayerWatch;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 namespace MareSynchronos.Utils
@@ -16,28 +16,35 @@ namespace MareSynchronos.Utils
     public delegate void LogIn();
     public delegate void LogOut();
 
+    public delegate void FrameworkUpdate();
+
     public class DalamudUtil : IDisposable
     {
         private readonly ClientState _clientState;
         private readonly ObjectTable _objectTable;
-        private readonly IPlayerWatcher _watcher;
+        private readonly Framework _framework;
         public event PlayerChange? PlayerChanged;
         public event LogIn? LogIn;
         public event LogOut? LogOut;
+        public event FrameworkUpdate? FrameworkUpdate;
 
-        public DalamudUtil(ClientState clientState, ObjectTable objectTable, IPlayerWatcher watcher)
+        public DalamudUtil(ClientState clientState, ObjectTable objectTable, Framework framework)
         {
             _clientState = clientState;
             _objectTable = objectTable;
-            _watcher = watcher;
-            _watcher.Enable();
-            _watcher.PlayerChanged += WatcherOnPlayerChanged;
+            _framework = framework;
             _clientState.Login += ClientStateOnLogin;
             _clientState.Logout += ClientStateOnLogout;
+            _framework.Update += FrameworkOnUpdate;
             if (IsLoggedIn)
             {
                 ClientStateOnLogin(null, EventArgs.Empty);
             }
+        }
+
+        private void FrameworkOnUpdate(Framework framework)
+        {
+            FrameworkUpdate?.Invoke();
         }
 
         private void ClientStateOnLogout(object? sender, EventArgs e)
@@ -57,17 +64,6 @@ namespace MareSynchronos.Utils
             PlayerChanged?.Invoke(actor);
         }
 
-
-        public void AddPlayerToWatch(string playerName)
-        {
-            _watcher.AddPlayerToWatch(playerName);
-        }
-
-        public void RemovePlayerFromWatch(string playerName)
-        {
-            _watcher.RemovePlayerFromWatch(playerName);
-        }
-
         public bool IsPlayerPresent => _clientState.LocalPlayer != null;
 
         public string PlayerName => _clientState.LocalPlayer?.Name.ToString() ?? "--";
@@ -75,6 +71,8 @@ namespace MareSynchronos.Utils
         public int PlayerJobId => (int)_clientState.LocalPlayer!.ClassJob.Id;
 
         public IntPtr PlayerPointer => _clientState.LocalPlayer!.Address;
+
+        public PlayerCharacter PlayerCharacter => _clientState.LocalPlayer!;
 
         public string PlayerNameHashed => Crypto.GetHash256(PlayerName + _clientState.LocalPlayer!.HomeWorld.Id);
 
@@ -105,7 +103,7 @@ namespace MareSynchronos.Utils
                 obj.Name.ToString() != PlayerName).Select(p => (PlayerCharacter)p).ToList();
         }
 
-        public PlayerCharacter? GetPlayerCharacterFromObjectTableIndex(int index)
+        public PlayerCharacter? GetPlayerCharacterFromObjectTableByIndex(int index)
         {
             var objTableObj = _objectTable[index];
             if (objTableObj!.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) return null;
@@ -132,8 +130,8 @@ namespace MareSynchronos.Utils
             // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
             while ((obj->RenderFlags & 0b100000000000) == 0b100000000000 && (!ct?.IsCancellationRequested ?? true)) // 0b100000000000 is "still rendering" or something
             {
-                Logger.Debug("Waiting for character to finish drawing");
-                Thread.Sleep(1000);
+                Logger.Verbose("Waiting for character to finish drawing");
+                Thread.Sleep(250);
             }
 
             if (ct?.IsCancellationRequested ?? false) return;
@@ -145,8 +143,9 @@ namespace MareSynchronos.Utils
 
         public void Dispose()
         {
-            _watcher.Disable();
-            _watcher.Dispose();
+            _clientState.Login -= ClientStateOnLogin;
+            _clientState.Logout -= ClientStateOnLogout;
+            _framework.Update -= FrameworkOnUpdate;
         }
     }
 }

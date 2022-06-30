@@ -9,31 +9,34 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Dalamud.Game.ClientState.Objects;
+using Penumbra.GameData.Structs;
 
 namespace MareSynchronos.Managers
 {
     public class PlayerManager : IDisposable
     {
         private readonly ApiController _apiController;
-        private readonly CachedPlayersManager _cachedPlayersManager;
+        private readonly OnlinePlayerManager _onlinePlayerManager;
         private readonly CharacterDataFactory _characterDataFactory;
         private readonly DalamudUtil _dalamudUtil;
         private readonly IpcManager _ipcManager;
         private string _lastSentHash = string.Empty;
         private CancellationTokenSource? _playerChangedCts;
+        private DateTime _lastPlayerObjectCheck;
+        private CharacterEquipment _currentCharacterEquipment;
 
         public PlayerManager(ApiController apiController, IpcManager ipcManager,
-            CharacterDataFactory characterDataFactory, CachedPlayersManager cachedPlayersManager, DalamudUtil dalamudUtil)
+            CharacterDataFactory characterDataFactory, OnlinePlayerManager onlinePlayerManager, DalamudUtil dalamudUtil)
         {
             Logger.Debug("Creating " + nameof(PlayerManager));
 
             _apiController = apiController;
             _ipcManager = ipcManager;
             _characterDataFactory = characterDataFactory;
-            _cachedPlayersManager = cachedPlayersManager;
+            _onlinePlayerManager = onlinePlayerManager;
             _dalamudUtil = dalamudUtil;
 
-            _dalamudUtil.AddPlayerToWatch(_dalamudUtil.PlayerName);
             _apiController.Connected += ApiController_Connected;
             _apiController.Disconnected += ApiController_Disconnected;
 
@@ -48,12 +51,25 @@ namespace MareSynchronos.Managers
         {
             Logger.Debug("Disposing " + nameof(PlayerManager));
 
-            _dalamudUtil.RemovePlayerFromWatch(_dalamudUtil.PlayerName);
             _apiController.Connected -= ApiController_Connected;
             _apiController.Disconnected -= ApiController_Disconnected;
 
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
-            _dalamudUtil.PlayerChanged -= Watcher_PlayerChanged;
+            _dalamudUtil.FrameworkUpdate -= DalamudUtilOnFrameworkUpdate;
+        }
+
+        private void DalamudUtilOnFrameworkUpdate()
+        {
+            if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized || !_apiController.IsConnected) return;
+
+            if (DateTime.Now < _lastPlayerObjectCheck.AddSeconds(0.25)) return;
+
+            if (_dalamudUtil.IsPlayerPresent && !_currentCharacterEquipment!.CompareAndUpdate(_dalamudUtil.PlayerCharacter))
+            {
+                OnPlayerChanged();
+            }
+
+            _lastPlayerObjectCheck = DateTime.Now;
         }
 
         private void ApiController_Connected(object? sender, EventArgs args)
@@ -64,11 +80,13 @@ namespace MareSynchronos.Managers
 
             Task.WaitAll(apiTask);
 
-            _cachedPlayersManager.AddInitialPairs(apiTask.Result);
+            _onlinePlayerManager.AddInitialPairs(apiTask.Result);
 
             _ipcManager.PenumbraRedrawEvent += IpcManager_PenumbraRedrawEvent;
-            _dalamudUtil.PlayerChanged += Watcher_PlayerChanged;
-            PlayerChanged(_dalamudUtil.PlayerName);
+            _dalamudUtil.FrameworkUpdate += DalamudUtilOnFrameworkUpdate;
+
+            _currentCharacterEquipment = new CharacterEquipment(_dalamudUtil.PlayerCharacter);
+            PlayerChanged();
         }
 
         private void ApiController_Disconnected(object? sender, EventArgs args)
@@ -76,7 +94,7 @@ namespace MareSynchronos.Managers
             Logger.Debug(nameof(ApiController_Disconnected));
 
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
-            _dalamudUtil.PlayerChanged -= Watcher_PlayerChanged;
+            _dalamudUtil.FrameworkUpdate -= DalamudUtilOnFrameworkUpdate;
         }
 
         private async Task<CharacterData> CreateFullCharacterCache(CancellationToken token)
@@ -102,18 +120,31 @@ namespace MareSynchronos.Managers
 
         private void IpcManager_PenumbraRedrawEvent(object? objectTableIndex, EventArgs e)
         {
-            var player = _dalamudUtil.GetPlayerCharacterFromObjectTableIndex((int)objectTableIndex!);
+            var player = _dalamudUtil.GetPlayerCharacterFromObjectTableByIndex((int)objectTableIndex!);
             if (player != null && player.Name.ToString() != _dalamudUtil.PlayerName) return;
             Logger.Debug("Penumbra Redraw Event for " + _dalamudUtil.PlayerName);
-            PlayerChanged(_dalamudUtil.PlayerName);
+            PlayerChanged();
         }
 
-        private void PlayerChanged(string name)
+        private void PlayerChanged()
         {
-            Logger.Debug("Player changed: " + name);
+            Logger.Debug("Player changed: " + _dalamudUtil.PlayerName);
             _playerChangedCts?.Cancel();
             _playerChangedCts = new CancellationTokenSource();
             var token = _playerChangedCts.Token;
+
+            // fix for redraw from anamnesis
+            while ((!_dalamudUtil.IsPlayerPresent || _dalamudUtil.PlayerName == "--") && !token.IsCancellationRequested)
+            {
+                Logger.Debug("Waiting Until Player is Present");
+                Thread.Sleep(100);
+            }
+
+            if (token.IsCancellationRequested)
+            {
+                Logger.Debug("Cancelled");
+                return;
+            }
 
             if (!_ipcManager.Initialized)
             {
@@ -159,22 +190,12 @@ namespace MareSynchronos.Managers
             }, token);
         }
 
-        private void Watcher_PlayerChanged(Dalamud.Game.ClientState.Objects.Types.Character actor)
+        private void OnPlayerChanged()
         {
             Task.Run(() =>
             {
-                // fix for redraw from anamnesis
-                while (!_dalamudUtil.IsPlayerPresent)
-                {
-                    Logger.Debug("Waiting Until Player is Present");
-                    Thread.Sleep(100);
-                }
-
-                if (actor.Name.ToString() == _dalamudUtil.PlayerName)
-                {
-                    Logger.Debug("Watcher: PlayerChanged");
-                    PlayerChanged(actor.Name.ToString());
-                }
+                Logger.Debug("Watcher: PlayerChanged");
+                PlayerChanged();
             });
         }
 

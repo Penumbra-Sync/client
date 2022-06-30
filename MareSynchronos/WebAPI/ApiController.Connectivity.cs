@@ -89,15 +89,17 @@ namespace MareSynchronos.WebAPI
 
         public List<FileTransfer> CurrentUploads { get; } = new();
 
-        public List<BannedUserDto> BannedUsers { get; private set; } = new();
+        public List<FileTransfer> ForbiddenTransfers { get; } = new();
 
-        public List<ForbiddenFileDto> ForbiddenFiles { get; private set; } = new();
+        public List<BannedUserDto> AdminBannedUsers { get; private set; } = new();
+
+        public List<ForbiddenFileDto> AdminForbiddenFiles { get; private set; } = new();
 
         public bool IsConnected => !string.IsNullOrEmpty(UID);
 
-        public bool IsDownloading { get; private set; }
+        public bool IsDownloading => CurrentDownloads.Count > 0;
 
-        public bool IsUploading { get; private set; }
+        public bool IsUploading => CurrentUploads.Count > 0;
 
         public List<ClientPairDto> PairedClients { get; set; } = new();
 
@@ -168,8 +170,8 @@ namespace MareSynchronos.WebAPI
 
                         if (IsModerator)
                         {
-                            ForbiddenFiles = await _adminHub.InvokeAsync<List<ForbiddenFileDto>>("GetForbiddenFiles", token);
-                            BannedUsers = await _adminHub.InvokeAsync<List<BannedUserDto>>("GetBannedUsers", token);
+                            AdminForbiddenFiles = await _adminHub.InvokeAsync<List<ForbiddenFileDto>>("GetForbiddenFiles", token);
+                            AdminBannedUsers = await _adminHub.InvokeAsync<List<BannedUserDto>>("GetBannedUsers", token);
                             _adminHub.On<BannedUserDto>("UpdateOrAddBannedUser", UpdateOrAddBannedUserCallback);
                             _adminHub.On<BannedUserDto>("DeleteBannedUser", DeleteBannedUserCallback);
                             _adminHub.On<ForbiddenFileDto>("UpdateOrAddForbiddenFile", UpdateOrAddForbiddenFileCallback);

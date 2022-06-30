@@ -33,7 +33,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Penumbra\Penumbra.GameData\Penumbra.GameData.csproj" />
-    <ProjectReference Include="..\..\..\Penumbra\Penumbra.PlayerWatch\Penumbra.PlayerWatch.csproj" />
     <ProjectReference Include="..\..\server\MareSynchronosServer\MareSynchronos.API\MareSynchronos.API.csproj" />
   </ItemGroup>
 

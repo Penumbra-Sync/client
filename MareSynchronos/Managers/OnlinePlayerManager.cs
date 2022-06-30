@@ -3,25 +3,23 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Dalamud.Game;
-using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.Managers;
 
-public class CachedPlayersManager : IDisposable
+public class OnlinePlayerManager : IDisposable
 {
     private readonly ApiController _apiController;
     private readonly DalamudUtil _dalamudUtil;
     private readonly Framework _framework;
     private readonly IpcManager _ipcManager;
     private readonly List<CachedPlayer> _onlineCachedPlayers = new();
-    private readonly List<string> _localVisiblePlayers = new();
     private DateTime _lastPlayerObjectCheck = DateTime.Now;
 
-    public CachedPlayersManager(Framework framework, ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager)
+    public OnlinePlayerManager(Framework framework, ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager)
     {
-        Logger.Debug("Creating " + nameof(CachedPlayersManager));
+        Logger.Debug("Creating " + nameof(OnlinePlayerManager));
 
         _framework = framework;
         _apiController = apiController;
@@ -74,7 +72,7 @@ public class CachedPlayersManager : IDisposable
 
     public void Dispose()
     {
-        Logger.Debug("Disposing " + nameof(CachedPlayersManager));
+        Logger.Debug("Disposing " + nameof(OnlinePlayerManager));
 
         RestoreAllCharacters();
 
@@ -142,9 +140,9 @@ public class CachedPlayersManager : IDisposable
 
     private void RemovePlayer(string characterHash)
     {
-        var cachedPlayer = _onlineCachedPlayers.Single(p => p.PlayerNameHash == characterHash);
+        var cachedPlayer = _onlineCachedPlayers.First(p => p.PlayerNameHash == characterHash);
         cachedPlayer.DisposePlayer();
-        _onlineCachedPlayers.Remove(cachedPlayer);
+        _onlineCachedPlayers.RemoveAll(c => c.PlayerNameHash == cachedPlayer.PlayerNameHash);
     }
 
     private void FrameworkOnUpdate(Framework framework)
@@ -153,25 +151,20 @@ public class CachedPlayersManager : IDisposable
 
         if (DateTime.Now < _lastPlayerObjectCheck.AddSeconds(0.25)) return;
 
-        _localVisiblePlayers.Clear();
         var playerCharacters = _dalamudUtil.GetPlayerCharacters();
         foreach (var pChar in playerCharacters)
         {
             var pObjName = pChar.Name.ToString();
-            _localVisiblePlayers.Add(pObjName);
-            var existingCachedPlayer = _onlineCachedPlayers.SingleOrDefault(p => p.PlayerName == pObjName);
+            var hashedName = Crypto.GetHash256(pChar);
+            var existingCachedPlayer = _onlineCachedPlayers.SingleOrDefault(p => p.PlayerNameHash == hashedName && !string.IsNullOrEmpty(p.PlayerName));
             if (existingCachedPlayer != null)
             {
                 existingCachedPlayer.IsVisible = true;
                 continue;
             }
 
-            var hashedName = Crypto.GetHash256(pChar);
             _onlineCachedPlayers.SingleOrDefault(p => p.PlayerNameHash == hashedName)?.InitializePlayer(pChar);
         }
-
-        _onlineCachedPlayers.Where(p => !string.IsNullOrEmpty(p.PlayerName) && !_localVisiblePlayers.Contains(p.PlayerName))
-            .ToList().ForEach(p => p.DisposePlayer());
 
         Task.Run(async () => await UpdatePlayersFromService(_onlineCachedPlayers
             .Where(p => p.PlayerCharacter != null && p.IsVisible && !p.WasVisible)
