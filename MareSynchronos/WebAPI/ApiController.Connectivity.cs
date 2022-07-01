@@ -17,7 +17,7 @@ namespace MareSynchronos.WebAPI
     {
 #if DEBUG
         public const string MainServer = "darkarchons Debug Server (Dev Server (CH))";
-        public const string MainServiceUri = "wss://darkarchon.internet-box.ch:5001";
+        public const string MainServiceUri = "wss://darkarchon.internet-box.ch:5000";
 #else
         public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
         public const string MainServiceUri = "to be defined";

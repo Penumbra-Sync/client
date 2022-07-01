@@ -24,7 +24,8 @@ namespace MareSynchronos.WebAPI
             {
                 Logger.Warn("Cancelling upload");
                 _uploadCancellationTokenSource?.Cancel();
-                _fileHub!.InvokeAsync("AbortUpload");
+                _fileHub!.SendAsync("AbortUpload");
+                CurrentUploads.Clear();
             }
         }
 
@@ -167,7 +168,7 @@ namespace MareSynchronos.WebAPI
                 Logger.Verbose("Compressing and uploading " + file);
                 var data = await GetCompressedFileData(file.Hash, uploadToken);
                 CurrentUploads.Single(e => e.Hash == data.Item1).Total = data.Item2.Length;
-                _ = UploadFile(data.Item2, file.Hash, uploadToken);
+                await UploadFile(data.Item2, file.Hash, uploadToken);
                 if (!uploadToken.IsCancellationRequested) continue;
                 Logger.Warn("Cancel in filesToUpload loop detected");
                 CurrentUploads.Clear();

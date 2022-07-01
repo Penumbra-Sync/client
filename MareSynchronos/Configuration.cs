@@ -114,6 +114,35 @@ namespace MareSynchronos
                 UidComments.Clear();
                 Save();
             }
+
+            if (Version == 1)
+            {
+                Logger.Debug("Migrating Configuration from V1 to V2");
+                ApiUri = ApiUri.Replace("5001", "5000");
+                foreach (var kvp in ClientSecret.ToList())
+                {
+                    var newKey = kvp.Key.Replace("5001", "5000");
+                    ClientSecret.Remove(kvp.Key);
+                    if (ClientSecret.ContainsKey(newKey))
+                    {
+                        ClientSecret[newKey] = kvp.Value;
+                    }
+                    else
+                    {
+                        ClientSecret.Add(newKey, kvp.Value);
+                    }
+                }
+
+                foreach (var kvp in UidServerComments.ToList())
+                {
+                    var newKey = kvp.Key.Replace("5001", "5000");
+                    UidServerComments.Remove(kvp.Key);
+                    UidServerComments.Add(newKey, kvp.Value);
+                }
+
+                Version = 2;
+                Save();
+            }
         }
     }
 }

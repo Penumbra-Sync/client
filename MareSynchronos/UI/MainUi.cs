@@ -82,7 +82,7 @@ namespace MareSynchronos.UI
             }
             else
             {
-                string error = _configuration.FullPause ? "Fully Paused" : _apiController.ServerAlive ? "Unauthorized" : "Service unavailable";
+                string error = _configuration.FullPause ? "Disconnected" : _apiController.ServerAlive ? "Unauthorized" : "Service unavailable";
                 ImGui.TextColored(ImGuiColors.DalamudRed, $"No UID ({error})");
                 ImGui.SetWindowFontScale(1.0f);
                 if (_apiController.ServerAlive && !_configuration.FullPause)
@@ -454,7 +454,7 @@ namespace MareSynchronos.UI
                 if (!_configuration.FullPause)
                 {
                     ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
-                    UiShared.TextWrapped("Note: to change servers you need to pause Mare Synchronos.");
+                    UiShared.TextWrapped("Note: to change servers you need to disconnect from your current Mare Synchronos server.");
                     ImGui.PopStyleColor();
                 }
 
@@ -462,19 +462,19 @@ namespace MareSynchronos.UI
 
                 if (_configuration.HasValidSetup())
                 {
-                    if (ImGui.Checkbox("Pause Mare Synchronos", ref marePaused))
+                    if (ImGui.Checkbox("Disconnect Mare Synchronos", ref marePaused))
                     {
                         _configuration.FullPause = marePaused;
                         _configuration.Save();
                         Task.Run(_apiController.CreateConnections);
                     }
 
-                    UiShared.DrawHelpText("Completely pauses the sync and clear your current data (not uploaded files) on the service.");
+                    UiShared.DrawHelpText("Completely pauses the sync and clears your current data (not uploaded files) on the service.");
                 }
                 else
                 {
                     ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
-                    ImGui.TextUnformatted("You cannot resume pause without a valid account on the service.");
+                    ImGui.TextUnformatted("You cannot reconnect without a valid account on the service.");
                     ImGui.PopStyleColor();
                 }
 
