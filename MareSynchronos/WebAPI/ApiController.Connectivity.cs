@@ -130,6 +130,7 @@ namespace MareSynchronos.WebAPI
 
                 try
                 {
+                    if (_dalamudUtil.PlayerCharacter == null) throw new ArgumentException("Player not initialized");
                     Logger.Debug("Building connection");
                     _heartbeatHub = BuildHubConnection("heartbeat");
                     _userHub = BuildHubConnection("user");
@@ -184,7 +185,7 @@ namespace MareSynchronos.WebAPI
                 catch (Exception ex)
                 {
                     Logger.Warn(ex.Message);
-                    Logger.Warn(ex.StackTrace);
+                    Logger.Warn(ex.StackTrace ?? string.Empty);
                     Logger.Debug("Failed to establish connection, retrying");
                     await Task.Delay(TimeSpan.FromSeconds(5), token);
                 }
@@ -227,6 +228,9 @@ namespace MareSynchronos.WebAPI
 
         private Task HeartbeatHubOnClosed(Exception? arg)
         {
+            CurrentUploads.Clear();
+            CurrentDownloads.Clear();
+            _uploadCancellationTokenSource?.Cancel();
             Logger.Debug("Connection closed");
             Disconnected?.Invoke(null, EventArgs.Empty);
             return Task.CompletedTask;
@@ -243,14 +247,17 @@ namespace MareSynchronos.WebAPI
 
         private Task HeartbeatHubOnReconnecting(Exception? arg)
         {
-            Logger.Debug("Connection closed... Reconnecting…");
+            CurrentUploads.Clear();
+            CurrentDownloads.Clear();
+            _uploadCancellationTokenSource?.Cancel();
+            Logger.Debug("Connection closed... Reconnecting");
             Disconnected?.Invoke(null, EventArgs.Empty);
             return Task.CompletedTask;
         }
 
         private async Task StopAllConnections(CancellationToken token)
         {
-            if (_heartbeatHub is { State: HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting })
+            if (_heartbeatHub is not null)
             {
                 await _heartbeatHub.StopAsync(token);
                 _heartbeatHub.Closed -= HeartbeatHubOnClosed;
@@ -260,21 +267,21 @@ namespace MareSynchronos.WebAPI
                 _heartbeatHub = null;
             }
 
-            if (_fileHub is { State: HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting })
+            if (_fileHub is not null)
             {
                 await _fileHub.StopAsync(token);
                 await _fileHub.DisposeAsync();
                 _fileHub = null;
             }
 
-            if (_userHub is { State: HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting })
+            if (_userHub is not null)
             {
                 await _userHub.StopAsync(token);
                 await _userHub.DisposeAsync();
                 _userHub = null;
             }
 
-            if (_adminHub is { State: HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting })
+            if (_adminHub is not null)
             {
                 await _adminHub.StopAsync(token);
                 await _adminHub.DisposeAsync();

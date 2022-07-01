@@ -1,13 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
-using MareSynchronos.API;
-using MareSynchronos.FileCacheDB;
 using MareSynchronos.Utils;
-using MareSynchronos.WebAPI.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
 
 namespace MareSynchronos.WebAPI

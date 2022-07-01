@@ -53,19 +53,22 @@ public class DownloadUi : Window, IDisposable
         if (_apiController.CurrentUploads.Any())
         {
             var currentUploads = _apiController.CurrentUploads.ToList();
-            var doneUploads = currentUploads.Count(c => c.IsTransferred);
             var totalUploads = currentUploads.Count;
+
+            var doneUploads = currentUploads.Count(c => c.IsTransferred);
             var totalUploaded = currentUploads.Sum(c => c.Transferred);
             var totalToUpload = currentUploads.Sum(c => c.Total);
+
             UiShared.DrawOutlinedFont(drawList, "▲",
                 new Vector2(basePosition.X + 0, basePosition.Y + (int)(yDistance * 0.5)),
                 UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
-            UiShared.DrawOutlinedFont(drawList, $"Uploading {doneUploads}/{totalUploads}",
+            UiShared.DrawOutlinedFont(drawList, $"Compressing+Uploading {doneUploads}/{totalUploads}",
                 new Vector2(basePosition.X + xDistance, basePosition.Y + yDistance * 0),
                 UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
             UiShared.DrawOutlinedFont(drawList, $"{UiShared.ByteToString(totalUploaded)}/{UiShared.ByteToString(totalToUpload)}",
                 new Vector2(basePosition.X + xDistance, basePosition.Y + yDistance * 1),
                 UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
+
         }
 
         if (_apiController.CurrentDownloads.Any())

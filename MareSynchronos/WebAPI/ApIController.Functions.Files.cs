@@ -3,10 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
-using Dalamud.Logging;
 using LZ4;
 using MareSynchronos.API;
 using MareSynchronos.FileCacheDB;
@@ -162,6 +161,7 @@ namespace MareSynchronos.WebAPI
                 }
             }
 
+            var totalSize = CurrentUploads.Sum(c => c.Total);
             Logger.Verbose("Compressing and uploading files");
             foreach (var file in CurrentUploads.Where(f => f.CanBeTransferred && !f.IsTransferred))
             {
@@ -173,6 +173,12 @@ namespace MareSynchronos.WebAPI
                 Logger.Warn("Cancel in filesToUpload loop detected");
                 CurrentUploads.Clear();
                 break;
+            }
+
+            if (CurrentUploads.Any())
+            {
+                var compressedSize = CurrentUploads.Sum(c => c.Total);
+                Logger.Debug($"Compressed {totalSize} to {compressedSize} ({(compressedSize / (double)totalSize):P2})");
             }
 
             Logger.Verbose("Upload tasks complete, waiting for server to confirm");
@@ -213,21 +219,21 @@ namespace MareSynchronos.WebAPI
         {
             if (uploadToken.IsCancellationRequested) return;
 
-            async IAsyncEnumerable<byte[]> AsyncFileData()
+            async IAsyncEnumerable<byte[]> AsyncFileData([EnumeratorCancellation] CancellationToken token)
             {
                 var chunkSize = 1024 * 512; // 512kb
                 using var ms = new MemoryStream(compressedFile);
                 var buffer = new byte[chunkSize];
                 int bytesRead;
-                while ((bytesRead = await ms.ReadAsync(buffer, 0, chunkSize, uploadToken)) > 0)
+                while ((bytesRead = await ms.ReadAsync(buffer, 0, chunkSize, token)) > 0 && !token.IsCancellationRequested)
                 {
                     CurrentUploads.Single(f => f.Hash == fileHash).Transferred += bytesRead;
-                    uploadToken.ThrowIfCancellationRequested();
+                    token.ThrowIfCancellationRequested();
                     yield return bytesRead == chunkSize ? buffer.ToArray() : buffer.Take(bytesRead).ToArray();
                 }
             }
 
-            await _fileHub!.SendAsync("UploadFileStreamAsync", fileHash, AsyncFileData(), uploadToken);
+            await _fileHub!.SendAsync("UploadFileStreamAsync", fileHash, AsyncFileData(uploadToken), uploadToken);
         }
     }
 
