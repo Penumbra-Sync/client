@@ -73,4 +73,8 @@
     </None>
   </ItemGroup>
 
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\alpine-x64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-arm&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-arm64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-armel&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-mips64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-musl-x64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-x64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-x86&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\osx-x64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\win-arm&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\win-arm64&#xD;&#xA;del /Q $(ProjectDir)$(OutDir)Mare.7z&#xD;&#xA;&quot;C:\Program Files\7-zip\7z.exe&quot; a $(ProjectDir)$(OutDir)Mare.7z $(ProjectDir)$(OutDir)*" />
+  </Target>
+
 </Project>

@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Dalamud.Game.ClientState.Objects.Types;
+using Lumina.Excel.GeneratedSheets;
 using MareSynchronos.Utils;
 
 namespace MareSynchronos.Managers
@@ -17,7 +18,7 @@ namespace MareSynchronos.Managers
         private readonly ICallGateSubscriber<GameObject?, object> _glamourerRevertCustomization;
         private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyOnlyEquipment;
         private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyOnlyCustomization;
-        private readonly ICallGateSubscriber<int> _penumbraApiVersion;
+        private readonly ICallGateSubscriber<(int, int)> _penumbraApiVersion;
         private readonly ICallGateSubscriber<string, string, bool, (int, string)> _penumbraCreateTemporaryCollection;
         private readonly ICallGateSubscriber<string, string> _penumbraGetMetaManipulations;
         private readonly ICallGateSubscriber<object> _penumbraInit;
@@ -40,7 +41,7 @@ namespace MareSynchronos.Managers
             _penumbraResolveModDir = pi.GetIpcSubscriber<string>("Penumbra.GetModDirectory");
             _penumbraRedraw = pi.GetIpcSubscriber<string, int, object>("Penumbra.RedrawObjectByName");
             _penumbraReverseResolvePath = pi.GetIpcSubscriber<string, string, string[]>("Penumbra.ReverseResolvePath");
-            _penumbraApiVersion = pi.GetIpcSubscriber<int>("Penumbra.ApiVersion");
+            _penumbraApiVersion = pi.GetIpcSubscriber<(int, int)>("Penumbra.ApiVersions");
             _penumbraObjectIsRedrawn = pi.GetIpcSubscriber<IntPtr, int, object?>("Penumbra.GameObjectRedrawn");
             _penumbraGetMetaManipulations =
                 pi.GetIpcSubscriber<string, string>("Penumbra.GetMetaManipulations");
@@ -93,7 +94,7 @@ namespace MareSynchronos.Managers
         {
             try
             {
-                return _penumbraApiVersion.InvokeFunc() >= 5;
+                return _penumbraApiVersion.InvokeFunc() is { Item1: 4, Item2: >=8 };
             }
             catch
             {
