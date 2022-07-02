@@ -4,13 +4,13 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Client.System.Resource;
 using MareSynchronos.Managers;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using Penumbra.GameData.ByteString;
 using Penumbra.Interop.Structs;
+using Human = MareSynchronos.Interop.Human;
 
 namespace MareSynchronos.Factories
 {
@@ -27,10 +27,10 @@ namespace MareSynchronos.Factories
             _ipcManager = ipcManager;
         }
 
-        private FileReplacement CreateFileReplacement(string path)
+        private FileReplacement CreateFileReplacement(string path, bool doNotReverseResolve = false)
         {
             var fileReplacement = new FileReplacement(_ipcManager.PenumbraModDirectory()!);
-            if (!path.Contains(".tex", StringComparison.OrdinalIgnoreCase))
+            if (!doNotReverseResolve)
             {
                 fileReplacement.GamePaths =
                     _ipcManager.PenumbraReverseResolvePath(path, _dalamudUtil.PlayerName).ToList();
@@ -70,10 +70,10 @@ namespace MareSynchronos.Factories
                 GlamourerString = _ipcManager.GlamourerGetCharacterCustomization(_dalamudUtil.PlayerCharacter),
                 ManipulationString = _ipcManager.PenumbraGetMetaManipulations(_dalamudUtil.PlayerName)
             };
-            var model = (CharacterBase*)((Character*)_dalamudUtil.PlayerPointer)->GameObject.GetDrawObject();
-            for (var mdlIdx = 0; mdlIdx < model->SlotCount; ++mdlIdx)
+            var drawObject = (Human*)((Character*)_dalamudUtil.PlayerPointer)->GameObject.GetDrawObject();
+            for (var mdlIdx = 0; mdlIdx < drawObject->CharacterBase.SlotCount; ++mdlIdx)
             {
-                var mdl = (RenderModel*)model->ModelArray[mdlIdx];
+                var mdl = (RenderModel*)drawObject->CharacterBase.ModelArray[mdlIdx];
                 if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
                 {
                     continue;
@@ -107,7 +107,7 @@ namespace MareSynchronos.Factories
 
                         if (string.IsNullOrEmpty(texPath)) continue;
 
-                        var texFileReplacement = CreateFileReplacement(texPath);
+                        var texFileReplacement = CreateFileReplacement(texPath, true);
                         Logger.Debug("\t\tTexture " + string.Join(", ", texFileReplacement.GamePaths));
                         Logger.Debug("\t\t\t\t=> " + texFileReplacement.ResolvedPath);
 
@@ -116,7 +116,7 @@ namespace MareSynchronos.Factories
                         if (texPath.Contains("/--")) continue;
 
                         var texDoubleMinusFileReplacement =
-                            CreateFileReplacement(texPath.Insert(texPath.LastIndexOf('/') + 1, "--"));
+                            CreateFileReplacement(texPath.Insert(texPath.LastIndexOf('/') + 1, "--"), true);
 
                         Logger.Debug("\t\tTexture-- " + string.Join(", ", texDoubleMinusFileReplacement.GamePaths));
                         Logger.Debug("\t\t\t\t=> " + texDoubleMinusFileReplacement.ResolvedPath);
@@ -124,6 +124,18 @@ namespace MareSynchronos.Factories
                     }
                 }
             }
+
+            var tattooDecalFileReplacement =
+                CreateFileReplacement(new Utf8String(drawObject->Decal->FileName()).ToString());
+            cache.AddFileReplacement(tattooDecalFileReplacement);
+            Logger.Debug("Decal " + string.Join(", ", tattooDecalFileReplacement.GamePaths));
+            Logger.Debug("\t\t=> " + tattooDecalFileReplacement.ResolvedPath);
+
+            var legacyDecalFileReplacement =
+                CreateFileReplacement(new Utf8String(drawObject->LegacyBodyDecal->FileName()).ToString());
+            cache.AddFileReplacement(legacyDecalFileReplacement);
+            Logger.Debug("Legacy Decal " + string.Join(", ", legacyDecalFileReplacement.GamePaths));
+            Logger.Debug("\t\t=> " + legacyDecalFileReplacement.ResolvedPath);
 
             st.Stop();
             Logger.Verbose("Building Character Data took " + st.Elapsed);
