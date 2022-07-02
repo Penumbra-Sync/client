@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.System.Resource;
+using MareSynchronos.Interop;
 using MareSynchronos.Managers;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
@@ -125,24 +126,24 @@ namespace MareSynchronos.Factories
                 }
             }
 
-            var weapon = (RenderModel*)human->Weapon->WeaponRenderModel->RenderModel;
+            var mainHandWeapon = (RenderModel*)human->Weapon->WeaponRenderModel->RenderModel;
 
-            var weaponPath = new Utf8String(weapon->ResourceHandle->FileName()).ToString();
-            FileReplacement weaponReplacement = CreateFileReplacement(weaponPath);
+            var mainHandWeaponPath = new Utf8String(mainHandWeapon->ResourceHandle->FileName()).ToString();
+            FileReplacement weaponReplacement = CreateFileReplacement(mainHandWeaponPath);
             cache.AddFileReplacement(weaponReplacement);
 
-            Logger.Debug("Weapon " + string.Join(", ", weaponReplacement.GamePaths));
+            Logger.Debug("MainHand Weapon " + string.Join(", ", weaponReplacement.GamePaths));
             Logger.Debug("\t\t=> " + weaponReplacement.ResolvedPath);
             
-            for (var mtrlIdx = 0; mtrlIdx < weapon->MaterialCount; mtrlIdx++)
+            for (var mtrlIdx = 0; mtrlIdx < mainHandWeapon->MaterialCount; mtrlIdx++)
             {
-                var mtrl = (Material*)weapon->Materials[mtrlIdx];
+                var mtrl = (Material*)mainHandWeapon->Materials[mtrlIdx];
                 if (mtrl == null) continue;
 
                 var mtrlPath = new Utf8String(mtrl->ResourceHandle->FileName()).ToString().Split("|")[2];
 
                 var mtrlFileReplacement = CreateFileReplacement(mtrlPath);
-                Logger.Debug("\tWeapon Material " + string.Join(", ", mtrlFileReplacement.GamePaths));
+                Logger.Debug("\tMainHand Weapon Material " + string.Join(", ", mtrlFileReplacement.GamePaths));
                 Logger.Debug("\t\t\t=> " + mtrlFileReplacement.ResolvedPath);
 
                 cache.AddFileReplacement(mtrlFileReplacement);
@@ -155,7 +156,7 @@ namespace MareSynchronos.Factories
                     if (string.IsNullOrEmpty(texPath)) continue;
 
                     var texFileReplacement = CreateFileReplacement(texPath, true);
-                    Logger.Debug("\t\tWeapon Texture " + string.Join(", ", texFileReplacement.GamePaths));
+                    Logger.Debug("\t\tMainHand tWeapon Texture " + string.Join(", ", texFileReplacement.GamePaths));
                     Logger.Debug("\t\t\t\t=> " + texFileReplacement.ResolvedPath);
 
                     cache.AddFileReplacement(texFileReplacement);
@@ -165,9 +166,58 @@ namespace MareSynchronos.Factories
                     var texDoubleMinusFileReplacement =
                         CreateFileReplacement(texPath.Insert(texPath.LastIndexOf('/') + 1, "--"), true);
 
-                    Logger.Debug("\t\tWeapon Texture-- " + string.Join(", ", texDoubleMinusFileReplacement.GamePaths));
+                    Logger.Debug("\t\tMainHand Weapon Texture-- " + string.Join(", ", texDoubleMinusFileReplacement.GamePaths));
                     Logger.Debug("\t\t\t\t=> " + texDoubleMinusFileReplacement.ResolvedPath);
                     cache.AddFileReplacement(texDoubleMinusFileReplacement);
+                }
+            }
+
+            if (human->Weapon->NextSibling != (IntPtr)human->Weapon)
+            {
+                var offHandWeapon = ((Weapon*)human->Weapon->NextSibling)->WeaponRenderModel->RenderModel;
+
+                var offHandWeaponPath = new Utf8String(offHandWeapon->ResourceHandle->FileName()).ToString();
+                FileReplacement offHandWeaponReplacement = CreateFileReplacement(offHandWeaponPath);
+                cache.AddFileReplacement(offHandWeaponReplacement);
+
+                Logger.Debug("OffHand Weapon " + string.Join(", ", offHandWeaponReplacement.GamePaths));
+                Logger.Debug("\t\t=> " + offHandWeaponReplacement.ResolvedPath);
+
+                for (var mtrlIdx = 0; mtrlIdx < offHandWeapon->MaterialCount; mtrlIdx++)
+                {
+                    var mtrl = (Material*)offHandWeapon->Materials[mtrlIdx];
+                    if (mtrl == null) continue;
+
+                    var mtrlPath = new Utf8String(mtrl->ResourceHandle->FileName()).ToString().Split("|")[2];
+
+                    var mtrlFileReplacement = CreateFileReplacement(mtrlPath);
+                    Logger.Debug("\tOffHand Weapon Material " + string.Join(", ", mtrlFileReplacement.GamePaths));
+                    Logger.Debug("\t\t\t=> " + mtrlFileReplacement.ResolvedPath);
+
+                    cache.AddFileReplacement(mtrlFileReplacement);
+
+                    var mtrlResourceHandle = (MtrlResource*)mtrl->ResourceHandle;
+                    for (var resIdx = 0; resIdx < mtrlResourceHandle->NumTex; resIdx++)
+                    {
+                        var texPath = new Utf8String(mtrlResourceHandle->TexString(resIdx)).ToString();
+
+                        if (string.IsNullOrEmpty(texPath)) continue;
+
+                        var texFileReplacement = CreateFileReplacement(texPath, true);
+                        Logger.Debug("\t\tOffHand tWeapon Texture " + string.Join(", ", texFileReplacement.GamePaths));
+                        Logger.Debug("\t\t\t\t=> " + texFileReplacement.ResolvedPath);
+
+                        cache.AddFileReplacement(texFileReplacement);
+
+                        if (texPath.Contains("/--")) continue;
+
+                        var texDoubleMinusFileReplacement =
+                            CreateFileReplacement(texPath.Insert(texPath.LastIndexOf('/') + 1, "--"), true);
+
+                        Logger.Debug("\t\tOffHand Weapon Texture-- " + string.Join(", ", texDoubleMinusFileReplacement.GamePaths));
+                        Logger.Debug("\t\t\t\t=> " + texDoubleMinusFileReplacement.ResolvedPath);
+                        cache.AddFileReplacement(texDoubleMinusFileReplacement);
+                    }
                 }
             }
 
