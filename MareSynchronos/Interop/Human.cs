@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using Penumbra.Interop.Structs;
 
@@ -13,6 +9,7 @@ namespace MareSynchronos.Interop
     public unsafe struct Human
     {
         [FieldOffset(0x0)] public CharacterBase CharacterBase;
+        [FieldOffset(0x30)] public Weapon* Weapon;
         [FieldOffset(0x8F0)] public fixed byte CustomizeData[0x1A];
         [FieldOffset(0x8F0)] public byte Race;
         [FieldOffset(0x8F1)] public byte Sex;
@@ -53,8 +50,8 @@ namespace MareSynchronos.Interop
         [FieldOffset(0x93E)] public ushort TailEarId; // tXXXX/zXXXX(viera)
 
         [FieldOffset(0x9D6)] public ushort Unknown; // 80 3F in memory
-        [FieldOffset(0x9D8)] public IntPtr VfxMaybe;
-        [FieldOffset(0x9E0)] public IntPtr Unk;
+        [FieldOffset(0x9D8)] public IntPtr Buffer1;
+        [FieldOffset(0x9E0)] public IntPtr Buffer;
         [FieldOffset(0x9E8)] public ResourceHandle* Decal;
         [FieldOffset(0x9F0)] public ResourceHandle* LegacyBodyDecal;
         [FieldOffset(0x9F8)] public IntPtr Unk2;

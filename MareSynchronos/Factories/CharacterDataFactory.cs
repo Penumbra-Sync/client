@@ -70,10 +70,10 @@ namespace MareSynchronos.Factories
                 GlamourerString = _ipcManager.GlamourerGetCharacterCustomization(_dalamudUtil.PlayerCharacter),
                 ManipulationString = _ipcManager.PenumbraGetMetaManipulations(_dalamudUtil.PlayerName)
             };
-            var drawObject = (Human*)((Character*)_dalamudUtil.PlayerPointer)->GameObject.GetDrawObject();
-            for (var mdlIdx = 0; mdlIdx < drawObject->CharacterBase.SlotCount; ++mdlIdx)
+            var human = (Human*)((Character*)_dalamudUtil.PlayerPointer)->GameObject.GetDrawObject();
+            for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)
             {
-                var mdl = (RenderModel*)drawObject->CharacterBase.ModelArray[mdlIdx];
+                var mdl = (RenderModel*)human->CharacterBase.ModelArray[mdlIdx];
                 if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
                 {
                     continue;
@@ -125,14 +125,60 @@ namespace MareSynchronos.Factories
                 }
             }
 
+            var weapon = (RenderModel*)human->Weapon->WeaponRenderModel->RenderModel;
+
+            var weaponPath = new Utf8String(weapon->ResourceHandle->FileName()).ToString();
+            FileReplacement weaponReplacement = CreateFileReplacement(weaponPath);
+            cache.AddFileReplacement(weaponReplacement);
+
+            Logger.Debug("Weapon " + string.Join(", ", weaponReplacement.GamePaths));
+            Logger.Debug("\t\t=> " + weaponReplacement.ResolvedPath);
+            
+            for (var mtrlIdx = 0; mtrlIdx < weapon->MaterialCount; mtrlIdx++)
+            {
+                var mtrl = (Material*)weapon->Materials[mtrlIdx];
+                if (mtrl == null) continue;
+
+                var mtrlPath = new Utf8String(mtrl->ResourceHandle->FileName()).ToString().Split("|")[2];
+
+                var mtrlFileReplacement = CreateFileReplacement(mtrlPath);
+                Logger.Debug("\tWeapon Material " + string.Join(", ", mtrlFileReplacement.GamePaths));
+                Logger.Debug("\t\t\t=> " + mtrlFileReplacement.ResolvedPath);
+
+                cache.AddFileReplacement(mtrlFileReplacement);
+
+                var mtrlResourceHandle = (MtrlResource*)mtrl->ResourceHandle;
+                for (var resIdx = 0; resIdx < mtrlResourceHandle->NumTex; resIdx++)
+                {
+                    var texPath = new Utf8String(mtrlResourceHandle->TexString(resIdx)).ToString();
+
+                    if (string.IsNullOrEmpty(texPath)) continue;
+
+                    var texFileReplacement = CreateFileReplacement(texPath, true);
+                    Logger.Debug("\t\tWeapon Texture " + string.Join(", ", texFileReplacement.GamePaths));
+                    Logger.Debug("\t\t\t\t=> " + texFileReplacement.ResolvedPath);
+
+                    cache.AddFileReplacement(texFileReplacement);
+
+                    if (texPath.Contains("/--")) continue;
+
+                    var texDoubleMinusFileReplacement =
+                        CreateFileReplacement(texPath.Insert(texPath.LastIndexOf('/') + 1, "--"), true);
+
+                    Logger.Debug("\t\tWeapon Texture-- " + string.Join(", ", texDoubleMinusFileReplacement.GamePaths));
+                    Logger.Debug("\t\t\t\t=> " + texDoubleMinusFileReplacement.ResolvedPath);
+                    cache.AddFileReplacement(texDoubleMinusFileReplacement);
+                }
+            }
+
             var tattooDecalFileReplacement =
-                CreateFileReplacement(new Utf8String(drawObject->Decal->FileName()).ToString());
+                CreateFileReplacement(new Utf8String(human->Decal->FileName()).ToString());
             cache.AddFileReplacement(tattooDecalFileReplacement);
             Logger.Debug("Decal " + string.Join(", ", tattooDecalFileReplacement.GamePaths));
             Logger.Debug("\t\t=> " + tattooDecalFileReplacement.ResolvedPath);
 
             var legacyDecalFileReplacement =
-                CreateFileReplacement(new Utf8String(drawObject->LegacyBodyDecal->FileName()).ToString());
+                CreateFileReplacement(new Utf8String(human->LegacyBodyDecal->FileName()).ToString());
             cache.AddFileReplacement(legacyDecalFileReplacement);
             Logger.Debug("Legacy Decal " + string.Join(", ", legacyDecalFileReplacement.GamePaths));
             Logger.Debug("\t\t=> " + legacyDecalFileReplacement.ResolvedPath);

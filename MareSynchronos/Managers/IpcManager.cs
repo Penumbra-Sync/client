@@ -198,6 +198,10 @@ namespace MareSynchronos.Managers
             if (!CheckPenumbraApi()) return;
 
             Logger.Debug("Assigning temp mods for " + collectionName);
+            foreach (var mod in modPaths)
+            {
+                Logger.Verbose(mod.Key + " => " + mod.Value);
+            }
             var ret = _penumbraSetTemporaryMod.InvokeFunc("MareSynchronos", collectionName, modPaths, manipulationData, 0);
         }
 
