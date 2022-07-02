@@ -121,6 +121,11 @@ public class CachedPlayer
                 {
                     return;
                 }
+
+                if ((TryCalculateModdedDictionary(_cache[_lastAppliedEquipmentHash], out moddedPaths)).All(c => _apiController.ForbiddenTransfers.Any(f => f.Hash == c.Hash)))
+                {
+                    break;
+                }
             }
 
             ApplyCharacterData(_cache[_lastAppliedEquipmentHash], moddedPaths);

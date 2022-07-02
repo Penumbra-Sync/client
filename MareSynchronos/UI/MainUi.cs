@@ -7,10 +7,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Mime;
 using System.Numerics;
 using System.Threading.Tasks;
 using MareSynchronos.API;
 using MareSynchronos.Utils;
+using MareSynchronos.WebAPI.Utils;
 
 namespace MareSynchronos.UI
 {
@@ -108,6 +110,7 @@ namespace MareSynchronos.UI
             DrawFileCacheSettings();
             if (_apiController.IsConnected)
                 DrawCurrentTransfers();
+            DrawBlockedTransfers();
             DrawUserAdministration(_apiController.IsConnected);
             if (_apiController.IsConnected && _apiController.IsModerator)
                 DrawAdministration();
@@ -489,6 +492,46 @@ namespace MareSynchronos.UI
             }
         }
 
+        private void DrawBlockedTransfers()
+        {
+            if (ImGui.TreeNode(
+                    $"Forbidden Transfers"))
+            {
+                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudGrey);
+                UiShared.TextWrapped("Files that you attempted to upload or download that were forbidden to be transferred by their creators will appear here. " +
+                                     "If you see file paths from your drive here, then those files were not allowed to be uploaded. If you see hashes, those files were not allowed to be downloaded. " +
+                                     "Ask your paired friend to send you the mod in question through other means, acquire the mod yourself or pester the mod creator to allow it to be sent over Mare.");
+                ImGui.PopStyleColor();
+
+                if (ImGui.BeginTable("TransfersTable", 2, ImGuiTableFlags.SizingStretchProp))
+                {
+                    ImGui.TableSetupColumn(
+                        $"Hash/Filename");
+                    ImGui.TableSetupColumn($"Forbidden by");
+
+                    ImGui.TableHeadersRow();
+
+                    foreach (var item in _apiController.ForbiddenTransfers)
+                    {
+                        ImGui.TableNextColumn();
+                        if (item is UploadFileTransfer transfer)
+                        {
+                            ImGui.Text(transfer.LocalFile);
+                        }
+                        else
+                        {
+                            ImGui.Text(item.Hash);
+                        }
+                        ImGui.TableNextColumn();
+                        ImGui.Text(item.ForbiddenBy);
+                    }
+                    ImGui.EndTable();
+                }
+
+                ImGui.TreePop();
+            }
+        }
+
         private void DrawCurrentTransfers()
         {
             if (ImGui.TreeNode(
@@ -499,6 +542,17 @@ namespace MareSynchronos.UI
                 {
                     _configuration.ShowTransferWindow = showTransferWindow;
                     _configuration.Save();
+                }
+
+                if (_configuration.ShowTransferWindow)
+                {
+                    ImGui.Indent();
+                    bool editTransferWindowPosition = _uiShared.EditTrackerPosition;
+                    if (ImGui.Checkbox("Edit Transfer Window position", ref editTransferWindowPosition))
+                    {
+                        _uiShared.EditTrackerPosition = editTransferWindowPosition;
+                    }
+                    ImGui.Unindent();
                 }
 
                 if (ImGui.BeginTable("TransfersTable", 2))
@@ -580,12 +634,16 @@ namespace MareSynchronos.UI
                         {
                             File.Delete(file);
                         }
-
-                        //_uiShared.ForceRescan();
                     });
                 }
                 ImGui.TreePop();
             }
+        }
+
+        public override void OnClose()
+        {
+            _uiShared.EditTrackerPosition = false;
+            base.OnClose();
         }
 
         private void DrawPairedClientsContent()

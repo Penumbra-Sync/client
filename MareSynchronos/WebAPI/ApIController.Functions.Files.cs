@@ -120,7 +120,7 @@ namespace MareSynchronos.WebAPI
                 await Task.Delay(250, ct);
             }
 
-            CurrentDownloads.RemoveAll(d => d.Transferred == d.Total);
+            CurrentDownloads.RemoveAll(d => d.Transferred == d.Total || !d.CanBeTransferred);
         }
 
         public async Task PushCharacterData(CharacterCacheDto character, List<string> visibleCharacterIds)
@@ -153,11 +153,17 @@ namespace MareSynchronos.WebAPI
                 }
             }
 
-            foreach (var file in CurrentUploads.Where(c => c.IsForbidden))
+            await using (var db = new FileCacheContext())
             {
-                if (ForbiddenTransfers.All(f => f.Hash != file.Hash))
+                foreach (var file in filesToUpload.Where(c => c.IsForbidden))
                 {
-                    ForbiddenTransfers.Add(file);
+                    if (ForbiddenTransfers.All(f => f.Hash != file.Hash))
+                    {
+                        ForbiddenTransfers.Add(new UploadFileTransfer(file)
+                        {
+                            LocalFile = db.FileCaches.FirstOrDefault(f => f.Hash == file.Hash)?.Filepath ?? string.Empty
+                        });
+                    }
                 }
             }
 

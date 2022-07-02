@@ -13,6 +13,7 @@ public class DownloadUi : Window, IDisposable
     private readonly WindowSystem _windowSystem;
     private readonly Configuration _pluginConfiguration;
     private readonly ApiController _apiController;
+    private readonly UiShared _uiShared;
 
     public void Dispose()
     {
@@ -20,12 +21,13 @@ public class DownloadUi : Window, IDisposable
         _windowSystem.RemoveWindow(this);
     }
 
-    public DownloadUi(WindowSystem windowSystem, Configuration pluginConfiguration, ApiController apiController) : base("Mare Synchronos Downloads")
+    public DownloadUi(WindowSystem windowSystem, Configuration pluginConfiguration, ApiController apiController, UiShared uiShared) : base("Mare Synchronos Downloads")
     {
         Logger.Debug("Creating " + nameof(DownloadUi));
         _windowSystem = windowSystem;
         _pluginConfiguration = pluginConfiguration;
         _apiController = apiController;
+        _uiShared = uiShared;
 
         SizeConstraints = new WindowSizeConstraints()
         {
@@ -33,10 +35,36 @@ public class DownloadUi : Window, IDisposable
             MinimumSize = new Vector2(300, 90)
         };
 
-        Flags = ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoBackground;
+        Flags |= ImGuiWindowFlags.NoMove;
+        Flags |= ImGuiWindowFlags.NoBackground;
+        Flags |= ImGuiWindowFlags.NoInputs;
+        Flags |= ImGuiWindowFlags.NoNavFocus;
+        Flags |= ImGuiWindowFlags.NoResize;
+        Flags |= ImGuiWindowFlags.NoScrollbar;
+        Flags |= ImGuiWindowFlags.NoTitleBar;
+        Flags |= ImGuiWindowFlags.NoDecoration;
 
         windowSystem.AddWindow(this);
         IsOpen = true;
+    }
+
+    public override void PreDraw()
+    {
+        base.PreDraw();
+        if (_uiShared.EditTrackerPosition)
+        {
+            Flags &= ~ImGuiWindowFlags.NoMove;
+            Flags &= ~ImGuiWindowFlags.NoBackground;
+            Flags &= ~ImGuiWindowFlags.NoInputs;
+            Flags &= ~ImGuiWindowFlags.NoResize;
+        }
+        else
+        {
+            Flags |= ImGuiWindowFlags.NoMove;
+            Flags |= ImGuiWindowFlags.NoBackground;
+            Flags |= ImGuiWindowFlags.NoInputs;
+            Flags |= ImGuiWindowFlags.NoResize;
+        }
     }
 
     public override void Draw()

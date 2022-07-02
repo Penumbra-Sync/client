@@ -76,7 +76,7 @@ namespace MareSynchronos
                 _fileCacheManager.StartWatchers();
                 ReLaunchCharacterManager();
             };
-            _downloadUi = new DownloadUi(_windowSystem, _configuration, _apiController);
+            _downloadUi = new DownloadUi(_windowSystem, _configuration, _apiController, uiSharedComponent);
 
 
             _dalamudUtil.LogIn += DalamudUtilOnLogIn;

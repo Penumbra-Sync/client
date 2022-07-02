@@ -25,6 +25,7 @@ public class UploadFileTransfer : FileTransfer
 {
     public UploadFileTransfer(UploadFileDto dto) : base(dto) { }
     public override long Total { get; set; }
+    public string LocalFile { get; set; } = string.Empty;
 }
 
 public class DownloadFileTransfer : FileTransfer

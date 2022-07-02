@@ -24,6 +24,8 @@ namespace MareSynchronos.UI
         public long FileCacheSize => _fileCacheManager.FileCacheSize;
         public bool ShowClientSecret = true;
         public string PlayerName => _dalamudUtil.PlayerName;
+        public bool EditTrackerPosition { get; set; }
+
         public UiShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, FileDialogManager fileDialogManager, Configuration pluginConfiguration, DalamudUtil dalamudUtil)
         {
             _ipcManager = ipcManager;
