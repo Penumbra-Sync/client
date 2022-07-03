@@ -124,6 +124,7 @@ public class OnlinePlayerManager : IDisposable
         _apiController.PairedWithOther -= ApiControllerOnPairedWithOther;
         _apiController.UnpairedFromOther -= ApiControllerOnUnpairedFromOther;
         _apiController.Disconnected -= ApiControllerOnDisconnected;
+        _apiController.Connected -= ApiControllerOnConnected;
 
         _ipcManager.PenumbraDisposed -= ApiControllerOnDisconnected;
 

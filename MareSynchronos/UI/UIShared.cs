@@ -171,6 +171,7 @@ namespace MareSynchronos.UI
                     {
                         _pluginConfiguration.ApiUri = _apiController.ServerDictionary.Single(k => k.Value == comboEntries[i]).Key;
                         _pluginConfiguration.Save();
+                        _ = _apiController.CreateConnections();
                     }
 
                     if (isSelected)
