@@ -18,6 +18,7 @@ namespace MareSynchronos.WebAPI
 #if DEBUG
         public const string MainServer = "darkarchons Debug Server (Dev Server (CH))";
         public const string MainServiceUri = "wss://darkarchon.internet-box.ch:5000";
+        public readonly int[] SupportedServerVersions = { 1 };
 #else
         public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
         public const string MainServiceUri = "to be defined";
@@ -37,10 +38,10 @@ namespace MareSynchronos.WebAPI
         private CancellationTokenSource? _uploadCancellationTokenSource;
 
         private HubConnection? _userHub;
-        private LoggedInUserDto? _loggedInUser;
-        public bool IsModerator => (_loggedInUser?.IsAdmin ?? false) || (_loggedInUser?.IsModerator ?? false);
+        private ConnectionDto? _connectionDto;
+        public bool IsModerator => (_connectionDto?.IsAdmin ?? false) || (_connectionDto?.IsModerator ?? false);
 
-        public bool IsAdmin => _loggedInUser?.IsAdmin ?? false;
+        public bool IsAdmin => _connectionDto?.IsAdmin ?? false;
 
         public ApiController(Configuration pluginConfiguration, DalamudUtil dalamudUtil)
         {
@@ -95,7 +96,7 @@ namespace MareSynchronos.WebAPI
 
         public List<ForbiddenFileDto> AdminForbiddenFiles { get; private set; } = new();
 
-        public bool IsConnected => !string.IsNullOrEmpty(UID);
+        public bool IsConnected => !string.IsNullOrEmpty(UID) && ServerSupportsThisClient;
 
         public bool IsDownloading => CurrentDownloads.Count > 0;
 
@@ -108,11 +109,13 @@ namespace MareSynchronos.WebAPI
         public bool ServerAlive =>
             (_heartbeatHub?.State ?? HubConnectionState.Disconnected) == HubConnectionState.Connected;
 
+        public bool ServerSupportsThisClient => SupportedServerVersions.Contains(_connectionDto?.ServerVersion ?? 0);
+
         public Dictionary<string, string> ServerDictionary => new Dictionary<string, string>() { { MainServiceUri, MainServer } }
             .Concat(_pluginConfiguration.CustomServerList)
             .ToDictionary(k => k.Key, k => k.Value);
 
-        public string UID => _loggedInUser?.UID ?? string.Empty;
+        public string UID => _connectionDto?.UID ?? string.Empty;
 
         private string ApiUri => _pluginConfiguration.ApiUri;
         public int OnlineUsers { get; private set; }
@@ -143,15 +146,17 @@ namespace MareSynchronos.WebAPI
                     await _adminHub.StartAsync(token);
 
                     OnlineUsers = await _userHub.InvokeAsync<int>("GetOnlineUsers", token);
-
+                    _userHub.On<int>("UsersOnline", (count) => OnlineUsers = count);
+                    
                     if (_pluginConfiguration.FullPause)
                     {
-                        _loggedInUser = null;
+                        _connectionDto = null;
                         return;
                     }
 
-                    _loggedInUser = await _heartbeatHub.InvokeAsync<LoggedInUserDto>("Heartbeat", token);
-                    if (!string.IsNullOrEmpty(UID) && !token.IsCancellationRequested) // user is authorized
+                    _connectionDto = await _heartbeatHub.InvokeAsync<ConnectionDto>("Heartbeat", token);
+                    if (!string.IsNullOrEmpty(UID) && !token.IsCancellationRequested 
+                                                   && ServerSupportsThisClient) // user is authorized && server is legit
                     {
                         Logger.Debug("Initializing data");
                         _userHub.On<ClientPairDto, string>("UpdateClientPairs", UpdateLocalClientPairsCallback);
@@ -160,7 +165,6 @@ namespace MareSynchronos.WebAPI
                             (s) => PairedClientOffline?.Invoke(s, EventArgs.Empty));
                         _userHub.On<string>("AddOnlinePairedPlayer",
                             (s) => PairedClientOnline?.Invoke(s, EventArgs.Empty));
-                        _userHub.On<int>("UsersOnline", (count) => OnlineUsers = count);
                         _adminHub.On("ForcedReconnect", UserForcedReconnectCallback);
 
                         PairedClients = await _userHub!.InvokeAsync<List<ClientPairDto>>("GetPairedClients", token);
@@ -239,7 +243,7 @@ namespace MareSynchronos.WebAPI
         {
             Logger.Debug("Connection restored");
             OnlineUsers = _userHub!.InvokeAsync<int>("GetOnlineUsers").Result;
-            _loggedInUser = _heartbeatHub!.InvokeAsync<LoggedInUserDto>("Heartbeat").Result;
+            _connectionDto = _heartbeatHub!.InvokeAsync<ConnectionDto>("Heartbeat").Result;
             Connected?.Invoke(this, EventArgs.Empty);
             return Task.CompletedTask;
         }

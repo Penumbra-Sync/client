@@ -7,7 +7,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.Mime;
 using System.Numerics;
 using System.Threading.Tasks;
 using MareSynchronos.API;
@@ -84,10 +83,15 @@ namespace MareSynchronos.UI
             }
             else
             {
-                string error = _configuration.FullPause ? "Disconnected" : _apiController.ServerAlive ? "Unauthorized" : "Service unavailable";
+                var error = _configuration.FullPause ? "Disconnected" 
+                    : !_apiController.ServerAlive 
+                        ? "Service unavailable" 
+                        : !_apiController.ServerSupportsThisClient 
+                            ? "Service version mismatch" 
+                            : "Unauthorized";
                 ImGui.TextColored(ImGuiColors.DalamudRed, $"No UID ({error})");
                 ImGui.SetWindowFontScale(1.0f);
-                if (_apiController.ServerAlive && !_configuration.FullPause)
+                if (_apiController.ServerAlive && !_configuration.FullPause && _apiController.ServerSupportsThisClient)
                 {
                     ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
                     UiShared.TextWrapped("Your account is not present on the service anymore or you are banned.");
@@ -101,6 +105,11 @@ namespace MareSynchronos.UI
                         _configuration.Save();
                         SwitchFromMainUiToIntro?.Invoke();
                     }
+                } else if (!_apiController.ServerSupportsThisClient)
+                {
+                    ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
+                    UiShared.TextWrapped("The server or your client is outdated. If the client has recently been updated for breaking service changes, the service must follow suit.");
+                    ImGui.PopStyleColor();
                 }
             }
 
