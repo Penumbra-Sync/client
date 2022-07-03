@@ -55,7 +55,7 @@ namespace MareSynchronos.WebAPI
 
         public ApiController(Configuration pluginConfiguration, DalamudUtil dalamudUtil)
         {
-            Verbose.Debug("Creating " + nameof(ApiController));
+            Logger.Verbose("Creating " + nameof(ApiController));
 
             _pluginConfiguration = pluginConfiguration;
             _dalamudUtil = dalamudUtil;
