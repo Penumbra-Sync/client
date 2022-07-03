@@ -17,13 +17,13 @@ public class DownloadUi : Window, IDisposable
 
     public void Dispose()
     {
-        Logger.Debug("Disposing " + nameof(DownloadUi));
+        Logger.Verbose("Disposing " + nameof(DownloadUi));
         _windowSystem.RemoveWindow(this);
     }
 
     public DownloadUi(WindowSystem windowSystem, Configuration pluginConfiguration, ApiController apiController, UiShared uiShared) : base("Mare Synchronos Downloads")
     {
-        Logger.Debug("Creating " + nameof(DownloadUi));
+        Logger.Verbose("Creating " + nameof(DownloadUi));
         _windowSystem = windowSystem;
         _pluginConfiguration = pluginConfiguration;
         _apiController = apiController;

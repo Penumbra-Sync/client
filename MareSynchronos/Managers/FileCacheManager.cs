@@ -25,22 +25,22 @@ namespace MareSynchronos.Managers
         private Task? _scanTask;
         public FileCacheManager(IpcManager ipcManager, Configuration pluginConfiguration)
         {
-            Logger.Debug("Creating " + nameof(FileCacheManager));
+            Logger.Verbose("Creating " + nameof(FileCacheManager));
 
             _ipcManager = ipcManager;
             _pluginConfiguration = pluginConfiguration;
 
             StartWatchersAndScan();
 
-            _ipcManager.PenumbraInitialized += IpcManagerOnPenumbraInitialized;
-            _ipcManager.PenumbraDisposed += IpcManagerOnPenumbraDisposed;
+            _ipcManager.PenumbraInitialized += StartWatchersAndScan;
+            _ipcManager.PenumbraDisposed += StopWatchersAndScan;
         }
 
         public long CurrentFileProgress { get; private set; }
 
         public long FileCacheSize { get; set; }
 
-        public bool IsScanRunning => !_scanTask?.IsCompleted ?? false;
+        public bool IsScanRunning => CurrentFileProgress > 0 || TotalFiles > 0;
 
         public long TotalFiles { get; private set; }
 
@@ -67,10 +67,10 @@ namespace MareSynchronos.Managers
 
         public void Dispose()
         {
-            Logger.Debug("Disposing " + nameof(FileCacheManager));
+            Logger.Verbose("Disposing " + nameof(FileCacheManager));
 
-            _ipcManager.PenumbraInitialized -= IpcManagerOnPenumbraInitialized;
-            _ipcManager.PenumbraDisposed -= IpcManagerOnPenumbraDisposed;
+            _ipcManager.PenumbraInitialized -= StartWatchersAndScan;
+            _ipcManager.PenumbraDisposed -= StopWatchersAndScan;
             _rescanTaskCancellationTokenSource?.Cancel();
             _rescanTaskRunCancellationTokenSource?.Cancel();
             _scanCancellationTokenSource?.Cancel();
@@ -119,16 +119,6 @@ namespace MareSynchronos.Managers
             _cacheDirWatcher.EnableRaisingEvents = true;
 
             Task.Run(RecalculateFileCacheSize);
-        }
-
-        private void IpcManagerOnPenumbraDisposed(object? sender, EventArgs e)
-        {
-            StopWatchersAndScan();
-        }
-
-        private void IpcManagerOnPenumbraInitialized(object? sender, EventArgs e)
-        {
-            StartWatchersAndScan();
         }
 
         private bool IsFileLocked(FileInfo file)
@@ -217,6 +207,7 @@ namespace MareSynchronos.Managers
 
         private async Task StartFileScan(CancellationToken ct)
         {
+            TotalFiles = 1;
             _scanCancellationTokenSource = new CancellationTokenSource();
             var penumbraDir = _ipcManager.PenumbraModDirectory()!;
             Logger.Debug("Getting files from " + penumbraDir + " and " + _pluginConfiguration.CacheFolder);
@@ -237,7 +228,7 @@ namespace MareSynchronos.Managers
             var fileCachesToDelete = new ConcurrentBag<FileCache>();
             var fileCachesToAdd = new ConcurrentBag<FileCache>();
 
-            Logger.Debug("Getting file list from Database");
+            Logger.Verbose("Getting file list from Database");
             // scan files from database
             Parallel.ForEach(fileCaches, new ParallelOptions()
             {

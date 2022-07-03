@@ -34,7 +34,7 @@ namespace MareSynchronos.UI
             _fileDialogManager = fileDialogManager;
             _pluginConfiguration = pluginConfiguration;
             _dalamudUtil = dalamudUtil;
-            isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder);
+            _isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder);
         }
 
         public bool DrawOtherPluginState()
@@ -85,7 +85,7 @@ namespace MareSynchronos.UI
             var serverName = _apiController.ServerDictionary.ContainsKey(_pluginConfiguration.ApiUri)
                 ? _apiController.ServerDictionary[_pluginConfiguration.ApiUri]
                 : _pluginConfiguration.ApiUri;
-            ImGui.Text("Service " + serverName + ":");
+            ImGui.TextUnformatted("Service " + serverName + ":");
             ImGui.SameLine();
             var color = _apiController.ServerAlive ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
             ImGui.TextColored(color, _apiController.ServerAlive ? "Available" : "Unavailable");
@@ -100,6 +100,20 @@ namespace MareSynchronos.UI
                 ImGui.SameLine();
                 ImGui.Text(")");
             }
+        }
+
+        public static void ColorText(string text, Vector4 color)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, color);
+            ImGui.TextUnformatted(text);
+            ImGui.PopStyleColor();
+        }
+
+        public static void ColorTextWrapped(string text, Vector4 color)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, color);
+            TextWrapped(text);
+            ImGui.PopStyleColor();
         }
 
         public static void TextWrapped(string text)
@@ -238,9 +252,7 @@ namespace MareSynchronos.UI
             }
             else
             {
-                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
-                TextWrapped("You already have an account on this server.");
-                ImGui.PopStyleColor();
+                ColorTextWrapped("You already have an account on this server.", ImGuiColors.DalamudYellow);
                 ImGui.SameLine();
                 if (ImGui.Button("Connect##connectToService"))
                 {
@@ -301,7 +313,7 @@ namespace MareSynchronos.UI
                 _pluginConfiguration.CacheFolder = cacheDirectory;
                 if (!string.IsNullOrEmpty(_pluginConfiguration.CacheFolder)
                     && Directory.Exists(_pluginConfiguration.CacheFolder)
-                    && (isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder)))
+                    && (_isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder)))
                 {
                     _pluginConfiguration.Save();
                     _fileCacheManager.StartWatchers();
@@ -318,8 +330,8 @@ namespace MareSynchronos.UI
                     if (!success) return;
 
                     _pluginConfiguration.CacheFolder = path;
-                    isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder);
-                    if (isDirectoryWritable)
+                    _isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder);
+                    if (_isDirectoryWritable)
                     {
                         _pluginConfiguration.Save();
                         _fileCacheManager.StartWatchers();
@@ -328,15 +340,13 @@ namespace MareSynchronos.UI
             }
             ImGui.PopFont();
 
-            if (!Directory.Exists(cacheDirectory) || !isDirectoryWritable)
+            if (!Directory.Exists(cacheDirectory) || !_isDirectoryWritable)
             {
-                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
-                TextWrapped("The folder you selected does not exist or cannot be written to. Please provide a valid path.");
-                ImGui.PopStyleColor();
+                ColorTextWrapped("The folder you selected does not exist or cannot be written to. Please provide a valid path.", ImGuiColors.DalamudRed);
             }
         }
 
-        private bool isDirectoryWritable = false;
+        private bool _isDirectoryWritable = false;
 
         public bool IsDirectoryWritable(string dirPath, bool throwIfFails = false)
         {

@@ -22,7 +22,7 @@ namespace MareSynchronos.Managers
         private readonly IpcManager _ipcManager;
         public event PlayerHasChanged? PlayerHasChanged;
         public bool SendingData { get; private set; }
-        public CharacterData? LastSentCharacterData { get; private set; }
+        public CharacterCacheDto? LastSentCharacterData { get; private set; }
 
         private CancellationTokenSource? _playerChangedCts;
         private DateTime _lastPlayerObjectCheck;
@@ -31,28 +31,28 @@ namespace MareSynchronos.Managers
         public PlayerManager(ApiController apiController, IpcManager ipcManager,
             CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil)
         {
-            Logger.Debug("Creating " + nameof(PlayerManager));
+            Logger.Verbose("Creating " + nameof(PlayerManager));
 
             _apiController = apiController;
             _ipcManager = ipcManager;
             _characterDataFactory = characterDataFactory;
             _dalamudUtil = dalamudUtil;
 
-            _apiController.Connected += ApiController_Connected;
+            _apiController.Connected += ApiControllerOnConnected;
             _apiController.Disconnected += ApiController_Disconnected;
 
             Logger.Debug("Watching Player, ApiController is Connected: " + _apiController.IsConnected);
             if (_apiController.IsConnected)
             {
-                ApiController_Connected(null, EventArgs.Empty);
+                ApiControllerOnConnected();
             }
         }
 
         public void Dispose()
         {
-            Logger.Debug("Disposing " + nameof(PlayerManager));
+            Logger.Verbose("Disposing " + nameof(PlayerManager));
 
-            _apiController.Connected -= ApiController_Connected;
+            _apiController.Connected -= ApiControllerOnConnected;
             _apiController.Disconnected -= ApiController_Disconnected;
 
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
@@ -73,7 +73,7 @@ namespace MareSynchronos.Managers
             _lastPlayerObjectCheck = DateTime.Now;
         }
 
-        private void ApiController_Connected(object? sender, EventArgs args)
+        private void ApiControllerOnConnected()
         {
             Logger.Debug("ApiController Connected");
 
@@ -84,17 +84,19 @@ namespace MareSynchronos.Managers
             PlayerChanged();
         }
 
-        private void ApiController_Disconnected(object? sender, EventArgs args)
+        private void ApiController_Disconnected()
         {
             Logger.Debug(nameof(ApiController_Disconnected));
 
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
             _dalamudUtil.FrameworkUpdate -= DalamudUtilOnFrameworkUpdate;
+            LastSentCharacterData = null;
         }
 
-        private async Task<CharacterData> CreateFullCharacterCache(CancellationToken token)
+        private async Task<CharacterCacheDto?> CreateFullCharacterCache(CancellationToken token)
         {
             var cache = _characterDataFactory.BuildCharacterData();
+            CharacterCacheDto? cacheDto = null;
 
             await Task.Run(async () =>
             {
@@ -105,12 +107,13 @@ namespace MareSynchronos.Managers
 
                 if (token.IsCancellationRequested) return;
 
-                var json = JsonConvert.SerializeObject(cache, Formatting.Indented);
+                cacheDto = cache.ToCharacterCacheDto();
+                var json = JsonConvert.SerializeObject(cacheDto);
 
-                cache.CacheHash = Crypto.GetHash(json);
+                cacheDto.Hash = Crypto.GetHash(json);
             }, token);
 
-            return cache;
+            return cacheDto;
         }
 
         private void IpcManager_PenumbraRedrawEvent(object? objectTableIndex, EventArgs e)
@@ -160,32 +163,21 @@ namespace MareSynchronos.Managers
 
                 if (attempts == 10 || token.IsCancellationRequested) return;
 
-                Stopwatch st = Stopwatch.StartNew();
                 _dalamudUtil.WaitWhileSelfIsDrawing(token);
 
-                var characterCache = await CreateFullCharacterCache(token);
+                var characterCache = (await CreateFullCharacterCache(token))!;
 
                 if (token.IsCancellationRequested) return;
 
-                var cacheDto = characterCache.ToCharacterCacheDto();
-                st.Stop();
-
-                if (token.IsCancellationRequested)
-                {
-                    return;
-                }
-
-                Logger.Debug("Elapsed time PlayerChangedTask: " + st.Elapsed);
-                if (cacheDto.Hash == (LastSentCharacterData?.CacheHash ?? "-"))
+                if (characterCache.Hash == (LastSentCharacterData?.Hash ?? "-"))
                 {
                     Logger.Debug("Not sending data, already sent");
                     return;
                 }
 
                 LastSentCharacterData = characterCache;
-                PlayerHasChanged?.Invoke(cacheDto);
+                PlayerHasChanged?.Invoke(characterCache);
                 SendingData = false;
-
             }, token);
         }
 

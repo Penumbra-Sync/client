@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -13,21 +12,32 @@ using Microsoft.AspNetCore.SignalR.Client;
 
 namespace MareSynchronos.WebAPI
 {
+    public delegate void VoidDelegate();
+    public delegate void SimpleStringDelegate(string str);
+    public enum ServerState
+    {
+        Offline,
+        Disconnected,
+        Connected,
+        Unauthorized,
+        VersionMisMatch
+    }
+
     public partial class ApiController : IDisposable
     {
 #if DEBUG
-        public const string MainServer = "darkarchons Debug Server (Dev Server (CH))";
-        public const string MainServiceUri = "wss://darkarchon.internet-box.ch:5000";
-        public readonly int[] SupportedServerVersions = { 1 };
+        public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
+        public const string MainServiceUri = "wss://v2202207178628194299.powersrv.de:6871";
 #else
         public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
-        public const string MainServiceUri = "to be defined";
+        public const string MainServiceUri = "wss://v2202207178628194299.powersrv.de:6871";
 #endif
+        public readonly int[] SupportedServerVersions = { 1 };
 
         private readonly Configuration _pluginConfiguration;
         private readonly DalamudUtil _dalamudUtil;
 
-        private CancellationTokenSource _cts;
+        private CancellationTokenSource _connectionCancellationTokenSource;
 
         private HubConnection? _fileHub;
 
@@ -45,11 +55,11 @@ namespace MareSynchronos.WebAPI
 
         public ApiController(Configuration pluginConfiguration, DalamudUtil dalamudUtil)
         {
-            Logger.Debug("Creating " + nameof(ApiController));
+            Verbose.Debug("Creating " + nameof(ApiController));
 
             _pluginConfiguration = pluginConfiguration;
             _dalamudUtil = dalamudUtil;
-            _cts = new CancellationTokenSource();
+            _connectionCancellationTokenSource = new CancellationTokenSource();
             _dalamudUtil.LogIn += DalamudUtilOnLogIn;
             _dalamudUtil.LogOut += DalamudUtilOnLogOut;
 
@@ -61,7 +71,7 @@ namespace MareSynchronos.WebAPI
 
         private void DalamudUtilOnLogOut()
         {
-            Task.Run(async () => await StopAllConnections(_cts.Token));
+            Task.Run(async () => await StopAllConnections(_connectionCancellationTokenSource.Token));
         }
 
         private void DalamudUtilOnLogIn()
@@ -70,21 +80,21 @@ namespace MareSynchronos.WebAPI
         }
 
 
-        public event EventHandler? ChangingServers;
-
         public event EventHandler<CharacterReceivedEventArgs>? CharacterReceived;
 
-        public event EventHandler? Connected;
+        public event VoidDelegate? RegisterFinalized;
 
-        public event EventHandler? Disconnected;
+        public event VoidDelegate? Connected;
 
-        public event EventHandler? PairedClientOffline;
+        public event VoidDelegate? Disconnected;
 
-        public event EventHandler? PairedClientOnline;
+        public event SimpleStringDelegate? PairedClientOffline;
 
-        public event EventHandler? PairedWithOther;
+        public event SimpleStringDelegate? PairedClientOnline;
 
-        public event EventHandler? UnpairedFromOther;
+        public event SimpleStringDelegate? PairedWithOther;
+
+        public event SimpleStringDelegate? UnpairedFromOther;
 
         public List<FileTransfer> CurrentDownloads { get; } = new();
 
@@ -96,7 +106,7 @@ namespace MareSynchronos.WebAPI
 
         public List<ForbiddenFileDto> AdminForbiddenFiles { get; private set; } = new();
 
-        public bool IsConnected => !string.IsNullOrEmpty(UID) && ServerSupportsThisClient;
+        public bool IsConnected => ServerState == ServerState.Connected;
 
         public bool IsDownloading => CurrentDownloads.Count > 0;
 
@@ -104,33 +114,51 @@ namespace MareSynchronos.WebAPI
 
         public List<ClientPairDto> PairedClients { get; set; } = new();
 
-        public string SecretKey => _pluginConfiguration.ClientSecret.ContainsKey(ApiUri) ? _pluginConfiguration.ClientSecret[ApiUri] : "-";
+        public string SecretKey => _pluginConfiguration.ClientSecret.ContainsKey(ApiUri)
+            ? _pluginConfiguration.ClientSecret[ApiUri]
+            : "-";
 
         public bool ServerAlive =>
             (_heartbeatHub?.State ?? HubConnectionState.Disconnected) == HubConnectionState.Connected;
 
-        public bool ServerSupportsThisClient => SupportedServerVersions.Contains(_connectionDto?.ServerVersion ?? 0);
-
-        public Dictionary<string, string> ServerDictionary => new Dictionary<string, string>() { { MainServiceUri, MainServer } }
+        public Dictionary<string, string> ServerDictionary => new Dictionary<string, string>()
+                { { MainServiceUri, MainServer } }
             .Concat(_pluginConfiguration.CustomServerList)
             .ToDictionary(k => k.Key, k => k.Value);
 
         public string UID => _connectionDto?.UID ?? string.Empty;
-
         private string ApiUri => _pluginConfiguration.ApiUri;
         public int OnlineUsers { get; private set; }
 
+        public ServerState ServerState
+        {
+            get
+            {
+                if (_pluginConfiguration.FullPause)
+                    return ServerState.Disconnected;
+                if (!ServerAlive)
+                    return ServerState.Offline;
+                if (ServerAlive && !SupportedServerVersions.Contains(_connectionDto?.ServerVersion ?? 0) && !string.IsNullOrEmpty(UID))
+                    return ServerState.VersionMisMatch;
+                if (ServerAlive && SupportedServerVersions.Contains(_connectionDto?.ServerVersion ?? 0)
+                                && string.IsNullOrEmpty(UID))
+                    return ServerState.Unauthorized;
+                return ServerState.Connected;
+            }
+        }
+
         public async Task CreateConnections()
         {
-            await StopAllConnections(_cts.Token);
+            Logger.Verbose("Recreating Connection");
 
-            _cts = new CancellationTokenSource();
-            var token = _cts.Token;
+            await StopAllConnections(_connectionCancellationTokenSource.Token);
+
+            _connectionCancellationTokenSource.Cancel();
+            _connectionCancellationTokenSource = new CancellationTokenSource();
+            var token = _connectionCancellationTokenSource.Token;
 
             while (!ServerAlive && !token.IsCancellationRequested)
             {
-                await StopAllConnections(token);
-
                 try
                 {
                     if (_dalamudUtil.PlayerCharacter == null) throw new ArgumentException("Player not initialized");
@@ -147,7 +175,7 @@ namespace MareSynchronos.WebAPI
 
                     OnlineUsers = await _userHub.InvokeAsync<int>("GetOnlineUsers", token);
                     _userHub.On<int>("UsersOnline", (count) => OnlineUsers = count);
-                    
+
                     if (_pluginConfiguration.FullPause)
                     {
                         _connectionDto = null;
@@ -155,16 +183,15 @@ namespace MareSynchronos.WebAPI
                     }
 
                     _connectionDto = await _heartbeatHub.InvokeAsync<ConnectionDto>("Heartbeat", token);
-                    if (!string.IsNullOrEmpty(UID) && !token.IsCancellationRequested 
-                                                   && ServerSupportsThisClient) // user is authorized && server is legit
+                    if (ServerState is ServerState.Connected) // user is authorized && server is legit
                     {
                         Logger.Debug("Initializing data");
                         _userHub.On<ClientPairDto, string>("UpdateClientPairs", UpdateLocalClientPairsCallback);
                         _userHub.On<CharacterCacheDto, string>("ReceiveCharacterData", ReceiveCharacterDataCallback);
                         _userHub.On<string>("RemoveOnlinePairedPlayer",
-                            (s) => PairedClientOffline?.Invoke(s, EventArgs.Empty));
+                            (s) => PairedClientOffline?.Invoke(s));
                         _userHub.On<string>("AddOnlinePairedPlayer",
-                            (s) => PairedClientOnline?.Invoke(s, EventArgs.Empty));
+                            (s) => PairedClientOnline?.Invoke(s));
                         _adminHub.On("ForcedReconnect", UserForcedReconnectCallback);
 
                         PairedClients = await _userHub!.InvokeAsync<List<ClientPairDto>>("GetPairedClients", token);
@@ -183,7 +210,7 @@ namespace MareSynchronos.WebAPI
                             _adminHub.On<ForbiddenFileDto>("DeleteForbiddenFile", DeleteForbiddenFileCallback);
                         }
 
-                        Connected?.Invoke(this, EventArgs.Empty);
+                        Connected?.Invoke();
                     }
                 }
                 catch (Exception ex)
@@ -191,6 +218,7 @@ namespace MareSynchronos.WebAPI
                     Logger.Warn(ex.Message);
                     Logger.Warn(ex.StackTrace ?? string.Empty);
                     Logger.Debug("Failed to establish connection, retrying");
+                    await StopAllConnections(token);
                     await Task.Delay(TimeSpan.FromSeconds(5), token);
                 }
             }
@@ -198,12 +226,12 @@ namespace MareSynchronos.WebAPI
 
         public void Dispose()
         {
-            Logger.Debug("Disposing " + nameof(ApiController));
+            Logger.Verbose("Disposing " + nameof(ApiController));
 
             _dalamudUtil.LogIn -= DalamudUtilOnLogIn;
             _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
 
-            Task.Run(async () => await StopAllConnections(_cts.Token));
+            Task.Run(async () => await StopAllConnections(_connectionCancellationTokenSource.Token));
         }
 
         private HubConnection BuildHubConnection(string hubName)
@@ -235,7 +263,7 @@ namespace MareSynchronos.WebAPI
             CurrentDownloads.Clear();
             _uploadCancellationTokenSource?.Cancel();
             Logger.Debug("Connection closed");
-            Disconnected?.Invoke(null, EventArgs.Empty);
+            Disconnected?.Invoke();
             return Task.CompletedTask;
         }
 
@@ -244,7 +272,7 @@ namespace MareSynchronos.WebAPI
             Logger.Debug("Connection restored");
             OnlineUsers = _userHub!.InvokeAsync<int>("GetOnlineUsers").Result;
             _connectionDto = _heartbeatHub!.InvokeAsync<ConnectionDto>("Heartbeat").Result;
-            Connected?.Invoke(this, EventArgs.Empty);
+            Connected?.Invoke();
             return Task.CompletedTask;
         }
 
@@ -254,12 +282,13 @@ namespace MareSynchronos.WebAPI
             CurrentDownloads.Clear();
             _uploadCancellationTokenSource?.Cancel();
             Logger.Debug("Connection closed... Reconnecting");
-            Disconnected?.Invoke(null, EventArgs.Empty);
+            Disconnected?.Invoke();
             return Task.CompletedTask;
         }
 
         private async Task StopAllConnections(CancellationToken token)
         {
+            Logger.Verbose("Stopping all connections");
             if (_heartbeatHub is not null)
             {
                 await _heartbeatHub.StopAsync(token);

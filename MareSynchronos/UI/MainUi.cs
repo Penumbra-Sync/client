@@ -27,7 +27,7 @@ namespace MareSynchronos.UI
         public MainUi(WindowSystem windowSystem,
             UiShared uiShared, Configuration configuration, ApiController apiController) : base("Mare Synchronos Settings", ImGuiWindowFlags.None)
         {
-            Logger.Debug("Creating " + nameof(MainUi));
+            Logger.Verbose("Creating " + nameof(MainUi));
 
             SizeConstraints = new WindowSizeConstraints()
             {
@@ -44,7 +44,7 @@ namespace MareSynchronos.UI
 
         public void Dispose()
         {
-            Logger.Debug("Disposing " + nameof(MainUi));
+            Logger.Verbose("Disposing " + nameof(MainUi));
 
             _windowSystem.RemoveWindow(this);
         }
@@ -66,11 +66,12 @@ namespace MareSynchronos.UI
         {
             _uiShared.PrintServerState();
             ImGui.Separator();
-            ImGui.SetWindowFontScale(1.2f);
-            ImGui.Text("Your UID");
-            ImGui.SameLine();
-            if (_apiController.IsConnected)
+
+            if (_apiController.ServerState is ServerState.Connected)
             {
+                ImGui.SetWindowFontScale(1.2f);
+                ImGui.Text("Your UID");
+                ImGui.SameLine();
                 ImGui.TextColored(ImGuiColors.ParsedGreen, _apiController.UID);
                 ImGui.SameLine();
                 ImGui.SetWindowFontScale(1.0f);
@@ -83,33 +84,44 @@ namespace MareSynchronos.UI
             }
             else
             {
-                var error = _configuration.FullPause ? "Disconnected" 
-                    : !_apiController.ServerAlive 
-                        ? "Service unavailable" 
-                        : !_apiController.ServerSupportsThisClient 
-                            ? "Service version mismatch" 
-                            : "Unauthorized";
-                ImGui.TextColored(ImGuiColors.DalamudRed, $"No UID ({error})");
+                string errorMsg = _apiController.ServerState switch
+                {
+                    ServerState.Disconnected => "Disconnected",
+                    ServerState.Unauthorized => "Unauthorized",
+                    ServerState.VersionMisMatch => "Service version mismatch",
+                    ServerState.Offline => "Service unavailable"
+                };
+                ImGui.SetWindowFontScale(1.2f);
+                ImGui.TextColored(ImGuiColors.DalamudRed, $"No UID ({errorMsg})");
                 ImGui.SetWindowFontScale(1.0f);
-                if (_apiController.ServerAlive && !_configuration.FullPause && _apiController.ServerSupportsThisClient)
+                switch (_apiController.ServerState)
                 {
-                    ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
-                    UiShared.TextWrapped("Your account is not present on the service anymore or you are banned.");
-                    ImGui.PopStyleColor();
-                    ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
-                    UiShared.TextWrapped("If you think your secret key is just invalid, use the following button to reset the local secret key to be able to re-register. If you continue to see this message after registering, tough luck, asshole.");
-                    ImGui.PopStyleColor();
-                    if (ImGui.Button("Reset Secret Key"))
-                    {
-                        _configuration.ClientSecret.Remove(_configuration.ApiUri);
-                        _configuration.Save();
-                        SwitchFromMainUiToIntro?.Invoke();
-                    }
-                } else if (!_apiController.ServerSupportsThisClient)
-                {
-                    ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
-                    UiShared.TextWrapped("The server or your client is outdated. If the client has recently been updated for breaking service changes, the service must follow suit.");
-                    ImGui.PopStyleColor();
+                    case ServerState.Disconnected:
+                        UiShared.ColorTextWrapped("You are currently disconnected from the Mare Synchronos service.", ImGuiColors.DalamudRed);
+                        break;
+                    case ServerState.Unauthorized:
+                        UiShared.ColorTextWrapped("Your account is not present on the service anymore or you are banned.", ImGuiColors.DalamudRed);
+                        UiShared.ColorTextWrapped("If you think your secret key is just invalid, use the following button to reset " +
+                                                  "the local secret key to be able to re-register. If you continue to see this message after " +
+                                                  "registering, tough luck, asshole.", ImGuiColors.DalamudYellow);
+                        if (ImGui.Button("Reset Secret Key"))
+                        {
+                            _configuration.ClientSecret.Remove(_configuration.ApiUri);
+                            _configuration.Save();
+                            SwitchFromMainUiToIntro?.Invoke();
+                        }
+                        break;
+                    case ServerState.Offline:
+                        UiShared.ColorTextWrapped("Your selected Mare Synchronos server is currently offline.", ImGuiColors.DalamudRed);
+                        break;
+                    case ServerState.VersionMisMatch:
+                        UiShared.ColorTextWrapped("The server or your client is outdated. If the client has recently been updated for breaking " +
+                                                  "service changes, the service must follow suit.", ImGuiColors.DalamudRed);
+                        break;
+                    case ServerState.Connected:
+                    default:
+                        break;
+
                 }
             }
 
@@ -465,9 +477,7 @@ namespace MareSynchronos.UI
 
                 if (!_configuration.FullPause)
                 {
-                    ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
-                    UiShared.TextWrapped("Note: to change servers you need to disconnect from your current Mare Synchronos server.");
-                    ImGui.PopStyleColor();
+                    UiShared.ColorTextWrapped("Note: to change servers you need to disconnect from your current Mare Synchronos server.", ImGuiColors.DalamudYellow);
                 }
 
                 var marePaused = _configuration.FullPause;
@@ -485,17 +495,13 @@ namespace MareSynchronos.UI
                 }
                 else
                 {
-                    ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
-                    ImGui.TextUnformatted("You cannot reconnect without a valid account on the service.");
-                    ImGui.PopStyleColor();
+                    UiShared.ColorText("You cannot reconnect without a valid account on the service.", ImGuiColors.DalamudYellow);
                 }
-
 
                 if (marePaused)
                 {
                     _uiShared.DrawServiceSelection(() => SwitchFromMainUiToIntro?.Invoke());
                 }
-
 
                 ImGui.TreePop();
             }
@@ -506,11 +512,10 @@ namespace MareSynchronos.UI
             if (ImGui.TreeNode(
                     $"Forbidden Transfers"))
             {
-                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudGrey);
-                UiShared.TextWrapped("Files that you attempted to upload or download that were forbidden to be transferred by their creators will appear here. " +
+                UiShared.ColorTextWrapped("Files that you attempted to upload or download that were forbidden to be transferred by their creators will appear here. " +
                                      "If you see file paths from your drive here, then those files were not allowed to be uploaded. If you see hashes, those files were not allowed to be downloaded. " +
-                                     "Ask your paired friend to send you the mod in question through other means, acquire the mod yourself or pester the mod creator to allow it to be sent over Mare.");
-                ImGui.PopStyleColor();
+                                     "Ask your paired friend to send you the mod in question through other means, acquire the mod yourself or pester the mod creator to allow it to be sent over Mare.",
+                    ImGuiColors.DalamudGrey);
 
                 if (ImGui.BeginTable("TransfersTable", 2, ImGuiTableFlags.SizingStretchProp))
                 {
@@ -579,7 +584,7 @@ namespace MareSynchronos.UI
                         ImGui.TableSetupColumn("Uploaded");
                         ImGui.TableSetupColumn("Size");
                         ImGui.TableHeadersRow();
-                        foreach (var transfer in _apiController.CurrentUploads)
+                        foreach (var transfer in _apiController.CurrentUploads.ToArray())
                         {
                             var color = UiShared.UploadColor((transfer.Transferred, transfer.Total));
                             ImGui.PushStyleColor(ImGuiCol.Text, color);
@@ -603,7 +608,7 @@ namespace MareSynchronos.UI
                         ImGui.TableSetupColumn("Downloaded");
                         ImGui.TableSetupColumn("Size");
                         ImGui.TableHeadersRow();
-                        foreach (var transfer in _apiController.CurrentDownloads)
+                        foreach (var transfer in _apiController.CurrentDownloads.ToArray())
                         {
                             var color = UiShared.UploadColor((transfer.Transferred, transfer.Total));
                             ImGui.PushStyleColor(ImGuiCol.Text, color);

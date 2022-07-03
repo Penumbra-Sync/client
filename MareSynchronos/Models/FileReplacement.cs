@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
 using MareSynchronos.FileCacheDB;
 using System.IO;
 using MareSynchronos.API;
@@ -12,29 +11,23 @@ using MareSynchronos.Utils;
 
 namespace MareSynchronos.Models
 {
-    [JsonObject(MemberSerialization.OptIn)]
     public class FileReplacement
     {
         private readonly string _penumbraDirectory;
 
-        private Task? _computationTask = null;
-
         public FileReplacement(string penumbraDirectory)
         {
-            this._penumbraDirectory = penumbraDirectory;
+            _penumbraDirectory = penumbraDirectory;
         }
 
-        public bool Computed => (_computationTask == null || (_computationTask?.IsCompleted ?? true));
+        public bool Computed => !HasFileReplacement || !string.IsNullOrEmpty(Hash);
 
-        [JsonProperty]
         public List<string> GamePaths { get; set; } = new();
 
         public bool HasFileReplacement => GamePaths.Count >= 1 && GamePaths.Any(p => p != ResolvedPath);
 
-        [JsonProperty]
         public string Hash { get; set; } = string.Empty;
         
-        [JsonProperty]
         public string ResolvedPath { get; set; } = string.Empty;
         
         public void SetResolvedPath(string path)
@@ -42,7 +35,7 @@ namespace MareSynchronos.Models
             ResolvedPath = path.ToLower().Replace('/', '\\').Replace(_penumbraDirectory, "").Replace('\\', '/');
             if (!HasFileReplacement) return;
 
-            _computationTask = Task.Run(() =>
+            _ = Task.Run(() =>
             {
                 FileCache? fileCache;
                 using (FileCacheContext db = new())

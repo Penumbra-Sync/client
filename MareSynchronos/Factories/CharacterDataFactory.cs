@@ -22,7 +22,7 @@ public class CharacterDataFactory
 
     public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager)
     {
-        Logger.Debug("Creating " + nameof(CharacterDataFactory));
+        Logger.Verbose("Creating " + nameof(CharacterDataFactory));
 
         _dalamudUtil = dalamudUtil;
         _ipcManager = ipcManager;
@@ -48,8 +48,8 @@ public class CharacterDataFactory
         var indentation = GetIndentationForInheritanceLevel(inheritanceLevel);
         objectKind += string.IsNullOrEmpty(objectKind) ? "" : " ";
 
-        Logger.Debug(indentation.Item1 + objectKind + resourceType + " [" + string.Join(", ", fileReplacement.GamePaths) + "]");
-        Logger.Debug(indentation.Item2 + "=> " + fileReplacement.ResolvedPath);
+        Logger.Verbose(indentation.Item1 + objectKind + resourceType + " [" + string.Join(", ", fileReplacement.GamePaths) + "]");
+        Logger.Verbose(indentation.Item2 + "=> " + fileReplacement.ResolvedPath);
     }
 
     private unsafe void AddReplacementsFromRenderModel(RenderModel* mdl, CharacterData cache, int inheritanceLevel = 0, string objectKind = "")
@@ -116,7 +116,7 @@ public class CharacterDataFactory
         Stopwatch st = Stopwatch.StartNew();
         while (!_dalamudUtil.IsPlayerPresent)
         {
-            Logger.Debug("Character is null but it shouldn't be, waiting");
+            Logger.Verbose("Character is null but it shouldn't be, waiting");
             Thread.Sleep(50);
         }
         _dalamudUtil.WaitWhileCharacterIsDrawing(_dalamudUtil.PlayerPointer);

@@ -27,7 +27,7 @@ public class OnlinePlayerManager : IDisposable
 
     public OnlinePlayerManager(Framework framework, ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager, PlayerManager playerManager)
     {
-        Logger.Debug("Creating " + nameof(OnlinePlayerManager));
+        Logger.Verbose("Creating " + nameof(OnlinePlayerManager));
 
         _framework = framework;
         _apiController = apiController;
@@ -74,7 +74,7 @@ public class OnlinePlayerManager : IDisposable
         PushCharacterData(OnlineVisiblePlayerHashes);
     }
 
-    private void ApiControllerOnConnected(object? sender, EventArgs e)
+    private void ApiControllerOnConnected()
     {
         var apiTask = _apiController.GetOnlineCharacters();
 
@@ -95,12 +95,12 @@ public class OnlinePlayerManager : IDisposable
         _framework.Update += FrameworkOnUpdate;
     }
 
-    private void IpcManagerOnPenumbraDisposed(object? sender, EventArgs e)
+    private void IpcManagerOnPenumbraDisposed()
     {
         _onlineCachedPlayers.ForEach(p => p.DisposePlayer());
     }
 
-    private void ApiControllerOnDisconnected(object? sender, EventArgs e)
+    private void ApiControllerOnDisconnected()
     {
         RestoreAllCharacters();
         _playerManager.PlayerHasChanged -= PlayerManagerOnPlayerHasChanged;
@@ -110,12 +110,12 @@ public class OnlinePlayerManager : IDisposable
     {
         _onlineCachedPlayers.Clear();
         _onlineCachedPlayers.AddRange(apiTaskResult.Select(CreateCachedPlayer));
-        Logger.Debug("Online and paired users: " + string.Join(",", _onlineCachedPlayers));
+        Logger.Verbose("Online and paired users: " + string.Join(Environment.NewLine, _onlineCachedPlayers));
     }
 
     public void Dispose()
     {
-        Logger.Debug("Disposing " + nameof(OnlinePlayerManager));
+        Logger.Verbose("Disposing " + nameof(OnlinePlayerManager));
 
         RestoreAllCharacters();
 
@@ -140,37 +140,28 @@ public class OnlinePlayerManager : IDisposable
         _onlineCachedPlayers.Clear();
     }
 
-    public async Task UpdatePlayersFromService(Dictionary<string, int> playerJobIds)
+    private void ApiControllerOnPairedClientOffline(string charHash)
     {
-        if (!playerJobIds.Any()) return;
-        Logger.Debug("Getting data for new players: " + string.Join(Environment.NewLine, playerJobIds));
-        await _apiController.GetCharacterData(playerJobIds);
+        Logger.Debug("Player offline: " + charHash);
+        RemovePlayer(charHash);
     }
 
-    private void ApiControllerOnPairedClientOffline(object? sender, EventArgs e)
+    private void ApiControllerOnPairedClientOnline(string charHash)
     {
-        Logger.Debug("Player offline: " + sender!);
-        RemovePlayer((string)sender!);
-    }
-
-    private void ApiControllerOnPairedClientOnline(object? sender, EventArgs e)
-    {
-        Logger.Debug("Player online: " + sender!);
-        AddPlayer((string)sender!);
+        Logger.Debug("Player online: " + charHash);
+        AddPlayer(charHash);
         return;
     }
 
-    private void ApiControllerOnPairedWithOther(object? sender, EventArgs e)
+    private void ApiControllerOnPairedWithOther(string charHash)
     {
-        var characterHash = (string?)sender;
-        if (string.IsNullOrEmpty(characterHash)) return;
-        Logger.Debug("Pairing with " + characterHash);
-        AddPlayer(characterHash);
+        if (string.IsNullOrEmpty(charHash)) return;
+        Logger.Debug("Pairing with " + charHash);
+        AddPlayer(charHash);
     }
 
-    private void ApiControllerOnUnpairedFromOther(object? sender, EventArgs e)
+    private void ApiControllerOnUnpairedFromOther(string? characterHash)
     {
-        var characterHash = (string?)sender;
         if (string.IsNullOrEmpty(characterHash)) return;
         Logger.Debug("Unpairing from " + characterHash);
         RemovePlayer(characterHash);
@@ -228,8 +219,8 @@ public class OnlinePlayerManager : IDisposable
         {
             Task.Run(async () =>
             {
-                Logger.Verbose(JsonConvert.SerializeObject(_playerManager.LastSentCharacterData!.ToCharacterCacheDto(), Formatting.Indented));
-                await _apiController.PushCharacterData(_playerManager.LastSentCharacterData.ToCharacterCacheDto(),
+                Logger.Verbose(JsonConvert.SerializeObject(_playerManager.LastSentCharacterData, Formatting.Indented));
+                await _apiController.PushCharacterData(_playerManager.LastSentCharacterData,
                     visiblePlayers);
             });
         }

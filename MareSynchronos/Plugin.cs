@@ -11,6 +11,7 @@ using Dalamud.Interface.ImGuiFileDialog;
 using MareSynchronos.Managers;
 using MareSynchronos.WebAPI;
 using Dalamud.Interface.Windowing;
+using Dalamud.Logging;
 using MareSynchronos.UI;
 using MareSynchronos.Utils;
 
@@ -81,7 +82,7 @@ namespace MareSynchronos
 
             _dalamudUtil.LogIn += DalamudUtilOnLogIn;
             _dalamudUtil.LogOut += DalamudUtilOnLogOut;
-            _apiController.ChangingServers += ApiControllerOnChangingServers;
+            _apiController.RegisterFinalized += ApiControllerOnRegisterFinalized;
 
             if (_dalamudUtil.IsLoggedIn)
             {
@@ -89,7 +90,7 @@ namespace MareSynchronos
             }
         }
 
-        private void ApiControllerOnChangingServers(object? sender, EventArgs e)
+        private void ApiControllerOnRegisterFinalized()
         {
             _mainUi.IsOpen = false;
             _introUi.IsOpen = true;
@@ -98,8 +99,8 @@ namespace MareSynchronos
         public string Name => "Mare Synchronos";
         public void Dispose()
         {
-            Logger.Debug("Disposing " + Name);
-            _apiController.ChangingServers -= ApiControllerOnChangingServers;
+            Logger.Verbose("Disposing " + Name);
+            _apiController.RegisterFinalized -= ApiControllerOnRegisterFinalized;
             _apiController?.Dispose();
 
             _commandManager.RemoveHandler(CommandName);
@@ -114,6 +115,7 @@ namespace MareSynchronos
             _ipcManager?.Dispose();
             _playerManager?.Dispose();
             _characterCacheManager?.Dispose();
+            PluginLog.Information("Shut down");
         }
 
 

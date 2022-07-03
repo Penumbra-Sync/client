@@ -178,12 +178,13 @@ public class CachedPlayer
 
     public void DisposePlayer()
     {
-        Logger.Debug("Disposing " + PlayerName + " (" + PlayerNameHash + ")");
         if (_isDisposed) return;
         if (string.IsNullOrEmpty(PlayerName)) return;
+        Logger.Verbose("Disposing " + PlayerName + " (" + PlayerNameHash + ")");
+        _isDisposed = true;
         try
         {
-            Logger.Debug("Restoring state for " + PlayerName);
+            Logger.Verbose("Restoring state for " + PlayerName);
             _dalamudUtil.FrameworkUpdate -= DalamudUtilOnFrameworkUpdate;
             _ipcManager.PenumbraRedrawEvent -= IpcManagerOnPenumbraRedrawEvent;
             _apiController.CharacterReceived -= ApiControllerOnCharacterReceived;
@@ -191,7 +192,7 @@ public class CachedPlayer
             _downloadCancellationTokenSource?.Dispose();
             _downloadCancellationTokenSource = null;
             _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName);
-            if (PlayerCharacter != null)
+            if (PlayerCharacter != null && PlayerCharacter.IsValid())
             {
                 _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerCharacter);
                 _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerCharacter);
@@ -206,7 +207,6 @@ public class CachedPlayer
             PlayerName = string.Empty;
             PlayerCharacter = null;
             IsVisible = false;
-            _isDisposed = true;
         }
     }
 

@@ -75,7 +75,7 @@ namespace MareSynchronos
         public Dictionary<string, Dictionary<string, string>> UidServerComments { get; set; } = new();
 
         public Dictionary<string, string> UidComments { get; set; } = new();
-        public int Version { get; set; } = 1;
+        public int Version { get; set; } = 3;
 
         public bool ShowTransferWindow { get; set; } = true;
 
@@ -141,6 +141,17 @@ namespace MareSynchronos
                 }
 
                 Version = 2;
+                Save();
+            }
+
+            if (Version == 2)
+            {
+                Logger.Debug("Migrating Configuration from V2 to V3");
+                ApiUri = "wss://v2202207178628194299.powersrv.de:6871";
+                ClientSecret.Clear();
+                UidServerComments.Clear();
+
+                Version = 3;
                 Save();
             }
         }

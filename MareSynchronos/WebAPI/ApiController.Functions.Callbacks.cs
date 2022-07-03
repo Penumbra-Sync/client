@@ -20,7 +20,7 @@ namespace MareSynchronos.WebAPI
             if (dto.IsRemoved)
             {
                 PairedClients.RemoveAll(p => p.OtherUID == dto.OtherUID);
-                UnpairedFromOther?.Invoke(characterIdentifier, EventArgs.Empty);
+                UnpairedFromOther?.Invoke(characterIdentifier);
                 return;
             }
             if (entry == null)
@@ -32,7 +32,7 @@ namespace MareSynchronos.WebAPI
             if ((entry.IsPausedFromOthers != dto.IsPausedFromOthers || entry.IsSynced != dto.IsSynced || entry.IsPaused != dto.IsPaused)
                 && !dto.IsPaused && dto.IsSynced && !dto.IsPausedFromOthers)
             {
-                PairedWithOther?.Invoke(characterIdentifier, EventArgs.Empty);
+                PairedWithOther?.Invoke(characterIdentifier);
             }
 
             entry.IsPaused = dto.IsPaused;
@@ -41,7 +41,7 @@ namespace MareSynchronos.WebAPI
 
             if (dto.IsPaused || dto.IsPausedFromOthers || !dto.IsSynced)
             {
-                UnpairedFromOther?.Invoke(characterIdentifier, EventArgs.Empty);
+                UnpairedFromOther?.Invoke(characterIdentifier);
             }
         }
 

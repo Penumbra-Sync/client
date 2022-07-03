@@ -17,12 +17,6 @@ namespace MareSynchronos.WebAPI
             await CreateConnections();
         }
 
-        public async Task GetCharacterData(Dictionary<string, int> hashedCharacterNames)
-        {
-            await _userHub!.InvokeAsync("GetCharacterData",
-                hashedCharacterNames);
-        }
-
         public async Task Register()
         {
             if (!ServerAlive) return;
@@ -30,7 +24,7 @@ namespace MareSynchronos.WebAPI
             var response = await _userHub!.InvokeAsync<string>("Register");
             _pluginConfiguration.ClientSecret[ApiUri] = response;
             _pluginConfiguration.Save();
-            ChangingServers?.Invoke(null, EventArgs.Empty);
+            RegisterFinalized?.Invoke();
             await CreateConnections();
         }
 

@@ -9,20 +9,6 @@ namespace MareSynchronos.Models
     [JsonObject(MemberSerialization.OptIn)]
     public class CharacterData
     {
-        [JsonProperty]
-        public List<FileReplacement> AllReplacements => FileReplacements.Where(f => f.HasFileReplacement).GroupBy(f => f.Hash).Select(g =>
-        {
-            return new FileReplacement("")
-            {
-                ResolvedPath = g.First().ResolvedPath,
-                GamePaths = g.SelectMany(g => g.GamePaths).Distinct().ToList(),
-                Hash = g.First().Hash
-            };
-        }).ToList();
-
-        [JsonProperty]
-        public string CacheHash { get; set; } = string.Empty;
-
         public List<FileReplacement> FileReplacements { get; set; } = new();
 
         [JsonProperty]
@@ -54,9 +40,15 @@ namespace MareSynchronos.Models
         {
             return new CharacterCacheDto()
             {
-                FileReplacements = AllReplacements.Select(f => f.ToFileReplacementDto()).ToList(),
+                FileReplacements = FileReplacements.Where(f => f.HasFileReplacement).GroupBy(f => f.Hash).Select(g =>
+                {
+                    return new FileReplacementDto()
+                    {
+                        GamePaths = g.SelectMany(g => g.GamePaths).Distinct().ToArray(),
+                        Hash = g.First().Hash
+                    };
+                }).ToList(),
                 GlamourerData = GlamourerString,
-                Hash = CacheHash,
                 JobId = JobId,
                 ManipulationData = ManipulationString
             };

@@ -20,7 +20,7 @@ namespace MareSynchronos.UI
 
         public void Dispose()
         {
-            Logger.Debug("Disposing " + nameof(IntroUi));
+            Logger.Verbose("Disposing " + nameof(IntroUi));
 
             _windowSystem.RemoveWindow(this);
         }
@@ -28,7 +28,7 @@ namespace MareSynchronos.UI
         public IntroUi(WindowSystem windowSystem, UiShared uiShared, Configuration pluginConfiguration,
             FileCacheManager fileCacheManager) : base("Mare Synchronos Setup")
         {
-            Logger.Debug("Creating " + nameof(IntroUi));
+            Logger.Verbose("Creating " + nameof(IntroUi));
 
             _uiShared = uiShared;
             _pluginConfiguration = pluginConfiguration;
@@ -61,10 +61,9 @@ namespace MareSynchronos.UI
                                   "Note that you will have to have Penumbra as well as Glamourer installed to use this plugin.");
                 UiShared.TextWrapped("We will have to setup a few things first before you can start using this plugin. Click on next to continue.");
 
-                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
-                UiShared.TextWrapped("Note: Any modifications you have applied through anything but Penumbra cannot be shared and your character state on other clients " +
-                                     "might look broken because of this. If you want to use this plugin you will have to move your mods to Penumbra.");
-                ImGui.PopStyleColor();
+                UiShared.ColorTextWrapped("Note: Any modifications you have applied through anything but Penumbra cannot be shared and your character state on other clients " +
+                                     "might look broken because of this or others players mods might not apply on your end altogether. " +
+                                     "If you want to use this plugin you will have to move your mods to Penumbra.", ImGuiColors.DalamudYellow);
                 if (!_uiShared.DrawOtherPluginState()) return;
                 ImGui.Separator();
                 if (ImGui.Button("Next##toAgreement"))
@@ -90,22 +89,16 @@ namespace MareSynchronos.UI
                 UiShared.TextWrapped("If you are on a data capped internet connection, higher fees due to data usage depending on the amount of downloaded and uploaded mod files might occur. " +
                     "Mod files will be compressed on up- and download to save on bandwidth usage. Due to varying up- and download speeds, changes in characters might not be visible immediately. " +
                     "Files present on the service that already represent your active mod files will not be uploaded again.");
-                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
-                UiShared.TextWrapped("The mod files you are uploading are confidential and will not be distributed to parties other than the ones who are requesting the exact same mod files. " +
+                UiShared.ColorTextWrapped("The mod files you are uploading are confidential and will not be distributed to parties other than the ones who are requesting the exact same mod files. " +
                     "Please think about who you are going to pair since it is unavoidable that they will receive and locally cache the necessary mod files that you have currently in use. " +
-                    "Locally cached mod files will have arbitrary file names to discourage attempts at replicating the original mod.");
-                ImGui.PopStyleColor();
-                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
-                UiShared.TextWrapped("The plugin creator tried their best to keep you secure. However, there is no guarantee for 100% security. Do not blindly pair your client with everyone.");
-                ImGui.PopStyleColor();
+                    "Locally cached mod files will have arbitrary file names to discourage attempts at replicating the original mod.", ImGuiColors.DalamudRed);
+                UiShared.ColorTextWrapped("The plugin creator tried their best to keep you secure. However, there is no guarantee for 100% security. Do not blindly pair your client with everyone.", ImGuiColors.DalamudYellow);
                 UiShared.TextWrapped("Mod files that are saved on the service will remain on the service as long as there are requests for the files from clients. " +
                                   "After a period of not being used, the mod files will be automatically deleted. " +
                                   "You will also be able to wipe all the files you have personally uploaded on request. " +
                                   "The service holds no information about which mod files belong to which mod.");
-                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
-                UiShared.TextWrapped("This service is provided as-is. In case of abuse, contact darkarchon#4313 on Discord or join the Mare Synchronos Discord. " +
-                                                          "To accept those conditions hold CTRL while clicking 'I agree'");
-                ImGui.PopStyleColor();
+                UiShared.ColorTextWrapped("This service is provided as-is. In case of abuse, contact darkarchon#4313 on Discord or join the Mare Synchronos Discord. " +
+                                                          "To accept those conditions hold CTRL while clicking 'I agree'", ImGuiColors.DalamudRed);
                 ImGui.Separator();
 
                 if (ImGui.Button("I agree##toSetup"))
