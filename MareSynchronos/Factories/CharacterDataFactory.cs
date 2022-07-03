@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Client.System.Resource;
 using MareSynchronos.Interop;
 using MareSynchronos.Managers;
@@ -11,232 +12,173 @@ using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using Penumbra.GameData.ByteString;
 using Penumbra.Interop.Structs;
-using Human = MareSynchronos.Interop.Human;
+using Object = FFXIVClientStructs.FFXIV.Client.Graphics.Scene.Object;
 
-namespace MareSynchronos.Factories
+namespace MareSynchronos.Factories;
+public class CharacterDataFactory
 {
-    public class CharacterDataFactory
+    private readonly DalamudUtil _dalamudUtil;
+    private readonly IpcManager _ipcManager;
+
+    public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager)
     {
-        private readonly DalamudUtil _dalamudUtil;
-        private readonly IpcManager _ipcManager;
+        Logger.Debug("Creating " + nameof(CharacterDataFactory));
 
-        public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager)
+        _dalamudUtil = dalamudUtil;
+        _ipcManager = ipcManager;
+    }
+
+    public CharacterData BuildCharacterData()
+    {
+        if (!_ipcManager.Initialized)
         {
-            Logger.Debug("Creating " + nameof(CharacterDataFactory));
-
-            _dalamudUtil = dalamudUtil;
-            _ipcManager = ipcManager;
+            throw new ArgumentException("Penumbra is not connected");
         }
 
-        private FileReplacement CreateFileReplacement(string path, bool doNotReverseResolve = false)
-        {
-            var fileReplacement = new FileReplacement(_ipcManager.PenumbraModDirectory()!);
-            if (!doNotReverseResolve)
-            {
-                fileReplacement.GamePaths =
-                    _ipcManager.PenumbraReverseResolvePath(path, _dalamudUtil.PlayerName).ToList();
-                fileReplacement.SetResolvedPath(path);
-            }
-            else
-            {
-                fileReplacement.GamePaths = new List<string> { path };
-                fileReplacement.SetResolvedPath(_ipcManager.PenumbraResolvePath(path, _dalamudUtil.PlayerName)!);
-            }
+        return CreateCharacterData();
+    }
 
-            return fileReplacement;
+    private (string, string) GetIndentationForInheritanceLevel(int inheritanceLevel)
+    {
+        return (string.Join("", Enumerable.Repeat("\t", inheritanceLevel)), string.Join("", Enumerable.Repeat("\t", inheritanceLevel + 2)));
+    }
+
+    private void DebugPrint(FileReplacement fileReplacement, string objectKind, string resourceType, int inheritanceLevel)
+    {
+        var indentation = GetIndentationForInheritanceLevel(inheritanceLevel);
+        objectKind += string.IsNullOrEmpty(objectKind) ? "" : " ";
+
+        Logger.Debug(indentation.Item1 + objectKind + resourceType + " [" + string.Join(", ", fileReplacement.GamePaths) + "]");
+        Logger.Debug(indentation.Item2 + "=> " + fileReplacement.ResolvedPath);
+    }
+
+    private unsafe void AddReplacementsFromRenderModel(RenderModel* mdl, CharacterData cache, int inheritanceLevel = 0, string objectKind = "")
+    {
+        if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
+        {
+            return;
         }
 
-        public CharacterData BuildCharacterData()
+        var mdlPath = new Utf8String(mdl->ResourceHandle->FileName()).ToString();
+        FileReplacement mdlFileReplacement = CreateFileReplacement(mdlPath);
+        DebugPrint(mdlFileReplacement, objectKind, "Model", inheritanceLevel);
+
+        cache.AddFileReplacement(mdlFileReplacement);
+
+        for (var mtrlIdx = 0; mtrlIdx < mdl->MaterialCount; mtrlIdx++)
         {
-            if (!_ipcManager.Initialized)
+            var mtrl = (Material*)mdl->Materials[mtrlIdx];
+            if (mtrl == null) continue;
+
+            AddReplacementsFromMaterial(mtrl, cache, inheritanceLevel + 1, objectKind);
+        }
+    }
+
+    private unsafe void AddReplacementsFromMaterial(Material* mtrl, CharacterData cache, int inheritanceLevel = 0, string objectKind = "")
+    {
+        var mtrlPath = new Utf8String(mtrl->ResourceHandle->FileName()).ToString().Split("|")[2];
+
+        var mtrlFileReplacement = CreateFileReplacement(mtrlPath);
+        DebugPrint(mtrlFileReplacement, objectKind, "Material", inheritanceLevel);
+
+        cache.AddFileReplacement(mtrlFileReplacement);
+
+        var mtrlResourceHandle = (MtrlResource*)mtrl->ResourceHandle;
+        for (var resIdx = 0; resIdx < mtrlResourceHandle->NumTex; resIdx++)
+        {
+            var texPath = new Utf8String(mtrlResourceHandle->TexString(resIdx)).ToString();
+
+            if (string.IsNullOrEmpty(texPath)) continue;
+
+            AddReplacementsFromTexture(texPath, cache, inheritanceLevel + 1, objectKind);
+        }
+    }
+
+    private void AddReplacementsFromTexture(string texPath, CharacterData cache, int inheritanceLevel = 0, string objectKind = "", bool doNotReverseResolve = true)
+    {
+        var texFileReplacement = CreateFileReplacement(texPath, doNotReverseResolve);
+        DebugPrint(texFileReplacement, objectKind, "Texture", inheritanceLevel);
+
+        cache.AddFileReplacement(texFileReplacement);
+
+        if (texPath.Contains("/--")) return;
+
+        var texDx11Replacement =
+            CreateFileReplacement(texPath.Insert(texPath.LastIndexOf('/') + 1, "--"), true);
+
+        DebugPrint(texDx11Replacement, objectKind, "Texture (DX11)", inheritanceLevel);
+
+        cache.AddFileReplacement(texDx11Replacement);
+    }
+
+    private unsafe CharacterData CreateCharacterData()
+    {
+        Stopwatch st = Stopwatch.StartNew();
+        while (!_dalamudUtil.IsPlayerPresent)
+        {
+            Logger.Debug("Character is null but it shouldn't be, waiting");
+            Thread.Sleep(50);
+        }
+        _dalamudUtil.WaitWhileCharacterIsDrawing(_dalamudUtil.PlayerPointer);
+        var cache = new CharacterData
+        {
+            JobId = _dalamudUtil.PlayerJobId,
+            GlamourerString = _ipcManager.GlamourerGetCharacterCustomization(_dalamudUtil.PlayerCharacter),
+            ManipulationString = _ipcManager.PenumbraGetMetaManipulations(_dalamudUtil.PlayerName)
+        };
+
+        var human = (Human*)((Character*)_dalamudUtil.PlayerPointer)->GameObject.GetDrawObject();
+        for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)
+        {
+            var mdl = (RenderModel*)human->CharacterBase.ModelArray[mdlIdx];
+            if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
             {
-                throw new ArgumentException("Penumbra is not connected");
+                continue;
             }
 
-            return CreateCharacterData();
+            AddReplacementsFromRenderModel(mdl, cache, 0, "Character");
         }
 
-        private unsafe CharacterData CreateCharacterData()
+        var weaponObject = (Weapon*)((Object*)human)->ChildObject;
+
+        if ((IntPtr)weaponObject != IntPtr.Zero)
         {
-            Stopwatch st = Stopwatch.StartNew();
-            while (!_dalamudUtil.IsPlayerPresent)
+            var mainHandWeapon = weaponObject->WeaponRenderModel->RenderModel;
+
+            AddReplacementsFromRenderModel(mainHandWeapon, cache, 0, "Weapon");
+
+            if (weaponObject->NextSibling != (IntPtr)weaponObject)
             {
-                Logger.Debug("Character is null but it shouldn't be, waiting");
-                Thread.Sleep(50);
+                var offHandWeapon = ((Weapon*)weaponObject->NextSibling)->WeaponRenderModel->RenderModel;
+
+                AddReplacementsFromRenderModel(offHandWeapon, cache, 1, "OffHand Weapon");
             }
-            _dalamudUtil.WaitWhileCharacterIsDrawing(_dalamudUtil.PlayerPointer);
-            var cache = new CharacterData
-            {
-                JobId = _dalamudUtil.PlayerJobId,
-                GlamourerString = _ipcManager.GlamourerGetCharacterCustomization(_dalamudUtil.PlayerCharacter),
-                ManipulationString = _ipcManager.PenumbraGetMetaManipulations(_dalamudUtil.PlayerName)
-            };
-            var human = (Human*)((Character*)_dalamudUtil.PlayerPointer)->GameObject.GetDrawObject();
-            for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)
-            {
-                var mdl = (RenderModel*)human->CharacterBase.ModelArray[mdlIdx];
-                if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
-                {
-                    continue;
-                }
-
-                var mdlPath = new Utf8String(mdl->ResourceHandle->FileName()).ToString();
-
-                FileReplacement mdlFileReplacement = CreateFileReplacement(mdlPath);
-                Logger.Debug("Model " + string.Join(", ", mdlFileReplacement.GamePaths));
-                Logger.Debug("\t\t=> " + mdlFileReplacement.ResolvedPath);
-
-                cache.AddFileReplacement(mdlFileReplacement);
-
-                for (var mtrlIdx = 0; mtrlIdx < mdl->MaterialCount; mtrlIdx++)
-                {
-                    var mtrl = (Material*)mdl->Materials[mtrlIdx];
-                    if (mtrl == null) continue;
-
-                    var mtrlPath = new Utf8String(mtrl->ResourceHandle->FileName()).ToString().Split("|")[2];
-
-                    var mtrlFileReplacement = CreateFileReplacement(mtrlPath);
-                    Logger.Debug("\tMaterial " + string.Join(", ", mtrlFileReplacement.GamePaths));
-                    Logger.Debug("\t\t\t=> " + mtrlFileReplacement.ResolvedPath);
-
-                    cache.AddFileReplacement(mtrlFileReplacement);
-
-                    var mtrlResourceHandle = (MtrlResource*)mtrl->ResourceHandle;
-                    for (var resIdx = 0; resIdx < mtrlResourceHandle->NumTex; resIdx++)
-                    {
-                        var texPath = new Utf8String(mtrlResourceHandle->TexString(resIdx)).ToString();
-
-                        if (string.IsNullOrEmpty(texPath)) continue;
-
-                        var texFileReplacement = CreateFileReplacement(texPath, true);
-                        Logger.Debug("\t\tTexture " + string.Join(", ", texFileReplacement.GamePaths));
-                        Logger.Debug("\t\t\t\t=> " + texFileReplacement.ResolvedPath);
-
-                        cache.AddFileReplacement(texFileReplacement);
-
-                        if (texPath.Contains("/--")) continue;
-
-                        var texDoubleMinusFileReplacement =
-                            CreateFileReplacement(texPath.Insert(texPath.LastIndexOf('/') + 1, "--"), true);
-
-                        Logger.Debug("\t\tTexture-- " + string.Join(", ", texDoubleMinusFileReplacement.GamePaths));
-                        Logger.Debug("\t\t\t\t=> " + texDoubleMinusFileReplacement.ResolvedPath);
-                        cache.AddFileReplacement(texDoubleMinusFileReplacement);
-                    }
-                }
-            }
-
-            var mainHandWeapon = (RenderModel*)human->Weapon->WeaponRenderModel->RenderModel;
-
-            var mainHandWeaponPath = new Utf8String(mainHandWeapon->ResourceHandle->FileName()).ToString();
-            FileReplacement weaponReplacement = CreateFileReplacement(mainHandWeaponPath);
-            cache.AddFileReplacement(weaponReplacement);
-
-            Logger.Debug("MainHand Weapon " + string.Join(", ", weaponReplacement.GamePaths));
-            Logger.Debug("\t\t=> " + weaponReplacement.ResolvedPath);
-            
-            for (var mtrlIdx = 0; mtrlIdx < mainHandWeapon->MaterialCount; mtrlIdx++)
-            {
-                var mtrl = (Material*)mainHandWeapon->Materials[mtrlIdx];
-                if (mtrl == null) continue;
-
-                var mtrlPath = new Utf8String(mtrl->ResourceHandle->FileName()).ToString().Split("|")[2];
-
-                var mtrlFileReplacement = CreateFileReplacement(mtrlPath);
-                Logger.Debug("\tMainHand Weapon Material " + string.Join(", ", mtrlFileReplacement.GamePaths));
-                Logger.Debug("\t\t\t=> " + mtrlFileReplacement.ResolvedPath);
-
-                cache.AddFileReplacement(mtrlFileReplacement);
-
-                var mtrlResourceHandle = (MtrlResource*)mtrl->ResourceHandle;
-                for (var resIdx = 0; resIdx < mtrlResourceHandle->NumTex; resIdx++)
-                {
-                    var texPath = new Utf8String(mtrlResourceHandle->TexString(resIdx)).ToString();
-
-                    if (string.IsNullOrEmpty(texPath)) continue;
-
-                    var texFileReplacement = CreateFileReplacement(texPath, true);
-                    Logger.Debug("\t\tMainHand tWeapon Texture " + string.Join(", ", texFileReplacement.GamePaths));
-                    Logger.Debug("\t\t\t\t=> " + texFileReplacement.ResolvedPath);
-
-                    cache.AddFileReplacement(texFileReplacement);
-
-                    if (texPath.Contains("/--")) continue;
-
-                    var texDoubleMinusFileReplacement =
-                        CreateFileReplacement(texPath.Insert(texPath.LastIndexOf('/') + 1, "--"), true);
-
-                    Logger.Debug("\t\tMainHand Weapon Texture-- " + string.Join(", ", texDoubleMinusFileReplacement.GamePaths));
-                    Logger.Debug("\t\t\t\t=> " + texDoubleMinusFileReplacement.ResolvedPath);
-                    cache.AddFileReplacement(texDoubleMinusFileReplacement);
-                }
-            }
-
-            if (human->Weapon->NextSibling != (IntPtr)human->Weapon)
-            {
-                var offHandWeapon = ((Weapon*)human->Weapon->NextSibling)->WeaponRenderModel->RenderModel;
-
-                var offHandWeaponPath = new Utf8String(offHandWeapon->ResourceHandle->FileName()).ToString();
-                FileReplacement offHandWeaponReplacement = CreateFileReplacement(offHandWeaponPath);
-                cache.AddFileReplacement(offHandWeaponReplacement);
-
-                Logger.Debug("OffHand Weapon " + string.Join(", ", offHandWeaponReplacement.GamePaths));
-                Logger.Debug("\t\t=> " + offHandWeaponReplacement.ResolvedPath);
-
-                for (var mtrlIdx = 0; mtrlIdx < offHandWeapon->MaterialCount; mtrlIdx++)
-                {
-                    var mtrl = (Material*)offHandWeapon->Materials[mtrlIdx];
-                    if (mtrl == null) continue;
-
-                    var mtrlPath = new Utf8String(mtrl->ResourceHandle->FileName()).ToString().Split("|")[2];
-
-                    var mtrlFileReplacement = CreateFileReplacement(mtrlPath);
-                    Logger.Debug("\tOffHand Weapon Material " + string.Join(", ", mtrlFileReplacement.GamePaths));
-                    Logger.Debug("\t\t\t=> " + mtrlFileReplacement.ResolvedPath);
-
-                    cache.AddFileReplacement(mtrlFileReplacement);
-
-                    var mtrlResourceHandle = (MtrlResource*)mtrl->ResourceHandle;
-                    for (var resIdx = 0; resIdx < mtrlResourceHandle->NumTex; resIdx++)
-                    {
-                        var texPath = new Utf8String(mtrlResourceHandle->TexString(resIdx)).ToString();
-
-                        if (string.IsNullOrEmpty(texPath)) continue;
-
-                        var texFileReplacement = CreateFileReplacement(texPath, true);
-                        Logger.Debug("\t\tOffHand tWeapon Texture " + string.Join(", ", texFileReplacement.GamePaths));
-                        Logger.Debug("\t\t\t\t=> " + texFileReplacement.ResolvedPath);
-
-                        cache.AddFileReplacement(texFileReplacement);
-
-                        if (texPath.Contains("/--")) continue;
-
-                        var texDoubleMinusFileReplacement =
-                            CreateFileReplacement(texPath.Insert(texPath.LastIndexOf('/') + 1, "--"), true);
-
-                        Logger.Debug("\t\tOffHand Weapon Texture-- " + string.Join(", ", texDoubleMinusFileReplacement.GamePaths));
-                        Logger.Debug("\t\t\t\t=> " + texDoubleMinusFileReplacement.ResolvedPath);
-                        cache.AddFileReplacement(texDoubleMinusFileReplacement);
-                    }
-                }
-            }
-
-            var tattooDecalFileReplacement =
-                CreateFileReplacement(new Utf8String(human->Decal->FileName()).ToString());
-            cache.AddFileReplacement(tattooDecalFileReplacement);
-            Logger.Debug("Decal " + string.Join(", ", tattooDecalFileReplacement.GamePaths));
-            Logger.Debug("\t\t=> " + tattooDecalFileReplacement.ResolvedPath);
-
-            var legacyDecalFileReplacement =
-                CreateFileReplacement(new Utf8String(human->LegacyBodyDecal->FileName()).ToString());
-            cache.AddFileReplacement(legacyDecalFileReplacement);
-            Logger.Debug("Legacy Decal " + string.Join(", ", legacyDecalFileReplacement.GamePaths));
-            Logger.Debug("\t\t=> " + legacyDecalFileReplacement.ResolvedPath);
-
-            st.Stop();
-            Logger.Verbose("Building Character Data took " + st.Elapsed);
-
-            return cache;
         }
+
+        AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->Decal->FileName()).ToString(), cache, 0, "Decal", false);
+        AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), cache, 0, "Legacy Decal", false);
+
+        st.Stop();
+        Logger.Verbose("Building Character Data took " + st.Elapsed);
+
+        return cache;
+    }
+
+    private FileReplacement CreateFileReplacement(string path, bool doNotReverseResolve = false)
+    {
+        var fileReplacement = new FileReplacement(_ipcManager.PenumbraModDirectory()!);
+        if (!doNotReverseResolve)
+        {
+            fileReplacement.GamePaths =
+                _ipcManager.PenumbraReverseResolvePath(path, _dalamudUtil.PlayerName).ToList();
+            fileReplacement.SetResolvedPath(path);
+        }
+        else
+        {
+            fileReplacement.GamePaths = new List<string> { path };
+            fileReplacement.SetResolvedPath(_ipcManager.PenumbraResolvePath(path, _dalamudUtil.PlayerName)!);
+        }
+
+        return fileReplacement;
     }
 }

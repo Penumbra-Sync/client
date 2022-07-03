@@ -23,4 +23,12 @@ namespace MareSynchronos.Interop
     {
         [FieldOffset(0x00)] public RenderModel* RenderModel;
     }
+
+    [StructLayout(LayoutKind.Explicit)]
+    public unsafe struct HumanExt
+    {
+        [FieldOffset(0x0)] public Human Human;
+        [FieldOffset(0x9E8)] public ResourceHandle* Decal;
+        [FieldOffset(0x9F0)] public ResourceHandle* LegacyBodyDecal;
+    }
 }
