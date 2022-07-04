@@ -55,6 +55,7 @@ namespace MareSynchronos
         public string CacheFolder { get; set; } = string.Empty;
         public Dictionary<string, string> ClientSecret { get; set; } = new();
         public Dictionary<string, string> CustomServerList { get; set; } = new();
+        public int MaxLocalCacheInGiB { get; set; } = 20;
 
         public bool InitialScanComplete { get; set; } = false;
         public int MaxParallelScan

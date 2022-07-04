@@ -122,7 +122,6 @@ public class CharacterDataFactory
         _dalamudUtil.WaitWhileCharacterIsDrawing(_dalamudUtil.PlayerPointer);
         var cache = new CharacterData
         {
-            JobId = _dalamudUtil.PlayerJobId,
             GlamourerString = _ipcManager.GlamourerGetCharacterCustomization(_dalamudUtil.PlayerCharacter),
             ManipulationString = _ipcManager.PenumbraGetMetaManipulations(_dalamudUtil.PlayerName)
         };

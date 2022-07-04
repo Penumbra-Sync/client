@@ -344,6 +344,13 @@ namespace MareSynchronos.UI
             {
                 ColorTextWrapped("The folder you selected does not exist or cannot be written to. Please provide a valid path.", ImGuiColors.DalamudRed);
             }
+
+            int maxCacheSize = _pluginConfiguration.MaxLocalCacheInGiB;
+            if (ImGui.SliderInt("Maximum Cache Size in GB", ref maxCacheSize, 1, 50, "%d GB"))
+            {
+                _pluginConfiguration.MaxLocalCacheInGiB = maxCacheSize;
+                _pluginConfiguration.Save();
+            }
         }
 
         private bool _isDirectoryWritable = false;

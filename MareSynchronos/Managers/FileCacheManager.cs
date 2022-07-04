@@ -19,10 +19,9 @@ namespace MareSynchronos.Managers
         private FileSystemWatcher? _cacheDirWatcher;
         private FileSystemWatcher? _penumbraDirWatcher;
         private Task? _rescanTask;
-        private CancellationTokenSource _rescanTaskCancellationTokenSource = new CancellationTokenSource();
-        private CancellationTokenSource _rescanTaskRunCancellationTokenSource = new CancellationTokenSource();
+        private readonly CancellationTokenSource _rescanTaskCancellationTokenSource = new();
+        private CancellationTokenSource _rescanTaskRunCancellationTokenSource = new();
         private CancellationTokenSource? _scanCancellationTokenSource;
-        private Task? _scanTask;
         public FileCacheManager(IpcManager ipcManager, Configuration pluginConfiguration)
         {
             Logger.Verbose("Creating " + nameof(FileCacheManager));
@@ -143,17 +142,18 @@ namespace MareSynchronos.Managers
 
         private void RecalculateFileCacheSize()
         {
-            FileCacheSize = 0;
-            foreach (var file in Directory.EnumerateFiles(_pluginConfiguration.CacheFolder))
+            FileCacheSize = Directory.EnumerateFiles(_pluginConfiguration.CacheFolder).Sum(f => new FileInfo(f).Length);
+
+            if (FileCacheSize <= _pluginConfiguration.MaxLocalCacheInGiB * 1024 * 1024 * 1024) return;
+
+            var allFiles = Directory.EnumerateFiles(_pluginConfiguration.CacheFolder)
+                .Select(f => new FileInfo(f)).OrderBy(f => f.LastAccessTime).ToList();
+            while (FileCacheSize > _pluginConfiguration.MaxLocalCacheInGiB * 1024 * 1024 * 1024)
             {
-                try
-                {
-                    FileCacheSize += new FileInfo(file).Length;
-                }
-                catch
-                {
-                    // whatever
-                }
+                var oldestFile = allFiles.First();
+                FileCacheSize -= oldestFile.Length;
+                File.Delete(oldestFile.FullName);
+                allFiles.Remove(oldestFile);
             }
         }
 
@@ -182,7 +182,6 @@ namespace MareSynchronos.Managers
                 await using var db = new FileCacheContext();
                 foreach (var item in listCopy.Distinct())
                 {
-
                     var fi = new FileInfo(item);
                     if (!fi.Exists)
                     {
@@ -215,10 +214,13 @@ namespace MareSynchronos.Managers
                 Directory.EnumerateFiles(penumbraDir, "*.*", SearchOption.AllDirectories)
                                 .Select(s => s.ToLowerInvariant())
                                 .Where(f => f.Contains(@"\chara\"))
+                                .Where(f =>
+                                    (f.EndsWith(".tex", StringComparison.OrdinalIgnoreCase)
+                                     || f.EndsWith(".mdl", StringComparison.OrdinalIgnoreCase)
+                                     || f.EndsWith(".mtrl", StringComparison.OrdinalIgnoreCase)))
                                 .Concat(Directory.EnumerateFiles(_pluginConfiguration.CacheFolder, "*.*", SearchOption.AllDirectories)
                                     .Select(s => s.ToLowerInvariant()))
-                                .Where(f => (f.EndsWith(".tex", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".mdl", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".mtrl", StringComparison.OrdinalIgnoreCase)))
-                                .Select(p => new KeyValuePair<string, bool>(p, false)));
+                                .Select(p => new KeyValuePair<string, bool>(p, false)).ToList());
             List<FileCache> fileCaches;
             await using (var db = new FileCacheContext())
                 fileCaches = db.FileCaches.ToList();

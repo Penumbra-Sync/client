@@ -23,7 +23,6 @@ namespace MareSynchronos.Utils
         private readonly ClientState _clientState;
         private readonly ObjectTable _objectTable;
         private readonly Framework _framework;
-        public event PlayerChange? PlayerChanged;
         public event LogIn? LogIn;
         public event LogOut? LogOut;
         public event FrameworkUpdate? FrameworkUpdate;
@@ -59,42 +58,15 @@ namespace MareSynchronos.Utils
 
         public bool IsLoggedIn => _clientState.IsLoggedIn;
 
-        private void WatcherOnPlayerChanged(Character actor)
-        {
-            PlayerChanged?.Invoke(actor);
-        }
-
         public bool IsPlayerPresent => _clientState.LocalPlayer != null;
 
         public string PlayerName => _clientState.LocalPlayer?.Name.ToString() ?? "--";
-
-        public int PlayerJobId => (int)_clientState.LocalPlayer!.ClassJob.Id;
 
         public IntPtr PlayerPointer => _clientState.LocalPlayer!.Address;
 
         public PlayerCharacter PlayerCharacter => _clientState.LocalPlayer!;
 
         public string PlayerNameHashed => Crypto.GetHash256(PlayerName + _clientState.LocalPlayer!.HomeWorld.Id);
-
-        public Dictionary<string, PlayerCharacter> GetLocalPlayers()
-        {
-            if (!_clientState.IsLoggedIn)
-            {
-                return new Dictionary<string, PlayerCharacter>();
-            }
-
-            Dictionary<string, PlayerCharacter> allLocalPlayers = new();
-            foreach (var obj in _objectTable)
-            {
-                if (obj.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) continue;
-                string playerName = obj.Name.ToString();
-                if (playerName == PlayerName) continue;
-                var playerObject = (PlayerCharacter)obj;
-                allLocalPlayers[Crypto.GetHash256(playerObject.Name.ToString() + playerObject.HomeWorld.Id.ToString())] = playerObject;
-            }
-
-            return allLocalPlayers;
-        }
 
         public List<PlayerCharacter> GetPlayerCharacters()
         {

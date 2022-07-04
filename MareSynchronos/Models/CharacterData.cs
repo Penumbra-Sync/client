@@ -16,9 +16,6 @@ namespace MareSynchronos.Models
 
         public bool IsReady => FileReplacements.All(f => f.Computed);
 
-        [JsonProperty]
-        public int JobId { get; set; } = 0;
-
         public string ManipulationString { get; set; } = string.Empty;
 
         public void AddFileReplacement(FileReplacement fileReplacement)
@@ -49,7 +46,6 @@ namespace MareSynchronos.Models
                     };
                 }).ToList(),
                 GlamourerData = GlamourerString,
-                JobId = JobId,
                 ManipulationData = ManipulationString
             };
         }
