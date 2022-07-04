@@ -80,7 +80,7 @@ namespace MareSynchronos.Managers
         public void StartInitialScan()
         {
             _scanCancellationTokenSource = new CancellationTokenSource();
-            _scanTask = Task.Run(() => StartFileScan(_scanCancellationTokenSource.Token));
+            Task.Run(() => StartFileScan(_scanCancellationTokenSource.Token));
         }
 
         public void StartWatchers()
