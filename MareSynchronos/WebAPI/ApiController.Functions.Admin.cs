@@ -9,39 +9,39 @@ namespace MareSynchronos.WebAPI
     {
         public async Task AddOrUpdateForbiddenFileEntry(ForbiddenFileDto forbiddenFile)
         {
-            await _adminHub!.SendAsync("UpdateOrAddForbiddenFile", forbiddenFile);
+            await _adminHub!.SendAsync(AdminHubAPI.SendUpdateOrAddForbiddenFile, forbiddenFile);
         }
 
         public async Task DeleteForbiddenFileEntry(ForbiddenFileDto forbiddenFile)
         {
-            await _adminHub!.SendAsync("DeleteForbiddenFile", forbiddenFile);
+            await _adminHub!.SendAsync(AdminHubAPI.SendDeleteForbiddenFile, forbiddenFile);
         }
 
         public async Task AddOrUpdateBannedUserEntry(BannedUserDto bannedUser)
         {
-            await _adminHub!.SendAsync("UpdateOrAddBannedUser", bannedUser);
+            await _adminHub!.SendAsync(AdminHubAPI.SendUpdateOrAddBannedUser, bannedUser);
         }
 
         public async Task DeleteBannedUserEntry(BannedUserDto bannedUser)
         {
-            await _adminHub!.SendAsync("DeleteBannedUser", bannedUser);
+            await _adminHub!.SendAsync(AdminHubAPI.SendDeleteBannedUser, bannedUser);
         }
 
         public async Task RefreshOnlineUsers()
         {
-            AdminOnlineUsers = await _adminHub!.InvokeAsync<List<OnlineUserDto>>("GetOnlineUsers");
+            AdminOnlineUsers = await _adminHub!.InvokeAsync<List<OnlineUserDto>>(AdminHubAPI.InvokeGetOnlineUsers);
         }
 
         public List<OnlineUserDto> AdminOnlineUsers { get; set; } = new List<OnlineUserDto>();
 
         public void PromoteToModerator(string onlineUserUID)
         {
-            _adminHub!.SendAsync("ChangeModeratorStatus", onlineUserUID, true);
+            _adminHub!.SendAsync(AdminHubAPI.SendChangeModeratorStatus, onlineUserUID, true);
         }
 
         public void DemoteFromModerator(string onlineUserUID)
         {
-            _adminHub!.SendAsync("ChangeModeratorStatus", onlineUserUID, false);
+            _adminHub!.SendAsync(AdminHubAPI.SendChangeModeratorStatus, onlineUserUID, false);
         }
     }
 }

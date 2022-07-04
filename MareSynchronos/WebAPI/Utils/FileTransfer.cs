@@ -17,7 +17,7 @@ public abstract class FileTransfer
     public string Hash => TransferDto.Hash;
     public bool IsInTransfer => Transferred != Total && Transferred > 0;
     public bool IsTransferred => Transferred == Total;
-    public virtual bool CanBeTransferred => !TransferDto.IsForbidden;
+    public virtual bool CanBeTransferred => !TransferDto.IsForbidden && (((DownloadFileDto)TransferDto)?.FileExists ?? true);
     public bool IsForbidden => TransferDto.IsForbidden;
 }
 

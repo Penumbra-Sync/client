@@ -25,14 +25,10 @@ namespace MareSynchronos.WebAPI
 
     public partial class ApiController : IDisposable
     {
-#if DEBUG
         public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
         public const string MainServiceUri = "wss://v2202207178628194299.powersrv.de:6871";
-#else
-        public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
-        public const string MainServiceUri = "wss://v2202207178628194299.powersrv.de:6871";
-#endif
-        public readonly int[] SupportedServerVersions = { 1 };
+
+        public readonly int[] SupportedServerVersions = { API.API.Version };
 
         private readonly Configuration _pluginConfiguration;
         private readonly DalamudUtil _dalamudUtil;
@@ -163,18 +159,18 @@ namespace MareSynchronos.WebAPI
                 {
                     if (_dalamudUtil.PlayerCharacter == null) throw new ArgumentException("Player not initialized");
                     Logger.Debug("Building connection");
-                    _heartbeatHub = BuildHubConnection("heartbeat");
-                    _userHub = BuildHubConnection("user");
-                    _fileHub = BuildHubConnection("files");
-                    _adminHub = BuildHubConnection("admin");
+                    _heartbeatHub = BuildHubConnection(ConnectionHubAPI.Path);
+                    _userHub = BuildHubConnection(UserHubAPI.Path);
+                    _fileHub = BuildHubConnection(FilesHubAPI.Path);
+                    _adminHub = BuildHubConnection(AdminHubAPI.Path);
 
                     await _heartbeatHub.StartAsync(token);
                     await _userHub.StartAsync(token);
                     await _fileHub.StartAsync(token);
                     await _adminHub.StartAsync(token);
 
-                    OnlineUsers = await _userHub.InvokeAsync<int>("GetOnlineUsers", token);
-                    _userHub.On<int>("UsersOnline", (count) => OnlineUsers = count);
+                    OnlineUsers = await _userHub.InvokeAsync<int>(UserHubAPI.InvokeGetOnlineUsers, token);
+                    _userHub.On<int>(UserHubAPI.OnUsersOnline, (count) => OnlineUsers = count);
 
                     if (_pluginConfiguration.FullPause)
                     {
@@ -182,19 +178,19 @@ namespace MareSynchronos.WebAPI
                         return;
                     }
 
-                    _connectionDto = await _heartbeatHub.InvokeAsync<ConnectionDto>("Heartbeat", token);
+                    _connectionDto = await _heartbeatHub.InvokeAsync<ConnectionDto>(ConnectionHubAPI.InvokeHeartbeat, token);
                     if (ServerState is ServerState.Connected) // user is authorized && server is legit
                     {
                         Logger.Debug("Initializing data");
-                        _userHub.On<ClientPairDto, string>("UpdateClientPairs", UpdateLocalClientPairsCallback);
-                        _userHub.On<CharacterCacheDto, string>("ReceiveCharacterData", ReceiveCharacterDataCallback);
-                        _userHub.On<string>("RemoveOnlinePairedPlayer",
+                        _userHub.On<ClientPairDto, string>(UserHubAPI.OnUpdateClientPairs, UpdateLocalClientPairsCallback);
+                        _userHub.On<CharacterCacheDto, string>(UserHubAPI.OnReceiveCharacterData, ReceiveCharacterDataCallback);
+                        _userHub.On<string>(UserHubAPI.OnRemoveOnlinePairedPlayer,
                             (s) => PairedClientOffline?.Invoke(s));
-                        _userHub.On<string>("AddOnlinePairedPlayer",
+                        _userHub.On<string>(UserHubAPI.OnAddOnlinePairedPlayer,
                             (s) => PairedClientOnline?.Invoke(s));
-                        _adminHub.On("ForcedReconnect", UserForcedReconnectCallback);
+                        _adminHub.On(AdminHubAPI.OnForcedReconnect, UserForcedReconnectCallback);
 
-                        PairedClients = await _userHub!.InvokeAsync<List<ClientPairDto>>("GetPairedClients", token);
+                        PairedClients = await _userHub!.InvokeAsync<List<ClientPairDto>>(UserHubAPI.InvokeGetPairedClients, token);
 
                         _heartbeatHub.Closed += HeartbeatHubOnClosed;
                         _heartbeatHub.Reconnected += HeartbeatHubOnReconnected;
@@ -202,12 +198,12 @@ namespace MareSynchronos.WebAPI
 
                         if (IsModerator)
                         {
-                            AdminForbiddenFiles = await _adminHub.InvokeAsync<List<ForbiddenFileDto>>("GetForbiddenFiles", token);
-                            AdminBannedUsers = await _adminHub.InvokeAsync<List<BannedUserDto>>("GetBannedUsers", token);
-                            _adminHub.On<BannedUserDto>("UpdateOrAddBannedUser", UpdateOrAddBannedUserCallback);
-                            _adminHub.On<BannedUserDto>("DeleteBannedUser", DeleteBannedUserCallback);
-                            _adminHub.On<ForbiddenFileDto>("UpdateOrAddForbiddenFile", UpdateOrAddForbiddenFileCallback);
-                            _adminHub.On<ForbiddenFileDto>("DeleteForbiddenFile", DeleteForbiddenFileCallback);
+                            AdminForbiddenFiles = await _adminHub.InvokeAsync<List<ForbiddenFileDto>>(AdminHubAPI.InvokeGetForbiddenFiles, token);
+                            AdminBannedUsers = await _adminHub.InvokeAsync<List<BannedUserDto>>(AdminHubAPI.InvokeGetBannedUsers, token);
+                            _adminHub.On<BannedUserDto>(AdminHubAPI.OnUpdateOrAddBannedUser, UpdateOrAddBannedUserCallback);
+                            _adminHub.On<BannedUserDto>(AdminHubAPI.OnDeleteBannedUser, DeleteBannedUserCallback);
+                            _adminHub.On<ForbiddenFileDto>(AdminHubAPI.OnUpdateOrAddForbiddenFile, UpdateOrAddForbiddenFileCallback);
+                            _adminHub.On<ForbiddenFileDto>(AdminHubAPI.OnDeleteForbiddenFile, DeleteForbiddenFileCallback);
                         }
 
                         Connected?.Invoke();
@@ -237,7 +233,7 @@ namespace MareSynchronos.WebAPI
         private HubConnection BuildHubConnection(string hubName)
         {
             return new HubConnectionBuilder()
-                .WithUrl(ApiUri + "/" + hubName, options =>
+                .WithUrl(ApiUri + hubName, options =>
                 {
                     if (!string.IsNullOrEmpty(SecretKey) && !_pluginConfiguration.FullPause)
                     {
@@ -246,12 +242,6 @@ namespace MareSynchronos.WebAPI
                     }
 
                     options.Transports = HttpTransportType.WebSockets;
-#if DEBUG
-                    options.HttpMessageHandlerFactory = (message) => new HttpClientHandler()
-                    {
-                        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-                    };
-#endif
                 })
                 .WithAutomaticReconnect(new ForeverRetryPolicy())
                 .Build();
@@ -270,8 +260,8 @@ namespace MareSynchronos.WebAPI
         private Task HeartbeatHubOnReconnected(string? arg)
         {
             Logger.Debug("Connection restored");
-            OnlineUsers = _userHub!.InvokeAsync<int>("GetOnlineUsers").Result;
-            _connectionDto = _heartbeatHub!.InvokeAsync<ConnectionDto>("Heartbeat").Result;
+            OnlineUsers = _userHub!.InvokeAsync<int>(UserHubAPI.InvokeGetOnlineUsers).Result;
+            _connectionDto = _heartbeatHub!.InvokeAsync<ConnectionDto>(ConnectionHubAPI.InvokeHeartbeat).Result;
             Connected?.Invoke();
             return Task.CompletedTask;
         }

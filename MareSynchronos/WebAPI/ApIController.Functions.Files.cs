@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -23,19 +22,19 @@ namespace MareSynchronos.WebAPI
             {
                 Logger.Warn("Cancelling upload");
                 _uploadCancellationTokenSource?.Cancel();
-                _fileHub!.SendAsync("AbortUpload");
+                _fileHub!.SendAsync(FilesHubAPI.SendAbortUpload);
                 CurrentUploads.Clear();
             }
         }
 
         public async Task DeleteAllMyFiles()
         {
-            await _fileHub!.SendAsync("DeleteAllFiles");
+            await _fileHub!.SendAsync(FilesHubAPI.SendDeleteAllFiles);
         }
 
         public async Task<string> DownloadFile(string hash, CancellationToken ct)
         {
-            var reader = _fileHub!.StreamAsync<byte[]>("DownloadFileAsync", hash, ct);
+            var reader = _fileHub!.StreamAsync<byte[]>(FilesHubAPI.StreamDownloadFileAsync, hash, ct);
             string fileName = Path.GetTempFileName();
             await using var fs = File.OpenWrite(fileName);
             await foreach (var data in reader.WithCancellation(ct))
@@ -43,7 +42,6 @@ namespace MareSynchronos.WebAPI
                 //Logger.Debug("Getting chunk of " + hash);
                 CurrentDownloads.Single(f => f.Hash == hash).Transferred += data.Length;
                 await fs.WriteAsync(data, ct);
-                Debug.WriteLine("Wrote chunk " + data.Length + " into " + fileName);
             }
             return fileName;
         }
@@ -55,7 +53,7 @@ namespace MareSynchronos.WebAPI
             List<DownloadFileDto> downloadFiles = new List<DownloadFileDto>();
             foreach (var file in fileReplacementDto)
             {
-                downloadFiles.Add(await _fileHub!.InvokeAsync<DownloadFileDto>("GetFileSize", file.Hash, ct));
+                downloadFiles.Add(await _fileHub!.InvokeAsync<DownloadFileDto>(FilesHubAPI.InvokeGetFileSize, file.Hash, ct));
             }
 
             downloadFiles = downloadFiles.Distinct().ToList();
@@ -133,7 +131,7 @@ namespace MareSynchronos.WebAPI
             var uploadToken = _uploadCancellationTokenSource.Token;
             Logger.Verbose("New Token Created");
 
-            var filesToUpload = await _fileHub!.InvokeAsync<List<UploadFileDto>>("SendFiles", character.FileReplacements.Select(c => c.Hash).Distinct(), uploadToken);
+            var filesToUpload = await _fileHub!.InvokeAsync<List<UploadFileDto>>(FilesHubAPI.InvokeSendFiles, character.FileReplacements.Select(c => c.Hash).Distinct(), uploadToken);
 
             foreach (var file in filesToUpload.Where(f => !f.IsForbidden))
             {
@@ -188,11 +186,11 @@ namespace MareSynchronos.WebAPI
             }
 
             Logger.Verbose("Upload tasks complete, waiting for server to confirm");
-            var anyUploadsOpen = await _fileHub!.InvokeAsync<bool>("IsUploadFinished", uploadToken);
+            var anyUploadsOpen = await _fileHub!.InvokeAsync<bool>(FilesHubAPI.InvokeIsUploadFinished, uploadToken);
             Logger.Verbose("Uploads open: " + anyUploadsOpen);
             while (anyUploadsOpen && !uploadToken.IsCancellationRequested)
             {
-                anyUploadsOpen = await _fileHub!.InvokeAsync<bool>("IsUploadFinished", uploadToken);
+                anyUploadsOpen = await _fileHub!.InvokeAsync<bool>(FilesHubAPI.InvokeIsUploadFinished, uploadToken);
                 await Task.Delay(TimeSpan.FromSeconds(0.5), uploadToken);
                 Logger.Verbose("Waiting for uploads to finish");
             }
@@ -202,7 +200,7 @@ namespace MareSynchronos.WebAPI
             if (!uploadToken.IsCancellationRequested)
             {
                 Logger.Verbose("=== Pushing character data ===");
-                await _userHub!.InvokeAsync("PushCharacterDataToVisibleClients", character, visibleCharacterIds, uploadToken);
+                await _userHub!.InvokeAsync(UserHubAPI.InvokePushCharacterDataToVisibleClients, character, visibleCharacterIds, uploadToken);
             }
             else
             {
@@ -239,7 +237,7 @@ namespace MareSynchronos.WebAPI
                 }
             }
 
-            await _fileHub!.SendAsync("UploadFileStreamAsync", fileHash, AsyncFileData(uploadToken), uploadToken);
+            await _fileHub!.SendAsync(FilesHubAPI.SendUploadFileStreamAsync, fileHash, AsyncFileData(uploadToken), uploadToken);
         }
     }
 
