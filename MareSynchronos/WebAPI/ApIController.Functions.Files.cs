@@ -118,6 +118,11 @@ namespace MareSynchronos.WebAPI
                 await Task.Delay(250, ct);
             }
 
+            if (ct.IsCancellationRequested)
+            {
+                CurrentDownloads.RemoveAll(d => fileReplacementDto.Any(f => f.Hash == d.Hash));
+            }
+
             CurrentDownloads.RemoveAll(d => d.Transferred == d.Total || !d.CanBeTransferred);
         }
 

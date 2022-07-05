@@ -307,6 +307,7 @@ namespace MareSynchronos.UI
 
         public void DrawCacheDirectorySetting()
         {
+            ColorTextWrapped("Note: The cache folder should be somewhere close to root (i.e. C:\\MareCache) in a new empty folder. DO NOT point this to your game folder. DO NOT point this to your Penumbra folder.", ImGuiColors.DalamudYellow);
             var cacheDirectory = _pluginConfiguration.CacheFolder;
             if (ImGui.InputText("Cache Folder##cache", ref cacheDirectory, 255))
             {
