@@ -104,7 +104,7 @@ public class CharacterDataFactory
         if (texPath.Contains("/--")) return;
 
         var texDx11Replacement =
-            CreateFileReplacement(texPath.Insert(texPath.LastIndexOf('/') + 1, "--"), true);
+            CreateFileReplacement(texPath.Insert(texPath.LastIndexOf('/') + 1, "--"), doNotReverseResolve);
 
         DebugPrint(texDx11Replacement, objectKind, "Texture (DX11)", inheritanceLevel);
 

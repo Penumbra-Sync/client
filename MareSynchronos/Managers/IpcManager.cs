@@ -190,6 +190,10 @@ namespace MareSynchronos.Managers
         {
             if (!CheckPenumbraApi()) return new[] { path };
             var resolvedPaths = _penumbraReverseResolvePath!.InvokeFunc(path, characterName);
+            if (resolvedPaths.Length == 0)
+            {
+                resolvedPaths = new[] { path };
+            }
             Logger.Verbose("Reverse Resolved " + path + "=>" + string.Join(", ", resolvedPaths));
             return resolvedPaths;
         }
