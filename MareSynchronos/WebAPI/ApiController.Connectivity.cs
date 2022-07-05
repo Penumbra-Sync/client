@@ -20,7 +20,8 @@ namespace MareSynchronos.WebAPI
         Disconnected,
         Connected,
         Unauthorized,
-        VersionMisMatch
+        VersionMisMatch,
+        NoAccount
     }
 
     public partial class ApiController : IDisposable
@@ -134,12 +135,13 @@ namespace MareSynchronos.WebAPI
                     return ServerState.Disconnected;
                 if (!ServerAlive)
                     return ServerState.Offline;
+                if (ServerAlive && SupportedServerVersions.Contains(_connectionDto?.ServerVersion ?? 0) && string.IsNullOrEmpty(UID))
+                    return ServerState.Unauthorized; 
                 if (ServerAlive && !SupportedServerVersions.Contains(_connectionDto?.ServerVersion ?? 0) && !string.IsNullOrEmpty(UID))
                     return ServerState.VersionMisMatch;
-                if (ServerAlive && SupportedServerVersions.Contains(_connectionDto?.ServerVersion ?? 0)
-                                && string.IsNullOrEmpty(UID))
-                    return ServerState.Unauthorized;
-                return ServerState.Connected;
+                if (ServerAlive && SupportedServerVersions.Contains(_connectionDto?.ServerVersion ?? 0) && !string.IsNullOrEmpty(UID)) 
+                    return ServerState.Connected;
+                return ServerState.NoAccount;
             }
         }
 
