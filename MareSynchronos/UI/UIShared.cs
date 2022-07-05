@@ -310,11 +310,15 @@ namespace MareSynchronos.UI
             var cacheDirectory = _pluginConfiguration.CacheFolder;
             if (ImGui.InputText("Cache Folder##cache", ref cacheDirectory, 255))
             {
-                _pluginConfiguration.CacheFolder = cacheDirectory;
-                if (!string.IsNullOrEmpty(_pluginConfiguration.CacheFolder)
-                    && Directory.Exists(_pluginConfiguration.CacheFolder)
-                    && (_isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder)))
+                _isPenumbraDirectory = cacheDirectory.ToLower() == _ipcManager.PenumbraModDirectory()?.ToLower();
+                _isDirectoryWritable = IsDirectoryWritable(cacheDirectory);
+
+                if (!string.IsNullOrEmpty(cacheDirectory)
+                    && Directory.Exists(cacheDirectory)
+                    && _isDirectoryWritable
+                    && !_isPenumbraDirectory)
                 {
+                    _pluginConfiguration.CacheFolder = cacheDirectory;
                     _pluginConfiguration.Save();
                     _fileCacheManager.StartWatchers();
                 }
@@ -329,10 +333,11 @@ namespace MareSynchronos.UI
                 {
                     if (!success) return;
 
-                    _pluginConfiguration.CacheFolder = path;
-                    _isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder);
-                    if (_isDirectoryWritable)
+                    _isDirectoryWritable = IsDirectoryWritable(path);
+                    _isPenumbraDirectory = path.ToLower() == _ipcManager.PenumbraModDirectory()?.ToLower();
+                    if (_isDirectoryWritable && !_isPenumbraDirectory)
                     {
+                        _pluginConfiguration.CacheFolder = path;
                         _pluginConfiguration.Save();
                         _fileCacheManager.StartWatchers();
                     }
@@ -340,10 +345,16 @@ namespace MareSynchronos.UI
             }
             ImGui.PopFont();
 
-            if (!Directory.Exists(cacheDirectory) || !_isDirectoryWritable)
+            if (_isPenumbraDirectory)
+            {
+                ColorTextWrapped("Do not point the cache path directly to the Penumbra directory. If necessary, make a subfolder in it.", ImGuiColors.DalamudRed);
+            }
+            else if (!Directory.Exists(cacheDirectory) || !_isDirectoryWritable)
             {
                 ColorTextWrapped("The folder you selected does not exist or cannot be written to. Please provide a valid path.", ImGuiColors.DalamudRed);
             }
+
+
 
             int maxCacheSize = _pluginConfiguration.MaxLocalCacheInGiB;
             if (ImGui.SliderInt("Maximum Cache Size in GB", ref maxCacheSize, 1, 50, "%d GB"))
@@ -354,6 +365,7 @@ namespace MareSynchronos.UI
         }
 
         private bool _isDirectoryWritable = false;
+        private bool _isPenumbraDirectory = false;
 
         public bool IsDirectoryWritable(string dirPath, bool throwIfFails = false)
         {

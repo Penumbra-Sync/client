@@ -89,7 +89,8 @@ namespace MareSynchronos.UI
                     ServerState.Disconnected => "Disconnected",
                     ServerState.Unauthorized => "Unauthorized",
                     ServerState.VersionMisMatch => "Service version mismatch",
-                    ServerState.Offline => "Service unavailable"
+                    ServerState.Offline => "Service unavailable",
+                    ServerState.NoAccount => "No account",
                 };
                 ImGui.SetWindowFontScale(1.2f);
                 ImGui.TextColored(ImGuiColors.DalamudRed, $"No UID ({errorMsg})");

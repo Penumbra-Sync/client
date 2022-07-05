@@ -127,7 +127,7 @@ namespace MareSynchronos.UI
                 _uiShared.DrawCacheDirectorySetting();
 
 
-                if (!_fileCacheManager.IsScanRunning)
+                if (!_fileCacheManager.IsScanRunning && !string.IsNullOrEmpty(_pluginConfiguration.CacheFolder))
                 {
                     UiShared.TextWrapped("You can adjust how many parallel threads will be used for scanning. Mind that ultimately it will depend on the amount of mods, your disk speed and your CPU. " +
                                       "More is not necessarily better, the default of 10 should be fine for most cases.");
