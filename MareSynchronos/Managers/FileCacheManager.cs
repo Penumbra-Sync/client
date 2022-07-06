@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Dalamud.Logging;
 using MareSynchronos.FileCacheDB;
 using MareSynchronos.Utils;
+using Microsoft.EntityFrameworkCore;
 
 namespace MareSynchronos.Managers
 {
@@ -143,7 +144,17 @@ namespace MareSynchronos.Managers
 
         private void RecalculateFileCacheSize()
         {
-            FileCacheSize = Directory.EnumerateFiles(_pluginConfiguration.CacheFolder).Sum(f => new FileInfo(f).Length);
+            FileCacheSize = Directory.EnumerateFiles(_pluginConfiguration.CacheFolder).Sum(f =>
+            {
+                try
+                {
+                    return new FileInfo(f).Length;
+                }
+                catch
+                {
+                    return 0;
+                }
+            });
 
             if (FileCacheSize < (long)_pluginConfiguration.MaxLocalCacheInGiB * 1024 * 1024 * 1024) return;
 
@@ -288,10 +299,10 @@ namespace MareSynchronos.Managers
                 {
                     foreach (var deletion in fileCachesToDelete)
                     {
-                        var entry = db.FileCaches.SingleOrDefault(f =>
+                        var entries = db.FileCaches.Where(f =>
                             f.Hash == deletion.Hash && f.Filepath == deletion.Filepath);
-                        if (entry != null)
-                            db.FileCaches.Remove(entry);
+                        if (await entries.AnyAsync(ct))
+                            db.FileCaches.RemoveRange(entries);
                     }
                     await db.SaveChangesAsync(ct);
                     foreach (var entry in fileCachesToAdd)

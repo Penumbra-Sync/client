@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using Dalamud.Logging;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Client.System.Resource;
@@ -60,6 +61,8 @@ public class CharacterDataFactory
         }
 
         var mdlPath = new Utf8String(mdl->ResourceHandle->FileName()).ToString();
+        PluginLog.Verbose("Adding File Replacement for Model " + mdlPath);
+
         FileReplacement mdlFileReplacement = CreateFileReplacement(mdlPath);
         DebugPrint(mdlFileReplacement, objectKind, "Model", inheritanceLevel);
 
@@ -76,7 +79,9 @@ public class CharacterDataFactory
 
     private unsafe void AddReplacementsFromMaterial(Material* mtrl, CharacterData cache, int inheritanceLevel = 0, string objectKind = "")
     {
-        var mtrlPath = new Utf8String(mtrl->ResourceHandle->FileName()).ToString().Split("|")[2];
+        var fileName = new Utf8String(mtrl->ResourceHandle->FileName()).ToString();
+        PluginLog.Verbose("Adding File Replacement for Material " + fileName);
+        var mtrlPath = fileName.Split("|")[2];
 
         var mtrlFileReplacement = CreateFileReplacement(mtrlPath);
         DebugPrint(mtrlFileReplacement, objectKind, "Material", inheritanceLevel);
@@ -96,6 +101,8 @@ public class CharacterDataFactory
 
     private void AddReplacementsFromTexture(string texPath, CharacterData cache, int inheritanceLevel = 0, string objectKind = "", bool doNotReverseResolve = true)
     {
+        PluginLog.Verbose("Adding File Replacement for Texture " + texPath);
+
         var texFileReplacement = CreateFileReplacement(texPath, doNotReverseResolve);
         DebugPrint(texFileReplacement, objectKind, "Texture", inheritanceLevel);
 

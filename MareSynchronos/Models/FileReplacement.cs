@@ -40,7 +40,7 @@ namespace MareSynchronos.Models
                 FileCache? fileCache;
                 using (FileCacheContext db = new())
                 {
-                    fileCache = db.FileCaches.SingleOrDefault(f => f.Filepath == path.ToLower());
+                    fileCache = db.FileCaches.FirstOrDefault(f => f.Filepath == path.ToLower());
                 }
 
                 if (fileCache != null)
@@ -88,7 +88,7 @@ namespace MareSynchronos.Models
             string hash = Crypto.GetFileHash(fi.FullName);
 
             using FileCacheContext db = new();
-            var fileAddedDuringCompute = db.FileCaches.SingleOrDefault(f => f.Filepath == fi.FullName.ToLower());
+            var fileAddedDuringCompute = db.FileCaches.FirstOrDefault(f => f.Filepath == fi.FullName.ToLower());
             if (fileAddedDuringCompute != null) return fileAddedDuringCompute.Hash;
 
             try
