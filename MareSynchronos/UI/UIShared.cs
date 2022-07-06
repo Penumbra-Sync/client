@@ -96,7 +96,11 @@ namespace MareSynchronos.UI
                 ImGui.SameLine();
                 ImGui.TextColored(ImGuiColors.ParsedGreen, _apiController.OnlineUsers.ToString());
                 ImGui.SameLine();
-                ImGui.Text("Users Online" + (!isIntroUi ? " (server-wide)" : string.Empty));
+                ImGui.Text("Users Online,");
+                ImGui.SameLine();
+                ColorText(_apiController.SystemInfoDto.CpuUsage.ToString("0.00") + "%", GetCpuLoadColor(_apiController.SystemInfoDto.CpuUsage));
+                ImGui.SameLine();
+                ImGui.Text("Load");
                 ImGui.SameLine();
                 ImGui.Text(")");
             }
@@ -122,6 +126,9 @@ namespace MareSynchronos.UI
             ImGui.TextUnformatted(text);
             ImGui.PopTextWrapPos();
         }
+
+        public static Vector4 GetCpuLoadColor(double input) => input < 50 ? ImGuiColors.ParsedGreen :
+            input < 90 ? ImGuiColors.DalamudYellow : ImGuiColors.DalamudRed;
 
         public static Vector4 GetBoolColor(bool input) => input ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
 

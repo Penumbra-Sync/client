@@ -58,7 +58,7 @@ namespace MareSynchronos.Utils
 
         public bool IsLoggedIn => _clientState.IsLoggedIn;
 
-        public bool IsPlayerPresent => _clientState.LocalPlayer != null;
+        public bool IsPlayerPresent => _clientState.LocalPlayer != null && _clientState.LocalPlayer.IsValid();
 
         public string PlayerName => _clientState.LocalPlayer?.Name.ToString() ?? "--";
 
