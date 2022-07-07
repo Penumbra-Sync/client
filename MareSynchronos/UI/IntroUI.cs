@@ -14,9 +14,9 @@ namespace MareSynchronos.UI
         private readonly Configuration _pluginConfiguration;
         private readonly FileCacheManager _fileCacheManager;
         private readonly WindowSystem _windowSystem;
-        private bool _readFirstPage = false;
+        private bool _readFirstPage;
 
-        public event SwitchUi? SwitchFromIntroToMainUi;
+        public event SwitchUi? SwitchToMainUi;
 
         public void Dispose()
         {
@@ -46,11 +46,6 @@ namespace MareSynchronos.UI
 
         public override void Draw()
         {
-            if (!IsOpen)
-            {
-                return;
-            }
-
             if (!_pluginConfiguration.AcceptedAgreement && !_readFirstPage)
             {
                 ImGui.SetWindowFontScale(1.3f);
@@ -152,6 +147,9 @@ namespace MareSynchronos.UI
                 ImGui.Separator();
                 if (_pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri) && _uiShared.ShowClientSecret)
                 {
+                    ImGui.SetWindowFontScale(2f);
+                    UiShared.ColorTextWrapped("DO NOT GIVE THIS KEY TO OTHER PEOPLE.", ImGuiColors.DalamudRed);
+                    ImGui.SetWindowFontScale(1f);
                     ImGui.Separator();
                     UiShared.TextWrapped(_pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri]);
                     ImGui.Separator();
@@ -169,7 +167,7 @@ namespace MareSynchronos.UI
                     ImGui.Separator();
                     if (ImGui.Button("Finish##finishIntro"))
                     {
-                        SwitchFromIntroToMainUi?.Invoke();
+                        SwitchToMainUi?.Invoke();
                         IsOpen = false;
                     }
                 }
@@ -183,7 +181,7 @@ namespace MareSynchronos.UI
                                          "to verify who you are. It is directly tied to the UID you will be receiving. In case of loss, you will have to re-register an account.");
                     UiShared.TextWrapped("Do not ever, under any circumstances, share your secret key to anyone! Likewise do not share your Mare Synchronos plugin configuration to anyone!");
                     ImGui.PopStyleColor();
-                    _uiShared.DrawServiceSelection(() => SwitchFromIntroToMainUi?.Invoke(), true);
+                    _uiShared.DrawServiceSelection(() => SwitchToMainUi?.Invoke(), true);
                 }
             }
         }

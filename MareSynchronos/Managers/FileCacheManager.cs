@@ -231,6 +231,7 @@ namespace MareSynchronos.Managers
                                      || f.EndsWith(".mdl", StringComparison.OrdinalIgnoreCase)
                                      || f.EndsWith(".mtrl", StringComparison.OrdinalIgnoreCase)))
                                 .Concat(Directory.EnumerateFiles(_pluginConfiguration.CacheFolder, "*.*", SearchOption.AllDirectories)
+                                    .Where(f => new FileInfo(f).Name.Length == 40)
                                     .Select(s => s.ToLowerInvariant()))
                                 .Select(p => new KeyValuePair<string, bool>(p, false)).ToList());
             List<FileCache> fileCaches;

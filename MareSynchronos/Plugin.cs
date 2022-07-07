@@ -28,13 +28,16 @@ namespace MareSynchronos
         private readonly IntroUi _introUi;
         private readonly IpcManager _ipcManager;
         public static DalamudPluginInterface PluginInterface { get; set; }
-        private readonly MainUi _mainUi;
+        private readonly SettingsUi _settingsUi;
         private readonly WindowSystem _windowSystem;
         private PlayerManager? _playerManager;
         private readonly DalamudUtil _dalamudUtil;
         private OnlinePlayerManager? _characterCacheManager;
         private readonly DownloadUi _downloadUi;
         private readonly FileDialogManager _fileDialogManager;
+        private readonly CompactUi _compactUi;
+        private readonly UiShared _uiSharedComponent;
+
 
         public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager,
             Framework framework, ObjectTable objectTable, ClientState clientState)
@@ -60,24 +63,30 @@ namespace MareSynchronos
             _fileCacheManager = new FileCacheManager(_ipcManager, _configuration);
             _fileDialogManager = new FileDialogManager();
 
-            var uiSharedComponent =
-                new UiShared(_ipcManager, _apiController, _fileCacheManager, _fileDialogManager, _configuration, _dalamudUtil);
-            _mainUi = new MainUi(_windowSystem, uiSharedComponent, _configuration, _apiController);
+            _uiSharedComponent =
+                new UiShared(_ipcManager, _apiController, _fileCacheManager, _fileDialogManager, _configuration, _dalamudUtil, PluginInterface);
+            _settingsUi = new SettingsUi(_windowSystem, _uiSharedComponent, _configuration, _apiController);
+            _compactUi = new CompactUi(_windowSystem, _uiSharedComponent, _configuration, _apiController);
 
-            _introUi = new IntroUi(_windowSystem, uiSharedComponent, _configuration, _fileCacheManager);
-            _mainUi.SwitchFromMainUiToIntro += () =>
+            _introUi = new IntroUi(_windowSystem, _uiSharedComponent, _configuration, _fileCacheManager);
+            _settingsUi.SwitchToIntroUi += () =>
             {
                 _introUi.IsOpen = true;
-                _mainUi.IsOpen = false;
+                _settingsUi.IsOpen = false;
+                _compactUi.IsOpen = false;
             };
-            _introUi.SwitchFromIntroToMainUi += () =>
+            _introUi.SwitchToMainUi += () =>
             {
                 _introUi.IsOpen = false;
-                _mainUi.IsOpen = true;
+                _compactUi.IsOpen = true;
                 _fileCacheManager.StartWatchers();
                 ReLaunchCharacterManager();
             };
-            _downloadUi = new DownloadUi(_windowSystem, _configuration, _apiController, uiSharedComponent);
+            _compactUi.OpenSettingsUi += () =>
+            {
+                _settingsUi.Toggle();
+            };
+            _downloadUi = new DownloadUi(_windowSystem, _configuration, _apiController, _uiSharedComponent);
 
 
             _dalamudUtil.LogIn += DalamudUtilOnLogIn;
@@ -92,8 +101,8 @@ namespace MareSynchronos
 
         private void ApiControllerOnRegisterFinalized()
         {
-            _mainUi.IsOpen = false;
-            _introUi.IsOpen = true;
+            _introUi.IsOpen = false;
+            _compactUi.IsOpen = true;
         }
 
         public string Name => "Mare Synchronos";
@@ -107,9 +116,11 @@ namespace MareSynchronos
             _dalamudUtil.LogIn -= DalamudUtilOnLogIn;
             _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
 
-            _mainUi?.Dispose();
+            _uiSharedComponent.Dispose();
+            _settingsUi?.Dispose();
             _introUi?.Dispose();
             _downloadUi?.Dispose();
+            _compactUi?.Dispose();
 
             _fileCacheManager?.Dispose();
             _ipcManager?.Dispose();
@@ -124,7 +135,7 @@ namespace MareSynchronos
             Logger.Debug("Client login");
 
             PluginInterface.UiBuilder.Draw += Draw;
-            PluginInterface.UiBuilder.OpenConfigUi += OpenConfigUi;
+            PluginInterface.UiBuilder.OpenConfigUi += OpenUi;
             _commandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
             {
                 HelpMessage = "Opens the Mare Synchronos UI"
@@ -147,7 +158,7 @@ namespace MareSynchronos
             _characterCacheManager?.Dispose();
             _playerManager?.Dispose();
             PluginInterface.UiBuilder.Draw -= Draw;
-            PluginInterface.UiBuilder.OpenConfigUi -= OpenConfigUi;
+            PluginInterface.UiBuilder.OpenConfigUi -= OpenUi;
             _commandManager.RemoveHandler(CommandName);
         }
 
@@ -191,14 +202,14 @@ namespace MareSynchronos
         {
             if (string.IsNullOrEmpty(args))
             {
-                _mainUi.Toggle();
+                OpenUi();
             }
         }
 
-        private void OpenConfigUi()
+        private void OpenUi()
         {
             if (_configuration.HasValidSetup())
-                _mainUi.Toggle();
+                _compactUi.Toggle();
             else
                 _introUi.Toggle();
         }

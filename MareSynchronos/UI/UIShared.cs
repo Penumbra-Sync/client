@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.ImGuiFileDialog;
+using Dalamud.Plugin;
 using ImGuiNET;
 using MareSynchronos.Managers;
 using MareSynchronos.Utils;
@@ -13,7 +14,7 @@ using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.UI
 {
-    public class UiShared
+    public class UiShared : IDisposable
     {
         private readonly IpcManager _ipcManager;
         private readonly ApiController _apiController;
@@ -21,12 +22,15 @@ namespace MareSynchronos.UI
         private readonly FileDialogManager _fileDialogManager;
         private readonly Configuration _pluginConfiguration;
         private readonly DalamudUtil _dalamudUtil;
+        private readonly DalamudPluginInterface _pluginInterface;
         public long FileCacheSize => _fileCacheManager.FileCacheSize;
         public bool ShowClientSecret = true;
         public string PlayerName => _dalamudUtil.PlayerName;
         public bool EditTrackerPosition { get; set; }
+        public ImFontPtr UidFont { get; private set; }
+        public bool UidFontBuilt { get; private set; }
 
-        public UiShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, FileDialogManager fileDialogManager, Configuration pluginConfiguration, DalamudUtil dalamudUtil)
+        public UiShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, FileDialogManager fileDialogManager, Configuration pluginConfiguration, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface)
         {
             _ipcManager = ipcManager;
             _apiController = apiController;
@@ -34,7 +38,35 @@ namespace MareSynchronos.UI
             _fileDialogManager = fileDialogManager;
             _pluginConfiguration = pluginConfiguration;
             _dalamudUtil = dalamudUtil;
+            _pluginInterface = pluginInterface;
             _isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder);
+
+            _pluginInterface.UiBuilder.BuildFonts += BuildFont;
+            _pluginInterface.UiBuilder.RebuildFonts();
+        }
+
+        private void BuildFont()
+        {
+            var fontFile = Path.Combine(_pluginInterface.DalamudAssetDirectory.FullName, "UIRes", "NotoSansCJKjp-Medium.otf");
+            UidFontBuilt = false;
+
+            if (File.Exists(fontFile))
+            {
+                try
+                {
+                    UidFont = ImGui.GetIO().Fonts.AddFontFromFileTTF(fontFile, 35);
+                    UidFontBuilt = true;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Debug($"Font failed to load. {fontFile}");
+                    Logger.Debug(ex.ToString());
+                }
+            }
+            else
+            {
+                Logger.Debug($"Font doesn't exist. {fontFile}");
+            }
         }
 
         public bool DrawOtherPluginState()
@@ -407,6 +439,11 @@ namespace MareSynchronos.UI
                 _pluginConfiguration.MaxParallelScan = parallelScans;
                 _pluginConfiguration.Save();
             }
+        }
+
+        public void Dispose()
+        {
+            _pluginInterface.UiBuilder.BuildFonts -= BuildFont;
         }
     }
 }
