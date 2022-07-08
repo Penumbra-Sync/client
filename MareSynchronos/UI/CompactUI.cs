@@ -145,6 +145,7 @@ namespace MareSynchronos.UI
             var trashButtonSize = GetIconButtonSize(FontAwesomeIcon.Trash);
             var textSize = ImGui.CalcTextSize(entry.OtherUID);
             var originalY = ImGui.GetCursorPosY();
+            var buttonSizes = buttonSize.Y + trashButtonSize.Y;
 
             var textPos = originalY + buttonSize.Y / 2 - textSize.Y / 2;
             ImGui.SetCursorPosY(textPos);
@@ -226,8 +227,8 @@ namespace MareSynchronos.UI
             {
                 ImGui.SetCursorPosY(originalY);
 
-                ImGui.InputTextWithHint("", "Nick/Notes", ref _editCharComment, 255);
-                if (ImGui.GetIO().KeysDown[(int)ImGuiKey.Enter])
+                ImGui.SetNextItemWidth(ImGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * 2);
+                if (ImGui.InputTextWithHint("", "Nick/Notes", ref _editCharComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
                 {
                     _configuration.SetCurrentServerUidComment(entry.OtherUID, _editCharComment);
                     _configuration.Save();
