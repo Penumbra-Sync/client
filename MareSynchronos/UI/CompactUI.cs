@@ -369,7 +369,7 @@ namespace MareSynchronos.UI
             ImGui.PushFont(UiBuilder.IconFont);
             ImGui.Text(FontAwesomeIcon.Upload.ToIconString());
             ImGui.PopFont();
-            ImGui.SameLine(35);
+            ImGui.SameLine(35 * ImGuiHelpers.GlobalScale);
 
             if (currentUploads.Any())
             {
@@ -394,7 +394,7 @@ namespace MareSynchronos.UI
             ImGui.PushFont(UiBuilder.IconFont);
             ImGui.Text(FontAwesomeIcon.Download.ToIconString());
             ImGui.PopFont();
-            ImGui.SameLine(35);
+            ImGui.SameLine(35 * ImGuiHelpers.GlobalScale);
 
             if (currentDownloads.Any())
             {
