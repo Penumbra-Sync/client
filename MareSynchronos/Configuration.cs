@@ -57,6 +57,8 @@ namespace MareSynchronos
         public Dictionary<string, string> CustomServerList { get; set; } = new();
         public int MaxLocalCacheInGiB { get; set; } = 20;
 
+        public bool ReverseUserSort { get; set; } = true;
+
         public bool InitialScanComplete { get; set; } = false;
         public int MaxParallelScan
         {

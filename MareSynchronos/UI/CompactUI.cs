@@ -41,7 +41,7 @@ namespace MareSynchronos.UI
 
             SizeConstraints = new WindowSizeConstraints()
             {
-                MinimumSize = new Vector2(300, 200),
+                MinimumSize = new Vector2(300, 400),
                 MaximumSize = new Vector2(300, 2000),
             };
 
@@ -98,7 +98,27 @@ namespace MareSynchronos.UI
         private void DrawFilter()
         {
             ImGui.PushID("filter");
-            ImGui.SetNextItemWidth(_windowContentWidth);
+            var buttonSize = GetIconButtonSize(FontAwesomeIcon.ArrowUp);
+            if (!_configuration.ReverseUserSort)
+            {
+                if (ImGuiComponents.IconButton(FontAwesomeIcon.ArrowDown))
+                {
+                    _configuration.ReverseUserSort = true;
+                    _configuration.Save();
+                }
+                AttachToolTip("Sort by newest additions first");
+            }
+            else
+            {
+                if (ImGuiComponents.IconButton(FontAwesomeIcon.ArrowUp))
+                {
+                    _configuration.ReverseUserSort = false;
+                    _configuration.Save();
+                }
+                AttachToolTip("Sort by oldest additions first");
+            }
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(_windowContentWidth - buttonSize.X - ImGui.GetStyle().ItemSpacing.X);
             ImGui.InputTextWithHint("##filter", "Filter for UID/notes", ref _characterOrCommentFilter, 255);
             ImGui.PopID();
         }
@@ -178,7 +198,7 @@ namespace MareSynchronos.UI
             }
             AttachToolTip("Hold CTRL to unpair permanently from " + entry.OtherUID);
 
-            ImGuiHelpers.ScaledDummy(5);
+            ImGuiHelpers.ScaledDummy(1);
 
             ImGui.PopID();
         }
@@ -208,13 +228,18 @@ namespace MareSynchronos.UI
             var ySize = _transferPartHeight == 0
                 ? 1
                 : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - _transferPartHeight - ImGui.GetCursorPosY();
+            var users = _apiController.PairedClients.Where(p =>
+            {
+                if (_characterOrCommentFilter.IsNullOrEmpty()) return true;
+                _configuration.GetCurrentServerUidComments().TryGetValue(p.OtherUID, out string? comment);
+                return p.OtherUID.ToLower().Contains(_characterOrCommentFilter.ToLower()) ||
+                       (comment?.ToLower().Contains(_characterOrCommentFilter.ToLower()) ?? false);
+            });
+
+            if (_configuration.ReverseUserSort) users = users.Reverse();
+
             ImGui.BeginChild("list", new Vector2(_windowContentWidth, ySize), false);
-            foreach (var entry in _apiController.PairedClients.Where(p =>
-                     {
-                         if (_characterOrCommentFilter.IsNullOrEmpty()) return true;
-                         _configuration.GetCurrentServerUidComments().TryGetValue(p.OtherUID, out string? comment);
-                         return p.OtherUID.ToLower().Contains(_characterOrCommentFilter.ToLower()) || (comment?.ToLower().Contains(_characterOrCommentFilter.ToLower()) ?? false);
-                     }).ToList())
+            foreach (var entry in users.ToList())
             {
                 DrawPairedClient(entry);
             }
