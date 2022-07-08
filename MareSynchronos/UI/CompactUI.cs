@@ -55,6 +55,16 @@ namespace MareSynchronos.UI
             _windowSystem.RemoveWindow(this);
         }
 
+        public override void OnClose()
+        {
+            _editNickEntry = string.Empty;
+            _editCharComment = string.Empty;
+            base.OnClose();
+        }
+
+        private Dictionary<string, bool> _showUidForEntry = new Dictionary<string, bool>();
+        private string _editNickEntry = string.Empty;
+
         public override void Draw()
         {
             _windowContentWidth = ImGui.GetWindowContentRegionWidth();
@@ -123,6 +133,8 @@ namespace MareSynchronos.UI
             ImGui.PopID();
         }
 
+        private string _editCharComment = string.Empty;
+        
         private void DrawPairedClient(ClientPairDto entry)
         {
             ImGui.PushID(entry.OtherUID);
@@ -130,6 +142,7 @@ namespace MareSynchronos.UI
             var pauseIcon = entry.IsPaused ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
 
             var buttonSize = GetIconButtonSize(pauseIcon);
+            var trashButtonSize = GetIconButtonSize(FontAwesomeIcon.Trash);
             var textSize = ImGui.CalcTextSize(_apiController.SystemInfoDto.CpuUsage.ToString("0.00") + "%");
             var originalY = ImGui.GetCursorPosY();
 
@@ -159,11 +172,79 @@ namespace MareSynchronos.UI
 
                 AttachToolTip("You are paired with " + entry.OtherUID);
             }
+
+            bool textIsUid = true;
+            var playerText = entry.OtherUID;
+            _showUidForEntry.TryGetValue(entry.OtherUID, out bool showUidInsteadOfName);
+            if (!showUidInsteadOfName && _configuration.GetCurrentServerUidComments().TryGetValue(entry.OtherUID, out playerText))
+            {
+                if (!playerText.IsNullOrEmpty())
+                {
+                    textIsUid = false;
+                }
+                else
+                {
+                    playerText = entry.OtherUID;
+                }
+            }
+
             ImGui.SameLine();
-            ImGui.SetCursorPosY(textPos);
-            ImGui.Text(entry.OtherUID);
+            if (_editNickEntry != entry.OtherUID)
+            {
+                ImGui.SetCursorPosY(textPos);
+                if (textIsUid) ImGui.PushFont(UiBuilder.MonoFont);
+                ImGui.Text(playerText);
+                if (textIsUid) ImGui.PopFont();
+                AttachToolTip("Left click to switch between UID display and nick" + Environment.NewLine +
+                              "Right click to change nick for " + entry.OtherUID);
+                if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
+                {
+                    bool prevState = textIsUid;
+                    if (_showUidForEntry.ContainsKey(entry.OtherUID))
+                    {
+                        prevState = _showUidForEntry[entry.OtherUID];
+                    }
+
+                    _showUidForEntry[entry.OtherUID] = !prevState;
+                }
+
+                if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+                {
+                    _configuration.SetCurrentServerUidComment(_editNickEntry, _editCharComment);
+                    _configuration.Save();
+                    _editCharComment = _configuration.GetCurrentServerUidComments().ContainsKey(entry.OtherUID)
+                        ? _configuration.GetCurrentServerUidComments()[entry.OtherUID]
+                        : string.Empty;
+                    _editNickEntry = entry.OtherUID;
+                }
+            }
+            else
+            {
+                ImGui.SetCursorPosY(originalY);
+
+                ImGui.InputTextWithHint("", "Nick/Notes", ref _editCharComment, 255);
+                if (ImGui.GetIO().KeysDown[(int)ImGuiKey.Enter])
+                {
+                    _configuration.SetCurrentServerUidComment(entry.OtherUID, _editCharComment);
+                    _configuration.Save();
+                    _editNickEntry = string.Empty;
+                }
+                AttachToolTip("Hit ENTER to save");
+            }
 
             ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + ImGui.GetWindowContentRegionWidth() - buttonSize.X);
+            ImGui.SetCursorPosY(originalY);
+            if (ImGuiComponents.IconButton(FontAwesomeIcon.Trash))
+            {
+                if (ImGui.GetIO().KeyCtrl)
+                {
+                    _ = _apiController.SendPairedClientRemoval(entry.OtherUID);
+                    _apiController.PairedClients.Remove(entry);
+                }
+            }
+            AttachToolTip("Hold CTRL and click to unpair permanently from " + entry.OtherUID);
+
+            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + ImGui.GetWindowContentRegionWidth() - buttonSize.X - trashButtonSize.X);
             ImGui.SetCursorPosY(originalY);
             if (ImGuiComponents.IconButton(pauseIcon))
             {
@@ -173,32 +254,6 @@ namespace MareSynchronos.UI
                 ? "Pause pairing with " + entry.OtherUID
                 : "Resume pairing with " + entry.OtherUID);
 
-            string charComment = _configuration.GetCurrentServerUidComments().ContainsKey(entry.OtherUID) ? _configuration.GetCurrentServerUidComments()[entry.OtherUID] : string.Empty;
-            buttonSize = GetIconButtonSize(FontAwesomeIcon.Trash);
-            ImGui.SetNextItemWidth(ImGui.GetWindowContentRegionMin().X + ImGui.GetWindowContentRegionWidth() - buttonSize.X - ImGui.GetStyle().ItemSpacing.X);
-            if (ImGui.InputTextWithHint("##comment", "Nick/Notes", ref charComment, 255))
-            {
-                if (_configuration.GetCurrentServerUidComments().Count == 0)
-                {
-                    _configuration.UidServerComments[_configuration.ApiUri] =
-                        new Dictionary<string, string>();
-                }
-                _configuration.SetCurrentServerUidComment(entry.OtherUID, charComment);
-                _configuration.Save();
-            }
-
-            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + ImGui.GetWindowContentRegionWidth() - buttonSize.X);
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.Trash))
-            {
-                if (ImGui.GetIO().KeyCtrl)
-                {
-                    _ = _apiController.SendPairedClientRemoval(entry.OtherUID);
-                    _apiController.PairedClients.Remove(entry);
-                }
-            }
-            AttachToolTip("Hold CTRL to unpair permanently from " + entry.OtherUID);
-
-            ImGuiHelpers.ScaledDummy(1);
 
             ImGui.PopID();
         }
