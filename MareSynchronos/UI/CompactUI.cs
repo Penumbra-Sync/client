@@ -234,7 +234,12 @@ namespace MareSynchronos.UI
                     _configuration.Save();
                     _editNickEntry = string.Empty;
                 }
-                AttachToolTip("Hit ENTER to save");
+
+                if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+                {
+                    _editNickEntry = string.Empty;
+                }
+                AttachToolTip("Hit ENTER to save\nRight click to cancel");
             }
 
             ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + ImGui.GetWindowContentRegionWidth() - buttonSize.X);
