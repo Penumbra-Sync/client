@@ -134,7 +134,7 @@ namespace MareSynchronos.UI
         }
 
         private string _editCharComment = string.Empty;
-        
+
         private void DrawPairedClient(ClientPairDto entry)
         {
             ImGui.PushID(entry.OtherUID);
@@ -143,7 +143,7 @@ namespace MareSynchronos.UI
 
             var buttonSize = GetIconButtonSize(pauseIcon);
             var trashButtonSize = GetIconButtonSize(FontAwesomeIcon.Trash);
-            var textSize = ImGui.CalcTextSize(_apiController.SystemInfoDto.CpuUsage.ToString("0.00") + "%");
+            var textSize = ImGui.CalcTextSize(entry.OtherUID);
             var originalY = ImGui.GetCursorPosY();
 
             var textPos = originalY + buttonSize.Y / 2 - textSize.Y / 2;
@@ -178,14 +178,18 @@ namespace MareSynchronos.UI
             _showUidForEntry.TryGetValue(entry.OtherUID, out bool showUidInsteadOfName);
             if (!showUidInsteadOfName && _configuration.GetCurrentServerUidComments().TryGetValue(entry.OtherUID, out playerText))
             {
-                if (!playerText.IsNullOrEmpty())
-                {
-                    textIsUid = false;
-                }
-                else
+                if (playerText.IsNullOrEmpty())
                 {
                     playerText = entry.OtherUID;
                 }
+                else
+                {
+                    textIsUid = false;
+                }
+            }
+            else
+            {
+                playerText = entry.OtherUID;
             }
 
             ImGui.SameLine();
@@ -193,7 +197,7 @@ namespace MareSynchronos.UI
             {
                 ImGui.SetCursorPosY(textPos);
                 if (textIsUid) ImGui.PushFont(UiBuilder.MonoFont);
-                ImGui.Text(playerText);
+                ImGui.TextUnformatted(playerText);
                 if (textIsUid) ImGui.PopFont();
                 AttachToolTip("Left click to switch between UID display and nick" + Environment.NewLine +
                               "Right click to change nick for " + entry.OtherUID);
@@ -244,7 +248,7 @@ namespace MareSynchronos.UI
             }
             AttachToolTip("Hold CTRL and click to unpair permanently from " + entry.OtherUID);
 
-            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + ImGui.GetWindowContentRegionWidth() - buttonSize.X - trashButtonSize.X);
+            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + ImGui.GetWindowContentRegionWidth() - buttonSize.X - ImGui.GetStyle().ItemSpacing.X - trashButtonSize.X);
             ImGui.SetCursorPosY(originalY);
             if (ImGuiComponents.IconButton(pauseIcon))
             {
