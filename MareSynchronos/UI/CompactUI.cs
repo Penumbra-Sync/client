@@ -423,17 +423,31 @@ namespace MareSynchronos.UI
         {
             ImGui.PushID("header");
             var uidText = GetUidText();
+            var buttonSizeX = 0f;
 
             if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
             var uidTextSize = ImGui.CalcTextSize(uidText);
             if (_uiShared.UidFontBuilt) ImGui.PopFont();
 
-            var originalPos = ImGui.GetCursorPosY();
+            var originalPos = ImGui.GetCursorPos();
             ImGui.SetWindowFontScale(1.5f);
             var buttonSize = GetIconButtonSize(FontAwesomeIcon.Cog);
+            buttonSizeX -= buttonSize.X - ImGui.GetStyle().ItemSpacing.X * 2;
+            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + ImGui.GetWindowContentRegionWidth() - buttonSize.X);
+            ImGui.SetCursorPosY(originalPos.Y + uidTextSize.Y / 2 - buttonSize.Y / 2);
+            if (ImGuiComponents.IconButton(FontAwesomeIcon.Cog))
+            {
+                OpenSettingsUi?.Invoke();
+            }
+            AttachToolTip("Open the Mare Synchronos Settings");
+            
+            ImGui.SameLine(); //Important to draw the uidText consistently
+            ImGui.SetCursorPos(originalPos);
+            
             if (_apiController.ServerState is ServerState.Connected)
             {
-                ImGui.SetCursorPosY(originalPos + uidTextSize.Y / 2 - buttonSize.Y / 2);
+                buttonSizeX += GetIconButtonSize(FontAwesomeIcon.Copy).X - ImGui.GetStyle().ItemSpacing.X * 2;
+                ImGui.SetCursorPosY(originalPos.Y + uidTextSize.Y / 2 - buttonSize.Y / 2);
                 if (ImGuiComponents.IconButton(FontAwesomeIcon.Copy))
                 {
                     ImGui.SetClipboardText(_apiController.UID);
@@ -443,22 +457,11 @@ namespace MareSynchronos.UI
             }
             ImGui.SetWindowFontScale(1f);
 
-            ImGui.SetCursorPosY(originalPos - uidTextSize.Y / 8);
+            ImGui.SetCursorPosY(originalPos.Y + buttonSize.Y / 2 - uidTextSize.Y / 2 - ImGui.GetStyle().ItemSpacing.Y / 2);
+            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMax().X + ImGui.GetWindowContentRegionMin().X) / 2 + buttonSizeX - uidTextSize.X / 2);
             if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
             ImGui.TextColored(GetUidColor(), uidText);
             if (_uiShared.UidFontBuilt) ImGui.PopFont();
-
-            ImGui.SetWindowFontScale(1.5f);
-
-            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + ImGui.GetWindowContentRegionWidth() - buttonSize.X);
-            ImGui.SetCursorPosY(originalPos + uidTextSize.Y / 2 - buttonSize.Y / 2);
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.Cog))
-            {
-                OpenSettingsUi?.Invoke();
-            }
-            AttachToolTip("Open the Mare Synchronos Settings");
-
-            ImGui.SetWindowFontScale(1f);
 
             if (_apiController.ServerState is not ServerState.Connected)
             {
