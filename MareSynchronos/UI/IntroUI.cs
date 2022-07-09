@@ -48,9 +48,9 @@ namespace MareSynchronos.UI
         {
             if (!_pluginConfiguration.AcceptedAgreement && !_readFirstPage)
             {
-                ImGui.SetWindowFontScale(1.3f);
-                ImGui.Text("Welcome to Mare Synchronos!");
-                ImGui.SetWindowFontScale(1.0f);
+                if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
+                ImGui.TextUnformatted("Welcome to Mare Synchronos");
+                if (_uiShared.UidFontBuilt) ImGui.PopFont();
                 ImGui.Separator();
                 UiShared.TextWrapped("Mare Synchronos is a plugin that will replicate your full current character state including all Penumbra mods to other paired Mare Synchronos users. " +
                                   "Note that you will have to have Penumbra as well as Glamourer installed to use this plugin.");
@@ -68,15 +68,15 @@ namespace MareSynchronos.UI
             }
             else if (!_pluginConfiguration.AcceptedAgreement && _readFirstPage)
             {
-                ImGui.SetWindowFontScale(1.3f);
-                ImGui.Text("Agreement of Usage of Service");
-                ImGui.SetWindowFontScale(1.0f);
+                if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
+                ImGui.TextUnformatted("Agreement of Usage of Service");
+                if (_uiShared.UidFontBuilt) ImGui.PopFont();
                 ImGui.Separator();
                 ImGui.SetWindowFontScale(1.5f);
                 string readThis = "READ THIS CAREFULLY";
                 var textSize = ImGui.CalcTextSize(readThis);
                 ImGui.SetCursorPosX(ImGui.GetWindowSize().X / 2 - textSize.X / 2);
-                ImGui.TextColored(ImGuiColors.DalamudRed, readThis);
+                UiShared.ColorText(readThis, ImGuiColors.DalamudRed);
                 ImGui.SetWindowFontScale(1.0f);
                 ImGui.Separator();
                 UiShared.TextWrapped("All of the mod files currently active on your character as well as your current character state will be uploaded to the service you registered yourself at automatically. " +
@@ -107,27 +107,28 @@ namespace MareSynchronos.UI
             }
             else if (_pluginConfiguration.AcceptedAgreement && (string.IsNullOrEmpty(_pluginConfiguration.CacheFolder) || _pluginConfiguration.InitialScanComplete == false))
             {
-                ImGui.SetWindowFontScale(1.3f);
-                ImGui.Text("File Cache Setup");
-                ImGui.SetWindowFontScale(1.0f);
+                if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
+                ImGui.TextUnformatted("File Cache Setup");
+                if (_uiShared.UidFontBuilt) ImGui.PopFont();
                 ImGui.Separator();
                 UiShared.TextWrapped("To not unnecessary download files already present on your computer, Mare Synchronos will have to scan your Penumbra mod directory. " +
                                   "Additionally, a local cache folder must be set where Mare Synchronos will download its local file cache to. " +
                                   "Once the Cache Folder is set and the scan complete, this page will automatically forward to registration at a service.");
                 UiShared.TextWrapped("Note: The initial scan, depending on the amount of mods you have, might take a while. Please wait until it is completed.");
-                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
-                UiShared.TextWrapped("Warning: once past this step you should not delete the FileCache.db of Mare Synchronos in the Plugin Configurations folder of Dalamud. " +
-                                  "Otherwise on the next launch a full re-scan of the file cache database will be initiated.");
-                ImGui.PopStyleColor();
+                UiShared.ColorTextWrapped("Warning: once past this step you should not delete the FileCache.db of Mare Synchronos in the Plugin Configurations folder of Dalamud. " +
+                                  "Otherwise on the next launch a full re-scan of the file cache database will be initiated.", ImGuiColors.DalamudYellow);
                 _uiShared.DrawCacheDirectorySetting();
 
+                if (!_uiShared.HasValidPenumbraModPath)
+                {
+                    UiShared.ColorTextWrapped("You do not have a valid Penumbra path set. Open Penumbra and set up a valid path for the mod directory.", ImGuiColors.DalamudRed);
+                }
 
-                if (!_fileCacheManager.IsScanRunning && !string.IsNullOrEmpty(_pluginConfiguration.CacheFolder))
+                if (!_fileCacheManager.IsScanRunning && !string.IsNullOrEmpty(_pluginConfiguration.CacheFolder) && _uiShared.HasValidPenumbraModPath)
                 {
                     UiShared.TextWrapped("You can adjust how many parallel threads will be used for scanning. Mind that ultimately it will depend on the amount of mods, your disk speed and your CPU. " +
                                       "More is not necessarily better, the default of 10 should be fine for most cases.");
                     _uiShared.DrawParallelScansSetting();
-
 
                     if (ImGui.Button("Start Scan##startScan"))
                     {
@@ -141,9 +142,9 @@ namespace MareSynchronos.UI
             }
             else
             {
-                ImGui.SetWindowFontScale(1.3f);
-                ImGui.Text("Service registration");
-                ImGui.SetWindowFontScale(1.0f);
+                if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
+                ImGui.TextUnformatted("Service Registration");
+                if (_uiShared.UidFontBuilt) ImGui.PopFont();
                 ImGui.Separator();
                 if (_pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri) && _uiShared.ShowClientSecret)
                 {
@@ -157,13 +158,9 @@ namespace MareSynchronos.UI
                     {
                         ImGui.SetClipboardText(_pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri]);
                     }
-                    ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
-                    UiShared.TextWrapped("This is the only time you will be able to see this key in the UI. You can copy it to make a backup somewhere.");
-                    ImGui.PopStyleColor();
+                    UiShared.ColorTextWrapped("This is the only time you will be able to see this key in the UI. You can copy it to make a backup somewhere.", ImGuiColors.DalamudYellow);
                     ImGui.Separator();
-                    ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.ParsedGreen);
-                    UiShared.TextWrapped("You are now ready to go. Press Finish to finalize the settings and open the Mare Synchronos main UI.");
-                    ImGui.PopStyleColor();
+                    UiShared.ColorTextWrapped("You are now ready to go. Press Finish to finalize the settings and open the Mare Synchronos main UI.", ImGuiColors.ParsedGreen);
                     ImGui.Separator();
                     if (ImGui.Button("Finish##finishIntro"))
                     {
@@ -175,12 +172,10 @@ namespace MareSynchronos.UI
                 {
                     UiShared.TextWrapped("You will now have to register at a service. You can use the provided central service or pick a custom one. " +
                                          "There is no support for custom services from the plugin creator. Use at your own risk.");
-                    ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
-                    UiShared.TextWrapped("On registration on a service the plugin will create and save a secret key to your plugin configuration. " +
+                    UiShared.ColorTextWrapped("On registration on a service the plugin will create and save a secret key to your plugin configuration. " +
                                          "Make a backup of your secret key. In case of loss, it cannot be restored. The secret key is your identification to the service " +
-                                         "to verify who you are. It is directly tied to the UID you will be receiving. In case of loss, you will have to re-register an account.");
-                    UiShared.TextWrapped("Do not ever, under any circumstances, share your secret key to anyone! Likewise do not share your Mare Synchronos plugin configuration to anyone!");
-                    ImGui.PopStyleColor();
+                                         "to verify who you are. It is directly tied to the UID you will be receiving. In case of loss, you will have to re-register an account.", ImGuiColors.DalamudRed);
+                    UiShared.ColorTextWrapped("Do not ever, under any circumstances, share your secret key to anyone! Likewise do not share your Mare Synchronos plugin configuration to anyone!", ImGuiColors.DalamudRed);
                     _uiShared.DrawServiceSelection(() => SwitchToMainUi?.Invoke(), true);
                 }
             }
