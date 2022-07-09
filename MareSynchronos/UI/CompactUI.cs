@@ -174,9 +174,8 @@ namespace MareSynchronos.UI
             }
 
             bool textIsUid = true;
-            var playerText = entry.OtherUID;
             _showUidForEntry.TryGetValue(entry.OtherUID, out bool showUidInsteadOfName);
-            if (!showUidInsteadOfName && _configuration.GetCurrentServerUidComments().TryGetValue(entry.OtherUID, out playerText))
+            if (!showUidInsteadOfName && _configuration.GetCurrentServerUidComments().TryGetValue(entry.OtherUID, out var playerText))
             {
                 if (playerText.IsNullOrEmpty())
                 {

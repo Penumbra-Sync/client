@@ -185,7 +185,7 @@ public class CharacterDataFactory
         }
 
         AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->Decal->FileName()).ToString(), cache, 0, "Decal", false);
-        AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), cache, 0, "Legacy Decal", false);
+        AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), cache, 0, "Legacy Decal", false);yes
 
         st.Stop();
         Logger.Verbose("Building Character Data took " + st.Elapsed);
@@ -199,7 +199,7 @@ public class CharacterDataFactory
         if (!doNotReverseResolve)
         {
             fileReplacement.GamePaths =
-                _ipcManager.PenumbraReverseResolvePath(path, _dalamudUtil.PlayerName).ToList();
+                _ipcManager.PenumbraReverseResolvePlayer(path).ToList();
             fileReplacement.SetResolvedPath(path);
         }
         else

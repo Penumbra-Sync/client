@@ -29,7 +29,7 @@ namespace MareSynchronos.Managers
         private readonly ICallGateSubscriber<string, int> _penumbraRemoveTemporaryCollection;
         private readonly ICallGateSubscriber<string>? _penumbraResolveModDir;
         private readonly ICallGateSubscriber<string, string, string>? _penumbraResolvePath;
-        private readonly ICallGateSubscriber<string, string, string[]>? _penumbraReverseResolvePath;
+        private readonly ICallGateSubscriber<string, string[]>? _reverseResolvePlayer;
         private readonly ICallGateSubscriber<string, string, Dictionary<string, string>, string, int, int>
             _penumbraSetTemporaryMod;
         public IpcManager(DalamudPluginInterface pi)
@@ -41,7 +41,7 @@ namespace MareSynchronos.Managers
             _penumbraResolvePath = pi.GetIpcSubscriber<string, string, string>("Penumbra.ResolveCharacterPath");
             _penumbraResolveModDir = pi.GetIpcSubscriber<string>("Penumbra.GetModDirectory");
             _penumbraRedraw = pi.GetIpcSubscriber<string, int, object>("Penumbra.RedrawObjectByName");
-            _penumbraReverseResolvePath = pi.GetIpcSubscriber<string, string, string[]>("Penumbra.ReverseResolvePath");
+            _reverseResolvePlayer = pi.GetIpcSubscriber<string, string[]>("Penumbra.ReverseResolvePlayer");
             _penumbraApiVersion = pi.GetIpcSubscriber<(int, int)>("Penumbra.ApiVersions");
             _penumbraObjectIsRedrawn = pi.GetIpcSubscriber<IntPtr, int, object?>("Penumbra.GameObjectRedrawn");
             _penumbraGetMetaManipulations =
@@ -95,7 +95,7 @@ namespace MareSynchronos.Managers
         {
             try
             {
-                return _penumbraApiVersion.InvokeFunc() is { Item1: 4, Item2: >=8 };
+                return _penumbraApiVersion.InvokeFunc() is { Item1: 4, Item2: >=9 };
             }
             catch
             {
@@ -186,10 +186,10 @@ namespace MareSynchronos.Managers
             return resolvedPath;
         }
 
-        public string[] PenumbraReverseResolvePath(string path, string characterName)
+        public string[] PenumbraReverseResolvePlayer(string path)
         {
             if (!CheckPenumbraApi()) return new[] { path };
-            var resolvedPaths = _penumbraReverseResolvePath!.InvokeFunc(path, characterName);
+            var resolvedPaths = _reverseResolvePlayer!.InvokeFunc(path);
             if (resolvedPaths.Length == 0)
             {
                 resolvedPaths = new[] { path };
