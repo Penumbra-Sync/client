@@ -48,15 +48,19 @@ namespace MareSynchronos.Managers
 
         public string WatchedPenumbraDirectory => (_penumbraDirWatcher?.EnableRaisingEvents ?? false) ? _penumbraDirWatcher!.Path : "Not watched";
 
-        public FileCache Create(string file, CancellationToken token)
+        public FileCache? Create(string file, CancellationToken token)
         {
             FileInfo fileInfo = new(file);
-            while (IsFileLocked(fileInfo))
+            int attempt = 0;
+            while (IsFileLocked(fileInfo) && attempt++ <= 10)
             {
                 Thread.Sleep(1000);
-                Logger.Debug("Waiting for file release " + fileInfo.FullName);
+                Logger.Debug("Waiting for file release " + fileInfo.FullName + " attempt " + attempt);
                 token.ThrowIfCancellationRequested();
             }
+
+            if (attempt >= 10) return null;
+
             var sha1Hash = Crypto.GetFileHash(fileInfo.FullName);
             return new FileCache()
             {
@@ -205,8 +209,11 @@ namespace MareSynchronos.Managers
                     {
                         PluginLog.Verbose("Changed :" + item);
                         var fileCache = Create(item, _rescanTaskCancellationTokenSource.Token);
-                        db.RemoveRange(db.FileCaches.Where(f => f.Hash == fileCache.Hash));
-                        await db.AddAsync(fileCache, _rescanTaskCancellationTokenSource.Token);
+                        if (fileCache != null)
+                        {
+                            db.RemoveRange(db.FileCaches.Where(f => f.Hash == fileCache.Hash));
+                            await db.AddAsync(fileCache, _rescanTaskCancellationTokenSource.Token);
+                        }
                     }
                 }
 
@@ -265,8 +272,12 @@ namespace MareSynchronos.Managers
                     }
                     FileInfo fileInfo = new(cache.Filepath);
                     if (fileInfo.LastWriteTimeUtc.Ticks == long.Parse(cache.LastModifiedDate)) return;
-                    fileCachesToAdd.Add(Create(cache.Filepath, ct));
-                    fileCachesToDelete.Add(cache);
+                    var newCache = Create(cache.Filepath, ct);
+                    if (newCache != null)
+                    {
+                        fileCachesToAdd.Add(newCache);
+                        fileCachesToDelete.Add(cache);
+                    }
                 }
 
                 var files = CurrentFileProgress;
@@ -282,14 +293,18 @@ namespace MareSynchronos.Managers
                 MaxDegreeOfParallelism = _pluginConfiguration.MaxParallelScan,
                 CancellationToken = ct
             },
-            file =>
-            {
-                fileCachesToAdd.Add(Create(file.Key, ct));
+                file =>
+                {
+                    var newCache = Create(file.Key, ct);
+                    if (newCache != null)
+                    {
+                        fileCachesToAdd.Add(newCache);
+                    }
 
-                var files = CurrentFileProgress;
-                Interlocked.Increment(ref files);
-                CurrentFileProgress = files;
-            });
+                    var files = CurrentFileProgress;
+                    Interlocked.Increment(ref files);
+                    CurrentFileProgress = files;
+                });
 
             if (fileCachesToAdd.Any() || fileCachesToDelete.Any())
             {

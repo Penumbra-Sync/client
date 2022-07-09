@@ -7,6 +7,7 @@ using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Plugin;
+using Dalamud.Utility;
 using ImGuiNET;
 using MareSynchronos.Managers;
 using MareSynchronos.Utils;
@@ -26,6 +27,7 @@ namespace MareSynchronos.UI
         public long FileCacheSize => _fileCacheManager.FileCacheSize;
         public bool ShowClientSecret = true;
         public string PlayerName => _dalamudUtil.PlayerName;
+        public bool HasValidPenumbraModPath => !(_ipcManager.PenumbraModDirectory() ?? string.Empty).IsNullOrEmpty() && Directory.Exists(_ipcManager.PenumbraModDirectory());
         public bool EditTrackerPosition { get; set; }
         public ImFontPtr UidFont { get; private set; }
         public bool UidFontBuilt { get; private set; }
@@ -43,6 +45,19 @@ namespace MareSynchronos.UI
 
             _pluginInterface.UiBuilder.BuildFonts += BuildFont;
             _pluginInterface.UiBuilder.RebuildFonts();
+        }
+
+        public static float GetWindowContentRegionWidth()
+        {
+            return ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
+        }
+
+        public static Vector2 GetIconButtonSize(FontAwesomeIcon icon)
+        {
+            ImGui.PushFont(UiBuilder.IconFont);
+            var buttonSize = ImGuiHelpers.GetButtonSize(icon.ToIconString());
+            ImGui.PopFont();
+            return buttonSize;
         }
 
         private void BuildFont()
@@ -66,6 +81,21 @@ namespace MareSynchronos.UI
             else
             {
                 Logger.Debug($"Font doesn't exist. {fontFile}");
+            }
+        }
+
+        public static void DrawWithID(string id, Action drawSubSection)
+        {
+            ImGui.PushID(id);
+            drawSubSection.Invoke();
+            ImGui.PopID();
+        }
+
+        public static void AttachToolTip(string text)
+        {
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip(text);
             }
         }
 
@@ -210,6 +240,7 @@ namespace MareSynchronos.UI
         private string _customServerName = "";
         private string _customServerUri = "";
         private bool _enterSecretKey = false;
+        private bool _cacheDirectoryHasOtherFilesThanCache = false;
 
         public void DrawServiceSelection(Action? callBackOnExit = null, bool isIntroUi = false)
         {
@@ -348,21 +379,7 @@ namespace MareSynchronos.UI
         {
             ColorTextWrapped("Note: The cache folder should be somewhere close to root (i.e. C:\\MareCache) in a new empty folder. DO NOT point this to your game folder. DO NOT point this to your Penumbra folder.", ImGuiColors.DalamudYellow);
             var cacheDirectory = _pluginConfiguration.CacheFolder;
-            if (ImGui.InputText("Cache Folder##cache", ref cacheDirectory, 255))
-            {
-                _isPenumbraDirectory = cacheDirectory.ToLower() == _ipcManager.PenumbraModDirectory()?.ToLower();
-                _isDirectoryWritable = IsDirectoryWritable(cacheDirectory);
-
-                if (!string.IsNullOrEmpty(cacheDirectory)
-                    && Directory.Exists(cacheDirectory)
-                    && _isDirectoryWritable
-                    && !_isPenumbraDirectory)
-                {
-                    _pluginConfiguration.CacheFolder = cacheDirectory;
-                    _pluginConfiguration.Save();
-                    _fileCacheManager.StartWatchers();
-                }
-            }
+            ImGui.InputText("Cache Folder##cache", ref cacheDirectory, 255, ImGuiInputTextFlags.ReadOnly);
 
             ImGui.SameLine();
             ImGui.PushFont(UiBuilder.IconFont);
@@ -373,9 +390,15 @@ namespace MareSynchronos.UI
                 {
                     if (!success) return;
 
-                    _isDirectoryWritable = IsDirectoryWritable(path);
                     _isPenumbraDirectory = path.ToLower() == _ipcManager.PenumbraModDirectory()?.ToLower();
-                    if (_isDirectoryWritable && !_isPenumbraDirectory)
+                    _isDirectoryWritable = IsDirectoryWritable(path);
+                    _cacheDirectoryHasOtherFilesThanCache = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Any(f => new FileInfo(f).Name.Length != 40);
+
+                    if (!string.IsNullOrEmpty(path)
+                        && Directory.Exists(path)
+                        && _isDirectoryWritable
+                        && !_isPenumbraDirectory
+                        && !_cacheDirectoryHasOtherFilesThanCache)
                     {
                         _pluginConfiguration.CacheFolder = path;
                         _pluginConfiguration.Save();
@@ -392,9 +415,10 @@ namespace MareSynchronos.UI
             else if (!Directory.Exists(cacheDirectory) || !_isDirectoryWritable)
             {
                 ColorTextWrapped("The folder you selected does not exist or cannot be written to. Please provide a valid path.", ImGuiColors.DalamudRed);
+            } else if (_cacheDirectoryHasOtherFilesThanCache)
+            {
+                ColorTextWrapped("Your selected directory has files inside that are not Mare related. Use an empty directory or a previous Mare cache directory only.", ImGuiColors.DalamudRed);
             }
-
-
 
             int maxCacheSize = _pluginConfiguration.MaxLocalCacheInGiB;
             if (ImGui.SliderInt("Maximum Cache Size in GB", ref maxCacheSize, 1, 50, "%d GB"))

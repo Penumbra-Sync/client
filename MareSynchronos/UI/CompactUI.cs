@@ -19,10 +19,13 @@ namespace MareSynchronos.UI
     {
         private readonly ApiController _apiController;
         private readonly Configuration _configuration;
+        private readonly Dictionary<string, bool> _showUidForEntry = new();
         private readonly UiShared _uiShared;
         private readonly WindowSystem _windowSystem;
         private string _characterOrCommentFilter = string.Empty;
 
+        private string _editCharComment = string.Empty;
+        private string _editNickEntry = string.Empty;
         private string _pairToAdd = string.Empty;
 
         private float _transferPartHeight = 0;
@@ -55,42 +58,38 @@ namespace MareSynchronos.UI
             _windowSystem.RemoveWindow(this);
         }
 
+        public override void Draw()
+        {
+            _windowContentWidth = UiShared.GetWindowContentRegionWidth();
+            UiShared.DrawWithID("header", DrawUIDHeader);
+            ImGui.Separator();
+            if (_apiController.ServerState is not ServerState.Offline)
+            {
+                UiShared.DrawWithID("serverstatus", DrawServerStatus);
+            }
+
+            if (_apiController.ServerState is ServerState.Connected)
+            {
+                ImGui.Separator();
+                UiShared.DrawWithID("pairlist", DrawPairList);
+                ImGui.Separator();
+                UiShared.DrawWithID("transfers", DrawTransfers);
+                _transferPartHeight = ImGui.GetCursorPosY() - _transferPartHeight;
+            }
+        }
+
         public override void OnClose()
         {
             _editNickEntry = string.Empty;
             _editCharComment = string.Empty;
             base.OnClose();
         }
-
-        private Dictionary<string, bool> _showUidForEntry = new Dictionary<string, bool>();
-        private string _editNickEntry = string.Empty;
-
-        public override void Draw()
-        {
-            _windowContentWidth = ImGui.GetWindowContentRegionWidth();
-            DrawUIDHeader();
-            ImGui.Separator();
-            if (_apiController.ServerState is not ServerState.Offline)
-            {
-                DrawServerStatus();
-            }
-
-            if (_apiController.ServerState is ServerState.Connected)
-            {
-                ImGui.Separator();
-                DrawPairList();
-                ImGui.Separator();
-                DrawTransfers();
-                _transferPartHeight = ImGui.GetCursorPosY() - _transferPartHeight;
-            }
-        }
         private void DrawAddPair()
         {
-            ImGui.PushID("pairs");
-            var buttonSize = GetIconButtonSize(FontAwesomeIcon.Plus);
-            ImGui.SetNextItemWidth(ImGui.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonSize.X);
+            var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Plus);
+            ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonSize.X);
             ImGui.InputTextWithHint("##otheruid", "Other players UID", ref _pairToAdd, 10);
-            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + ImGui.GetWindowContentRegionWidth() - buttonSize.X);
+            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
             if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
             {
                 if (_apiController.PairedClients.All(w => w.OtherUID != _pairToAdd))
@@ -99,16 +98,14 @@ namespace MareSynchronos.UI
                     _pairToAdd = string.Empty;
                 }
             }
-            AttachToolTip("Pair with " + (_pairToAdd.IsNullOrEmpty() ? "other user" : _pairToAdd));
+            UiShared.AttachToolTip("Pair with " + (_pairToAdd.IsNullOrEmpty() ? "other user" : _pairToAdd));
 
             ImGuiHelpers.ScaledDummy(2);
-            ImGui.PopID();
         }
 
         private void DrawFilter()
         {
-            ImGui.PushID("filter");
-            var buttonSize = GetIconButtonSize(FontAwesomeIcon.ArrowUp);
+            var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.ArrowUp);
             if (!_configuration.ReverseUserSort)
             {
                 if (ImGuiComponents.IconButton(FontAwesomeIcon.ArrowDown))
@@ -116,7 +113,7 @@ namespace MareSynchronos.UI
                     _configuration.ReverseUserSort = true;
                     _configuration.Save();
                 }
-                AttachToolTip("Sort by newest additions first");
+                UiShared.AttachToolTip("Sort by newest additions first");
             }
             else
             {
@@ -125,24 +122,19 @@ namespace MareSynchronos.UI
                     _configuration.ReverseUserSort = false;
                     _configuration.Save();
                 }
-                AttachToolTip("Sort by oldest additions first");
+                UiShared.AttachToolTip("Sort by oldest additions first");
             }
             ImGui.SameLine();
             ImGui.SetNextItemWidth(_windowContentWidth - buttonSize.X - ImGui.GetStyle().ItemSpacing.X);
             ImGui.InputTextWithHint("##filter", "Filter for UID/notes", ref _characterOrCommentFilter, 255);
-            ImGui.PopID();
         }
-
-        private string _editCharComment = string.Empty;
 
         private void DrawPairedClient(ClientPairDto entry)
         {
-            ImGui.PushID(entry.OtherUID);
-
             var pauseIcon = entry.IsPaused ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
 
-            var buttonSize = GetIconButtonSize(pauseIcon);
-            var trashButtonSize = GetIconButtonSize(FontAwesomeIcon.Trash);
+            var buttonSize = UiShared.GetIconButtonSize(pauseIcon);
+            var trashButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Trash);
             var textSize = ImGui.CalcTextSize(entry.OtherUID);
             var originalY = ImGui.GetCursorPosY();
             var buttonSizes = buttonSize.Y + trashButtonSize.Y;
@@ -155,7 +147,7 @@ namespace MareSynchronos.UI
                 UiShared.ColorText(FontAwesomeIcon.ArrowUp.ToIconString(), ImGuiColors.DalamudRed);
                 ImGui.PopFont();
 
-                AttachToolTip(entry.OtherUID + " has not added you back");
+                UiShared.AttachToolTip(entry.OtherUID + " has not added you back");
             }
             else if (entry.IsPaused || entry.IsPausedFromOthers)
             {
@@ -163,7 +155,7 @@ namespace MareSynchronos.UI
                 UiShared.ColorText(FontAwesomeIcon.PauseCircle.ToIconString(), ImGuiColors.DalamudYellow);
                 ImGui.PopFont();
 
-                AttachToolTip("Pairing status with " + entry.OtherUID + " is paused");
+                UiShared.AttachToolTip("Pairing status with " + entry.OtherUID + " is paused");
             }
             else
             {
@@ -171,13 +163,12 @@ namespace MareSynchronos.UI
                 UiShared.ColorText(FontAwesomeIcon.Check.ToIconString(), ImGuiColors.ParsedGreen);
                 ImGui.PopFont();
 
-                AttachToolTip("You are paired with " + entry.OtherUID);
+                UiShared.AttachToolTip("You are paired with " + entry.OtherUID);
             }
 
-            bool textIsUid = true;
-            var playerText = entry.OtherUID;
-            _showUidForEntry.TryGetValue(entry.OtherUID, out bool showUidInsteadOfName);
-            if (!showUidInsteadOfName && _configuration.GetCurrentServerUidComments().TryGetValue(entry.OtherUID, out playerText))
+            var textIsUid = true;
+            _showUidForEntry.TryGetValue(entry.OtherUID, out var showUidInsteadOfName);
+            if (!showUidInsteadOfName && _configuration.GetCurrentServerUidComments().TryGetValue(entry.OtherUID, out var playerText))
             {
                 if (playerText.IsNullOrEmpty())
                 {
@@ -200,11 +191,11 @@ namespace MareSynchronos.UI
                 if (textIsUid) ImGui.PushFont(UiBuilder.MonoFont);
                 ImGui.TextUnformatted(playerText);
                 if (textIsUid) ImGui.PopFont();
-                AttachToolTip("Left click to switch between UID display and nick" + Environment.NewLine +
+                UiShared.AttachToolTip("Left click to switch between UID display and nick" + Environment.NewLine +
                               "Right click to change nick for " + entry.OtherUID);
                 if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
                 {
-                    bool prevState = textIsUid;
+                    var prevState = textIsUid;
                     if (_showUidForEntry.ContainsKey(entry.OtherUID))
                     {
                         prevState = _showUidForEntry[entry.OtherUID];
@@ -227,7 +218,7 @@ namespace MareSynchronos.UI
             {
                 ImGui.SetCursorPosY(originalY);
 
-                ImGui.SetNextItemWidth(ImGui.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * 2);
+                ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * 2);
                 if (ImGui.InputTextWithHint("", "Nick/Notes", ref _editCharComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
                 {
                     _configuration.SetCurrentServerUidComment(entry.OtherUID, _editCharComment);
@@ -239,10 +230,10 @@ namespace MareSynchronos.UI
                 {
                     _editNickEntry = string.Empty;
                 }
-                AttachToolTip("Hit ENTER to save\nRight click to cancel");
+                UiShared.AttachToolTip("Hit ENTER to save\nRight click to cancel");
             }
 
-            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + ImGui.GetWindowContentRegionWidth() - buttonSize.X);
+            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
             ImGui.SetCursorPosY(originalY);
             if (ImGuiComponents.IconButton(FontAwesomeIcon.Trash))
             {
@@ -252,51 +243,36 @@ namespace MareSynchronos.UI
                     _apiController.PairedClients.Remove(entry);
                 }
             }
-            AttachToolTip("Hold CTRL and click to unpair permanently from " + entry.OtherUID);
+            UiShared.AttachToolTip("Hold CTRL and click to unpair permanently from " + entry.OtherUID);
 
-            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + ImGui.GetWindowContentRegionWidth() - buttonSize.X - ImGui.GetStyle().ItemSpacing.X - trashButtonSize.X);
+            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X - ImGui.GetStyle().ItemSpacing.X - trashButtonSize.X);
             ImGui.SetCursorPosY(originalY);
             if (ImGuiComponents.IconButton(pauseIcon))
             {
                 _ = _apiController.SendPairedClientPauseChange(entry.OtherUID, !entry.IsPaused);
             }
-            AttachToolTip(entry.IsSynced
+            UiShared.AttachToolTip(entry.IsSynced
                 ? "Pause pairing with " + entry.OtherUID
                 : "Resume pairing with " + entry.OtherUID);
-
-
-            ImGui.PopID();
-        }
-
-        private void AttachToolTip(string text)
-        {
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.SetTooltip(text);
-            }
         }
 
         private void DrawPairList()
         {
-            ImGui.PushID("pairlist");
-            DrawAddPair();
-            DrawPairs();
+            UiShared.DrawWithID("addpair", DrawAddPair);
+            UiShared.DrawWithID("pairs", DrawPairs);
             _transferPartHeight = ImGui.GetCursorPosY();
-            DrawFilter();
-            ImGui.PopID();
+            UiShared.DrawWithID("filter", DrawFilter);
         }
 
         private void DrawPairs()
         {
-            ImGui.PushID("pairs");
-
             var ySize = _transferPartHeight == 0
                 ? 1
                 : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - _transferPartHeight - ImGui.GetCursorPosY();
             var users = _apiController.PairedClients.Where(p =>
             {
                 if (_characterOrCommentFilter.IsNullOrEmpty()) return true;
-                _configuration.GetCurrentServerUidComments().TryGetValue(p.OtherUID, out string? comment);
+                _configuration.GetCurrentServerUidComments().TryGetValue(p.OtherUID, out var comment);
                 return p.OtherUID.ToLower().Contains(_characterOrCommentFilter.ToLower()) ||
                        (comment?.ToLower().Contains(_characterOrCommentFilter.ToLower()) ?? false);
             });
@@ -306,19 +282,16 @@ namespace MareSynchronos.UI
             ImGui.BeginChild("list", new Vector2(_windowContentWidth, ySize), false);
             foreach (var entry in users.ToList())
             {
-                DrawPairedClient(entry);
+                UiShared.DrawWithID("client", () => DrawPairedClient(entry));
             }
             ImGui.EndChild();
-
-            ImGui.PopID();
         }
 
         private void DrawServerStatus()
         {
-            ImGui.PushID("serverstate");
             if (_apiController.ServerAlive)
             {
-                var buttonSize = GetIconButtonSize(FontAwesomeIcon.Link);
+                var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Link);
                 var textSize = ImGui.CalcTextSize(_apiController.SystemInfoDto.CpuUsage.ToString("0.00") + "%");
                 var originalY = ImGui.GetCursorPosY();
 
@@ -335,13 +308,13 @@ namespace MareSynchronos.UI
                 ImGui.SameLine();
                 ImGui.SetCursorPosY(textPos);
                 ImGui.Text("Load");
-                AttachToolTip("This is the current servers' CPU load");
+                UiShared.AttachToolTip("This is the current servers' CPU load");
 
-                ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + ImGui.GetWindowContentRegionWidth() - buttonSize.X);
+                ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
                 ImGui.SetCursorPosY(originalY);
                 var serverIsConnected = _apiController.ServerState is ServerState.Connected;
                 var color = UiShared.GetBoolColor(serverIsConnected);
-                FontAwesomeIcon connectedIcon = serverIsConnected ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
+                var connectedIcon = serverIsConnected ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
 
                 ImGui.PushStyleColor(ImGuiCol.Text, color);
                 if (ImGuiComponents.IconButton(connectedIcon))
@@ -359,18 +332,16 @@ namespace MareSynchronos.UI
                     _ = _apiController.CreateConnections();
                 }
                 ImGui.PopStyleColor();
-                AttachToolTip(_apiController.IsConnected ? "Disconnect from " + _apiController.ServerDictionary[_configuration.ApiUri] : "Connect to " + _apiController.ServerDictionary[_configuration.ApiUri]);
+                UiShared.AttachToolTip(_apiController.IsConnected ? "Disconnect from " + _apiController.ServerDictionary[_configuration.ApiUri] : "Connect to " + _apiController.ServerDictionary[_configuration.ApiUri]);
             }
             else
             {
                 UiShared.ColorTextWrapped("Server is offline", ImGuiColors.DalamudRed);
             }
-            ImGui.PopID();
         }
 
         private void DrawTransfers()
         {
-            ImGui.PushID("transfers");
             var currentUploads = _apiController.CurrentUploads.ToList();
             ImGui.PushFont(UiBuilder.IconFont);
             ImGui.Text(FontAwesomeIcon.Upload.ToIconString());
@@ -422,12 +393,10 @@ namespace MareSynchronos.UI
             }
 
             ImGui.SameLine();
-            ImGui.PopID();
         }
 
         private void DrawUIDHeader()
         {
-            ImGui.PushID("header");
             var uidText = GetUidText();
             var buttonSizeX = 0f;
 
@@ -437,28 +406,28 @@ namespace MareSynchronos.UI
 
             var originalPos = ImGui.GetCursorPos();
             ImGui.SetWindowFontScale(1.5f);
-            var buttonSize = GetIconButtonSize(FontAwesomeIcon.Cog);
+            var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Cog);
             buttonSizeX -= buttonSize.X - ImGui.GetStyle().ItemSpacing.X * 2;
-            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + ImGui.GetWindowContentRegionWidth() - buttonSize.X);
+            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
             ImGui.SetCursorPosY(originalPos.Y + uidTextSize.Y / 2 - buttonSize.Y / 2);
             if (ImGuiComponents.IconButton(FontAwesomeIcon.Cog))
             {
                 OpenSettingsUi?.Invoke();
             }
-            AttachToolTip("Open the Mare Synchronos Settings");
-            
+            UiShared.AttachToolTip("Open the Mare Synchronos Settings");
+
             ImGui.SameLine(); //Important to draw the uidText consistently
             ImGui.SetCursorPos(originalPos);
-            
+
             if (_apiController.ServerState is ServerState.Connected)
             {
-                buttonSizeX += GetIconButtonSize(FontAwesomeIcon.Copy).X - ImGui.GetStyle().ItemSpacing.X * 2;
+                buttonSizeX += UiShared.GetIconButtonSize(FontAwesomeIcon.Copy).X - ImGui.GetStyle().ItemSpacing.X * 2;
                 ImGui.SetCursorPosY(originalPos.Y + uidTextSize.Y / 2 - buttonSize.Y / 2);
                 if (ImGuiComponents.IconButton(FontAwesomeIcon.Copy))
                 {
                     ImGui.SetClipboardText(_apiController.UID);
                 }
-                AttachToolTip("Copy your UID to clipboard");
+                UiShared.AttachToolTip("Copy your UID to clipboard");
                 ImGui.SameLine();
             }
             ImGui.SetWindowFontScale(1f);
@@ -473,17 +442,9 @@ namespace MareSynchronos.UI
             {
                 UiShared.ColorTextWrapped(GetServerError(), GetUidColor());
             }
-
-            ImGui.PopID();
         }
 
-        private Vector2 GetIconButtonSize(FontAwesomeIcon icon)
-        {
-            ImGui.PushFont(UiBuilder.IconFont);
-            var buttonSize = ImGuiHelpers.GetButtonSize(icon.ToIconString());
-            ImGui.PopFont();
-            return buttonSize;
-        }
+
         private string GetServerError()
         {
             return _apiController.ServerState switch
