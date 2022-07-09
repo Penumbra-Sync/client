@@ -95,7 +95,7 @@ namespace MareSynchronos.Managers
         {
             try
             {
-                return _penumbraApiVersion.InvokeFunc() is { Item1: 4, Item2: >=9 };
+                return _penumbraApiVersion.InvokeFunc() is { Item1: 4, Item2: >=10 };
             }
             catch
             {
