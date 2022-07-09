@@ -28,7 +28,7 @@ namespace MareSynchronos.Managers
         private readonly ICallGateSubscriber<string, int, object>? _penumbraRedraw;
         private readonly ICallGateSubscriber<string, int> _penumbraRemoveTemporaryCollection;
         private readonly ICallGateSubscriber<string>? _penumbraResolveModDir;
-        private readonly ICallGateSubscriber<string, string, string>? _penumbraResolvePath;
+        private readonly ICallGateSubscriber<string, string>? _penumbraResolvePlayer;
         private readonly ICallGateSubscriber<string, string[]>? _reverseResolvePlayer;
         private readonly ICallGateSubscriber<string, string, Dictionary<string, string>, string, int, int>
             _penumbraSetTemporaryMod;
@@ -38,10 +38,10 @@ namespace MareSynchronos.Managers
 
             _penumbraInit = pi.GetIpcSubscriber<object>("Penumbra.Initialized");
             _penumbraDispose = pi.GetIpcSubscriber<object>("Penumbra.Disposed");
-            _penumbraResolvePath = pi.GetIpcSubscriber<string, string, string>("Penumbra.ResolveCharacterPath");
+            _penumbraResolvePlayer = pi.GetIpcSubscriber<string, string>("Penumbra.ResolvePlayerPath");
             _penumbraResolveModDir = pi.GetIpcSubscriber<string>("Penumbra.GetModDirectory");
             _penumbraRedraw = pi.GetIpcSubscriber<string, int, object>("Penumbra.RedrawObjectByName");
-            _reverseResolvePlayer = pi.GetIpcSubscriber<string, string[]>("Penumbra.ReverseResolvePlayer");
+            _reverseResolvePlayer = pi.GetIpcSubscriber<string, string[]>("Penumbra.ReverseResolvePlayerPath");
             _penumbraApiVersion = pi.GetIpcSubscriber<(int, int)>("Penumbra.ApiVersions");
             _penumbraObjectIsRedrawn = pi.GetIpcSubscriber<IntPtr, int, object?>("Penumbra.GameObjectRedrawn");
             _penumbraGetMetaManipulations =
@@ -181,7 +181,7 @@ namespace MareSynchronos.Managers
         public string? PenumbraResolvePath(string path, string characterName)
         {
             if (!CheckPenumbraApi()) return null;
-            var resolvedPath = _penumbraResolvePath!.InvokeFunc(path, characterName);
+            var resolvedPath = _penumbraResolvePlayer!.InvokeFunc(path);
             Logger.Verbose("Resolved " + path + "=>" + string.Join(", ", resolvedPath));
             return resolvedPath;
         }
