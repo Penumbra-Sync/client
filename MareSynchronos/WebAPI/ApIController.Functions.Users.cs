@@ -18,14 +18,18 @@ namespace MareSynchronos.WebAPI
             await CreateConnections();
         }
 
-        public async Task Register()
+        public async Task Register(bool isIntroUi = false)
         {
             if (!ServerAlive) return;
             Logger.Debug("Registering at service " + ApiUri);
             var response = await _userHub!.InvokeAsync<string>(UserHubAPI.InvokeRegister);
             _pluginConfiguration.ClientSecret[ApiUri] = response;
             _pluginConfiguration.Save();
-            RegisterFinalized?.Invoke();
+            if (!isIntroUi)
+            {
+                RegisterFinalized?.Invoke();
+            }
+
             await CreateConnections();
         }
 

@@ -176,7 +176,7 @@ namespace MareSynchronos.UI
                                          "Make a backup of your secret key. In case of loss, it cannot be restored. The secret key is your identification to the service " +
                                          "to verify who you are. It is directly tied to the UID you will be receiving. In case of loss, you will have to re-register an account.", ImGuiColors.DalamudRed);
                     UiShared.ColorTextWrapped("Do not ever, under any circumstances, share your secret key to anyone! Likewise do not share your Mare Synchronos plugin configuration to anyone!", ImGuiColors.DalamudRed);
-                    _uiShared.DrawServiceSelection(() => SwitchToMainUi?.Invoke(), true);
+                    _uiShared.DrawServiceSelection(new Action(() => { }), true);
                 }
             }
         }

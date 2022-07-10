@@ -91,7 +91,7 @@ namespace MareSynchronos.Managers
 
         public void StartWatchers()
         {
-            if (!_ipcManager.Initialized || !_pluginConfiguration.HasValidSetup()) return;
+            if (!_ipcManager.Initialized || string.IsNullOrEmpty(_pluginConfiguration.CacheFolder)) return;
             Logger.Verbose("Starting File System Watchers");
             _penumbraDirWatcher?.Dispose();
             _cacheDirWatcher?.Dispose();

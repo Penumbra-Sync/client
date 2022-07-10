@@ -318,7 +318,7 @@ namespace MareSynchronos.UI
                     {
                         _pluginConfiguration.FullPause = false;
                         _pluginConfiguration.Save();
-                        Task.Run(_apiController.Register);
+                        Task.Run(() => _apiController.Register(isIntroUi));
                         ShowClientSecret = true;
                         callBackOnExit?.Invoke();
                     }
@@ -345,7 +345,7 @@ namespace MareSynchronos.UI
 
             if (_enterSecretKey)
             {
-                ColorTextWrapped("This will overwrite your currently used secret key for the selected service. Make sure to have a backup for the current secret key if you want to switch back to this acocunt.", ImGuiColors.DalamudYellow);
+                ColorTextWrapped("This will overwrite your currently used secret key for the selected service. Make sure to have a backup for the current secret key if you want to switch back to this account.", ImGuiColors.DalamudYellow);
                 ImGui.SetNextItemWidth(400);
                 ImGui.InputText("Enter Secret Key", ref _secretKey, 255);
                 ImGui.SameLine();
