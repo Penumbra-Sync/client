@@ -98,7 +98,7 @@ namespace MareSynchronos.UI
 
                 if (ImGui.Button("I agree##toSetup"))
                 {
-                    if (ImGui.GetIO().KeyCtrl)
+                    if (UiShared.CtrlPressed())
                     {
                         _pluginConfiguration.AcceptedAgreement = true;
                         _pluginConfiguration.Save();

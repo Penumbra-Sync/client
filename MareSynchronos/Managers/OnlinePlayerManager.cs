@@ -189,7 +189,6 @@ public class OnlinePlayerManager : IDisposable
         var playerCharacters = _dalamudUtil.GetPlayerCharacters();
         foreach (var pChar in playerCharacters)
         {
-            var pObjName = pChar.Name.ToString();
             var hashedName = Crypto.GetHash256(pChar);
             var existingCachedPlayer = _onlineCachedPlayers.SingleOrDefault(p => p.PlayerNameHash == hashedName && !string.IsNullOrEmpty(p.PlayerName));
             if (existingCachedPlayer != null)

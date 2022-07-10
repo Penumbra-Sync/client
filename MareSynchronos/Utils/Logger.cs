@@ -29,7 +29,11 @@ namespace MareSynchronos.Utils
         public static void Verbose(string verbose)
         {
             var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
+#if DEBUG
+            PluginLog.Debug($"[{caller}] {verbose}");
+#else
             PluginLog.Verbose($"[{caller}] {verbose}");
+#endif
         }
     }
 }

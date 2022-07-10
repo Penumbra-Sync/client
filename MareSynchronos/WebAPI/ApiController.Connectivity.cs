@@ -259,6 +259,7 @@ namespace MareSynchronos.WebAPI
             _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
 
             Task.Run(async () => await StopAllConnections(_connectionCancellationTokenSource.Token));
+            _connectionCancellationTokenSource?.Cancel();
         }
 
         private HubConnection BuildHubConnection(string hubName)

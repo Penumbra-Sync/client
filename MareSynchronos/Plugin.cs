@@ -126,7 +126,7 @@ namespace MareSynchronos
             _ipcManager?.Dispose();
             _playerManager?.Dispose();
             _characterCacheManager?.Dispose();
-            PluginLog.Information("Shut down");
+            Logger.Debug("Shut down");
         }
 
 

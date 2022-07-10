@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
@@ -17,6 +18,9 @@ namespace MareSynchronos.UI
 {
     public class UiShared : IDisposable
     {
+        [DllImport("user32")]
+        public static extern short GetKeyState(int nVirtKey);
+
         private readonly IpcManager _ipcManager;
         private readonly ApiController _apiController;
         private readonly FileCacheManager _fileCacheManager;
@@ -31,6 +35,8 @@ namespace MareSynchronos.UI
         public bool EditTrackerPosition { get; set; }
         public ImFontPtr UidFont { get; private set; }
         public bool UidFontBuilt { get; private set; }
+
+        public static bool CtrlPressed() => (GetKeyState(0xA2) & 0x8000) != 0 || (GetKeyState(0xA3) & 0x8000) != 0;
 
         public UiShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, FileDialogManager fileDialogManager, Configuration pluginConfiguration, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface)
         {
@@ -304,7 +310,7 @@ namespace MareSynchronos.UI
 
             PrintServerState(isIntroUi);
 
-            if (_apiController.ServerAlive && !_pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri))
+            if (_apiController.ServerAlive && (!_pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri) || _pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri].IsNullOrEmpty()))
             {
                 if (!_enterSecretKey)
                 {
@@ -339,6 +345,7 @@ namespace MareSynchronos.UI
 
             if (_enterSecretKey)
             {
+                ColorTextWrapped("This will overwrite your currently used secret key for the selected service. Make sure to have a backup for the current secret key if you want to switch back to this acocunt.", ImGuiColors.DalamudYellow);
                 ImGui.SetNextItemWidth(400);
                 ImGui.InputText("Enter Secret Key", ref _secretKey, 255);
                 ImGui.SameLine();
@@ -415,7 +422,8 @@ namespace MareSynchronos.UI
             else if (!Directory.Exists(cacheDirectory) || !_isDirectoryWritable)
             {
                 ColorTextWrapped("The folder you selected does not exist or cannot be written to. Please provide a valid path.", ImGuiColors.DalamudRed);
-            } else if (_cacheDirectoryHasOtherFilesThanCache)
+            }
+            else if (_cacheDirectoryHasOtherFilesThanCache)
             {
                 ColorTextWrapped("Your selected directory has files inside that are not Mare related. Use an empty directory or a previous Mare cache directory only.", ImGuiColors.DalamudRed);
             }

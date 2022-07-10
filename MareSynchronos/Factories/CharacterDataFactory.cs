@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
-using Dalamud.Logging;
 using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
@@ -71,7 +70,7 @@ public class CharacterDataFactory
             Logger.Warn("Could not get model data for " + objectKind);
             return;
         }
-        PluginLog.Verbose("Adding File Replacement for Model " + mdlPath);
+        Logger.Verbose("Adding File Replacement for Model " + mdlPath);
 
         FileReplacement mdlFileReplacement = CreateFileReplacement(mdlPath);
         DebugPrint(mdlFileReplacement, objectKind, "Model", inheritanceLevel);
@@ -101,7 +100,7 @@ public class CharacterDataFactory
             return;
         }
 
-        PluginLog.Verbose("Adding File Replacement for Material " + fileName);
+        Logger.Verbose("Adding File Replacement for Material " + fileName);
         var mtrlPath = fileName.Split("|")[2];
 
         var mtrlFileReplacement = CreateFileReplacement(mtrlPath);
@@ -124,7 +123,7 @@ public class CharacterDataFactory
     {
         if (texPath.IsNullOrEmpty()) return;
 
-        PluginLog.Verbose("Adding File Replacement for Texture " + texPath);
+        Logger.Verbose("Adding File Replacement for Texture " + texPath);
 
         var texFileReplacement = CreateFileReplacement(texPath, doNotReverseResolve);
         DebugPrint(texFileReplacement, objectKind, "Texture", inheritanceLevel);

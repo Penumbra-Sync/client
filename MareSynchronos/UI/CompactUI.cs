@@ -237,7 +237,7 @@ namespace MareSynchronos.UI
             ImGui.SetCursorPosY(originalY);
             if (ImGuiComponents.IconButton(FontAwesomeIcon.Trash))
             {
-                if (ImGui.GetIO().KeyCtrl)
+                if (UiShared.CtrlPressed())
                 {
                     _ = _apiController.SendPairedClientRemoval(entry.OtherUID);
                     _apiController.PairedClients.Remove(entry);
