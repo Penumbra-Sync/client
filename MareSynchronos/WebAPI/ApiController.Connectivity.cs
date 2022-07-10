@@ -162,7 +162,7 @@ namespace MareSynchronos.WebAPI
             var token = _connectionCancellationTokenSource.Token;
             while (ServerState is not ServerState.Connected && !token.IsCancellationRequested)
             {
-                await StopAllConnections(_connectionCancellationTokenSource.Token);
+                await StopAllConnections(token);
 
                 try
                 {
@@ -195,7 +195,7 @@ namespace MareSynchronos.WebAPI
                     }
 
                     _connectionDto =
-                        await _connectionHub.InvokeAsync<ConnectionDto>(ConnectionHubAPI.InvokeHeartbeat, token);
+                        await _connectionHub.InvokeAsync<ConnectionDto>(ConnectionHubAPI.InvokeHeartbeat, _dalamudUtil.PlayerNameHashed, token);
                     if (ServerState is ServerState.Connected) // user is authorized && server is legit
                     {
                         Logger.Debug("Initializing data");
@@ -269,7 +269,6 @@ namespace MareSynchronos.WebAPI
                     if (!string.IsNullOrEmpty(SecretKey) && !_pluginConfiguration.FullPause)
                     {
                         options.Headers.Add("Authorization", SecretKey);
-                        options.Headers.Add("CharacterNameHash", _dalamudUtil.PlayerNameHashed);
                     }
 
                     options.Transports = HttpTransportType.WebSockets;

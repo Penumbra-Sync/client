@@ -111,7 +111,7 @@ namespace MareSynchronos.Utils
             Thread.Sleep(500);
         }
 
-        public void WaitWhileSelfIsDrawing(CancellationToken token) => WaitWhileCharacterIsDrawing(_clientState.LocalPlayer?.Address ?? new IntPtr(), token);
+        public void WaitWhileSelfIsDrawing(CancellationToken? token) => WaitWhileCharacterIsDrawing(_clientState.LocalPlayer?.Address ?? new IntPtr(), token);
 
         public void Dispose()
         {

@@ -32,7 +32,7 @@ namespace MareSynchronos.WebAPI
             await _fileHub!.SendAsync(FilesHubAPI.SendDeleteAllFiles);
         }
 
-        public async Task<string> DownloadFile(string hash, CancellationToken ct)
+        private async Task<string> DownloadFile(string hash, CancellationToken ct)
         {
             var reader = _fileHub!.StreamAsync<byte[]>(FilesHubAPI.StreamDownloadFileAsync, hash, ct);
             string fileName = Path.GetTempFileName();

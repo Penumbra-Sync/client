@@ -166,6 +166,7 @@ public class CachedPlayer
 
     private void ApplyCharacterData(CharacterCacheDto cache, Dictionary<string, string> moddedPaths)
     {
+        if (PlayerCharacter is null) return;
         _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName!);
         var tempCollection = _ipcManager.PenumbraCreateTemporaryCollection(PlayerName!);
         _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerCharacter!.Address);

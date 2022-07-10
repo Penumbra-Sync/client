@@ -282,7 +282,7 @@ namespace MareSynchronos.UI
             ImGui.BeginChild("list", new Vector2(_windowContentWidth, ySize), false);
             foreach (var entry in users.ToList())
             {
-                UiShared.DrawWithID("client", () => DrawPairedClient(entry));
+                UiShared.DrawWithID(entry.OtherUID, () => DrawPairedClient(entry));
             }
             ImGui.EndChild();
         }
