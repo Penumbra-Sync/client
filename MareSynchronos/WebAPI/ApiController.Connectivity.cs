@@ -246,7 +246,7 @@ namespace MareSynchronos.WebAPI
                     Logger.Warn(ex.StackTrace ?? string.Empty);
                     Logger.Debug("Failed to establish connection, retrying");
                     await StopAllConnections(token);
-                    await Task.Delay(TimeSpan.FromSeconds(5), token);
+                    await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token);
                 }
             }
         }
