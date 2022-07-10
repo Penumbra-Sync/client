@@ -96,7 +96,7 @@ namespace MareSynchronos.WebAPI
 
         public event SimpleStringDelegate? UnpairedFromOther;
 
-        public List<FileTransfer> CurrentDownloads { get; } = new();
+        public Dictionary<int, List<DownloadFileTransfer>> CurrentDownloads { get; } = new();
 
         public List<FileTransfer> CurrentUploads { get; } = new();
 

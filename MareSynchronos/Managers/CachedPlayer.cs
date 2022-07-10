@@ -107,18 +107,20 @@ public class CachedPlayer
         _downloadCancellationTokenSource?.Cancel();
         _downloadCancellationTokenSource = new CancellationTokenSource();
         var downloadToken = _downloadCancellationTokenSource.Token;
-
+        var downloadId = _apiController.GetDownloadId();
         Task.Run(async () =>
         {
             List<FileReplacementDto> toDownloadReplacements;
 
             Dictionary<string, string> moddedPaths;
-            while ((toDownloadReplacements = TryCalculateModdedDictionary(_cache[_lastAppliedEquipmentHash], out moddedPaths)).Count > 0)
+            int attempts = 0;
+            while ((toDownloadReplacements = TryCalculateModdedDictionary(_cache[_lastAppliedEquipmentHash], out moddedPaths)).Count > 0 && attempts++ <= 10)
             {
                 Logger.Debug("Downloading missing files for player " + PlayerName);
-                await _apiController.DownloadFiles(toDownloadReplacements, downloadToken);
+                await _apiController.DownloadFiles(downloadId, toDownloadReplacements, downloadToken);
                 if (downloadToken.IsCancellationRequested)
                 {
+                    Logger.Verbose("Detected cancellation");
                     return;
                 }
 
@@ -129,7 +131,13 @@ public class CachedPlayer
             }
 
             ApplyCharacterData(_cache[_lastAppliedEquipmentHash], moddedPaths);
-        }, downloadToken);
+        }, downloadToken).ContinueWith(task =>
+        {
+            if (!task.IsCanceled) return;
+
+            Logger.Debug("Download Task was cancelled");
+            _apiController.CancelDownload(downloadId);
+        });
     }
 
     private List<FileReplacementDto> TryCalculateModdedDictionary(CharacterCacheDto cache,

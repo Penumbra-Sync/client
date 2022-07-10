@@ -518,7 +518,7 @@ namespace MareSynchronos.UI
             {
                 ImGui.TableSetupColumn(
                     $"Uploads ({UiShared.ByteToString(_apiController.CurrentUploads.Sum(a => a.Transferred))} / {UiShared.ByteToString(_apiController.CurrentUploads.Sum(a => a.Total))})");
-                ImGui.TableSetupColumn($"Downloads ({UiShared.ByteToString(_apiController.CurrentDownloads.Sum(a => a.Transferred))} / {UiShared.ByteToString(_apiController.CurrentDownloads.Sum(a => a.Total))})");
+                ImGui.TableSetupColumn($"Downloads ({UiShared.ByteToString(_apiController.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Transferred))} / {UiShared.ByteToString(_apiController.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Total))})");
 
                 ImGui.TableHeadersRow();
 
@@ -553,7 +553,7 @@ namespace MareSynchronos.UI
                     ImGui.TableSetupColumn("Downloaded");
                     ImGui.TableSetupColumn("Size");
                     ImGui.TableHeadersRow();
-                    foreach (var transfer in _apiController.CurrentDownloads.ToArray())
+                    foreach (var transfer in _apiController.CurrentDownloads.SelectMany(k => k.Value).ToArray())
                     {
                         var color = UiShared.UploadColor((transfer.Transferred, transfer.Total));
                         ImGui.PushStyleColor(ImGuiCol.Text, color);

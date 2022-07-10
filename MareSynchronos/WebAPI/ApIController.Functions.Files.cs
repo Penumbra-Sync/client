@@ -16,6 +16,7 @@ namespace MareSynchronos.WebAPI
 {
     public partial class ApiController
     {
+        private int _downloadId = 0;
         public void CancelUpload()
         {
             if (_uploadCancellationTokenSource != null)
@@ -32,7 +33,7 @@ namespace MareSynchronos.WebAPI
             await _fileHub!.SendAsync(FilesHubAPI.SendDeleteAllFiles);
         }
 
-        private async Task<string> DownloadFile(string hash, CancellationToken ct)
+        private async Task<string> DownloadFile(int downloadId, string hash, CancellationToken ct)
         {
             var reader = _fileHub!.StreamAsync<byte[]>(FilesHubAPI.StreamDownloadFileAsync, hash, ct);
             string fileName = Path.GetTempFileName();
@@ -40,51 +41,44 @@ namespace MareSynchronos.WebAPI
             await foreach (var data in reader.WithCancellation(ct))
             {
                 //Logger.Debug("Getting chunk of " + hash);
-                CurrentDownloads.Single(f => f.Hash == hash).Transferred += data.Length;
+                CurrentDownloads[downloadId].Single(f => f.Hash == hash).Transferred += data.Length;
                 await fs.WriteAsync(data, ct);
             }
             return fileName;
         }
 
-        public async Task DownloadFiles(List<FileReplacementDto> fileReplacementDto, CancellationToken ct)
+        public int GetDownloadId() => _downloadId++;
+
+        public async Task DownloadFiles(int currentDownloadId, List<FileReplacementDto> fileReplacementDto, CancellationToken ct)
         {
-            Logger.Debug("Downloading files");
-            List<FileTransfer> fileTransferList = new List<FileTransfer>();
-            List<DownloadFileDto> downloadFiles = new List<DownloadFileDto>();
+            Logger.Debug("Downloading files (Download ID " + currentDownloadId + ")");
+
+            List<DownloadFileDto> downloadFileInfoFromService = new List<DownloadFileDto>();
             foreach (var file in fileReplacementDto)
             {
-                downloadFiles.Add(await _fileHub!.InvokeAsync<DownloadFileDto>(FilesHubAPI.InvokeGetFileSize, file.Hash, ct));
+                downloadFileInfoFromService.Add(await _fileHub!.InvokeAsync<DownloadFileDto>(FilesHubAPI.InvokeGetFileSize, file.Hash, ct));
             }
 
-            downloadFiles = downloadFiles.Distinct().ToList();
+            CurrentDownloads[currentDownloadId] = downloadFileInfoFromService.Distinct().Select(d => new DownloadFileTransfer(d))
+                .Where(d => d.CanBeTransferred).ToList();
 
-            foreach (var dto in downloadFiles)
+            foreach (var dto in downloadFileInfoFromService.Where(c => c.IsForbidden))
             {
-                var downloadFileTransfer = new DownloadFileTransfer(dto);
-                if (CurrentDownloads.All(f => f.Hash != downloadFileTransfer.Hash))
+                if (ForbiddenTransfers.All(f => f.Hash != dto.Hash))
                 {
-                    CurrentDownloads.Add(downloadFileTransfer);
-                }
-
-                fileTransferList.Add(downloadFileTransfer);
-            }
-
-            foreach (var file in CurrentDownloads.Where(c => c.IsForbidden))
-            {
-                if (ForbiddenTransfers.All(f => f.Hash != file.Hash))
-                {
-                    ForbiddenTransfers.Add(file);
+                    ForbiddenTransfers.Add(new DownloadFileTransfer(dto));
                 }
             }
 
-            foreach (var file in fileTransferList.Where(f => f.CanBeTransferred))
+            foreach (var file in CurrentDownloads[currentDownloadId].Where(f => f.CanBeTransferred))
             {
                 var hash = file.Hash;
-                var tempFile = await DownloadFile(hash, ct);
+                var tempFile = await DownloadFile(currentDownloadId, hash, ct);
                 if (ct.IsCancellationRequested)
                 {
                     File.Delete(tempFile);
-                    CurrentDownloads.RemoveAll(d => fileReplacementDto.Any(f => f.Hash == d.Hash));
+                    Logger.Verbose("Detected cancellation, removing " + currentDownloadId);
+                    CurrentDownloads.Remove(currentDownloadId);
                     break;
                 }
 
@@ -112,18 +106,16 @@ namespace MareSynchronos.WebAPI
             {
                 await using (var db = new FileCacheContext())
                 {
-                    allFilesInDb = fileTransferList.Where(c => c.CanBeTransferred).All(h => db.FileCaches.Any(f => f.Hash == h.Hash));
+                    allFilesInDb = CurrentDownloads[currentDownloadId]
+                        .Where(c => c.CanBeTransferred)
+                        .All(h => db.FileCaches.Any(f => f.Hash == h.Hash));
                 }
 
                 await Task.Delay(250, ct);
             }
 
-            if (ct.IsCancellationRequested)
-            {
-                CurrentDownloads.RemoveAll(d => fileReplacementDto.Any(f => f.Hash == d.Hash));
-            }
-
-            CurrentDownloads.RemoveAll(d => d.Transferred == d.Total || !d.CanBeTransferred);
+            Logger.Verbose("Download complete, removing " + currentDownloadId);
+            CurrentDownloads.Remove(currentDownloadId);
         }
 
         public async Task PushCharacterData(CharacterCacheDto character, List<string> visibleCharacterIds)
@@ -243,6 +235,11 @@ namespace MareSynchronos.WebAPI
             }
 
             await _fileHub!.SendAsync(FilesHubAPI.SendUploadFileStreamAsync, fileHash, AsyncFileData(uploadToken), uploadToken);
+        }
+
+        public void CancelDownload(int downloadId)
+        {
+            CurrentDownloads.Remove(downloadId);
         }
     }
 

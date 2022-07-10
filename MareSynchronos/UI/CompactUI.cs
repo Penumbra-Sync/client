@@ -367,7 +367,7 @@ namespace MareSynchronos.UI
                 ImGui.Text("No uploads in progress");
             }
 
-            var currentDownloads = _apiController.CurrentDownloads.ToList();
+            var currentDownloads = _apiController.CurrentDownloads.SelectMany(k => k.Value).ToList();
             ImGui.PushFont(UiBuilder.IconFont);
             ImGui.Text(FontAwesomeIcon.Download.ToIconString());
             ImGui.PopFont();
