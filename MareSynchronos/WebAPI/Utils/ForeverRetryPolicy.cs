@@ -7,6 +7,6 @@ public class ForeverRetryPolicy : IRetryPolicy
 {
     public TimeSpan? NextRetryDelay(RetryContext retryContext)
     {
-        return TimeSpan.FromSeconds(5);
+        return TimeSpan.FromSeconds(new Random().Next(5, 20));
     }
 }

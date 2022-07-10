@@ -288,12 +288,12 @@ namespace MareSynchronos.WebAPI
             return Task.CompletedTask;
         }
 
-        private Task ConnectionHubOnReconnected(string? arg)
+        private async Task ConnectionHubOnReconnected(string? arg)
         {
             Logger.Debug("Connection restored");
+            await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 10)));
             _connectionDto = _connectionHub!.InvokeAsync<ConnectionDto>(ConnectionHubAPI.InvokeHeartbeat, _dalamudUtil.PlayerNameHashed).Result;
             Connected?.Invoke();
-            return Task.CompletedTask;
         }
 
         private Task ConnectionHubOnReconnecting(Exception? arg)
