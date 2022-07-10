@@ -152,7 +152,7 @@ public class CharacterDataFactory
         var cache = new CharacterData
         {
             GlamourerString = _ipcManager.GlamourerGetCharacterCustomization(_dalamudUtil.PlayerCharacter),
-            ManipulationString = _ipcManager.PenumbraGetMetaManipulations(_dalamudUtil.PlayerName)
+            ManipulationString = _ipcManager.PenumbraGetMetaManipulations()
         };
 
         var human = (Human*)((Character*)_dalamudUtil.PlayerPointer)->GameObject.GetDrawObject();

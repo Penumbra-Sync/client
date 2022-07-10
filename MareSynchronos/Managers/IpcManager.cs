@@ -21,7 +21,7 @@ namespace MareSynchronos.Managers
         private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyOnlyCustomization;
         private readonly ICallGateSubscriber<(int, int)> _penumbraApiVersion;
         private readonly ICallGateSubscriber<string, string, bool, (int, string)> _penumbraCreateTemporaryCollection;
-        private readonly ICallGateSubscriber<string, string> _penumbraGetMetaManipulations;
+        private readonly ICallGateSubscriber<string> _penumbraGetMetaManipulations;
         private readonly ICallGateSubscriber<object> _penumbraInit;
         private readonly ICallGateSubscriber<object> _penumbraDispose;
         private readonly ICallGateSubscriber<IntPtr, int, object?> _penumbraObjectIsRedrawn;
@@ -45,7 +45,7 @@ namespace MareSynchronos.Managers
             _penumbraApiVersion = pi.GetIpcSubscriber<(int, int)>("Penumbra.ApiVersions");
             _penumbraObjectIsRedrawn = pi.GetIpcSubscriber<IntPtr, int, object?>("Penumbra.GameObjectRedrawn");
             _penumbraGetMetaManipulations =
-                pi.GetIpcSubscriber<string, string>("Penumbra.GetMetaManipulations");
+                pi.GetIpcSubscriber<string>("Penumbra.GetPlayerMetaManipulations");
 
             _glamourerApiVersion = pi.GetIpcSubscriber<int>("Glamourer.ApiVersion");
             _glamourerGetAllCustomization = pi.GetIpcSubscriber<GameObject?, string>("Glamourer.GetAllCustomizationFromCharacter");
@@ -95,7 +95,7 @@ namespace MareSynchronos.Managers
         {
             try
             {
-                return _penumbraApiVersion.InvokeFunc() is { Item1: 4, Item2: >=10 };
+                return _penumbraApiVersion.InvokeFunc() is { Item1: 4, Item2: >=11 };
             }
             catch
             {
@@ -153,10 +153,10 @@ namespace MareSynchronos.Managers
             return ret.Item2;
         }
 
-        public string PenumbraGetMetaManipulations(string characterName)
+        public string PenumbraGetMetaManipulations()
         {
             if (!CheckPenumbraApi()) return string.Empty;
-            return _penumbraGetMetaManipulations.InvokeFunc(characterName);
+            return _penumbraGetMetaManipulations.InvokeFunc();
         }
 
         public string? PenumbraModDirectory()
