@@ -290,7 +290,7 @@ namespace MareSynchronos.WebAPI
         private Task ConnectionHubOnReconnected(string? arg)
         {
             Logger.Debug("Connection restored");
-            _connectionDto = _connectionHub!.InvokeAsync<ConnectionDto>(ConnectionHubAPI.InvokeHeartbeat).Result;
+            _connectionDto = _connectionHub!.InvokeAsync<ConnectionDto>(ConnectionHubAPI.InvokeHeartbeat, _dalamudUtil.PlayerNameHashed).Result;
             Connected?.Invoke();
             return Task.CompletedTask;
         }
