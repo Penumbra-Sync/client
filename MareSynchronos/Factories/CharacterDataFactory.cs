@@ -29,14 +29,24 @@ public class CharacterDataFactory
         _ipcManager = ipcManager;
     }
 
-    public CharacterData BuildCharacterData()
+    public CharacterData? BuildCharacterData()
     {
         if (!_ipcManager.Initialized)
         {
             throw new ArgumentException("Penumbra is not connected");
         }
 
-        return CreateCharacterData();
+        try
+        {
+            return CreateCharacterData();
+        }
+        catch (Exception e)
+        {
+            Logger.Warn("Failed to create character data");
+            Logger.Warn(e.Message);
+            Logger.Warn(e.StackTrace ?? string.Empty);
+            return null;
+        }
     }
 
     private (string, string) GetIndentationForInheritanceLevel(int inheritanceLevel)

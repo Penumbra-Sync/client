@@ -96,6 +96,7 @@ namespace MareSynchronos.Managers
         private async Task<CharacterCacheDto?> CreateFullCharacterCache(CancellationToken token)
         {
             var cache = _characterDataFactory.BuildCharacterData();
+            if (cache == null) return null;
             CharacterCacheDto? cacheDto = null;
 
             await Task.Run(async () =>
@@ -165,9 +166,9 @@ namespace MareSynchronos.Managers
 
                 _dalamudUtil.WaitWhileSelfIsDrawing(token);
 
-                var characterCache = (await CreateFullCharacterCache(token))!;
+                var characterCache = (await CreateFullCharacterCache(token));
 
-                if (token.IsCancellationRequested) return;
+                if (characterCache == null || token.IsCancellationRequested) return;
 
                 if (characterCache.Hash == (LastSentCharacterData?.Hash ?? "-"))
                 {

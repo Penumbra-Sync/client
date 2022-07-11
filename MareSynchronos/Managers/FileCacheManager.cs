@@ -211,7 +211,7 @@ namespace MareSynchronos.Managers
                         var fileCache = Create(item, _rescanTaskCancellationTokenSource.Token);
                         if (fileCache != null)
                         {
-                            db.RemoveRange(db.FileCaches.Where(f => f.Hash == fileCache.Hash));
+                            db.RemoveRange(db.FileCaches.Where(f => f.Filepath.ToLower() == fileCache.Filepath.ToLower()));
                             await db.AddAsync(fileCache, _rescanTaskCancellationTokenSource.Token);
                         }
                     }
