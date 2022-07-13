@@ -29,7 +29,7 @@ namespace MareSynchronos.WebAPI
     public partial class ApiController : IDisposable
     {
         public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
-        public const string MainServiceUri = "wss://v2202207178628194299.powersrv.de:6871";
+        public const string MainServiceUri = "wss://v2202207178628194299.powersrv.de:6872";
 
         public readonly int[] SupportedServerVersions = { API.API.Version };
 
@@ -38,15 +38,10 @@ namespace MareSynchronos.WebAPI
 
         private CancellationTokenSource _connectionCancellationTokenSource;
 
-        private HubConnection? _fileHub;
-
-        private HubConnection? _connectionHub;
-
-        private HubConnection? _adminHub;
+        private HubConnection? _mareHub;
 
         private CancellationTokenSource? _uploadCancellationTokenSource;
 
-        private HubConnection? _userHub;
         private ConnectionDto? _connectionDto;
         public SystemInfoDto SystemInfoDto { get; private set; } = new();
         public bool IsModerator => (_connectionDto?.IsAdmin ?? false) || (_connectionDto?.IsModerator ?? false);
@@ -71,7 +66,7 @@ namespace MareSynchronos.WebAPI
 
         private void DalamudUtilOnLogOut()
         {
-            Task.Run(async () => await StopAllConnections(_connectionCancellationTokenSource.Token));
+            Task.Run(async () => await StopConnection(_connectionCancellationTokenSource.Token));
         }
 
         private void DalamudUtilOnLogIn()
@@ -119,7 +114,7 @@ namespace MareSynchronos.WebAPI
             : "-";
 
         public bool ServerAlive =>
-            (_connectionHub?.State ?? HubConnectionState.Disconnected) == HubConnectionState.Connected;
+            (_mareHub?.State ?? HubConnectionState.Disconnected) == HubConnectionState.Connected;
 
         public Dictionary<string, string> ServerDictionary => new Dictionary<string, string>()
                 { { MainServiceUri, MainServer } }
@@ -155,14 +150,14 @@ namespace MareSynchronos.WebAPI
         {
             Logger.Verbose("Recreating Connection");
 
-            await StopAllConnections(_connectionCancellationTokenSource.Token);
+            await StopConnection(_connectionCancellationTokenSource.Token);
 
             _connectionCancellationTokenSource.Cancel();
             _connectionCancellationTokenSource = new CancellationTokenSource();
             var token = _connectionCancellationTokenSource.Token;
             while (ServerState is not ServerState.Connected && !token.IsCancellationRequested)
             {
-                await StopAllConnections(token);
+                await StopConnection(token);
 
                 try
                 {
@@ -176,17 +171,11 @@ namespace MareSynchronos.WebAPI
 
                     if (token.IsCancellationRequested) break;
 
-                    _connectionHub = BuildHubConnection(ConnectionHubAPI.Path);
-                    _userHub = BuildHubConnection(UserHubAPI.Path);
-                    _fileHub = BuildHubConnection(FilesHubAPI.Path);
-                    _adminHub = BuildHubConnection(AdminHubAPI.Path);
+                    _mareHub = BuildHubConnection(API.API.Path);
 
-                    await _connectionHub.StartAsync(token);
-                    await _userHub.StartAsync(token);
-                    await _fileHub.StartAsync(token);
-                    await _adminHub.StartAsync(token);
+                    await _mareHub.StartAsync(token);
 
-                    _connectionHub.On<SystemInfoDto>(ConnectionHubAPI.OnUpdateSystemInfo, (dto) => SystemInfoDto = dto);
+                    _mareHub.On<SystemInfoDto>(ConnectionHubAPI.OnUpdateSystemInfo, (dto) => SystemInfoDto = dto);
 
                     if (_pluginConfiguration.FullPause)
                     {
@@ -195,41 +184,41 @@ namespace MareSynchronos.WebAPI
                     }
 
                     _connectionDto =
-                        await _connectionHub.InvokeAsync<ConnectionDto>(ConnectionHubAPI.InvokeHeartbeat, _dalamudUtil.PlayerNameHashed, token);
+                        await _mareHub.InvokeAsync<ConnectionDto>(ConnectionHubAPI.InvokeHeartbeat, _dalamudUtil.PlayerNameHashed, token);
                     if (ServerState is ServerState.Connected) // user is authorized && server is legit
                     {
                         Logger.Debug("Initializing data");
-                        _userHub.On<ClientPairDto, string>(UserHubAPI.OnUpdateClientPairs,
+                        _mareHub.On<ClientPairDto, string>(UserHubAPI.OnUpdateClientPairs,
                             UpdateLocalClientPairsCallback);
-                        _userHub.On<CharacterCacheDto, string>(UserHubAPI.OnReceiveCharacterData,
+                        _mareHub.On<CharacterCacheDto, string>(UserHubAPI.OnReceiveCharacterData,
                             ReceiveCharacterDataCallback);
-                        _userHub.On<string>(UserHubAPI.OnRemoveOnlinePairedPlayer,
+                        _mareHub.On<string>(UserHubAPI.OnRemoveOnlinePairedPlayer,
                             (s) => PairedClientOffline?.Invoke(s));
-                        _userHub.On<string>(UserHubAPI.OnAddOnlinePairedPlayer,
+                        _mareHub.On<string>(UserHubAPI.OnAddOnlinePairedPlayer,
                             (s) => PairedClientOnline?.Invoke(s));
-                        _adminHub.On(AdminHubAPI.OnForcedReconnect, UserForcedReconnectCallback);
+                        _mareHub.On(AdminHubAPI.OnForcedReconnect, UserForcedReconnectCallback);
 
                         PairedClients =
-                            await _userHub!.InvokeAsync<List<ClientPairDto>>(UserHubAPI.InvokeGetPairedClients, token);
+                            await _mareHub!.InvokeAsync<List<ClientPairDto>>(UserHubAPI.InvokeGetPairedClients, token);
 
-                        _connectionHub.Closed += ConnectionHubOnClosed;
-                        _connectionHub.Reconnected += ConnectionHubOnReconnected;
-                        _connectionHub.Reconnecting += ConnectionHubOnReconnecting;
+                        _mareHub.Closed += MareHubOnClosed;
+                        _mareHub.Reconnected += MareHubOnReconnected;
+                        _mareHub.Reconnecting += MareHubOnReconnecting;
 
                         if (IsModerator)
                         {
                             AdminForbiddenFiles =
-                                await _adminHub.InvokeAsync<List<ForbiddenFileDto>>(AdminHubAPI.InvokeGetForbiddenFiles,
+                                await _mareHub.InvokeAsync<List<ForbiddenFileDto>>(AdminHubAPI.InvokeGetForbiddenFiles,
                                     token);
                             AdminBannedUsers =
-                                await _adminHub.InvokeAsync<List<BannedUserDto>>(AdminHubAPI.InvokeGetBannedUsers,
+                                await _mareHub.InvokeAsync<List<BannedUserDto>>(AdminHubAPI.InvokeGetBannedUsers,
                                     token);
-                            _adminHub.On<BannedUserDto>(AdminHubAPI.OnUpdateOrAddBannedUser,
+                            _mareHub.On<BannedUserDto>(AdminHubAPI.OnUpdateOrAddBannedUser,
                                 UpdateOrAddBannedUserCallback);
-                            _adminHub.On<BannedUserDto>(AdminHubAPI.OnDeleteBannedUser, DeleteBannedUserCallback);
-                            _adminHub.On<ForbiddenFileDto>(AdminHubAPI.OnUpdateOrAddForbiddenFile,
+                            _mareHub.On<BannedUserDto>(AdminHubAPI.OnDeleteBannedUser, DeleteBannedUserCallback);
+                            _mareHub.On<ForbiddenFileDto>(AdminHubAPI.OnUpdateOrAddForbiddenFile,
                                 UpdateOrAddForbiddenFileCallback);
-                            _adminHub.On<ForbiddenFileDto>(AdminHubAPI.OnDeleteForbiddenFile,
+                            _mareHub.On<ForbiddenFileDto>(AdminHubAPI.OnDeleteForbiddenFile,
                                 DeleteForbiddenFileCallback);
                         }
 
@@ -245,7 +234,7 @@ namespace MareSynchronos.WebAPI
                     Logger.Warn(ex.Message);
                     Logger.Warn(ex.StackTrace ?? string.Empty);
                     Logger.Debug("Failed to establish connection, retrying");
-                    await StopAllConnections(token);
+                    await StopConnection(token);
                     await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token);
                 }
             }
@@ -258,7 +247,7 @@ namespace MareSynchronos.WebAPI
             _dalamudUtil.LogIn -= DalamudUtilOnLogIn;
             _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
 
-            Task.Run(async () => await StopAllConnections(_connectionCancellationTokenSource.Token));
+            Task.Run(async () => await StopConnection(_connectionCancellationTokenSource.Token));
             _connectionCancellationTokenSource?.Cancel();
         }
 
@@ -278,7 +267,7 @@ namespace MareSynchronos.WebAPI
                 .Build();
         }
 
-        private Task ConnectionHubOnClosed(Exception? arg)
+        private Task MareHubOnClosed(Exception? arg)
         {
             CurrentUploads.Clear();
             CurrentDownloads.Clear();
@@ -288,15 +277,15 @@ namespace MareSynchronos.WebAPI
             return Task.CompletedTask;
         }
 
-        private async Task ConnectionHubOnReconnected(string? arg)
+        private async Task MareHubOnReconnected(string? arg)
         {
             Logger.Debug("Connection restored");
             await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 10)));
-            _connectionDto = await _connectionHub!.InvokeAsync<ConnectionDto>(ConnectionHubAPI.InvokeHeartbeat, _dalamudUtil.PlayerNameHashed);
+            _connectionDto = await _mareHub!.InvokeAsync<ConnectionDto>(ConnectionHubAPI.InvokeHeartbeat, _dalamudUtil.PlayerNameHashed);
             Connected?.Invoke();
         }
 
-        private Task ConnectionHubOnReconnecting(Exception? arg)
+        private Task MareHubOnReconnecting(Exception? arg)
         {
             CurrentUploads.Clear();
             CurrentDownloads.Clear();
@@ -306,38 +295,17 @@ namespace MareSynchronos.WebAPI
             return Task.CompletedTask;
         }
 
-        private async Task StopAllConnections(CancellationToken token)
+        private async Task StopConnection(CancellationToken token)
         {
             Logger.Verbose("Stopping all connections");
-            if (_connectionHub is not null)
+            if (_mareHub is not null)
             {
-                await _connectionHub.StopAsync(token);
-                _connectionHub.Closed -= ConnectionHubOnClosed;
-                _connectionHub.Reconnected -= ConnectionHubOnReconnected;
-                _connectionHub.Reconnecting += ConnectionHubOnReconnecting;
-                await _connectionHub.DisposeAsync();
-                _connectionHub = null;
-            }
-
-            if (_fileHub is not null)
-            {
-                await _fileHub.StopAsync(token);
-                await _fileHub.DisposeAsync();
-                _fileHub = null;
-            }
-
-            if (_userHub is not null)
-            {
-                await _userHub.StopAsync(token);
-                await _userHub.DisposeAsync();
-                _userHub = null;
-            }
-
-            if (_adminHub is not null)
-            {
-                await _adminHub.StopAsync(token);
-                await _adminHub.DisposeAsync();
-                _adminHub = null;
+                await _mareHub.StopAsync(token);
+                _mareHub.Closed -= MareHubOnClosed;
+                _mareHub.Reconnected -= MareHubOnReconnected;
+                _mareHub.Reconnecting += MareHubOnReconnecting;
+                await _mareHub.DisposeAsync();
+                _mareHub = null;
             }
         }
     }

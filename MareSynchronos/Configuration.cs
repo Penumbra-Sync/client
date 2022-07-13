@@ -78,7 +78,7 @@ namespace MareSynchronos
         public Dictionary<string, Dictionary<string, string>> UidServerComments { get; set; } = new();
 
         public Dictionary<string, string> UidComments { get; set; } = new();
-        public int Version { get; set; } = 3;
+        public int Version { get; set; } = 4;
 
         public bool ShowTransferWindow { get; set; } = true;
 
@@ -156,6 +156,33 @@ namespace MareSynchronos
 
                 Version = 3;
                 Save();
+            }
+
+            if (Version == 3)
+            {
+                Logger.Debug("Migrating Configuration from V3 to V4");
+
+                ApiUri = ApiUri.Replace("wss://v2202207178628194299.powersrv.de:6871", "wss://v2202207178628194299.powersrv.de:6872");
+                foreach (var kvp in ClientSecret.ToList())
+                {
+                    var newKey = kvp.Key.Replace("wss://v2202207178628194299.powersrv.de:6871", "wss://v2202207178628194299.powersrv.de:6872");
+                    ClientSecret.Remove(kvp.Key);
+                    if (ClientSecret.ContainsKey(newKey))
+                    {
+                        ClientSecret[newKey] = kvp.Value;
+                    }
+                    else
+                    {
+                        ClientSecret.Add(newKey, kvp.Value);
+                    }
+                }
+
+                foreach (var kvp in UidServerComments.ToList())
+                {
+                    var newKey = kvp.Key.Replace("wss://v2202207178628194299.powersrv.de:6871", "wss://v2202207178628194299.powersrv.de:6872");
+                    UidServerComments.Remove(kvp.Key);
+                    UidServerComments.Add(newKey, kvp.Value);
+                }
             }
         }
     }
