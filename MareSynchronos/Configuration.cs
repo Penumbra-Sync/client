@@ -183,6 +183,9 @@ namespace MareSynchronos
                     UidServerComments.Remove(kvp.Key);
                     UidServerComments.Add(newKey, kvp.Value);
                 }
+
+                Version = 4;
+                Save();
             }
         }
     }
