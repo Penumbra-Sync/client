@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using System.Text;
 using Dalamud.Logging;
 using Dalamud.Utility;
 

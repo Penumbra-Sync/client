@@ -11,7 +11,6 @@ using Dalamud.Interface.ImGuiFileDialog;
 using MareSynchronos.Managers;
 using MareSynchronos.WebAPI;
 using Dalamud.Interface.Windowing;
-using Dalamud.Logging;
 using MareSynchronos.UI;
 using MareSynchronos.Utils;
 

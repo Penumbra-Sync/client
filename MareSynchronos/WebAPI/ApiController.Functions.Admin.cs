@@ -9,39 +9,39 @@ namespace MareSynchronos.WebAPI
     {
         public async Task AddOrUpdateForbiddenFileEntry(ForbiddenFileDto forbiddenFile)
         {
-            await _mareHub!.SendAsync(AdminHubAPI.SendUpdateOrAddForbiddenFile, forbiddenFile);
+            await _mareHub!.SendAsync(Api.SendAdminUpdateOrAddForbiddenFile, forbiddenFile);
         }
 
         public async Task DeleteForbiddenFileEntry(ForbiddenFileDto forbiddenFile)
         {
-            await _mareHub!.SendAsync(AdminHubAPI.SendDeleteForbiddenFile, forbiddenFile);
+            await _mareHub!.SendAsync(Api.SendAdminDeleteForbiddenFile, forbiddenFile);
         }
 
         public async Task AddOrUpdateBannedUserEntry(BannedUserDto bannedUser)
         {
-            await _mareHub!.SendAsync(AdminHubAPI.SendUpdateOrAddBannedUser, bannedUser);
+            await _mareHub!.SendAsync(Api.SendAdminUpdateOrAddBannedUser, bannedUser);
         }
 
         public async Task DeleteBannedUserEntry(BannedUserDto bannedUser)
         {
-            await _mareHub!.SendAsync(AdminHubAPI.SendDeleteBannedUser, bannedUser);
+            await _mareHub!.SendAsync(Api.SendAdminDeleteBannedUser, bannedUser);
         }
 
         public async Task RefreshOnlineUsers()
         {
-            AdminOnlineUsers = await _mareHub!.InvokeAsync<List<OnlineUserDto>>(AdminHubAPI.InvokeGetOnlineUsers);
+            AdminOnlineUsers = await _mareHub!.InvokeAsync<List<OnlineUserDto>>(Api.InvokeAdminGetOnlineUsers);
         }
 
         public List<OnlineUserDto> AdminOnlineUsers { get; set; } = new List<OnlineUserDto>();
 
         public void PromoteToModerator(string onlineUserUID)
         {
-            _mareHub!.SendAsync(AdminHubAPI.SendChangeModeratorStatus, onlineUserUID, true);
+            _mareHub!.SendAsync(Api.SendAdminChangeModeratorStatus, onlineUserUID, true);
         }
 
         public void DemoteFromModerator(string onlineUserUID)
         {
-            _mareHub!.SendAsync(AdminHubAPI.SendChangeModeratorStatus, onlineUserUID, false);
+            _mareHub!.SendAsync(Api.SendAdminChangeModeratorStatus, onlineUserUID, false);
         }
     }
 }

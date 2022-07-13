@@ -1,10 +1,8 @@
 ﻿using MareSynchronos.Factories;
-using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using Newtonsoft.Json;
 using System;
-using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using MareSynchronos.API;

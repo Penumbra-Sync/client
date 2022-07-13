@@ -1,6 +1,4 @@
-﻿using System;
-using System.IO;
-using Dalamud.Logging;
+﻿using System.IO;
 using MareSynchronos.Utils;
 using Microsoft.EntityFrameworkCore;
 

@@ -23,19 +23,19 @@ namespace MareSynchronos.WebAPI
             {
                 Logger.Warn("Cancelling upload");
                 _uploadCancellationTokenSource?.Cancel();
-                _mareHub!.SendAsync(FilesHubAPI.SendAbortUpload);
+                _mareHub!.SendAsync(Api.SendFileAbortUpload);
                 CurrentUploads.Clear();
             }
         }
 
         public async Task DeleteAllMyFiles()
         {
-            await _mareHub!.SendAsync(FilesHubAPI.SendDeleteAllFiles);
+            await _mareHub!.SendAsync(Api.SendFileDeleteAllFiles);
         }
 
         private async Task<string> DownloadFile(int downloadId, string hash, CancellationToken ct)
         {
-            var reader = _mareHub!.StreamAsync<byte[]>(FilesHubAPI.StreamDownloadFileAsync, hash, ct);
+            var reader = _mareHub!.StreamAsync<byte[]>(Api.StreamFileDownloadFileAsync, hash, ct);
             string fileName = Path.GetTempFileName();
             await using var fs = File.OpenWrite(fileName);
             await foreach (var data in reader.WithCancellation(ct))
@@ -56,7 +56,7 @@ namespace MareSynchronos.WebAPI
             List<DownloadFileDto> downloadFileInfoFromService = new List<DownloadFileDto>();
             foreach (var file in fileReplacementDto)
             {
-                downloadFileInfoFromService.Add(await _mareHub!.InvokeAsync<DownloadFileDto>(FilesHubAPI.InvokeGetFileSize, file.Hash, ct));
+                downloadFileInfoFromService.Add(await _mareHub!.InvokeAsync<DownloadFileDto>(Api.InvokeFileGetFileSize, file.Hash, ct));
             }
 
             CurrentDownloads[currentDownloadId] = downloadFileInfoFromService.Distinct().Select(d => new DownloadFileTransfer(d))
@@ -128,7 +128,7 @@ namespace MareSynchronos.WebAPI
             var uploadToken = _uploadCancellationTokenSource.Token;
             Logger.Verbose("New Token Created");
 
-            var filesToUpload = await _mareHub!.InvokeAsync<List<UploadFileDto>>(FilesHubAPI.InvokeSendFiles, character.FileReplacements.Select(c => c.Hash).Distinct(), uploadToken);
+            var filesToUpload = await _mareHub!.InvokeAsync<List<UploadFileDto>>(Api.InvokeFileSendFiles, character.FileReplacements.Select(c => c.Hash).Distinct(), uploadToken);
 
             foreach (var file in filesToUpload.Where(f => !f.IsForbidden))
             {
@@ -183,11 +183,11 @@ namespace MareSynchronos.WebAPI
             }
 
             Logger.Verbose("Upload tasks complete, waiting for server to confirm");
-            var anyUploadsOpen = await _mareHub!.InvokeAsync<bool>(FilesHubAPI.InvokeIsUploadFinished, uploadToken);
+            var anyUploadsOpen = await _mareHub!.InvokeAsync<bool>(Api.InvokeFileIsUploadFinished, uploadToken);
             Logger.Verbose("Uploads open: " + anyUploadsOpen);
             while (anyUploadsOpen && !uploadToken.IsCancellationRequested)
             {
-                anyUploadsOpen = await _mareHub!.InvokeAsync<bool>(FilesHubAPI.InvokeIsUploadFinished, uploadToken);
+                anyUploadsOpen = await _mareHub!.InvokeAsync<bool>(Api.InvokeFileIsUploadFinished, uploadToken);
                 await Task.Delay(TimeSpan.FromSeconds(0.5), uploadToken);
                 Logger.Verbose("Waiting for uploads to finish");
             }
@@ -197,7 +197,7 @@ namespace MareSynchronos.WebAPI
             if (!uploadToken.IsCancellationRequested)
             {
                 Logger.Verbose("=== Pushing character data ===");
-                await _mareHub!.InvokeAsync(UserHubAPI.InvokePushCharacterDataToVisibleClients, character, visibleCharacterIds, uploadToken);
+                await _mareHub!.InvokeAsync(Api.InvokeUserPushCharacterDataToVisibleClients, character, visibleCharacterIds, uploadToken);
             }
             else
             {
@@ -234,7 +234,7 @@ namespace MareSynchronos.WebAPI
                 }
             }
 
-            await _mareHub!.SendAsync(FilesHubAPI.SendUploadFileStreamAsync, fileHash, AsyncFileData(uploadToken), uploadToken);
+            await _mareHub!.SendAsync(Api.SendFileUploadFileStreamAsync, fileHash, AsyncFileData(uploadToken), uploadToken);
         }
 
         public void CancelDownload(int downloadId)
