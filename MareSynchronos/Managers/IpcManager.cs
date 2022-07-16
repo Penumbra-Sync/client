@@ -175,7 +175,7 @@ namespace MareSynchronos.Managers
             _penumbraRemoveTemporaryCollection.InvokeFunc(characterName);
         }
 
-        public string? PenumbraResolvePath(string path, string characterName)
+        public string? PenumbraResolvePath(string path)
         {
             if (!CheckPenumbraApi()) return null;
             var resolvedPath = _penumbraResolvePlayer!.InvokeFunc(path);

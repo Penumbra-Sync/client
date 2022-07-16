@@ -196,10 +196,27 @@ public class CharacterDataFactory
         AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->Decal->FileName()).ToString(), cache, 0, "Decal", false);
         AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), cache, 0, "Legacy Decal", false);
 
+
+        AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId, cache);
+
         st.Stop();
         Logger.Verbose("Building Character Data took " + st.Elapsed);
 
         return cache;
+    }
+
+    private void AddReplacementSkeleton(ushort raceSexId, CharacterData cache)
+    {
+        string raceSexIdString = raceSexId.ToString("0000");
+
+        string skeletonPath = $"chara/human/c{raceSexIdString}/skeleton/base/b0001/skl_c{raceSexIdString}b0001.sklb";
+
+        Logger.Verbose("Adding File Replacement for Skeleton " + skeletonPath);
+
+        var replacement = CreateFileReplacement(skeletonPath, true);
+        cache.AddFileReplacement(replacement);
+
+        DebugPrint(replacement, "Skeleton", "SKLB", 0);
     }
 
     private FileReplacement CreateFileReplacement(string path, bool doNotReverseResolve = false)
@@ -214,7 +231,7 @@ public class CharacterDataFactory
         else
         {
             fileReplacement.GamePaths = new List<string> { path };
-            fileReplacement.SetResolvedPath(_ipcManager.PenumbraResolvePath(path, _dalamudUtil.PlayerName)!);
+            fileReplacement.SetResolvedPath(_ipcManager.PenumbraResolvePath(path)!);
         }
 
         return fileReplacement;
