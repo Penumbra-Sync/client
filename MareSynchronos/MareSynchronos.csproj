@@ -32,11 +32,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Penumbra\Penumbra.GameData\Penumbra.GameData.csproj" />
-    <ProjectReference Include="..\..\server\MareSynchronosServer\MareSynchronos.API\MareSynchronos.API.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Reference Include="FFXIVClientStructs">
       <HintPath>$(DalamudLibPath)FFXIVClientStructs.dll</HintPath>
       <Private>false</Private>
