@@ -351,9 +351,9 @@ namespace MareSynchronos.UI
                 ImGui.SetNextItemWidth(400);
                 ImGui.InputText("Enter Secret Key", ref _secretKey, 255);
                 ImGui.SameLine();
-                if (_secretKey.Length > 0 && _secretKey.Length != 40)
+                if (_secretKey.Length > 0 && _secretKey.Length != 64)
                 {
-                    ColorTextWrapped("Your secret key must be exactly 40 characters long. If try to enter your UID here, this is incorrect." +
+                    ColorTextWrapped("Your secret key must be exactly 64 characters long. If try to enter your UID here, this is incorrect." +
                                      " If you have lost your secret key, you will need to create a new account.", ImGuiColors.DalamudRed);
                 }
                 else
