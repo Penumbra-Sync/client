@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Linq;
 using System.Numerics;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
@@ -18,6 +19,36 @@ namespace MareSynchronos.UI
         private bool _readFirstPage;
 
         public event SwitchUi? SwitchToMainUi;
+
+        private readonly string[] TosParagraphs = new[]
+{
+                    "All of the mod files currently active on your character as well as your current character state will be uploaded to the service you registered yourself at automatically. " +
+                    "The plugin will exclusively upload the necessary mod files and not the whole mod.",
+                    "If you are on a data capped internet connection, higher fees due to data usage depending on the amount of downloaded and uploaded mod files might occur. " +
+                    "Mod files will be compressed on up- and download to save on bandwidth usage. Due to varying up- and download speeds, changes in characters might not be visible immediately. " +
+                    "Files present on the service that already represent your active mod files will not be uploaded again.",
+                    "The mod files you are uploading are confidential and will not be distributed to parties other than the ones who are requesting the exact same mod files. " +
+                    "Please think about who you are going to pair since it is unavoidable that they will receive and locally cache the necessary mod files that you have currently in use. " +
+                    "Locally cached mod files will have arbitrary file names to discourage attempts at replicating the original mod.",
+                    "The plugin creator tried their best to keep you secure. However, there is no guarantee for 100% security. Do not blindly pair your client with everyone.",
+                    "Mod files that are saved on the service will remain on the service as long as there are requests for the files from clients. " +
+                                  "After a period of not being used, the mod files will be automatically deleted. " +
+                                  "You will also be able to wipe all the files you have personally uploaded on request. " +
+                                  "The service holds no information about which mod files belong to which mod.",
+                    "This service is provided as-is. In case of abuse, contact darkarchon#4313 on Discord or join the Mare Synchronos Discord. " +
+                                                          "To accept those conditions hold CTRL while clicking 'I agree'"
+                };
+
+        private Tuple<string, string> _darkSoulsCaptcha1 = new(string.Empty, string.Empty);
+        private Tuple<string, string> _darkSoulsCaptcha2 = new(string.Empty, string.Empty);
+        private Tuple<string, string> _darkSoulsCaptcha3 = new(string.Empty, string.Empty);
+        private string _enteredDarkSoulsCaptcha1 = string.Empty;
+        private string _enteredDarkSoulsCaptcha2 = string.Empty;
+        private string _enteredDarkSoulsCaptcha3 = string.Empty;
+
+        private bool DarkSoulsCaptchaValid => _darkSoulsCaptcha1.Item2 == _enteredDarkSoulsCaptcha1
+            && _darkSoulsCaptcha2.Item2 == _enteredDarkSoulsCaptcha2
+            && _darkSoulsCaptcha3.Item2 == _enteredDarkSoulsCaptcha3;
 
         public void Dispose()
         {
@@ -41,6 +72,11 @@ namespace MareSynchronos.UI
                 MinimumSize = new Vector2(600, 400),
                 MaximumSize = new Vector2(600, 2000)
             };
+
+            if (_pluginConfiguration.DarkSoulsAgreement)
+            {
+                GenerateDarkSoulsAgreementCaptcha();
+            }
 
             _windowSystem.AddWindow(this);
         }
@@ -80,35 +116,52 @@ namespace MareSynchronos.UI
                 UiShared.ColorText(readThis, ImGuiColors.DalamudRed);
                 ImGui.SetWindowFontScale(1.0f);
                 ImGui.Separator();
-                UiShared.TextWrapped("All of the mod files currently active on your character as well as your current character state will be uploaded to the service you registered yourself at automatically. " +
-                    "The plugin will exclusively upload the necessary mod files and not the whole mod.");
-                UiShared.TextWrapped("If you are on a data capped internet connection, higher fees due to data usage depending on the amount of downloaded and uploaded mod files might occur. " +
-                    "Mod files will be compressed on up- and download to save on bandwidth usage. Due to varying up- and download speeds, changes in characters might not be visible immediately. " +
-                    "Files present on the service that already represent your active mod files will not be uploaded again.");
-                UiShared.ColorTextWrapped("The mod files you are uploading are confidential and will not be distributed to parties other than the ones who are requesting the exact same mod files. " +
-                    "Please think about who you are going to pair since it is unavoidable that they will receive and locally cache the necessary mod files that you have currently in use. " +
-                    "Locally cached mod files will have arbitrary file names to discourage attempts at replicating the original mod.", ImGuiColors.DalamudRed);
-                UiShared.ColorTextWrapped("The plugin creator tried their best to keep you secure. However, there is no guarantee for 100% security. Do not blindly pair your client with everyone.", ImGuiColors.DalamudYellow);
-                UiShared.TextWrapped("Mod files that are saved on the service will remain on the service as long as there are requests for the files from clients. " +
-                                  "After a period of not being used, the mod files will be automatically deleted. " +
-                                  "You will also be able to wipe all the files you have personally uploaded on request. " +
-                                  "The service holds no information about which mod files belong to which mod.");
-                UiShared.ColorTextWrapped("This service is provided as-is. In case of abuse, contact darkarchon#4313 on Discord or join the Mare Synchronos Discord. " +
-                                                          "To accept those conditions hold CTRL while clicking 'I agree'", ImGuiColors.DalamudRed);
-                ImGui.Separator();
 
-                if (ImGui.Button("I agree##toSetup"))
+
+                UiShared.TextWrapped(TosParagraphs[0]);
+                UiShared.TextWrapped(TosParagraphs[1]);
+                UiShared.ColorTextWrapped(TosParagraphs[2], ImGuiColors.DalamudRed);
+                UiShared.ColorTextWrapped(TosParagraphs[3], ImGuiColors.DalamudYellow);
+                UiShared.TextWrapped(TosParagraphs[4]);
+                UiShared.ColorTextWrapped(TosParagraphs[5], ImGuiColors.DalamudRed);
+
+                ImGui.Separator();
+                if (!_pluginConfiguration.DarkSoulsAgreement || DarkSoulsCaptchaValid)
                 {
-                    if (UiShared.CtrlPressed())
+                    if (ImGui.Button("I agree##toSetup"))
                     {
-                        _pluginConfiguration.AcceptedAgreement = true;
-                        _pluginConfiguration.Save();
+                        _enteredDarkSoulsCaptcha1 = string.Empty;
+                        _enteredDarkSoulsCaptcha2 = string.Empty;
+                        _enteredDarkSoulsCaptcha3 = string.Empty;
+
+                        if (UiShared.CtrlPressed())
+                        {
+                            _pluginConfiguration.AcceptedAgreement = true;
+                            _pluginConfiguration.Save();
+                        }
+                        else
+                        {
+                            _pluginConfiguration.DarkSoulsAgreement = true;
+                            _pluginConfiguration.Save();
+                            GenerateDarkSoulsAgreementCaptcha();
+                        }
                     }
                 }
+                else
+                {
+                    UiShared.ColorTextWrapped("Congratulations. You have failed to read the agreements.", ImGuiColors.DalamudYellow);
+                    UiShared.TextWrapped("Enter the following 3 words from the agreement exactly as described without punctuation to make the \"I agree\" button visible again.");
+                    ImGui.SetNextItemWidth(100);
+                    ImGui.InputText(_darkSoulsCaptcha1.Item1, ref _enteredDarkSoulsCaptcha1, 255);
+                    ImGui.SetNextItemWidth(100);
+                    ImGui.InputText(_darkSoulsCaptcha2.Item1, ref _enteredDarkSoulsCaptcha2, 255);
+                    ImGui.SetNextItemWidth(100);
+                    ImGui.InputText(_darkSoulsCaptcha3.Item1, ref _enteredDarkSoulsCaptcha3, 255);
+                }
             }
-            else if (_pluginConfiguration.AcceptedAgreement 
-                     && (string.IsNullOrEmpty(_pluginConfiguration.CacheFolder) 
-                         || _pluginConfiguration.InitialScanComplete == false 
+            else if (_pluginConfiguration.AcceptedAgreement
+                     && (string.IsNullOrEmpty(_pluginConfiguration.CacheFolder)
+                         || _pluginConfiguration.InitialScanComplete == false
                          || !Directory.Exists(_pluginConfiguration.CacheFolder)))
             {
                 if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
@@ -153,7 +206,7 @@ namespace MareSynchronos.UI
                 if (_pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri) && _uiShared.ShowClientSecret)
                 {
                     ImGui.SetWindowFontScale(2f);
-                    UiShared.ColorTextWrapped("DO NOT GIVE THIS KEY TO OTHER PEOPLE.", ImGuiColors.DalamudRed);
+                    UiShared.ColorTextWrapped("DO NOT GIVE THIS KEY TO OTHER PEOPLE.", ImGuiColors.DalamudYellow);
                     ImGui.SetWindowFontScale(1f);
                     ImGui.Separator();
                     UiShared.TextWrapped(_pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri]);
@@ -183,6 +236,27 @@ namespace MareSynchronos.UI
                     _uiShared.DrawServiceSelection(new Action(() => { }), true);
                 }
             }
+        }
+
+        private void GenerateDarkSoulsAgreementCaptcha()
+        {
+            _darkSoulsCaptcha1 = GetCaptchaTuple();
+            _darkSoulsCaptcha2 = GetCaptchaTuple();
+            _darkSoulsCaptcha3 = GetCaptchaTuple();
+            Logger.Debug(_darkSoulsCaptcha1.ToString());
+            Logger.Debug(_darkSoulsCaptcha2.ToString());
+            Logger.Debug(_darkSoulsCaptcha3.ToString());
+        }
+
+        private Tuple<string, string> GetCaptchaTuple()
+        {
+            Random random = new Random();
+            var paragraphIdx = random.Next(TosParagraphs.Length);
+            var splitParagraph = TosParagraphs[paragraphIdx].Split(".", StringSplitOptions.RemoveEmptyEntries).Select(c => c.Trim()).ToArray();
+            var sentenceIdx = random.Next(splitParagraph.Length);
+            var splitSentence = splitParagraph[sentenceIdx].Split(" ").Select(c => c.Trim()).Select(c => c.Replace(".", "").Replace(",", "").Replace("'", "")).ToArray();
+            var wordIdx = random.Next(splitSentence.Length);
+            return new($"Paragraph {paragraphIdx + 1}, Sentence {sentenceIdx + 1}, Word {wordIdx + 1}", splitSentence[wordIdx]);
         }
     }
 }

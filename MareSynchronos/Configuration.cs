@@ -45,6 +45,7 @@ namespace MareSynchronos
         [NonSerialized]
         private DalamudPluginInterface? _pluginInterface;
 
+        public bool DarkSoulsAgreement { get; set; } = false;
         public bool AcceptedAgreement { get; set; } = false;
         public string ApiUri
         {
