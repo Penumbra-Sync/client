@@ -251,7 +251,7 @@ namespace MareSynchronos.UI
             {
                 _ = _apiController.SendPairedClientPauseChange(entry.OtherUID, !entry.IsPaused);
             }
-            UiShared.AttachToolTip(entry.IsSynced
+            UiShared.AttachToolTip(entry.IsPaused
                 ? "Pause pairing with " + entry.OtherUID
                 : "Resume pairing with " + entry.OtherUID);
         }
