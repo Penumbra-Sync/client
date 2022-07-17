@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Numerics;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
@@ -105,7 +106,10 @@ namespace MareSynchronos.UI
                     }
                 }
             }
-            else if (_pluginConfiguration.AcceptedAgreement && (string.IsNullOrEmpty(_pluginConfiguration.CacheFolder) || _pluginConfiguration.InitialScanComplete == false))
+            else if (_pluginConfiguration.AcceptedAgreement 
+                     && (string.IsNullOrEmpty(_pluginConfiguration.CacheFolder) 
+                         || _pluginConfiguration.InitialScanComplete == false 
+                         || !Directory.Exists(_pluginConfiguration.CacheFolder)))
             {
                 if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
                 ImGui.TextUnformatted("File Cache Setup");

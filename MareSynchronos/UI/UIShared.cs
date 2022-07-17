@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
@@ -247,6 +248,7 @@ namespace MareSynchronos.UI
         private string _customServerUri = "";
         private bool _enterSecretKey = false;
         private bool _cacheDirectoryHasOtherFilesThanCache = false;
+        private bool _cacheDirectoryHasIllegalCharacter = false;
 
         public void DrawServiceSelection(Action? callBackOnExit = null, bool isIntroUi = false)
         {
@@ -349,15 +351,23 @@ namespace MareSynchronos.UI
                 ImGui.SetNextItemWidth(400);
                 ImGui.InputText("Enter Secret Key", ref _secretKey, 255);
                 ImGui.SameLine();
-                if (ImGui.Button("Save"))
+                if (_secretKey.Length > 0 && _secretKey.Length != 40)
                 {
-                    _pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri] = _secretKey;
-                    _pluginConfiguration.Save();
-                    _secretKey = string.Empty;
-                    Task.Run(_apiController.CreateConnections);
-                    ShowClientSecret = false;
-                    _enterSecretKey = false;
-                    callBackOnExit?.Invoke();
+                    ColorTextWrapped("Your secret key must be exactly 40 characters long. If try to enter your UID here, this is incorrect." +
+                                     " If you have lost your secret key, you will need to create a new account.", ImGuiColors.DalamudRed);
+                }
+                else
+                {
+                    if (ImGui.Button("Save"))
+                    {
+                        _pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri] = _secretKey;
+                        _pluginConfiguration.Save();
+                        _secretKey = string.Empty;
+                        Task.Run(_apiController.CreateConnections);
+                        ShowClientSecret = false;
+                        _enterSecretKey = false;
+                        callBackOnExit?.Invoke();
+                    }
                 }
             }
         }
@@ -400,12 +410,14 @@ namespace MareSynchronos.UI
                     _isPenumbraDirectory = path.ToLower() == _ipcManager.PenumbraModDirectory()?.ToLower();
                     _isDirectoryWritable = IsDirectoryWritable(path);
                     _cacheDirectoryHasOtherFilesThanCache = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Any(f => new FileInfo(f).Name.Length != 40);
+                    _cacheDirectoryHasIllegalCharacter = Regex.IsMatch(path, @"^(\w:\\(\w|\\)*|\/(\w|\/)*)");
 
                     if (!string.IsNullOrEmpty(path)
                         && Directory.Exists(path)
                         && _isDirectoryWritable
                         && !_isPenumbraDirectory
-                        && !_cacheDirectoryHasOtherFilesThanCache)
+                        && !_cacheDirectoryHasOtherFilesThanCache
+                        && !_cacheDirectoryHasIllegalCharacter)
                     {
                         _pluginConfiguration.CacheFolder = path;
                         _pluginConfiguration.Save();
@@ -426,6 +438,10 @@ namespace MareSynchronos.UI
             else if (_cacheDirectoryHasOtherFilesThanCache)
             {
                 ColorTextWrapped("Your selected directory has files inside that are not Mare related. Use an empty directory or a previous Mare cache directory only.", ImGuiColors.DalamudRed);
+            } else if (_cacheDirectoryHasIllegalCharacter)
+            {
+                ColorTextWrapped("Your selected directory contains illegal characters unreadable by FFXIV. " +
+                                 "Restrict yourself to latin letters (A-Z), underscores (_) and arabic numbers (0-9).", ImGuiColors.DalamudRed);
             }
 
             int maxCacheSize = _pluginConfiguration.MaxLocalCacheInGiB;

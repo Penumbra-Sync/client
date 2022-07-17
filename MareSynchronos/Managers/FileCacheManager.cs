@@ -358,6 +358,7 @@ namespace MareSynchronos.Managers
             StartWatchers();
             StartInitialScan();
         }
+
         private void StopWatchersAndScan()
         {
             _cacheDirWatcher?.Dispose();
