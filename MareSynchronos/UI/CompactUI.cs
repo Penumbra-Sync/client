@@ -245,15 +245,18 @@ namespace MareSynchronos.UI
             }
             UiShared.AttachToolTip("Hold CTRL and click to unpair permanently from " + entry.OtherUID);
 
-            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X - ImGui.GetStyle().ItemSpacing.X - trashButtonSize.X);
-            ImGui.SetCursorPosY(originalY);
-            if (ImGuiComponents.IconButton(pauseIcon))
+            if (entry.IsSynced)
             {
-                _ = _apiController.SendPairedClientPauseChange(entry.OtherUID, !entry.IsPaused);
+                ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X - ImGui.GetStyle().ItemSpacing.X - trashButtonSize.X);
+                ImGui.SetCursorPosY(originalY);
+                if (ImGuiComponents.IconButton(pauseIcon))
+                {
+                    _ = _apiController.SendPairedClientPauseChange(entry.OtherUID, !entry.IsPaused);
+                }
+                UiShared.AttachToolTip(!entry.IsPaused
+                    ? "Pause pairing with " + entry.OtherUID
+                    : "Resume pairing with " + entry.OtherUID);
             }
-            UiShared.AttachToolTip(entry.IsPaused
-                ? "Pause pairing with " + entry.OtherUID
-                : "Resume pairing with " + entry.OtherUID);
         }
 
         private void DrawPairList()
