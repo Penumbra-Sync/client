@@ -410,7 +410,7 @@ namespace MareSynchronos.UI
                     _isPenumbraDirectory = path.ToLower() == _ipcManager.PenumbraModDirectory()?.ToLower();
                     _isDirectoryWritable = IsDirectoryWritable(path);
                     _cacheDirectoryHasOtherFilesThanCache = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Any(f => new FileInfo(f).Name.Length != 40);
-                    _cacheDirectoryHasIllegalCharacter = Regex.IsMatch(path, @"^(\w:\\(\w|\\)*|\/(\w|\/)*)");
+                    _cacheDirectoryHasIllegalCharacter = Regex.IsMatch(path, @"^(\w:\\(\w|\\| |-|_)*|\/(\w|\/| |-|_)*)");
 
                     if (!string.IsNullOrEmpty(path)
                         && Directory.Exists(path)
