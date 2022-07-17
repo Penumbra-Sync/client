@@ -243,9 +243,6 @@ namespace MareSynchronos.UI
             _darkSoulsCaptcha1 = GetCaptchaTuple();
             _darkSoulsCaptcha2 = GetCaptchaTuple();
             _darkSoulsCaptcha3 = GetCaptchaTuple();
-            Logger.Debug(_darkSoulsCaptcha1.ToString());
-            Logger.Debug(_darkSoulsCaptcha2.ToString());
-            Logger.Debug(_darkSoulsCaptcha3.ToString());
         }
 
         private Tuple<string, string> GetCaptchaTuple()
