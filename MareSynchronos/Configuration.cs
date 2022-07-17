@@ -87,6 +87,13 @@ namespace MareSynchronos
         public void Initialize(DalamudPluginInterface pluginInterface)
         {
             _pluginInterface = pluginInterface;
+
+            if (!Directory.Exists(CacheFolder))
+            {
+                InitialScanComplete = false;
+            }
+
+            Save();
         }
 
         public void Save()
