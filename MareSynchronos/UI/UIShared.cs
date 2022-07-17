@@ -248,7 +248,7 @@ namespace MareSynchronos.UI
         private string _customServerUri = "";
         private bool _enterSecretKey = false;
         private bool _cacheDirectoryHasOtherFilesThanCache = false;
-        private bool _cacheDirectoryHasIllegalCharacter = false;
+        private bool _cacheDirectoryIsValidPath = true;
 
         public void DrawServiceSelection(Action? callBackOnExit = null, bool isIntroUi = false)
         {
@@ -410,14 +410,14 @@ namespace MareSynchronos.UI
                     _isPenumbraDirectory = path.ToLower() == _ipcManager.PenumbraModDirectory()?.ToLower();
                     _isDirectoryWritable = IsDirectoryWritable(path);
                     _cacheDirectoryHasOtherFilesThanCache = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Any(f => new FileInfo(f).Name.Length != 40);
-                    _cacheDirectoryHasIllegalCharacter = Regex.IsMatch(path, @"^(?:[a-zA-Z]:\\[\w\s\-\\]+?|\/(?:[\w\s\-\/])+?)$");
+                    _cacheDirectoryIsValidPath = Regex.IsMatch(path, @"^(?:[a-zA-Z]:\\[\w\s\-\\]+?|\/(?:[\w\s\-\/])+?)$", RegexOptions.ECMAScript);
 
                     if (!string.IsNullOrEmpty(path)
                         && Directory.Exists(path)
                         && _isDirectoryWritable
                         && !_isPenumbraDirectory
                         && !_cacheDirectoryHasOtherFilesThanCache
-                        && !_cacheDirectoryHasIllegalCharacter)
+                        && _cacheDirectoryIsValidPath)
                     {
                         _pluginConfiguration.CacheFolder = path;
                         _pluginConfiguration.Save();
@@ -438,10 +438,11 @@ namespace MareSynchronos.UI
             else if (_cacheDirectoryHasOtherFilesThanCache)
             {
                 ColorTextWrapped("Your selected directory has files inside that are not Mare related. Use an empty directory or a previous Mare cache directory only.", ImGuiColors.DalamudRed);
-            } else if (_cacheDirectoryHasIllegalCharacter)
+            }
+            else if (!_cacheDirectoryIsValidPath)
             {
                 ColorTextWrapped("Your selected directory contains illegal characters unreadable by FFXIV. " +
-                                 "Restrict yourself to latin letters (A-Z), underscores (_) and arabic numbers (0-9).", ImGuiColors.DalamudRed);
+                                 "Restrict yourself to latin letters (A-Z), underscores (_), dashes (-) and arabic numbers (0-9).", ImGuiColors.DalamudRed);
             }
 
             int maxCacheSize = _pluginConfiguration.MaxLocalCacheInGiB;
