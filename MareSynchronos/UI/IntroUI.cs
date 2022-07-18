@@ -2,6 +2,7 @@
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Threading.Tasks;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
@@ -45,6 +46,10 @@ namespace MareSynchronos.UI
         private string _enteredDarkSoulsCaptcha1 = string.Empty;
         private string _enteredDarkSoulsCaptcha2 = string.Empty;
         private string _enteredDarkSoulsCaptcha3 = string.Empty;
+
+        private bool _failedOnce = false;
+        private Task _timeoutTask;
+        private string _timeoutTime;
 
         private bool DarkSoulsCaptchaValid => _darkSoulsCaptcha1.Item2 == _enteredDarkSoulsCaptcha1
             && _darkSoulsCaptcha2.Item2 == _enteredDarkSoulsCaptcha2
@@ -120,13 +125,13 @@ namespace MareSynchronos.UI
 
                 UiShared.TextWrapped(TosParagraphs[0]);
                 UiShared.TextWrapped(TosParagraphs[1]);
-                UiShared.ColorTextWrapped(TosParagraphs[2], ImGuiColors.DalamudRed);
-                UiShared.ColorTextWrapped(TosParagraphs[3], ImGuiColors.DalamudYellow);
+                UiShared.TextWrapped(TosParagraphs[2]);
+                UiShared.TextWrapped(TosParagraphs[3]);
                 UiShared.TextWrapped(TosParagraphs[4]);
-                UiShared.ColorTextWrapped(TosParagraphs[5], ImGuiColors.DalamudRed);
+                UiShared.TextWrapped(TosParagraphs[5]);
 
                 ImGui.Separator();
-                if (!_pluginConfiguration.DarkSoulsAgreement || DarkSoulsCaptchaValid)
+                if ((!_pluginConfiguration.DarkSoulsAgreement || DarkSoulsCaptchaValid) && (_timeoutTask?.IsCompleted ?? true))
                 {
                     if (ImGui.Button("I agree##toSetup"))
                     {
@@ -141,22 +146,48 @@ namespace MareSynchronos.UI
                         }
                         else
                         {
-                            _pluginConfiguration.DarkSoulsAgreement = true;
-                            _pluginConfiguration.Save();
-                            GenerateDarkSoulsAgreementCaptcha();
+                            if (!_failedOnce)
+                            {
+                                _failedOnce = true;
+                                _timeoutTask = Task.Run(async () =>
+                                {
+                                    for (int i = 60; i > 0; i--)
+                                    {
+                                        _timeoutTime = $"{i}s remaining";
+                                        Logger.Debug(_timeoutTime);
+                                        await Task.Delay(TimeSpan.FromSeconds(1));
+                                    }
+                                });
+                            }
+                            else
+                            {
+                                _pluginConfiguration.DarkSoulsAgreement = true;
+                                _pluginConfiguration.Save();
+                                GenerateDarkSoulsAgreementCaptcha();
+                            }
                         }
                     }
                 }
                 else
                 {
-                    UiShared.ColorTextWrapped("Congratulations. You have failed to read the agreements.", ImGuiColors.DalamudYellow);
-                    UiShared.TextWrapped("Enter the following 3 words from the agreement exactly as described without punctuation to make the \"I agree\" button visible again.");
-                    ImGui.SetNextItemWidth(100);
-                    ImGui.InputText(_darkSoulsCaptcha1.Item1, ref _enteredDarkSoulsCaptcha1, 255);
-                    ImGui.SetNextItemWidth(100);
-                    ImGui.InputText(_darkSoulsCaptcha2.Item1, ref _enteredDarkSoulsCaptcha2, 255);
-                    ImGui.SetNextItemWidth(100);
-                    ImGui.InputText(_darkSoulsCaptcha3.Item1, ref _enteredDarkSoulsCaptcha3, 255);
+                    if (_failedOnce && (!_timeoutTask?.IsCompleted ?? true))
+                    {
+                        UiShared.ColorTextWrapped("Congratulations. You have failed to read the agreements.", ImGuiColors.DalamudYellow);
+                        UiShared.TextWrapped("I'm going to give you 1 minute to read the agreements carefully again. If you fail once more you will have to solve an annoying puzzle.");
+                        UiShared.TextWrapped(_timeoutTime);
+                    }
+                    else
+                    {
+                        UiShared.ColorTextWrapped("Congratulations. You have failed to read the agreements. Again.", ImGuiColors.DalamudYellow);
+                        UiShared.TextWrapped("I did warn you. Here's your annoying puzzle:");
+                        UiShared.TextWrapped("Enter the following 3 words from the agreement exactly as described without punctuation to make the \"I agree\" button visible again.");
+                        ImGui.SetNextItemWidth(100);
+                        ImGui.InputText(_darkSoulsCaptcha1.Item1, ref _enteredDarkSoulsCaptcha1, 255);
+                        ImGui.SetNextItemWidth(100);
+                        ImGui.InputText(_darkSoulsCaptcha2.Item1, ref _enteredDarkSoulsCaptcha2, 255);
+                        ImGui.SetNextItemWidth(100);
+                        ImGui.InputText(_darkSoulsCaptcha3.Item1, ref _enteredDarkSoulsCaptcha3, 255);
+                    }
                 }
             }
             else if (_pluginConfiguration.AcceptedAgreement
@@ -231,8 +262,8 @@ namespace MareSynchronos.UI
                                          "There is no support for custom services from the plugin creator. Use at your own risk.");
                     UiShared.ColorTextWrapped("On registration on a service the plugin will create and save a secret key to your plugin configuration. " +
                                          "Make a backup of your secret key. In case of loss, it cannot be restored. The secret key is your identification to the service " +
-                                         "to verify who you are. It is directly tied to the UID you will be receiving. In case of loss, you will have to re-register an account.", ImGuiColors.DalamudRed);
-                    UiShared.ColorTextWrapped("Do not ever, under any circumstances, share your secret key to anyone! Likewise do not share your Mare Synchronos plugin configuration to anyone!", ImGuiColors.DalamudRed);
+                                         "to verify who you are. It is directly tied to the UID you will be receiving. In case of loss, you will have to re-register an account.", ImGuiColors.DalamudYellow);
+                    UiShared.ColorTextWrapped("Do not ever, under any circumstances, share your secret key to anyone! Likewise do not share your Mare Synchronos plugin configuration to anyone!", ImGuiColors.DalamudYellow);
                     _uiShared.DrawServiceSelection(new Action(() => { }), true);
                 }
             }

@@ -374,6 +374,23 @@ namespace MareSynchronos.UI
 
         private string _secretKey = "";
 
+        public static void OutlineTextWrapped(string text, Vector4 textcolor, Vector4 outlineColor, float dist = 3)
+        {
+            var cursorPos = ImGui.GetCursorPos();
+            UiShared.ColorTextWrapped(text, outlineColor);
+            ImGui.SetCursorPos(new(cursorPos.X, cursorPos.Y + dist));
+            UiShared.ColorTextWrapped(text, outlineColor);
+            ImGui.SetCursorPos(new(cursorPos.X + dist, cursorPos.Y));
+            UiShared.ColorTextWrapped(text, outlineColor);
+            ImGui.SetCursorPos(new(cursorPos.X + dist, cursorPos.Y + dist));
+            UiShared.ColorTextWrapped(text, outlineColor);
+
+            ImGui.SetCursorPos(new(cursorPos.X + dist / 2, cursorPos.Y + dist / 2));
+            UiShared.ColorTextWrapped(text, textcolor);
+            ImGui.SetCursorPos(new(cursorPos.X + dist / 2, cursorPos.Y + dist / 2));
+            UiShared.ColorTextWrapped(text, textcolor);
+        }
+
         public static void DrawHelpText(string helpText)
         {
             ImGui.SameLine();
