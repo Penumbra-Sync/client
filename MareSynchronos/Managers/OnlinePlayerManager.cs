@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Game;
 using MareSynchronos.API;
@@ -20,6 +21,7 @@ public class OnlinePlayerManager : IDisposable
     private readonly PlayerManager _playerManager;
     private readonly List<CachedPlayer> _onlineCachedPlayers = new();
     private readonly Dictionary<string, CharacterCacheDto> _temporaryStoredCharacterCache = new();
+    private readonly Dictionary<CachedPlayer, CancellationTokenSource> _playerTokenDisposal = new();
 
     private List<string> OnlineVisiblePlayerHashes => _onlineCachedPlayers.Where(p => p.PlayerCharacter != null)
         .Select(p => p.PlayerNameHash).ToList();
@@ -169,13 +171,43 @@ public class OnlinePlayerManager : IDisposable
 
     private void AddPlayer(string characterNameHash)
     {
-        if (_onlineCachedPlayers.Any(p => p.PlayerNameHash == characterNameHash)) return;
+        if (_onlineCachedPlayers.Any(p => p.PlayerNameHash == characterNameHash))
+        {
+            PushCharacterData(new List<string>() { characterNameHash });
+            _playerTokenDisposal.TryGetValue(_onlineCachedPlayers.Single(p => p.PlayerNameHash == characterNameHash), out var cancellationTokenSource);
+            cancellationTokenSource?.Cancel();
+            return;
+        }
         _onlineCachedPlayers.Add(CreateCachedPlayer(characterNameHash));
     }
 
     private void RemovePlayer(string characterHash)
     {
         var cachedPlayer = _onlineCachedPlayers.First(p => p.PlayerNameHash == characterHash);
+        if (_dalamudUtil.IsInGpose)
+        {
+            _playerTokenDisposal.TryGetValue(cachedPlayer, out var cancellationTokenSource);
+            cancellationTokenSource?.Cancel();
+            cachedPlayer.IsVisible = false;
+            _playerTokenDisposal[cachedPlayer] = new CancellationTokenSource();
+            cancellationTokenSource = _playerTokenDisposal[cachedPlayer];
+            var token = cancellationTokenSource.Token;
+            Task.Run(async () =>
+            {
+                Logger.Verbose("Cannot dispose Player, in GPose");
+                while (_dalamudUtil.IsInGpose)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(0.5));
+                    if (token.IsCancellationRequested) return;
+                }
+
+                cachedPlayer.DisposePlayer();
+                _onlineCachedPlayers.RemoveAll(c => c.PlayerNameHash == cachedPlayer.PlayerNameHash);
+            }, token);
+
+            return;
+        }
+
         cachedPlayer.DisposePlayer();
         _onlineCachedPlayers.RemoveAll(c => c.PlayerNameHash == cachedPlayer.PlayerNameHash);
     }
@@ -207,7 +239,11 @@ public class OnlinePlayerManager : IDisposable
         var newlyVisiblePlayers = _onlineCachedPlayers
             .Where(p => p.PlayerCharacter != null && p.IsVisible && !p.WasVisible).Select(p => p.PlayerNameHash)
             .ToList();
-        PushCharacterData(newlyVisiblePlayers);
+        if (newlyVisiblePlayers.Any())
+        {
+            Logger.Verbose("Has new visible players, pushing character data");
+            PushCharacterData(newlyVisiblePlayers);
+        }
 
         _lastPlayerObjectCheck = DateTime.Now;
     }

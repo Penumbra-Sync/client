@@ -68,6 +68,8 @@ namespace MareSynchronos.Utils
 
         public string PlayerNameHashed => Crypto.GetHash256(PlayerName + _clientState.LocalPlayer!.HomeWorld.Id);
 
+        public bool IsInGpose => _objectTable[201] != null;
+
         public List<PlayerCharacter> GetPlayerCharacters()
         {
             return _objectTable.Where(obj =>

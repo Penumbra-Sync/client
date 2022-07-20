@@ -130,6 +130,16 @@ public class CachedPlayer
                 }
             }
 
+            if (_dalamudUtil.IsInGpose)
+            {
+                Logger.Verbose("Player is in GPose, waiting");
+                while (_dalamudUtil.IsInGpose)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(0.5));
+                    downloadToken.ThrowIfCancellationRequested();
+                }
+            }
+
             ApplyCharacterData(_cache[_lastAppliedEquipmentHash], moddedPaths);
         }, downloadToken).ContinueWith(task =>
         {
@@ -221,10 +231,10 @@ public class CachedPlayer
 
     public void InitializePlayer(PlayerCharacter character, CharacterCacheDto? cache)
     {
+        Logger.Debug("Initializing Player " + this);
         IsVisible = true;
         PlayerName = character.Name.ToString();
         PlayerCharacter = character;
-        Logger.Debug("Initializing Player " + this);
         _dalamudUtil.FrameworkUpdate += DalamudUtilOnFrameworkUpdate;
         _ipcManager.PenumbraRedrawEvent += IpcManagerOnPenumbraRedrawEvent;
         _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);

@@ -125,6 +125,8 @@ namespace MareSynchronos.Managers
 
         private void PlayerChanged()
         {
+            if (_dalamudUtil.IsInGpose) return;
+
             Logger.Debug("Player changed: " + _dalamudUtil.PlayerName);
             _playerChangedCts?.Cancel();
             _playerChangedCts = new CancellationTokenSource();
