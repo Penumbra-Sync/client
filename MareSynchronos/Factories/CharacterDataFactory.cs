@@ -195,9 +195,23 @@ public class CharacterDataFactory
 
         AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->Decal->FileName()).ToString(), cache, 0, "Decal", false);
         AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), cache, 0, "Legacy Decal", false);
-
-
         AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId, cache);
+
+        var minion = ((Character*)_dalamudUtil.PlayerPointer)->CompanionObject;
+        if (minion != null)
+        {
+            var minionDrawObj = ((CharacterBase*)minion->Character.GameObject.GetDrawObject());
+            for (var mdlIdx = 0; mdlIdx < minionDrawObj->SlotCount; mdlIdx++)
+            {
+                var mdl = (RenderModel*)minionDrawObj->ModelArray[mdlIdx];
+                if (mdl == null || mdl->ResourceHandle == null)
+                {
+                    continue;
+                }
+
+                AddReplacementsFromRenderModel(mdl, cache, 0, "Companion");
+            }
+        }
 
         st.Stop();
         Logger.Verbose("Building Character Data took " + st.Elapsed);

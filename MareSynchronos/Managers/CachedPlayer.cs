@@ -5,11 +5,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Logging;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using MareSynchronos.API;
 using MareSynchronos.FileCacheDB;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Utils;
+using Penumbra.GameData.ByteString;
 using Penumbra.GameData.Structs;
 
 namespace MareSynchronos.Managers;
@@ -182,7 +184,7 @@ public class CachedPlayer
         return missingFiles;
     }
 
-    private void ApplyCharacterData(CharacterCacheDto cache, Dictionary<string, string> moddedPaths)
+    private unsafe void ApplyCharacterData(CharacterCacheDto cache, Dictionary<string, string> moddedPaths)
     {
         if (PlayerCharacter is null) return;
         _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName!);
@@ -193,6 +195,15 @@ public class CachedPlayer
             $"Request Redraw for {PlayerName}");
         _ipcManager.PenumbraSetTemporaryMods(tempCollection, moddedPaths, cache.ManipulationData);
         _ipcManager.GlamourerApplyAll(cache.GlamourerData, PlayerCharacter!);
+        var minion = ((Character*)PlayerCharacter.Address)->CompanionObject;
+        if (minion != null)
+        {
+            var compName = new Utf8String(minion->Character.GameObject.GetName()).ToString();
+            if (compName != null)
+            {
+                _ipcManager.PenumbraRedraw(compName);
+            }
+        }
     }
 
     public void DisposePlayer()

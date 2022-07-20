@@ -7,6 +7,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using MareSynchronos.API;
 using Penumbra.GameData.Structs;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using Penumbra.GameData.ByteString;
 
 namespace MareSynchronos.Managers
 {
@@ -25,6 +28,7 @@ namespace MareSynchronos.Managers
         private CancellationTokenSource? _playerChangedCts;
         private DateTime _lastPlayerObjectCheck;
         private CharacterEquipment? _currentCharacterEquipment;
+        private string _lastMinionName = string.Empty;
 
         public PlayerManager(ApiController apiController, IpcManager ipcManager,
             CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil)
@@ -57,14 +61,23 @@ namespace MareSynchronos.Managers
             _dalamudUtil.FrameworkUpdate -= DalamudUtilOnFrameworkUpdate;
         }
 
-        private void DalamudUtilOnFrameworkUpdate()
+        private unsafe void DalamudUtilOnFrameworkUpdate()
         {
             if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized || !_apiController.IsConnected) return;
 
             if (DateTime.Now < _lastPlayerObjectCheck.AddSeconds(0.25)) return;
 
-            if (_dalamudUtil.IsPlayerPresent && !_currentCharacterEquipment!.CompareAndUpdate(_dalamudUtil.PlayerCharacter))
+            var minion = ((Character*)_dalamudUtil.PlayerPointer)->CompanionObject;
+            string minionName = "";
+            if (minion != null)
             {
+                minionName = new Utf8String(minion->Character.GameObject.GetName()).ToString();
+            }
+
+            if (_dalamudUtil.IsPlayerPresent
+                && (!_currentCharacterEquipment!.CompareAndUpdate(_dalamudUtil.PlayerCharacter) || minionName != _lastMinionName))
+            {
+                _lastMinionName = minionName;
                 OnPlayerChanged();
             }
 
