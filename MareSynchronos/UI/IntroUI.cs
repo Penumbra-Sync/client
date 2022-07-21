@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -34,6 +35,8 @@ namespace MareSynchronos.UI
         private bool _failedOnce = false;
         private Task _timeoutTask;
         private string _timeoutTime;
+
+        private Dictionary<string, string> _languages = new() { { "English", "en" }, { "Deutsch", "de" }, { "Français", "fr" } };
         private int _currentLanguage;
 
         private bool DarkSoulsCaptchaValid => _darkSoulsCaptcha1.Item2 == _enteredDarkSoulsCaptcha1
@@ -92,18 +95,29 @@ namespace MareSynchronos.UI
             }
             else if (!_pluginConfiguration.AcceptedAgreement && _readFirstPage)
             {
-                if (ImGui.Combo("Language", ref _currentLanguage, new []{"English"}, 1))
+                if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
+                var textSize = ImGui.CalcTextSize(Strings.ToS.LanguageLabel);
+                ImGui.TextUnformatted(Strings.ToS.AgreementLabel);
+                if (_uiShared.UidFontBuilt) ImGui.PopFont();
+                
+                ImGui.SameLine();
+                var languageSize = ImGui.CalcTextSize(Strings.ToS.LanguageLabel);
+                ImGui.SetCursorPosX(ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X - languageSize.X - 80);
+                ImGui.SetCursorPosY(ImGui.GetCursorPosY() + textSize.Y / 2 - languageSize.Y / 2);
+                
+                ImGui.TextUnformatted(Strings.ToS.LanguageLabel);
+                ImGui.SameLine();
+                ImGui.SetCursorPosY(ImGui.GetCursorPosY() + textSize.Y / 2 - (languageSize.Y + ImGui.GetStyle().FramePadding.Y) / 2);
+                ImGui.SetNextItemWidth(80);
+                if (ImGui.Combo("", ref _currentLanguage, _languages.Keys.ToArray(), _languages.Count))
                 {
                     GetToSLocalization(_currentLanguage);
                 }
-
-                if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
-                ImGui.TextUnformatted(Strings.ToS.AgreementLabel);
-                if (_uiShared.UidFontBuilt) ImGui.PopFont();
+                
                 ImGui.Separator();
                 ImGui.SetWindowFontScale(1.5f);
                 string readThis = Strings.ToS.ReadLabel;
-                var textSize = ImGui.CalcTextSize(readThis);
+                textSize = ImGui.CalcTextSize(readThis);
                 ImGui.SetCursorPosX(ImGui.GetWindowSize().X / 2 - textSize.X / 2);
                 UiShared.ColorText(readThis, ImGuiColors.DalamudRed);
                 ImGui.SetWindowFontScale(1.0f);
@@ -260,15 +274,7 @@ namespace MareSynchronos.UI
         {
             if (changeLanguageTo != -1)
             {
-                var languageCode = changeLanguageTo switch
-                {
-                    1 => "de",
-                    2 => "fr",
-                    3 => "jp",
-                    _ => "en"
-                };
-
-                _uiShared.LoadLocalization(languageCode);
+                _uiShared.LoadLocalization(_languages.ElementAt(changeLanguageTo).Value);
             }
             
             TosParagraphs = new[] { Strings.ToS.Paragraph1, Strings.ToS.Paragraph2, Strings.ToS.Paragraph3, Strings.ToS.Paragraph4, Strings.ToS.Paragraph5, Strings.ToS.Paragraph6 };

@@ -1,4 +1,8 @@
 {
+  "LanguageLabel": {
+    "message": "Language",
+    "description": "ToSStrings..ctor"
+  },
   "AgreementLabel": {
     "message": "Agreement of Usage of Service",
     "description": "ToSStrings..ctor"

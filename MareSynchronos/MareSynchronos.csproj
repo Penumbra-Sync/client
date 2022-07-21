@@ -78,7 +78,8 @@
     <None Update="images\icon.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <EmbeddedResource Include="Localization\en.json" />
+    <EmbeddedResource Include="Localization\de.json" />
+    <EmbeddedResource Include="Localization\fr.json" />
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">

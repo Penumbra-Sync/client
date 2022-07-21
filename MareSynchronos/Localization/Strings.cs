@@ -6,6 +6,7 @@ namespace MareSynchronos.Localization
     {
         public class ToSStrings
         {
+            public readonly string LanguageLabel = Loc.Localize("LanguageLabel", "Language");
             public readonly string AgreementLabel = Loc.Localize("AgreementLabel", "Agreement of Usage of Service");
             public readonly string ReadLabel = Loc.Localize("ReadLabel", "READ THIS CAREFULLY");
 
@@ -61,7 +62,7 @@ namespace MareSynchronos.Localization
 
             public readonly string WordLabel = Loc.Localize("WordLabel", "Word");
         }
-        
-        public static ToSStrings ToS = new();
+
+        public static ToSStrings ToS { get; set; } = new();
     }
 }
