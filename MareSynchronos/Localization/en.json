@@ -1,0 +1,74 @@
+{
+  "AgreementLabel": {
+    "message": "Agreement of Usage of Service",
+    "description": "ToSStrings..ctor"
+  },
+  "ReadLabel": {
+    "message": "READ THIS CAREFULLY",
+    "description": "ToSStrings..ctor"
+  },
+  "Paragraph1": {
+    "message": "All of the mod files currently active on your character as well as your current character state will be uploaded to the service you registered yourself at automatically. The plugin will exclusively upload the necessary mod files and not the whole mod.",
+    "description": "ToSStrings..ctor"
+  },
+  "Paragraph2": {
+    "message": "If you are on a data capped internet connection, higher fees due to data usage depending on the amount of downloaded and uploaded mod files might occur. Mod files will be compressed on up- and download to save on bandwidth usage. Due to varying up- and download speeds, changes in characters might not be visible immediately. Files present on the service that already represent your active mod files will not be uploaded again.",
+    "description": "ToSStrings..ctor"
+  },
+  "Paragraph3": {
+    "message": "The mod files you are uploading are confidential and will not be distributed to parties other than the ones who are requesting the exact same mod files. Please think about who you are going to pair since it is unavoidable that they will receive and locally cache the necessary mod files that you have currently in use. Locally cached mod files will have arbitrary file names to discourage attempts at replicating the original mod.",
+    "description": "ToSStrings..ctor"
+  },
+  "Paragraph4": {
+    "message": "The plugin creator tried their best to keep you secure. However, there is no guarantee for 100% security. Do not blindly pair your client with everyone.",
+    "description": "ToSStrings..ctor"
+  },
+  "Paragraph5": {
+    "message": "Mod files that are saved on the service will remain on the service as long as there are requests for the files from clients. After a period of not being used, the mod files will be automatically deleted. You will also be able to wipe all the files you have personally uploaded on request. The service holds no information about which mod files belong to which mod.",
+    "description": "ToSStrings..ctor"
+  },
+  "Paragraph6": {
+    "message": "This service is provided as-is. In case of abuse, contact darkarchon#4313 on Discord or join the Mare Synchronos Discord. To accept those conditions hold CTRL while clicking 'I agree'",
+    "description": "ToSStrings..ctor"
+  },
+  "AgreeLabel": {
+    "message": "I agree",
+    "description": "ToSStrings..ctor"
+  },
+  "RemainingLabel": {
+    "message": "remaining",
+    "description": "ToSStrings..ctor"
+  },
+  "FailedLabel": {
+    "message": "Congratulations. You have failed to read the agreements.",
+    "description": "ToSStrings..ctor"
+  },
+  "TimeoutLabel": {
+    "message": "I'm going to give you 1 minute to read the agreements carefully again. If you fail once more you will have to solve an annoying puzzle.",
+    "description": "ToSStrings..ctor"
+  },
+  "FailedAgainLabel": {
+    "message": "Congratulations. You have failed to read the agreements. Again.",
+    "description": "ToSStrings..ctor"
+  },
+  "PuzzleLabel": {
+    "message": "I did warn you. Here's your annoying puzzle:",
+    "description": "ToSStrings..ctor"
+  },
+  "PuzzleDescLabel": {
+    "message": "Enter the following 3 words from the agreement exactly as described without punctuation to make the \"I agree\" button visible again.",
+    "description": "ToSStrings..ctor"
+  },
+  "ParagraphLabel": {
+    "message": "Paragraph",
+    "description": "ToSStrings..ctor"
+  },
+  "SentenceLabel": {
+    "message": "Sentence",
+    "description": "ToSStrings..ctor"
+  },
+  "WordLabel": {
+    "message": "Word",
+    "description": "ToSStrings..ctor"
+  }
+}

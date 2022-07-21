@@ -8,6 +8,7 @@ using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using MareSynchronos.Managers;
 using MareSynchronos.Utils;
+using MareSynchronos.Localization;
 
 namespace MareSynchronos.UI
 {
@@ -21,24 +22,7 @@ namespace MareSynchronos.UI
 
         public event SwitchUi? SwitchToMainUi;
 
-        private readonly string[] TosParagraphs = new[]
-{
-                    "All of the mod files currently active on your character as well as your current character state will be uploaded to the service you registered yourself at automatically. " +
-                    "The plugin will exclusively upload the necessary mod files and not the whole mod.",
-                    "If you are on a data capped internet connection, higher fees due to data usage depending on the amount of downloaded and uploaded mod files might occur. " +
-                    "Mod files will be compressed on up- and download to save on bandwidth usage. Due to varying up- and download speeds, changes in characters might not be visible immediately. " +
-                    "Files present on the service that already represent your active mod files will not be uploaded again.",
-                    "The mod files you are uploading are confidential and will not be distributed to parties other than the ones who are requesting the exact same mod files. " +
-                    "Please think about who you are going to pair since it is unavoidable that they will receive and locally cache the necessary mod files that you have currently in use. " +
-                    "Locally cached mod files will have arbitrary file names to discourage attempts at replicating the original mod.",
-                    "The plugin creator tried their best to keep you secure. However, there is no guarantee for 100% security. Do not blindly pair your client with everyone.",
-                    "Mod files that are saved on the service will remain on the service as long as there are requests for the files from clients. " +
-                                  "After a period of not being used, the mod files will be automatically deleted. " +
-                                  "You will also be able to wipe all the files you have personally uploaded on request. " +
-                                  "The service holds no information about which mod files belong to which mod.",
-                    "This service is provided as-is. In case of abuse, contact darkarchon#4313 on Discord or join the Mare Synchronos Discord. " +
-                                                          "To accept those conditions hold CTRL while clicking 'I agree'"
-                };
+        private string[] TosParagraphs;
 
         private Tuple<string, string> _darkSoulsCaptcha1 = new(string.Empty, string.Empty);
         private Tuple<string, string> _darkSoulsCaptcha2 = new(string.Empty, string.Empty);
@@ -50,6 +34,7 @@ namespace MareSynchronos.UI
         private bool _failedOnce = false;
         private Task _timeoutTask;
         private string _timeoutTime;
+        private int _currentLanguage;
 
         private bool DarkSoulsCaptchaValid => _darkSoulsCaptcha1.Item2 == _enteredDarkSoulsCaptcha1
             && _darkSoulsCaptcha2.Item2 == _enteredDarkSoulsCaptcha2
@@ -78,10 +63,7 @@ namespace MareSynchronos.UI
                 MaximumSize = new Vector2(600, 2000)
             };
 
-            if (_pluginConfiguration.DarkSoulsAgreement)
-            {
-                GenerateDarkSoulsAgreementCaptcha();
-            }
+            GetToSLocalization();
 
             _windowSystem.AddWindow(this);
         }
@@ -110,12 +92,17 @@ namespace MareSynchronos.UI
             }
             else if (!_pluginConfiguration.AcceptedAgreement && _readFirstPage)
             {
+                if (ImGui.Combo("Language", ref _currentLanguage, new []{"English"}, 1))
+                {
+                    GetToSLocalization(_currentLanguage);
+                }
+
                 if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
-                ImGui.TextUnformatted("Agreement of Usage of Service");
+                ImGui.TextUnformatted(Strings.ToS.AgreementLabel);
                 if (_uiShared.UidFontBuilt) ImGui.PopFont();
                 ImGui.Separator();
                 ImGui.SetWindowFontScale(1.5f);
-                string readThis = "READ THIS CAREFULLY";
+                string readThis = Strings.ToS.ReadLabel;
                 var textSize = ImGui.CalcTextSize(readThis);
                 ImGui.SetCursorPosX(ImGui.GetWindowSize().X / 2 - textSize.X / 2);
                 UiShared.ColorText(readThis, ImGuiColors.DalamudRed);
@@ -133,7 +120,7 @@ namespace MareSynchronos.UI
                 ImGui.Separator();
                 if ((!_pluginConfiguration.DarkSoulsAgreement || DarkSoulsCaptchaValid) && (_timeoutTask?.IsCompleted ?? true))
                 {
-                    if (ImGui.Button("I agree##toSetup"))
+                    if (ImGui.Button(Strings.ToS.AgreeLabel + "##toSetup"))
                     {
                         _enteredDarkSoulsCaptcha1 = string.Empty;
                         _enteredDarkSoulsCaptcha2 = string.Empty;
@@ -153,7 +140,7 @@ namespace MareSynchronos.UI
                                 {
                                     for (int i = 60; i > 0; i--)
                                     {
-                                        _timeoutTime = $"{i}s remaining";
+                                        _timeoutTime = $"{i}s " + Strings.ToS.RemainingLabel;
                                         Logger.Debug(_timeoutTime);
                                         await Task.Delay(TimeSpan.FromSeconds(1));
                                     }
@@ -172,15 +159,15 @@ namespace MareSynchronos.UI
                 {
                     if (_failedOnce && (!_timeoutTask?.IsCompleted ?? true))
                     {
-                        UiShared.ColorTextWrapped("Congratulations. You have failed to read the agreements.", ImGuiColors.DalamudYellow);
-                        UiShared.TextWrapped("I'm going to give you 1 minute to read the agreements carefully again. If you fail once more you will have to solve an annoying puzzle.");
+                        UiShared.ColorTextWrapped(Strings.ToS.FailedLabel, ImGuiColors.DalamudYellow);
+                        UiShared.TextWrapped(Strings.ToS.TimeoutLabel);
                         UiShared.TextWrapped(_timeoutTime);
                     }
                     else
                     {
-                        UiShared.ColorTextWrapped("Congratulations. You have failed to read the agreements. Again.", ImGuiColors.DalamudYellow);
-                        UiShared.TextWrapped("I did warn you. Here's your annoying puzzle:");
-                        UiShared.TextWrapped("Enter the following 3 words from the agreement exactly as described without punctuation to make the \"I agree\" button visible again.");
+                        UiShared.ColorTextWrapped(Strings.ToS.FailedAgainLabel, ImGuiColors.DalamudYellow);
+                        UiShared.TextWrapped(Strings.ToS.PuzzleLabel);
+                        UiShared.TextWrapped(Strings.ToS.PuzzleDescLabel);
                         ImGui.SetNextItemWidth(100);
                         ImGui.InputText(_darkSoulsCaptcha1.Item1, ref _enteredDarkSoulsCaptcha1, 255);
                         ImGui.SetNextItemWidth(100);
@@ -269,6 +256,29 @@ namespace MareSynchronos.UI
             }
         }
 
+        private void GetToSLocalization(int changeLanguageTo = -1)
+        {
+            if (changeLanguageTo != -1)
+            {
+                var languageCode = changeLanguageTo switch
+                {
+                    1 => "de",
+                    2 => "fr",
+                    3 => "jp",
+                    _ => "en"
+                };
+
+                _uiShared.LoadLocalization(languageCode);
+            }
+            
+            TosParagraphs = new[] { Strings.ToS.Paragraph1, Strings.ToS.Paragraph2, Strings.ToS.Paragraph3, Strings.ToS.Paragraph4, Strings.ToS.Paragraph5, Strings.ToS.Paragraph6 };
+            
+            if (_pluginConfiguration.DarkSoulsAgreement)
+            {
+                GenerateDarkSoulsAgreementCaptcha();
+            }
+        }
+        
         private void GenerateDarkSoulsAgreementCaptcha()
         {
             _darkSoulsCaptcha1 = GetCaptchaTuple();
@@ -284,7 +294,7 @@ namespace MareSynchronos.UI
             var sentenceIdx = random.Next(splitParagraph.Length);
             var splitSentence = splitParagraph[sentenceIdx].Split(" ").Select(c => c.Trim()).Select(c => c.Replace(".", "").Replace(",", "").Replace("'", "")).ToArray();
             var wordIdx = random.Next(splitSentence.Length);
-            return new($"Paragraph {paragraphIdx + 1}, Sentence {sentenceIdx + 1}, Word {wordIdx + 1}", splitSentence[wordIdx]);
+            return new($"{Strings.ToS.ParagraphLabel} {paragraphIdx + 1}, {Strings.ToS.SentenceLabel} {sentenceIdx + 1}, {Strings.ToS.WordLabel} {wordIdx + 1}", splitSentence[wordIdx]);
         }
     }
 }

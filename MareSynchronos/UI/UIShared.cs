@@ -11,6 +11,7 @@ using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Plugin;
 using Dalamud.Utility;
 using ImGuiNET;
+using MareSynchronos.Localization;
 using MareSynchronos.Managers;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
@@ -203,6 +204,12 @@ namespace MareSynchronos.UI
 
         public static Vector4 UploadColor((long, long) data) => data.Item1 == 0 ? ImGuiColors.DalamudGrey :
             data.Item1 == data.Item2 ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudYellow;
+
+        public void LoadLocalization(string languageCode)
+        {
+            _dalamudUtil.Localization.SetupWithLangCode(languageCode);
+            Strings.ToS = new Strings.ToSStrings();
+        }
 
         public static uint Color(byte r, byte g, byte b, byte a)
         { uint ret = a; ret <<= 8; ret += b; ret <<= 8; ret += g; ret <<= 8; ret += r; return ret; }

@@ -26,6 +26,7 @@ namespace MareSynchronos.Utils
         public event LogIn? LogIn;
         public event LogOut? LogOut;
         public event FrameworkUpdate? FrameworkUpdate;
+        public readonly Dalamud.Localization Localization;
 
         public DalamudUtil(ClientState clientState, ObjectTable objectTable, Framework framework)
         {
@@ -39,6 +40,9 @@ namespace MareSynchronos.Utils
             {
                 ClientStateOnLogin(null, EventArgs.Empty);
             }
+
+            Localization = new Dalamud.Localization("MareSynchronos.Localization.", "", true);
+            Localization.SetupWithLangCode("en");
         }
 
         private void FrameworkOnUpdate(Framework framework)
