@@ -16,6 +16,7 @@ using Penumbra.Interop.Structs;
 using Object = FFXIVClientStructs.FFXIV.Client.Graphics.Scene.Object;
 
 namespace MareSynchronos.Factories;
+
 public class CharacterDataFactory
 {
     private readonly DalamudUtil _dalamudUtil;
@@ -29,16 +30,21 @@ public class CharacterDataFactory
         _ipcManager = ipcManager;
     }
 
-    public CharacterData? BuildCharacterData()
+    public CharacterData? BuildCharacterData(IntPtr playerPointer)
     {
         if (!_ipcManager.Initialized)
         {
             throw new ArgumentException("Penumbra is not connected");
         }
 
+        if (playerPointer == IntPtr.Zero)
+        {
+            return null;
+        }
+
         try
         {
-            return CreateCharacterData();
+            return CreateCharacterData(playerPointer);
         }
         catch (Exception e)
         {
@@ -150,22 +156,32 @@ public class CharacterDataFactory
         cache.AddFileReplacement(texDx11Replacement);
     }
 
-    private unsafe CharacterData CreateCharacterData()
+    private unsafe CharacterData CreateCharacterData(IntPtr charaPointer)
     {
         Stopwatch st = Stopwatch.StartNew();
-        while (!_dalamudUtil.IsPlayerPresent)
+        var chara = _dalamudUtil.CreateGameObject(charaPointer)!;
+        while (!_dalamudUtil.IsObjectPresent(chara))
         {
             Logger.Verbose("Character is null but it shouldn't be, waiting");
             Thread.Sleep(50);
         }
-        _dalamudUtil.WaitWhileCharacterIsDrawing(_dalamudUtil.PlayerPointer);
-        var cache = new CharacterData
+        _dalamudUtil.WaitWhileCharacterIsDrawing(charaPointer);
+        var cache = new CharacterData()
         {
-            GlamourerString = _ipcManager.GlamourerGetCharacterCustomization(_dalamudUtil.PlayerCharacter),
-            ManipulationString = _ipcManager.PenumbraGetMetaManipulations()
+            ManipulationString = _ipcManager.PenumbraGetMetaManipulations(),
         };
 
-        var human = (Human*)((Character*)_dalamudUtil.PlayerPointer)->GameObject.GetDrawObject();
+        try
+        {
+            cache.GlamourerString = _ipcManager.GlamourerGetCharacterCustomization(chara);
+        }
+        catch
+        {
+            // might not have glamourer data
+        }
+
+
+        var human = (Human*)((Character*)charaPointer)->GameObject.GetDrawObject();
         for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)
         {
             var mdl = (RenderModel*)human->CharacterBase.ModelArray[mdlIdx];
@@ -193,24 +209,15 @@ public class CharacterDataFactory
             }
         }
 
-        AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->Decal->FileName()).ToString(), cache, 0, "Decal", false);
-        AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), cache, 0, "Legacy Decal", false);
-        AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId, cache);
-
-        var minion = ((Character*)_dalamudUtil.PlayerPointer)->CompanionObject;
-        if (minion != null)
+        if (!string.IsNullOrEmpty(cache.GlamourerString))
         {
-            var minionDrawObj = ((CharacterBase*)minion->Character.GameObject.GetDrawObject());
-            for (var mdlIdx = 0; mdlIdx < minionDrawObj->SlotCount; mdlIdx++)
+            try
             {
-                var mdl = (RenderModel*)minionDrawObj->ModelArray[mdlIdx];
-                if (mdl == null || mdl->ResourceHandle == null)
-                {
-                    continue;
-                }
-
-                AddReplacementsFromRenderModel(mdl, cache, 0, "Companion");
+                AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId, cache);
+                AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->Decal->FileName()).ToString(), cache, 0, "Decal", false);
+                AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), cache, 0, "Legacy Decal", false);
             }
+            catch { }
         }
 
         st.Stop();

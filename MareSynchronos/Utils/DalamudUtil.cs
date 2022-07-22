@@ -7,11 +7,12 @@ using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 namespace MareSynchronos.Utils
 {
-    public delegate void PlayerChange(Character actor);
+    public delegate void PlayerChange(Dalamud.Game.ClientState.Objects.Types.Character actor);
 
     public delegate void LogIn();
     public delegate void LogOut();
@@ -56,9 +57,38 @@ namespace MareSynchronos.Utils
             LogIn?.Invoke();
         }
 
+        public Dalamud.Game.ClientState.Objects.Types.GameObject? CreateGameObject(IntPtr reference)
+        {
+            return _objectTable.CreateObjectReference(reference);
+        }
+
         public bool IsLoggedIn => _clientState.IsLoggedIn;
 
         public bool IsPlayerPresent => _clientState.LocalPlayer != null && _clientState.LocalPlayer.IsValid();
+
+        public bool IsObjectPresent(Dalamud.Game.ClientState.Objects.Types.GameObject? obj)
+        {
+            return obj != null && obj.IsValid();
+        }
+
+        public unsafe IntPtr GetMinion()
+        {
+            return (IntPtr)((FFXIVClientStructs.FFXIV.Client.Game.Character.Character*)PlayerPointer)->CompanionObject;
+        }
+
+        public unsafe IntPtr GetPet(IntPtr? playerPointer = null)
+        {
+            var mgr = CharacterManager.Instance();
+            if (playerPointer == null) playerPointer = PlayerPointer;
+            return (IntPtr)mgr->LookupPetByOwnerObject((FFXIVClientStructs.FFXIV.Client.Game.Character.BattleChara*)playerPointer);
+        }
+
+        public unsafe IntPtr GetCompanion(IntPtr? playerPointer = null)
+        {
+            var mgr = CharacterManager.Instance();
+            if (playerPointer == null) playerPointer = PlayerPointer;
+            return (IntPtr)mgr->LookupBuddyByOwnerObject((FFXIVClientStructs.FFXIV.Client.Game.Character.BattleChara*)playerPointer);
+        }
 
         public string PlayerName => _clientState.LocalPlayer?.Name.ToString() ?? "--";
 
@@ -77,11 +107,23 @@ namespace MareSynchronos.Utils
                 obj.Name.ToString() != PlayerName).Select(p => (PlayerCharacter)p).ToList();
         }
 
-        public PlayerCharacter? GetPlayerCharacterFromObjectTableByIndex(int index)
+        public Dalamud.Game.ClientState.Objects.Types.Character? GetCharacterFromObjectTableByIndex(int index)
         {
             var objTableObj = _objectTable[index];
             if (objTableObj!.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) return null;
-            return (PlayerCharacter)objTableObj;
+            return (Dalamud.Game.ClientState.Objects.Types.Character)objTableObj;
+        }
+
+        internal unsafe int GetIdxBasedOnPtr(FFXIVClientStructs.FFXIV.Client.Game.Character.Character* pet)
+        {
+            var idx = 0;
+            foreach (var item in _objectTable)
+            {
+                if (item.Address == (IntPtr)pet) return idx;
+                idx++;
+            }
+
+            return -1;
         }
 
         public PlayerCharacter? GetPlayerCharacterFromObjectTableByName(string characterName)
@@ -93,6 +135,12 @@ namespace MareSynchronos.Utils
             }
 
             return null;
+        }
+
+        public unsafe void DebugPrintRenderFlags(IntPtr characterAddress)
+        {
+            var obj = (GameObject*)characterAddress;
+            Logger.Verbose("RenderFlags for " + characterAddress + ": " + Convert.ToString(obj->RenderFlags, 2));
         }
 
         public unsafe void WaitWhileCharacterIsDrawing(IntPtr characterAddress, CancellationToken? ct = null)

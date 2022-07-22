@@ -17,12 +17,13 @@ namespace MareSynchronos.WebAPI
     public partial class ApiController
     {
         private int _downloadId = 0;
-        public void CancelUpload()
+        public void CancelUpload(ObjectKind objectKind)
         {
-            if (_uploadCancellationTokenSource != null)
+            _uploadTokens.TryGetValue(objectKind, out var cts);
+            if (cts != null)
             {
                 Logger.Warn("Cancelling upload");
-                _uploadCancellationTokenSource?.Cancel();
+                cts?.Cancel();
                 _mareHub!.SendAsync(Api.SendFileAbortUpload);
                 CurrentUploads.Clear();
             }
@@ -123,9 +124,9 @@ namespace MareSynchronos.WebAPI
             if (!IsConnected || SecretKey == "-") return;
             Logger.Debug("Sending Character data to service " + ApiUri);
 
-            CancelUpload();
-            _uploadCancellationTokenSource = new CancellationTokenSource();
-            var uploadToken = _uploadCancellationTokenSource.Token;
+            CancelUpload(character.ObjectKind);
+            _uploadTokens[character.ObjectKind] = new CancellationTokenSource();
+            var uploadToken = _uploadTokens[character.ObjectKind]!.Token;
             Logger.Verbose("New Token Created");
 
             var filesToUpload = await _mareHub!.InvokeAsync<List<UploadFileDto>>(Api.InvokeFileSendFiles, character.FileReplacements.Select(c => c.Hash).Distinct(), uploadToken);
@@ -164,7 +165,7 @@ namespace MareSynchronos.WebAPI
 
             var totalSize = CurrentUploads.Sum(c => c.Total);
             Logger.Verbose("Compressing and uploading files");
-            foreach (var file in CurrentUploads.Where(f => f.CanBeTransferred && !f.IsTransferred))
+            foreach (var file in CurrentUploads.Where(f => f.CanBeTransferred && !f.IsTransferred).ToList())
             {
                 Logger.Verbose("Compressing and uploading " + file);
                 var data = await GetCompressedFileData(file.Hash, uploadToken);
@@ -205,7 +206,7 @@ namespace MareSynchronos.WebAPI
             }
 
             Logger.Verbose("Upload complete for " + character.Hash);
-            _uploadCancellationTokenSource = null;
+            _uploadTokens.Remove(character.ObjectKind);
         }
 
         private async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)

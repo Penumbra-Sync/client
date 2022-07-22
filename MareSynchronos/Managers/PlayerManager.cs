@@ -10,10 +10,14 @@ using Penumbra.GameData.Structs;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using Penumbra.GameData.ByteString;
+using System.Collections.Generic;
+using System.Linq;
+using MareSynchronos.Models;
+using MareSynchronos.Interop;
 
 namespace MareSynchronos.Managers
 {
-    public delegate void PlayerHasChanged(CharacterCacheDto characterCache);
+    public delegate void PlayerHasChanged(CharacterCacheDto characterCache, ObjectKind objectKind);
 
     public class PlayerManager : IDisposable
     {
@@ -23,14 +27,18 @@ namespace MareSynchronos.Managers
         private readonly IpcManager _ipcManager;
         public event PlayerHasChanged? PlayerHasChanged;
         public bool SendingData { get; private set; }
-        public CharacterCacheDto? LastSentCharacterData { get; private set; }
+        public Dictionary<ObjectKind, CharacterCacheDto?> LastSentCharacterData { get; private set; } = new();
 
-        private CancellationTokenSource? _playerChangedCts;
+        private Dictionary<ObjectKind, CancellationTokenSource?> _playerChangedCts = new();
         private DateTime _lastPlayerObjectCheck;
-        private CharacterEquipment? _currentCharacterEquipment;
-        private string _lastMinionName = string.Empty;
+        private Dictionary<ObjectKind, CharacterEquipment?> _currentCharacterEquipment = new();
 
-        public PlayerManager(ApiController apiController, IpcManager ipcManager,
+        private PlayerAttachedObject Minion;
+        private PlayerAttachedObject Pet;
+        private PlayerAttachedObject Companion;
+        private PlayerAttachedObject Mount;
+
+        public unsafe PlayerManager(ApiController apiController, IpcManager ipcManager,
             CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil)
         {
             Logger.Verbose("Creating " + nameof(PlayerManager));
@@ -48,6 +56,11 @@ namespace MareSynchronos.Managers
             {
                 ApiControllerOnConnected();
             }
+
+            Minion = new PlayerAttachedObject(ObjectKind.Minion, IntPtr.Zero, IntPtr.Zero, () => (IntPtr)((Character*)_dalamudUtil.PlayerPointer)->CompanionObject);
+            Pet = new PlayerAttachedObject(ObjectKind.Pet, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.GetPet());
+            Companion = new PlayerAttachedObject(ObjectKind.Companion, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.GetCompanion());
+            Mount = new PlayerAttachedObject(ObjectKind.Mount, IntPtr.Zero, IntPtr.Zero, () => (IntPtr)((CharaExt*)_dalamudUtil.PlayerPointer)->Mount);
         }
 
         public void Dispose()
@@ -61,25 +74,48 @@ namespace MareSynchronos.Managers
             _dalamudUtil.FrameworkUpdate -= DalamudUtilOnFrameworkUpdate;
         }
 
+        private unsafe void CheckAndUpdateObject(PlayerAttachedObject attachedObject)
+        {
+            var curPtr = attachedObject.CurrentAddress;
+            if (curPtr != IntPtr.Zero)
+            {
+                var chara = (Character*)curPtr;
+                if (attachedObject.Address == IntPtr.Zero || attachedObject.Address != curPtr
+                    || attachedObject.CompareAndUpdateEquipment(chara->EquipSlotData, chara->CustomizeData)
+                    || (chara->GameObject.DrawObject != null && (IntPtr)chara->GameObject.DrawObject != attachedObject.DrawObjectAddress))
+                {
+                    Logger.Verbose(attachedObject.ObjectKind + " Changed " + curPtr);
+
+                    attachedObject.Address = curPtr;
+                    attachedObject.DrawObjectAddress = (IntPtr)chara->GameObject.DrawObject;
+                    attachedObject.CompareAndUpdateEquipment(chara->EquipSlotData, chara->CustomizeData);
+                    OnPlayerChanged(attachedObject.ObjectKind);
+                }
+            }
+            else
+            {
+                attachedObject.Address = IntPtr.Zero;
+                LastSentCharacterData[attachedObject.ObjectKind] = null;
+            }
+        }
+
         private unsafe void DalamudUtilOnFrameworkUpdate()
         {
             if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized || !_apiController.IsConnected) return;
+            //_dalamudUtil.DebugPrintRenderFlags(_dalamudUtil.PlayerPointer);
 
             if (DateTime.Now < _lastPlayerObjectCheck.AddSeconds(0.25)) return;
 
-            var minion = ((Character*)_dalamudUtil.PlayerPointer)->CompanionObject;
-            string minionName = "";
-            if (minion != null)
+
+            if (_dalamudUtil.IsPlayerPresent && !_currentCharacterEquipment[ObjectKind.Player]!.CompareAndUpdate(_dalamudUtil.PlayerCharacter))
             {
-                minionName = new Utf8String(minion->Character.GameObject.GetName()).ToString();
+                OnPlayerChanged(ObjectKind.Player);
             }
 
-            if (_dalamudUtil.IsPlayerPresent
-                && (!_currentCharacterEquipment!.CompareAndUpdate(_dalamudUtil.PlayerCharacter) || minionName != _lastMinionName))
-            {
-                _lastMinionName = minionName;
-                OnPlayerChanged();
-            }
+            CheckAndUpdateObject(Minion);
+            CheckAndUpdateObject(Pet);
+            CheckAndUpdateObject(Companion);
+            CheckAndUpdateObject(Mount);
 
             _lastPlayerObjectCheck = DateTime.Now;
         }
@@ -91,8 +127,8 @@ namespace MareSynchronos.Managers
             _ipcManager.PenumbraRedrawEvent += IpcManager_PenumbraRedrawEvent;
             _dalamudUtil.FrameworkUpdate += DalamudUtilOnFrameworkUpdate;
 
-            _currentCharacterEquipment = new CharacterEquipment(_dalamudUtil.PlayerCharacter);
-            PlayerChanged();
+            _currentCharacterEquipment[ObjectKind.Player] = new CharacterEquipment(_dalamudUtil.PlayerCharacter);
+            PlayerChanged(ObjectKind.Player);
         }
 
         private void ApiController_Disconnected()
@@ -101,12 +137,22 @@ namespace MareSynchronos.Managers
 
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
             _dalamudUtil.FrameworkUpdate -= DalamudUtilOnFrameworkUpdate;
-            LastSentCharacterData = null;
+            LastSentCharacterData.Clear();
         }
 
-        private async Task<CharacterCacheDto?> CreateFullCharacterCache(CancellationToken token)
+        private async Task<CharacterCacheDto?> CreateFullCharacterCache(CancellationToken token, ObjectKind objectKind)
         {
-            var cache = _characterDataFactory.BuildCharacterData();
+            IntPtr pointer = objectKind switch
+            {
+                ObjectKind.Player => _dalamudUtil.PlayerPointer,
+                ObjectKind.Minion => Minion.Address,
+                ObjectKind.Pet => Pet.Address,
+                ObjectKind.Companion => Companion.Address,
+                ObjectKind.Mount => Mount.Address,
+                _ => throw new NotImplementedException()
+            };
+
+            var cache = _characterDataFactory.BuildCharacterData(pointer);
             if (cache == null) return null;
             CharacterCacheDto? cacheDto = null;
 
@@ -118,7 +164,7 @@ namespace MareSynchronos.Managers
                 }
 
                 if (token.IsCancellationRequested) return;
-
+                cache.Kind = objectKind;
                 cacheDto = cache.ToCharacterCacheDto();
                 var json = JsonConvert.SerializeObject(cacheDto);
 
@@ -128,22 +174,44 @@ namespace MareSynchronos.Managers
             return cacheDto;
         }
 
-        private void IpcManager_PenumbraRedrawEvent(object? objectTableIndex, EventArgs e)
+        private void IpcManager_PenumbraRedrawEvent(IntPtr address, int idx)
         {
-            var player = _dalamudUtil.GetPlayerCharacterFromObjectTableByIndex((int)objectTableIndex!);
-            if (player != null && player.Name.ToString() != _dalamudUtil.PlayerName) return;
-            Logger.Debug("Penumbra Redraw Event for " + _dalamudUtil.PlayerName);
-            PlayerChanged();
+            Logger.Verbose("RedrawEvent for addr " + address);
+
+            if (address == _dalamudUtil.PlayerPointer)
+            {
+                Logger.Debug("Penumbra Redraw Event for " + _dalamudUtil.PlayerName);
+                PlayerChanged(ObjectKind.Player);
+            }
+
+            if (address == Minion.Address)
+            {
+                Logger.Debug("Penumbra Redraw Event for Minion");
+                PlayerChanged(ObjectKind.Minion);
+            }
+
+            if (address == Pet.Address)
+            {
+                Logger.Debug("Penumbra Redraw Event for Pet");
+                PlayerChanged(ObjectKind.Pet);
+            }
+
+            if (address == Companion.Address)
+            {
+                Logger.Debug("Penumbra Redraw Event for Companion");
+                PlayerChanged(ObjectKind.Companion);
+            }
         }
 
-        private void PlayerChanged()
+        private void PlayerChanged(ObjectKind objectKind)
         {
             if (_dalamudUtil.IsInGpose) return;
 
-            Logger.Debug("Player changed: " + _dalamudUtil.PlayerName);
-            _playerChangedCts?.Cancel();
-            _playerChangedCts = new CancellationTokenSource();
-            var token = _playerChangedCts.Token;
+            Logger.Debug("Object changed: " + objectKind.ToString());
+            _playerChangedCts.TryGetValue(objectKind, out var cts);
+            cts?.Cancel();
+            _playerChangedCts[objectKind] = new CancellationTokenSource();
+            var token = _playerChangedCts[objectKind]!.Token;
 
             // fix for redraw from anamnesis
             while ((!_dalamudUtil.IsPlayerPresent || _dalamudUtil.PlayerName == "--") && !token.IsCancellationRequested)
@@ -179,28 +247,29 @@ namespace MareSynchronos.Managers
 
                 _dalamudUtil.WaitWhileSelfIsDrawing(token);
 
-                var characterCache = (await CreateFullCharacterCache(token));
+                var characterCache = (await CreateFullCharacterCache(token, objectKind));
 
                 if (characterCache == null || token.IsCancellationRequested) return;
 
-                if (characterCache.Hash == (LastSentCharacterData?.Hash ?? "-"))
+                LastSentCharacterData.TryGetValue(objectKind, out var lastSentPlayerData);
+                if (characterCache.Hash == (lastSentPlayerData?.Hash ?? string.Empty))
                 {
                     Logger.Debug("Not sending data, already sent");
                     return;
                 }
 
-                LastSentCharacterData = characterCache;
-                PlayerHasChanged?.Invoke(characterCache);
+                LastSentCharacterData[objectKind] = characterCache;
+                PlayerHasChanged?.Invoke(characterCache, objectKind);
                 SendingData = false;
             }, token);
         }
 
-        private void OnPlayerChanged()
+        private void OnPlayerChanged(ObjectKind objectKind)
         {
             Task.Run(() =>
             {
                 Logger.Debug("Watcher: PlayerChanged");
-                PlayerChanged();
+                PlayerChanged(objectKind);
             });
         }
 

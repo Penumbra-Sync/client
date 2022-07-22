@@ -37,7 +37,7 @@ namespace MareSynchronos.WebAPI
 
         private HubConnection? _mareHub;
 
-        private CancellationTokenSource? _uploadCancellationTokenSource;
+        private Dictionary<ObjectKind, CancellationTokenSource?> _uploadTokens = new();
 
         private ConnectionDto? _connectionDto;
         public SystemInfoDto SystemInfoDto { get; private set; } = new();
@@ -268,7 +268,10 @@ namespace MareSynchronos.WebAPI
         {
             CurrentUploads.Clear();
             CurrentDownloads.Clear();
-            _uploadCancellationTokenSource?.Cancel();
+            foreach(var token in _uploadTokens.Values)
+            {
+                token?.Cancel();
+            } 
             Logger.Debug("Connection closed");
             Disconnected?.Invoke();
             return Task.CompletedTask;
@@ -286,7 +289,10 @@ namespace MareSynchronos.WebAPI
         {
             CurrentUploads.Clear();
             CurrentDownloads.Clear();
-            _uploadCancellationTokenSource?.Cancel();
+            foreach (var token in _uploadTokens.Values)
+            {
+                token?.Cancel();
+            }
             Logger.Debug("Connection closed... Reconnecting");
             Disconnected?.Invoke();
             return Task.CompletedTask;

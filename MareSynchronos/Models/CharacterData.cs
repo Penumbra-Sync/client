@@ -3,12 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using MareSynchronos.API;
+using MareSynchronos.Factories;
 
 namespace MareSynchronos.Models
 {
     [JsonObject(MemberSerialization.OptIn)]
     public class CharacterData
     {
+        [JsonProperty]
+        public ObjectKind Kind { get; set; }
         public List<FileReplacement> FileReplacements { get; set; } = new();
 
         [JsonProperty]
@@ -37,6 +40,7 @@ namespace MareSynchronos.Models
         {
             return new CharacterCacheDto()
             {
+                ObjectKind = Kind,
                 FileReplacements = FileReplacements.Where(f => f.HasFileReplacement).GroupBy(f => f.Hash).Select(g =>
                 {
                     return new FileReplacementDto()
