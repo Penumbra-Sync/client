@@ -11,6 +11,7 @@ using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Plugin;
 using Dalamud.Utility;
 using ImGuiNET;
+using MareSynchronos.Localization;
 using MareSynchronos.Managers;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
@@ -29,6 +30,7 @@ namespace MareSynchronos.UI
         private readonly Configuration _pluginConfiguration;
         private readonly DalamudUtil _dalamudUtil;
         private readonly DalamudPluginInterface _pluginInterface;
+        private readonly Dalamud.Localization _localization;
         public long FileCacheSize => _fileCacheManager.FileCacheSize;
         public bool ShowClientSecret = true;
         public string PlayerName => _dalamudUtil.PlayerName;
@@ -39,7 +41,7 @@ namespace MareSynchronos.UI
 
         public static bool CtrlPressed() => (GetKeyState(0xA2) & 0x8000) != 0 || (GetKeyState(0xA3) & 0x8000) != 0;
 
-        public UiShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, FileDialogManager fileDialogManager, Configuration pluginConfiguration, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface)
+        public UiShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, FileDialogManager fileDialogManager, Configuration pluginConfiguration, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization)
         {
             _ipcManager = ipcManager;
             _apiController = apiController;
@@ -48,6 +50,7 @@ namespace MareSynchronos.UI
             _pluginConfiguration = pluginConfiguration;
             _dalamudUtil = dalamudUtil;
             _pluginInterface = pluginInterface;
+            _localization = localization;
             _isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder);
 
             _pluginInterface.UiBuilder.BuildFonts += BuildFont;
@@ -203,6 +206,12 @@ namespace MareSynchronos.UI
 
         public static Vector4 UploadColor((long, long) data) => data.Item1 == 0 ? ImGuiColors.DalamudGrey :
             data.Item1 == data.Item2 ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudYellow;
+
+        public void LoadLocalization(string languageCode)
+        {
+            _localization.SetupWithLangCode(languageCode);
+            Strings.ToS = new Strings.ToSStrings();
+        }
 
         public static uint Color(byte r, byte g, byte b, byte a)
         { uint ret = a; ret <<= 8; ret += b; ret <<= 8; ret += g; ret <<= 8; ret += r; return ret; }

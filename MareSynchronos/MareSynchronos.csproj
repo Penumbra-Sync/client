@@ -65,6 +65,10 @@
       <HintPath>$(DalamudLibPath)Lumina.Excel.dll</HintPath>
       <Private>false</Private>
     </Reference>
+    <Reference Include="CheapLoc">
+      <HintPath>$(DalamudLibPath)CheapLoc.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <ItemGroup>
@@ -74,6 +78,8 @@
     <None Update="images\icon.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <EmbeddedResource Include="Localization\de.json" />
+    <EmbeddedResource Include="Localization\fr.json" />
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">

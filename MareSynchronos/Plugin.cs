@@ -36,6 +36,7 @@ namespace MareSynchronos
         private readonly FileDialogManager _fileDialogManager;
         private readonly CompactUi _compactUi;
         private readonly UiShared _uiSharedComponent;
+        private readonly Dalamud.Localization _localization;
 
 
         public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager,
@@ -48,6 +49,9 @@ namespace MareSynchronos
             _configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
             _configuration.Initialize(PluginInterface);
             _configuration.Migrate();
+            
+            _localization = new Dalamud.Localization("MareSynchronos.Localization.", "", true);
+            _localization.SetupWithLangCode("en");
 
             _windowSystem = new WindowSystem("MareSynchronos");
 
@@ -63,7 +67,7 @@ namespace MareSynchronos
             _fileDialogManager = new FileDialogManager();
 
             _uiSharedComponent =
-                new UiShared(_ipcManager, _apiController, _fileCacheManager, _fileDialogManager, _configuration, _dalamudUtil, PluginInterface);
+                new UiShared(_ipcManager, _apiController, _fileCacheManager, _fileDialogManager, _configuration, _dalamudUtil, PluginInterface, _localization);
             _settingsUi = new SettingsUi(_windowSystem, _uiSharedComponent, _configuration, _apiController);
             _compactUi = new CompactUi(_windowSystem, _uiSharedComponent, _configuration, _apiController);
 
