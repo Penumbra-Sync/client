@@ -30,6 +30,7 @@ namespace MareSynchronos.UI
         private readonly Configuration _pluginConfiguration;
         private readonly DalamudUtil _dalamudUtil;
         private readonly DalamudPluginInterface _pluginInterface;
+        private readonly Dalamud.Localization _localization;
         public long FileCacheSize => _fileCacheManager.FileCacheSize;
         public bool ShowClientSecret = true;
         public string PlayerName => _dalamudUtil.PlayerName;
@@ -40,7 +41,7 @@ namespace MareSynchronos.UI
 
         public static bool CtrlPressed() => (GetKeyState(0xA2) & 0x8000) != 0 || (GetKeyState(0xA3) & 0x8000) != 0;
 
-        public UiShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, FileDialogManager fileDialogManager, Configuration pluginConfiguration, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface)
+        public UiShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, FileDialogManager fileDialogManager, Configuration pluginConfiguration, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization)
         {
             _ipcManager = ipcManager;
             _apiController = apiController;
@@ -49,6 +50,7 @@ namespace MareSynchronos.UI
             _pluginConfiguration = pluginConfiguration;
             _dalamudUtil = dalamudUtil;
             _pluginInterface = pluginInterface;
+            _localization = localization;
             _isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder);
 
             _pluginInterface.UiBuilder.BuildFonts += BuildFont;
@@ -207,7 +209,7 @@ namespace MareSynchronos.UI
 
         public void LoadLocalization(string languageCode)
         {
-            _dalamudUtil.Localization.SetupWithLangCode(languageCode);
+            _localization.SetupWithLangCode(languageCode);
             Strings.ToS = new Strings.ToSStrings();
         }
 
