@@ -4,75 +4,75 @@
     "description": "ToSStrings..ctor"
   },
   "AgreementLabel": {
-    "message": "Agreement of Usage of Service",
+    "message": "Conditions d'Utilisation",
     "description": "ToSStrings..ctor"
   },
   "ReadLabel": {
-    "message": "READ THIS CAREFULLY",
+    "message": "LISEZ CES INFORMATIONS ATTENTIVEMENT",
     "description": "ToSStrings..ctor"
   },
   "Paragraph1": {
-    "message": "All of the mod files currently active on your character as well as your current character state will be uploaded to the service you registered yourself at automatically. The plugin will exclusively upload the necessary mod files and not the whole mod.",
+    "message": "Tous les fichiers moddés actuellement en cours d'utilisation ainsi que le statut actuel de votre personnage vont être mix en ligne via le service sur lequel vous vous êtes automatiquement enregistré. Seuls les fichiers nécessaires seront téléversés par le plugin et non pas le mod en entier.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph2": {
-    "message": "If you are on a data capped internet connection, higher fees due to data usage depending on the amount of downloaded and uploaded mod files might occur. Mod files will be compressed on up- and download to save on bandwidth usage. Due to varying up- and download speeds, changes in characters might not be visible immediately. Files present on the service that already represent your active mod files will not be uploaded again.",
+    "message": "Si le débit de votre connexion internet est limité, le téléchargement et téléversement d'un grand nombre de fichiers peut entraîner des coûts supplémentaires. Les fichiers seront compressés au chargement et versement pour réduire l'impact sur votre bande passants. Selon la rapidité de vos téléchargements et téléversements, les changements ne seront peut-être pas visibles instantanément sur les personnages. Les fichiers déja présents sur le service qui correspondent à ceux de vos mods en cours d'utilisation ne seront pas remis en ligne.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph3": {
-    "message": "The mod files you are uploading are confidential and will not be distributed to parties other than the ones who are requesting the exact same mod files. Please think about who you are going to pair since it is unavoidable that they will receive and locally cache the necessary mod files that you have currently in use. Locally cached mod files will have arbitrary file names to discourage attempts at replicating the original mod.",
+    "message": "Les fichiers que vous allez partager sont confidentiels et ne seront envoyés qu'aux utilisateurs qui feront une requête exacte de ceux-çi. Nous vous demandons de (re)considérer qui sera synchronisé avec vous, puisqu'ils recevront et stockeront inévitablement en local les fichiers nécéssaires utilisés à cet instant. Les noms des fichiers stockés localement sont changés de manière arbitraire afin de décourager toute tentative de réplication des originaux.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph4": {
-    "message": "The plugin creator tried their best to keep you secure. However, there is no guarantee for 100% security. Do not blindly pair your client with everyone.",
+    "message": "Le créateur de ce plugin a tenté de sécuriser l'application du mieux possible. Cependant, il ne peut pas garantir une protection 100% infaillible. Pour votre sécurité, ne vous synchronisez pas aveuglément et avec n'importe qui.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph5": {
-    "message": "Mod files that are saved on the service will remain on the service as long as there are requests for the files from clients. After a period of not being used, the mod files will be automatically deleted. You will also be able to wipe all the files you have personally uploaded on request. The service holds no information about which mod files belong to which mod.",
+    "message": "Les fichiers sauvegardés sur le service resteront en ligne tant que des utilisateurs en feront usage. Ils seront effacés automatiquement après une certaine période d'inactivité. Vous pouvez également demander l'effacement de tous les fichiers que vous avez mis en ligne vous-même. Le service en soi ne contient aucune information pouvant identifier quel fichier appartient à quel mod.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph6": {
-    "message": "This service is provided as-is. In case of abuse, contact darkarchon#4313 on Discord or join the Mare Synchronos Discord. To accept those conditions hold CTRL while clicking 'I agree'",
+    "message": "Ce service et ses composants vous sont fournis en l'état. En cas d'abus, veuillez contacter darkarchon#4313 sur Discord ou rejoindre le serveur Discord Mare Synchronos. Pour accepters ces conditions d'utilisation, veuillez tenir la touche CTRL enfoncée en cliquant sur le bouton 'J'accepte'.",
     "description": "ToSStrings..ctor"
   },
   "AgreeLabel": {
-    "message": "I agree",
+    "message": "J'accept",
     "description": "ToSStrings..ctor"
   },
   "RemainingLabel": {
-    "message": "remaining",
+    "message": "restants",
     "description": "ToSStrings..ctor"
   },
   "FailedLabel": {
-    "message": "Congratulations. You have failed to read the agreements.",
+    "message": "Bravo! Vous n'avez donc pas lu les conditions d'utilisation suffisament en détail.",
     "description": "ToSStrings..ctor"
   },
   "TimeoutLabel": {
-    "message": "I'm going to give you 1 minute to read the agreements carefully again. If you fail once more you will have to solve an annoying puzzle.",
+    "message": "C'est pas bien grave, vous avez droit à 1 minute de répit pour vous relire et tenter une seconde fois. Si vous ignorez à nouveau les conditions d'utilisation, un petit puzzle agaçant vous sera proposé.",
     "description": "ToSStrings..ctor"
   },
   "FailedAgainLabel": {
-    "message": "Congratulations. You have failed to read the agreements. Again.",
+    "message": "Bravo, vous avez encore ignoré les consignes écrites dans les conditions d'utilisation.",
     "description": "ToSStrings..ctor"
   },
   "PuzzleLabel": {
-    "message": "I did warn you. Here's your annoying puzzle:",
+    "message": "Chose promise, chose dûe. Voici votre puzzle casse-pied:",
     "description": "ToSStrings..ctor"
   },
   "PuzzleDescLabel": {
-    "message": "Enter the following 3 words from the agreement exactly as described without punctuation to make the \"I agree\" button visible again.",
+    "message": "Entrez les 3 mots suivants tirés des conditions d'utilisation, sans ponctuation, pour rendre le bouton 'J'accepte' de nouveau visible.",
     "description": "ToSStrings..ctor"
   },
   "ParagraphLabel": {
-    "message": "Paragraph",
+    "message": "Paragraphe",
     "description": "ToSStrings..ctor"
   },
   "SentenceLabel": {
-    "message": "Sentence",
+    "message": "Phrase",
     "description": "ToSStrings..ctor"
   },
   "WordLabel": {
-    "message": "Word",
+    "message": "Mot",
     "description": "ToSStrings..ctor"
   }
 }

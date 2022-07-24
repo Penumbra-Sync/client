@@ -11,6 +11,8 @@ using System.Threading.Tasks;
 using MareSynchronos.API;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
+using System.Diagnostics;
+using Dalamud.Utility;
 
 namespace MareSynchronos.UI
 {
@@ -58,6 +60,13 @@ namespace MareSynchronos.UI
         private void DrawSettingsContent()
         {
             _uiShared.PrintServerState();
+            ImGui.AlignTextToFramePadding();
+            ImGui.Text("Community and Support:");
+            ImGui.SameLine();
+            if (ImGui.Button("Mare Synchronos Discord"))
+            {
+                Util.OpenLink("https://discord.gg/mpNdkrTRjW");
+            }
             ImGui.Separator();
             if (ImGui.BeginTabBar("mainTabBar"))
             {

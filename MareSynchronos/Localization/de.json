@@ -12,15 +12,15 @@
     "description": "ToSStrings..ctor"
   },
   "Paragraph1": {
-    "message": "Alle Moddateien, die aktuell auf deinem Charakter aktiv sind als auch dein Charakter Zustand werden automatisch zu dem Service an dem du dich registriert hast hochgeladen. Das Plugin wird ausschließlich die nötigen Moddateien hochladen und nicht den gesamten Mod.",
+    "message": "Alle Moddateien, die aktuell auf deinem Charakter aktiv sind sowohl dein Charakterzustand werden automatisch zu dem Service, an dem du dich registriert hast, hochgeladen. Das Plugin wird ausschließlich die nötigen Moddateien hochladen und nicht die gesamte Modifikation.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph2": {
-    "message": "Falls du mit einer getakteten Internetverbindung verbunden bist, können durch den Datentransfer von Hoch- und Runtergeladenen Moddateien höhere Kosten entstehen. Moddateien werden beim Hoch- und Runterladen komprimiert um Bandbreite zu sparen. Durch unterschiedliche Hoch- und Runterladgeschwindigkeiten ist es möglich, dass Änderungen an Charakteren nicht sofort sichtbar sind. Dateien die bereits auf dem Service existieren, werden nicht nochmals hochgeladen.",
+    "message": "Falls du mit einer getakteten Internetverbindung verbunden bist, können durch den Datentransfer von Hoch- und Runtergeladenen Moddateien höhere Kosten entstehen. Moddateien werden beim hoch- und runterladen komprimiert um Bandbreite zu sparen. Durch unterschiedliche Hoch- und Runterladgeschwindigkeiten ist es möglich, dass Änderungen an Charakteren nicht sofort sichtbar sind. Dateien die bereits auf dem Service existieren, werden nicht nochmals hochgeladen.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph3": {
-    "message": "Die Moddateien die du hochlädst sind vertraulich und werden nicht zu anderen Clients verteilt, die nicht die exakt selben Dateien anfordern. Bitte überlege dir sortfältig mit wem du deinen Identifikationscode teilst, da es unvermeidlich ist, dass die andere Person deine Moddateien erhalten und lokal zwischenspeichern. Lokal zwischengespeicherte Dateien haben willkürrliche Namen um vor Versuchen die originalen Modifikationen aus diesen wiederherzustellen abzuschrecken.",
+    "message": "Die Moddateien die du hochlädst sind vertraulich und werden nicht zu anderen Clients verteilt, die nicht die exakt selben Dateien anfordern. Bitte überlege dir sortfältig mit wem du deinen Identifikationscode teilst, da es unvermeidlich ist, dass die andere Person deine Moddateien erhalten und lokal zwischenspeichern. Lokal zwischengespeicherte Dateien haben willkürrliche Namen um vor Versuchen abzuschrecken die originalen Modifikationen aus diesen wiederherzustellen.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph4": {
@@ -28,7 +28,7 @@
     "description": "ToSStrings..ctor"
   },
   "Paragraph5": {
-    "message": "Moddateien, die auf dem Service gespeichert sind, verbleiben auf dem Service solange es Anforderungen für diese Dateien gibt. Nach einer Zeitspanne in der die Dateien nicht verwendet wurden, werden diese automatisch gelöscht. Du hast auch die Möglichkeit manuell alle Dateien auf dem Service zu löschen. Der Service hat keine Informationen welche Moddateien zu welcher Modifikation gehören.",
+    "message": "Moddateien, die auf dem Service gespeichert sind, verbleiben auf dem Service, solange es Anforderungen für diese Dateien gibt. Nach einer Zeitspanne in der die Dateien nicht verwendet wurden, werden diese automatisch gelöscht. Du hast auch die Möglichkeit manuell alle Dateien auf dem Service zu löschen. Der Service hat keine Informationen welche Moddateien zu welcher Modifikation gehören.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph6": {
@@ -48,7 +48,7 @@
     "description": "ToSStrings..ctor"
   },
   "TimeoutLabel": {
-    "message": "Ich gebe dir nun 1 Minute um die Nutzungsbedingungen nochmals sorgfälig zu lesen. Falls du wieder scheiterst, musst du ein nerviges Puzzle lösen.",
+    "message": "Ich gebe dir nun 1 Minute um die Nutzungsbedingungen nochmals sorgfälig zu lesen. Falls du wieder daran scheiterst, musst du ein nerviges Puzzle lösen.",
     "description": "ToSStrings..ctor"
   },
   "FailedAgainLabel": {
