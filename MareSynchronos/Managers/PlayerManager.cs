@@ -139,7 +139,7 @@ namespace MareSynchronos.Managers
                 }
             }
 
-            if (playerRelatedObjects.Any(c => c.HasUnprocessedUpdate))
+            if (playerRelatedObjects.Any(c => c.HasUnprocessedUpdate && !c.IsProcessing))
             {
                 OnPlayerOrAttachedObjectsChanged();
             }
@@ -195,7 +195,7 @@ namespace MareSynchronos.Managers
                     LastCreatedCharacterData = cacheDto;
                 }
 
-                if (_apiController.IsConnected)
+                if (_apiController.IsConnected && !token.IsCancellationRequested)
                 {
                     Logger.Verbose("Invoking PlayerHasChanged");
                     PlayerHasChanged?.Invoke(cacheDto);

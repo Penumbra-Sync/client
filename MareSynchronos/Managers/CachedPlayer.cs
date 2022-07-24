@@ -313,6 +313,7 @@ public class CachedPlayer
         }
         finally
         {
+            _cachedData = new();
             PlayerName = string.Empty;
             PlayerCharacter = null;
             IsVisible = false;
@@ -321,7 +322,7 @@ public class CachedPlayer
 
     public void InitializePlayer(PlayerCharacter character, CharacterCacheDto? cache)
     {
-        Logger.Debug("Initializing Player " + this);
+        Logger.Debug("Initializing Player " + this + " has cache: " + (cache != null));
         IsVisible = true;
         PlayerName = character.Name.ToString();
         PlayerCharacter = character;
@@ -375,7 +376,7 @@ public class CachedPlayer
 
             if (RequestedPenumbraRedraw == false)
             {
-                Logger.Warn("Unauthorized character change detected");
+                Logger.Debug("Unauthorized character change detected");
                 ApplyCustomizationData(ObjectKind.Player);
             }
             else
