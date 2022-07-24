@@ -200,17 +200,20 @@ namespace MareSynchronos.UI
                 ImGui.TextUnformatted("File Cache Setup");
                 if (_uiShared.UidFontBuilt) ImGui.PopFont();
                 ImGui.Separator();
-                UiShared.TextWrapped("To not unnecessary download files already present on your computer, Mare Synchronos will have to scan your Penumbra mod directory. " +
-                                  "Additionally, a local cache folder must be set where Mare Synchronos will download its local file cache to. " +
-                                  "Once the Cache Folder is set and the scan complete, this page will automatically forward to registration at a service.");
-                UiShared.TextWrapped("Note: The initial scan, depending on the amount of mods you have, might take a while. Please wait until it is completed.");
-                UiShared.ColorTextWrapped("Warning: once past this step you should not delete the FileCache.db of Mare Synchronos in the Plugin Configurations folder of Dalamud. " +
-                                  "Otherwise on the next launch a full re-scan of the file cache database will be initiated.", ImGuiColors.DalamudYellow);
-                _uiShared.DrawCacheDirectorySetting();
 
                 if (!_uiShared.HasValidPenumbraModPath)
                 {
                     UiShared.ColorTextWrapped("You do not have a valid Penumbra path set. Open Penumbra and set up a valid path for the mod directory.", ImGuiColors.DalamudRed);
+                }
+                else
+                {
+                    UiShared.TextWrapped("To not unnecessary download files already present on your computer, Mare Synchronos will have to scan your Penumbra mod directory. " +
+                                         "Additionally, a local cache folder must be set where Mare Synchronos will download its local file cache to. " +
+                                         "Once the Cache Folder is set and the scan complete, this page will automatically forward to registration at a service.");
+                    UiShared.TextWrapped("Note: The initial scan, depending on the amount of mods you have, might take a while. Please wait until it is completed.");
+                    UiShared.ColorTextWrapped("Warning: once past this step you should not delete the FileCache.db of Mare Synchronos in the Plugin Configurations folder of Dalamud. " +
+                                              "Otherwise on the next launch a full re-scan of the file cache database will be initiated.", ImGuiColors.DalamudYellow);
+                    _uiShared.DrawCacheDirectorySetting();
                 }
 
                 if (!_fileCacheManager.IsScanRunning && !string.IsNullOrEmpty(_pluginConfiguration.CacheFolder) && _uiShared.HasValidPenumbraModPath && Directory.Exists(_pluginConfiguration.CacheFolder))
