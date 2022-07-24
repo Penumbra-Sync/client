@@ -12,7 +12,7 @@
     "description": "ToSStrings..ctor"
   },
   "Paragraph1": {
-    "message": "Alle Moddateien, die aktuell auf deinem Charakter aktiv sind als auch dein Charakterzustand werden automatisch zu dem Service, an dem du dich registriert hast, hochgeladen. Das Plugin wird ausschließlich die nötigen Moddateien hochladen und nicht die gesamte Modifikation.",
+    "message": "Alle Moddateien, die aktuell auf deinem Charakter aktiv sind und dein Charakterzustand werden automatisch zu dem Service, an dem du dich registriert hast, hochgeladen. Das Plugin wird ausschließlich die nötigen Moddateien hochladen und nicht die gesamte Modifikation.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph2": {
