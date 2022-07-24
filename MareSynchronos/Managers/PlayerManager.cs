@@ -1,15 +1,16 @@
 ﻿using MareSynchronos.Factories;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using Newtonsoft.Json;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 using MareSynchronos.API;
 using Penumbra.GameData.Structs;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using Penumbra.GameData.ByteString;
+using System.Collections.Generic;
+using System.Linq;
+using MareSynchronos.Models;
+using MareSynchronos.Interop;
 
 namespace MareSynchronos.Managers
 {
@@ -22,15 +23,17 @@ namespace MareSynchronos.Managers
         private readonly DalamudUtil _dalamudUtil;
         private readonly IpcManager _ipcManager;
         public event PlayerHasChanged? PlayerHasChanged;
-        public bool SendingData { get; private set; }
-        public CharacterCacheDto? LastSentCharacterData { get; private set; }
+        public CharacterCacheDto? LastCreatedCharacterData { get; private set; }
+        public CharacterData PermanentDataCache { get; private set; } = new();
+        private readonly Dictionary<ObjectKind, Func<bool>> objectKindsToUpdate = new();
 
-        private CancellationTokenSource? _playerChangedCts;
+        private CancellationTokenSource? _playerChangedCts = new();
         private DateTime _lastPlayerObjectCheck;
-        private CharacterEquipment? _currentCharacterEquipment;
-        private string _lastMinionName = string.Empty;
+        private CharacterEquipment? _currentCharacterEquipment = new();
 
-        public PlayerManager(ApiController apiController, IpcManager ipcManager,
+        private List<PlayerOrRelatedObject> playerAttachedObjects = new List<PlayerOrRelatedObject>();
+
+        public unsafe PlayerManager(ApiController apiController, IpcManager ipcManager,
             CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil)
         {
             Logger.Verbose("Creating " + nameof(PlayerManager));
@@ -42,12 +45,22 @@ namespace MareSynchronos.Managers
 
             _apiController.Connected += ApiControllerOnConnected;
             _apiController.Disconnected += ApiController_Disconnected;
+            _dalamudUtil.FrameworkUpdate += DalamudUtilOnFrameworkUpdate;
 
             Logger.Debug("Watching Player, ApiController is Connected: " + _apiController.IsConnected);
             if (_apiController.IsConnected)
             {
                 ApiControllerOnConnected();
             }
+
+            playerAttachedObjects = new List<PlayerOrRelatedObject>()
+            {
+                new PlayerOrRelatedObject(ObjectKind.Player, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.PlayerPointer),
+                new PlayerOrRelatedObject(ObjectKind.Minion, IntPtr.Zero, IntPtr.Zero, () => (IntPtr)((Character*)_dalamudUtil.PlayerPointer)->CompanionObject),
+                new PlayerOrRelatedObject(ObjectKind.Pet, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.GetPet()),
+                new PlayerOrRelatedObject(ObjectKind.Companion, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.GetCompanion()),
+                new PlayerOrRelatedObject(ObjectKind.Mount, IntPtr.Zero, IntPtr.Zero, () => (IntPtr)((CharaExt*)_dalamudUtil.PlayerPointer)->Mount),
+            };
         }
 
         public void Dispose()
@@ -63,22 +76,14 @@ namespace MareSynchronos.Managers
 
         private unsafe void DalamudUtilOnFrameworkUpdate()
         {
-            if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized || !_apiController.IsConnected) return;
+            if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized) return;
 
             if (DateTime.Now < _lastPlayerObjectCheck.AddSeconds(0.25)) return;
 
-            var minion = ((Character*)_dalamudUtil.PlayerPointer)->CompanionObject;
-            string minionName = "";
-            if (minion != null)
+            playerAttachedObjects.ForEach(k => k.CheckAndUpdateObject());
+            if (playerAttachedObjects.Any(c => c.HasUnprocessedUpdate && !c.IsProcessing))
             {
-                minionName = new Utf8String(minion->Character.GameObject.GetName()).ToString();
-            }
-
-            if (_dalamudUtil.IsPlayerPresent
-                && (!_currentCharacterEquipment!.CompareAndUpdate(_dalamudUtil.PlayerCharacter) || minionName != _lastMinionName))
-            {
-                _lastMinionName = minionName;
-                OnPlayerChanged();
+                OnPlayerOrAttachedObjectsChanged();
             }
 
             _lastPlayerObjectCheck = DateTime.Now;
@@ -89,10 +94,6 @@ namespace MareSynchronos.Managers
             Logger.Debug("ApiController Connected");
 
             _ipcManager.PenumbraRedrawEvent += IpcManager_PenumbraRedrawEvent;
-            _dalamudUtil.FrameworkUpdate += DalamudUtilOnFrameworkUpdate;
-
-            _currentCharacterEquipment = new CharacterEquipment(_dalamudUtil.PlayerCharacter);
-            PlayerChanged();
         }
 
         private void ApiController_Disconnected()
@@ -100,47 +101,60 @@ namespace MareSynchronos.Managers
             Logger.Debug(nameof(ApiController_Disconnected));
 
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
-            _dalamudUtil.FrameworkUpdate -= DalamudUtilOnFrameworkUpdate;
-            LastSentCharacterData = null;
         }
 
-        private async Task<CharacterCacheDto?> CreateFullCharacterCache(CancellationToken token)
+        private async Task<CharacterCacheDto?> CreateFullCharacterCacheDto(CancellationToken token)
         {
-            var cache = _characterDataFactory.BuildCharacterData();
-            if (cache == null) return null;
-            CharacterCacheDto? cacheDto = null;
-
-            await Task.Run(async () =>
+            foreach (var unprocessedObject in playerAttachedObjects.Where(c => c.HasUnprocessedUpdate).ToList())
             {
-                while (!cache.IsReady && !token.IsCancellationRequested)
-                {
-                    await Task.Delay(50, token);
-                }
+                Logger.Verbose("Building Cache for " + unprocessedObject.ObjectKind);
+                PermanentDataCache = _characterDataFactory.BuildCharacterData(PermanentDataCache, unprocessedObject.ObjectKind, unprocessedObject.Address);
+                unprocessedObject.HasUnprocessedUpdate = false;
+                unprocessedObject.IsProcessing = false;
+                token.ThrowIfCancellationRequested();
+            }
 
-                if (token.IsCancellationRequested) return;
+            while (!PermanentDataCache.IsReady && !token.IsCancellationRequested)
+            {
+                await Task.Delay(50, token);
+            }
 
-                cacheDto = cache.ToCharacterCacheDto();
-                var json = JsonConvert.SerializeObject(cacheDto);
+            if (token.IsCancellationRequested) return null;
 
-                cacheDto.Hash = Crypto.GetHash(json);
-            }, token);
+            Logger.Verbose("Cache creation complete");
 
-            return cacheDto;
+            return PermanentDataCache.ToCharacterCacheDto();
         }
 
-        private void IpcManager_PenumbraRedrawEvent(object? objectTableIndex, EventArgs e)
+        private void IpcManager_PenumbraRedrawEvent(IntPtr address, int idx)
         {
-            var player = _dalamudUtil.GetPlayerCharacterFromObjectTableByIndex((int)objectTableIndex!);
-            if (player != null && player.Name.ToString() != _dalamudUtil.PlayerName) return;
-            Logger.Debug("Penumbra Redraw Event for " + _dalamudUtil.PlayerName);
-            PlayerChanged();
+            Logger.Verbose("RedrawEvent for addr " + address);
+
+            foreach (var item in playerAttachedObjects)
+            {
+                if (address == item.Address)
+                {
+                    Logger.Debug("Penumbra redraw Event for " + item.ObjectKind);
+                    item.HasUnprocessedUpdate = true;
+                }
+            }
+
+            if (playerAttachedObjects.Any(c => c.HasUnprocessedUpdate))
+            {
+                OnPlayerOrAttachedObjectsChanged();
+            }
         }
 
-        private void PlayerChanged()
+        private void OnPlayerOrAttachedObjectsChanged()
         {
             if (_dalamudUtil.IsInGpose) return;
 
-            Logger.Debug("Player changed: " + _dalamudUtil.PlayerName);
+            var unprocessedObjects = playerAttachedObjects.Where(c => c.HasUnprocessedUpdate);
+            foreach (var unprocessedObject in unprocessedObjects)
+            {
+                unprocessedObject.IsProcessing = true;
+            }
+            Logger.Debug("Object(s) changed: " + string.Join(", ", unprocessedObjects.Select(c => c.ObjectKind)));
             _playerChangedCts?.Cancel();
             _playerChangedCts = new CancellationTokenSource();
             var token = _playerChangedCts.Token;
@@ -166,44 +180,27 @@ namespace MareSynchronos.Managers
 
             Task.Run(async () =>
             {
-                SendingData = true;
-                int attempts = 0;
-                while (!_apiController.IsConnected && attempts < 10 && !token.IsCancellationRequested)
-                {
-                    Logger.Warn("No connection to the API");
-                    await Task.Delay(TimeSpan.FromSeconds(1), token);
-                    attempts++;
-                }
-
-                if (attempts == 10 || token.IsCancellationRequested) return;
-
                 _dalamudUtil.WaitWhileSelfIsDrawing(token);
 
-                var characterCache = (await CreateFullCharacterCache(token));
+                CharacterCacheDto? cacheDto = (await CreateFullCharacterCacheDto(token));
+                if (cacheDto == null || token.IsCancellationRequested) return;
 
-                if (characterCache == null || token.IsCancellationRequested) return;
-
-                if (characterCache.Hash == (LastSentCharacterData?.Hash ?? "-"))
+                if ((LastCreatedCharacterData?.GetHashCode() ?? 0) == cacheDto.GetHashCode())
                 {
                     Logger.Debug("Not sending data, already sent");
                     return;
                 }
+                else
+                {
+                    LastCreatedCharacterData = cacheDto;
+                }
 
-                LastSentCharacterData = characterCache;
-                PlayerHasChanged?.Invoke(characterCache);
-                SendingData = false;
+                if (_apiController.IsConnected)
+                {
+                    Logger.Verbose("Invoking PlayerHasChanged");
+                    PlayerHasChanged?.Invoke(cacheDto);
+                }
             }, token);
         }
-
-        private void OnPlayerChanged()
-        {
-            Task.Run(() =>
-            {
-                Logger.Debug("Watcher: PlayerChanged");
-                PlayerChanged();
-            });
-        }
-
-
     }
 }

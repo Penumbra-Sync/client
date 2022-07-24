@@ -250,12 +250,11 @@ public class OnlinePlayerManager : IDisposable
 
     private void PushCharacterData(List<string> visiblePlayers)
     {
-        if (visiblePlayers.Any() && _playerManager.LastSentCharacterData != null)
+        if (visiblePlayers.Any() && _playerManager.LastCreatedCharacterData != null)
         {
             Task.Run(async () =>
             {
-                Logger.Verbose(JsonConvert.SerializeObject(_playerManager.LastSentCharacterData, Formatting.Indented));
-                await _apiController.PushCharacterData(_playerManager.LastSentCharacterData,
+                await _apiController.PushCharacterData(_playerManager.LastCreatedCharacterData!,
                     visiblePlayers);
             });
         }

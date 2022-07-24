@@ -8,9 +8,9 @@ using Dalamud.Logging;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using MareSynchronos.API;
 using MareSynchronos.FileCacheDB;
+using MareSynchronos.Interop;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using MareSynchronos.WebAPI.Utils;
 using Penumbra.GameData.ByteString;
 using Penumbra.GameData.Structs;
 
@@ -42,24 +42,23 @@ public class CachedPlayer
     }
 
     private bool _isDisposed = false;
-    private CancellationTokenSource? _downloadCancellationTokenSource;
+    private CancellationTokenSource? _downloadCancellationTokenSource = new();
 
     private string _lastGlamourerData = string.Empty;
 
     private string _originalGlamourerData = string.Empty;
 
-    public PlayerCharacter? PlayerCharacter { get; set; }
+    public Dalamud.Game.ClientState.Objects.Types.Character? PlayerCharacter { get; set; }
 
     public string? PlayerName { get; private set; }
 
     public string PlayerNameHash { get; }
-    private string _lastAppliedEquipmentHash = string.Empty;
 
     public bool RequestedPenumbraRedraw { get; set; }
 
     public bool WasVisible { get; private set; }
 
-    private readonly Dictionary<string, CharacterCacheDto> _cache = new();
+    private CharacterCacheDto _cachedData = new();
 
     private CharacterEquipment? _currentCharacterEquipment;
 
@@ -68,43 +67,37 @@ public class CachedPlayer
         Logger.Debug("Received data for " + this);
 
         Logger.Debug("Checking for files to download for player " + PlayerName);
-        Logger.Debug("Hash for data is " + characterData.Hash);
-        if (!_cache.ContainsKey(characterData.Hash))
-        {
-            Logger.Debug("Received total " + characterData.FileReplacements.Count + " file replacement data");
-            _cache[characterData.Hash] = characterData;
-        }
-        else
-        {
-            Logger.Debug("Had valid local cache for " + PlayerName);
-        }
-        _lastAppliedEquipmentHash = characterData.Hash;
+        Logger.Debug("Hash for data is " + characterData.GetHashCode());
 
-        DownloadAndApplyCharacter();
+        if (characterData.GetHashCode() == _cachedData.GetHashCode()) return;
+
+        List<ObjectKind> charaDataToUpdate = new List<ObjectKind>();
+        foreach (var objectKind in Enum.GetValues<ObjectKind>())
+        {
+            bool doesntContainKey = !_cachedData.FileReplacements.ContainsKey(objectKind)
+                || (_cachedData.FileReplacements.ContainsKey(objectKind) && !characterData.FileReplacements.ContainsKey(objectKind));
+            if (doesntContainKey)
+            {
+                charaDataToUpdate.Add(objectKind);
+                continue;
+            }
+
+            bool listsAreEqual = Enumerable.SequenceEqual(_cachedData.FileReplacements[objectKind], characterData.FileReplacements[objectKind]);
+            bool glamourerDataDifferent = _cachedData.GlamourerData[objectKind] != characterData.GlamourerData[objectKind];
+            if (!listsAreEqual || glamourerDataDifferent)
+            {
+                Logger.Debug("Updating " + objectKind);
+
+                charaDataToUpdate.Add(objectKind);
+            }
+        }
+
+        _cachedData = characterData;
+
+        DownloadAndApplyCharacter(charaDataToUpdate);
     }
 
-    private void ApiControllerOnCharacterReceived(object? sender, CharacterReceivedEventArgs e)
-    {
-        if (string.IsNullOrEmpty(PlayerName) || e.CharacterNameHash != PlayerNameHash) return;
-        Logger.Debug("Received data for " + this);
-
-        Logger.Debug("Checking for files to download for player " + PlayerName);
-        Logger.Debug("Hash for data is " + e.CharacterData.Hash);
-        if (!_cache.ContainsKey(e.CharacterData.Hash))
-        {
-            Logger.Debug("Received total " + e.CharacterData.FileReplacements.Count + " file replacement data");
-            _cache[e.CharacterData.Hash] = e.CharacterData;
-        }
-        else
-        {
-            Logger.Debug("Had valid local cache for " + PlayerName);
-        }
-        _lastAppliedEquipmentHash = e.CharacterData.Hash;
-
-        DownloadAndApplyCharacter();
-    }
-
-    private void DownloadAndApplyCharacter()
+    private void DownloadAndApplyCharacter(List<ObjectKind> objectKind)
     {
         _downloadCancellationTokenSource?.Cancel();
         _downloadCancellationTokenSource = new CancellationTokenSource();
@@ -116,9 +109,9 @@ public class CachedPlayer
 
             Dictionary<string, string> moddedPaths;
             int attempts = 0;
-            while ((toDownloadReplacements = TryCalculateModdedDictionary(_cache[_lastAppliedEquipmentHash], out moddedPaths)).Count > 0 && attempts++ <= 10)
+            while ((toDownloadReplacements = TryCalculateModdedDictionary(out moddedPaths)).Count > 0 && attempts++ <= 10)
             {
-                Logger.Debug("Downloading missing files for player " + PlayerName);
+                Logger.Debug("Downloading missing files for player " + PlayerName + ", kind: " + objectKind);
                 await _apiController.DownloadFiles(downloadId, toDownloadReplacements, downloadToken);
                 if (downloadToken.IsCancellationRequested)
                 {
@@ -126,7 +119,7 @@ public class CachedPlayer
                     return;
                 }
 
-                if ((TryCalculateModdedDictionary(_cache[_lastAppliedEquipmentHash], out moddedPaths)).All(c => _apiController.ForbiddenTransfers.Any(f => f.Hash == c.Hash)))
+                if ((TryCalculateModdedDictionary(out moddedPaths)).All(c => _apiController.ForbiddenTransfers.Any(f => f.Hash == c.Hash)))
                 {
                     break;
                 }
@@ -142,7 +135,12 @@ public class CachedPlayer
                 }
             }
 
-            ApplyCharacterData(_cache[_lastAppliedEquipmentHash], moddedPaths);
+            ApplyBaseData(moddedPaths);
+
+            foreach (var kind in objectKind)
+            {
+                ApplyCustomizationData(kind);
+            }
         }, downloadToken).ContinueWith(task =>
         {
             if (!task.IsCanceled) return;
@@ -152,22 +150,21 @@ public class CachedPlayer
         });
     }
 
-    private List<FileReplacementDto> TryCalculateModdedDictionary(CharacterCacheDto cache,
-        out Dictionary<string, string> moddedDictionary)
+    private List<FileReplacementDto> TryCalculateModdedDictionary(out Dictionary<string, string> moddedDictionary)
     {
         List<FileReplacementDto> missingFiles = new();
         moddedDictionary = new Dictionary<string, string>();
         try
         {
             using var db = new FileCacheContext();
-            foreach (var item in cache.FileReplacements)
+            foreach (var item in _cachedData.FileReplacements.SelectMany(k => k.Value).ToList())
             {
                 foreach (var gamePath in item.GamePaths)
                 {
                     var fileCache = db.FileCaches.FirstOrDefault(f => f.Hash == item.Hash);
                     if (fileCache != null)
                     {
-                        moddedDictionary.Add(gamePath, fileCache.Filepath);
+                        moddedDictionary[gamePath] = fileCache.Filepath;
                     }
                     else
                     {
@@ -184,24 +181,102 @@ public class CachedPlayer
         return missingFiles;
     }
 
-    private unsafe void ApplyCharacterData(CharacterCacheDto cache, Dictionary<string, string> moddedPaths)
+    private void ApplyBaseData(Dictionary<string, string> moddedPaths)
     {
-        if (PlayerCharacter is null) return;
         _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName!);
         var tempCollection = _ipcManager.PenumbraCreateTemporaryCollection(PlayerName!);
-        _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerCharacter!.Address);
-        RequestedPenumbraRedraw = true;
-        Logger.Debug(
-            $"Request Redraw for {PlayerName}");
-        _ipcManager.PenumbraSetTemporaryMods(tempCollection, moddedPaths, cache.ManipulationData);
-        _ipcManager.GlamourerApplyAll(cache.GlamourerData, PlayerCharacter!);
-        var minion = ((Character*)PlayerCharacter.Address)->CompanionObject;
-        if (minion != null)
+        _ipcManager.PenumbraSetTemporaryMods(tempCollection, moddedPaths, _cachedData.ManipulationData);
+    }
+
+    private unsafe void ApplyCustomizationData(ObjectKind objectKind)
+    {
+        if (PlayerCharacter is null) return;
+
+        if (objectKind == ObjectKind.Player)
         {
-            var compName = new Utf8String(minion->Character.GameObject.GetName()).ToString();
-            if (compName != null)
+            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerCharacter!.Address);
+            RequestedPenumbraRedraw = true;
+            Logger.Debug(
+                $"Request Redraw for {PlayerName}");
+            _ipcManager.GlamourerApplyAll(_cachedData.GlamourerData[objectKind], PlayerCharacter!);
+        }
+        else if (objectKind == ObjectKind.Minion)
+        {
+            var minion = ((Character*)PlayerCharacter.Address)->CompanionObject;
+            if (minion != null)
             {
-                _ipcManager.PenumbraRedraw(compName);
+                Logger.Debug($"Request Redraw for Minion");
+                _ipcManager.GlamourerApplyAll(_cachedData.GlamourerData[objectKind], obj: (IntPtr)minion);
+            }
+        }
+        else if (objectKind == ObjectKind.Pet)
+        {
+            var pet = _dalamudUtil.GetPet(PlayerCharacter.Address);
+            if (pet != IntPtr.Zero)
+            {
+                Logger.Debug("Request Redraw for Pet");
+                _ipcManager.GlamourerApplyAll(_cachedData.GlamourerData[objectKind], pet);
+            }
+        }
+        else if (objectKind == ObjectKind.Companion)
+        {
+            var companion = _dalamudUtil.GetCompanion(PlayerCharacter.Address);
+            if (companion != IntPtr.Zero)
+            {
+                Logger.Debug("Request Redraw for Companion");
+                _ipcManager.GlamourerApplyAll(_cachedData.GlamourerData[objectKind], companion);
+            }
+        }
+        else if (objectKind == ObjectKind.Mount)
+        {
+            var mount = ((CharaExt*)PlayerCharacter.Address)->Mount;
+            if (mount != null)
+            {
+                Logger.Debug($"Request Redraw for Mount");
+                _ipcManager.PenumbraRedraw((IntPtr)mount);
+            }
+        }
+    }
+
+    private unsafe void RevertCustomizationData(ObjectKind objectKind)
+    {
+        if (PlayerCharacter is null) return;
+
+        if (objectKind == ObjectKind.Player)
+        {
+            _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerCharacter);
+            _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerCharacter);
+        }
+        else if (objectKind == ObjectKind.Minion)
+        {
+            var minion = ((Character*)PlayerCharacter.Address)->CompanionObject;
+            if (minion != null)
+            {
+                _ipcManager.PenumbraRedraw((IntPtr)minion);
+            }
+        }
+        else if (objectKind == ObjectKind.Pet)
+        {
+            var pet = _dalamudUtil.GetPet(PlayerCharacter.Address);
+            if (pet != IntPtr.Zero)
+            {
+                _ipcManager.PenumbraRedraw(pet);
+            }
+        }
+        else if (objectKind == ObjectKind.Companion)
+        {
+            var companion = _dalamudUtil.GetCompanion(PlayerCharacter.Address);
+            if (companion != IntPtr.Zero)
+            {
+                _ipcManager.PenumbraRedraw(companion);
+            }
+        }
+        else if (objectKind == ObjectKind.Mount)
+        {
+            var mount = ((CharaExt*)PlayerCharacter.Address)->Mount;
+            if (mount != null)
+            {
+                _ipcManager.PenumbraRedraw((IntPtr)mount);
             }
         }
     }
@@ -217,15 +292,15 @@ public class CachedPlayer
             Logger.Verbose("Restoring state for " + PlayerName);
             _dalamudUtil.FrameworkUpdate -= DalamudUtilOnFrameworkUpdate;
             _ipcManager.PenumbraRedrawEvent -= IpcManagerOnPenumbraRedrawEvent;
-            _apiController.CharacterReceived -= ApiControllerOnCharacterReceived;
             _downloadCancellationTokenSource?.Cancel();
             _downloadCancellationTokenSource?.Dispose();
-            _downloadCancellationTokenSource = null;
             _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName);
             if (PlayerCharacter != null && PlayerCharacter.IsValid())
             {
-                _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerCharacter);
-                _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerCharacter);
+                foreach (var item in _cachedData.FileReplacements)
+                {
+                    RevertCustomizationData(item.Key);
+                }
             }
         }
         catch (Exception ex)
@@ -283,9 +358,9 @@ public class CachedPlayer
 
     private Task? _penumbraRedrawEventTask;
 
-    private void IpcManagerOnPenumbraRedrawEvent(object? sender, EventArgs e)
+    private void IpcManagerOnPenumbraRedrawEvent(IntPtr address, int idx)
     {
-        var player = _dalamudUtil.GetPlayerCharacterFromObjectTableByIndex((int)sender!);
+        var player = _dalamudUtil.GetCharacterFromObjectTableByIndex(idx);
         if (player == null || player.Name.ToString() != PlayerName) return;
         if (!_penumbraRedrawEventTask?.IsCompleted ?? false) return;
 
@@ -294,10 +369,10 @@ public class CachedPlayer
             PlayerCharacter = player;
             _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerCharacter.Address);
 
-            if (RequestedPenumbraRedraw == false && !string.IsNullOrEmpty(_lastAppliedEquipmentHash))
+            if (RequestedPenumbraRedraw == false)
             {
                 Logger.Warn("Unauthorized character change detected");
-                DownloadAndApplyCharacter();
+                ApplyCustomizationData(ObjectKind.Player);
             }
             else
             {

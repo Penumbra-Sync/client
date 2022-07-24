@@ -8,6 +8,7 @@ using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.Managers
 {
+    public delegate void PenumbraRedrawEvent(IntPtr address, int objTblIdx);
     public class IpcManager : IDisposable
     {
         private readonly ICallGateSubscriber<int> _glamourerApiVersion;
@@ -23,13 +24,16 @@ namespace MareSynchronos.Managers
         private readonly ICallGateSubscriber<object> _penumbraDispose;
         private readonly ICallGateSubscriber<IntPtr, int, object?> _penumbraObjectIsRedrawn;
         private readonly ICallGateSubscriber<string, int, object>? _penumbraRedraw;
+        private readonly ICallGateSubscriber<GameObject, int, object>? _penumbraRedrawObject;
         private readonly ICallGateSubscriber<string, int> _penumbraRemoveTemporaryCollection;
         private readonly ICallGateSubscriber<string>? _penumbraResolveModDir;
         private readonly ICallGateSubscriber<string, string>? _penumbraResolvePlayer;
         private readonly ICallGateSubscriber<string, string[]>? _reverseResolvePlayer;
         private readonly ICallGateSubscriber<string, string, Dictionary<string, string>, string, int, int>
             _penumbraSetTemporaryMod;
-        public IpcManager(DalamudPluginInterface pi)
+        private readonly DalamudUtil _dalamudUtil;
+
+        public IpcManager(DalamudPluginInterface pi, DalamudUtil dalamudUtil)
         {
             Logger.Verbose("Creating " + nameof(IpcManager));
 
@@ -38,6 +42,7 @@ namespace MareSynchronos.Managers
             _penumbraResolvePlayer = pi.GetIpcSubscriber<string, string>("Penumbra.ResolvePlayerPath");
             _penumbraResolveModDir = pi.GetIpcSubscriber<string>("Penumbra.GetModDirectory");
             _penumbraRedraw = pi.GetIpcSubscriber<string, int, object>("Penumbra.RedrawObjectByName");
+            _penumbraRedrawObject = pi.GetIpcSubscriber<GameObject, int, object>("Penumbra.RedrawObject");
             _reverseResolvePlayer = pi.GetIpcSubscriber<string, string[]>("Penumbra.ReverseResolvePlayerPath");
             _penumbraApiVersion = pi.GetIpcSubscriber<(int, int)>("Penumbra.ApiVersions");
             _penumbraObjectIsRedrawn = pi.GetIpcSubscriber<IntPtr, int, object?>("Penumbra.GameObjectRedrawn");
@@ -69,11 +74,13 @@ namespace MareSynchronos.Managers
             {
                 PenumbraInitialized?.Invoke();
             }
+
+            this._dalamudUtil = dalamudUtil;
         }
 
         public event VoidDelegate? PenumbraInitialized;
         public event VoidDelegate? PenumbraDisposed;
-        public event EventHandler? PenumbraRedrawEvent;
+        public event PenumbraRedrawEvent? PenumbraRedrawEvent;
 
         public bool Initialized => CheckPenumbraApi();
         public bool CheckGlamourerApi()
@@ -92,7 +99,7 @@ namespace MareSynchronos.Managers
         {
             try
             {
-                return _penumbraApiVersion.InvokeFunc() is { Item1: 4, Item2: >=11 };
+                return _penumbraApiVersion.InvokeFunc() is { Item1: 4, Item2: >= 11 };
             }
             catch
             {
@@ -109,10 +116,19 @@ namespace MareSynchronos.Managers
             _penumbraObjectIsRedrawn.Unsubscribe(RedrawEvent);
         }
 
+        public void GlamourerApplyAll(string customization, IntPtr obj)
+        {
+            if (!CheckGlamourerApi()) return;
+            var gameObj = _dalamudUtil.CreateGameObject(obj);
+            if (gameObj != null)
+            {
+                _glamourerApplyAll!.InvokeAction(customization, gameObj);
+            }
+        }
+
         public void GlamourerApplyAll(string customization, GameObject character)
         {
             if (!CheckGlamourerApi()) return;
-            Logger.Verbose("Glamourer apply all to " + character);
             _glamourerApplyAll!.InvokeAction(customization, character);
         }
 
@@ -133,7 +149,12 @@ namespace MareSynchronos.Managers
         public string GlamourerGetCharacterCustomization(GameObject character)
         {
             if (!CheckGlamourerApi()) return string.Empty;
-            return _glamourerGetAllCustomization!.InvokeFunc(character);
+            var glamourerString = _glamourerGetAllCustomization!.InvokeFunc(character);
+            byte[] bytes = Convert.FromBase64String(glamourerString);
+            // ignore transparency
+            bytes[88] = 128;
+            bytes[89] = 63;
+            return Convert.ToBase64String(bytes);
         }
 
         public void GlamourerRevertCharacterCustomization(GameObject character)
@@ -162,6 +183,16 @@ namespace MareSynchronos.Managers
             return _penumbraResolveModDir!.InvokeFunc();
         }
 
+        public void PenumbraRedraw(IntPtr obj)
+        {
+            if (!CheckPenumbraApi()) return;
+            var gameObj = _dalamudUtil.CreateGameObject(obj);
+            if (gameObj != null)
+            {
+                _penumbraRedrawObject!.InvokeAction(gameObj, 0);
+            }
+        }
+
         public void PenumbraRedraw(string actorName)
         {
             if (!CheckPenumbraApi()) return;
@@ -179,7 +210,7 @@ namespace MareSynchronos.Managers
         {
             if (!CheckPenumbraApi()) return null;
             var resolvedPath = _penumbraResolvePlayer!.InvokeFunc(path);
-            Logger.Verbose("Resolved " + path + "=>" + string.Join(", ", resolvedPath));
+            //Logger.Verbose("Resolved " + path + "=>" + string.Join(", ", resolvedPath));
             return resolvedPath;
         }
 
@@ -191,7 +222,7 @@ namespace MareSynchronos.Managers
             {
                 resolvedPaths = new[] { path };
             }
-            Logger.Verbose("Reverse Resolved " + path + "=>" + string.Join(", ", resolvedPaths));
+            //Logger.Verbose("Reverse Resolved " + path + "=>" + string.Join(", ", resolvedPaths));
             return resolvedPaths;
         }
 
@@ -209,7 +240,7 @@ namespace MareSynchronos.Managers
 
         private void RedrawEvent(IntPtr objectAddress, int objectTableIndex)
         {
-            PenumbraRedrawEvent?.Invoke(objectTableIndex, EventArgs.Empty);
+            PenumbraRedrawEvent?.Invoke(objectAddress, objectTableIndex);
         }
 
         private void PenumbraInit()
