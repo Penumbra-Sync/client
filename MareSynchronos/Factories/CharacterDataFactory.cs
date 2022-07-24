@@ -7,6 +7,7 @@ using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Client.System.Resource;
+using MareSynchronos.API;
 using MareSynchronos.Interop;
 using MareSynchronos.Managers;
 using MareSynchronos.Models;
@@ -30,7 +31,7 @@ public class CharacterDataFactory
         _ipcManager = ipcManager;
     }
 
-    public CharacterData? BuildCharacterData(IntPtr playerPointer)
+    public CharacterData BuildCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr playerPointer)
     {
         if (!_ipcManager.Initialized)
         {
@@ -39,19 +40,22 @@ public class CharacterDataFactory
 
         if (playerPointer == IntPtr.Zero)
         {
-            return null;
+            Logger.Verbose("Pointer was zero for " + objectKind);
+            previousData.FileReplacements.Remove(objectKind);
+            previousData.GlamourerString.Remove(objectKind);
+            return previousData;
         }
 
         try
         {
-            return CreateCharacterData(playerPointer);
+            return CreateCharacterData(previousData, objectKind, playerPointer);
         }
         catch (Exception e)
         {
-            Logger.Warn("Failed to create character data");
+            Logger.Warn("Failed to create " + objectKind + " data");
             Logger.Warn(e.Message);
             Logger.Warn(e.StackTrace ?? string.Empty);
-            return null;
+            return previousData;
         }
     }
 
@@ -60,16 +64,15 @@ public class CharacterDataFactory
         return (string.Join("", Enumerable.Repeat("\t", inheritanceLevel)), string.Join("", Enumerable.Repeat("\t", inheritanceLevel + 2)));
     }
 
-    private void DebugPrint(FileReplacement fileReplacement, string objectKind, string resourceType, int inheritanceLevel)
+    private void DebugPrint(FileReplacement fileReplacement, ObjectKind objectKind, string resourceType, int inheritanceLevel)
     {
         var indentation = GetIndentationForInheritanceLevel(inheritanceLevel);
-        objectKind += string.IsNullOrEmpty(objectKind) ? "" : " ";
 
         Logger.Verbose(indentation.Item1 + objectKind + resourceType + " [" + string.Join(", ", fileReplacement.GamePaths) + "]");
         Logger.Verbose(indentation.Item2 + "=> " + fileReplacement.ResolvedPath);
     }
 
-    private unsafe void AddReplacementsFromRenderModel(RenderModel* mdl, CharacterData cache, int inheritanceLevel = 0, string objectKind = "")
+    private unsafe void AddReplacementsFromRenderModel(RenderModel* mdl, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0)
     {
         if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
         {
@@ -91,18 +94,18 @@ public class CharacterDataFactory
         FileReplacement mdlFileReplacement = CreateFileReplacement(mdlPath);
         DebugPrint(mdlFileReplacement, objectKind, "Model", inheritanceLevel);
 
-        cache.AddFileReplacement(mdlFileReplacement);
+        cache.AddFileReplacement(objectKind, mdlFileReplacement);
 
         for (var mtrlIdx = 0; mtrlIdx < mdl->MaterialCount; mtrlIdx++)
         {
             var mtrl = (Material*)mdl->Materials[mtrlIdx];
             if (mtrl == null) continue;
 
-            AddReplacementsFromMaterial(mtrl, cache, inheritanceLevel + 1, objectKind);
+            AddReplacementsFromMaterial(mtrl, objectKind, cache, inheritanceLevel + 1);
         }
     }
 
-    private unsafe void AddReplacementsFromMaterial(Material* mtrl, CharacterData cache, int inheritanceLevel = 0, string objectKind = "")
+    private unsafe void AddReplacementsFromMaterial(Material* mtrl, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0)
     {
         string fileName;
         try
@@ -122,7 +125,7 @@ public class CharacterDataFactory
         var mtrlFileReplacement = CreateFileReplacement(mtrlPath);
         DebugPrint(mtrlFileReplacement, objectKind, "Material", inheritanceLevel);
 
-        cache.AddFileReplacement(mtrlFileReplacement);
+        cache.AddFileReplacement(objectKind, mtrlFileReplacement);
 
         var mtrlResourceHandle = (MtrlResource*)mtrl->ResourceHandle;
         for (var resIdx = 0; resIdx < mtrlResourceHandle->NumTex; resIdx++)
@@ -131,11 +134,11 @@ public class CharacterDataFactory
 
             if (string.IsNullOrEmpty(texPath)) continue;
 
-            AddReplacementsFromTexture(texPath, cache, inheritanceLevel + 1, objectKind);
+            AddReplacementsFromTexture(texPath, objectKind, cache, inheritanceLevel + 1);
         }
     }
 
-    private void AddReplacementsFromTexture(string texPath, CharacterData cache, int inheritanceLevel = 0, string objectKind = "", bool doNotReverseResolve = true)
+    private void AddReplacementsFromTexture(string texPath, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0, bool doNotReverseResolve = true)
     {
         if (texPath.IsNullOrEmpty()) return;
 
@@ -144,7 +147,7 @@ public class CharacterDataFactory
         var texFileReplacement = CreateFileReplacement(texPath, doNotReverseResolve);
         DebugPrint(texFileReplacement, objectKind, "Texture", inheritanceLevel);
 
-        cache.AddFileReplacement(texFileReplacement);
+        cache.AddFileReplacement(objectKind, texFileReplacement);
 
         if (texPath.Contains("/--")) return;
 
@@ -153,10 +156,10 @@ public class CharacterDataFactory
 
         DebugPrint(texDx11Replacement, objectKind, "Texture (DX11)", inheritanceLevel);
 
-        cache.AddFileReplacement(texDx11Replacement);
+        cache.AddFileReplacement(objectKind, texDx11Replacement);
     }
 
-    private unsafe CharacterData CreateCharacterData(IntPtr charaPointer)
+    private unsafe CharacterData CreateCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr charaPointer)
     {
         Stopwatch st = Stopwatch.StartNew();
         var chara = _dalamudUtil.CreateGameObject(charaPointer)!;
@@ -166,20 +169,18 @@ public class CharacterDataFactory
             Thread.Sleep(50);
         }
         _dalamudUtil.WaitWhileCharacterIsDrawing(charaPointer);
-        var cache = new CharacterData()
-        {
-            ManipulationString = _ipcManager.PenumbraGetMetaManipulations(),
-        };
 
-        try
+        if (previousData.FileReplacements.ContainsKey(objectKind))
         {
-            cache.GlamourerString = _ipcManager.GlamourerGetCharacterCustomization(chara);
-        }
-        catch
-        {
-            // might not have glamourer data
+            previousData.FileReplacements[objectKind].Clear();
         }
 
+        previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
+
+        if (objectKind is not ObjectKind.Mount)
+        {
+            previousData.GlamourerString[objectKind] = _ipcManager.GlamourerGetCharacterCustomization(chara);
+        }
 
         var human = (Human*)((Character*)charaPointer)->GameObject.GetDrawObject();
         for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)
@@ -190,54 +191,50 @@ public class CharacterDataFactory
                 continue;
             }
 
-            AddReplacementsFromRenderModel(mdl, cache, 0, "Character");
+            AddReplacementsFromRenderModel(mdl, objectKind, previousData, 0);
         }
 
-        var weaponObject = (Weapon*)((Object*)human)->ChildObject;
-
-        if ((IntPtr)weaponObject != IntPtr.Zero)
+        if (objectKind == ObjectKind.Player)
         {
-            var mainHandWeapon = weaponObject->WeaponRenderModel->RenderModel;
+            var weaponObject = (Weapon*)((Object*)human)->ChildObject;
 
-            AddReplacementsFromRenderModel(mainHandWeapon, cache, 0, "Weapon");
-
-            if (weaponObject->NextSibling != (IntPtr)weaponObject)
+            if ((IntPtr)weaponObject != IntPtr.Zero)
             {
-                var offHandWeapon = ((Weapon*)weaponObject->NextSibling)->WeaponRenderModel->RenderModel;
+                var mainHandWeapon = weaponObject->WeaponRenderModel->RenderModel;
 
-                AddReplacementsFromRenderModel(offHandWeapon, cache, 1, "OffHand Weapon");
-            }
-        }
+                AddReplacementsFromRenderModel(mainHandWeapon, objectKind, previousData, 0);
 
-        if (!string.IsNullOrEmpty(cache.GlamourerString))
-        {
-            try
-            {
-                AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId, cache);
-                AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->Decal->FileName()).ToString(), cache, 0, "Decal", false);
-                AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), cache, 0, "Legacy Decal", false);
+                if (weaponObject->NextSibling != (IntPtr)weaponObject)
+                {
+                    var offHandWeapon = ((Weapon*)weaponObject->NextSibling)->WeaponRenderModel->RenderModel;
+
+                    AddReplacementsFromRenderModel(offHandWeapon, objectKind, previousData, 1);
+                }
             }
-            catch { }
+
+            AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId, objectKind, previousData);
+            AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->Decal->FileName()).ToString(), objectKind, previousData, 0, false);
+            AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), objectKind, previousData, 0, false);
         }
 
         st.Stop();
-        Logger.Verbose("Building Character Data took " + st.Elapsed);
+        Logger.Verbose("Building " + objectKind + " Data took " + st.Elapsed);
 
-        return cache;
+        return previousData;
     }
 
-    private void AddReplacementSkeleton(ushort raceSexId, CharacterData cache)
+    private void AddReplacementSkeleton(ushort raceSexId, ObjectKind objectKind, CharacterData cache)
     {
         string raceSexIdString = raceSexId.ToString("0000");
 
         string skeletonPath = $"chara/human/c{raceSexIdString}/skeleton/base/b0001/skl_c{raceSexIdString}b0001.sklb";
 
-        Logger.Verbose("Adding File Replacement for Skeleton " + skeletonPath);
+        //Logger.Verbose("Adding File Replacement for Skeleton " + skeletonPath);
 
         var replacement = CreateFileReplacement(skeletonPath, true);
-        cache.AddFileReplacement(replacement);
+        cache.AddFileReplacement(objectKind, replacement);
 
-        DebugPrint(replacement, "Skeleton", "SKLB", 0);
+        DebugPrint(replacement, objectKind, "SKLB", 0);
     }
 
     private FileReplacement CreateFileReplacement(string path, bool doNotReverseResolve = false)

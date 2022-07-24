@@ -129,7 +129,6 @@ namespace MareSynchronos.Managers
         public void GlamourerApplyAll(string customization, GameObject character)
         {
             if (!CheckGlamourerApi()) return;
-            Logger.Verbose("Glamourer apply all to " + character);
             _glamourerApplyAll!.InvokeAction(customization, character);
         }
 
@@ -150,7 +149,12 @@ namespace MareSynchronos.Managers
         public string GlamourerGetCharacterCustomization(GameObject character)
         {
             if (!CheckGlamourerApi()) return string.Empty;
-            return _glamourerGetAllCustomization!.InvokeFunc(character);
+            var glamourerString = _glamourerGetAllCustomization!.InvokeFunc(character);
+            byte[] bytes = Convert.FromBase64String(glamourerString);
+            // ignore transparency
+            bytes[88] = 128;
+            bytes[89] = 63;
+            return Convert.ToBase64String(bytes);
         }
 
         public void GlamourerRevertCharacterCustomization(GameObject character)
@@ -206,7 +210,7 @@ namespace MareSynchronos.Managers
         {
             if (!CheckPenumbraApi()) return null;
             var resolvedPath = _penumbraResolvePlayer!.InvokeFunc(path);
-            Logger.Verbose("Resolved " + path + "=>" + string.Join(", ", resolvedPath));
+            //Logger.Verbose("Resolved " + path + "=>" + string.Join(", ", resolvedPath));
             return resolvedPath;
         }
 
@@ -218,7 +222,7 @@ namespace MareSynchronos.Managers
             {
                 resolvedPaths = new[] { path };
             }
-            Logger.Verbose("Reverse Resolved " + path + "=>" + string.Join(", ", resolvedPaths));
+            //Logger.Verbose("Reverse Resolved " + path + "=>" + string.Join(", ", resolvedPaths));
             return resolvedPaths;
         }
 

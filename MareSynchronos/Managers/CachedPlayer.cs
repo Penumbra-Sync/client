@@ -42,7 +42,7 @@ public class CachedPlayer
     }
 
     private bool _isDisposed = false;
-    private Dictionary<ObjectKind, CancellationTokenSource?> _downloadCancellationTokenSources = new();
+    private CancellationTokenSource? _downloadCancellationTokenSource = new();
 
     private string _lastGlamourerData = string.Empty;
 
@@ -58,7 +58,7 @@ public class CachedPlayer
 
     public bool WasVisible { get; private set; }
 
-    private readonly Dictionary<ObjectKind, CharacterCacheDto> _cache = new();
+    private CharacterCacheDto _cachedData = new();
 
     private CharacterEquipment? _currentCharacterEquipment;
 
@@ -67,33 +67,41 @@ public class CachedPlayer
         Logger.Debug("Received data for " + this);
 
         Logger.Debug("Checking for files to download for player " + PlayerName);
-        Logger.Debug("Hash for data is " + characterData.Hash);
+        Logger.Debug("Hash for data is " + characterData.GetHashCode());
 
-        if (!_cache.ContainsKey(characterData.ObjectKind))
+        if (characterData.GetHashCode() == _cachedData.GetHashCode()) return;
+
+        List<ObjectKind> charaDataToUpdate = new List<ObjectKind>();
+        foreach (var objectKind in Enum.GetValues<ObjectKind>())
         {
-            _cache.Add(characterData.ObjectKind, new());
-            _downloadCancellationTokenSources.Add(characterData.ObjectKind, null);
+            bool doesntContainKey = !_cachedData.FileReplacements.ContainsKey(objectKind)
+                || (_cachedData.FileReplacements.ContainsKey(objectKind) && !characterData.FileReplacements.ContainsKey(objectKind));
+            if (doesntContainKey)
+            {
+                charaDataToUpdate.Add(objectKind);
+                continue;
+            }
+
+            bool listsAreEqual = Enumerable.SequenceEqual(_cachedData.FileReplacements[objectKind], characterData.FileReplacements[objectKind]);
+            bool glamourerDataDifferent = _cachedData.GlamourerData[objectKind] != characterData.GlamourerData[objectKind];
+            if (!listsAreEqual || glamourerDataDifferent)
+            {
+                Logger.Debug("Updating " + objectKind);
+
+                charaDataToUpdate.Add(objectKind);
+            }
         }
 
-        _cache.TryGetValue(characterData.ObjectKind, out var cachedDto);
-        if ((cachedDto?.Hash ?? string.Empty) != characterData.Hash)
-        {
-            Logger.Debug("Received total " + characterData.FileReplacements.Count + " file replacement data");
-            _cache[characterData.ObjectKind] = characterData;
-        }
-        else
-        {
-            Logger.Debug("Had valid local cache for " + PlayerName);
-        }
+        _cachedData = characterData;
 
-        DownloadAndApplyCharacter(characterData.ObjectKind);
+        DownloadAndApplyCharacter(charaDataToUpdate);
     }
 
-    private void DownloadAndApplyCharacter(ObjectKind objectKind)
+    private void DownloadAndApplyCharacter(List<ObjectKind> objectKind)
     {
-        _downloadCancellationTokenSources[objectKind]?.Cancel();
-        _downloadCancellationTokenSources[objectKind] = new CancellationTokenSource();
-        var downloadToken = _downloadCancellationTokenSources[objectKind]!.Token;
+        _downloadCancellationTokenSource?.Cancel();
+        _downloadCancellationTokenSource = new CancellationTokenSource();
+        var downloadToken = _downloadCancellationTokenSource.Token;
         var downloadId = _apiController.GetDownloadId();
         Task.Run(async () =>
         {
@@ -103,7 +111,7 @@ public class CachedPlayer
             int attempts = 0;
             while ((toDownloadReplacements = TryCalculateModdedDictionary(out moddedPaths)).Count > 0 && attempts++ <= 10)
             {
-                Logger.Debug("Downloading missing files for player " + PlayerName);
+                Logger.Debug("Downloading missing files for player " + PlayerName + ", kind: " + objectKind);
                 await _apiController.DownloadFiles(downloadId, toDownloadReplacements, downloadToken);
                 if (downloadToken.IsCancellationRequested)
                 {
@@ -127,7 +135,12 @@ public class CachedPlayer
                 }
             }
 
-            ApplyCharacterData(objectKind, moddedPaths);
+            ApplyBaseData(moddedPaths);
+
+            foreach (var kind in objectKind)
+            {
+                ApplyCustomizationData(kind);
+            }
         }, downloadToken).ContinueWith(task =>
         {
             if (!task.IsCanceled) return;
@@ -144,7 +157,7 @@ public class CachedPlayer
         try
         {
             using var db = new FileCacheContext();
-            foreach (var item in _cache.SelectMany(c => c.Value.FileReplacements).ToList())
+            foreach (var item in _cachedData.FileReplacements.SelectMany(k => k.Value).ToList())
             {
                 foreach (var gamePath in item.GamePaths)
                 {
@@ -168,14 +181,16 @@ public class CachedPlayer
         return missingFiles;
     }
 
-    private unsafe void ApplyCharacterData(ObjectKind objectKind, Dictionary<string, string> moddedPaths)
+    private void ApplyBaseData(Dictionary<string, string> moddedPaths)
     {
-        if (PlayerCharacter is null) return;
-        var cache = _cache[objectKind];
-
         _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName!);
         var tempCollection = _ipcManager.PenumbraCreateTemporaryCollection(PlayerName!);
-        _ipcManager.PenumbraSetTemporaryMods(tempCollection, moddedPaths, _cache.First().Value.ManipulationData);
+        _ipcManager.PenumbraSetTemporaryMods(tempCollection, moddedPaths, _cachedData.ManipulationData);
+    }
+
+    private unsafe void ApplyCustomizationData(ObjectKind objectKind)
+    {
+        if (PlayerCharacter is null) return;
 
         if (objectKind == ObjectKind.Player)
         {
@@ -183,7 +198,7 @@ public class CachedPlayer
             RequestedPenumbraRedraw = true;
             Logger.Debug(
                 $"Request Redraw for {PlayerName}");
-            _ipcManager.GlamourerApplyAll(cache.GlamourerData, PlayerCharacter!);
+            _ipcManager.GlamourerApplyAll(_cachedData.GlamourerData[objectKind], PlayerCharacter!);
         }
         else if (objectKind == ObjectKind.Minion)
         {
@@ -191,7 +206,7 @@ public class CachedPlayer
             if (minion != null)
             {
                 Logger.Debug($"Request Redraw for Minion");
-                _ipcManager.GlamourerApplyAll(cache.GlamourerData, obj: (IntPtr)minion);
+                _ipcManager.GlamourerApplyAll(_cachedData.GlamourerData[objectKind], obj: (IntPtr)minion);
             }
         }
         else if (objectKind == ObjectKind.Pet)
@@ -200,7 +215,7 @@ public class CachedPlayer
             if (pet != IntPtr.Zero)
             {
                 Logger.Debug("Request Redraw for Pet");
-                _ipcManager.GlamourerApplyAll(cache.GlamourerData, pet);
+                _ipcManager.GlamourerApplyAll(_cachedData.GlamourerData[objectKind], pet);
             }
         }
         else if (objectKind == ObjectKind.Companion)
@@ -209,7 +224,7 @@ public class CachedPlayer
             if (companion != IntPtr.Zero)
             {
                 Logger.Debug("Request Redraw for Companion");
-                _ipcManager.GlamourerApplyAll(cache.GlamourerData, companion);
+                _ipcManager.GlamourerApplyAll(_cachedData.GlamourerData[objectKind], companion);
             }
         }
         else if (objectKind == ObjectKind.Mount)
@@ -218,6 +233,49 @@ public class CachedPlayer
             if (mount != null)
             {
                 Logger.Debug($"Request Redraw for Mount");
+                _ipcManager.PenumbraRedraw((IntPtr)mount);
+            }
+        }
+    }
+
+    private unsafe void RevertCustomizationData(ObjectKind objectKind)
+    {
+        if (PlayerCharacter is null) return;
+
+        if (objectKind == ObjectKind.Player)
+        {
+            _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerCharacter);
+            _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerCharacter);
+        }
+        else if (objectKind == ObjectKind.Minion)
+        {
+            var minion = ((Character*)PlayerCharacter.Address)->CompanionObject;
+            if (minion != null)
+            {
+                _ipcManager.PenumbraRedraw((IntPtr)minion);
+            }
+        }
+        else if (objectKind == ObjectKind.Pet)
+        {
+            var pet = _dalamudUtil.GetPet(PlayerCharacter.Address);
+            if (pet != IntPtr.Zero)
+            {
+                _ipcManager.PenumbraRedraw(pet);
+            }
+        }
+        else if (objectKind == ObjectKind.Companion)
+        {
+            var companion = _dalamudUtil.GetCompanion(PlayerCharacter.Address);
+            if (companion != IntPtr.Zero)
+            {
+                _ipcManager.PenumbraRedraw(companion);
+            }
+        }
+        else if (objectKind == ObjectKind.Mount)
+        {
+            var mount = ((CharaExt*)PlayerCharacter.Address)->Mount;
+            if (mount != null)
+            {
                 _ipcManager.PenumbraRedraw((IntPtr)mount);
             }
         }
@@ -234,16 +292,15 @@ public class CachedPlayer
             Logger.Verbose("Restoring state for " + PlayerName);
             _dalamudUtil.FrameworkUpdate -= DalamudUtilOnFrameworkUpdate;
             _ipcManager.PenumbraRedrawEvent -= IpcManagerOnPenumbraRedrawEvent;
-            foreach (var token in _downloadCancellationTokenSources)
-            {
-                token.Value?.Cancel();
-                token.Value?.Dispose();
-            }
+            _downloadCancellationTokenSource?.Cancel();
+            _downloadCancellationTokenSource?.Dispose();
             _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName);
             if (PlayerCharacter != null && PlayerCharacter.IsValid())
             {
-                _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerCharacter);
-                _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerCharacter);
+                foreach (var item in _cachedData.FileReplacements)
+                {
+                    RevertCustomizationData(item.Key);
+                }
             }
         }
         catch (Exception ex)
@@ -315,8 +372,7 @@ public class CachedPlayer
             if (RequestedPenumbraRedraw == false)
             {
                 Logger.Warn("Unauthorized character change detected");
-                // todo for everything I guess
-                DownloadAndApplyCharacter(ObjectKind.Player);
+                ApplyCustomizationData(ObjectKind.Player);
             }
             else
             {

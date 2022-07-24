@@ -71,9 +71,9 @@ public class OnlinePlayerManager : IDisposable
         }
     }
 
-    private void PlayerManagerOnPlayerHasChanged(CharacterCacheDto characterCache, ObjectKind objectKind)
+    private void PlayerManagerOnPlayerHasChanged(CharacterCacheDto characterCache)
     {
-        PushCharacterData(OnlineVisiblePlayerHashes, objectKind);
+        PushCharacterData(OnlineVisiblePlayerHashes);
     }
 
     private void ApiControllerOnConnected()
@@ -173,7 +173,7 @@ public class OnlinePlayerManager : IDisposable
     {
         if (_onlineCachedPlayers.Any(p => p.PlayerNameHash == characterNameHash))
         {
-            PushCharacterData(new List<string>() { characterNameHash }, ObjectKind.Player);
+            PushCharacterData(new List<string>() { characterNameHash });
             _playerTokenDisposal.TryGetValue(_onlineCachedPlayers.Single(p => p.PlayerNameHash == characterNameHash), out var cancellationTokenSource);
             cancellationTokenSource?.Cancel();
             return;
@@ -242,25 +242,19 @@ public class OnlinePlayerManager : IDisposable
         if (newlyVisiblePlayers.Any())
         {
             Logger.Verbose("Has new visible players, pushing character data");
-            PushCharacterData(newlyVisiblePlayers, ObjectKind.Player);
-            PushCharacterData(newlyVisiblePlayers, ObjectKind.Pet);
-            PushCharacterData(newlyVisiblePlayers, ObjectKind.Minion);
-            PushCharacterData(newlyVisiblePlayers, ObjectKind.Companion);
-            PushCharacterData(newlyVisiblePlayers, ObjectKind.Mount);
+            PushCharacterData(newlyVisiblePlayers);
         }
 
         _lastPlayerObjectCheck = DateTime.Now;
     }
 
-    private void PushCharacterData(List<string> visiblePlayers, ObjectKind objectKind)
+    private void PushCharacterData(List<string> visiblePlayers)
     {
-        _playerManager.LastSentCharacterData.TryGetValue(objectKind, out var characterData);
-        if (visiblePlayers.Any() && characterData != null)
+        if (visiblePlayers.Any() && _playerManager.LastCreatedCharacterData != null)
         {
             Task.Run(async () =>
             {
-                Logger.Verbose(JsonConvert.SerializeObject(_playerManager.LastSentCharacterData[objectKind], Formatting.Indented));
-                await _apiController.PushCharacterData(_playerManager.LastSentCharacterData[objectKind]!,
+                await _apiController.PushCharacterData(_playerManager.LastCreatedCharacterData!,
                     visiblePlayers);
             });
         }
