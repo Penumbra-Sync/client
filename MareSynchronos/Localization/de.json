@@ -4,63 +4,63 @@
     "description": "ToSStrings..ctor"
   },
   "AgreementLabel": {
-    "message": "Agreement of Usage of Service",
+    "message": "Nutzungsbedingungen",
     "description": "ToSStrings..ctor"
   },
   "ReadLabel": {
-    "message": "READ THIS CAREFULLY",
+    "message": "LESE DIESE SORTFÄLTIG",
     "description": "ToSStrings..ctor"
   },
   "Paragraph1": {
-    "message": "All of the mod files currently active on your character as well as your current character state will be uploaded to the service you registered yourself at automatically. The plugin will exclusively upload the necessary mod files and not the whole mod.",
+    "message": "Alle Moddateien, die aktuell auf deinem Charakter aktiv sind sowohl dein Character Status werden automatisch zu dem Service an dem du dich registriert hast hochgeladen. Das Plugin wird ausschliesslich die nötigen Moddateien hochladen und nicht das gesamte Mod.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph2": {
-    "message": "If you are on a data capped internet connection, higher fees due to data usage depending on the amount of downloaded and uploaded mod files might occur. Mod files will be compressed on up- and download to save on bandwidth usage. Due to varying up- and download speeds, changes in characters might not be visible immediately. Files present on the service that already represent your active mod files will not be uploaded again.",
+    "message": "Falls du mit einer Volumen-basierten Internetverbindung verbunden bist, können durch den Datentransfer von Hoch- und Runtergeladenen Moddateien höhere Kosten entstehen. Moddateien werden beim Hoch- und Runterladen komprimiert um Bandbreite zu sparen. Durch unterschiedliche Hoch- und Runterladgeschwindigkeiten ist es möglich, dass Änderungen an Charakteren nicht sofort sichtbar sind. Dateien die bereits auf dem Service existieren, werden nicht nochmals hochgeladen.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph3": {
-    "message": "The mod files you are uploading are confidential and will not be distributed to parties other than the ones who are requesting the exact same mod files. Please think about who you are going to pair since it is unavoidable that they will receive and locally cache the necessary mod files that you have currently in use. Locally cached mod files will have arbitrary file names to discourage attempts at replicating the original mod.",
+    "message": "Die Moddateien die du hochlädst sind vertraulich und werden nicht zu anderen Clients verteilt, die nicht die exakt selben Dateien anfordern. Bitte überlege dir sortfältig mit wem du paarst, da es unvermeidlich ist, dass die andere Person deine Moddateien erhalten und lokal zwischenspeichern wird. Lokal zwischengespeicherte Dateien haben willkürrliche Namen um vor Versuchen die originalen Modifikationen aus diesen wiederherzustellen abzuschrecken.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph4": {
-    "message": "The plugin creator tried their best to keep you secure. However, there is no guarantee for 100% security. Do not blindly pair your client with everyone.",
+    "message": "Der Pluginersteller versuchte sein Bestes um dich sicher zu halten. Jedoch gibt es keine Garantie für 100% Sicherheit. Paare dich nicht blind mit jedem.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph5": {
-    "message": "Mod files that are saved on the service will remain on the service as long as there are requests for the files from clients. After a period of not being used, the mod files will be automatically deleted. You will also be able to wipe all the files you have personally uploaded on request. The service holds no information about which mod files belong to which mod.",
+    "message": "Moddateien, die auf dem Service gespeichert sind, verbleiben auf dem Service solange es Anforderungen für diese Dateien gibt. Nach einer Zeitspanne in der die Dateien nicht verwendet wurden, werden diese automatisch gelöscht. Du hast auch die Möglichkeit manuell alle Dateien auf dem Service zu löschen. Der Service hat keine Informationen welche Moddateien zu welcher Modifikation gehören.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph6": {
-    "message": "This service is provided as-is. In case of abuse, contact darkarchon#4313 on Discord or join the Mare Synchronos Discord. To accept those conditions hold CTRL while clicking 'I agree'",
+    "message": "Der Service wird so bereitgestellt wie er ist. Im Falle von Missbrauch, kontaktiere darkarchon#4313 auf Discord oder trete dem Mare Synchronos Discord bei. Um diese Konditionen zu akzeptieren, halte STRG gedrückt während du \"Stimme zu\" klickst.",
     "description": "ToSStrings..ctor"
   },
   "AgreeLabel": {
-    "message": "I agree",
+    "message": "Stimme zu",
     "description": "ToSStrings..ctor"
   },
   "RemainingLabel": {
-    "message": "remaining",
+    "message": "übrig",
     "description": "ToSStrings..ctor"
   },
   "FailedLabel": {
-    "message": "Congratulations. You have failed to read the agreements.",
+    "message": "Gratulation. Du bist daran gescheitert die Nutzungsbedingungen zu lesen.",
     "description": "ToSStrings..ctor"
   },
   "TimeoutLabel": {
-    "message": "I'm going to give you 1 minute to read the agreements carefully again. If you fail once more you will have to solve an annoying puzzle.",
+    "message": "Ich gebe dir nun 1 Minute um die Nutzungsbedingungen nochmals sorgfälig zu lesen. Falls du wieder scheiterst, musst du ein nerviges Puzzle lösen.",
     "description": "ToSStrings..ctor"
   },
   "FailedAgainLabel": {
-    "message": "Congratulations. You have failed to read the agreements. Again.",
+    "message": "Gratulation. Du bist daran gescheitert die Nutzungsbedingungen zu lesen. Schon wieder.",
     "description": "ToSStrings..ctor"
   },
   "PuzzleLabel": {
-    "message": "I did warn you. Here's your annoying puzzle:",
+    "message": "Ich habe dich gewarnt. Hier ist dein nerviges Puzzle:",
     "description": "ToSStrings..ctor"
   },
   "PuzzleDescLabel": {
-    "message": "Enter the following 3 words from the agreement exactly as described without punctuation to make the \"I agree\" button visible again.",
+    "message": "Gib die 3 folgenden Wörter der Nutzungsbedingungen ohne Zeichensetzung exakt wie im Text ein um den \"Stimme zu\" Knopf wieder sichtbar zu machen.",
     "description": "ToSStrings..ctor"
   },
   "ParagraphLabel": {
@@ -68,11 +68,11 @@
     "description": "ToSStrings..ctor"
   },
   "SentenceLabel": {
-    "message": "Sentence",
+    "message": "Satz",
     "description": "ToSStrings..ctor"
   },
   "WordLabel": {
-    "message": "Word",
+    "message": "Wort",
     "description": "ToSStrings..ctor"
   }
 }
