@@ -8,23 +8,23 @@
     "description": "ToSStrings..ctor"
   },
   "ReadLabel": {
-    "message": "LESE DIESE SORTFÄLTIG",
+    "message": "BITTE LIES DIES SORGFÄLTIG",
     "description": "ToSStrings..ctor"
   },
   "Paragraph1": {
-    "message": "Alle Moddateien, die aktuell auf deinem Charakter aktiv sind sowohl dein Character Status werden automatisch zu dem Service an dem du dich registriert hast hochgeladen. Das Plugin wird ausschliesslich die nötigen Moddateien hochladen und nicht das gesamte Mod.",
+    "message": "Alle Moddateien, die aktuell auf deinem Charakter aktiv sind als auch dein Charakter Zustand werden automatisch zu dem Service an dem du dich registriert hast hochgeladen. Das Plugin wird ausschließlich die nötigen Moddateien hochladen und nicht den gesamten Mod.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph2": {
-    "message": "Falls du mit einer Volumen-basierten Internetverbindung verbunden bist, können durch den Datentransfer von Hoch- und Runtergeladenen Moddateien höhere Kosten entstehen. Moddateien werden beim Hoch- und Runterladen komprimiert um Bandbreite zu sparen. Durch unterschiedliche Hoch- und Runterladgeschwindigkeiten ist es möglich, dass Änderungen an Charakteren nicht sofort sichtbar sind. Dateien die bereits auf dem Service existieren, werden nicht nochmals hochgeladen.",
+    "message": "Falls du mit einer getakteten Internetverbindung verbunden bist, können durch den Datentransfer von Hoch- und Runtergeladenen Moddateien höhere Kosten entstehen. Moddateien werden beim Hoch- und Runterladen komprimiert um Bandbreite zu sparen. Durch unterschiedliche Hoch- und Runterladgeschwindigkeiten ist es möglich, dass Änderungen an Charakteren nicht sofort sichtbar sind. Dateien die bereits auf dem Service existieren, werden nicht nochmals hochgeladen.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph3": {
-    "message": "Die Moddateien die du hochlädst sind vertraulich und werden nicht zu anderen Clients verteilt, die nicht die exakt selben Dateien anfordern. Bitte überlege dir sortfältig mit wem du paarst, da es unvermeidlich ist, dass die andere Person deine Moddateien erhalten und lokal zwischenspeichern wird. Lokal zwischengespeicherte Dateien haben willkürrliche Namen um vor Versuchen die originalen Modifikationen aus diesen wiederherzustellen abzuschrecken.",
+    "message": "Die Moddateien die du hochlädst sind vertraulich und werden nicht zu anderen Clients verteilt, die nicht die exakt selben Dateien anfordern. Bitte überlege dir sortfältig mit wem du deinen Identifikationscode teilst, da es unvermeidlich ist, dass die andere Person deine Moddateien erhalten und lokal zwischenspeichern. Lokal zwischengespeicherte Dateien haben willkürrliche Namen um vor Versuchen die originalen Modifikationen aus diesen wiederherzustellen abzuschrecken.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph4": {
-    "message": "Der Pluginersteller versuchte sein Bestes um dich sicher zu halten. Jedoch gibt es keine Garantie für 100% Sicherheit. Paare dich nicht blind mit jedem.",
+    "message": "Der Pluginersteller versuchte sein Bestes um dich sicher zu halten. Jedoch gibt es keine Garantie für 100% Sicherheit. Teile deinen Identifikationscode nicht blind mit jedem.",
     "description": "ToSStrings..ctor"
   },
   "Paragraph5": {
@@ -32,11 +32,11 @@
     "description": "ToSStrings..ctor"
   },
   "Paragraph6": {
-    "message": "Der Service wird so bereitgestellt wie er ist. Im Falle von Missbrauch, kontaktiere darkarchon#4313 auf Discord oder trete dem Mare Synchronos Discord bei. Um diese Konditionen zu akzeptieren, halte STRG gedrückt während du \"Stimme zu\" klickst.",
+    "message": "Der Service wird so bereitgestellt wie er ist. Im Falle von Missbrauch, kontaktiere darkarchon#4313 auf Discord oder trete dem Mare Synchronos Discord bei. Um diese Konditionen zu akzeptieren, halte STRG gedrückt während du \"Ich Stimme zu\" klickst.",
     "description": "ToSStrings..ctor"
   },
   "AgreeLabel": {
-    "message": "Stimme zu",
+    "message": "Ich Stimme zu",
     "description": "ToSStrings..ctor"
   },
   "RemainingLabel": {
@@ -60,7 +60,7 @@
     "description": "ToSStrings..ctor"
   },
   "PuzzleDescLabel": {
-    "message": "Gib die 3 folgenden Wörter der Nutzungsbedingungen ohne Zeichensetzung exakt wie im Text ein um den \"Stimme zu\" Knopf wieder sichtbar zu machen.",
+    "message": "Gib die 3 folgenden Wörter der Nutzungsbedingungen ohne Zeichensetzung exakt wie im Text ein um den \"Ich Stimme zu\" Knopf wieder sichtbar zu machen.",
     "description": "ToSStrings..ctor"
   },
   "ParagraphLabel": {
