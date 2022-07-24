@@ -138,7 +138,10 @@ public class CachedPlayer
 
             foreach (var kind in objectKind)
             {
-                ApplyCustomizationData(kind);
+                if (_cachedData.GlamourerData.ContainsKey(kind))
+                {
+                    ApplyCustomizationData(kind);
+                }
             }
         }, downloadToken).ContinueWith(task =>
         {
@@ -147,6 +150,8 @@ public class CachedPlayer
             Logger.Debug("Download Task was cancelled");
             _apiController.CancelDownload(downloadId);
         });
+
+        _downloadCancellationTokenSource = null;
     }
 
     private List<FileReplacementDto> TryCalculateModdedDictionary(out Dictionary<string, string> moddedDictionary)

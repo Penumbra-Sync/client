@@ -68,8 +68,11 @@ public class CharacterDataFactory
     {
         var indentation = GetIndentationForInheritanceLevel(inheritanceLevel);
 
-        Logger.Verbose(indentation.Item1 + objectKind + resourceType + " [" + string.Join(", ", fileReplacement.GamePaths) + "]");
-        Logger.Verbose(indentation.Item2 + "=> " + fileReplacement.ResolvedPath);
+        if (fileReplacement.HasFileReplacement)
+        {
+            Logger.Verbose(indentation.Item1 + objectKind + resourceType + " [" + string.Join(", ", fileReplacement.GamePaths) + "]");
+            Logger.Verbose(indentation.Item2 + "=> " + fileReplacement.ResolvedPath);
+        }
     }
 
     private unsafe void AddReplacementsFromRenderModel(RenderModel* mdl, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0)
@@ -89,7 +92,7 @@ public class CharacterDataFactory
             Logger.Warn("Could not get model data for " + objectKind);
             return;
         }
-        Logger.Verbose("Adding File Replacement for Model " + mdlPath);
+        //Logger.Verbose("Adding File Replacement for Model " + mdlPath);
 
         FileReplacement mdlFileReplacement = CreateFileReplacement(mdlPath);
         DebugPrint(mdlFileReplacement, objectKind, "Model", inheritanceLevel);
@@ -119,7 +122,7 @@ public class CharacterDataFactory
             return;
         }
 
-        Logger.Verbose("Adding File Replacement for Material " + fileName);
+        //Logger.Verbose("Adding File Replacement for Material " + fileName);
         var mtrlPath = fileName.Split("|")[2];
 
         var mtrlFileReplacement = CreateFileReplacement(mtrlPath);
@@ -130,7 +133,15 @@ public class CharacterDataFactory
         var mtrlResourceHandle = (MtrlResource*)mtrl->ResourceHandle;
         for (var resIdx = 0; resIdx < mtrlResourceHandle->NumTex; resIdx++)
         {
-            var texPath = new Utf8String(mtrlResourceHandle->TexString(resIdx)).ToString();
+            string? texPath = null;
+            try
+            {
+                texPath = new Utf8String(mtrlResourceHandle->TexString(resIdx)).ToString();
+            }
+            catch
+            {
+                Logger.Warn("Could not get Texture data for Material " + fileName);
+            }
 
             if (string.IsNullOrEmpty(texPath)) continue;
 
@@ -142,7 +153,7 @@ public class CharacterDataFactory
     {
         if (texPath.IsNullOrEmpty()) return;
 
-        Logger.Verbose("Adding File Replacement for Texture " + texPath);
+        //Logger.Verbose("Adding File Replacement for Texture " + texPath);
 
         var texFileReplacement = CreateFileReplacement(texPath, doNotReverseResolve);
         DebugPrint(texFileReplacement, objectKind, "Texture", inheritanceLevel);
@@ -213,8 +224,22 @@ public class CharacterDataFactory
             }
 
             AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId, objectKind, previousData);
-            AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->Decal->FileName()).ToString(), objectKind, previousData, 0, false);
-            AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), objectKind, previousData, 0, false);
+            try
+            {
+                AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->Decal->FileName()).ToString(), objectKind, previousData, 0, false);
+            }
+            catch
+            {
+                Logger.Warn("Could not get Decal data");
+            }
+            try
+            {
+                AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), objectKind, previousData, 0, false);
+            }
+            catch
+            {
+                Logger.Warn("Could not get Legacy Body Decal Data");
+            }
         }
 
         st.Stop();
