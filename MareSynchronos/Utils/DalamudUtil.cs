@@ -114,18 +114,6 @@ namespace MareSynchronos.Utils
             return (Dalamud.Game.ClientState.Objects.Types.Character)objTableObj;
         }
 
-        internal unsafe int GetIdxBasedOnPtr(FFXIVClientStructs.FFXIV.Client.Game.Character.Character* pet)
-        {
-            var idx = 0;
-            foreach (var item in _objectTable)
-            {
-                if (item.Address == (IntPtr)pet) return idx;
-                idx++;
-            }
-
-            return -1;
-        }
-
         public PlayerCharacter? GetPlayerCharacterFromObjectTableByName(string characterName)
         {
             foreach (var item in _objectTable)
@@ -135,12 +123,6 @@ namespace MareSynchronos.Utils
             }
 
             return null;
-        }
-
-        public unsafe void DebugPrintRenderFlags(IntPtr characterAddress)
-        {
-            var obj = (GameObject*)characterAddress;
-            Logger.Verbose("RenderFlags for " + characterAddress + ": " + Convert.ToString(obj->RenderFlags, 2));
         }
 
         public unsafe void WaitWhileCharacterIsDrawing(IntPtr characterAddress, CancellationToken? ct = null)

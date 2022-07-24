@@ -254,7 +254,7 @@ public class OnlinePlayerManager : IDisposable
         {
             Task.Run(async () =>
             {
-                await _apiController.PushCharacterData(_playerManager.LastCreatedCharacterData!,
+                await _apiController.PushCharacterData(_playerManager.LastCreatedCharacterData,
                     visiblePlayers);
             });
         }

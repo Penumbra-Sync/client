@@ -19,10 +19,10 @@ namespace MareSynchronos.WebAPI
         private int _downloadId = 0;
         public void CancelUpload()
         {
-            if (_uploadToken != null)
+            if (_uploadCancellationTokenSource != null)
             {
                 Logger.Debug("Cancelling upload");
-                _uploadToken?.Cancel();
+                _uploadCancellationTokenSource?.Cancel();
                 _mareHub!.SendAsync(Api.SendFileAbortUpload);
                 CurrentUploads.Clear();
             }
@@ -123,8 +123,8 @@ namespace MareSynchronos.WebAPI
             Logger.Debug("Sending Character data to service " + ApiUri);
 
             CancelUpload();
-            _uploadToken = new CancellationTokenSource();
-            var uploadToken = _uploadToken.Token;
+            _uploadCancellationTokenSource = new CancellationTokenSource();
+            var uploadToken = _uploadCancellationTokenSource.Token;
             Logger.Verbose("New Token Created");
 
             var filesToUpload = await _mareHub!.InvokeAsync<List<UploadFileDto>>(Api.InvokeFileSendFiles, character.FileReplacements.SelectMany(c => c.Value.Select(v => v.Hash)).Distinct(), uploadToken);
@@ -204,7 +204,7 @@ namespace MareSynchronos.WebAPI
             }
 
             Logger.Verbose("Upload complete for " + character.GetHashCode());
-            _uploadToken = null;
+            _uploadCancellationTokenSource = null;
         }
 
         private async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)

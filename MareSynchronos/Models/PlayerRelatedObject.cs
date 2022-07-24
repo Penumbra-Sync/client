@@ -7,7 +7,7 @@ using Penumbra.GameData.ByteString;
 
 namespace MareSynchronos.Models
 {
-    internal class PlayerOrRelatedObject
+    internal class PlayerRelatedObject
     {
         private readonly Func<IntPtr> getAddress;
 
@@ -21,7 +21,7 @@ namespace MareSynchronos.Models
 
         private IntPtr CurrentAddress => getAddress.Invoke();
 
-        public PlayerOrRelatedObject(ObjectKind objectKind, IntPtr address, IntPtr drawObjectAddress, Func<IntPtr> getAddress)
+        public PlayerRelatedObject(ObjectKind objectKind, IntPtr address, IntPtr drawObjectAddress, Func<IntPtr> getAddress)
         {
             ObjectKind = objectKind;
             Address = address;

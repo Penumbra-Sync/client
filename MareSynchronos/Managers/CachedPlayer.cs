@@ -11,7 +11,6 @@ using MareSynchronos.FileCacheDB;
 using MareSynchronos.Interop;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using Penumbra.GameData.ByteString;
 using Penumbra.GameData.Structs;
 
 namespace MareSynchronos.Managers;

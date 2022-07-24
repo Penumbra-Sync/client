@@ -31,7 +31,7 @@ namespace MareSynchronos.Managers
         private DateTime _lastPlayerObjectCheck;
         private CharacterEquipment? _currentCharacterEquipment = new();
 
-        private List<PlayerOrRelatedObject> playerAttachedObjects = new List<PlayerOrRelatedObject>();
+        private List<PlayerRelatedObject> playerRelatedObjects = new List<PlayerRelatedObject>();
 
         public unsafe PlayerManager(ApiController apiController, IpcManager ipcManager,
             CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil)
@@ -53,13 +53,13 @@ namespace MareSynchronos.Managers
                 ApiControllerOnConnected();
             }
 
-            playerAttachedObjects = new List<PlayerOrRelatedObject>()
+            playerRelatedObjects = new List<PlayerRelatedObject>()
             {
-                new PlayerOrRelatedObject(ObjectKind.Player, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.PlayerPointer),
-                new PlayerOrRelatedObject(ObjectKind.Minion, IntPtr.Zero, IntPtr.Zero, () => (IntPtr)((Character*)_dalamudUtil.PlayerPointer)->CompanionObject),
-                new PlayerOrRelatedObject(ObjectKind.Pet, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.GetPet()),
-                new PlayerOrRelatedObject(ObjectKind.Companion, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.GetCompanion()),
-                new PlayerOrRelatedObject(ObjectKind.Mount, IntPtr.Zero, IntPtr.Zero, () => (IntPtr)((CharaExt*)_dalamudUtil.PlayerPointer)->Mount),
+                new PlayerRelatedObject(ObjectKind.Player, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.PlayerPointer),
+                new PlayerRelatedObject(ObjectKind.Minion, IntPtr.Zero, IntPtr.Zero, () => (IntPtr)((Character*)_dalamudUtil.PlayerPointer)->CompanionObject),
+                new PlayerRelatedObject(ObjectKind.Pet, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.GetPet()),
+                new PlayerRelatedObject(ObjectKind.Companion, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.GetCompanion()),
+                new PlayerRelatedObject(ObjectKind.Mount, IntPtr.Zero, IntPtr.Zero, () => (IntPtr)((CharaExt*)_dalamudUtil.PlayerPointer)->Mount),
             };
         }
 
@@ -80,8 +80,8 @@ namespace MareSynchronos.Managers
 
             if (DateTime.Now < _lastPlayerObjectCheck.AddSeconds(0.25)) return;
 
-            playerAttachedObjects.ForEach(k => k.CheckAndUpdateObject());
-            if (playerAttachedObjects.Any(c => c.HasUnprocessedUpdate && !c.IsProcessing))
+            playerRelatedObjects.ForEach(k => k.CheckAndUpdateObject());
+            if (playerRelatedObjects.Any(c => c.HasUnprocessedUpdate && !c.IsProcessing))
             {
                 OnPlayerOrAttachedObjectsChanged();
             }
@@ -105,7 +105,7 @@ namespace MareSynchronos.Managers
 
         private async Task<CharacterCacheDto?> CreateFullCharacterCacheDto(CancellationToken token)
         {
-            foreach (var unprocessedObject in playerAttachedObjects.Where(c => c.HasUnprocessedUpdate).ToList())
+            foreach (var unprocessedObject in playerRelatedObjects.Where(c => c.HasUnprocessedUpdate).ToList())
             {
                 Logger.Verbose("Building Cache for " + unprocessedObject.ObjectKind);
                 PermanentDataCache = _characterDataFactory.BuildCharacterData(PermanentDataCache, unprocessedObject.ObjectKind, unprocessedObject.Address);
@@ -130,7 +130,7 @@ namespace MareSynchronos.Managers
         {
             Logger.Verbose("RedrawEvent for addr " + address);
 
-            foreach (var item in playerAttachedObjects)
+            foreach (var item in playerRelatedObjects)
             {
                 if (address == item.Address)
                 {
@@ -139,7 +139,7 @@ namespace MareSynchronos.Managers
                 }
             }
 
-            if (playerAttachedObjects.Any(c => c.HasUnprocessedUpdate))
+            if (playerRelatedObjects.Any(c => c.HasUnprocessedUpdate))
             {
                 OnPlayerOrAttachedObjectsChanged();
             }
@@ -149,7 +149,7 @@ namespace MareSynchronos.Managers
         {
             if (_dalamudUtil.IsInGpose) return;
 
-            var unprocessedObjects = playerAttachedObjects.Where(c => c.HasUnprocessedUpdate);
+            var unprocessedObjects = playerRelatedObjects.Where(c => c.HasUnprocessedUpdate);
             foreach (var unprocessedObject in unprocessedObjects)
             {
                 unprocessedObject.IsProcessing = true;
