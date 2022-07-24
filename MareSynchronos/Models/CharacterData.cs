@@ -49,7 +49,7 @@ namespace MareSynchronos.Models
                         Hash = g.First().Hash
                     };
                 }).ToList()),
-                GlamourerData = GlamourerString,
+                GlamourerData = GlamourerString.ToDictionary(d => d.Key, d => d.Value),
                 ManipulationData = ManipulationString
             };
         }
