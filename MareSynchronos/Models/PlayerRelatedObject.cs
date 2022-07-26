@@ -77,6 +77,7 @@ namespace MareSynchronos.Models
         private unsafe bool CompareAndUpdateByteData(byte* equipSlotData, byte* customizeData)
         {
             bool hasChanges = false;
+            DoNotSendUpdate = false;
             for (int i = 0; i < EquipSlotData.Length; i++)
             {
                 var data = Marshal.ReadByte((IntPtr)equipSlotData, i);
@@ -103,14 +104,22 @@ namespace MareSynchronos.Models
                 var newWeaponOrVisorState = Marshal.ReadByte((IntPtr)customizeData + 31, 0);
                 if (newHatState != HatState)
                 {
-                    if (HatState != null && !hasChanges) DoNotSendUpdate = true;
+                    if (HatState != null && !hasChanges)
+                    {
+                        Logger.Verbose("Not Sending Update, only Hat changed");
+                        DoNotSendUpdate = true;
+                    }
                     HatState = newHatState;
                     hasChanges = true;
                 }
 
                 if (newWeaponOrVisorState != VisorWeaponState)
                 {
-                    if (VisorWeaponState != null && !hasChanges) DoNotSendUpdate = true;
+                    if (VisorWeaponState != null && !hasChanges)
+                    {
+                        Logger.Verbose("Not Sending Update, only Visor/Weapon changed");
+                        DoNotSendUpdate = true;
+                    }
                     VisorWeaponState = newWeaponOrVisorState;
                     hasChanges = true;
                 }

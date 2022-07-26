@@ -108,10 +108,10 @@ namespace MareSynchronos.Managers
             foreach (var unprocessedObject in playerRelatedObjects.Where(c => c.HasUnprocessedUpdate).ToList())
             {
                 Logger.Verbose("Building Cache for " + unprocessedObject.ObjectKind);
-                PermanentDataCache = _characterDataFactory.BuildCharacterData(PermanentDataCache, unprocessedObject.ObjectKind, unprocessedObject.Address);
-                unprocessedObject.HasUnprocessedUpdate = false;
+                PermanentDataCache = _characterDataFactory.BuildCharacterData(PermanentDataCache, unprocessedObject.ObjectKind, unprocessedObject.Address, token);
                 unprocessedObject.IsProcessing = false;
                 token.ThrowIfCancellationRequested();
+                unprocessedObject.HasUnprocessedUpdate = false;
             }
 
             while (!PermanentDataCache.IsReady && !token.IsCancellationRequested)
@@ -139,7 +139,7 @@ namespace MareSynchronos.Managers
                 }
             }
 
-            if (playerRelatedObjects.Any(c => c.HasUnprocessedUpdate && !c.IsProcessing))
+            if (playerRelatedObjects.Any(c => c.HasUnprocessedUpdate && (!c.IsProcessing || (c.IsProcessing && c.DoNotSendUpdate))))
             {
                 OnPlayerOrAttachedObjectsChanged();
             }
@@ -155,6 +155,8 @@ namespace MareSynchronos.Managers
                 unprocessedObject.IsProcessing = true;
             }
             Logger.Debug("Object(s) changed: " + string.Join(", ", unprocessedObjects.Select(c => c.ObjectKind)));
+            bool doNotSendUpdate = unprocessedObjects.All(c => c.DoNotSendUpdate);
+            unprocessedObjects.ForEach(p => p.DoNotSendUpdate = false);
             _playerChangedCts?.Cancel();
             _playerChangedCts = new CancellationTokenSource();
             var token = _playerChangedCts.Token;
@@ -195,13 +197,11 @@ namespace MareSynchronos.Managers
                     LastCreatedCharacterData = cacheDto;
                 }
 
-                if (_apiController.IsConnected && !token.IsCancellationRequested && !unprocessedObjects.All(c => c.DoNotSendUpdate))
+                if (_apiController.IsConnected && !token.IsCancellationRequested && !doNotSendUpdate)
                 {
                     Logger.Verbose("Invoking PlayerHasChanged");
                     PlayerHasChanged?.Invoke(cacheDto);
                 }
-
-                unprocessedObjects.ForEach(p => p.DoNotSendUpdate = false);
             }, token);
         }
     }

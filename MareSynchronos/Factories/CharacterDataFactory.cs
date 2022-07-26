@@ -31,7 +31,7 @@ public class CharacterDataFactory
         _ipcManager = ipcManager;
     }
 
-    public CharacterData BuildCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr playerPointer)
+    public CharacterData BuildCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr playerPointer, CancellationToken token)
     {
         if (!_ipcManager.Initialized)
         {
@@ -48,7 +48,12 @@ public class CharacterDataFactory
 
         try
         {
-            return CreateCharacterData(previousData, objectKind, playerPointer);
+            return CreateCharacterData(previousData, objectKind, playerPointer, token);
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.Debug("Cancelled creating Character data");
+            return previousData;
         }
         catch (Exception e)
         {
@@ -186,7 +191,7 @@ public class CharacterDataFactory
         cache.AddFileReplacement(objectKind, texDx11Replacement);
     }
 
-    private unsafe CharacterData CreateCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr charaPointer)
+    private unsafe CharacterData CreateCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr charaPointer, CancellationToken token)
     {
         Stopwatch st = Stopwatch.StartNew();
         var chara = _dalamudUtil.CreateGameObject(charaPointer)!;
@@ -217,6 +222,8 @@ public class CharacterDataFactory
             {
                 continue;
             }
+
+            token.ThrowIfCancellationRequested();
 
             AddReplacementsFromRenderModel(mdl, objectKind, previousData, 0);
         }
