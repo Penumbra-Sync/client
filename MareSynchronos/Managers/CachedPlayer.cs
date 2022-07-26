@@ -73,21 +73,45 @@ public class CachedPlayer
         List<ObjectKind> charaDataToUpdate = new List<ObjectKind>();
         foreach (var objectKind in Enum.GetValues<ObjectKind>())
         {
-            bool doesntContainKey = !_cachedData.FileReplacements.ContainsKey(objectKind)
-                || (_cachedData.FileReplacements.ContainsKey(objectKind) && !characterData.FileReplacements.ContainsKey(objectKind));
-            if (doesntContainKey)
+            _cachedData.FileReplacements.TryGetValue(objectKind, out var existingFileReplacements);
+            characterData.FileReplacements.TryGetValue(objectKind, out var newFileReplacements);
+            _cachedData.GlamourerData.TryGetValue(objectKind, out var existingGlamourerData);
+            characterData.GlamourerData.TryGetValue(objectKind, out var newGlamourerData);
+
+            bool hasNewButNotOldFileReplacements = newFileReplacements != null && existingFileReplacements == null;
+            bool hasOldButNotNewFileReplacements = existingFileReplacements != null && newFileReplacements == null;
+            bool hasNewButNotOldGlamourerData = newGlamourerData != null && existingGlamourerData == null;
+            bool hasOldButNotNewGlamourerData = existingGlamourerData != null && newGlamourerData == null;
+            bool hasNewAndOldFileReplacements = newFileReplacements != null && existingFileReplacements != null;
+            bool hasNewAndOldGlamourerData = newGlamourerData != null && existingGlamourerData != null;
+
+            if (hasNewButNotOldFileReplacements || hasOldButNotNewFileReplacements || hasNewButNotOldGlamourerData || hasOldButNotNewGlamourerData)
             {
+                Logger.Debug("Updating " + objectKind);
                 charaDataToUpdate.Add(objectKind);
                 continue;
             }
 
-            bool listsAreEqual = Enumerable.SequenceEqual(_cachedData.FileReplacements[objectKind], characterData.FileReplacements[objectKind]);
-            bool glamourerDataDifferent = _cachedData.GlamourerData[objectKind] != characterData.GlamourerData[objectKind];
-            if (!listsAreEqual || glamourerDataDifferent)
+            if (hasNewAndOldFileReplacements)
             {
-                Logger.Debug("Updating " + objectKind);
+                bool listsAreEqual = Enumerable.SequenceEqual(_cachedData.FileReplacements[objectKind], characterData.FileReplacements[objectKind]);
+                if (!listsAreEqual)
+                {
+                    Logger.Debug("Updating " + objectKind);
+                    charaDataToUpdate.Add(objectKind);
+                    continue;
+                }
+            }
 
-                charaDataToUpdate.Add(objectKind);
+            if (hasNewAndOldGlamourerData)
+            {
+                bool glamourerDataDifferent = _cachedData.GlamourerData[objectKind] != characterData.GlamourerData[objectKind];
+                if (glamourerDataDifferent)
+                {
+                    Logger.Debug("Updating " + objectKind);
+                    charaDataToUpdate.Add(objectKind);
+                    continue;
+                }
             }
         }
 
@@ -138,10 +162,7 @@ public class CachedPlayer
 
             foreach (var kind in objectKind)
             {
-                if (_cachedData.GlamourerData.ContainsKey(kind))
-                {
-                    ApplyCustomizationData(kind);
-                }
+                ApplyCustomizationData(kind);
             }
         }, downloadToken).ContinueWith(task =>
         {
@@ -195,14 +216,15 @@ public class CachedPlayer
     private unsafe void ApplyCustomizationData(ObjectKind objectKind)
     {
         if (PlayerCharacter is null) return;
+        _cachedData.GlamourerData.TryGetValue(objectKind, out var glamourerData);
 
         if (objectKind == ObjectKind.Player)
         {
-            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerCharacter!.Address);
+            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerCharacter.Address);
             RequestedPenumbraRedraw = true;
             Logger.Debug(
                 $"Request Redraw for {PlayerName}");
-            _ipcManager.GlamourerApplyAll(_cachedData.GlamourerData[objectKind], PlayerCharacter!);
+            _ipcManager.GlamourerApplyAll(glamourerData, PlayerCharacter.Address);
         }
         else if (objectKind == ObjectKind.Minion)
         {
@@ -210,7 +232,7 @@ public class CachedPlayer
             if (minion != null)
             {
                 Logger.Debug($"Request Redraw for Minion");
-                _ipcManager.GlamourerApplyAll(_cachedData.GlamourerData[objectKind], obj: (IntPtr)minion);
+                _ipcManager.GlamourerApplyAll(glamourerData, obj: (IntPtr)minion);
             }
         }
         else if (objectKind == ObjectKind.Pet)
@@ -219,7 +241,7 @@ public class CachedPlayer
             if (pet != IntPtr.Zero)
             {
                 Logger.Debug("Request Redraw for Pet");
-                _ipcManager.GlamourerApplyAll(_cachedData.GlamourerData[objectKind], pet);
+                _ipcManager.GlamourerApplyAll(glamourerData, pet);
             }
         }
         else if (objectKind == ObjectKind.Companion)
@@ -228,7 +250,7 @@ public class CachedPlayer
             if (companion != IntPtr.Zero)
             {
                 Logger.Debug("Request Redraw for Companion");
-                _ipcManager.GlamourerApplyAll(_cachedData.GlamourerData[objectKind], companion);
+                _ipcManager.GlamourerApplyAll(glamourerData, companion);
             }
         }
         else if (objectKind == ObjectKind.Mount)

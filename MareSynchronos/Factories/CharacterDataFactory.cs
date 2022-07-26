@@ -125,6 +125,14 @@ public class CharacterDataFactory
         //Logger.Verbose("Adding File Replacement for Material " + fileName);
         var mtrlPath = fileName.Split("|")[2];
 
+        if (cache.FileReplacements.ContainsKey(objectKind))
+        {
+            if (cache.FileReplacements[objectKind].Any(c => c.ResolvedPath.Contains(mtrlPath)))
+            {
+                return;
+            }
+        }
+
         var mtrlFileReplacement = CreateFileReplacement(mtrlPath);
         DebugPrint(mtrlFileReplacement, objectKind, "Material", inheritanceLevel);
 
@@ -154,6 +162,14 @@ public class CharacterDataFactory
         if (texPath.IsNullOrEmpty()) return;
 
         //Logger.Verbose("Adding File Replacement for Texture " + texPath);
+
+        if (cache.FileReplacements.ContainsKey(objectKind))
+        {
+            if (cache.FileReplacements[objectKind].Any(c => c.GamePaths.Contains(texPath)))
+            {
+                return;
+            }
+        }
 
         var texFileReplacement = CreateFileReplacement(texPath, doNotReverseResolve);
         DebugPrint(texFileReplacement, objectKind, "Texture", inheritanceLevel);

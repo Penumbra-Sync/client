@@ -139,8 +139,8 @@ namespace MareSynchronos.Utils
             }
 
             if (ct?.IsCancellationRequested ?? false) return;
-            // wait half a second just in case
-            Thread.Sleep(500);
+            // wait quarter a second just in case
+            Thread.Sleep(250);
         }
 
         public void WaitWhileSelfIsDrawing(CancellationToken? token) => WaitWhileCharacterIsDrawing(_clientState.LocalPlayer?.Address ?? new IntPtr(), token);

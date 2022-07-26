@@ -149,7 +149,7 @@ namespace MareSynchronos.Managers
         {
             if (_dalamudUtil.IsInGpose) return;
 
-            var unprocessedObjects = playerRelatedObjects.Where(c => c.HasUnprocessedUpdate);
+            var unprocessedObjects = playerRelatedObjects.Where(c => c.HasUnprocessedUpdate).ToList();
             foreach (var unprocessedObject in unprocessedObjects)
             {
                 unprocessedObject.IsProcessing = true;
@@ -195,11 +195,13 @@ namespace MareSynchronos.Managers
                     LastCreatedCharacterData = cacheDto;
                 }
 
-                if (_apiController.IsConnected && !token.IsCancellationRequested)
+                if (_apiController.IsConnected && !token.IsCancellationRequested && !unprocessedObjects.All(c => c.DoNotSendUpdate))
                 {
                     Logger.Verbose("Invoking PlayerHasChanged");
                     PlayerHasChanged?.Invoke(cacheDto);
                 }
+
+                unprocessedObjects.ForEach(p => p.DoNotSendUpdate = false);
             }, token);
         }
     }

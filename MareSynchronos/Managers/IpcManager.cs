@@ -116,20 +116,14 @@ namespace MareSynchronos.Managers
             _penumbraObjectIsRedrawn.Unsubscribe(RedrawEvent);
         }
 
-        public void GlamourerApplyAll(string customization, IntPtr obj)
+        public void GlamourerApplyAll(string? customization, IntPtr obj)
         {
-            if (!CheckGlamourerApi()) return;
+            if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
             var gameObj = _dalamudUtil.CreateGameObject(obj);
             if (gameObj != null)
             {
                 _glamourerApplyAll!.InvokeAction(customization, gameObj);
             }
-        }
-
-        public void GlamourerApplyAll(string customization, GameObject character)
-        {
-            if (!CheckGlamourerApi()) return;
-            _glamourerApplyAll!.InvokeAction(customization, character);
         }
 
         public void GlamourerApplyOnlyEquipment(string customization, GameObject character)

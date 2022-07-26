@@ -32,8 +32,11 @@ namespace MareSynchronos.Models
 
         public byte[] EquipSlotData { get; set; } = new byte[40];
         public byte[] CustomizeData { get; set; } = new byte[26];
+        public byte? HatState { get; set; }
+        public byte? VisorWeaponState { get; set; }
 
         public bool HasUnprocessedUpdate { get; set; } = false;
+        public bool DoNotSendUpdate { get; set; } = false;
         public bool IsProcessing { get; set; } = false;
 
         public unsafe void CheckAndUpdateObject()
@@ -90,6 +93,25 @@ namespace MareSynchronos.Models
                 if (CustomizeData[i] != data)
                 {
                     CustomizeData[i] = data;
+                    hasChanges = true;
+                }
+            }
+
+            if (ObjectKind is not ObjectKind.Mount)
+            {
+                var newHatState = Marshal.ReadByte((IntPtr)customizeData + 30, 0);
+                var newWeaponOrVisorState = Marshal.ReadByte((IntPtr)customizeData + 31, 0);
+                if (newHatState != HatState)
+                {
+                    if (HatState != null) DoNotSendUpdate = true;
+                    HatState = newHatState;
+                    hasChanges = true;
+                }
+
+                if (newWeaponOrVisorState != VisorWeaponState)
+                {
+                    if (VisorWeaponState != null) DoNotSendUpdate = true;
+                    VisorWeaponState = newWeaponOrVisorState;
                     hasChanges = true;
                 }
             }
