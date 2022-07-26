@@ -104,7 +104,7 @@ namespace MareSynchronos.Models
                 var newWeaponOrVisorState = Marshal.ReadByte((IntPtr)customizeData + 31, 0);
                 if (newHatState != HatState)
                 {
-                    if (HatState != null && !hasChanges)
+                    if (HatState != null && !hasChanges && !HasUnprocessedUpdate)
                     {
                         Logger.Verbose("Not Sending Update, only Hat changed");
                         DoNotSendUpdate = true;
@@ -115,7 +115,7 @@ namespace MareSynchronos.Models
 
                 if (newWeaponOrVisorState != VisorWeaponState)
                 {
-                    if (VisorWeaponState != null && !hasChanges)
+                    if (VisorWeaponState != null && !hasChanges && !HasUnprocessedUpdate)
                     {
                         Logger.Verbose("Not Sending Update, only Visor/Weapon changed");
                         DoNotSendUpdate = true;
