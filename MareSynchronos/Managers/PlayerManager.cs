@@ -110,8 +110,8 @@ namespace MareSynchronos.Managers
                 Logger.Verbose("Building Cache for " + unprocessedObject.ObjectKind);
                 PermanentDataCache = _characterDataFactory.BuildCharacterData(PermanentDataCache, unprocessedObject.ObjectKind, unprocessedObject.Address, token);
                 unprocessedObject.IsProcessing = false;
-                token.ThrowIfCancellationRequested();
                 unprocessedObject.HasUnprocessedUpdate = false;
+                token.ThrowIfCancellationRequested();
             }
 
             while (!PermanentDataCache.IsReady && !token.IsCancellationRequested)
