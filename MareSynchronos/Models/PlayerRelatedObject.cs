@@ -103,14 +103,14 @@ namespace MareSynchronos.Models
                 var newWeaponOrVisorState = Marshal.ReadByte((IntPtr)customizeData + 31, 0);
                 if (newHatState != HatState)
                 {
-                    if (HatState != null) DoNotSendUpdate = true;
+                    if (HatState != null && !hasChanges) DoNotSendUpdate = true;
                     HatState = newHatState;
                     hasChanges = true;
                 }
 
                 if (newWeaponOrVisorState != VisorWeaponState)
                 {
-                    if (VisorWeaponState != null) DoNotSendUpdate = true;
+                    if (VisorWeaponState != null && !hasChanges) DoNotSendUpdate = true;
                     VisorWeaponState = newWeaponOrVisorState;
                     hasChanges = true;
                 }
