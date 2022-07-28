@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,14 +36,21 @@ namespace MareSynchronos.WebAPI
 
         private async Task<string> DownloadFile(int downloadId, string hash, CancellationToken ct)
         {
-            var reader = _mareHub!.StreamAsync<byte[]>(Api.StreamFileDownloadFileAsync, hash, ct);
-            string fileName = Path.GetTempFileName();
-            await using var fs = File.OpenWrite(fileName);
-            await foreach (var data in reader.WithCancellation(ct))
+            using WebClient wc = new();
+            wc.DownloadProgressChanged += (s, e) =>
             {
-                CurrentDownloads[downloadId].Single(f => f.Hash == hash).Transferred += data.Length;
-                await fs.WriteAsync(data, ct);
-            }
+                CurrentDownloads[downloadId].Single(f => f.Hash == hash).Transferred = e.BytesReceived;
+            };
+
+            string fileName = Path.GetTempFileName();
+            var baseUri = new Uri(ApiUri.Replace("wss", "https"), UriKind.Absolute);
+            var relativeUri = new Uri("cache/" + hash, UriKind.Relative);
+            var fileUri = new Uri(baseUri, relativeUri);
+
+            await wc.DownloadFileTaskAsync(fileUri, fileName);
+
+            CurrentDownloads[downloadId].Single(f => f.Hash == hash).Transferred = CurrentDownloads[downloadId].Single(f => f.Hash == hash).Total;
+
             return fileName;
         }
 
