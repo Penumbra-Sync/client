@@ -184,42 +184,11 @@ namespace MareSynchronos.WebAPI
                         await _mareHub.InvokeAsync<ConnectionDto>(Api.InvokeHeartbeat, _dalamudUtil.PlayerNameHashed, token);
                     if (ServerState is ServerState.Connected) // user is authorized && server is legit
                     {
-                        Logger.Debug("Initializing data");
-                        _mareHub.On<ClientPairDto, string>(Api.OnUserUpdateClientPairs,
-                            UpdateLocalClientPairsCallback);
-                        _mareHub.On<CharacterCacheDto, string>(Api.OnUserReceiveCharacterData,
-                            ReceiveCharacterDataCallback);
-                        _mareHub.On<string>(Api.OnUserRemoveOnlinePairedPlayer,
-                            (s) => PairedClientOffline?.Invoke(s));
-                        _mareHub.On<string>(Api.OnUserAddOnlinePairedPlayer,
-                            (s) => PairedClientOnline?.Invoke(s));
-                        _mareHub.On(Api.OnAdminForcedReconnect, UserForcedReconnectCallback);
-
-                        PairedClients =
-                            await _mareHub!.InvokeAsync<List<ClientPairDto>>(Api.InvokeUserGetPairedClients, token);
+                        await InitializeData(token);
 
                         _mareHub.Closed += MareHubOnClosed;
                         _mareHub.Reconnected += MareHubOnReconnected;
                         _mareHub.Reconnecting += MareHubOnReconnecting;
-
-                        if (IsModerator)
-                        {
-                            AdminForbiddenFiles =
-                                await _mareHub.InvokeAsync<List<ForbiddenFileDto>>(Api.InvokeAdminGetForbiddenFiles,
-                                    token);
-                            AdminBannedUsers =
-                                await _mareHub.InvokeAsync<List<BannedUserDto>>(Api.InvokeAdminGetBannedUsers,
-                                    token);
-                            _mareHub.On<BannedUserDto>(Api.OnAdminUpdateOrAddBannedUser,
-                                UpdateOrAddBannedUserCallback);
-                            _mareHub.On<BannedUserDto>(Api.OnAdminDeleteBannedUser, DeleteBannedUserCallback);
-                            _mareHub.On<ForbiddenFileDto>(Api.OnAdminUpdateOrAddForbiddenFile,
-                                UpdateOrAddForbiddenFileCallback);
-                            _mareHub.On<ForbiddenFileDto>(Api.OnAdminDeleteForbiddenFile,
-                                DeleteForbiddenFileCallback);
-                        }
-
-                        Connected?.Invoke();
                     }
                     else if (ServerState is ServerState.VersionMisMatch or ServerState.NoAccount or ServerState.Unauthorized)
                     {
@@ -235,6 +204,43 @@ namespace MareSynchronos.WebAPI
                     await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token);
                 }
             }
+        }
+
+        private async Task InitializeData(CancellationToken? token)
+        {
+            if (_mareHub == null) return;
+            Logger.Debug("Initializing data");
+            _mareHub.On<ClientPairDto, string>(Api.OnUserUpdateClientPairs,
+                UpdateLocalClientPairsCallback);
+            _mareHub.On<CharacterCacheDto, string>(Api.OnUserReceiveCharacterData,
+                ReceiveCharacterDataCallback);
+            _mareHub.On<string>(Api.OnUserRemoveOnlinePairedPlayer,
+                (s) => PairedClientOffline?.Invoke(s));
+            _mareHub.On<string>(Api.OnUserAddOnlinePairedPlayer,
+                (s) => PairedClientOnline?.Invoke(s));
+            _mareHub.On(Api.OnAdminForcedReconnect, UserForcedReconnectCallback);
+
+            PairedClients =
+                await _mareHub!.InvokeAsync<List<ClientPairDto>>(Api.InvokeUserGetPairedClients, token);
+
+            if (IsModerator)
+            {
+                AdminForbiddenFiles =
+                    await _mareHub.InvokeAsync<List<ForbiddenFileDto>>(Api.InvokeAdminGetForbiddenFiles,
+                        token);
+                AdminBannedUsers =
+                    await _mareHub.InvokeAsync<List<BannedUserDto>>(Api.InvokeAdminGetBannedUsers,
+                        token);
+                _mareHub.On<BannedUserDto>(Api.OnAdminUpdateOrAddBannedUser,
+                    UpdateOrAddBannedUserCallback);
+                _mareHub.On<BannedUserDto>(Api.OnAdminDeleteBannedUser, DeleteBannedUserCallback);
+                _mareHub.On<ForbiddenFileDto>(Api.OnAdminUpdateOrAddForbiddenFile,
+                    UpdateOrAddForbiddenFileCallback);
+                _mareHub.On<ForbiddenFileDto>(Api.OnAdminDeleteForbiddenFile,
+                    DeleteForbiddenFileCallback);
+            }
+
+            Connected?.Invoke();
         }
 
         public void Dispose()
@@ -278,8 +284,7 @@ namespace MareSynchronos.WebAPI
         {
             Logger.Info("Connection restored");
             await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 10)));
-            _connectionDto = await _mareHub!.InvokeAsync<ConnectionDto>(Api.InvokeHeartbeat, _dalamudUtil.PlayerNameHashed);
-            Connected?.Invoke();
+            await InitializeData(null);
         }
 
         private Task MareHubOnReconnecting(Exception? arg)
@@ -288,6 +293,8 @@ namespace MareSynchronos.WebAPI
             CurrentDownloads.Clear();
             _uploadCancellationTokenSource?.Cancel();
             Logger.Warn("Connection closed... Reconnecting");
+            Logger.Warn(arg?.Message ?? string.Empty);
+            Logger.Warn(arg?.StackTrace ?? string.Empty);
             Disconnected?.Invoke();
             return Task.CompletedTask;
         }

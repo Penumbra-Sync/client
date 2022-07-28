@@ -46,6 +46,9 @@ public class CharacterDataFactory
             return previousData;
         }
 
+        var previousFileReplacements = previousData.FileReplacements.ToDictionary(d => d.Key, d => d.Value);
+        var previousGlamourerData = previousData.GlamourerString.ToDictionary(d => d.Key, d => d.Value);
+
         try
         {
             return CreateCharacterData(previousData, objectKind, playerPointer, token);
@@ -53,15 +56,17 @@ public class CharacterDataFactory
         catch (OperationCanceledException)
         {
             Logger.Debug("Cancelled creating Character data");
-            return previousData;
         }
         catch (Exception e)
         {
             Logger.Warn("Failed to create " + objectKind + " data");
             Logger.Warn(e.Message);
             Logger.Warn(e.StackTrace ?? string.Empty);
-            return previousData;
         }
+
+        previousData.FileReplacements = previousFileReplacements;
+        previousData.GlamourerString = previousGlamourerData;
+        return previousData;
     }
 
     private (string, string) GetIndentationForInheritanceLevel(int inheritanceLevel)

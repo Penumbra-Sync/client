@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using LZ4;
@@ -203,7 +204,17 @@ namespace MareSynchronos.WebAPI
 
             if (!uploadToken.IsCancellationRequested)
             {
-                Logger.Info("Pushing character data for " + character.GetHashCode());
+                Logger.Info("Pushing character data for " + character.GetHashCode() + " to " + string.Join(", ", visibleCharacterIds));
+                StringBuilder sb = new StringBuilder();
+                foreach (var item in character.FileReplacements)
+                {
+                    sb.AppendLine($"FileReplacements for {item.Key}: {item.Value.Count}");
+                }
+                foreach (var item in character.GlamourerData)
+                {
+                    sb.AppendLine($"GlamourerData for {item.Key}: {!string.IsNullOrEmpty(item.Value)}");
+                }
+                Logger.Debug("Chara data contained: " + Environment.NewLine + sb.ToString());
                 await _mareHub!.InvokeAsync(Api.InvokeUserPushCharacterDataToVisibleClients, character, visibleCharacterIds, uploadToken);
             }
             else
