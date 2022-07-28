@@ -106,7 +106,7 @@ namespace MareSynchronos.Models
                 {
                     if (HatState != null && !hasChanges && !HasUnprocessedUpdate)
                     {
-                        Logger.Verbose("Not Sending Update, only Hat changed");
+                        Logger.Debug("Not Sending Update, only Hat changed");
                         DoNotSendUpdate = true;
                     }
                     HatState = newHatState;
@@ -117,7 +117,7 @@ namespace MareSynchronos.Models
                 {
                     if (VisorWeaponState != null && !hasChanges && !HasUnprocessedUpdate)
                     {
-                        Logger.Verbose("Not Sending Update, only Visor/Weapon changed");
+                        Logger.Debug("Not Sending Update, only Visor/Weapon changed");
                         DoNotSendUpdate = true;
                     }
                     VisorWeaponState = newWeaponOrVisorState;

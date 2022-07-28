@@ -76,7 +76,7 @@ namespace MareSynchronos.WebAPI
                 if (ct.IsCancellationRequested)
                 {
                     File.Delete(tempFile);
-                    Logger.Verbose("Detected cancellation, removing " + currentDownloadId);
+                    Logger.Debug("Detected cancellation, removing " + currentDownloadId);
                     CurrentDownloads.Remove(currentDownloadId);
                     break;
                 }
@@ -113,7 +113,7 @@ namespace MareSynchronos.WebAPI
                 await Task.Delay(250, ct);
             }
 
-            Logger.Verbose("Download complete, removing " + currentDownloadId);
+            Logger.Debug("Download complete, removing " + currentDownloadId);
             CurrentDownloads.Remove(currentDownloadId);
         }
 
@@ -162,10 +162,10 @@ namespace MareSynchronos.WebAPI
             }
 
             var totalSize = CurrentUploads.Sum(c => c.Total);
-            Logger.Verbose("Compressing and uploading files");
+            Logger.Debug("Compressing and uploading files");
             foreach (var file in CurrentUploads.Where(f => f.CanBeTransferred && !f.IsTransferred).ToList())
             {
-                Logger.Verbose("Compressing and uploading " + file);
+                Logger.Debug("Compressing and uploading " + file);
                 var data = await GetCompressedFileData(file.Hash, uploadToken);
                 CurrentUploads.Single(e => e.Hash == data.Item1).Total = data.Item2.Length;
                 await UploadFile(data.Item2, file.Hash, uploadToken);
@@ -181,21 +181,21 @@ namespace MareSynchronos.WebAPI
                 Logger.Debug($"Compressed {totalSize} to {compressedSize} ({(compressedSize / (double)totalSize):P2})");
             }
 
-            Logger.Verbose("Upload tasks complete, waiting for server to confirm");
+            Logger.Debug("Upload tasks complete, waiting for server to confirm");
             var anyUploadsOpen = await _mareHub!.InvokeAsync<bool>(Api.InvokeFileIsUploadFinished, uploadToken);
-            Logger.Verbose("Uploads open: " + anyUploadsOpen);
+            Logger.Debug("Uploads open: " + anyUploadsOpen);
             while (anyUploadsOpen && !uploadToken.IsCancellationRequested)
             {
                 anyUploadsOpen = await _mareHub!.InvokeAsync<bool>(Api.InvokeFileIsUploadFinished, uploadToken);
                 await Task.Delay(TimeSpan.FromSeconds(0.5), uploadToken);
-                Logger.Verbose("Waiting for uploads to finish");
+                Logger.Debug("Waiting for uploads to finish");
             }
 
             CurrentUploads.Clear();
 
             if (!uploadToken.IsCancellationRequested)
             {
-                Logger.Verbose("=== Pushing character data ===");
+                Logger.Info("Pushing character data for " + character.GetHashCode());
                 await _mareHub!.InvokeAsync(Api.InvokeUserPushCharacterDataToVisibleClients, character, visibleCharacterIds, uploadToken);
             }
             else

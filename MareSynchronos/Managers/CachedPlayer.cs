@@ -70,6 +70,7 @@ public class CachedPlayer
 
         if (characterData.GetHashCode() == _cachedData.GetHashCode()) return;
 
+        bool updateModdedPaths = false;
         List<ObjectKind> charaDataToUpdate = new List<ObjectKind>();
         foreach (var objectKind in Enum.GetValues<ObjectKind>())
         {
@@ -88,6 +89,7 @@ public class CachedPlayer
             if (hasNewButNotOldFileReplacements || hasOldButNotNewFileReplacements || hasNewButNotOldGlamourerData || hasOldButNotNewGlamourerData)
             {
                 Logger.Debug("Updating " + objectKind);
+                updateModdedPaths = true;
                 charaDataToUpdate.Add(objectKind);
                 continue;
             }
@@ -98,6 +100,7 @@ public class CachedPlayer
                 if (!listsAreEqual)
                 {
                     Logger.Debug("Updating " + objectKind);
+                    updateModdedPaths = true;
                     charaDataToUpdate.Add(objectKind);
                     continue;
                 }
@@ -117,11 +120,16 @@ public class CachedPlayer
 
         _cachedData = characterData;
 
-        DownloadAndApplyCharacter(charaDataToUpdate);
+        DownloadAndApplyCharacter(charaDataToUpdate, updateModdedPaths);
     }
 
-    private void DownloadAndApplyCharacter(List<ObjectKind> objectKind)
+    private void DownloadAndApplyCharacter(List<ObjectKind> objectKind, bool updateModdedPaths)
     {
+        if (!objectKind.Any())
+        {
+            Logger.Debug("Nothing to update for " + this);
+        }
+
         _downloadCancellationTokenSource?.Cancel();
         _downloadCancellationTokenSource = new CancellationTokenSource();
         var downloadToken = _downloadCancellationTokenSource.Token;
@@ -130,22 +138,27 @@ public class CachedPlayer
         {
             List<FileReplacementDto> toDownloadReplacements;
 
-            Dictionary<string, string> moddedPaths;
-            int attempts = 0;
-            while ((toDownloadReplacements = TryCalculateModdedDictionary(out moddedPaths)).Count > 0 && attempts++ <= 10)
+            if (updateModdedPaths)
             {
-                Logger.Debug("Downloading missing files for player " + PlayerName + ", kind: " + objectKind);
-                await _apiController.DownloadFiles(downloadId, toDownloadReplacements, downloadToken);
-                if (downloadToken.IsCancellationRequested)
+                Dictionary<string, string> moddedPaths;
+                int attempts = 0;
+                while ((toDownloadReplacements = TryCalculateModdedDictionary(out moddedPaths)).Count > 0 && attempts++ <= 10)
                 {
-                    Logger.Verbose("Detected cancellation");
-                    return;
+                    Logger.Debug("Downloading missing files for player " + PlayerName + ", kind: " + objectKind);
+                    await _apiController.DownloadFiles(downloadId, toDownloadReplacements, downloadToken);
+                    if (downloadToken.IsCancellationRequested)
+                    {
+                        Logger.Verbose("Detected cancellation");
+                        return;
+                    }
+
+                    if ((TryCalculateModdedDictionary(out moddedPaths)).All(c => _apiController.ForbiddenTransfers.Any(f => f.Hash == c.Hash)))
+                    {
+                        break;
+                    }
                 }
 
-                if ((TryCalculateModdedDictionary(out moddedPaths)).All(c => _apiController.ForbiddenTransfers.Any(f => f.Hash == c.Hash)))
-                {
-                    break;
-                }
+                ApplyBaseData(moddedPaths);
             }
 
             if (_dalamudUtil.IsInGpose)
@@ -157,8 +170,6 @@ public class CachedPlayer
                     downloadToken.ThrowIfCancellationRequested();
                 }
             }
-
-            ApplyBaseData(moddedPaths);
 
             foreach (var kind in objectKind)
             {
@@ -311,15 +322,13 @@ public class CachedPlayer
     {
         if (_isDisposed) return;
         if (string.IsNullOrEmpty(PlayerName)) return;
-        Logger.Verbose("Disposing " + PlayerName + " (" + PlayerNameHash + ")");
+        Logger.Debug("Disposing " + PlayerName + " (" + PlayerNameHash + ")");
         _isDisposed = true;
         try
         {
             Logger.Verbose("Restoring state for " + PlayerName);
             _dalamudUtil.FrameworkUpdate -= DalamudUtilOnFrameworkUpdate;
             _ipcManager.PenumbraRedrawEvent -= IpcManagerOnPenumbraRedrawEvent;
-            _downloadCancellationTokenSource?.Cancel();
-            _downloadCancellationTokenSource?.Dispose();
             _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName);
             if (PlayerCharacter != null && PlayerCharacter.IsValid())
             {
@@ -328,6 +337,9 @@ public class CachedPlayer
                     RevertCustomizationData(item.Key);
                 }
             }
+
+            _downloadCancellationTokenSource?.Cancel();
+            _downloadCancellationTokenSource?.Dispose();
         }
         catch (Exception ex)
         {

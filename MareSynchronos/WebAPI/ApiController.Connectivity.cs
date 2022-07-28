@@ -145,7 +145,7 @@ namespace MareSynchronos.WebAPI
 
         public async Task CreateConnections()
         {
-            Logger.Verbose("Recreating Connection");
+            Logger.Info("Recreating Connection");
 
             await StopConnection(_connectionCancellationTokenSource.Token);
 
@@ -230,7 +230,7 @@ namespace MareSynchronos.WebAPI
                 {
                     Logger.Warn(ex.Message);
                     Logger.Warn(ex.StackTrace ?? string.Empty);
-                    Logger.Debug("Failed to establish connection, retrying");
+                    Logger.Info("Failed to establish connection, retrying");
                     await StopConnection(token);
                     await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token);
                 }
@@ -269,14 +269,14 @@ namespace MareSynchronos.WebAPI
             CurrentUploads.Clear();
             CurrentDownloads.Clear();
             _uploadCancellationTokenSource?.Cancel();
-            Logger.Debug("Connection closed");
+            Logger.Info("Connection closed");
             Disconnected?.Invoke();
             return Task.CompletedTask;
         }
 
         private async Task MareHubOnReconnected(string? arg)
         {
-            Logger.Debug("Connection restored");
+            Logger.Info("Connection restored");
             await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 10)));
             _connectionDto = await _mareHub!.InvokeAsync<ConnectionDto>(Api.InvokeHeartbeat, _dalamudUtil.PlayerNameHashed);
             Connected?.Invoke();
@@ -287,14 +287,14 @@ namespace MareSynchronos.WebAPI
             CurrentUploads.Clear();
             CurrentDownloads.Clear();
             _uploadCancellationTokenSource?.Cancel();
-            Logger.Debug("Connection closed... Reconnecting");
+            Logger.Warn("Connection closed... Reconnecting");
             Disconnected?.Invoke();
             return Task.CompletedTask;
         }
 
         private async Task StopConnection(CancellationToken token)
         {
-            Logger.Verbose("Stopping all connections");
+            Logger.Info("Stopping all connections");
             if (_mareHub is not null)
             {
                 await _mareHub.StopAsync(token);
