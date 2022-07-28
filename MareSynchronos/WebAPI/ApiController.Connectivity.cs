@@ -206,7 +206,7 @@ namespace MareSynchronos.WebAPI
             }
         }
 
-        private async Task InitializeData(CancellationToken? token)
+        private async Task InitializeData(CancellationToken token)
         {
             if (_mareHub == null) return;
             Logger.Debug("Initializing data");
@@ -284,7 +284,7 @@ namespace MareSynchronos.WebAPI
         {
             Logger.Info("Connection restored");
             await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 10)));
-            await InitializeData(null);
+            await InitializeData(_connectionCancellationTokenSource.Token);
         }
 
         private Task MareHubOnReconnecting(Exception? arg)
