@@ -40,7 +40,7 @@ namespace MareSynchronos.Models
                 FileCache? fileCache;
                 using (FileCacheContext db = new())
                 {
-                    fileCache = db.FileCaches.LastOrDefault(f => f.Filepath == path.ToLower());
+                    fileCache = db.FileCaches.FirstOrDefault(f => f.Filepath == path.ToLower());
                 }
 
                 if (fileCache != null)

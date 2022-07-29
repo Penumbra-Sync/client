@@ -113,6 +113,8 @@ namespace MareSynchronos.Models
                     hasChanges = true;
                 }
 
+                newWeaponOrVisorState &= 0b1101; // ignore drawing weapon
+
                 if (newWeaponOrVisorState != VisorWeaponState)
                 {
                     if (VisorWeaponState != null && !hasChanges && !HasUnprocessedUpdate)
