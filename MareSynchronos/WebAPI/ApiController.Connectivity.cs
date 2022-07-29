@@ -209,6 +209,7 @@ namespace MareSynchronos.WebAPI
         private async Task InitializeData(CancellationToken token)
         {
             if (_mareHub == null) return;
+
             Logger.Debug("Initializing data");
             _mareHub.On<ClientPairDto, string>(Api.OnUserUpdateClientPairs,
                 UpdateLocalClientPairsCallback);
@@ -284,6 +285,9 @@ namespace MareSynchronos.WebAPI
         {
             Logger.Info("Connection restored");
             await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 10)));
+
+            _connectionDto = await _mareHub.InvokeAsync<ConnectionDto>(Api.InvokeHeartbeat, _dalamudUtil.PlayerNameHashed, _connectionCancellationTokenSource.Token);
+
             await InitializeData(_connectionCancellationTokenSource.Token);
         }
 
