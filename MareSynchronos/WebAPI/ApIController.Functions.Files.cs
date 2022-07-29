@@ -38,10 +38,20 @@ namespace MareSynchronos.WebAPI
         private async Task<string> DownloadFile(int downloadId, string hash, CancellationToken ct)
         {
             using WebClient wc = new();
-            wc.DownloadProgressChanged += (s, e) =>
+            DownloadProgressChangedEventHandler progChanged = (s, e) =>
             {
-                CurrentDownloads[downloadId].Single(f => f.Hash == hash).Transferred = e.BytesReceived;
+                try
+                {
+                    CurrentDownloads[downloadId].Single(f => f.Hash == hash).Transferred = e.BytesReceived;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn("Could not set download progress for " + hash);
+                    Logger.Warn(ex.Message);
+                    Logger.Warn(ex.StackTrace ?? string.Empty);
+                }
             };
+            wc.DownloadProgressChanged += progChanged;
 
             string fileName = Path.GetTempFileName();
             var baseUri = new Uri(ApiUri.Replace("wss", "https"), UriKind.Absolute);
@@ -52,6 +62,7 @@ namespace MareSynchronos.WebAPI
 
             CurrentDownloads[downloadId].Single(f => f.Hash == hash).Transferred = CurrentDownloads[downloadId].Single(f => f.Hash == hash).Total;
 
+            wc.DownloadProgressChanged -= progChanged;
             return fileName;
         }
 
