@@ -286,9 +286,7 @@ namespace MareSynchronos.WebAPI
             Logger.Info("Connection restored");
             await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 10)));
 
-            _connectionDto = await _mareHub.InvokeAsync<ConnectionDto>(Api.InvokeHeartbeat, _dalamudUtil.PlayerNameHashed, _connectionCancellationTokenSource.Token);
-
-            await InitializeData(_connectionCancellationTokenSource.Token);
+            _ = Task.Run(CreateConnections);
         }
 
         private Task MareHubOnReconnecting(Exception? arg)
@@ -305,9 +303,9 @@ namespace MareSynchronos.WebAPI
 
         private async Task StopConnection(CancellationToken token)
         {
-            Logger.Info("Stopping all connections");
             if (_mareHub is not null)
             {
+                Logger.Info("Stopping all connections");
                 await _mareHub.StopAsync(token);
                 _mareHub.Closed -= MareHubOnClosed;
                 _mareHub.Reconnected -= MareHubOnReconnected;

@@ -187,7 +187,7 @@ namespace MareSynchronos.Managers
 
             if (token.IsCancellationRequested) return;
 
-            PluginLog.Debug("File changes detected, scanning the changes ");
+            Logger.Debug("File changes detected");
 
             if (!_modifiedFiles.Any()) return;
 
@@ -250,7 +250,7 @@ namespace MareSynchronos.Managers
             var fileCachesToDelete = new ConcurrentBag<FileCache>();
             var fileCachesToAdd = new ConcurrentBag<FileCache>();
 
-            Logger.Verbose("Getting file list from Database");
+            Logger.Debug("Database contains " + fileCaches.Count + " files, local system contains " + TotalFiles);
             // scan files from database
             Parallel.ForEach(fileCaches, new ParallelOptions()
             {
@@ -316,9 +316,12 @@ namespace MareSynchronos.Managers
                     foreach (var deletion in fileCachesToDelete)
                     {
                         var entries = db.FileCaches.Where(f =>
-                            f.Hash == deletion.Hash && f.Filepath == deletion.Filepath);
+                            f.Hash == deletion.Hash && f.Filepath.ToLower() == deletion.Filepath.ToLower());
                         if (await entries.AnyAsync(ct))
+                        {
+                            Logger.Verbose("Removing file from DB: " + deletion.Filepath);
                             db.FileCaches.RemoveRange(entries);
+                        }
                     }
                     await db.SaveChangesAsync(ct);
                     foreach (var entry in fileCachesToAdd)
