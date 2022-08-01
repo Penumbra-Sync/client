@@ -10,6 +10,7 @@ using ImGuiNET;
 using MareSynchronos.Managers;
 using MareSynchronos.Utils;
 using MareSynchronos.Localization;
+using Dalamud.Utility;
 
 namespace MareSynchronos.UI
 {
@@ -99,12 +100,12 @@ namespace MareSynchronos.UI
                 var textSize = ImGui.CalcTextSize(Strings.ToS.LanguageLabel);
                 ImGui.TextUnformatted(Strings.ToS.AgreementLabel);
                 if (_uiShared.UidFontBuilt) ImGui.PopFont();
-                
+
                 ImGui.SameLine();
                 var languageSize = ImGui.CalcTextSize(Strings.ToS.LanguageLabel);
                 ImGui.SetCursorPosX(ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X - languageSize.X - 80);
                 ImGui.SetCursorPosY(ImGui.GetCursorPosY() + textSize.Y / 2 - languageSize.Y / 2);
-                
+
                 ImGui.TextUnformatted(Strings.ToS.LanguageLabel);
                 ImGui.SameLine();
                 ImGui.SetCursorPosY(ImGui.GetCursorPosY() + textSize.Y / 2 - (languageSize.Y + ImGui.GetStyle().FramePadding.Y) / 2);
@@ -113,7 +114,7 @@ namespace MareSynchronos.UI
                 {
                     GetToSLocalization(_currentLanguage);
                 }
-                
+
                 ImGui.Separator();
                 ImGui.SetWindowFontScale(1.5f);
                 string readThis = Strings.ToS.ReadLabel;
@@ -262,16 +263,30 @@ namespace MareSynchronos.UI
                 }
                 else
                 {
-                    UiShared.TextWrapped("You will now have to register at a service. You can use the provided central service or pick a custom one. " +
-                                         "There is no support for custom services from the plugin creator. Use at your own risk.");
-                    UiShared.ColorTextWrapped("On registration on a service the plugin will create and save a secret key to your plugin configuration. " +
-                                         "Make a backup of your secret key. In case of loss, it cannot be restored. The secret key is your identification to the service " +
-                                         "to verify who you are. It is directly tied to the UID you will be receiving. In case of loss, you will have to re-register an account.", ImGuiColors.DalamudYellow);
-                    UiShared.ColorTextWrapped("Do not ever, under any circumstances, share your secret key to anyone! Likewise do not share your Mare Synchronos plugin configuration to anyone!", ImGuiColors.DalamudYellow);
-                    _uiShared.DrawServiceSelection(new Action(() => { }), true);
+                    UiShared.TextWrapped("Registrations are currently closed. Join the Mare Synchronos server Discord for further information.");
+
+                    if (ImGui.Button("Mare Synchronos Discord"))
+                    {
+                        Util.OpenLink("https://discord.gg/mpNdkrTRjW");
+                    }
+
+                    UiShared.TextWrapped("I'm sorry for the inconvenience caused, however the main service suffered from a DDoS-like attack a short time ago. I am currently working hard on implementing measures to avoid such issues in the future.");
+                    UiShared.TextWrapped("You can close this window for now.");
+
+                    ImGui.Separator();
+
+                    UiShared.TextWrapped("If you made an account before (AND ONLY THEN) you can connect to the service using the tools provided below.");
+
+                    _uiShared.DrawServiceSelection(() =>
+                    {
+                        SwitchToMainUi?.Invoke();
+                        IsOpen = false;
+                    }, true);
                 }
             }
         }
+
+        private string _secretKey = string.Empty;
 
         private void GetToSLocalization(int changeLanguageTo = -1)
         {
@@ -279,15 +294,15 @@ namespace MareSynchronos.UI
             {
                 _uiShared.LoadLocalization(_languages.ElementAt(changeLanguageTo).Value);
             }
-            
+
             TosParagraphs = new[] { Strings.ToS.Paragraph1, Strings.ToS.Paragraph2, Strings.ToS.Paragraph3, Strings.ToS.Paragraph4, Strings.ToS.Paragraph5, Strings.ToS.Paragraph6 };
-            
+
             if (_pluginConfiguration.DarkSoulsAgreement)
             {
                 GenerateDarkSoulsAgreementCaptcha();
             }
         }
-        
+
         private void GenerateDarkSoulsAgreementCaptcha()
         {
             _darkSoulsCaptcha1 = GetCaptchaTuple();

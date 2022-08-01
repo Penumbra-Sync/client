@@ -41,6 +41,9 @@ namespace MareSynchronos.UI
 
         public static bool CtrlPressed() => (GetKeyState(0xA2) & 0x8000) != 0 || (GetKeyState(0xA3) & 0x8000) != 0;
 
+        // todo remove after rework
+        public ApiController ApiController => _apiController;
+
         public UiShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, FileDialogManager fileDialogManager, Configuration pluginConfiguration, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization)
         {
             _ipcManager = ipcManager;
@@ -321,23 +324,7 @@ namespace MareSynchronos.UI
 
             PrintServerState(isIntroUi);
 
-            if (_apiController.ServerAlive && (!_pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri) || _pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri].IsNullOrEmpty()))
-            {
-                if (!_enterSecretKey)
-                {
-                    if (ImGui.Button("Register"))
-                    {
-                        _pluginConfiguration.FullPause = false;
-                        _pluginConfiguration.Save();
-                        Task.Run(() => _apiController.Register(isIntroUi));
-                        ShowClientSecret = true;
-                        callBackOnExit?.Invoke();
-                    }
-
-                    ImGui.SameLine();
-                }
-            }
-            else
+            if (!_apiController.ServerAlive && (_pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri) && !_pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri].IsNullOrEmpty()))
             {
                 ColorTextWrapped("You already have an account on this server.", ImGuiColors.DalamudYellow);
                 ImGui.SameLine();
@@ -380,10 +367,10 @@ namespace MareSynchronos.UI
                 ImGui.SameLine();
                 if (_secretKey.Length > 0 && _secretKey.Length != 64)
                 {
-                    ColorTextWrapped("Your secret key must be exactly 64 characters long. If try to enter your UID here, this is incorrect." +
-                                     " If you have lost your secret key, you will need to create a new account.", ImGuiColors.DalamudRed);
+                    UiShared.ColorTextWrapped("Your secret key must be exactly 64 characters long. If try to enter your UID here, this is incorrect." +
+                                     " Don't enter anything but a prior acquired secret key here.", ImGuiColors.DalamudRed);
                 }
-                else
+                else if (_secretKey.Length == 64)
                 {
                     if (ImGui.Button("Save"))
                     {

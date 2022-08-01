@@ -38,6 +38,7 @@ namespace MareSynchronos.WebAPI
         private async Task<string> DownloadFile(int downloadId, string hash, CancellationToken ct)
         {
             using WebClient wc = new();
+            wc.Headers.Add("Authorization", SecretKey);
             DownloadProgressChangedEventHandler progChanged = (s, e) =>
             {
                 try
