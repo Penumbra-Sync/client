@@ -55,12 +55,7 @@ namespace MareSynchronos.WebAPI
             wc.DownloadProgressChanged += progChanged;
 
             string fileName = Path.GetTempFileName();
-            Uri baseUri;
-            if (ApiUri.StartsWith("ws://")) { // Bad bad bad but yeah
-                baseUri = new Uri(ApiUri.Replace("ws", "http"), UriKind.Absolute);
-            } else {
-                baseUri = new Uri(ApiUri.Replace("wss", "https"), UriKind.Absolute);
-            }
+            var baseUri = new Uri(ApiUri.Replace("ws", "http"), UriKind.Absolute);
             var relativeUri = new Uri("cache/" + hash, UriKind.Relative);
             var fileUri = new Uri(baseUri, relativeUri);
 
