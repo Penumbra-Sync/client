@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using LZ4;
@@ -55,7 +56,7 @@ namespace MareSynchronos.WebAPI
             wc.DownloadProgressChanged += progChanged;
 
             string fileName = Path.GetTempFileName();
-            var baseUri = new Uri(ApiUri.Replace("ws", "http"), UriKind.Absolute);
+            var baseUri = new Uri(Regex.Replace(ApiUri, "^ws", "http"), UriKind.Absolute);
             var relativeUri = new Uri("cache/" + hash, UriKind.Relative);
             var fileUri = new Uri(baseUri, relativeUri);
 
