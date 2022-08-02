@@ -79,7 +79,7 @@ namespace MareSynchronos
         public Dictionary<string, Dictionary<string, string>> UidServerComments { get; set; } = new();
 
         public Dictionary<string, string> UidComments { get; set; } = new();
-        public int Version { get; set; } = 4;
+        public int Version { get; set; } = 5;
 
         public bool ShowTransferWindow { get; set; } = true;
 
@@ -193,6 +193,18 @@ namespace MareSynchronos
                 }
 
                 Version = 4;
+                Save();
+            }
+
+            if (Version == 4)
+            {
+                Logger.Debug("Migrating Configuration from V4 to V5");
+
+                ApiUri = ApiUri.Replace("wss://v2202207178628194299.powersrv.de:6872", "wss://maresynchronos.com");
+                ClientSecret.Remove("wss://v2202207178628194299.powersrv.de:6872");
+                UidServerComments.Remove("wss://v2202207178628194299.powersrv.de:6872");
+
+                Version = 5;
                 Save();
             }
         }

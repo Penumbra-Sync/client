@@ -466,7 +466,7 @@ namespace MareSynchronos.UI
 
             if (marePaused)
             {
-                _uiShared.DrawServiceSelection(() => SwitchToIntroUi?.Invoke());
+                _uiShared.DrawServiceSelection(() => { });
             }
         }
 

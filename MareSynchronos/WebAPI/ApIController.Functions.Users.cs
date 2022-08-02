@@ -17,21 +17,6 @@ namespace MareSynchronos.WebAPI
             await CreateConnections();
         }
 
-        public async Task Register(bool isIntroUi = false)
-        {
-            if (!ServerAlive) return;
-            Logger.Debug("Registering at service " + ApiUri);
-            //var response = await _mareHub!.InvokeAsync<string>(Api.InvokeUserRegister);
-            //_pluginConfiguration.ClientSecret[ApiUri] = response;
-            _pluginConfiguration.Save();
-            if (!isIntroUi)
-            {
-                RegisterFinalized?.Invoke();
-            }
-
-            await CreateConnections();
-        }
-
         public async Task<List<string>> GetOnlineCharacters()
         {
             return await _mareHub!.InvokeAsync<List<string>>(Api.InvokeUserGetOnlineCharacters);

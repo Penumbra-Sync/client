@@ -239,50 +239,26 @@ namespace MareSynchronos.UI
                 ImGui.TextUnformatted("Service Registration");
                 if (_uiShared.UidFontBuilt) ImGui.PopFont();
                 ImGui.Separator();
-                if (_pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri) && _uiShared.ShowClientSecret)
+                UiShared.TextWrapped("To be able to use Mare Synchronos you will have to register an account.");
+                UiShared.TextWrapped("For the official Mare Synchronos Servers the account creation will be handled on the official Mare Synchronos Discord. Due to security risks for the server, there is no way to handle this senisibly otherwise.");
+                UiShared.TextWrapped("If you want to register at the main server \"" + WebAPI.ApiController.MainServer + "\" join the Discord and follow the instructions as described in #registration.");
+
+                if (ImGui.Button("Join the Mare Synchronos Discord"))
                 {
-                    ImGui.SetWindowFontScale(2f);
-                    UiShared.ColorTextWrapped("DO NOT GIVE THIS KEY TO OTHER PEOPLE.", ImGuiColors.DalamudYellow);
-                    ImGui.SetWindowFontScale(1f);
-                    ImGui.Separator();
-                    UiShared.TextWrapped(_pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri]);
-                    ImGui.Separator();
-                    if (ImGui.Button("Copy secret key to clipboard"))
-                    {
-                        ImGui.SetClipboardText(_pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri]);
-                    }
-                    UiShared.ColorTextWrapped("This is the only time you will be able to see this key in the UI. You can copy it to make a backup somewhere.", ImGuiColors.DalamudYellow);
-                    ImGui.Separator();
-                    UiShared.ColorTextWrapped("You are now ready to go. Press Finish to finalize the settings and open the Mare Synchronos main UI.", ImGuiColors.ParsedGreen);
-                    ImGui.Separator();
-                    if (ImGui.Button("Finish##finishIntro"))
-                    {
-                        SwitchToMainUi?.Invoke();
-                        IsOpen = false;
-                    }
+                    Util.OpenLink("https://discord.gg/mpNdkrTRjW");
                 }
-                else
+
+                UiShared.TextWrapped("For all other non official services you will have to contact the appropriate service provider how to obtain a secret key.");
+
+                ImGui.Separator();
+
+                UiShared.TextWrapped("Once you have received a secret key you can connect to the service using the tools provided below.");
+
+                _uiShared.DrawServiceSelection(() =>
                 {
-                    UiShared.TextWrapped("Registrations are currently closed. Join the Mare Synchronos server Discord for further information.");
-
-                    if (ImGui.Button("Mare Synchronos Discord"))
-                    {
-                        Util.OpenLink("https://discord.gg/mpNdkrTRjW");
-                    }
-
-                    UiShared.TextWrapped("I'm sorry for the inconvenience caused, however the main service suffered from a DDoS-like attack a short time ago. I am currently working hard on implementing measures to avoid such issues in the future.");
-                    UiShared.TextWrapped("You can close this window for now.");
-
-                    ImGui.Separator();
-
-                    UiShared.TextWrapped("If you made an account before (AND ONLY THEN) you can connect to the service using the tools provided below.");
-
-                    _uiShared.DrawServiceSelection(() =>
-                    {
-                        SwitchToMainUi?.Invoke();
-                        IsOpen = false;
-                    }, true);
-                }
+                    SwitchToMainUi?.Invoke();
+                    IsOpen = false;
+                });
             }
         }
 

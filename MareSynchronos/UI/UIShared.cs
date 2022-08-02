@@ -32,7 +32,6 @@ namespace MareSynchronos.UI
         private readonly DalamudPluginInterface _pluginInterface;
         private readonly Dalamud.Localization _localization;
         public long FileCacheSize => _fileCacheManager.FileCacheSize;
-        public bool ShowClientSecret = true;
         public string PlayerName => _dalamudUtil.PlayerName;
         public bool HasValidPenumbraModPath => !(_ipcManager.PenumbraModDirectory() ?? string.Empty).IsNullOrEmpty() && Directory.Exists(_ipcManager.PenumbraModDirectory());
         public bool EditTrackerPosition { get; set; }
@@ -155,7 +154,7 @@ namespace MareSynchronos.UI
             }
         }
 
-        public void PrintServerState(bool isIntroUi = false)
+        public void PrintServerState()
         {
             var serverName = _apiController.ServerDictionary.ContainsKey(_pluginConfiguration.ApiUri)
                 ? _apiController.ServerDictionary[_pluginConfiguration.ApiUri]
@@ -262,7 +261,7 @@ namespace MareSynchronos.UI
         private bool _cacheDirectoryHasOtherFilesThanCache = false;
         private bool _cacheDirectoryIsValidPath = true;
 
-        public void DrawServiceSelection(Action? callBackOnExit = null, bool isIntroUi = false)
+        public void DrawServiceSelection(Action? callBackOnExit = null)
         {
             string[] comboEntries = _apiController.ServerDictionary.Values.ToArray();
             _serverSelectionIndex = Array.IndexOf(_apiController.ServerDictionary.Keys.ToArray(), _pluginConfiguration.ApiUri);
@@ -322,7 +321,7 @@ namespace MareSynchronos.UI
                 ImGui.TreePop();
             }
 
-            PrintServerState(isIntroUi);
+            PrintServerState();
 
             if (!_apiController.ServerAlive && (_pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri) && !_pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri].IsNullOrEmpty()))
             {
@@ -338,7 +337,7 @@ namespace MareSynchronos.UI
 
             string checkboxText = _pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri)
                 ? "I want to switch accounts"
-                : "I already have an account";
+                : "I have an account";
             ImGui.Checkbox(checkboxText, ref _enterSecretKey);
 
             if (_enterSecretKey)
@@ -348,26 +347,13 @@ namespace MareSynchronos.UI
                 {
                     ColorTextWrapped("IF YOU HAVE NEVER MADE AN ACCOUNT BEFORE DO NOT ENTER ANYTHING HERE", ImGuiColors.DalamudYellow);
                 }
-                else
-                {
-                    ImGui.AlignTextToFramePadding();
-                    ImGui.Text("If you made a mistake before or your account was deleted you can use this to re-register: ");
-                    ImGui.SameLine();
-                    if (ImGui.Button("Register##Reregister"))
-                    {
-                        _pluginConfiguration.FullPause = false;
-                        _pluginConfiguration.Save();
-                        Task.Run(() => _apiController.Register(isIntroUi));
-                        ShowClientSecret = true;
-                        callBackOnExit?.Invoke();
-                    }
-                }
+
                 ImGui.SetNextItemWidth(400);
                 ImGui.InputText("Enter Secret Key", ref _secretKey, 255);
                 ImGui.SameLine();
                 if (_secretKey.Length > 0 && _secretKey.Length != 64)
                 {
-                    UiShared.ColorTextWrapped("Your secret key must be exactly 64 characters long. If try to enter your UID here, this is incorrect." +
+                    ColorTextWrapped("Your secret key must be exactly 64 characters long. If try to enter your UID here, this is incorrect." +
                                      " Don't enter anything but a prior acquired secret key here.", ImGuiColors.DalamudRed);
                 }
                 else if (_secretKey.Length == 64)
@@ -378,7 +364,6 @@ namespace MareSynchronos.UI
                         _pluginConfiguration.Save();
                         _secretKey = string.Empty;
                         Task.Run(_apiController.CreateConnections);
-                        ShowClientSecret = false;
                         _enterSecretKey = false;
                         callBackOnExit?.Invoke();
                     }

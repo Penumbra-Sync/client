@@ -26,7 +26,7 @@ namespace MareSynchronos.WebAPI
     public partial class ApiController : IDisposable
     {
         public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
-        public const string MainServiceUri = "wss://v2202207178628194299.powersrv.de:6872";
+        public const string MainServiceUri = "wss://maresynchronos.com";
 
         public readonly int[] SupportedServerVersions = { Api.Version };
 
