@@ -233,7 +233,7 @@ namespace MareSynchronos.UI
                     _uiShared.DrawFileScanState();
                 }
             }
-            else
+            else if (!_uiShared.ApiController.ServerAlive)
             {
                 if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
                 ImGui.TextUnformatted("Service Registration");
@@ -254,11 +254,12 @@ namespace MareSynchronos.UI
 
                 UiShared.TextWrapped("Once you have received a secret key you can connect to the service using the tools provided below.");
 
-                _uiShared.DrawServiceSelection(() =>
-                {
-                    SwitchToMainUi?.Invoke();
-                    IsOpen = false;
-                });
+                _uiShared.DrawServiceSelection(() => { });
+            }
+            else
+            {
+                SwitchToMainUi?.Invoke();
+                IsOpen = false;
             }
         }
 

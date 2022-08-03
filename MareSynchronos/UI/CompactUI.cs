@@ -63,10 +63,7 @@ namespace MareSynchronos.UI
             _windowContentWidth = UiShared.GetWindowContentRegionWidth();
             UiShared.DrawWithID("header", DrawUIDHeader);
             ImGui.Separator();
-            if (_apiController.ServerState is not ServerState.Offline)
-            {
-                UiShared.DrawWithID("serverstatus", DrawServerStatus);
-            }
+            UiShared.DrawWithID("serverstatus", DrawServerStatus);
 
             if (_apiController.ServerState is ServerState.Connected)
             {
@@ -292,14 +289,13 @@ namespace MareSynchronos.UI
 
         private void DrawServerStatus()
         {
-            if (_apiController.ServerAlive)
+            var originalY = ImGui.GetCursorPosY();
+            var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Link);
+            var textSize = ImGui.CalcTextSize("%");
+            var textPos = originalY + buttonSize.Y / 2 - textSize.Y / 2;
+
+            if (_apiController.ServerState is ServerState.Connected)
             {
-                var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Link);
-                var textSize = ImGui.CalcTextSize(_apiController.SystemInfoDto.CpuUsage.ToString("0.00") + "%");
-                var originalY = ImGui.GetCursorPosY();
-
-                var textPos = originalY + buttonSize.Y / 2 - textSize.Y / 2;
-
                 ImGui.SetCursorPosY(textPos);
                 ImGui.TextColored(ImGuiColors.ParsedGreen, _apiController.OnlineUsers.ToString());
                 ImGui.SameLine();
@@ -312,35 +308,27 @@ namespace MareSynchronos.UI
                 ImGui.SetCursorPosY(textPos);
                 ImGui.Text("Load");
                 UiShared.AttachToolTip("This is the current servers' CPU load");
-
-                ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
-                ImGui.SetCursorPosY(originalY);
-                var serverIsConnected = _apiController.ServerState is ServerState.Connected;
-                var color = UiShared.GetBoolColor(serverIsConnected);
-                var connectedIcon = serverIsConnected ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
-
-                ImGui.PushStyleColor(ImGuiCol.Text, color);
-                if (ImGuiComponents.IconButton(connectedIcon))
-                {
-                    if (_apiController.ServerState == ServerState.Connected)
-                    {
-                        _configuration.FullPause = true;
-                        _configuration.Save();
-                    }
-                    else
-                    {
-                        _configuration.FullPause = false;
-                        _configuration.Save();
-                    }
-                    _ = _apiController.CreateConnections();
-                }
-                ImGui.PopStyleColor();
-                UiShared.AttachToolTip(_apiController.IsConnected ? "Disconnect from " + _apiController.ServerDictionary[_configuration.ApiUri] : "Connect to " + _apiController.ServerDictionary[_configuration.ApiUri]);
             }
             else
             {
-                UiShared.ColorTextWrapped("Server is offline", ImGuiColors.DalamudRed);
+                ImGui.SetCursorPosY(textPos);
+                ImGui.TextColored(ImGuiColors.DalamudRed, "Not connected to any server");
             }
+
+            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
+            ImGui.SetCursorPosY(originalY);
+            var color = UiShared.GetBoolColor(!_configuration.FullPause);
+            var connectedIcon = !_configuration.FullPause ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
+
+            ImGui.PushStyleColor(ImGuiCol.Text, color);
+            if (ImGuiComponents.IconButton(connectedIcon))
+            {
+                _configuration.FullPause = !_configuration.FullPause;
+                _configuration.Save();
+                _ = _apiController.CreateConnections();
+            }
+            ImGui.PopStyleColor();
+            UiShared.AttachToolTip(!_configuration.FullPause ? "Disconnect from " + _apiController.ServerDictionary[_configuration.ApiUri] : "Connect to " + _apiController.ServerDictionary[_configuration.ApiUri]);
         }
 
         private void DrawTransfers()
@@ -456,8 +444,8 @@ namespace MareSynchronos.UI
                 ServerState.Unauthorized => "Your account is not present on the server anymore or you are banned.",
                 ServerState.Offline => "Your selected Mare Synchronos server is currently offline.",
                 ServerState.VersionMisMatch =>
-                    "The plugin or server you are connecting to is outdated. Please update your plugin now. If you already did so, contact the server provider to update their server to the latest version.",
-                ServerState.NoAccount => "Idk how you got here but you have no account. What are you doing?",
+                    "Your plugin or the server you are connecting to is out of date. Please update your plugin now. If you already did so, contact the server provider to update their server to the latest version.",
+                ServerState.RateLimited => "You are rate limited for (re)connecting too often. Wait and try again later.",
                 ServerState.Connected => string.Empty,
                 _ => string.Empty
             };
@@ -472,7 +460,7 @@ namespace MareSynchronos.UI
                 ServerState.Unauthorized => ImGuiColors.DalamudRed,
                 ServerState.VersionMisMatch => ImGuiColors.DalamudRed,
                 ServerState.Offline => ImGuiColors.DalamudRed,
-                ServerState.NoAccount => ImGuiColors.DalamudRed,
+                ServerState.RateLimited => ImGuiColors.DalamudYellow,
                 _ => ImGuiColors.DalamudRed
             };
         }
@@ -485,7 +473,7 @@ namespace MareSynchronos.UI
                 ServerState.Unauthorized => "Unauthorized",
                 ServerState.VersionMisMatch => "Version mismatch",
                 ServerState.Offline => "Unavailable",
-                ServerState.NoAccount => "No account",
+                ServerState.RateLimited => "Rate Limited",
                 ServerState.Connected => _apiController.UID,
                 _ => string.Empty
             };

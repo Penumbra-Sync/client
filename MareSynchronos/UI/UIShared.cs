@@ -159,12 +159,11 @@ namespace MareSynchronos.UI
             var serverName = _apiController.ServerDictionary.ContainsKey(_pluginConfiguration.ApiUri)
                 ? _apiController.ServerDictionary[_pluginConfiguration.ApiUri]
                 : _pluginConfiguration.ApiUri;
-            ImGui.TextUnformatted("Service " + serverName + ":");
-            ImGui.SameLine();
-            var color = _apiController.ServerAlive ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
-            ImGui.TextColored(color, _apiController.ServerAlive ? "Available" : "Unavailable");
-            if (_apiController.ServerAlive)
+            if (_apiController.ServerState is ServerState.Connected)
             {
+                ImGui.TextUnformatted("Service " + serverName + ":");
+                ImGui.SameLine();
+                ImGui.TextColored(ImGuiColors.ParsedGreen, "Available");
                 ImGui.SameLine();
                 ImGui.TextUnformatted("(");
                 ImGui.SameLine();
@@ -350,14 +349,13 @@ namespace MareSynchronos.UI
 
                 ImGui.SetNextItemWidth(400);
                 ImGui.InputText("Enter Secret Key", ref _secretKey, 255);
-                ImGui.SameLine();
                 if (_secretKey.Length > 0 && _secretKey.Length != 64)
                 {
-                    ColorTextWrapped("Your secret key must be exactly 64 characters long. If try to enter your UID here, this is incorrect." +
-                                     " Don't enter anything but a prior acquired secret key here.", ImGuiColors.DalamudRed);
+                    ColorTextWrapped("Your secret key must be exactly 64 characters long. Don't enter your Lodestone auth here.", ImGuiColors.DalamudRed);
                 }
                 else if (_secretKey.Length == 64)
                 {
+                    ImGui.SameLine();
                     if (ImGui.Button("Save"))
                     {
                         _pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri] = _secretKey;
