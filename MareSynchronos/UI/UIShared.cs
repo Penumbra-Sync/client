@@ -169,11 +169,7 @@ namespace MareSynchronos.UI
                 ImGui.SameLine();
                 ImGui.TextColored(ImGuiColors.ParsedGreen, _apiController.OnlineUsers.ToString());
                 ImGui.SameLine();
-                ImGui.Text("Users Online,");
-                ImGui.SameLine();
-                ColorText(_apiController.SystemInfoDto.CpuUsage.ToString("0.00") + "%", GetCpuLoadColor(_apiController.SystemInfoDto.CpuUsage));
-                ImGui.SameLine();
-                ImGui.Text("Load");
+                ImGui.Text("Users Online");
                 ImGui.SameLine();
                 ImGui.Text(")");
             }
