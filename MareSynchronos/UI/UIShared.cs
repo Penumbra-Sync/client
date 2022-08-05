@@ -343,8 +343,15 @@ namespace MareSynchronos.UI
                     ColorTextWrapped("IF YOU HAVE NEVER MADE AN ACCOUNT BEFORE DO NOT ENTER ANYTHING HERE", ImGuiColors.DalamudYellow);
                 }
 
-                ImGui.SetNextItemWidth(400);
-                ImGui.InputText("Enter Secret Key", ref _secretKey, 255);
+                var text = "Enter Secret Key";
+                var buttonText = "Save";
+                var buttonWidth = _secretKey.Length != 64 ? 0 : ImGuiHelpers.GetButtonSize(buttonText).X + ImGui.GetStyle().ItemSpacing.X;
+                var textSize = ImGui.CalcTextSize(text);
+                ImGui.AlignTextToFramePadding();
+                ImGui.Text(text);
+                ImGui.SameLine();
+                ImGui.SetNextItemWidth(GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonWidth - textSize.X);
+                ImGui.InputText("", ref _secretKey, 64);
                 if (_secretKey.Length > 0 && _secretKey.Length != 64)
                 {
                     ColorTextWrapped("Your secret key must be exactly 64 characters long. Don't enter your Lodestone auth here.", ImGuiColors.DalamudRed);
@@ -352,7 +359,7 @@ namespace MareSynchronos.UI
                 else if (_secretKey.Length == 64)
                 {
                     ImGui.SameLine();
-                    if (ImGui.Button("Save"))
+                    if (ImGui.Button(buttonText))
                     {
                         _pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri] = _secretKey;
                         _pluginConfiguration.Save();

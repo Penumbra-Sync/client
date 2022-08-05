@@ -606,7 +606,5 @@ namespace MareSynchronos.UI
             _uiShared.EditTrackerPosition = false;
             base.OnClose();
         }
-
-        private string _tempNameUID = string.Empty;
     }
 }
