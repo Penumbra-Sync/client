@@ -33,7 +33,7 @@ namespace MareSynchronos.UI
             SizeConstraints = new WindowSizeConstraints()
             {
                 MinimumSize = new Vector2(800, 400),
-                MaximumSize = new Vector2(800, 2000),
+                MaximumSize = new Vector2(1000, 2000),
             };
 
             _configuration = configuration;
