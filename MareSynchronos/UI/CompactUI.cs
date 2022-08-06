@@ -301,13 +301,6 @@ namespace MareSynchronos.UI
                 ImGui.SameLine();
                 ImGui.SetCursorPosY(textPos);
                 ImGui.Text("Users Online");
-                ImGui.SameLine();
-                ImGui.SetCursorPosY(textPos);
-                UiShared.ColorText(_apiController.SystemInfoDto.CpuUsage.ToString("0.00") + "%", UiShared.GetCpuLoadColor(_apiController.SystemInfoDto.CpuUsage));
-                ImGui.SameLine();
-                ImGui.SetCursorPosY(textPos);
-                ImGui.Text("Load");
-                UiShared.AttachToolTip("This is the current servers' CPU load");
             }
             else
             {
