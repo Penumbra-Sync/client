@@ -289,27 +289,27 @@ namespace MareSynchronos.UI
 
         private void DrawServerStatus()
         {
-            var originalY = ImGui.GetCursorPosY();
             var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Link);
-            var textSize = ImGui.CalcTextSize("%");
-            var textPos = originalY + buttonSize.Y / 2 - textSize.Y / 2;
+            var userCount = _apiController.OnlineUsers.ToString();
+            var userSize = ImGui.CalcTextSize(userCount);
+            var textSize = ImGui.CalcTextSize("Users Online");
 
             if (_apiController.ServerState is ServerState.Connected)
             {
-                ImGui.SetCursorPosY(textPos);
-                ImGui.TextColored(ImGuiColors.ParsedGreen, _apiController.OnlineUsers.ToString());
+                ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X) / 2 - (userSize.X + textSize.X) / 2);
+                ImGui.AlignTextToFramePadding();
+                ImGui.TextColored(ImGuiColors.ParsedGreen, userCount);
                 ImGui.SameLine();
-                ImGui.SetCursorPosY(textPos);
+                ImGui.AlignTextToFramePadding();
                 ImGui.Text("Users Online");
             }
             else
             {
-                ImGui.SetCursorPosY(textPos);
+                ImGui.AlignTextToFramePadding();
                 ImGui.TextColored(ImGuiColors.DalamudRed, "Not connected to any server");
             }
 
             ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
-            ImGui.SetCursorPosY(originalY);
             var color = UiShared.GetBoolColor(!_configuration.FullPause);
             var connectedIcon = !_configuration.FullPause ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
 
