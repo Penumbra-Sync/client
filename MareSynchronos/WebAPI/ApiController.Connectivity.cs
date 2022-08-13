@@ -57,6 +57,7 @@ namespace MareSynchronos.WebAPI
             _dalamudUtil.LogIn += DalamudUtilOnLogIn;
             _dalamudUtil.LogOut += DalamudUtilOnLogOut;
             ServerState = ServerState.Offline;
+            _verifiedUploadedHashes = new();
 
             if (_dalamudUtil.IsLoggedIn)
             {
@@ -141,6 +142,7 @@ namespace MareSynchronos.WebAPI
             _connectionCancellationTokenSource.Cancel();
             _connectionCancellationTokenSource = new CancellationTokenSource();
             var token = _connectionCancellationTokenSource.Token;
+            _verifiedUploadedHashes.Clear();
             while (ServerState is not ServerState.Connected && !token.IsCancellationRequested)
             {
                 if (string.IsNullOrEmpty(SecretKey))

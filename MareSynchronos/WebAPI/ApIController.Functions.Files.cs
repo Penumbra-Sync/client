@@ -19,6 +19,8 @@ namespace MareSynchronos.WebAPI
 {
     public partial class ApiController
     {
+        private readonly HashSet<string> _verifiedUploadedHashes;
+
         private int _downloadId = 0;
         public void CancelUpload()
         {
@@ -149,71 +151,93 @@ namespace MareSynchronos.WebAPI
             var uploadToken = _uploadCancellationTokenSource.Token;
             Logger.Verbose("New Token Created");
 
-            var filesToUpload = await _mareHub!.InvokeAsync<List<UploadFileDto>>(Api.InvokeFileSendFiles, character.FileReplacements.SelectMany(c => c.Value.Select(v => v.Hash)).Distinct(), uploadToken);
-
-            foreach (var file in filesToUpload.Where(f => !f.IsForbidden))
+            List<string> unverifiedUploadHashes = new();
+            foreach (var item in character.FileReplacements.SelectMany(c => c.Value.Select(v => v.Hash).Distinct()).Distinct().ToList())
             {
-                await using var db = new FileCacheContext();
-                try
+                if (!_verifiedUploadedHashes.Contains(item))
                 {
-                    CurrentUploads.Add(new UploadFileTransfer(file)
-                    {
-                        Total = new FileInfo(db.FileCaches.FirstOrDefault(f => f.Hash.ToLower() == file.Hash.ToLower())
-                            ?.Filepath ?? string.Empty).Length
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn("Tried to request file " + file.Hash + " but file was not present");
-                    Logger.Warn(ex.StackTrace!);
+                    unverifiedUploadHashes.Add(item);
                 }
             }
 
-            await using (var db = new FileCacheContext())
+            if (unverifiedUploadHashes.Any())
             {
-                foreach (var file in filesToUpload.Where(c => c.IsForbidden))
+                Logger.Debug("Verifying " + unverifiedUploadHashes.Count + " files");
+                var filesToUpload = await _mareHub!.InvokeAsync<List<UploadFileDto>>(Api.InvokeFileSendFiles, unverifiedUploadHashes, uploadToken);
+
+                foreach (var file in filesToUpload.Where(f => !f.IsForbidden))
                 {
-                    if (ForbiddenTransfers.All(f => f.Hash != file.Hash))
+                    await using var db = new FileCacheContext();
+                    try
                     {
-                        ForbiddenTransfers.Add(new UploadFileTransfer(file)
+                        CurrentUploads.Add(new UploadFileTransfer(file)
                         {
-                            LocalFile = db.FileCaches.FirstOrDefault(f => f.Hash == file.Hash)?.Filepath ?? string.Empty
+                            Total = new FileInfo(db.FileCaches.FirstOrDefault(f => f.Hash.ToLower() == file.Hash.ToLower())
+                                ?.Filepath ?? string.Empty).Length
                         });
                     }
+                    catch (Exception ex)
+                    {
+                        Logger.Warn("Tried to request file " + file.Hash + " but file was not present");
+                        Logger.Warn(ex.StackTrace!);
+                    }
                 }
-            }
 
-            var totalSize = CurrentUploads.Sum(c => c.Total);
-            Logger.Debug("Compressing and uploading files");
-            foreach (var file in CurrentUploads.Where(f => f.CanBeTransferred && !f.IsTransferred).ToList())
-            {
-                Logger.Debug("Compressing and uploading " + file);
-                var data = await GetCompressedFileData(file.Hash, uploadToken);
-                CurrentUploads.Single(e => e.Hash == data.Item1).Total = data.Item2.Length;
-                await UploadFile(data.Item2, file.Hash, uploadToken);
-                if (!uploadToken.IsCancellationRequested) continue;
-                Logger.Warn("Cancel in filesToUpload loop detected");
+                await using (var db = new FileCacheContext())
+                {
+                    foreach (var file in filesToUpload.Where(c => c.IsForbidden))
+                    {
+                        if (ForbiddenTransfers.All(f => f.Hash != file.Hash))
+                        {
+                            ForbiddenTransfers.Add(new UploadFileTransfer(file)
+                            {
+                                LocalFile = db.FileCaches.FirstOrDefault(f => f.Hash == file.Hash)?.Filepath ?? string.Empty
+                            });
+                        }
+                    }
+                }
+
+                var totalSize = CurrentUploads.Sum(c => c.Total);
+                Logger.Debug("Compressing and uploading files");
+                foreach (var file in CurrentUploads.Where(f => f.CanBeTransferred && !f.IsTransferred).ToList())
+                {
+                    Logger.Debug("Compressing and uploading " + file);
+                    var data = await GetCompressedFileData(file.Hash, uploadToken);
+                    CurrentUploads.Single(e => e.Hash == data.Item1).Total = data.Item2.Length;
+                    await UploadFile(data.Item2, file.Hash, uploadToken);
+                    if (!uploadToken.IsCancellationRequested) continue;
+                    Logger.Warn("Cancel in filesToUpload loop detected");
+                    CurrentUploads.Clear();
+                    break;
+                }
+
+                if (CurrentUploads.Any())
+                {
+                    var compressedSize = CurrentUploads.Sum(c => c.Total);
+                    Logger.Debug($"Compressed {totalSize} to {compressedSize} ({(compressedSize / (double)totalSize):P2})");
+                }
+
+                Logger.Debug("Upload tasks complete, waiting for server to confirm");
+                var anyUploadsOpen = await _mareHub!.InvokeAsync<bool>(Api.InvokeFileIsUploadFinished, uploadToken);
+                Logger.Debug("Uploads open: " + anyUploadsOpen);
+                while (anyUploadsOpen && !uploadToken.IsCancellationRequested)
+                {
+                    anyUploadsOpen = await _mareHub!.InvokeAsync<bool>(Api.InvokeFileIsUploadFinished, uploadToken);
+                    await Task.Delay(TimeSpan.FromSeconds(0.5), uploadToken);
+                    Logger.Debug("Waiting for uploads to finish");
+                }
+
+                foreach (var item in unverifiedUploadHashes)
+                {
+                    _verifiedUploadedHashes.Add(item);
+                }
+
                 CurrentUploads.Clear();
-                break;
             }
-
-            if (CurrentUploads.Any())
+            else
             {
-                var compressedSize = CurrentUploads.Sum(c => c.Total);
-                Logger.Debug($"Compressed {totalSize} to {compressedSize} ({(compressedSize / (double)totalSize):P2})");
+                Logger.Debug("All files already verified");
             }
-
-            Logger.Debug("Upload tasks complete, waiting for server to confirm");
-            var anyUploadsOpen = await _mareHub!.InvokeAsync<bool>(Api.InvokeFileIsUploadFinished, uploadToken);
-            Logger.Debug("Uploads open: " + anyUploadsOpen);
-            while (anyUploadsOpen && !uploadToken.IsCancellationRequested)
-            {
-                anyUploadsOpen = await _mareHub!.InvokeAsync<bool>(Api.InvokeFileIsUploadFinished, uploadToken);
-                await Task.Delay(TimeSpan.FromSeconds(0.5), uploadToken);
-                Logger.Debug("Waiting for uploads to finish");
-            }
-
-            CurrentUploads.Clear();
 
             if (!uploadToken.IsCancellationRequested)
             {
