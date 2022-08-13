@@ -31,6 +31,7 @@ namespace MareSynchronos.Managers
         private readonly ICallGateSubscriber<string, string[]>? _reverseResolvePlayer;
         private readonly ICallGateSubscriber<string, string, Dictionary<string, string>, string, int, int>
             _penumbraSetTemporaryMod;
+        private readonly ICallGateSubscriber<string, string, string> _penumbraPlayerPathResolved;
         private readonly DalamudUtil _dalamudUtil;
 
         public IpcManager(DalamudPluginInterface pi, DalamudUtil dalamudUtil)
@@ -55,7 +56,9 @@ namespace MareSynchronos.Managers
             _glamourerApplyOnlyCustomization = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyOnlyCustomizationToCharacter");
             _glamourerApplyOnlyEquipment = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyOnlyEquipmentToCharacter");
             _glamourerRevertCustomization = pi.GetIpcSubscriber<GameObject?, object>("Glamourer.RevertCharacter");
+            _penumbraPlayerPathResolved = pi.GetIpcSubscriber<string, string, string>("Penumbra.PlayerFileResourceResolved");
 
+            _penumbraPlayerPathResolved.Subscribe(PlayerPathResolved);
             _penumbraObjectIsRedrawn.Subscribe(RedrawEvent);
             _penumbraInit.Subscribe(PenumbraInit);
             _penumbraDispose.Subscribe(PenumbraDispose);
@@ -76,6 +79,11 @@ namespace MareSynchronos.Managers
             }
 
             this._dalamudUtil = dalamudUtil;
+        }
+
+        private void PlayerPathResolved(string arg1, string arg2)
+        {
+            Logger.Debug($"Resolved {arg1} => {arg2}");
         }
 
         public event VoidDelegate? PenumbraInitialized;

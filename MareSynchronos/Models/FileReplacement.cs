@@ -32,7 +32,7 @@ namespace MareSynchronos.Models
         
         public void SetResolvedPath(string path)
         {
-            ResolvedPath = path.ToLower().Replace('/', '\\').Replace(_penumbraDirectory, "").Replace('\\', '/');
+            ResolvedPath = path.ToLowerInvariant().Replace('/', '\\').Replace(_penumbraDirectory, "").Replace('\\', '/');
             if (!HasFileReplacement) return;
 
             _ = Task.Run(() =>
@@ -40,7 +40,7 @@ namespace MareSynchronos.Models
                 FileCache? fileCache;
                 using (FileCacheContext db = new())
                 {
-                    fileCache = db.FileCaches.FirstOrDefault(f => f.Filepath == path.ToLower());
+                    fileCache = db.FileCaches.FirstOrDefault(f => f.Filepath == path.ToLowerInvariant());
                 }
 
                 if (fileCache != null)
@@ -54,7 +54,7 @@ namespace MareSynchronos.Models
                     {
                         Hash = ComputeHash(fi);
                         using var db = new FileCacheContext();
-                        var newTempCache = db.FileCaches.Single(f => f.Filepath == path.ToLower());
+                        var newTempCache = db.FileCaches.Single(f => f.Filepath == path.ToLowerInvariant());
                         newTempCache.Hash = Hash;
                         db.Update(newTempCache);
                         db.SaveChanges();
@@ -88,7 +88,7 @@ namespace MareSynchronos.Models
             string hash = Crypto.GetFileHash(fi.FullName);
 
             using FileCacheContext db = new();
-            var fileAddedDuringCompute = db.FileCaches.FirstOrDefault(f => f.Filepath == fi.FullName.ToLower());
+            var fileAddedDuringCompute = db.FileCaches.FirstOrDefault(f => f.Filepath == fi.FullName.ToLowerInvariant());
             if (fileAddedDuringCompute != null) return fileAddedDuringCompute.Hash;
 
             try
@@ -96,7 +96,7 @@ namespace MareSynchronos.Models
                 db.Add(new FileCache()
                 {
                     Hash = hash,
-                    Filepath = fi.FullName.ToLower(),
+                    Filepath = fi.FullName.ToLowerInvariant(),
                     LastModifiedDate = fi.LastWriteTimeUtc.Ticks.ToString()
                 });
                 db.SaveChanges();

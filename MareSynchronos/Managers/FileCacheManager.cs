@@ -64,7 +64,7 @@ namespace MareSynchronos.Managers
             var sha1Hash = Crypto.GetFileHash(fileInfo.FullName);
             return new FileCache()
             {
-                Filepath = fileInfo.FullName.ToLower(),
+                Filepath = fileInfo.FullName.ToLowerInvariant(),
                 Hash = sha1Hash,
                 LastModifiedDate = fileInfo.LastWriteTimeUtc.Ticks.ToString(),
             };
@@ -203,7 +203,7 @@ namespace MareSynchronos.Managers
                     {
                         PluginLog.Verbose("Removed: " + item);
 
-                        db.RemoveRange(db.FileCaches.Where(f => f.Filepath.ToLower() == item.ToLower()));
+                        db.RemoveRange(db.FileCaches.Where(f => f.Filepath.ToLowerInvariant() == item.ToLowerInvariant()));
                     }
                     else
                     {
@@ -211,7 +211,7 @@ namespace MareSynchronos.Managers
                         var fileCache = Create(item, _rescanTaskCancellationTokenSource.Token);
                         if (fileCache != null)
                         {
-                            db.RemoveRange(db.FileCaches.Where(f => f.Filepath.ToLower() == fileCache.Filepath.ToLower()));
+                            db.RemoveRange(db.FileCaches.Where(f => f.Filepath.ToLowerInvariant() == fileCache.Filepath.ToLowerInvariant()));
                             await db.AddAsync(fileCache, _rescanTaskCancellationTokenSource.Token);
                         }
                     }
@@ -316,7 +316,7 @@ namespace MareSynchronos.Managers
                     foreach (var deletion in fileCachesToDelete)
                     {
                         var entries = db.FileCaches.Where(f =>
-                            f.Hash == deletion.Hash && f.Filepath.ToLower() == deletion.Filepath.ToLower());
+                            f.Hash == deletion.Hash && f.Filepath.ToLowerInvariant() == deletion.Filepath.ToLowerInvariant());
                         if (await entries.AnyAsync(ct))
                         {
                             Logger.Verbose("Removing file from DB: " + deletion.Filepath);
