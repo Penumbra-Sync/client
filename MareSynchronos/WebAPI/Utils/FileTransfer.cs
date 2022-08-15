@@ -1,4 +1,5 @@
 ﻿using MareSynchronos.API;
+using System;
 
 namespace MareSynchronos.WebAPI.Utils;
 
@@ -37,7 +38,7 @@ public class DownloadFileTransfer : FileTransfer
 {
     private DownloadFileDto Dto => (DownloadFileDto)TransferDto;
     public DownloadFileTransfer(DownloadFileDto dto) : base(dto) { }
-
+    public Uri DownloadUri => new(Dto.Url);
     public override long Total
     {
         set { }
