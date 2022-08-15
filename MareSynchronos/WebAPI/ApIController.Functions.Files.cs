@@ -38,7 +38,7 @@ namespace MareSynchronos.WebAPI
             await _mareHub!.SendAsync(Api.SendFileDeleteAllFiles);
         }
 
-        private async Task<string> DownloadFile(int downloadId, string hash, CancellationToken ct)
+        private async Task<string> DownloadFile(int downloadId, string hash, Uri downloadUri, CancellationToken ct)
         {
             using WebClient wc = new();
             wc.Headers.Add("Authorization", SecretKey);
@@ -58,11 +58,8 @@ namespace MareSynchronos.WebAPI
             wc.DownloadProgressChanged += progChanged;
 
             string fileName = Path.GetTempFileName();
-            var baseUri = new Uri(Regex.Replace(ApiUri, "^ws", "http"), UriKind.Absolute);
-            var relativeUri = new Uri("cache/" + hash, UriKind.Relative);
-            var fileUri = new Uri(baseUri, relativeUri);
 
-            await wc.DownloadFileTaskAsync(fileUri, fileName);
+            await wc.DownloadFileTaskAsync(downloadUri, fileName);
 
             CurrentDownloads[downloadId].Single(f => f.Hash == hash).Transferred = CurrentDownloads[downloadId].Single(f => f.Hash == hash).Total;
 
@@ -96,7 +93,7 @@ namespace MareSynchronos.WebAPI
             foreach (var file in CurrentDownloads[currentDownloadId].Where(f => f.CanBeTransferred))
             {
                 var hash = file.Hash;
-                var tempFile = await DownloadFile(currentDownloadId, hash, ct);
+                var tempFile = await DownloadFile(currentDownloadId, file.Hash, file.DownloadUri, ct);
                 if (ct.IsCancellationRequested)
                 {
                     File.Delete(tempFile);
