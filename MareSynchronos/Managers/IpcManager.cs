@@ -9,6 +9,7 @@ using MareSynchronos.WebAPI;
 namespace MareSynchronos.Managers
 {
     public delegate void PenumbraRedrawEvent(IntPtr address, int objTblIdx);
+    public delegate void PenumbraResourceLoadEvent(IntPtr drawObject, string gamePath, string filePath);
     public class IpcManager : IDisposable
     {
         private readonly ICallGateSubscriber<int> _glamourerApiVersion;
@@ -31,7 +32,7 @@ namespace MareSynchronos.Managers
         private readonly ICallGateSubscriber<string, string[]>? _reverseResolvePlayer;
         private readonly ICallGateSubscriber<string, string, Dictionary<string, string>, string, int, int>
             _penumbraSetTemporaryMod;
-        private readonly ICallGateSubscriber<string, string, string> _penumbraPlayerPathResolved;
+        private readonly ICallGateSubscriber<IntPtr, string, string, string> _penumbraResourceLoaded;
         private readonly DalamudUtil _dalamudUtil;
 
         public IpcManager(DalamudPluginInterface pi, DalamudUtil dalamudUtil)
@@ -56,9 +57,9 @@ namespace MareSynchronos.Managers
             _glamourerApplyOnlyCustomization = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyOnlyCustomizationToCharacter");
             _glamourerApplyOnlyEquipment = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyOnlyEquipmentToCharacter");
             _glamourerRevertCustomization = pi.GetIpcSubscriber<GameObject?, object>("Glamourer.RevertCharacter");
-            _penumbraPlayerPathResolved = pi.GetIpcSubscriber<string, string, string>("Penumbra.PlayerFileResourceResolved");
+            _penumbraResourceLoaded = pi.GetIpcSubscriber<IntPtr, string, string, string>("Penumbra.ResourceLoaded");
 
-            _penumbraPlayerPathResolved.Subscribe(PlayerPathResolved);
+            _penumbraResourceLoaded.Subscribe(ResourceLoaded);
             _penumbraObjectIsRedrawn.Subscribe(RedrawEvent);
             _penumbraInit.Subscribe(PenumbraInit);
             _penumbraDispose.Subscribe(PenumbraDispose);
@@ -81,14 +82,19 @@ namespace MareSynchronos.Managers
             this._dalamudUtil = dalamudUtil;
         }
 
-        private void PlayerPathResolved(string arg1, string arg2)
+        private void ResourceLoaded(IntPtr ptr, string arg1, string arg2)
         {
-            Logger.Debug($"Resolved {arg1} => {arg2}");
+            if (ptr != IntPtr.Zero && string.Compare(arg1, arg2, true, System.Globalization.CultureInfo.InvariantCulture) != 0)
+            {
+                PenumbraResourceLoadEvent?.Invoke(ptr, arg1, arg2);
+                //Logger.Debug($"Resolved {ptr:X}: {arg1} => {arg2}");
+            }
         }
 
         public event VoidDelegate? PenumbraInitialized;
         public event VoidDelegate? PenumbraDisposed;
         public event PenumbraRedrawEvent? PenumbraRedrawEvent;
+        public event PenumbraResourceLoadEvent? PenumbraResourceLoadEvent;
 
         public bool Initialized => CheckPenumbraApi();
         public bool CheckGlamourerApi()
@@ -122,6 +128,7 @@ namespace MareSynchronos.Managers
             _penumbraDispose.Unsubscribe(PenumbraDispose);
             _penumbraInit.Unsubscribe(PenumbraInit);
             _penumbraObjectIsRedrawn.Unsubscribe(RedrawEvent);
+            _penumbraResourceLoaded.Unsubscribe(ResourceLoaded);
         }
 
         public void GlamourerApplyAll(string? customization, IntPtr obj)

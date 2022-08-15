@@ -53,7 +53,7 @@ namespace MareSynchronos.Models
                 if (addr || equip || drawObj || nameChange)
                 {
                     _name = name;
-                    Logger.Verbose(ObjectKind + " Changed: " + _name + ", now: " + curPtr + ", " + (IntPtr)chara->GameObject.DrawObject);
+                    Logger.Verbose($"{ObjectKind} changed: {_name}, now: {curPtr:X}, {(IntPtr)chara->GameObject.DrawObject:X}");
 
                     Address = curPtr;
                     DrawObjectAddress = (IntPtr)chara->GameObject.DrawObject;

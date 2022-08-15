@@ -22,13 +22,15 @@ public class CharacterDataFactory
 {
     private readonly DalamudUtil _dalamudUtil;
     private readonly IpcManager _ipcManager;
+    private readonly TransientResourceManager transientResourceManager;
 
-    public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager)
+    public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager, TransientResourceManager transientResourceManager)
     {
         Logger.Verbose("Creating " + nameof(CharacterDataFactory));
 
         _dalamudUtil = dalamudUtil;
         _ipcManager = ipcManager;
+        this.transientResourceManager = transientResourceManager;
     }
 
     public CharacterData BuildCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr playerPointer, CancellationToken token)
@@ -167,6 +169,26 @@ public class CharacterDataFactory
         }
     }
 
+    private void AddReplacement(string varPath, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0)
+    {
+        if (varPath.IsNullOrEmpty()) return;
+
+        //Logger.Verbose("Adding File Replacement for Texture " + texPath);
+
+        if (cache.FileReplacements.ContainsKey(objectKind))
+        {
+            if (cache.FileReplacements[objectKind].Any(c => c.GamePaths.Contains(varPath)))
+            {
+                return;
+            }
+        }
+
+        var variousReplacement = CreateFileReplacement(varPath, false);
+        DebugPrint(variousReplacement, objectKind, "Various", inheritanceLevel);
+
+        cache.AddFileReplacement(objectKind, variousReplacement);
+    }
+
     private void AddReplacementsFromTexture(string texPath, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0, bool doNotReverseResolve = true)
     {
         if (texPath.IsNullOrEmpty()) return;
@@ -233,6 +255,11 @@ public class CharacterDataFactory
             AddReplacementsFromRenderModel(mdl, objectKind, previousData, 0);
         }
 
+        foreach (var item in previousData.FileReplacements[objectKind])
+        {
+            transientResourceManager.RemoveTransientResource((IntPtr)human, item);
+        }
+
         if (objectKind == ObjectKind.Player)
         {
             var weaponObject = (Weapon*)((Object*)human)->ChildObject;
@@ -243,11 +270,33 @@ public class CharacterDataFactory
 
                 AddReplacementsFromRenderModel(mainHandWeapon, objectKind, previousData, 0);
 
+                foreach (var item in previousData.FileReplacements[objectKind])
+                {
+                    transientResourceManager.RemoveTransientResource((IntPtr)weaponObject, item);
+                }
+
+                foreach (var item in transientResourceManager.GetTransientResources((IntPtr)weaponObject))
+                {
+                    Logger.Verbose("Found transient weapon resource: " + item);
+                    AddReplacementsFromTexture(item, objectKind, previousData, 0, false);
+                }
+
                 if (weaponObject->NextSibling != (IntPtr)weaponObject)
                 {
                     var offHandWeapon = ((Weapon*)weaponObject->NextSibling)->WeaponRenderModel->RenderModel;
 
                     AddReplacementsFromRenderModel(offHandWeapon, objectKind, previousData, 1);
+
+                    foreach (var item in previousData.FileReplacements[objectKind])
+                    {
+                        transientResourceManager.RemoveTransientResource((IntPtr)offHandWeapon, item);
+                    }
+
+                    foreach (var item in transientResourceManager.GetTransientResources((IntPtr)weaponObject))
+                    {
+                        Logger.Verbose("Found transient offhand weapon resource: " + item);
+                        AddReplacement(item, objectKind, previousData, 1);
+                    }
                 }
             }
 
@@ -268,11 +317,21 @@ public class CharacterDataFactory
             {
                 Logger.Warn("Could not get Legacy Body Decal Data");
             }
+
+            foreach (var item in previousData.FileReplacements[objectKind])
+            {
+                transientResourceManager.RemoveTransientResource((IntPtr)human, item);
+            }
+        }
+
+        foreach (var item in transientResourceManager.GetTransientResources((IntPtr)human))
+        {
+            Logger.Verbose("Found transient resource: " + item);
+            AddReplacement(item, objectKind, previousData, 1);
         }
 
         st.Stop();
         Logger.Verbose("Building " + objectKind + " Data took " + st.Elapsed);
-
         return previousData;
     }
 
@@ -281,8 +340,6 @@ public class CharacterDataFactory
         string raceSexIdString = raceSexId.ToString("0000");
 
         string skeletonPath = $"chara/human/c{raceSexIdString}/skeleton/base/b0001/skl_c{raceSexIdString}b0001.sklb";
-
-        //Logger.Verbose("Adding File Replacement for Skeleton " + skeletonPath);
 
         var replacement = CreateFileReplacement(skeletonPath, true);
         cache.AddFileReplacement(objectKind, replacement);

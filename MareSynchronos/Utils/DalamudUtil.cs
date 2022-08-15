@@ -28,6 +28,19 @@ namespace MareSynchronos.Utils
         public event LogOut? LogOut;
         public event FrameworkUpdate? FrameworkUpdate;
 
+        public unsafe bool IsDrawObjectPresent(IntPtr key)
+        {
+            foreach (var obj in _objectTable)
+            {
+                if ((IntPtr)((GameObject*)obj.Address)->GetDrawObject() == key)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public DalamudUtil(ClientState clientState, ObjectTable objectTable, Framework framework)
         {
             _clientState = clientState;

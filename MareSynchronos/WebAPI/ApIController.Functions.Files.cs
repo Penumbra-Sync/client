@@ -172,7 +172,7 @@ namespace MareSynchronos.WebAPI
                     {
                         CurrentUploads.Add(new UploadFileTransfer(file)
                         {
-                            Total = new FileInfo(db.FileCaches.FirstOrDefault(f => f.Hash.ToLowerInvariant() == file.Hash.ToLowerInvariant())
+                            Total = new FileInfo(db.FileCaches.FirstOrDefault(f => f.Hash.ToLower() == file.Hash.ToLower())
                                 ?.Filepath ?? string.Empty).Length
                         });
                     }

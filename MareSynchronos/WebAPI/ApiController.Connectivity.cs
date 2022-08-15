@@ -128,16 +128,16 @@ namespace MareSynchronos.WebAPI
 
         public async Task CreateConnections()
         {
+            Logger.Info("Recreating Connection");
+
+            await StopConnection(_connectionCancellationTokenSource.Token);
+
             if (_pluginConfiguration.FullPause)
             {
                 ServerState = ServerState.Disconnected;
                 _connectionDto = null;
                 return;
             }
-
-            Logger.Info("Recreating Connection");
-
-            await StopConnection(_connectionCancellationTokenSource.Token);
 
             _connectionCancellationTokenSource.Cancel();
             _connectionCancellationTokenSource = new CancellationTokenSource();
@@ -329,6 +329,7 @@ namespace MareSynchronos.WebAPI
         {
             if (_mareHub is not null)
             {
+                _uploadCancellationTokenSource?.Cancel();
                 Logger.Info("Stopping existing connection");
                 await _mareHub.StopAsync(token);
                 _mareHub.Closed -= MareHubOnClosed;

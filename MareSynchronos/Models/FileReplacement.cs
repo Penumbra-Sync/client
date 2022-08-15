@@ -27,9 +27,9 @@ namespace MareSynchronos.Models
         public bool HasFileReplacement => GamePaths.Count >= 1 && GamePaths.Any(p => p != ResolvedPath);
 
         public string Hash { get; set; } = string.Empty;
-        
+
         public string ResolvedPath { get; set; } = string.Empty;
-        
+
         public void SetResolvedPath(string path)
         {
             ResolvedPath = path.ToLowerInvariant().Replace('/', '\\').Replace(_penumbraDirectory, "").Replace('\\', '/');
@@ -93,6 +93,7 @@ namespace MareSynchronos.Models
 
             try
             {
+                Logger.Debug("Adding new file to DB: " + fi.FullName + ", " + hash);
                 db.Add(new FileCache()
                 {
                     Hash = hash,

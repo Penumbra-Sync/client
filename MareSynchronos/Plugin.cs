@@ -30,6 +30,7 @@ namespace MareSynchronos
         private readonly SettingsUi _settingsUi;
         private readonly WindowSystem _windowSystem;
         private PlayerManager? _playerManager;
+        private TransientResourceManager? _transientResourceManager;
         private readonly DalamudUtil _dalamudUtil;
         private OnlinePlayerManager? _characterCacheManager;
         private readonly DownloadUi _downloadUi;
@@ -129,6 +130,7 @@ namespace MareSynchronos
             _ipcManager?.Dispose();
             _playerManager?.Dispose();
             _characterCacheManager?.Dispose();
+            _transientResourceManager?.Dispose();
             Logger.Debug("Shut down");
         }
 
@@ -160,6 +162,7 @@ namespace MareSynchronos
             Logger.Debug("Client logout");
             _characterCacheManager?.Dispose();
             _playerManager?.Dispose();
+            _transientResourceManager?.Dispose();
             PluginInterface.UiBuilder.Draw -= Draw;
             PluginInterface.UiBuilder.OpenConfigUi -= OpenUi;
             _commandManager.RemoveHandler(CommandName);
@@ -169,6 +172,7 @@ namespace MareSynchronos
         {
             _characterCacheManager?.Dispose();
             _playerManager?.Dispose();
+            _transientResourceManager?.Dispose();
 
             Task.Run(WaitForPlayerAndLaunchCharacterManager);
         }
@@ -182,10 +186,11 @@ namespace MareSynchronos
 
             try
             {
+                _transientResourceManager = new TransientResourceManager(_ipcManager, _dalamudUtil);
                 var characterCacheFactory =
-                    new CharacterDataFactory(_dalamudUtil, _ipcManager);
+                    new CharacterDataFactory(_dalamudUtil, _ipcManager, _transientResourceManager);
                 _playerManager = new PlayerManager(_apiController, _ipcManager,
-                    characterCacheFactory, _dalamudUtil);
+                    characterCacheFactory, _dalamudUtil, _transientResourceManager);
                 _characterCacheManager = new OnlinePlayerManager(_framework,
                     _apiController, _dalamudUtil, _ipcManager, _playerManager);
             }

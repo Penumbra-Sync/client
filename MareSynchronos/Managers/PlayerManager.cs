@@ -21,6 +21,7 @@ namespace MareSynchronos.Managers
         private readonly ApiController _apiController;
         private readonly CharacterDataFactory _characterDataFactory;
         private readonly DalamudUtil _dalamudUtil;
+        private readonly TransientResourceManager _transientResourceManager;
         private readonly IpcManager _ipcManager;
         public event PlayerHasChanged? PlayerHasChanged;
         public CharacterCacheDto? LastCreatedCharacterData { get; private set; }
@@ -34,7 +35,7 @@ namespace MareSynchronos.Managers
         private List<PlayerRelatedObject> playerRelatedObjects = new List<PlayerRelatedObject>();
 
         public unsafe PlayerManager(ApiController apiController, IpcManager ipcManager,
-            CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil)
+            CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil, TransientResourceManager transientResourceManager)
         {
             Logger.Verbose("Creating " + nameof(PlayerManager));
 
@@ -42,10 +43,11 @@ namespace MareSynchronos.Managers
             _ipcManager = ipcManager;
             _characterDataFactory = characterDataFactory;
             _dalamudUtil = dalamudUtil;
-
+            _transientResourceManager = transientResourceManager;
             _apiController.Connected += ApiControllerOnConnected;
             _apiController.Disconnected += ApiController_Disconnected;
             _dalamudUtil.FrameworkUpdate += DalamudUtilOnFrameworkUpdate;
+            _transientResourceManager.TransientResourceLoaded += HandleTransientResourceLoad;
 
             Logger.Debug("Watching Player, ApiController is Connected: " + _apiController.IsConnected);
             if (_apiController.IsConnected)
@@ -63,6 +65,19 @@ namespace MareSynchronos.Managers
             };
         }
 
+        public void HandleTransientResourceLoad(IntPtr drawObj)
+        {
+            foreach (var obj in playerRelatedObjects)
+            {
+                if (obj.DrawObjectAddress == drawObj && !obj.HasUnprocessedUpdate)
+                {
+                    obj.HasUnprocessedUpdate = true;
+                    OnPlayerOrAttachedObjectsChanged();
+                    return;
+                }
+            }
+        }
+
         public void Dispose()
         {
             Logger.Verbose("Disposing " + nameof(PlayerManager));
@@ -72,13 +87,17 @@ namespace MareSynchronos.Managers
 
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
             _dalamudUtil.FrameworkUpdate -= DalamudUtilOnFrameworkUpdate;
+
+            _transientResourceManager.TransientResourceLoaded -= HandleTransientResourceLoad;
+
+            _playerChangedCts?.Cancel();
         }
 
         private unsafe void DalamudUtilOnFrameworkUpdate()
         {
-            if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized) return;
+            //if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized) return;
 
-            if (DateTime.Now < _lastPlayerObjectCheck.AddSeconds(0.25)) return;
+            //if (DateTime.Now < _lastPlayerObjectCheck.AddSeconds(0.25)) return;
 
             playerRelatedObjects.ForEach(k => k.CheckAndUpdateObject());
             if (playerRelatedObjects.Any(c => c.HasUnprocessedUpdate && !c.IsProcessing))
@@ -86,7 +105,7 @@ namespace MareSynchronos.Managers
                 OnPlayerOrAttachedObjectsChanged();
             }
 
-            _lastPlayerObjectCheck = DateTime.Now;
+            //_lastPlayerObjectCheck = DateTime.Now;
         }
 
         private void ApiControllerOnConnected()
@@ -119,6 +138,7 @@ namespace MareSynchronos.Managers
 
             while (!PermanentDataCache.IsReady && !token.IsCancellationRequested)
             {
+                Logger.Verbose("Waiting until cache is ready");
                 await Task.Delay(50, token);
             }
 

@@ -203,7 +203,7 @@ namespace MareSynchronos.Managers
                     {
                         PluginLog.Verbose("Removed: " + item);
 
-                        db.RemoveRange(db.FileCaches.Where(f => f.Filepath.ToLowerInvariant() == item.ToLowerInvariant()));
+                        db.RemoveRange(db.FileCaches.Where(f => f.Filepath.ToLower() == item.ToLowerInvariant()));
                     }
                     else
                     {
@@ -211,7 +211,7 @@ namespace MareSynchronos.Managers
                         var fileCache = Create(item, _rescanTaskCancellationTokenSource.Token);
                         if (fileCache != null)
                         {
-                            db.RemoveRange(db.FileCaches.Where(f => f.Filepath.ToLowerInvariant() == fileCache.Filepath.ToLowerInvariant()));
+                            db.RemoveRange(db.FileCaches.Where(f => f.Filepath.ToLower() == fileCache.Filepath.ToLowerInvariant()));
                             await db.AddAsync(fileCache, _rescanTaskCancellationTokenSource.Token);
                         }
                     }
