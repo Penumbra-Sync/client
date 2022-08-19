@@ -13,6 +13,7 @@ using MareSynchronos.WebAPI;
 using Dalamud.Interface.Windowing;
 using MareSynchronos.UI;
 using MareSynchronos.Utils;
+using System.Runtime.InteropServices;
 
 namespace MareSynchronos
 {
