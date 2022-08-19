@@ -74,10 +74,7 @@ namespace MareSynchronos.WebAPI
             Logger.Debug("Downloading files (Download ID " + currentDownloadId + ")");
 
             List<DownloadFileDto> downloadFileInfoFromService = new List<DownloadFileDto>();
-            foreach (var file in fileReplacementDto)
-            {
-                downloadFileInfoFromService.Add(await _mareHub!.InvokeAsync<DownloadFileDto>(Api.InvokeFileGetFileSize, file.Hash, ct));
-            }
+            downloadFileInfoFromService.AddRange(await _mareHub!.InvokeAsync<List<DownloadFileDto>>(Api.InvokeGetFilesSizes, fileReplacementDto.Select(m => m.Hash).ToList(), ct));
 
             CurrentDownloads[currentDownloadId] = downloadFileInfoFromService.Distinct().Select(d => new DownloadFileTransfer(d))
                 .Where(d => d.CanBeTransferred).ToList();
