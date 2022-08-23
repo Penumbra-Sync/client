@@ -169,7 +169,7 @@ public class CharacterDataFactory
 
     private void AddReplacementsFromTexture(string texPath, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0, bool doNotReverseResolve = true)
     {
-        if (texPath.IsNullOrEmpty()) return;
+        if (string.IsNullOrEmpty(texPath)) return;
 
         //Logger.Verbose("Adding File Replacement for Texture " + texPath);
 

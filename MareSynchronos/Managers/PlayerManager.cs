@@ -29,7 +29,6 @@ namespace MareSynchronos.Managers
 
         private CancellationTokenSource? _playerChangedCts = new();
         private DateTime _lastPlayerObjectCheck;
-        private CharacterEquipment? _currentCharacterEquipment = new();
 
         private List<PlayerRelatedObject> playerRelatedObjects = new List<PlayerRelatedObject>();
 

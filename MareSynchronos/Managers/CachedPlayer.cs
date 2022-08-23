@@ -9,9 +9,9 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using MareSynchronos.API;
 using MareSynchronos.FileCacheDB;
 using MareSynchronos.Interop;
+using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using Penumbra.GameData.Structs;
 
 namespace MareSynchronos.Managers;
 
@@ -59,7 +59,7 @@ public class CachedPlayer
 
     private CharacterCacheDto _cachedData = new();
 
-    private CharacterEquipment? _currentCharacterEquipment;
+    private PlayerRelatedObject? _currentCharacterEquipment;
 
     public void ApplyCharacterData(CharacterCacheDto characterData)
     {
@@ -363,7 +363,8 @@ public class CachedPlayer
         _dalamudUtil.FrameworkUpdate += DalamudUtilOnFrameworkUpdate;
         _ipcManager.PenumbraRedrawEvent += IpcManagerOnPenumbraRedrawEvent;
         _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
-        _currentCharacterEquipment = new CharacterEquipment(PlayerCharacter);
+        _currentCharacterEquipment = new PlayerRelatedObject(ObjectKind.Player, IntPtr.Zero, IntPtr.Zero,
+            () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName)?.Address ?? IntPtr.Zero);
         _isDisposed = false;
         if (cache != null)
         {
@@ -382,7 +383,8 @@ public class CachedPlayer
             return;
         }
 
-        if (!_currentCharacterEquipment!.CompareAndUpdate(PlayerCharacter))
+        _currentCharacterEquipment?.CheckAndUpdateObject();
+        if (_currentCharacterEquipment?.HasUnprocessedUpdate ?? false)
         {
             OnPlayerChanged();
         }
