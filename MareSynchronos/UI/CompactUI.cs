@@ -132,7 +132,8 @@ namespace MareSynchronos.UI
 
             var buttonSize = UiShared.GetIconButtonSize(pauseIcon);
             var trashButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Trash);
-            var textSize = ImGui.CalcTextSize(entry.OtherUID);
+            var entryUID = string.IsNullOrEmpty(entry.VanityUID) ? entry.OtherUID : entry.VanityUID;
+            var textSize = ImGui.CalcTextSize(entryUID);
             var originalY = ImGui.GetCursorPosY();
             var buttonSizes = buttonSize.Y + trashButtonSize.Y;
 
@@ -144,7 +145,7 @@ namespace MareSynchronos.UI
                 UiShared.ColorText(FontAwesomeIcon.ArrowUp.ToIconString(), ImGuiColors.DalamudRed);
                 ImGui.PopFont();
 
-                UiShared.AttachToolTip(entry.OtherUID + " has not added you back");
+                UiShared.AttachToolTip(entryUID + " has not added you back");
             }
             else if (entry.IsPaused || entry.IsPausedFromOthers)
             {
@@ -152,7 +153,7 @@ namespace MareSynchronos.UI
                 UiShared.ColorText(FontAwesomeIcon.PauseCircle.ToIconString(), ImGuiColors.DalamudYellow);
                 ImGui.PopFont();
 
-                UiShared.AttachToolTip("Pairing status with " + entry.OtherUID + " is paused");
+                UiShared.AttachToolTip("Pairing status with " + entryUID + " is paused");
             }
             else
             {
@@ -160,7 +161,7 @@ namespace MareSynchronos.UI
                 UiShared.ColorText(FontAwesomeIcon.Check.ToIconString(), ImGuiColors.ParsedGreen);
                 ImGui.PopFont();
 
-                UiShared.AttachToolTip("You are paired with " + entry.OtherUID);
+                UiShared.AttachToolTip("You are paired with " + entryUID);
             }
 
             var textIsUid = true;
@@ -169,7 +170,7 @@ namespace MareSynchronos.UI
             {
                 if (string.IsNullOrEmpty(playerText))
                 {
-                    playerText = entry.OtherUID;
+                    playerText = entryUID;
                 }
                 else
                 {
@@ -178,7 +179,7 @@ namespace MareSynchronos.UI
             }
             else
             {
-                playerText = entry.OtherUID;
+                playerText = entryUID;
             }
 
             ImGui.SameLine();
@@ -189,7 +190,7 @@ namespace MareSynchronos.UI
                 ImGui.TextUnformatted(playerText);
                 if (textIsUid) ImGui.PopFont();
                 UiShared.AttachToolTip("Left click to switch between UID display and nick" + Environment.NewLine +
-                              "Right click to change nick for " + entry.OtherUID);
+                              "Right click to change nick for " + entryUID);
                 if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
                 {
                     var prevState = textIsUid;
@@ -240,7 +241,7 @@ namespace MareSynchronos.UI
                     _apiController.PairedClients.Remove(entry);
                 }
             }
-            UiShared.AttachToolTip("Hold CTRL and click to unpair permanently from " + entry.OtherUID);
+            UiShared.AttachToolTip("Hold CTRL and click to unpair permanently from " + entryUID);
 
             if (entry.IsSynced)
             {
@@ -251,8 +252,8 @@ namespace MareSynchronos.UI
                     _ = _apiController.SendPairedClientPauseChange(entry.OtherUID, !entry.IsPaused);
                 }
                 UiShared.AttachToolTip(!entry.IsPaused
-                    ? "Pause pairing with " + entry.OtherUID
-                    : "Resume pairing with " + entry.OtherUID);
+                    ? "Pause pairing with " + entryUID
+                    : "Resume pairing with " + entryUID);
             }
         }
 

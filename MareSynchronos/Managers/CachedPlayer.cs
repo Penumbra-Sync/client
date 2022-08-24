@@ -422,7 +422,7 @@ public class CachedPlayer
         Logger.Debug($"Player {PlayerName} changed, PenumbraRedraw is {RequestedPenumbraRedraw}");
         if (!RequestedPenumbraRedraw && PlayerCharacter is not null)
         {
-            _currentCharacterEquipment.HasUnprocessedUpdate = false;
+            _currentCharacterEquipment!.HasUnprocessedUpdate = false;
             Logger.Debug($"Saving new Glamourer data");
             _lastGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter!);
         }
