@@ -47,7 +47,7 @@ namespace MareSynchronos.Models
                 var chara = (Character*)curPtr;
                 bool addr = Address == IntPtr.Zero || Address != curPtr;
                 bool equip = CompareAndUpdateByteData(chara->EquipSlotData, chara->CustomizeData);
-                bool drawObj = (chara->GameObject.DrawObject != null && (IntPtr)chara->GameObject.DrawObject != DrawObjectAddress);
+                bool drawObj = (IntPtr)chara->GameObject.DrawObject != DrawObjectAddress;
                 var name = new Utf8String(chara->GameObject.Name).ToString();
                 bool nameChange = (name != _name);
                 if (addr || equip || drawObj || nameChange)
@@ -98,33 +98,30 @@ namespace MareSynchronos.Models
                 }
             }
 
-            if (ObjectKind is not ObjectKind.Mount)
+            var newHatState = Marshal.ReadByte((IntPtr)customizeData + 30, 0);
+            var newWeaponOrVisorState = Marshal.ReadByte((IntPtr)customizeData + 31, 0);
+            if (newHatState != HatState)
             {
-                var newHatState = Marshal.ReadByte((IntPtr)customizeData + 30, 0);
-                var newWeaponOrVisorState = Marshal.ReadByte((IntPtr)customizeData + 31, 0);
-                if (newHatState != HatState)
+                if (HatState != null && !hasChanges && !HasUnprocessedUpdate)
                 {
-                    if (HatState != null && !hasChanges && !HasUnprocessedUpdate)
-                    {
-                        Logger.Debug("Not Sending Update, only Hat changed");
-                        DoNotSendUpdate = true;
-                    }
-                    HatState = newHatState;
-                    hasChanges = true;
+                    Logger.Debug("Not Sending Update, only Hat changed");
+                    DoNotSendUpdate = true;
                 }
+                HatState = newHatState;
+                hasChanges = true;
+            }
 
-                newWeaponOrVisorState &= 0b1101; // ignore drawing weapon
+            newWeaponOrVisorState &= 0b1101; // ignore drawing weapon
 
-                if (newWeaponOrVisorState != VisorWeaponState)
+            if (newWeaponOrVisorState != VisorWeaponState)
+            {
+                if (VisorWeaponState != null && !hasChanges && !HasUnprocessedUpdate)
                 {
-                    if (VisorWeaponState != null && !hasChanges && !HasUnprocessedUpdate)
-                    {
-                        Logger.Debug("Not Sending Update, only Visor/Weapon changed");
-                        DoNotSendUpdate = true;
-                    }
-                    VisorWeaponState = newWeaponOrVisorState;
-                    hasChanges = true;
+                    Logger.Debug("Not Sending Update, only Visor/Weapon changed");
+                    DoNotSendUpdate = true;
                 }
+                VisorWeaponState = newWeaponOrVisorState;
+                hasChanges = true;
             }
 
             return hasChanges;

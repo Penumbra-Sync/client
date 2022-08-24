@@ -236,14 +236,18 @@ public class CachedPlayer
             Logger.Debug(
                 $"Request Redraw for {PlayerName}");
             _ipcManager.GlamourerApplyAll(glamourerData, PlayerCharacter.Address);
+            // todo: remove
+            _ipcManager.PenumbraRedraw(PlayerCharacter.Address);
         }
-        else if (objectKind == ObjectKind.Minion)
+        else if (objectKind == ObjectKind.MinionOrMount)
         {
-            var minion = ((Character*)PlayerCharacter.Address)->CompanionObject;
-            if (minion != null)
+            var minionOrMount = ((Character*)PlayerCharacter.Address)->CompanionObject;
+            if (minionOrMount != null)
             {
-                Logger.Debug($"Request Redraw for Minion");
-                _ipcManager.GlamourerApplyAll(glamourerData, obj: (IntPtr)minion);
+                Logger.Debug($"Request Redraw for Minion/Mount");
+                _ipcManager.GlamourerApplyAll(glamourerData, obj: (IntPtr)minionOrMount);
+                // todo: remove
+                _ipcManager.PenumbraRedraw((IntPtr)minionOrMount);
             }
         }
         else if (objectKind == ObjectKind.Pet)
@@ -253,6 +257,8 @@ public class CachedPlayer
             {
                 Logger.Debug("Request Redraw for Pet");
                 _ipcManager.GlamourerApplyAll(glamourerData, pet);
+                // todo: remove
+                _ipcManager.PenumbraRedraw(pet);
             }
         }
         else if (objectKind == ObjectKind.Companion)
@@ -262,15 +268,8 @@ public class CachedPlayer
             {
                 Logger.Debug("Request Redraw for Companion");
                 _ipcManager.GlamourerApplyAll(glamourerData, companion);
-            }
-        }
-        else if (objectKind == ObjectKind.Mount)
-        {
-            var mount = ((CharaExt*)PlayerCharacter.Address)->Mount;
-            if (mount != null)
-            {
-                Logger.Debug($"Request Redraw for Mount");
-                _ipcManager.PenumbraRedraw((IntPtr)mount);
+                // todo: remove
+                _ipcManager.PenumbraRedraw(companion);
             }
         }
     }
@@ -283,13 +282,15 @@ public class CachedPlayer
         {
             _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerCharacter);
             _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerCharacter);
+            // todo: remove
+            _ipcManager.PenumbraRedraw(PlayerCharacter.Address);
         }
-        else if (objectKind == ObjectKind.Minion)
+        else if (objectKind == ObjectKind.MinionOrMount)
         {
-            var minion = ((Character*)PlayerCharacter.Address)->CompanionObject;
-            if (minion != null)
+            var minionOrMount = ((Character*)PlayerCharacter.Address)->CompanionObject;
+            if (minionOrMount != null)
             {
-                _ipcManager.PenumbraRedraw((IntPtr)minion);
+                _ipcManager.PenumbraRedraw((IntPtr)minionOrMount);
             }
         }
         else if (objectKind == ObjectKind.Pet)
@@ -306,14 +307,6 @@ public class CachedPlayer
             if (companion != IntPtr.Zero)
             {
                 _ipcManager.PenumbraRedraw(companion);
-            }
-        }
-        else if (objectKind == ObjectKind.Mount)
-        {
-            var mount = ((CharaExt*)PlayerCharacter.Address)->Mount;
-            if (mount != null)
-            {
-                _ipcManager.PenumbraRedraw((IntPtr)mount);
             }
         }
     }
@@ -429,6 +422,7 @@ public class CachedPlayer
         Logger.Debug($"Player {PlayerName} changed, PenumbraRedraw is {RequestedPenumbraRedraw}");
         if (!RequestedPenumbraRedraw && PlayerCharacter is not null)
         {
+            _currentCharacterEquipment.HasUnprocessedUpdate = false;
             Logger.Debug($"Saving new Glamourer data");
             _lastGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter!);
         }

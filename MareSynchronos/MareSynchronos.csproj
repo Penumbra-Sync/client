@@ -21,7 +21,7 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <DalamudLibPath>$(appdata)\XIVLauncher\addon\Hooks\6692d56\</DalamudLibPath>
+    <DalamudLibPath>$(appdata)\XIVLauncher\addon\Hooks\Dev\</DalamudLibPath>
     <AssemblyVersion></AssemblyVersion>
   </PropertyGroup>
 

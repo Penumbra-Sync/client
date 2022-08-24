@@ -31,14 +31,14 @@ public class CharacterDataFactory
         _ipcManager = ipcManager;
     }
 
-    public CharacterData BuildCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr playerPointer, CancellationToken token)
+    public unsafe CharacterData BuildCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr playerPointer, CancellationToken token)
     {
         if (!_ipcManager.Initialized)
         {
             throw new ArgumentException("Penumbra is not connected");
         }
 
-        if (playerPointer == IntPtr.Zero)
+        if (playerPointer == IntPtr.Zero || ((Character*)playerPointer)->GameObject.GetDrawObject() == null)
         {
             Logger.Verbose("Pointer was zero for " + objectKind);
             previousData.FileReplacements.Remove(objectKind);
@@ -198,6 +198,11 @@ public class CharacterDataFactory
 
     private unsafe CharacterData CreateCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr charaPointer, CancellationToken token)
     {
+        if (previousData.FileReplacements.ContainsKey(objectKind))
+        {
+            previousData.FileReplacements[objectKind].Clear();
+        }
+
         Stopwatch st = Stopwatch.StartNew();
         var chara = _dalamudUtil.CreateGameObject(charaPointer)!;
         while (!_dalamudUtil.IsObjectPresent(chara))
@@ -207,17 +212,9 @@ public class CharacterDataFactory
         }
         _dalamudUtil.WaitWhileCharacterIsDrawing(charaPointer);
 
-        if (previousData.FileReplacements.ContainsKey(objectKind))
-        {
-            previousData.FileReplacements[objectKind].Clear();
-        }
-
         previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
 
-        if (objectKind is not ObjectKind.Mount)
-        {
-            previousData.GlamourerString[objectKind] = _ipcManager.GlamourerGetCharacterCustomization(chara);
-        }
+        previousData.GlamourerString[objectKind] = _ipcManager.GlamourerGetCharacterCustomization(chara);
 
         var human = (Human*)((Character*)charaPointer)->GameObject.GetDrawObject();
         for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)

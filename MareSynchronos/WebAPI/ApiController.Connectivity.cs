@@ -124,20 +124,30 @@ namespace MareSynchronos.WebAPI
         private string ApiUri => _pluginConfiguration.ApiUri;
         public int OnlineUsers => SystemInfoDto.OnlineUsers;
 
-        public ServerState ServerState { get; private set; }
+        private ServerState _serverState;
+        public ServerState ServerState
+        {
+            get => _serverState;
+            private set
+            {
+                Logger.Debug($"New ServerState: {value}, prev ServerState: {_serverState}");
+                _serverState = value;
+            }
+        }
 
         public async Task CreateConnections()
         {
+            await StopConnection(_connectionCancellationTokenSource.Token);
+
             if (_pluginConfiguration.FullPause)
             {
+                Logger.Info("Not recreating Connection, paused");
                 ServerState = ServerState.Disconnected;
                 _connectionDto = null;
                 return;
             }
 
             Logger.Info("Recreating Connection");
-
-            await StopConnection(_connectionCancellationTokenSource.Token);
 
             _connectionCancellationTokenSource.Cancel();
             _connectionCancellationTokenSource = new CancellationTokenSource();
@@ -298,9 +308,9 @@ namespace MareSynchronos.WebAPI
             CurrentUploads.Clear();
             CurrentDownloads.Clear();
             _uploadCancellationTokenSource?.Cancel();
-            Logger.Info("Connection closed");
             Disconnected?.Invoke();
             ServerState = ServerState.Offline;
+            Logger.Info("Connection closed");
             return Task.CompletedTask;
         }
 
@@ -336,6 +346,14 @@ namespace MareSynchronos.WebAPI
                 _mareHub.Reconnecting += MareHubOnReconnecting;
                 await _mareHub.DisposeAsync();
                 _mareHub = null;
+            }
+
+            if (ServerState != ServerState.Disconnected)
+            {
+                while (ServerState != ServerState.Offline)
+                {
+                    await Task.Delay(16);
+                }
             }
         }
     }
