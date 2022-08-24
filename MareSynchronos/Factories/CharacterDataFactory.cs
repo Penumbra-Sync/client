@@ -38,7 +38,19 @@ public class CharacterDataFactory
             throw new ArgumentException("Penumbra is not connected");
         }
 
-        if (playerPointer == IntPtr.Zero || ((Character*)playerPointer)->GameObject.GetDrawObject() == null)
+        bool pointerIsZero = true;
+        try
+        {
+            pointerIsZero = playerPointer == IntPtr.Zero || ((Character*)playerPointer)->GameObject.GetDrawObject() == null;
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Could not create data for " + objectKind);
+            Logger.Warn(ex.Message);
+            Logger.Warn(ex.StackTrace ?? string.Empty);
+        }
+
+        if (pointerIsZero)
         {
             Logger.Verbose("Pointer was zero for " + objectKind);
             previousData.FileReplacements.Remove(objectKind);
