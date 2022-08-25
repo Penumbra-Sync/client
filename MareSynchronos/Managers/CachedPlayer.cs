@@ -235,7 +235,7 @@ public class CachedPlayer
             RequestedPenumbraRedraw = true;
             Logger.Debug(
                 $"Request Redraw for {PlayerName}");
-            if (_ipcManager.CheckGlamourerApi())
+            if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
             {
                 _ipcManager.GlamourerApplyAll(glamourerData, PlayerCharacter.Address);
             }
@@ -250,7 +250,7 @@ public class CachedPlayer
             if (minionOrMount != null)
             {
                 Logger.Debug($"Request Redraw for Minion/Mount");
-                if (_ipcManager.CheckGlamourerApi())
+                if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                 {
                     _ipcManager.GlamourerApplyAll(glamourerData, obj: (IntPtr)minionOrMount);
                 }
@@ -266,7 +266,7 @@ public class CachedPlayer
             if (pet != IntPtr.Zero)
             {
                 Logger.Debug("Request Redraw for Pet");
-                if (_ipcManager.CheckGlamourerApi())
+                if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                 {
                     _ipcManager.GlamourerApplyAll(glamourerData, pet);
                 }
@@ -282,7 +282,7 @@ public class CachedPlayer
             if (companion != IntPtr.Zero)
             {
                 Logger.Debug("Request Redraw for Companion");
-                if (_ipcManager.CheckGlamourerApi())
+                if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                 {
                     _ipcManager.GlamourerApplyAll(glamourerData, companion);
                 }
