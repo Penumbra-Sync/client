@@ -297,7 +297,7 @@ namespace MareSynchronos.WebAPI
                 .WithUrl(ApiUri + hubName, options =>
                 {
                     options.Headers.Add("Authorization", SecretKey);
-                    options.Transports = HttpTransportType.WebSockets;
+                    options.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling;
                 })
                 .WithAutomaticReconnect(new ForeverRetryPolicy())
                 .Build();
