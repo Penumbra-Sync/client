@@ -137,15 +137,18 @@ namespace MareSynchronos.WebAPI
 
         public async Task CreateConnections()
         {
-            await StopConnection(_connectionCancellationTokenSource.Token);
+            Logger.Debug("CreateConnections called");
 
             if (_pluginConfiguration.FullPause)
             {
                 Logger.Info("Not recreating Connection, paused");
                 ServerState = ServerState.Disconnected;
                 _connectionDto = null;
+                await StopConnection(_connectionCancellationTokenSource.Token);
                 return;
             }
+
+            await StopConnection(_connectionCancellationTokenSource.Token);
 
             Logger.Info("Recreating Connection");
 
@@ -198,7 +201,6 @@ namespace MareSynchronos.WebAPI
                         await InitializeData(token);
 
                         _mareHub.Closed += MareHubOnClosed;
-                        _mareHub.Reconnected += MareHubOnReconnected;
                         _mareHub.Reconnecting += MareHubOnReconnecting;
                     }
                 }
@@ -314,24 +316,15 @@ namespace MareSynchronos.WebAPI
             return Task.CompletedTask;
         }
 
-        private async Task MareHubOnReconnected(string? arg)
-        {
-            Logger.Info("Connection restored");
-            await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 10)));
-
-            _ = Task.Run(CreateConnections);
-        }
-
         private Task MareHubOnReconnecting(Exception? arg)
         {
-            CurrentUploads.Clear();
-            CurrentDownloads.Clear();
-            _uploadCancellationTokenSource?.Cancel();
             ServerState = ServerState.Disconnected;
             Logger.Warn("Connection closed... Reconnecting");
             Logger.Warn(arg?.Message ?? string.Empty);
             Logger.Warn(arg?.StackTrace ?? string.Empty);
             Disconnected?.Invoke();
+            ServerState = ServerState.Offline;
+            _ = Task.Run(CreateConnections);
             return Task.CompletedTask;
         }
 
@@ -340,11 +333,14 @@ namespace MareSynchronos.WebAPI
             if (_mareHub is not null)
             {
                 Logger.Info("Stopping existing connection");
-                await _mareHub.StopAsync(token);
                 _mareHub.Closed -= MareHubOnClosed;
-                _mareHub.Reconnected -= MareHubOnReconnected;
                 _mareHub.Reconnecting += MareHubOnReconnecting;
+                await _mareHub.StopAsync(token);
                 await _mareHub.DisposeAsync();
+                CurrentUploads.Clear();
+                CurrentDownloads.Clear();
+                _uploadCancellationTokenSource?.Cancel();
+                Disconnected?.Invoke();
                 _mareHub = null;
             }
 

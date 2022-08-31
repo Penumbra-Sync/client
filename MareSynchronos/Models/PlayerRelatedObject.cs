@@ -60,17 +60,11 @@ namespace MareSynchronos.Models
                     HasUnprocessedUpdate = true;
                 }
             }
-            else
+            else if (Address != IntPtr.Zero || DrawObjectAddress != IntPtr.Zero)
             {
-                if (Address != IntPtr.Zero || DrawObjectAddress != IntPtr.Zero)
-                {
-                    Address = IntPtr.Zero;
-                    DrawObjectAddress = IntPtr.Zero;
-                    HasUnprocessedUpdate = true;
-                }
-
                 Address = IntPtr.Zero;
                 DrawObjectAddress = IntPtr.Zero;
+                Logger.Verbose(ObjectKind + " Changed: " + _name + ", now: " + Address + ", " + DrawObjectAddress);
             }
         }
 

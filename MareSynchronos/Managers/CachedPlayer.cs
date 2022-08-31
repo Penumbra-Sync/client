@@ -426,7 +426,9 @@ public class CachedPlayer
         _penumbraRedrawEventTask = Task.Run(() =>
         {
             PlayerCharacter = player;
-            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerCharacter.Address);
+            using var cts = new CancellationTokenSource();
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerCharacter.Address, cts.Token);
 
             if (RequestedPenumbraRedraw == false)
             {
@@ -445,9 +447,9 @@ public class CachedPlayer
     private void OnPlayerChanged()
     {
         Logger.Debug($"Player {PlayerName} changed, PenumbraRedraw is {RequestedPenumbraRedraw}");
+        _currentCharacterEquipment!.HasUnprocessedUpdate = false;
         if (!RequestedPenumbraRedraw && PlayerCharacter is not null)
         {
-            _currentCharacterEquipment!.HasUnprocessedUpdate = false;
             Logger.Debug($"Saving new Glamourer data");
             _lastGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter!);
         }
