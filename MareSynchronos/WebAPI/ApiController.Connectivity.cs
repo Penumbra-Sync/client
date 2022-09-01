@@ -68,6 +68,7 @@ namespace MareSynchronos.WebAPI
         private void DalamudUtilOnLogOut()
         {
             Task.Run(async () => await StopConnection(_connectionCancellationTokenSource.Token));
+            ServerState = ServerState.Offline;
         }
 
         private void DalamudUtilOnLogIn()

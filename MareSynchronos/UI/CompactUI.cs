@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
@@ -33,7 +34,13 @@ namespace MareSynchronos.UI
         private float _windowContentWidth = 0;
 
         public CompactUi(WindowSystem windowSystem,
-            UiShared uiShared, Configuration configuration, ApiController apiController) : base("Mare Synchronos " + Assembly.GetExecutingAssembly().GetName().Version + "###MareSynchronosMainUI")
+            UiShared uiShared, Configuration configuration, ApiController apiController)
+#if DEBUG
+            : base("Mare Synchronos " + new FileInfo(Assembly.GetExecutingAssembly().Location) .LastWriteTime.ToString("yyyyMMddHHmmss")+ "###MareSynchronosMainUI")
+#else
+            : base("Mare Synchronos " + Assembly.GetExecutingAssembly().GetName().Version + "###MareSynchronosMainUI")
+#endif
+
         {
             Logger.Verbose("Creating " + nameof(CompactUi));
 
