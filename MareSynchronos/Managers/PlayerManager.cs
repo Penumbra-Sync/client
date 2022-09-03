@@ -5,12 +5,10 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using MareSynchronos.API;
-using Penumbra.GameData.Structs;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using System.Collections.Generic;
 using System.Linq;
 using MareSynchronos.Models;
-using MareSynchronos.Interop;
 
 namespace MareSynchronos.Managers
 {
@@ -30,7 +28,6 @@ namespace MareSynchronos.Managers
 
         private CancellationTokenSource? _playerChangedCts = new();
         private DateTime _lastPlayerObjectCheck;
-        private CharacterEquipment? _currentCharacterEquipment = new();
 
         private List<PlayerRelatedObject> playerRelatedObjects = new List<PlayerRelatedObject>();
 
@@ -58,10 +55,9 @@ namespace MareSynchronos.Managers
             playerRelatedObjects = new List<PlayerRelatedObject>()
             {
                 new PlayerRelatedObject(ObjectKind.Player, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.PlayerPointer),
-                new PlayerRelatedObject(ObjectKind.Minion, IntPtr.Zero, IntPtr.Zero, () => (IntPtr)((Character*)_dalamudUtil.PlayerPointer)->CompanionObject),
+                new PlayerRelatedObject(ObjectKind.MinionOrMount, IntPtr.Zero, IntPtr.Zero, () => (IntPtr)((Character*)_dalamudUtil.PlayerPointer)->CompanionObject),
                 new PlayerRelatedObject(ObjectKind.Pet, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.GetPet()),
                 new PlayerRelatedObject(ObjectKind.Companion, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.GetCompanion()),
-                new PlayerRelatedObject(ObjectKind.Mount, IntPtr.Zero, IntPtr.Zero, () => (IntPtr)((CharaExt*)_dalamudUtil.PlayerPointer)->Mount),
             };
         }
 

@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Authors></Authors>
     <Company></Company>
-    <Version>0.3.4</Version>
+    <Version>0.3.10</Version>
     <Description></Description>
     <Copyright></Copyright>
     <PackageProjectUrl>https://github.com/Penumbra-Sync/client</PackageProjectUrl>
@@ -21,12 +21,12 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <DalamudLibPath>$(appdata)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
+    <DalamudLibPath>$(appdata)\XIVLauncher\addon\Hooks\Dev\</DalamudLibPath>
     <AssemblyVersion></AssemblyVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DalamudPackager" Version="2.1.7" />
+    <PackageReference Include="DalamudPackager" Version="2.1.8" />
     <PackageReference Include="lz4net" Version="1.0.15.93" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="6.0.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="6.0.8" />
@@ -84,7 +84,7 @@
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\alpine-x64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-arm&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-arm64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-armel&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-mips64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-musl-x64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-x64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-x86&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\osx-x64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\win-arm&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\win-arm64&#xD;&#xA;if $(ConfigurationName) == Debug (&#xD;&#xA;del /Q $(ProjectDir)$(OutDir)Mare.7z&#xD;&#xA;&quot;C:\Program Files\7-zip\7z.exe&quot; a $(ProjectDir)$(OutDir)Mare.7z $(ProjectDir)$(OutDir)*&#xD;&#xA;)" />
+    <Exec Command="rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\alpine-x64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-arm&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-arm64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-armel&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-mips64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-musl-x64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-x64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-x86&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-s390x&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\osx-x64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\osx-arm64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\win-arm&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\win-arm64&#xD;&#xA;if $(ConfigurationName) == Debug (&#xD;&#xA;del /Q $(ProjectDir)$(OutDir)Mare.7z&#xD;&#xA;&quot;C:\Program Files\7-zip\7z.exe&quot; a $(ProjectDir)$(OutDir)Mare.7z $(ProjectDir)$(OutDir)*&#xD;&#xA;)" />
   </Target>
 
 </Project>

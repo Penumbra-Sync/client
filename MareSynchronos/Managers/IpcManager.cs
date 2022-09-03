@@ -158,12 +158,19 @@ namespace MareSynchronos.Managers
         public string GlamourerGetCharacterCustomization(GameObject character)
         {
             if (!CheckGlamourerApi()) return string.Empty;
-            var glamourerString = _glamourerGetAllCustomization!.InvokeFunc(character);
-            byte[] bytes = Convert.FromBase64String(glamourerString);
-            // ignore transparency
-            bytes[88] = 128;
-            bytes[89] = 63;
-            return Convert.ToBase64String(bytes);
+            try
+            {
+                var glamourerString = _glamourerGetAllCustomization!.InvokeFunc(character);
+                byte[] bytes = Convert.FromBase64String(glamourerString);
+                // ignore transparency
+                bytes[88] = 128;
+                bytes[89] = 63;
+                return Convert.ToBase64String(bytes);
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
 
         public void GlamourerRevertCharacterCustomization(GameObject character)

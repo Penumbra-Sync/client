@@ -13,6 +13,7 @@ using MareSynchronos.WebAPI;
 using Dalamud.Interface.Windowing;
 using MareSynchronos.UI;
 using MareSynchronos.Utils;
+using System.Runtime.InteropServices;
 
 namespace MareSynchronos
 {
@@ -63,6 +64,10 @@ namespace MareSynchronos
 
             _apiController = new ApiController(_configuration, _dalamudUtil);
             _ipcManager = new IpcManager(PluginInterface, _dalamudUtil);
+
+            // Compatibility for FileSystemWatchers under OSX
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                Environment.SetEnvironmentVariable("MONO_MANAGED_WATCHER", "enabled");
 
             _fileCacheManager = new FileCacheManager(_ipcManager, _configuration);
             _fileDialogManager = new FileDialogManager();

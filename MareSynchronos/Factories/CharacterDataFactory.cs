@@ -33,14 +33,26 @@ public class CharacterDataFactory
         this.transientResourceManager = transientResourceManager;
     }
 
-    public CharacterData BuildCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr playerPointer, CancellationToken token)
+    public unsafe CharacterData BuildCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr playerPointer, CancellationToken token)
     {
         if (!_ipcManager.Initialized)
         {
             throw new ArgumentException("Penumbra is not connected");
         }
 
-        if (playerPointer == IntPtr.Zero)
+        bool pointerIsZero = true;
+        try
+        {
+            pointerIsZero = playerPointer == IntPtr.Zero || ((Character*)playerPointer)->GameObject.GetDrawObject() == null;
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Could not create data for " + objectKind);
+            Logger.Warn(ex.Message);
+            Logger.Warn(ex.StackTrace ?? string.Empty);
+        }
+
+        if (pointerIsZero)
         {
             Logger.Verbose("Pointer was zero for " + objectKind);
             previousData.FileReplacements.Remove(objectKind);
@@ -191,7 +203,7 @@ public class CharacterDataFactory
 
     private void AddReplacementsFromTexture(string texPath, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0, bool doNotReverseResolve = true)
     {
-        if (texPath.IsNullOrEmpty()) return;
+        if (string.IsNullOrEmpty(texPath)) return;
 
         //Logger.Verbose("Adding File Replacement for Texture " + texPath);
 
@@ -220,6 +232,11 @@ public class CharacterDataFactory
 
     private unsafe CharacterData CreateCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr charaPointer, CancellationToken token)
     {
+        if (previousData.FileReplacements.ContainsKey(objectKind))
+        {
+            previousData.FileReplacements[objectKind].Clear();
+        }
+
         Stopwatch st = Stopwatch.StartNew();
         var chara = _dalamudUtil.CreateGameObject(charaPointer)!;
         while (!_dalamudUtil.IsObjectPresent(chara))
@@ -229,17 +246,9 @@ public class CharacterDataFactory
         }
         _dalamudUtil.WaitWhileCharacterIsDrawing(charaPointer);
 
-        if (previousData.FileReplacements.ContainsKey(objectKind))
-        {
-            previousData.FileReplacements[objectKind].Clear();
-        }
-
         previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
 
-        if (objectKind is not ObjectKind.Mount)
-        {
-            previousData.GlamourerString[objectKind] = _ipcManager.GlamourerGetCharacterCustomization(chara);
-        }
+        previousData.GlamourerString[objectKind] = _ipcManager.GlamourerGetCharacterCustomization(chara);
 
         var human = (Human*)((Character*)charaPointer)->GameObject.GetDrawObject();
         for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)
