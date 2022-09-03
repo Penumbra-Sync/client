@@ -32,7 +32,7 @@ namespace MareSynchronos.Managers
         private readonly ICallGateSubscriber<string, string[]>? _reverseResolvePlayer;
         private readonly ICallGateSubscriber<string, string, Dictionary<string, string>, string, int, int>
             _penumbraSetTemporaryMod;
-        private readonly ICallGateSubscriber<IntPtr, string, string, string> _penumbraResourceLoaded;
+        private readonly ICallGateSubscriber<IntPtr, string, string, object?> _penumbraGameObjectResourcePathResolved;
         private readonly DalamudUtil _dalamudUtil;
 
         public IpcManager(DalamudPluginInterface pi, DalamudUtil dalamudUtil)
@@ -57,9 +57,9 @@ namespace MareSynchronos.Managers
             _glamourerApplyOnlyCustomization = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyOnlyCustomizationToCharacter");
             _glamourerApplyOnlyEquipment = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyOnlyEquipmentToCharacter");
             _glamourerRevertCustomization = pi.GetIpcSubscriber<GameObject?, object>("Glamourer.RevertCharacter");
-            _penumbraResourceLoaded = pi.GetIpcSubscriber<IntPtr, string, string, string>("Penumbra.ResourceLoaded");
+            _penumbraGameObjectResourcePathResolved = pi.GetIpcSubscriber<IntPtr, string, string, object?>("Penumbra.GameObjectResourcePathResolved");
 
-            _penumbraResourceLoaded.Subscribe(ResourceLoaded);
+            _penumbraGameObjectResourcePathResolved.Subscribe(ResourceLoaded);
             _penumbraObjectIsRedrawn.Subscribe(RedrawEvent);
             _penumbraInit.Subscribe(PenumbraInit);
             _penumbraDispose.Subscribe(PenumbraDispose);
@@ -113,7 +113,7 @@ namespace MareSynchronos.Managers
         {
             try
             {
-                return _penumbraApiVersion.InvokeFunc() is { Item1: 4, Item2: >= 11 };
+                return _penumbraApiVersion.InvokeFunc() is { Item1: 4, Item2: >= 13 };
             }
             catch
             {
@@ -128,7 +128,7 @@ namespace MareSynchronos.Managers
             _penumbraDispose.Unsubscribe(PenumbraDispose);
             _penumbraInit.Unsubscribe(PenumbraInit);
             _penumbraObjectIsRedrawn.Unsubscribe(RedrawEvent);
-            _penumbraResourceLoaded.Unsubscribe(ResourceLoaded);
+            _penumbraGameObjectResourcePathResolved.Unsubscribe(ResourceLoaded);
         }
 
         public void GlamourerApplyAll(string? customization, IntPtr obj)
