@@ -123,9 +123,13 @@ namespace MareSynchronos.WebAPI
             {
                 await using (var db = new FileCacheContext())
                 {
-                    allFilesInDb = CurrentDownloads[currentDownloadId]
+                    var fileCount = CurrentDownloads[currentDownloadId]
                         .Where(c => c.CanBeTransferred)
-                        .All(h => db.FileCaches.Any(f => f.Hash == h.Hash));
+                        .Count(h => db.FileCaches.Any(f => f.Hash == h.Hash));
+                    var totalFiles = CurrentDownloads[currentDownloadId].Count(c => c.CanBeTransferred);
+                    Logger.Debug("Waiting for files to be in the DB, added " + fileCount + " of " + totalFiles);
+
+                    allFilesInDb = fileCount == totalFiles;
                 }
 
                 await Task.Delay(250, ct);

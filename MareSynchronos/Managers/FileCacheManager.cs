@@ -23,6 +23,7 @@ namespace MareSynchronos.Managers
         private readonly CancellationTokenSource _rescanTaskCancellationTokenSource = new();
         private CancellationTokenSource _rescanTaskRunCancellationTokenSource = new();
         private CancellationTokenSource? _scanCancellationTokenSource;
+        private object modifiedFilesLock = new object();
         public FileCacheManager(IpcManager ipcManager, Configuration pluginConfiguration)
         {
             Logger.Verbose("Creating " + nameof(FileCacheManager));
@@ -142,7 +143,10 @@ namespace MareSynchronos.Managers
 
         private void OnModified(object sender, FileSystemEventArgs e)
         {
-            _modifiedFiles.Add(e.FullPath);
+            lock (modifiedFilesLock)
+            {
+                _modifiedFiles.Add(e.FullPath);
+            }
             _ = StartRescan();
         }
 
@@ -189,14 +193,21 @@ namespace MareSynchronos.Managers
 
             Logger.Debug("File changes detected");
 
-            if (!_modifiedFiles.Any()) return;
+            lock (modifiedFilesLock)
+            {
+                if (!_modifiedFiles.Any()) return;
+            }
 
             _rescanTask = Task.Run(async () =>
             {
-                var listCopy = _modifiedFiles.ToList();
-                _modifiedFiles.Clear();
+                List<string> modifiedFilesCopy = new List<string>();
+                lock (modifiedFilesLock)
+                {
+                    modifiedFilesCopy = _modifiedFiles.ToList();
+                    _modifiedFiles.Clear();
+                }
                 await using var db = new FileCacheContext();
-                foreach (var item in listCopy.Distinct())
+                foreach (var item in modifiedFilesCopy.Distinct())
                 {
                     var fi = new FileInfo(item);
                     if (!fi.Exists)
