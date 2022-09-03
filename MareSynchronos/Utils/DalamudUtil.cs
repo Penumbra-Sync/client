@@ -16,6 +16,7 @@ namespace MareSynchronos.Utils
 
     public delegate void LogIn();
     public delegate void LogOut();
+    public delegate void ClassJobChanged();
 
     public delegate void FrameworkUpdate();
 
@@ -27,6 +28,8 @@ namespace MareSynchronos.Utils
         public event LogIn? LogIn;
         public event LogOut? LogOut;
         public event FrameworkUpdate? FrameworkUpdate;
+        public event ClassJobChanged? ClassJobChanged;
+        private uint? classJobId = 0;
 
         public unsafe bool IsGameObjectPresent(IntPtr key)
         {
@@ -51,12 +54,18 @@ namespace MareSynchronos.Utils
             _framework.Update += FrameworkOnUpdate;
             if (IsLoggedIn)
             {
+                classJobId = _clientState.LocalPlayer!.ClassJob.Id;
                 ClientStateOnLogin(null, EventArgs.Empty);
             }
         }
 
         private void FrameworkOnUpdate(Framework framework)
         {
+            if(_clientState.LocalPlayer != null && _clientState.LocalPlayer.ClassJob.Id != classJobId)
+            {
+                classJobId = _clientState.LocalPlayer.ClassJob.Id;
+                ClassJobChanged?.Invoke();
+            }
             FrameworkUpdate?.Invoke();
         }
 

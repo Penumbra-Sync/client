@@ -49,7 +49,7 @@ namespace MareSynchronos.Managers
 
         public string WatchedPenumbraDirectory => (_penumbraDirWatcher?.EnableRaisingEvents ?? false) ? _penumbraDirWatcher!.Path : "Not watched";
 
-        public FileCache? Create(string file, CancellationToken token)
+        public FileCache? Create(string file, CancellationToken? token)
         {
             FileInfo fileInfo = new(file);
             int attempt = 0;
@@ -57,7 +57,7 @@ namespace MareSynchronos.Managers
             {
                 Thread.Sleep(1000);
                 Logger.Debug("Waiting for file release " + fileInfo.FullName + " attempt " + attempt);
-                token.ThrowIfCancellationRequested();
+                token?.ThrowIfCancellationRequested();
             }
 
             if (attempt >= 10) return null;

@@ -334,6 +334,16 @@ public class CharacterDataFactory
             }
         }
 
+        if (objectKind == ObjectKind.Pet)
+        {
+            foreach (var item in previousData.FileReplacements[objectKind])
+            {
+                transientResourceManager.AddSemiTransientResource(objectKind, item);
+            }
+
+            previousData.FileReplacements[objectKind].Clear();
+        }
+
         foreach (var item in transientResourceManager.GetTransientResources(charaPointer))
         {
             Logger.Verbose("Found transient resource: " + item);
@@ -343,10 +353,14 @@ public class CharacterDataFactory
         foreach (var item in transientResourceManager.GetSemiTransientResources(objectKind))
         {
             Logger.Verbose("Found semi transient resource: " + item);
-            AddReplacement(item, objectKind, previousData, 1);
+            if (!previousData.FileReplacements.ContainsKey(objectKind))
+            {
+                previousData.FileReplacements.Add(objectKind, new());
+            }
+            previousData.FileReplacements[objectKind].Add(item);
         }
 
-        transientResourceManager.PersistTransientResources(charaPointer, objectKind);
+        transientResourceManager.PersistTransientResources(charaPointer, objectKind, CreateFileReplacement);
 
         st.Stop();
         Logger.Verbose("Building " + objectKind + " Data took " + st.Elapsed);
