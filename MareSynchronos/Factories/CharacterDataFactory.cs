@@ -146,7 +146,6 @@ public class CharacterDataFactory
             return;
         }
 
-        //Logger.Verbose("Adding File Replacement for Material " + fileName);
         var mtrlPath = fileName.Split("|")[2];
 
         if (cache.FileReplacements.ContainsKey(objectKind))
@@ -185,8 +184,6 @@ public class CharacterDataFactory
     {
         if (varPath.IsNullOrEmpty()) return;
 
-        //Logger.Verbose("Adding File Replacement for Texture " + texPath);
-
         if (cache.FileReplacements.ContainsKey(objectKind))
         {
             if (cache.FileReplacements[objectKind].Any(c => c.GamePaths.Contains(varPath)))
@@ -204,8 +201,6 @@ public class CharacterDataFactory
     private void AddReplacementsFromTexture(string texPath, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0, bool doNotReverseResolve = true)
     {
         if (string.IsNullOrEmpty(texPath)) return;
-
-        //Logger.Verbose("Adding File Replacement for Texture " + texPath);
 
         if (cache.FileReplacements.ContainsKey(objectKind))
         {
@@ -243,7 +238,8 @@ public class CharacterDataFactory
             Logger.Verbose("Character is null but it shouldn't be, waiting");
             Thread.Sleep(50);
         }
-        //_dalamudUtil.WaitWhileCharacterIsDrawing(charaPointer);
+        
+        _dalamudUtil.WaitWhileCharacterIsDrawing(charaPointer);
 
         Stopwatch st = Stopwatch.StartNew();
 
@@ -357,7 +353,11 @@ public class CharacterDataFactory
             {
                 previousData.FileReplacements.Add(objectKind, new());
             }
-            previousData.FileReplacements[objectKind].Add(item);
+
+            if (!previousData.FileReplacements[objectKind].Any(k => k.ResolvedPath == item.ResolvedPath))
+            {
+                previousData.FileReplacements[objectKind].Add(item);
+            }
         }
 
         transientResourceManager.PersistTransientResources(charaPointer, objectKind, CreateFileReplacement);
