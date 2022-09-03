@@ -8,7 +8,6 @@ using Dalamud.Logging;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using MareSynchronos.API;
 using MareSynchronos.FileCacheDB;
-using MareSynchronos.Interop;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
@@ -250,6 +249,7 @@ public class CachedPlayer
             if (minionOrMount != null)
             {
                 Logger.Debug($"Request Redraw for Minion/Mount");
+                _dalamudUtil.WaitWhileCharacterIsDrawing((IntPtr)minionOrMount);
                 if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                 {
                     _ipcManager.GlamourerApplyAll(glamourerData, obj: (IntPtr)minionOrMount);
@@ -262,17 +262,29 @@ public class CachedPlayer
         }
         else if (objectKind == ObjectKind.Pet)
         {
+            int tick = 16;
             var pet = _dalamudUtil.GetPet(PlayerCharacter.Address);
             if (pet != IntPtr.Zero)
             {
-                Logger.Debug("Request Redraw for Pet");
+                var totalWait = 0;
+                var newPet = IntPtr.Zero;
+                const int maxWait = 3000;
+                Logger.Debug($"Request Redraw for Pet, waiting {maxWait}ms");
+
+                do
+                {
+                    Thread.Sleep(tick);
+                    totalWait += tick;
+                    newPet = _dalamudUtil.GetPet(PlayerCharacter.Address);
+                } while (newPet == pet && totalWait < maxWait);
+
                 if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                 {
-                    _ipcManager.GlamourerApplyAll(glamourerData, pet);
+                    _ipcManager.GlamourerApplyAll(glamourerData, newPet);
                 }
                 else
                 {
-                    _ipcManager.PenumbraRedraw(pet);
+                    _ipcManager.PenumbraRedraw(newPet);
                 }
             }
         }
@@ -282,6 +294,7 @@ public class CachedPlayer
             if (companion != IntPtr.Zero)
             {
                 Logger.Debug("Request Redraw for Companion");
+                _dalamudUtil.WaitWhileCharacterIsDrawing(companion);
                 if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                 {
                     _ipcManager.GlamourerApplyAll(glamourerData, companion);

@@ -237,14 +237,15 @@ public class CharacterDataFactory
             previousData.FileReplacements[objectKind].Clear();
         }
 
-        Stopwatch st = Stopwatch.StartNew();
         var chara = _dalamudUtil.CreateGameObject(charaPointer)!;
         while (!_dalamudUtil.IsObjectPresent(chara))
         {
             Logger.Verbose("Character is null but it shouldn't be, waiting");
             Thread.Sleep(50);
         }
-        _dalamudUtil.WaitWhileCharacterIsDrawing(charaPointer);
+        //_dalamudUtil.WaitWhileCharacterIsDrawing(charaPointer);
+
+        Stopwatch st = Stopwatch.StartNew();
 
         previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
 
@@ -338,6 +339,14 @@ public class CharacterDataFactory
             Logger.Verbose("Found transient resource: " + item);
             AddReplacement(item, objectKind, previousData, 1);
         }
+
+        foreach (var item in transientResourceManager.GetSemiTransientResources(objectKind))
+        {
+            Logger.Verbose("Found semi transient resource: " + item);
+            AddReplacement(item, objectKind, previousData, 1);
+        }
+
+        transientResourceManager.PersistTransientResources(charaPointer, objectKind);
 
         st.Stop();
         Logger.Verbose("Building " + objectKind + " Data took " + st.Elapsed);

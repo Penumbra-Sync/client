@@ -61,11 +61,11 @@ namespace MareSynchronos.Managers
             };
         }
 
-        public void HandleTransientResourceLoad(IntPtr drawObj)
+        public void HandleTransientResourceLoad(IntPtr gameObj)
         {
             foreach (var obj in playerRelatedObjects)
             {
-                if (obj.Address == drawObj && !obj.HasUnprocessedUpdate)
+                if (obj.Address == gameObj && !obj.HasUnprocessedUpdate)
                 {
                     obj.HasUnprocessedUpdate = true;
                     OnPlayerOrAttachedObjectsChanged();
@@ -91,7 +91,7 @@ namespace MareSynchronos.Managers
 
         private unsafe void DalamudUtilOnFrameworkUpdate()
         {
-            //if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized) return;
+            if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized) return;
 
             //if (DateTime.Now < _lastPlayerObjectCheck.AddSeconds(0.25)) return;
 
@@ -154,6 +154,7 @@ namespace MareSynchronos.Managers
                 if (address == item.Address)
                 {
                     Logger.Debug("Penumbra redraw Event for " + item.ObjectKind);
+                    _transientResourceManager.CleanSemiTransientResources(item.ObjectKind);
                     item.HasUnprocessedUpdate = true;
                 }
             }
@@ -201,7 +202,10 @@ namespace MareSynchronos.Managers
 
             Task.Run(async () =>
             {
-                _dalamudUtil.WaitWhileSelfIsDrawing(token);
+                foreach(var item in unprocessedObjects)
+                {
+                    _dalamudUtil.WaitWhileCharacterIsDrawing(item.Address, token);
+                }
 
                 CharacterCacheDto? cacheDto = (await CreateFullCharacterCacheDto(token));
                 if (cacheDto == null || token.IsCancellationRequested) return;

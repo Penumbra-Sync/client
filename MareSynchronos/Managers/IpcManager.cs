@@ -137,6 +137,7 @@ namespace MareSynchronos.Managers
             var gameObj = _dalamudUtil.CreateGameObject(obj);
             if (gameObj != null)
             {
+                Logger.Verbose("Glamourer applying for " + gameObj);
                 _glamourerApplyAll!.InvokeAction(customization, gameObj);
             }
         }
@@ -205,6 +206,7 @@ namespace MareSynchronos.Managers
             var gameObj = _dalamudUtil.CreateGameObject(obj);
             if (gameObj != null)
             {
+                Logger.Verbose("Redrawing " + gameObj);
                 _penumbraRedrawObject!.InvokeAction(gameObj, 0);
             }
         }

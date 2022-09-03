@@ -1,4 +1,5 @@
-﻿using MareSynchronos.Models;
+﻿using MareSynchronos.API;
+using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using System;
 using System.Collections.Generic;
@@ -17,6 +18,7 @@ namespace MareSynchronos.Managers
         public event TransientResourceLoadedEvent? TransientResourceLoaded;
 
         private Dictionary<IntPtr, HashSet<string>> TransientResources { get; } = new();
+        private Dictionary<ObjectKind, HashSet<string>> SemiTransientResources { get; } = new();
         public TransientResourceManager(IpcManager manager, DalamudUtil dalamudUtil)
         {
             manager.PenumbraResourceLoadEvent += Manager_PenumbraResourceLoadEvent;
@@ -37,9 +39,27 @@ namespace MareSynchronos.Managers
             }
         }
 
+        public void CleanSemiTransientResources(ObjectKind objectKind)
+        {
+            if (SemiTransientResources.ContainsKey(objectKind))
+            {
+                SemiTransientResources[objectKind].Clear();
+            }
+        }
+
         public List<string> GetTransientResources(IntPtr gameObject)
         {
             if (TransientResources.TryGetValue(gameObject, out var result))
+            {
+                return result.ToList();
+            }
+
+            return new List<string>();
+        }
+
+        public List<string> GetSemiTransientResources(ObjectKind objectKind)
+        {
+            if (SemiTransientResources.TryGetValue(objectKind, out var result))
             {
                 return result.ToList();
             }
@@ -61,7 +81,7 @@ namespace MareSynchronos.Managers
 
             var newPath = filePath.ToLowerInvariant().Replace("\\", "/");
 
-            if (filePath != gamePath && !TransientResources[gameObject].Contains(newPath))
+            if (filePath != gamePath && !TransientResources[gameObject].Contains(newPath) && !SemiTransientResources.Any(r => r.Value.Contains(newPath)))
             {
                 TransientResources[gameObject].Add(newPath);
                 Logger.Debug($"Adding {filePath.ToLowerInvariant().Replace("\\", "/")} for {gameObject}");
@@ -69,12 +89,34 @@ namespace MareSynchronos.Managers
             }
         }
 
-        public void RemoveTransientResource(IntPtr drawObject, FileReplacement fileReplacement)
+        public void RemoveTransientResource(IntPtr gameObject, FileReplacement fileReplacement)
         {
-            if (TransientResources.ContainsKey(drawObject))
+            if (TransientResources.ContainsKey(gameObject))
             {
-                TransientResources[drawObject].RemoveWhere(f => fileReplacement.ResolvedPath == f);
+                TransientResources[gameObject].RemoveWhere(f => fileReplacement.ResolvedPath == f);
             }
+        }
+
+        public void PersistTransientResources(IntPtr gameObject, ObjectKind objectKind)
+        {
+            if (!SemiTransientResources.ContainsKey(objectKind))
+            {
+                SemiTransientResources[objectKind] = new HashSet<string>();
+            }
+
+            if (!TransientResources.TryGetValue(gameObject, out var resources))
+            {
+                return;
+            }
+
+            var transientResources = resources.ToList();
+            Logger.Debug("Persisting " + transientResources.Count + " transient resources");
+            foreach (var item in transientResources)
+            {
+                SemiTransientResources[objectKind].Add(item);
+            }
+
+            TransientResources[gameObject].Clear();
         }
 
         public void Dispose()
