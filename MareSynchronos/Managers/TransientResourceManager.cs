@@ -29,7 +29,7 @@ namespace MareSynchronos.Managers
         {
             foreach (var item in TransientResources.ToList())
             {
-                if (!dalamudUtil.IsDrawObjectPresent(item.Key))
+                if (!dalamudUtil.IsGameObjectPresent(item.Key))
                 {
                     Logger.Debug("Object not present anymore: " + item.Key);
                     TransientResources.Remove(item.Key);
@@ -37,9 +37,9 @@ namespace MareSynchronos.Managers
             }
         }
 
-        public List<string> GetTransientResources(IntPtr drawObject)
+        public List<string> GetTransientResources(IntPtr gameObject)
         {
-            if (TransientResources.TryGetValue(drawObject, out var result))
+            if (TransientResources.TryGetValue(gameObject, out var result))
             {
                 return result.ToList();
             }
@@ -47,11 +47,11 @@ namespace MareSynchronos.Managers
             return new List<string>();
         }
 
-        private void Manager_PenumbraResourceLoadEvent(IntPtr drawObject, string gamePath, string filePath)
+        private void Manager_PenumbraResourceLoadEvent(IntPtr gameObject, string gamePath, string filePath)
         {
-            if (!TransientResources.ContainsKey(drawObject))
+            if (!TransientResources.ContainsKey(gameObject))
             {
-                TransientResources[drawObject] = new();
+                TransientResources[gameObject] = new();
             }
 
             if (filePath.StartsWith("|"))
@@ -61,11 +61,11 @@ namespace MareSynchronos.Managers
 
             var newPath = filePath.ToLowerInvariant().Replace("\\", "/");
 
-            if (filePath != gamePath && !TransientResources[drawObject].Contains(newPath))
+            if (filePath != gamePath && !TransientResources[gameObject].Contains(newPath))
             {
-                TransientResources[drawObject].Add(newPath);
-                Logger.Debug($"Adding {filePath.ToLowerInvariant().Replace("\\", "/")} for {drawObject}");
-                TransientResourceLoaded?.Invoke(drawObject);
+                TransientResources[gameObject].Add(newPath);
+                Logger.Debug($"Adding {filePath.ToLowerInvariant().Replace("\\", "/")} for {gameObject}");
+                TransientResourceLoaded?.Invoke(gameObject);
             }
         }
 

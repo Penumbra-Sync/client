@@ -348,6 +348,8 @@ public class CachedPlayer
             _dalamudUtil.FrameworkUpdate -= DalamudUtilOnFrameworkUpdate;
             _ipcManager.PenumbraRedrawEvent -= IpcManagerOnPenumbraRedrawEvent;
             _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName);
+            _downloadCancellationTokenSource?.Cancel();
+            _downloadCancellationTokenSource?.Dispose();
             if (PlayerCharacter != null && PlayerCharacter.IsValid())
             {
                 foreach (var item in _cachedData.FileReplacements)
@@ -355,9 +357,6 @@ public class CachedPlayer
                     RevertCustomizationData(item.Key);
                 }
             }
-
-            _downloadCancellationTokenSource?.Cancel();
-            _downloadCancellationTokenSource?.Dispose();
         }
         catch (Exception ex)
         {

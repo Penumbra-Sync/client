@@ -19,7 +19,18 @@ namespace MareSynchronos.Models
         public IntPtr Address { get; set; }
         public IntPtr DrawObjectAddress { get; set; }
 
-        private IntPtr CurrentAddress => getAddress.Invoke();
+        private IntPtr CurrentAddress
+        {
+            get
+            {
+                try
+                {
+                    return getAddress.Invoke();
+                }
+                catch
+                { return IntPtr.Zero; }
+            }
+        }
 
         public PlayerRelatedObject(ObjectKind objectKind, IntPtr address, IntPtr drawObjectAddress, Func<IntPtr> getAddress)
         {

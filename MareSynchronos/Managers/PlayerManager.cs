@@ -65,7 +65,7 @@ namespace MareSynchronos.Managers
         {
             foreach (var obj in playerRelatedObjects)
             {
-                if (obj.DrawObjectAddress == drawObj && !obj.HasUnprocessedUpdate)
+                if (obj.Address == drawObj && !obj.HasUnprocessedUpdate)
                 {
                     obj.HasUnprocessedUpdate = true;
                     OnPlayerOrAttachedObjectsChanged();

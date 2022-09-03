@@ -266,7 +266,7 @@ public class CharacterDataFactory
 
         foreach (var item in previousData.FileReplacements[objectKind])
         {
-            transientResourceManager.RemoveTransientResource((IntPtr)human, item);
+            transientResourceManager.RemoveTransientResource(charaPointer, item);
         }
 
         if (objectKind == ObjectKind.Player)
@@ -281,7 +281,7 @@ public class CharacterDataFactory
 
                 foreach (var item in previousData.FileReplacements[objectKind])
                 {
-                    transientResourceManager.RemoveTransientResource((IntPtr)weaponObject, item);
+                    transientResourceManager.RemoveTransientResource(charaPointer, item);
                 }
 
                 foreach (var item in transientResourceManager.GetTransientResources((IntPtr)weaponObject))
@@ -329,11 +329,11 @@ public class CharacterDataFactory
 
             foreach (var item in previousData.FileReplacements[objectKind])
             {
-                transientResourceManager.RemoveTransientResource((IntPtr)human, item);
+                transientResourceManager.RemoveTransientResource(charaPointer, item);
             }
         }
 
-        foreach (var item in transientResourceManager.GetTransientResources((IntPtr)human))
+        foreach (var item in transientResourceManager.GetTransientResources(charaPointer))
         {
             Logger.Verbose("Found transient resource: " + item);
             AddReplacement(item, objectKind, previousData, 1);

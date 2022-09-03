@@ -28,11 +28,11 @@ namespace MareSynchronos.Utils
         public event LogOut? LogOut;
         public event FrameworkUpdate? FrameworkUpdate;
 
-        public unsafe bool IsDrawObjectPresent(IntPtr key)
+        public unsafe bool IsGameObjectPresent(IntPtr key)
         {
             foreach (var obj in _objectTable)
             {
-                if ((IntPtr)((GameObject*)obj.Address)->GetDrawObject() == key)
+                if (obj.Address == key)
                 {
                     return true;
                 }
@@ -105,7 +105,7 @@ namespace MareSynchronos.Utils
 
         public string PlayerName => _clientState.LocalPlayer?.Name.ToString() ?? "--";
 
-        public IntPtr PlayerPointer => _clientState.LocalPlayer!.Address;
+        public IntPtr PlayerPointer => _clientState.LocalPlayer?.Address ?? IntPtr.Zero;
 
         public PlayerCharacter PlayerCharacter => _clientState.LocalPlayer!;
 

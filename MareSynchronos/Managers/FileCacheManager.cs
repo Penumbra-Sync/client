@@ -316,7 +316,7 @@ namespace MareSynchronos.Managers
                     foreach (var deletion in fileCachesToDelete)
                     {
                         var entries = db.FileCaches.Where(f =>
-                            f.Hash == deletion.Hash && f.Filepath.ToLowerInvariant() == deletion.Filepath.ToLowerInvariant());
+                            f.Hash == deletion.Hash && f.Filepath.ToLower() == deletion.Filepath.ToLower());
                         if (await entries.AnyAsync(ct))
                         {
                             Logger.Verbose("Removing file from DB: " + deletion.Filepath);
