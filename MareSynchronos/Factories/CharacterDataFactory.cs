@@ -180,7 +180,7 @@ public class CharacterDataFactory
         }
     }
 
-    private void AddReplacement(string varPath, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0)
+    private void AddReplacement(string varPath, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0, bool doNotReverseResolve = false)
     {
         if (varPath.IsNullOrEmpty()) return;
 
@@ -192,7 +192,7 @@ public class CharacterDataFactory
             }
         }
 
-        var variousReplacement = CreateFileReplacement(varPath, false);
+        var variousReplacement = CreateFileReplacement(varPath, doNotReverseResolve);
         DebugPrint(variousReplacement, objectKind, "Various", inheritanceLevel);
 
         cache.AddFileReplacement(objectKind, variousReplacement);
@@ -343,7 +343,7 @@ public class CharacterDataFactory
         foreach (var item in transientResourceManager.GetTransientResources(charaPointer))
         {
             Logger.Verbose("Found transient resource: " + item);
-            AddReplacement(item, objectKind, previousData, 1);
+            AddReplacement(item, objectKind, previousData, 1, true);
         }
 
         foreach (var item in transientResourceManager.GetSemiTransientResources(objectKind))

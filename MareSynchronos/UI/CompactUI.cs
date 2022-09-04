@@ -34,15 +34,21 @@ namespace MareSynchronos.UI
         private float _windowContentWidth = 0;
 
         public CompactUi(WindowSystem windowSystem,
-            UiShared uiShared, Configuration configuration, ApiController apiController)
-#if DEBUG
-            : base("Mare Synchronos " + new FileInfo(Assembly.GetExecutingAssembly().Location).LastWriteTime.ToString("yyyyMMddHHmmss")+ "###MareSynchronosMainUI")
-#else
-            : base("Mare Synchronos " + Assembly.GetExecutingAssembly().GetName().Version + "###MareSynchronosMainUI")
-#endif
-
+            UiShared uiShared, Configuration configuration, ApiController apiController) : base("###MareSynchronosMainUI")
         {
             Logger.Verbose("Creating " + nameof(CompactUi));
+
+#if DEBUG
+            string dateTime = "DEV VERSION";
+            try
+            {
+                dateTime = new FileInfo(Assembly.GetExecutingAssembly().Location).LastWriteTime.ToString("yyyyMMddHHmmss");
+            }
+            catch { }
+            this.WindowName = "Mare Synchronos " + dateTime + "###MareSynchronosMainUI";
+#else
+            this.WindowName = "Mare Synchronos " + Assembly.GetExecutingAssembly().GetName().Version + "###MareSynchronosMainUI";
+#endif
 
             _windowSystem = windowSystem;
             _uiShared = uiShared;

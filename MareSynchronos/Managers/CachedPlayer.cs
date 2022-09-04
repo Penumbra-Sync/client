@@ -11,6 +11,7 @@ using MareSynchronos.FileCacheDB;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
+using Newtonsoft.Json;
 
 namespace MareSynchronos.Managers;
 
@@ -141,6 +142,7 @@ public class CachedPlayer
             {
                 Dictionary<string, string> moddedPaths;
                 int attempts = 0;
+                //Logger.Verbose(JsonConvert.SerializeObject(_cachedData, Formatting.Indented));
                 while ((toDownloadReplacements = TryCalculateModdedDictionary(out moddedPaths)).Count > 0 && attempts++ <= 10)
                 {
                     Logger.Debug("Downloading missing files for player " + PlayerName + ", kind: " + objectKind);
@@ -192,7 +194,7 @@ public class CachedPlayer
         try
         {
             using var db = new FileCacheContext();
-            foreach (var item in _cachedData.FileReplacements.SelectMany(k => k.Value).ToList())
+            foreach (var item in _cachedData.FileReplacements.SelectMany(k => k.Value.Where(v => string.IsNullOrEmpty(v.FileSwapPath))).ToList())
             {
                 foreach (var gamePath in item.GamePaths)
                 {
@@ -205,6 +207,15 @@ public class CachedPlayer
                     {
                         missingFiles.Add(item);
                     }
+                }
+            }
+
+            foreach (var item in _cachedData.FileReplacements.SelectMany(k => k.Value.Where(v => !string.IsNullOrEmpty(v.FileSwapPath))).ToList())
+            {
+                foreach (var gamePath in item.GamePaths)
+                {
+                    Logger.Verbose("Adding file swap for " + gamePath + ":" + item.FileSwapPath);
+                    moddedDictionary[gamePath] = item.FileSwapPath;
                 }
             }
         }

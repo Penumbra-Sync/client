@@ -150,7 +150,7 @@ namespace MareSynchronos.WebAPI
             Logger.Verbose("New Token Created");
 
             List<string> unverifiedUploadHashes = new();
-            foreach (var item in character.FileReplacements.SelectMany(c => c.Value.Select(v => v.Hash).Distinct()).Distinct().ToList())
+            foreach (var item in character.FileReplacements.SelectMany(c => c.Value.Where(f => string.IsNullOrEmpty(f.FileSwapPath)).Select(v => v.Hash).Distinct()).Distinct().ToList())
             {
                 if (!_verifiedUploadedHashes.Contains(item))
                 {

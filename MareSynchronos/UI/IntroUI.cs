@@ -40,9 +40,10 @@ namespace MareSynchronos.UI
         private Dictionary<string, string> _languages = new() { { "English", "en" }, { "Deutsch", "de" }, { "Français", "fr" } };
         private int _currentLanguage;
 
-        private bool DarkSoulsCaptchaValid => _darkSoulsCaptcha1.Item2 == _enteredDarkSoulsCaptcha1
-            && _darkSoulsCaptcha2.Item2 == _enteredDarkSoulsCaptcha2
-            && _darkSoulsCaptcha3.Item2 == _enteredDarkSoulsCaptcha3;
+        private bool DarkSoulsCaptchaValid => _darkSoulsCaptcha1.Item2 == _enteredDarkSoulsCaptcha1.Trim()
+            && _darkSoulsCaptcha2.Item2 == _enteredDarkSoulsCaptcha2.Trim()
+            && _darkSoulsCaptcha3.Item2 == _enteredDarkSoulsCaptcha3.Trim();
+
 
         public void Dispose()
         {

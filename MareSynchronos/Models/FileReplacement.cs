@@ -8,6 +8,7 @@ using MareSynchronos.FileCacheDB;
 using System.IO;
 using MareSynchronos.API;
 using MareSynchronos.Utils;
+using System.Text.RegularExpressions;
 
 namespace MareSynchronos.Models
 {
@@ -20,11 +21,13 @@ namespace MareSynchronos.Models
             _penumbraDirectory = penumbraDirectory;
         }
 
-        public bool Computed => !HasFileReplacement || !string.IsNullOrEmpty(Hash);
+        public bool Computed => IsFileSwap || !HasFileReplacement || !string.IsNullOrEmpty(Hash);
 
         public List<string> GamePaths { get; set; } = new();
 
         public bool HasFileReplacement => GamePaths.Count >= 1 && GamePaths.Any(p => p != ResolvedPath);
+
+        public bool IsFileSwap => !Regex.IsMatch(ResolvedPath, @"^[a-zA-Z]:(/|\\)", RegexOptions.ECMAScript) && GamePaths.First() != ResolvedPath;
 
         public string Hash { get; set; } = string.Empty;
 
@@ -33,7 +36,7 @@ namespace MareSynchronos.Models
         public void SetResolvedPath(string path)
         {
             ResolvedPath = path.ToLowerInvariant().Replace('/', '\\').Replace(_penumbraDirectory, "").Replace('\\', '/');
-            if (!HasFileReplacement) return;
+            if (!HasFileReplacement || IsFileSwap) return;
 
             _ = Task.Run(() =>
             {
@@ -73,6 +76,7 @@ namespace MareSynchronos.Models
             {
                 GamePaths = GamePaths.ToArray(),
                 Hash = Hash,
+                FileSwapPath = IsFileSwap ? ResolvedPath : string.Empty
             };
         }
         public override string ToString()

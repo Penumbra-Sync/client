@@ -9,6 +9,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using System.Collections.Generic;
 using System.Linq;
 using MareSynchronos.Models;
+using Newtonsoft.Json;
 
 namespace MareSynchronos.Managers
 {
@@ -142,7 +143,9 @@ namespace MareSynchronos.Managers
 
             Logger.Verbose("Cache creation complete");
 
-            return PermanentDataCache.ToCharacterCacheDto();
+            var cache = PermanentDataCache.ToCharacterCacheDto();
+            //Logger.Verbose(JsonConvert.SerializeObject(cache, Formatting.Indented));
+            return cache;
         }
 
         private void IpcManager_PenumbraRedrawEvent(IntPtr address, int idx)
