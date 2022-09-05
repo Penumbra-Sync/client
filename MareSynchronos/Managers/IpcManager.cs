@@ -34,6 +34,7 @@ namespace MareSynchronos.Managers
         private readonly ICallGateSubscriber<string, string, Dictionary<string, string>, string, int, int>
             _penumbraSetTemporaryMod;
         private readonly DalamudUtil _dalamudUtil;
+        private readonly Queue<Action> actionQueue = new();
 
         public IpcManager(DalamudPluginInterface pi, DalamudUtil dalamudUtil)
         {
@@ -78,6 +79,15 @@ namespace MareSynchronos.Managers
             }
 
             this._dalamudUtil = dalamudUtil;
+            _dalamudUtil.FrameworkUpdate += HandleActionQueue;
+        }
+
+        private void HandleActionQueue()
+        {
+            while (actionQueue.TryDequeue(out var action))
+            {
+                action();
+            }
         }
 
         public event VoidDelegate? PenumbraInitialized;
@@ -113,6 +123,9 @@ namespace MareSynchronos.Managers
         {
             Logger.Verbose("Disposing " + nameof(IpcManager));
 
+            _dalamudUtil.FrameworkUpdate -= HandleActionQueue;
+            actionQueue.Clear();
+
             _penumbraDispose.Unsubscribe(PenumbraDispose);
             _penumbraInit.Unsubscribe(PenumbraInit);
             _penumbraObjectIsRedrawn.Unsubscribe(RedrawEvent);
@@ -121,25 +134,35 @@ namespace MareSynchronos.Managers
         public void GlamourerApplyAll(string? customization, IntPtr obj)
         {
             if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
-            var gameObj = _dalamudUtil.CreateGameObject(obj);
-            if (gameObj != null)
+            actionQueue.Enqueue(() =>
             {
-                _glamourerApplyAll!.InvokeAction(customization, gameObj);
-            }
+                var gameObj = _dalamudUtil.CreateGameObject(obj);
+                if (gameObj != null)
+                {
+                    Logger.Verbose("Glamourer applying for " + gameObj);
+                    _glamourerApplyAll!.InvokeAction(customization, gameObj);
+                }
+            });
         }
 
         public void GlamourerApplyOnlyEquipment(string customization, GameObject character)
         {
             if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
-            Logger.Verbose("Glamourer apply only equipment to " + character);
-            _glamourerApplyOnlyEquipment!.InvokeAction(customization, character);
+            actionQueue.Enqueue(() =>
+            {
+                Logger.Verbose("Glamourer apply only equipment to " + character);
+                _glamourerApplyOnlyEquipment!.InvokeAction(customization, character);
+            });
         }
 
         public void GlamourerApplyOnlyCustomization(string customization, GameObject character)
         {
             if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
-            Logger.Verbose("Glamourer apply only customization to " + character);
-            _glamourerApplyOnlyCustomization!.InvokeAction(customization, character);
+            actionQueue.Enqueue(() =>
+            {
+                Logger.Verbose("Glamourer apply only customization to " + character);
+                _glamourerApplyOnlyCustomization!.InvokeAction(customization, character);
+            });
         }
 
         public string GlamourerGetCharacterCustomization(GameObject character)
@@ -163,7 +186,7 @@ namespace MareSynchronos.Managers
         public void GlamourerRevertCharacterCustomization(GameObject character)
         {
             if (!CheckGlamourerApi()) return;
-            _glamourerRevertCustomization!.InvokeAction(character);
+            actionQueue.Enqueue(() => _glamourerRevertCustomization!.InvokeAction(character));
         }
 
         public string PenumbraCreateTemporaryCollection(string characterName)
@@ -189,31 +212,37 @@ namespace MareSynchronos.Managers
         public void PenumbraRedraw(IntPtr obj)
         {
             if (!CheckPenumbraApi()) return;
-            var gameObj = _dalamudUtil.CreateGameObject(obj);
-            if (gameObj != null)
+            actionQueue.Enqueue(() =>
             {
-                _penumbraRedrawObject!.InvokeAction(gameObj, 0);
-            }
+                var gameObj = _dalamudUtil.CreateGameObject(obj);
+                if (gameObj != null)
+                {
+                    Logger.Verbose("Redrawing " + gameObj);
+                    _penumbraRedrawObject!.InvokeAction(gameObj, 0);
+                }
+            });
         }
 
         public void PenumbraRedraw(string actorName)
         {
             if (!CheckPenumbraApi()) return;
-            _penumbraRedraw!.InvokeAction(actorName, 0);
+            actionQueue.Enqueue(() => _penumbraRedraw!.InvokeAction(actorName, 0));
         }
 
         public void PenumbraRemoveTemporaryCollection(string characterName)
         {
             if (!CheckPenumbraApi()) return;
-            Logger.Verbose("Removing temp collection for " + characterName);
-            _penumbraRemoveTemporaryCollection.InvokeFunc(characterName);
+            actionQueue.Enqueue(() =>
+            {
+                Logger.Verbose("Removing temp collection for " + characterName);
+                _penumbraRemoveTemporaryCollection.InvokeFunc(characterName);
+            });
         }
 
         public string? PenumbraResolvePath(string path)
         {
             if (!CheckPenumbraApi()) return null;
             var resolvedPath = _penumbraResolvePlayer!.InvokeFunc(path);
-            //Logger.Verbose("Resolved " + path + "=>" + string.Join(", ", resolvedPath));
             return resolvedPath;
         }
 
@@ -225,7 +254,6 @@ namespace MareSynchronos.Managers
             {
                 resolvedPaths = new[] { path };
             }
-            //Logger.Verbose("Reverse Resolved " + path + "=>" + string.Join(", ", resolvedPaths));
             return resolvedPaths;
         }
 
@@ -235,13 +263,12 @@ namespace MareSynchronos.Managers
 
             actionQueue.Enqueue(() =>
             {
-                var ret = _penumbraCreateTemporaryCollection.InvokeFunc("MareSynchronos", characterName, true);
-                Logger.Verbose("Assigning temp mods for " + ret.Item2);
+                Logger.Verbose("Assigning temp mods for " + collectionName);
                 foreach (var mod in modPaths)
                 {
                     Logger.Verbose(mod.Key + " => " + mod.Value);
                 }
-                _penumbraSetTemporaryMod.InvokeFunc("MareSynchronos", ret.Item2, modPaths, manipulationData, 0);
+                _penumbraSetTemporaryMod.InvokeFunc("MareSynchronos", collectionName, modPaths, manipulationData, 0);
             });
         }
 
@@ -259,6 +286,7 @@ namespace MareSynchronos.Managers
         private void PenumbraDispose()
         {
             PenumbraDisposed?.Invoke();
+            actionQueue.Clear();
         }
     }
 }
