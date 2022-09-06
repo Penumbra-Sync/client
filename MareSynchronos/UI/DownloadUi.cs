@@ -101,7 +101,7 @@ public class DownloadUi : Window, IDisposable
 
         if (_apiController.CurrentDownloads.Any())
         {
-            var currentDownloads = _apiController.CurrentDownloads.SelectMany(k => k.Value).ToList();
+            var currentDownloads = _apiController.CurrentDownloads.Where(d => d.Value != null && d.Value.Any()).ToList().SelectMany(k => k.Value).ToList();
             var multBase = currentDownloads.Any() ? 0 : 2;
             var doneDownloads = currentDownloads.Count(c => c.IsTransferred);
             var totalDownloads = currentDownloads.Count;

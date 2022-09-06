@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using Dalamud.Game.ClientState.Objects.Types;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
+using Lumina.Excel.GeneratedSheets;
+using Action = System.Action;
 
 namespace MareSynchronos.Managers
 {
@@ -227,16 +229,20 @@ namespace MareSynchronos.Managers
             return resolvedPaths;
         }
 
-        public void PenumbraSetTemporaryMods(string collectionName, Dictionary<string, string> modPaths, string manipulationData)
+        public void PenumbraSetTemporaryMods(string characterName, Dictionary<string, string> modPaths, string manipulationData)
         {
             if (!CheckPenumbraApi()) return;
 
-            Logger.Verbose("Assigning temp mods for " + collectionName);
-            foreach (var mod in modPaths)
+            actionQueue.Enqueue(() =>
             {
-                Logger.Verbose(mod.Key + " => " + mod.Value);
-            }
-            var ret = _penumbraSetTemporaryMod.InvokeFunc("MareSynchronos", collectionName, modPaths, manipulationData, 0);
+                var ret = _penumbraCreateTemporaryCollection.InvokeFunc("MareSynchronos", characterName, true);
+                Logger.Verbose("Assigning temp mods for " + ret.Item2);
+                foreach (var mod in modPaths)
+                {
+                    Logger.Verbose(mod.Key + " => " + mod.Value);
+                }
+                _penumbraSetTemporaryMod.InvokeFunc("MareSynchronos", ret.Item2, modPaths, manipulationData, 0);
+            });
         }
 
         private void RedrawEvent(IntPtr objectAddress, int objectTableIndex)
