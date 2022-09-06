@@ -137,6 +137,13 @@ namespace MareSynchronos.Managers
         {
             Logger.Verbose("Disposing " + nameof(IpcManager));
 
+            int totalSleepTime = 0;
+            while (actionQueue.Count > 0 && totalSleepTime < 2000)
+            {
+                System.Threading.Thread.Sleep(16);
+                totalSleepTime += 16;
+            }
+
             _dalamudUtil.FrameworkUpdate -= HandleActionQueue;
             actionQueue.Clear();
 

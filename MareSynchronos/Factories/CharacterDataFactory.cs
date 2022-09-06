@@ -268,66 +268,7 @@ public class CharacterDataFactory
 
         if (objectKind == ObjectKind.Player)
         {
-            var weaponObject = (Weapon*)((Object*)human)->ChildObject;
-
-            if ((IntPtr)weaponObject != IntPtr.Zero)
-            {
-                var mainHandWeapon = weaponObject->WeaponRenderModel->RenderModel;
-
-                AddReplacementsFromRenderModel(mainHandWeapon, objectKind, previousData, 0);
-
-                foreach (var item in previousData.FileReplacements[objectKind])
-                {
-                    transientResourceManager.RemoveTransientResource(charaPointer, item);
-                }
-
-                foreach (var item in transientResourceManager.GetTransientResources((IntPtr)weaponObject))
-                {
-                    Logger.Verbose("Found transient weapon resource: " + item);
-                    AddReplacementsFromTexture(item, objectKind, previousData, 0, false);
-                }
-
-                if (weaponObject->NextSibling != (IntPtr)weaponObject)
-                {
-                    var offHandWeapon = ((Weapon*)weaponObject->NextSibling)->WeaponRenderModel->RenderModel;
-
-                    AddReplacementsFromRenderModel(offHandWeapon, objectKind, previousData, 1);
-
-                    foreach (var item in previousData.FileReplacements[objectKind])
-                    {
-                        transientResourceManager.RemoveTransientResource((IntPtr)offHandWeapon, item);
-                    }
-
-                    foreach (var item in transientResourceManager.GetTransientResources((IntPtr)weaponObject))
-                    {
-                        Logger.Verbose("Found transient offhand weapon resource: " + item);
-                        AddReplacement(item, objectKind, previousData, 1);
-                    }
-                }
-            }
-
-            AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId, objectKind, previousData);
-            try
-            {
-                AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->Decal->FileName()).ToString(), objectKind, previousData, 0, false);
-            }
-            catch
-            {
-                Logger.Warn("Could not get Decal data");
-            }
-            try
-            {
-                AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), objectKind, previousData, 0, false);
-            }
-            catch
-            {
-                Logger.Warn("Could not get Legacy Body Decal Data");
-            }
-
-            foreach (var item in previousData.FileReplacements[objectKind])
-            {
-                transientResourceManager.RemoveTransientResource(charaPointer, item);
-            }
+            AddPlayerSpecificReplacements(previousData, objectKind, charaPointer, human);
         }
 
         if (objectKind == ObjectKind.Pet)
@@ -340,14 +281,26 @@ public class CharacterDataFactory
             previousData.FileReplacements[objectKind].Clear();
         }
 
-        foreach (var item in transientResourceManager.GetTransientResources(charaPointer))
+        ManageSemiTransientData(previousData, objectKind, charaPointer);
+
+        st.Stop();
+        Logger.Verbose("Building " + objectKind + " Data took " + st.Elapsed);
+        return previousData;
+    }
+
+    private unsafe void ManageSemiTransientData(CharacterData previousData, ObjectKind objectKind, IntPtr charaPointer)
+    {
+        transientResourceManager.PersistTransientResources(charaPointer, objectKind, CreateFileReplacement);
+
+        /*foreach (var item in transientResourceManager.GetTransientResources(charaPointer))
         {
             if (!previousData.FileReplacements[objectKind].Any(f => f.GamePaths.Any(p => p.ToLowerInvariant() == item.ToLowerInvariant())))
             {
                 Logger.Verbose("Found transient resource: " + item);
                 AddReplacement(item, objectKind, previousData, 1, true);
             }
-        }
+        }*/
+
 
         foreach (var item in transientResourceManager.GetSemiTransientResources(objectKind))
         {
@@ -369,12 +322,70 @@ public class CharacterDataFactory
                 }
             }
         }
+    }
 
-        transientResourceManager.PersistTransientResources(charaPointer, objectKind, CreateFileReplacement);
+    private unsafe void AddPlayerSpecificReplacements(CharacterData previousData, ObjectKind objectKind, IntPtr charaPointer, Human* human)
+    {
+        var weaponObject = (Weapon*)((Object*)human)->ChildObject;
 
-        st.Stop();
-        Logger.Verbose("Building " + objectKind + " Data took " + st.Elapsed);
-        return previousData;
+        if ((IntPtr)weaponObject != IntPtr.Zero)
+        {
+            var mainHandWeapon = weaponObject->WeaponRenderModel->RenderModel;
+
+            AddReplacementsFromRenderModel(mainHandWeapon, objectKind, previousData, 0);
+
+            foreach (var item in previousData.FileReplacements[objectKind])
+            {
+                transientResourceManager.RemoveTransientResource(charaPointer, item);
+            }
+
+            foreach (var item in transientResourceManager.GetTransientResources((IntPtr)weaponObject))
+            {
+                Logger.Verbose("Found transient weapon resource: " + item);
+                AddReplacement(item, objectKind, previousData, 1, true);
+            }
+
+            if (weaponObject->NextSibling != (IntPtr)weaponObject)
+            {
+                var offHandWeapon = ((Weapon*)weaponObject->NextSibling)->WeaponRenderModel->RenderModel;
+
+                AddReplacementsFromRenderModel(offHandWeapon, objectKind, previousData, 1);
+
+                foreach (var item in previousData.FileReplacements[objectKind])
+                {
+                    transientResourceManager.RemoveTransientResource((IntPtr)offHandWeapon, item);
+                }
+
+                foreach (var item in transientResourceManager.GetTransientResources((IntPtr)offHandWeapon))
+                {
+                    Logger.Verbose("Found transient offhand weapon resource: " + item);
+                    AddReplacement(item, objectKind, previousData, 1, true);
+                }
+            }
+        }
+
+        AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId, objectKind, previousData);
+        try
+        {
+            AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->Decal->FileName()).ToString(), objectKind, previousData, 0, false);
+        }
+        catch
+        {
+            Logger.Warn("Could not get Decal data");
+        }
+        try
+        {
+            AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), objectKind, previousData, 0, false);
+        }
+        catch
+        {
+            Logger.Warn("Could not get Legacy Body Decal Data");
+        }
+
+        foreach (var item in previousData.FileReplacements[objectKind])
+        {
+            transientResourceManager.RemoveTransientResource(charaPointer, item);
+        }
     }
 
     private void AddReplacementSkeleton(ushort raceSexId, ObjectKind objectKind, CharacterData cache)

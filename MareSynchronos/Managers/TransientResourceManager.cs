@@ -88,12 +88,22 @@ namespace MareSynchronos.Managers
                 filePath = filePath.Split("|")[2];
             }
 
-            var newPath = gamePath.ToLowerInvariant().Replace("\\", "/");
+            filePath = filePath.ToLowerInvariant();
 
-            if (filePath != gamePath && !TransientResources[gameObject].Contains(newPath) && !SemiTransientResources.Any(r => r.Value.Any(f => f.GamePaths.First().ToLowerInvariant() == newPath.ToLowerInvariant())))
+            var replacedGamePath = gamePath.ToLowerInvariant().Replace("\\", "/");
+
+            if (TransientResources[gameObject].Contains(replacedGamePath) ||
+                SemiTransientResources.Any(r => r.Value.Any(f => f.GamePaths.First().ToLowerInvariant() == replacedGamePath
+                    && f.ResolvedPath.ToLowerInvariant() == filePath)))
             {
-                TransientResources[gameObject].Add(newPath);
-                Logger.Debug($"Adding {newPath.ToLowerInvariant().Replace("\\", "/")} for {gameObject} ({filePath})");
+                Logger.Debug("Not adding " + replacedGamePath + ":" + filePath);
+                Logger.Verbose("SemiTransientAny: " + SemiTransientResources.Any(r => r.Value.Any(f => f.GamePaths.First().ToLowerInvariant() == replacedGamePath
+                    && f.ResolvedPath.ToLowerInvariant() == filePath)).ToString() + ", TransientAny: " + TransientResources[gameObject].Contains(replacedGamePath));
+            }
+            else
+            {
+                TransientResources[gameObject].Add(replacedGamePath);
+                Logger.Debug($"Adding {replacedGamePath} for {gameObject} ({filePath})");
                 TransientResourceLoaded?.Invoke(gameObject);
             }
         }
@@ -102,7 +112,7 @@ namespace MareSynchronos.Managers
         {
             if (TransientResources.ContainsKey(gameObject))
             {
-                TransientResources[gameObject].RemoveWhere(f => fileReplacement.ResolvedPath == f);
+                TransientResources[gameObject].RemoveWhere(f => fileReplacement.ResolvedPath.ToLowerInvariant() == f.ToLowerInvariant());
             }
         }
 
@@ -122,7 +132,14 @@ namespace MareSynchronos.Managers
             Logger.Debug("Persisting " + transientResources.Count + " transient resources");
             foreach (var item in transientResources)
             {
-                if (!SemiTransientResources[objectKind].Any(f => f.ResolvedPath.ToLowerInvariant() == item.ToLowerInvariant()))
+                var existingResource = SemiTransientResources[objectKind].Any(f => f.GamePaths.First().ToLowerInvariant() == item.ToLowerInvariant());
+                if (existingResource)
+                {
+                    Logger.Debug("Semi Transient resource replaced: " + item);
+                    SemiTransientResources[objectKind].RemoveWhere(f => f.GamePaths.First().ToLowerInvariant() == item.ToLowerInvariant());
+                }
+
+                if (!SemiTransientResources[objectKind].Any(f => f.GamePaths.First().ToLowerInvariant() == item.ToLowerInvariant()))
                 {
                     Logger.Debug("Persisting " + item.ToLowerInvariant());
                     var fileReplacement = createFileReplacement(item.ToLowerInvariant(), true);
