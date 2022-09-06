@@ -95,7 +95,7 @@ namespace MareSynchronos.WebAPI
                 {
                     File.Delete(tempFile);
                     Logger.Debug("Detected cancellation, removing " + currentDownloadId);
-                    CurrentDownloads.Remove(currentDownloadId);
+                    CancelDownload(currentDownloadId);
                     break;
                 }
 
@@ -136,7 +136,7 @@ namespace MareSynchronos.WebAPI
             }
 
             Logger.Debug("Download complete, removing " + currentDownloadId);
-            CurrentDownloads.Remove(currentDownloadId);
+            CancelDownload(currentDownloadId);
         }
 
         public async Task PushCharacterData(CharacterCacheDto character, List<string> visibleCharacterIds)
@@ -292,7 +292,10 @@ namespace MareSynchronos.WebAPI
 
         public void CancelDownload(int downloadId)
         {
-            CurrentDownloads.Remove(downloadId);
+            while (CurrentDownloads.ContainsKey(downloadId))
+            {
+                CurrentDownloads.TryRemove(downloadId, out _);
+            }
         }
     }
 

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
@@ -93,7 +94,7 @@ namespace MareSynchronos.WebAPI
 
         public event SimpleStringDelegate? UnpairedFromOther;
 
-        public Dictionary<int, List<DownloadFileTransfer>> CurrentDownloads { get; } = new();
+        public ConcurrentDictionary<int, List<DownloadFileTransfer>> CurrentDownloads { get; } = new();
 
         public List<FileTransfer> CurrentUploads { get; } = new();
 

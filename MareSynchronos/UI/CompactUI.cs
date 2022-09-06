@@ -378,7 +378,7 @@ namespace MareSynchronos.UI
 
             if (currentDownloads.Any())
             {
-                var totalDownloads = currentDownloads.Count;
+                var totalDownloads = currentDownloads.Count();
                 var doneDownloads = currentDownloads.Count(c => c.IsTransferred);
                 var totalDownloaded = currentDownloads.Sum(c => c.Transferred);
                 var totalToDownload = currentDownloads.Sum(c => c.Total);
