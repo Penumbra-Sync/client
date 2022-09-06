@@ -238,7 +238,7 @@ public class CharacterDataFactory
             Logger.Verbose("Character is null but it shouldn't be, waiting");
             Thread.Sleep(50);
         }
-        
+
         _dalamudUtil.WaitWhileCharacterIsDrawing(charaPointer);
 
         Stopwatch st = Stopwatch.StartNew();
@@ -342,21 +342,31 @@ public class CharacterDataFactory
 
         foreach (var item in transientResourceManager.GetTransientResources(charaPointer))
         {
-            Logger.Verbose("Found transient resource: " + item);
-            AddReplacement(item, objectKind, previousData, 1, true);
+            if (!previousData.FileReplacements[objectKind].Any(f => f.GamePaths.Any(p => p.ToLowerInvariant() == item.ToLowerInvariant())))
+            {
+                Logger.Verbose("Found transient resource: " + item);
+                AddReplacement(item, objectKind, previousData, 1, true);
+            }
         }
 
         foreach (var item in transientResourceManager.GetSemiTransientResources(objectKind))
         {
-            Logger.Verbose("Found semi transient resource: " + item);
             if (!previousData.FileReplacements.ContainsKey(objectKind))
             {
                 previousData.FileReplacements.Add(objectKind, new());
             }
 
-            if (!previousData.FileReplacements[objectKind].Any(k => k.ResolvedPath == item.ResolvedPath))
+            if (!previousData.FileReplacements[objectKind].Any(k => k.ResolvedPath.ToLowerInvariant() == item.ResolvedPath.ToLowerInvariant()))
             {
-                previousData.FileReplacements[objectKind].Add(item);
+                if (_ipcManager.PenumbraResolvePath(item.GamePaths.First()).ToLowerInvariant() == item.GamePaths.First().ToLowerInvariant())
+                {
+                    transientResourceManager.RemoveTransientResource(charaPointer, item);
+                }
+                else
+                {
+                    Logger.Verbose("Found semi transient resource: " + item);
+                    previousData.FileReplacements[objectKind].Add(item);
+                }
             }
         }
 

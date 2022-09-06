@@ -254,11 +254,11 @@ namespace MareSynchronos.Managers
             });
         }
 
-        public string? PenumbraResolvePath(string path)
+        public string PenumbraResolvePath(string path)
         {
-            if (!CheckPenumbraApi()) return null;
+            if (!CheckPenumbraApi()) return path;
             var resolvedPath = _penumbraResolvePlayer!.InvokeFunc(path);
-            return resolvedPath;
+            return resolvedPath ?? path;
         }
 
         public string[] PenumbraReverseResolvePlayer(string path)

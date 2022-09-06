@@ -157,7 +157,7 @@ namespace MareSynchronos.Managers
                 if (address == item.Address)
                 {
                     Logger.Debug("Penumbra redraw Event for " + item.ObjectKind);
-                    _transientResourceManager.CleanSemiTransientResources(item.ObjectKind);
+                    //_transientResourceManager.CleanSemiTransientResources(item.ObjectKind);
                     item.HasUnprocessedUpdate = true;
                 }
             }
