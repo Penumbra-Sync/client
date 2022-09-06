@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using Dalamud.Game.ClientState.Objects.Types;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using Lumina.Excel.GeneratedSheets;
 using Action = System.Action;
 
 namespace MareSynchronos.Managers
@@ -86,6 +85,7 @@ namespace MareSynchronos.Managers
         {
             while (actionQueue.TryDequeue(out var action))
             {
+                Logger.Debug("Execution action in queue: " + action.Method);
                 action();
             }
         }
@@ -263,12 +263,13 @@ namespace MareSynchronos.Managers
 
             actionQueue.Enqueue(() =>
             {
-                Logger.Verbose("Assigning temp mods for " + characterName);
+                var ret = _penumbraCreateTemporaryCollection.InvokeFunc("MareSynchronos", characterName, true);
+                Logger.Verbose("Assigning temp mods for " + ret.Item2);
                 foreach (var mod in modPaths)
                 {
                     Logger.Verbose(mod.Key + " => " + mod.Value);
                 }
-                _penumbraSetTemporaryMod.InvokeFunc("MareSynchronos", characterName, modPaths, manipulationData, 0);
+                _penumbraSetTemporaryMod.InvokeFunc("MareSynchronos", ret.Item2, modPaths, manipulationData, 0);
             });
         }
 
