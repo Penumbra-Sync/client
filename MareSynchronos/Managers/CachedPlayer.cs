@@ -230,8 +230,7 @@ public class CachedPlayer
     private void ApplyBaseData(Dictionary<string, string> moddedPaths)
     {
         _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName!);
-        var tempCollection = _ipcManager.PenumbraCreateTemporaryCollection(PlayerName!);
-        _ipcManager.PenumbraSetTemporaryMods(tempCollection, moddedPaths, _cachedData.ManipulationData);
+        _ipcManager.PenumbraSetTemporaryMods(PlayerName!, moddedPaths, _cachedData.ManipulationData);
     }
 
     private unsafe void ApplyCustomizationData(ObjectKind objectKind)

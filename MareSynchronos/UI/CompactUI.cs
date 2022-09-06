@@ -42,9 +42,14 @@ namespace MareSynchronos.UI
             string dateTime = "DEV VERSION";
             try
             {
-                dateTime = new FileInfo(Assembly.GetExecutingAssembly().Location).LastWriteTime.ToString("yyyyMMddHHmmss");
+                dateTime = VariousExtensions.GetLinkerTime(Assembly.GetCallingAssembly()).ToString("yyyyMMddHHmmss");
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Logger.Warn("Could not get assembly name");
+                Logger.Warn(ex.Message);
+                Logger.Warn(ex.StackTrace);
+            }
             this.WindowName = "Mare Synchronos " + dateTime + "###MareSynchronosMainUI";
 #else
             this.WindowName = "Mare Synchronos " + Assembly.GetExecutingAssembly().GetName().Version + "###MareSynchronosMainUI";

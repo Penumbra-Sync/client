@@ -32,6 +32,10 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="6.0.8" />
   </ItemGroup>
 
+  <PropertyGroup>
+    <SourceRevisionId>build$([System.DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ss:fffZ"))</SourceRevisionId>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\MareAPI\MareSynchronosAPI\MareSynchronos.API.csproj" />
     <ProjectReference Include="..\Penumbra\Penumbra.GameData\Penumbra.GameData.csproj" />
