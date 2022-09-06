@@ -34,7 +34,9 @@ namespace MareSynchronos.UI
         private float _windowContentWidth = 0;
 
         public CompactUi(WindowSystem windowSystem,
-            UiShared uiShared, Configuration configuration, ApiController apiController)
+            UiShared uiShared, Configuration configuration, ApiController apiController) : base("###MareSynchronosMainUI")
+        {
+
 #if DEBUG
             string dateTime = "DEV VERSION";
             try
@@ -49,10 +51,8 @@ namespace MareSynchronos.UI
             }
             this.WindowName = "Mare Synchronos " + dateTime + "###MareSynchronosMainUI";
 #else
-            : base("Mare Synchronos " + Assembly.GetExecutingAssembly().GetName().Version + "###MareSynchronosMainUI")
+            this.WindowName = "Mare Synchronos " + Assembly.GetExecutingAssembly().GetName().Version;
 #endif
-
-        {
             Logger.Verbose("Creating " + nameof(CompactUi));
 
             _windowSystem = windowSystem;

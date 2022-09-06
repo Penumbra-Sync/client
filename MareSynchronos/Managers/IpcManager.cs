@@ -263,12 +263,12 @@ namespace MareSynchronos.Managers
 
             actionQueue.Enqueue(() =>
             {
-                Logger.Verbose("Assigning temp mods for " + collectionName);
+                Logger.Verbose("Assigning temp mods for " + characterName);
                 foreach (var mod in modPaths)
                 {
                     Logger.Verbose(mod.Key + " => " + mod.Value);
                 }
-                _penumbraSetTemporaryMod.InvokeFunc("MareSynchronos", collectionName, modPaths, manipulationData, 0);
+                _penumbraSetTemporaryMod.InvokeFunc("MareSynchronos", characterName, modPaths, manipulationData, 0);
             });
         }
 
