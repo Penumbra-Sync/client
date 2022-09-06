@@ -146,6 +146,7 @@ public class CachedPlayer
                 {
                     Logger.Debug("Downloading missing files for player " + PlayerName + ", kind: " + objectKind);
                     await _apiController.DownloadFiles(downloadId, toDownloadReplacements, downloadToken);
+                    _apiController.CancelDownload(downloadId);
                     if (downloadToken.IsCancellationRequested)
                     {
                         Logger.Verbose("Detected cancellation");
