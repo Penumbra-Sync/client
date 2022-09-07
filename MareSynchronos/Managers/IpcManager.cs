@@ -7,6 +7,7 @@ using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using Lumina.Excel.GeneratedSheets;
 using Action = System.Action;
+using System.Collections.Concurrent;
 
 namespace MareSynchronos.Managers
 {
@@ -36,7 +37,7 @@ namespace MareSynchronos.Managers
             _penumbraSetTemporaryMod;
         private readonly ICallGateSubscriber<IntPtr, string, string, object?> _penumbraGameObjectResourcePathResolved;
         private readonly DalamudUtil _dalamudUtil;
-        private readonly Queue<Action> actionQueue = new();
+        private readonly ConcurrentQueue<Action> actionQueue = new();
 
         public IpcManager(DalamudPluginInterface pi, DalamudUtil dalamudUtil)
         {
