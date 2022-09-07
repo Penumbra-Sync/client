@@ -287,7 +287,7 @@ public class CachedPlayer
                 {
                     Thread.Sleep(tick);
                     totalWait += tick;
-                    newPet = _dalamudUtil.GetPet(PlayerCharacter.Address);
+                    newPet = _dalamudUtil.GetPet(PlayerCharacter);
                 } while (newPet == pet && totalWait < maxWait);
 
                 if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
