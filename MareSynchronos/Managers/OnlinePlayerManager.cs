@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -19,11 +20,11 @@ public class OnlinePlayerManager : IDisposable
     private readonly Framework _framework;
     private readonly IpcManager _ipcManager;
     private readonly PlayerManager _playerManager;
-    private readonly List<CachedPlayer> _onlineCachedPlayers = new();
-    private readonly Dictionary<string, CharacterCacheDto> _temporaryStoredCharacterCache = new();
-    private readonly Dictionary<CachedPlayer, CancellationTokenSource> _playerTokenDisposal = new();
+    private readonly ConcurrentDictionary<string, CachedPlayer> _onlineCachedPlayers = new();
+    private readonly ConcurrentDictionary<string, CharacterCacheDto> _temporaryStoredCharacterCache = new();
+    private readonly ConcurrentDictionary<CachedPlayer, CancellationTokenSource> _playerTokenDisposal = new();
 
-    private List<string> OnlineVisiblePlayerHashes => _onlineCachedPlayers.Where(p => p.PlayerCharacter != null)
+    private List<string> OnlineVisiblePlayerHashes => _onlineCachedPlayers.Select(p => p.Value).Where(p => p.PlayerCharacter != null)
         .Select(p => p.PlayerNameHash).ToList();
     private DateTime _lastPlayerObjectCheck = DateTime.Now;
 
@@ -58,8 +59,7 @@ public class OnlinePlayerManager : IDisposable
 
     private void ApiControllerOnCharacterReceived(object? sender, CharacterReceivedEventArgs e)
     {
-        var visiblePlayer = _onlineCachedPlayers.SingleOrDefault(c => c.IsVisible && c.PlayerNameHash == e.CharacterNameHash);
-        if (visiblePlayer != null)
+        if (_onlineCachedPlayers.TryGetValue(e.CharacterNameHash, out var visiblePlayer) && visiblePlayer.IsVisible)
         {
             Logger.Debug("Received data and applying to " + e.CharacterNameHash);
             visiblePlayer.ApplyCharacterData(e.CharacterData);
@@ -99,7 +99,15 @@ public class OnlinePlayerManager : IDisposable
 
     private void IpcManagerOnPenumbraDisposed()
     {
-        _onlineCachedPlayers.ForEach(p => p.DisposePlayer());
+        DisposePlayers();
+    }
+
+    private void DisposePlayers()
+    {
+        foreach (var kvp in _onlineCachedPlayers)
+        {
+            kvp.Value.DisposePlayer();
+        }
     }
 
     private void ApiControllerOnDisconnected()
@@ -111,8 +119,11 @@ public class OnlinePlayerManager : IDisposable
     public void AddInitialPairs(List<string> apiTaskResult)
     {
         _onlineCachedPlayers.Clear();
-        _onlineCachedPlayers.AddRange(apiTaskResult.Select(CreateCachedPlayer));
-        Logger.Verbose("Online and paired users: " + string.Join(Environment.NewLine, _onlineCachedPlayers));
+        foreach (var hash in apiTaskResult)
+        {
+            _onlineCachedPlayers.TryAdd(hash, CreateCachedPlayer(hash));
+        }
+        Logger.Verbose("Online and paired users: " + string.Join(Environment.NewLine, _onlineCachedPlayers.Select(k => k.Key)));
     }
 
     public void Dispose()
@@ -138,7 +149,7 @@ public class OnlinePlayerManager : IDisposable
 
     private void RestoreAllCharacters()
     {
-        _onlineCachedPlayers.ForEach(p => p.DisposePlayer());
+        DisposePlayers();
         _onlineCachedPlayers.Clear();
     }
 
@@ -171,19 +182,23 @@ public class OnlinePlayerManager : IDisposable
 
     private void AddPlayer(string characterNameHash)
     {
-        if (_onlineCachedPlayers.Any(p => p.PlayerNameHash == characterNameHash))
+        if (_onlineCachedPlayers.TryGetValue(characterNameHash, out var cachedPlayer))
         {
             PushCharacterData(new List<string>() { characterNameHash });
-            _playerTokenDisposal.TryGetValue(_onlineCachedPlayers.Single(p => p.PlayerNameHash == characterNameHash), out var cancellationTokenSource);
+            _playerTokenDisposal.TryGetValue(cachedPlayer, out var cancellationTokenSource);
             cancellationTokenSource?.Cancel();
             return;
         }
-        _onlineCachedPlayers.Add(CreateCachedPlayer(characterNameHash));
+        _onlineCachedPlayers.TryAdd(characterNameHash, CreateCachedPlayer(characterNameHash));
     }
 
     private void RemovePlayer(string characterHash)
     {
-        var cachedPlayer = _onlineCachedPlayers.First(p => p.PlayerNameHash == characterHash);
+        if (!_onlineCachedPlayers.TryGetValue(characterHash, out var cachedPlayer))
+        {
+            return;
+        }
+
         if (_dalamudUtil.IsInGpose)
         {
             _playerTokenDisposal.TryGetValue(cachedPlayer, out var cancellationTokenSource);
@@ -202,14 +217,14 @@ public class OnlinePlayerManager : IDisposable
                 }
 
                 cachedPlayer.DisposePlayer();
-                _onlineCachedPlayers.RemoveAll(c => c.PlayerNameHash == cachedPlayer.PlayerNameHash);
+                _onlineCachedPlayers.TryRemove(characterHash, out _);
             }, token);
 
             return;
         }
 
         cachedPlayer.DisposePlayer();
-        _onlineCachedPlayers.RemoveAll(c => c.PlayerNameHash == cachedPlayer.PlayerNameHash);
+        _onlineCachedPlayers.TryRemove(characterHash, out _);
     }
 
     private void FrameworkOnUpdate(Framework framework)
@@ -222,22 +237,21 @@ public class OnlinePlayerManager : IDisposable
         foreach (var pChar in playerCharacters)
         {
             var hashedName = Crypto.GetHash256(pChar);
-            var existingCachedPlayer = _onlineCachedPlayers.SingleOrDefault(p => p.PlayerNameHash == hashedName && !string.IsNullOrEmpty(p.PlayerName));
-            if (existingCachedPlayer != null)
+            if (_onlineCachedPlayers.TryGetValue(hashedName, out var existingPlayer) && !string.IsNullOrEmpty(existingPlayer.PlayerName))
             {
-                existingCachedPlayer.IsVisible = true;
+                existingPlayer.IsVisible = true;
                 continue;
             }
 
-            if (_temporaryStoredCharacterCache.TryGetValue(hashedName, out var cache))
+            if (existingPlayer != null)
             {
-                _temporaryStoredCharacterCache.Remove(hashedName);
+                _temporaryStoredCharacterCache.TryRemove(hashedName, out var cache);
+                existingPlayer.InitializePlayer(pChar.Address, pChar.Name.ToString(), cache);
             }
-            _onlineCachedPlayers.SingleOrDefault(p => p.PlayerNameHash == hashedName)?.InitializePlayer(pChar, cache);
         }
 
-        var newlyVisiblePlayers = _onlineCachedPlayers
-            .Where(p => p.PlayerCharacter != null && p.IsVisible && !p.WasVisible).Select(p => p.PlayerNameHash)
+        var newlyVisiblePlayers = _onlineCachedPlayers.Select(v => v.Value)
+            .Where(p => p.PlayerCharacter != IntPtr.Zero && p.IsVisible && !p.WasVisible).Select(p => p.PlayerNameHash)
             .ToList();
         if (newlyVisiblePlayers.Any())
         {

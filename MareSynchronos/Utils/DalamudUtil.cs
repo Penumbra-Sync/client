@@ -6,7 +6,6 @@ using Dalamud.Game;
 using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
-using Dalamud.Game.ClientState.Objects.Types;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
@@ -27,6 +26,8 @@ namespace MareSynchronos.Utils
         public event LogIn? LogIn;
         public event LogOut? LogOut;
         public event FrameworkUpdate? FrameworkUpdate;
+        public event FrameworkUpdate? DelayedFrameworkUpdate;
+        private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
 
         public DalamudUtil(ClientState clientState, ObjectTable objectTable, Framework framework)
         {
@@ -44,7 +45,33 @@ namespace MareSynchronos.Utils
 
         private void FrameworkOnUpdate(Framework framework)
         {
-            FrameworkUpdate?.Invoke();
+            foreach (FrameworkUpdate frameworkInvocation in (FrameworkUpdate?.GetInvocationList() ?? Array.Empty<FrameworkUpdate>()).Cast<FrameworkUpdate>())
+            {
+                try
+                {
+                    frameworkInvocation.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex.Message);
+                    Logger.Warn(ex.StackTrace ?? string.Empty);
+                }
+            }
+
+            if (DateTime.Now < _delayedFrameworkUpdateCheck.AddSeconds(0.25)) return;
+            foreach (FrameworkUpdate frameworkInvocation in (DelayedFrameworkUpdate?.GetInvocationList() ?? Array.Empty<FrameworkUpdate>()).Cast<FrameworkUpdate>())
+            {
+                try
+                {
+                    frameworkInvocation.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex.Message);
+                    Logger.Warn(ex.StackTrace ?? string.Empty);
+                }
+            }
+            _delayedFrameworkUpdateCheck = DateTime.Now;
         }
 
         private void ClientStateOnLogout(object? sender, EventArgs e)

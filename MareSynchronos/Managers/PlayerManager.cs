@@ -26,7 +26,6 @@ namespace MareSynchronos.Managers
         private readonly Dictionary<ObjectKind, Func<bool>> objectKindsToUpdate = new();
 
         private CancellationTokenSource? _playerChangedCts = new();
-        private DateTime _lastPlayerObjectCheck;
 
         private List<PlayerRelatedObject> playerRelatedObjects = new List<PlayerRelatedObject>();
 
@@ -42,7 +41,7 @@ namespace MareSynchronos.Managers
 
             _apiController.Connected += ApiControllerOnConnected;
             _apiController.Disconnected += ApiController_Disconnected;
-            _dalamudUtil.FrameworkUpdate += DalamudUtilOnFrameworkUpdate;
+            _dalamudUtil.DelayedFrameworkUpdate += DalamudUtilOnDelayedFrameworkUpdate;
 
             Logger.Debug("Watching Player, ApiController is Connected: " + _apiController.IsConnected);
             if (_apiController.IsConnected)
@@ -67,22 +66,18 @@ namespace MareSynchronos.Managers
             _apiController.Disconnected -= ApiController_Disconnected;
 
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
-            _dalamudUtil.FrameworkUpdate -= DalamudUtilOnFrameworkUpdate;
+            _dalamudUtil.DelayedFrameworkUpdate -= DalamudUtilOnDelayedFrameworkUpdate;
         }
 
-        private unsafe void DalamudUtilOnFrameworkUpdate()
+        private unsafe void DalamudUtilOnDelayedFrameworkUpdate()
         {
             if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized) return;
-
-            if (DateTime.Now < _lastPlayerObjectCheck.AddSeconds(0.25)) return;
 
             playerRelatedObjects.ForEach(k => k.CheckAndUpdateObject());
             if (playerRelatedObjects.Any(c => c.HasUnprocessedUpdate && !c.IsProcessing))
             {
                 OnPlayerOrAttachedObjectsChanged();
             }
-
-            _lastPlayerObjectCheck = DateTime.Now;
         }
 
         private void ApiControllerOnConnected()
