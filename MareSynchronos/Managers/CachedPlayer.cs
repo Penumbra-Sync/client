@@ -40,7 +40,7 @@ public class CachedPlayer
         }
     }
 
-    private bool _isDisposed = false;
+    private bool _isDisposed = true;
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
 
     private string _lastGlamourerData = string.Empty;
@@ -206,6 +206,7 @@ public class CachedPlayer
                     }
                     else
                     {
+                        Logger.Verbose("Missing file: " + item.Hash);
                         missingFiles.Add(item);
                     }
                 }
@@ -397,6 +398,7 @@ public class CachedPlayer
 
     public void InitializePlayer(PlayerCharacter character, CharacterCacheDto? cache)
     {
+        if (!_isDisposed) return;
         Logger.Debug("Initializing Player " + this + " has cache: " + (cache != null));
         IsVisible = true;
         PlayerName = character.Name.ToString();

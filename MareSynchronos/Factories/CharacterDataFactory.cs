@@ -292,16 +292,6 @@ public class CharacterDataFactory
     {
         transientResourceManager.PersistTransientResources(charaPointer, objectKind, CreateFileReplacement);
 
-        /*foreach (var item in transientResourceManager.GetTransientResources(charaPointer))
-        {
-            if (!previousData.FileReplacements[objectKind].Any(f => f.GamePaths.Any(p => p.ToLowerInvariant() == item.ToLowerInvariant())))
-            {
-                Logger.Verbose("Found transient resource: " + item);
-                AddReplacement(item, objectKind, previousData, 1, true);
-            }
-        }*/
-
-
         foreach (var item in transientResourceManager.GetSemiTransientResources(objectKind))
         {
             if (!previousData.FileReplacements.ContainsKey(objectKind))
