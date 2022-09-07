@@ -6,7 +6,6 @@ using Dalamud.Game;
 using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
-using Dalamud.Game.ClientState.Objects.Types;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
@@ -30,6 +29,8 @@ namespace MareSynchronos.Utils
         public event FrameworkUpdate? FrameworkUpdate;
         public event ClassJobChanged? ClassJobChanged;
         private uint? classJobId = 0;
+        public event FrameworkUpdate? DelayedFrameworkUpdate;
+        private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
 
         public unsafe bool IsGameObjectPresent(IntPtr key)
         {
@@ -61,12 +62,36 @@ namespace MareSynchronos.Utils
 
         private void FrameworkOnUpdate(Framework framework)
         {
-            if(_clientState.LocalPlayer != null && _clientState.LocalPlayer.ClassJob.Id != classJobId)
+            foreach (FrameworkUpdate frameworkInvocation in (FrameworkUpdate?.GetInvocationList() ?? Array.Empty<FrameworkUpdate>()).Cast<FrameworkUpdate>())
             {
-                classJobId = _clientState.LocalPlayer.ClassJob.Id;
-                ClassJobChanged?.Invoke();
+                try
+                {
+                    frameworkInvocation.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex.Message);
+                    Logger.Warn(ex.StackTrace ?? string.Empty);
+                }
             }
-            FrameworkUpdate?.Invoke();
+
+            classJobId = _clientState.LocalPlayer.ClassJob.Id;
+            ClassJobChanged?.Invoke();
+
+            if (DateTime.Now < _delayedFrameworkUpdateCheck.AddSeconds(0.25)) return;
+            foreach (FrameworkUpdate frameworkInvocation in (DelayedFrameworkUpdate?.GetInvocationList() ?? Array.Empty<FrameworkUpdate>()).Cast<FrameworkUpdate>())
+            {
+                try
+                {
+                    frameworkInvocation.Invoke();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn(ex.Message);
+                    Logger.Warn(ex.StackTrace ?? string.Empty);
+                }
+            }
+            _delayedFrameworkUpdateCheck = DateTime.Now;
         }
 
         private void ClientStateOnLogout(object? sender, EventArgs e)

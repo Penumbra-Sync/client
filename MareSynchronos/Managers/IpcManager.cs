@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using Dalamud.Game.ClientState.Objects.Types;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using Lumina.Excel.GeneratedSheets;
 using Action = System.Action;
 using System.Collections.Concurrent;
 
@@ -87,20 +86,22 @@ namespace MareSynchronos.Managers
             _dalamudUtil.FrameworkUpdate += HandleActionQueue;
         }
 
-        private void HandleActionQueue()
-        {
-            while (actionQueue.TryDequeue(out var action))
-            {
-                action();
-            }
-        }
-
         private void ResourceLoaded(IntPtr ptr, string arg1, string arg2)
         {
             if (ptr != IntPtr.Zero && string.Compare(arg1, arg2, true, System.Globalization.CultureInfo.InvariantCulture) != 0)
             {
                 PenumbraResourceLoadEvent?.Invoke(ptr, arg1, arg2);
                 //Logger.Debug($"Resolved {ptr:X}: {arg1} => {arg2}");
+            }
+        }
+
+        private void HandleActionQueue()
+        {
+            if (actionQueue.TryDequeue(out var action))
+            {
+                if (action == null) return;
+                Logger.Debug("Execution action in queue: " + action.Method);
+                action();
             }
         }
 
@@ -168,37 +169,50 @@ namespace MareSynchronos.Managers
             });
         }
 
-        public void GlamourerApplyOnlyEquipment(string customization, GameObject character)
+        public void GlamourerApplyOnlyEquipment(string customization, IntPtr character)
         {
             if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
             actionQueue.Enqueue(() =>
             {
-                Logger.Verbose("Glamourer apply only equipment to " + character);
-                _glamourerApplyOnlyEquipment!.InvokeAction(customization, character);
+                var gameObj = _dalamudUtil.CreateGameObject(character);
+                if (gameObj != null)
+                {
+                    Logger.Verbose("Glamourer apply only equipment to " + character.ToString("X"));
+                    _glamourerApplyOnlyEquipment!.InvokeAction(customization, gameObj);
+                }
             });
         }
 
-        public void GlamourerApplyOnlyCustomization(string customization, GameObject character)
+        public void GlamourerApplyOnlyCustomization(string customization, IntPtr character)
         {
             if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
             actionQueue.Enqueue(() =>
             {
-                Logger.Verbose("Glamourer apply only customization to " + character);
-                _glamourerApplyOnlyCustomization!.InvokeAction(customization, character);
+                var gameObj = _dalamudUtil.CreateGameObject(character);
+                if (gameObj != null)
+                {
+                    Logger.Verbose("Glamourer apply only customization to " + character.ToString("X"));
+                    _glamourerApplyOnlyCustomization!.InvokeAction(customization, gameObj);
+                }
             });
         }
 
-        public string GlamourerGetCharacterCustomization(GameObject character)
+        public string GlamourerGetCharacterCustomization(IntPtr character)
         {
             if (!CheckGlamourerApi()) return string.Empty;
             try
             {
-                var glamourerString = _glamourerGetAllCustomization!.InvokeFunc(character);
-                byte[] bytes = Convert.FromBase64String(glamourerString);
-                // ignore transparency
-                bytes[88] = 128;
-                bytes[89] = 63;
-                return Convert.ToBase64String(bytes);
+                var gameObj = _dalamudUtil.CreateGameObject(character);
+                if (gameObj != null)
+                {
+                    var glamourerString = _glamourerGetAllCustomization!.InvokeFunc(gameObj);
+                    byte[] bytes = Convert.FromBase64String(glamourerString);
+                    // ignore transparency
+                    bytes[88] = 128;
+                    bytes[89] = 63;
+                    return Convert.ToBase64String(bytes);
+                }
+                return string.Empty;
             }
             catch
             {
@@ -210,14 +224,6 @@ namespace MareSynchronos.Managers
         {
             if (!CheckGlamourerApi()) return;
             actionQueue.Enqueue(() => _glamourerRevertCustomization!.InvokeAction(character));
-        }
-
-        public string PenumbraCreateTemporaryCollection(string characterName)
-        {
-            if (!CheckPenumbraApi()) return string.Empty;
-            Logger.Verbose("Creating temp collection for " + characterName);
-            var ret = _penumbraCreateTemporaryCollection.InvokeFunc("MareSynchronos", characterName, true);
-            return ret.Item2;
         }
 
         public string PenumbraGetMetaManipulations()

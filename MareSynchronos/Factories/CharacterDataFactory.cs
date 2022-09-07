@@ -245,7 +245,7 @@ public class CharacterDataFactory
 
         previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
 
-        previousData.GlamourerString[objectKind] = _ipcManager.GlamourerGetCharacterCustomization(chara);
+        previousData.GlamourerString[objectKind] = _ipcManager.GlamourerGetCharacterCustomization(charaPointer);
 
         var human = (Human*)((Character*)charaPointer)->GameObject.GetDrawObject();
         for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)

@@ -36,6 +36,23 @@ namespace MareSynchronos.UI
         public CompactUi(WindowSystem windowSystem,
             UiShared uiShared, Configuration configuration, ApiController apiController) : base("###MareSynchronosMainUI")
         {
+
+#if DEBUG
+            string dateTime = "DEV VERSION";
+            try
+            {
+                dateTime = VariousExtensions.GetLinkerTime(Assembly.GetCallingAssembly()).ToString("yyyyMMddHHmmss");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn("Could not get assembly name");
+                Logger.Warn(ex.Message);
+                Logger.Warn(ex.StackTrace);
+            }
+            this.WindowName = "Mare Synchronos " + dateTime + "###MareSynchronosMainUI";
+#else
+            this.WindowName = "Mare Synchronos " + Assembly.GetExecutingAssembly().GetName().Version;
+#endif
             Logger.Verbose("Creating " + nameof(CompactUi));
 
 #if DEBUG
