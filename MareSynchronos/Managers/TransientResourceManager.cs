@@ -1,5 +1,4 @@
 ﻿using MareSynchronos.API;
-using MareSynchronos.FileCacheDB;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using System;
@@ -42,7 +41,7 @@ namespace MareSynchronos.Managers
             {
                 if (!dalamudUtil.IsGameObjectPresent(item.Key))
                 {
-                    Logger.Debug("Object not present anymore: " + item.Key);
+                    Logger.Debug("Object not present anymore: " + item.Key.ToString("X"));
                     TransientResources.Remove(item.Key);
                 }
             }

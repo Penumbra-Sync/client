@@ -14,6 +14,7 @@ using Dalamud.Interface.Windowing;
 using MareSynchronos.UI;
 using MareSynchronos.Utils;
 using System.Runtime.InteropServices;
+using Dalamud.Game.ClientState.Conditions;
 
 namespace MareSynchronos
 {
@@ -42,7 +43,7 @@ namespace MareSynchronos
 
 
         public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager,
-            Framework framework, ObjectTable objectTable, ClientState clientState)
+            Framework framework, ObjectTable objectTable, ClientState clientState, Condition condition)
         {
             Logger.Debug("Launching " + Name);
             PluginInterface = pluginInterface;
@@ -60,7 +61,7 @@ namespace MareSynchronos
             new FileCacheContext().Dispose(); // make sure db is initialized I guess
 
             // those can be initialized outside of game login
-            _dalamudUtil = new DalamudUtil(clientState, objectTable, framework);
+            _dalamudUtil = new DalamudUtil(clientState, objectTable, framework, condition);
 
             _apiController = new ApiController(_configuration, _dalamudUtil);
             _ipcManager = new IpcManager(PluginInterface, _dalamudUtil);
@@ -124,7 +125,7 @@ namespace MareSynchronos
             _commandManager.RemoveHandler(CommandName);
             _dalamudUtil.LogIn -= DalamudUtilOnLogIn;
             _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
-
+            
             _uiSharedComponent.Dispose();
             _settingsUi?.Dispose();
             _introUi?.Dispose();
@@ -136,6 +137,7 @@ namespace MareSynchronos
             _playerManager?.Dispose();
             _characterCacheManager?.Dispose();
             _transientResourceManager?.Dispose();
+            _dalamudUtil.Dispose();
             Logger.Debug("Shut down");
         }
 

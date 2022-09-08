@@ -11,6 +11,7 @@ using MareSynchronos.WebAPI.Utils;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.WebAPI
 {
@@ -304,6 +305,10 @@ namespace MareSynchronos.WebAPI
                     options.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling;
                 })
                 .WithAutomaticReconnect(new ForeverRetryPolicy())
+                .ConfigureLogging(a => {
+                    a.ClearProviders().AddProvider(new DalamudLoggingProvider());
+                    a.SetMinimumLevel(LogLevel.Trace);
+                    })
                 .Build();
         }
 

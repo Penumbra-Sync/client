@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using Dalamud.Game;
 using Dalamud.Game.ClientState;
+using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
@@ -24,6 +25,8 @@ namespace MareSynchronos.Utils
         private readonly ClientState _clientState;
         private readonly ObjectTable _objectTable;
         private readonly Framework _framework;
+        private readonly Condition _condition;
+
         public event LogIn? LogIn;
         public event LogOut? LogOut;
         public event FrameworkUpdate? FrameworkUpdate;
@@ -45,11 +48,12 @@ namespace MareSynchronos.Utils
             return false;
         }
 
-        public DalamudUtil(ClientState clientState, ObjectTable objectTable, Framework framework)
+        public DalamudUtil(ClientState clientState, ObjectTable objectTable, Framework framework, Condition condition)
         {
             _clientState = clientState;
             _objectTable = objectTable;
             _framework = framework;
+            _condition = condition;
             _clientState.Login += ClientStateOnLogin;
             _clientState.Logout += ClientStateOnLogout;
             _framework.Update += FrameworkOnUpdate;
@@ -62,11 +66,16 @@ namespace MareSynchronos.Utils
 
         private void FrameworkOnUpdate(Framework framework)
         {
-            foreach (FrameworkUpdate frameworkInvocation in (FrameworkUpdate?.GetInvocationList() ?? Array.Empty<FrameworkUpdate>()).Cast<FrameworkUpdate>())
+            if (_condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51])
+            {
+                return;
+            }
+
+            foreach (FrameworkUpdate? frameworkInvocation in (FrameworkUpdate?.GetInvocationList() ?? Array.Empty<FrameworkUpdate>()).Cast<FrameworkUpdate>())
             {
                 try
                 {
-                    frameworkInvocation.Invoke();
+                    frameworkInvocation?.Invoke();
                 }
                 catch (Exception ex)
                 {
@@ -75,15 +84,23 @@ namespace MareSynchronos.Utils
                 }
             }
 
-            classJobId = _clientState.LocalPlayer.ClassJob.Id;
-            ClassJobChanged?.Invoke();
+            if (DateTime.Now < _delayedFrameworkUpdateCheck.AddSeconds(1)) return;
+            if (_clientState.LocalPlayer != null && _clientState.LocalPlayer.IsValid())
+            {
+                var newclassJobId = _clientState.LocalPlayer.ClassJob.Id;
 
-            if (DateTime.Now < _delayedFrameworkUpdateCheck.AddSeconds(0.25)) return;
-            foreach (FrameworkUpdate frameworkInvocation in (DelayedFrameworkUpdate?.GetInvocationList() ?? Array.Empty<FrameworkUpdate>()).Cast<FrameworkUpdate>())
+                if (classJobId != newclassJobId)
+                {
+                    classJobId = newclassJobId;
+                    ClassJobChanged?.Invoke();
+                }
+            }
+
+            foreach (FrameworkUpdate? frameworkInvocation in (DelayedFrameworkUpdate?.GetInvocationList() ?? Array.Empty<FrameworkUpdate>()).Cast<FrameworkUpdate>())
             {
                 try
                 {
-                    frameworkInvocation.Invoke();
+                    frameworkInvocation?.Invoke();
                 }
                 catch (Exception ex)
                 {
