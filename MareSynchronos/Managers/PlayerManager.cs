@@ -119,7 +119,7 @@ namespace MareSynchronos.Managers
             foreach (var unprocessedObject in playerRelatedObjects.Where(c => c.HasUnprocessedUpdate).ToList())
             {
                 Logger.Verbose("Building Cache for " + unprocessedObject.ObjectKind);
-                PermanentDataCache = await _characterDataFactory.BuildCharacterData(PermanentDataCache, unprocessedObject.ObjectKind, unprocessedObject.Address, token);
+                PermanentDataCache = _characterDataFactory.BuildCharacterData(PermanentDataCache, unprocessedObject.ObjectKind, unprocessedObject.Address, token);
                 if (!token.IsCancellationRequested)
                 {
                     unprocessedObject.HasUnprocessedUpdate = false;

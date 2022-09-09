@@ -40,7 +40,7 @@ public class CharacterDataFactory
         return playerPointer == IntPtr.Zero || ((Character*)playerPointer)->GameObject.GetDrawObject() == null;
     }
 
-    public async Task<CharacterData> BuildCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr playerPointer, CancellationToken token)
+    public CharacterData BuildCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr playerPointer, CancellationToken token)
     {
         if (!_ipcManager.Initialized)
         {
@@ -72,7 +72,7 @@ public class CharacterDataFactory
 
         try
         {
-            return await _dalamudUtil.RunOnFrameworkThread(() => CreateCharacterData(previousData, objectKind, playerPointer, token));
+            return CreateCharacterData(previousData, objectKind, playerPointer, token);
         }
         catch (OperationCanceledException)
         {
