@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Dalamud.Game;
 using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Conditions;
@@ -187,6 +188,11 @@ namespace MareSynchronos.Utils
             }
 
             return null;
+        }
+
+        public async Task<T> RunOnFrameworkThread<T>(Func<T> func)
+        {
+            return await _framework.RunOnFrameworkThread(func);
         }
 
         public unsafe void WaitWhileCharacterIsDrawing(string name, IntPtr characterAddress, CancellationToken? ct = null)

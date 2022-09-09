@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
+using Dalamud.Game;
 using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
@@ -33,7 +35,12 @@ public class CharacterDataFactory
         this.transientResourceManager = transientResourceManager;
     }
 
-    public unsafe CharacterData BuildCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr playerPointer, CancellationToken token)
+    private unsafe bool CheckForPointer(IntPtr playerPointer)
+    {
+        return playerPointer == IntPtr.Zero || ((Character*)playerPointer)->GameObject.GetDrawObject() == null;
+    }
+
+    public async Task<CharacterData> BuildCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr playerPointer, CancellationToken token)
     {
         if (!_ipcManager.Initialized)
         {
@@ -43,7 +50,7 @@ public class CharacterDataFactory
         bool pointerIsZero = true;
         try
         {
-            pointerIsZero = playerPointer == IntPtr.Zero || ((Character*)playerPointer)->GameObject.GetDrawObject() == null;
+            pointerIsZero = CheckForPointer(playerPointer);
         }
         catch (Exception ex)
         {
@@ -65,7 +72,7 @@ public class CharacterDataFactory
 
         try
         {
-            return CreateCharacterData(previousData, objectKind, playerPointer, token);
+            return await _dalamudUtil.RunOnFrameworkThread(() => CreateCharacterData(previousData, objectKind, playerPointer, token));
         }
         catch (OperationCanceledException)
         {
