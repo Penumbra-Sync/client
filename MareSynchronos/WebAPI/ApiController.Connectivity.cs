@@ -342,7 +342,7 @@ namespace MareSynchronos.WebAPI
                 _uploadCancellationTokenSource?.Cancel();
                 Logger.Info("Stopping existing connection");
                 _mareHub.Closed -= MareHubOnClosed;
-                _mareHub.Reconnecting += MareHubOnReconnecting;
+                _mareHub.Reconnecting -= MareHubOnReconnecting;
                 await _mareHub.StopAsync(token);
                 await _mareHub.DisposeAsync();
                 CurrentUploads.Clear();

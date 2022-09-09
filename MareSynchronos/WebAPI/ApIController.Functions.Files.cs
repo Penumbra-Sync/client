@@ -76,6 +76,8 @@ namespace MareSynchronos.WebAPI
             List<DownloadFileDto> downloadFileInfoFromService = new List<DownloadFileDto>();
             downloadFileInfoFromService.AddRange(await _mareHub!.InvokeAsync<List<DownloadFileDto>>(Api.InvokeGetFilesSizes, fileReplacementDto.Select(f => f.Hash).ToList(), ct));
 
+            Logger.Debug("Files with size 0 or less: " + string.Join(", ", downloadFileInfoFromService.Where(f => f.Size <= 0).Select(f => f.Hash)));
+
             CurrentDownloads[currentDownloadId] = downloadFileInfoFromService.Distinct().Select(d => new DownloadFileTransfer(d))
                 .Where(d => d.CanBeTransferred).ToList();
 
