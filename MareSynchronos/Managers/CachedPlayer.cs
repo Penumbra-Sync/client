@@ -165,7 +165,7 @@ public class CachedPlayer
 
             foreach (var kind in objectKind)
             {
-                ApplyCustomizationData(kind);
+                ApplyCustomizationData(kind, downloadToken);
             }
         }, downloadToken).ContinueWith(task =>
         {
@@ -225,14 +225,15 @@ public class CachedPlayer
         _ipcManager.PenumbraSetTemporaryMods(PlayerName!, moddedPaths, _cachedData.ManipulationData);
     }
 
-    private unsafe void ApplyCustomizationData(ObjectKind objectKind)
+    private unsafe void ApplyCustomizationData(ObjectKind objectKind, CancellationToken ct)
     {
         if (PlayerCharacter == IntPtr.Zero) return;
         _cachedData.GlamourerData.TryGetValue(objectKind, out var glamourerData);
 
         if (objectKind == ObjectKind.Player)
         {
-            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerCharacter);
+            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, ct);
+            ct.ThrowIfCancellationRequested();
             RequestedPenumbraRedraw = true;
             Logger.Debug(
                 $"Request Redraw for {PlayerName}");
@@ -251,7 +252,8 @@ public class CachedPlayer
             if (minionOrMount != null)
             {
                 Logger.Debug($"Request Redraw for Minion/Mount");
-                _dalamudUtil.WaitWhileCharacterIsDrawing((IntPtr)minionOrMount);
+                _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " minion or mount", (IntPtr)minionOrMount, ct);
+                ct.ThrowIfCancellationRequested();
                 if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                 {
                     _ipcManager.GlamourerApplyAll(glamourerData, obj: (IntPtr)minionOrMount);
@@ -296,7 +298,8 @@ public class CachedPlayer
             if (companion != IntPtr.Zero)
             {
                 Logger.Debug("Request Redraw for Companion");
-                _dalamudUtil.WaitWhileCharacterIsDrawing(companion);
+                _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " companion", companion, ct);
+                ct.ThrowIfCancellationRequested();
                 if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                 {
                     _ipcManager.GlamourerApplyAll(glamourerData, companion);
@@ -441,14 +444,16 @@ public class CachedPlayer
         _penumbraRedrawEventTask = Task.Run(() =>
         {
             PlayerCharacter = address;
-            using var cts = new CancellationTokenSource();
+            var cts = new CancellationTokenSource();
             cts.CancelAfter(TimeSpan.FromSeconds(5));
-            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerCharacter, cts.Token);
-
+            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, cts.Token);
+            cts.Dispose();
+            cts = new CancellationTokenSource();
+            cts.CancelAfter(TimeSpan.FromSeconds(5));
             if (RequestedPenumbraRedraw == false)
             {
                 Logger.Debug("Unauthorized character change detected");
-                ApplyCustomizationData(ObjectKind.Player);
+                ApplyCustomizationData(ObjectKind.Player, cts.Token);
             }
             else
             {
@@ -456,6 +461,7 @@ public class CachedPlayer
                 Logger.Debug(
                     $"Penumbra Redraw done for {PlayerName}");
             }
+            cts.Dispose();
         });
     }
 

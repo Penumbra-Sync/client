@@ -239,7 +239,7 @@ public class CharacterDataFactory
             Thread.Sleep(50);
         }
 
-        _dalamudUtil.WaitWhileCharacterIsDrawing(charaPointer);
+        _dalamudUtil.WaitWhileCharacterIsDrawing(objectKind.ToString(), charaPointer);
 
         Stopwatch st = Stopwatch.StartNew();
 

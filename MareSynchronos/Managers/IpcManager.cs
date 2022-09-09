@@ -142,10 +142,12 @@ namespace MareSynchronos.Managers
             int totalSleepTime = 0;
             while (actionQueue.Count > 0 && totalSleepTime < 2000)
             {
+                Logger.Verbose("Waiting for actionqueue to clear...");
                 System.Threading.Thread.Sleep(16);
                 totalSleepTime += 16;
             }
 
+            Logger.Verbose("Action queue clear or not, disposing");
             _dalamudUtil.FrameworkUpdate -= HandleActionQueue;
             actionQueue.Clear();
 
