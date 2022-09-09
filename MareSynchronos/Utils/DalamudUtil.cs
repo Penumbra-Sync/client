@@ -66,7 +66,7 @@ namespace MareSynchronos.Utils
 
         private void FrameworkOnUpdate(Framework framework)
         {
-            if (_condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51])
+            if (_condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51] || IsInGpose)
             {
                 return;
             }

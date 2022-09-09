@@ -165,8 +165,6 @@ namespace MareSynchronos.Managers
 
         private void OnPlayerOrAttachedObjectsChanged()
         {
-            if (_dalamudUtil.IsInGpose) return;
-
             var unprocessedObjects = playerRelatedObjects.Where(c => c.HasUnprocessedUpdate).ToList();
             foreach (var unprocessedObject in unprocessedObjects)
             {

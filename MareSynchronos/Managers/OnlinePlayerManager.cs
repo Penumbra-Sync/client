@@ -198,30 +198,6 @@ public class OnlinePlayerManager : IDisposable
             return;
         }
 
-        if (_dalamudUtil.IsInGpose)
-        {
-            _playerTokenDisposal.TryGetValue(cachedPlayer, out var cancellationTokenSource);
-            cancellationTokenSource?.Cancel();
-            cachedPlayer.IsVisible = false;
-            _playerTokenDisposal[cachedPlayer] = new CancellationTokenSource();
-            cancellationTokenSource = _playerTokenDisposal[cachedPlayer];
-            var token = cancellationTokenSource.Token;
-            Task.Run(async () =>
-            {
-                Logger.Verbose("Cannot dispose Player, in GPose");
-                while (_dalamudUtil.IsInGpose)
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(0.5));
-                    if (token.IsCancellationRequested) return;
-                }
-
-                cachedPlayer.DisposePlayer();
-                _onlineCachedPlayers.TryRemove(characterHash, out _);
-            }, token);
-
-            return;
-        }
-
         cachedPlayer.DisposePlayer();
         _onlineCachedPlayers.TryRemove(characterHash, out _);
     }

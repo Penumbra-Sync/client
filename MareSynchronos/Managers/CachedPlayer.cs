@@ -163,16 +163,6 @@ public class CachedPlayer
                 ApplyBaseData(moddedPaths);
             }
 
-            if (_dalamudUtil.IsInGpose)
-            {
-                Logger.Verbose("Player is in GPose, waiting");
-                while (_dalamudUtil.IsInGpose)
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(0.5));
-                    downloadToken.ThrowIfCancellationRequested();
-                }
-            }
-
             foreach (var kind in objectKind)
             {
                 ApplyCustomizationData(kind);
