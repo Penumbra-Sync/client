@@ -277,8 +277,6 @@ public class CharacterDataFactory
             {
                 Logger.Warn("Could not get Legacy Body Decal Data");
             }
-
-            previousData.HeelsOffset = _ipcManager.GetHeelsOffset();
         }
 
         st.Stop();
