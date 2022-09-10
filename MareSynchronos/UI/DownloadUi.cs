@@ -80,44 +80,52 @@ public class DownloadUi : Window, IDisposable
 
         var basePosition = ImGui.GetWindowPos() + ImGui.GetWindowContentRegionMin();
 
-        if (_apiController.CurrentUploads.Any())
+        try
         {
-            var currentUploads = _apiController.CurrentUploads.ToList();
-            var totalUploads = currentUploads.Count;
+            if (_apiController.CurrentUploads.Any())
+            {
+                var currentUploads = _apiController.CurrentUploads.ToList();
+                var totalUploads = currentUploads.Count;
 
-            var doneUploads = currentUploads.Count(c => c.IsTransferred);
-            var totalUploaded = currentUploads.Sum(c => c.Transferred);
-            var totalToUpload = currentUploads.Sum(c => c.Total);
+                var doneUploads = currentUploads.Count(c => c.IsTransferred);
+                var totalUploaded = currentUploads.Sum(c => c.Transferred);
+                var totalToUpload = currentUploads.Sum(c => c.Total);
 
-            UiShared.DrawOutlinedFont(drawList, "▲",
-                new Vector2(basePosition.X + 0, basePosition.Y + (int)(yDistance * 0.5)),
-                UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
-            UiShared.DrawOutlinedFont(drawList, $"Compressing+Uploading {doneUploads}/{totalUploads}",
-                new Vector2(basePosition.X + xDistance, basePosition.Y + yDistance * 0),
-                UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
-            UiShared.DrawOutlinedFont(drawList, $"{UiShared.ByteToString(totalUploaded)}/{UiShared.ByteToString(totalToUpload)}",
-                new Vector2(basePosition.X + xDistance, basePosition.Y + yDistance * 1),
-                UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
+                UiShared.DrawOutlinedFont(drawList, "▲",
+                    new Vector2(basePosition.X + 0, basePosition.Y + (int)(yDistance * 0.5)),
+                    UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
+                UiShared.DrawOutlinedFont(drawList, $"Compressing+Uploading {doneUploads}/{totalUploads}",
+                    new Vector2(basePosition.X + xDistance, basePosition.Y + yDistance * 0),
+                    UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
+                UiShared.DrawOutlinedFont(drawList, $"{UiShared.ByteToString(totalUploaded)}/{UiShared.ByteToString(totalToUpload)}",
+                    new Vector2(basePosition.X + xDistance, basePosition.Y + yDistance * 1),
+                    UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
 
+            }
         }
+        catch { }
 
-        if (_apiController.CurrentDownloads.Any())
+        try
         {
-            var currentDownloads = _apiController.CurrentDownloads.Where(d => d.Value != null && d.Value.Any()).ToList().SelectMany(k => k.Value).ToList();
-            var multBase = currentDownloads.Any() ? 0 : 2;
-            var doneDownloads = currentDownloads.Count(c => c.IsTransferred);
-            var totalDownloads = currentDownloads.Count;
-            var totalDownloaded = currentDownloads.Sum(c => c.Transferred);
-            var totalToDownload = currentDownloads.Sum(c => c.Total);
-            UiShared.DrawOutlinedFont(drawList, "▼",
-                new Vector2(basePosition.X + 0, basePosition.Y + (int)(yDistance * multBase + (yDistance * 0.5))),
-                UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
-            UiShared.DrawOutlinedFont(drawList, $"Downloading {doneDownloads}/{totalDownloads}",
-                new Vector2(basePosition.X + xDistance, basePosition.Y + yDistance * multBase),
-                UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
-            UiShared.DrawOutlinedFont(drawList, $"{UiShared.ByteToString(totalDownloaded)}/{UiShared.ByteToString(totalToDownload)}",
-                new Vector2(basePosition.X + xDistance, basePosition.Y + yDistance * (1 + multBase)),
-                UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
+            if (_apiController.CurrentDownloads.Any())
+            {
+                var currentDownloads = _apiController.CurrentDownloads.Where(d => d.Value != null && d.Value.Any()).ToList().SelectMany(k => k.Value).ToList();
+                var multBase = currentDownloads.Any() ? 0 : 2;
+                var doneDownloads = currentDownloads.Count(c => c.IsTransferred);
+                var totalDownloads = currentDownloads.Count;
+                var totalDownloaded = currentDownloads.Sum(c => c.Transferred);
+                var totalToDownload = currentDownloads.Sum(c => c.Total);
+                UiShared.DrawOutlinedFont(drawList, "▼",
+                    new Vector2(basePosition.X + 0, basePosition.Y + (int)(yDistance * multBase + (yDistance * 0.5))),
+                    UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
+                UiShared.DrawOutlinedFont(drawList, $"Downloading {doneDownloads}/{totalDownloads}",
+                    new Vector2(basePosition.X + xDistance, basePosition.Y + yDistance * multBase),
+                    UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
+                UiShared.DrawOutlinedFont(drawList, $"{UiShared.ByteToString(totalDownloaded)}/{UiShared.ByteToString(totalToDownload)}",
+                    new Vector2(basePosition.X + xDistance, basePosition.Y + yDistance * (1 + multBase)),
+                    UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
+            }
         }
+        catch { }
     }
 }
