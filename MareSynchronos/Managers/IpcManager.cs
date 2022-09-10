@@ -85,6 +85,14 @@ namespace MareSynchronos.Managers
             _penumbraRemoveTemporaryCollection =
                 pi.GetIpcSubscriber<string, int>("Penumbra.RemoveTemporaryCollection");
 
+            _heelsGetApiVersion = pi.GetIpcSubscriber<string>("HeelsPlugin.ApiVersion");
+            _heelsGetOffset = pi.GetIpcSubscriber<float>("HeelsPlugin.GetOffset");
+            _heelsRegisterPlayer = pi.GetIpcSubscriber<GameObject, float, object?>("HeelsPlugin.RegisterPlayer");
+            _heelsUnregisterPlayer = pi.GetIpcSubscriber<GameObject, object?>("HeelsPlugin.UnregisterPlayer");
+            _heelsOffsetUpdate = pi.GetIpcSubscriber<float, object?>("HeelsPlugin.OffsetChanged");
+
+            _heelsOffsetUpdate.Subscribe(HeelsOffsetChange);
+
             if (Initialized)
             {
                 PenumbraInitialized?.Invoke();
@@ -144,6 +152,18 @@ namespace MareSynchronos.Managers
             }
         }
 
+        public bool CheckHeelsApi()
+        {
+            try
+            {
+                return _heelsGetApiVersion.InvokeFunc() == "1.0.1";
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public void Dispose()
         {
             Logger.Verbose("Disposing " + nameof(IpcManager));
@@ -175,7 +195,7 @@ namespace MareSynchronos.Managers
 
         public void HeelsSetOffsetForPlayer(float offset, IntPtr character)
         {
-            if(!CheckHeelsApi()) return;
+            if (!CheckHeelsApi()) return;
             actionQueue.Enqueue(() =>
             {
                 var gameObj = _dalamudUtil.CreateGameObject(character);
@@ -343,6 +363,11 @@ namespace MareSynchronos.Managers
         {
             PenumbraInitialized?.Invoke();
             _penumbraRedraw!.InvokeAction("self", 0);
+        }
+
+        private void HeelsOffsetChange(float offset)
+        {
+            HeelsOffsetChangeEvent?.Invoke(offset);
         }
 
         private void PenumbraDispose()

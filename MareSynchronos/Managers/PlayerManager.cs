@@ -45,6 +45,8 @@ namespace MareSynchronos.Managers
             _apiController.Disconnected += ApiController_Disconnected;
             _transientResourceManager.TransientResourceLoaded += HandleTransientResourceLoad;
             _dalamudUtil.DelayedFrameworkUpdate += DalamudUtilOnDelayedFrameworkUpdate;
+            _ipcManager.HeelsOffsetChangeEvent += HeelsOffsetChanged;
+
 
             Logger.Debug("Watching Player, ApiController is Connected: " + _apiController.IsConnected);
             if (_apiController.IsConnected)
