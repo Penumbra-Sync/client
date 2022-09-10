@@ -20,6 +20,9 @@ namespace MareSynchronos.Models
         [JsonProperty]
         public string ManipulationString { get; set; } = string.Empty;
 
+        [JsonProperty]
+        public float HeelsOffset { get; set; } = 0.0f;
+
         public void AddFileReplacement(ObjectKind objectKind, FileReplacement fileReplacement)
         {
             if (!fileReplacement.HasFileReplacement) return;
@@ -50,7 +53,8 @@ namespace MareSynchronos.Models
                     };
                 }).ToList()),
                 GlamourerData = GlamourerString.ToDictionary(d => d.Key, d => d.Value),
-                ManipulationData = ManipulationString
+                ManipulationData = ManipulationString,
+                HeelsOffset = HeelsOffset
             };
         }
 

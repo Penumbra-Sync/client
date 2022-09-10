@@ -114,9 +114,11 @@ namespace MareSynchronos.UI
         {
             var penumbraExists = _ipcManager.CheckPenumbraApi();
             var glamourerExists = _ipcManager.CheckGlamourerApi();
+            var heelsExists = _ipcManager.CheckHeelsApi();
 
             var penumbraColor = penumbraExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
             var glamourerColor = glamourerExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
+            var heelsColor = heelsExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
             ImGui.Text("Penumbra:");
             ImGui.SameLine();
             ImGui.TextColored(penumbraColor, penumbraExists ? "Available" : "Unavailable");
@@ -124,6 +126,11 @@ namespace MareSynchronos.UI
             ImGui.Text("Glamourer:");
             ImGui.SameLine();
             ImGui.TextColored(glamourerColor, glamourerExists ? "Available" : "Unavailable");
+            ImGui.Text("Optional Addons | ");
+            ImGui.SameLine();
+            ImGui.Text("Heels:");
+            ImGui.SameLine();
+            ImGui.TextColored(heelsColor, heelsExists ? "Available" : "Unavailable");
 
             if (!penumbraExists || !glamourerExists)
             {

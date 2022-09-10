@@ -42,6 +42,7 @@ namespace MareSynchronos.Managers
             _apiController.Connected += ApiControllerOnConnected;
             _apiController.Disconnected += ApiController_Disconnected;
             _dalamudUtil.DelayedFrameworkUpdate += DalamudUtilOnDelayedFrameworkUpdate;
+            _ipcManager.HeelsOffsetChangeEvent += HeelsOffsetChanged;
 
             Logger.Debug("Watching Player, ApiController is Connected: " + _apiController.IsConnected);
             if (_apiController.IsConnected)
@@ -58,6 +59,16 @@ namespace MareSynchronos.Managers
             };
         }
 
+        private void HeelsOffsetChanged(float change)
+        {
+            var player = playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player);
+            if (LastCreatedCharacterData != null && LastCreatedCharacterData.HeelsOffset != change && !player.IsProcessing)
+            {
+                Logger.Debug("Heels offset changed to " + change);
+                playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player).HasUnprocessedUpdate = true;
+            }
+        }
+
         public void Dispose()
         {
             Logger.Verbose("Disposing " + nameof(PlayerManager));
@@ -67,6 +78,7 @@ namespace MareSynchronos.Managers
 
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
             _dalamudUtil.DelayedFrameworkUpdate -= DalamudUtilOnDelayedFrameworkUpdate;
+            _ipcManager.HeelsOffsetChangeEvent -= HeelsOffsetChanged;
         }
 
         private unsafe void DalamudUtilOnDelayedFrameworkUpdate()

@@ -3,12 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Logging;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using MareSynchronos.API;
 using MareSynchronos.FileCacheDB;
-using MareSynchronos.Interop;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
@@ -110,6 +108,17 @@ public class CachedPlayer
             {
                 bool glamourerDataDifferent = _cachedData.GlamourerData[objectKind] != characterData.GlamourerData[objectKind];
                 if (glamourerDataDifferent)
+                {
+                    Logger.Debug("Updating " + objectKind);
+                    charaDataToUpdate.Add(objectKind);
+                    continue;
+                }
+            }
+
+            if (objectKind == ObjectKind.Player)
+            {
+                bool heelsOffsetDifferent = _cachedData.HeelsOffset != characterData.HeelsOffset;
+                if (heelsOffsetDifferent)
                 {
                     Logger.Debug("Updating " + objectKind);
                     charaDataToUpdate.Add(objectKind);
@@ -232,6 +241,7 @@ public class CachedPlayer
         if (objectKind == ObjectKind.Player)
         {
             _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerCharacter);
+            _ipcManager.HeelsSetOffsetForPlayer(_cachedData.HeelsOffset, PlayerCharacter);
             RequestedPenumbraRedraw = true;
             Logger.Debug(
                 $"Request Redraw for {PlayerName}");
@@ -309,6 +319,8 @@ public class CachedPlayer
             {
                 _ipcManager.PenumbraRedraw(PlayerCharacter);
             }
+
+            _ipcManager.HeelsRestoreOffsetForPlayer(PlayerCharacter);
         }
         else if (objectKind == ObjectKind.MinionOrMount)
         {
