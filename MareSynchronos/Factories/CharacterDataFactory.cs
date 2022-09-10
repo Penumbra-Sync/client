@@ -383,6 +383,8 @@ public class CharacterDataFactory
         {
             transientResourceManager.RemoveTransientResource(charaPointer, item);
         }
+
+        previousData.HeelsOffset = _ipcManager.GetHeelsOffset();
     }
 
     private void AddReplacementSkeleton(ushort raceSexId, ObjectKind objectKind, CharacterData cache)

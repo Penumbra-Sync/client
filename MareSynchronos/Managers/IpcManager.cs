@@ -11,6 +11,7 @@ using System.Collections.Concurrent;
 namespace MareSynchronos.Managers
 {
     public delegate void PenumbraRedrawEvent(IntPtr address, int objTblIdx);
+    public delegate void HeelsOffsetChange(float change);
     public delegate void PenumbraResourceLoadEvent(IntPtr drawObject, string gamePath, string filePath);
     public class IpcManager : IDisposable
     {
@@ -35,6 +36,13 @@ namespace MareSynchronos.Managers
         private readonly ICallGateSubscriber<string, string, Dictionary<string, string>, string, int, int>
             _penumbraSetTemporaryMod;
         private readonly ICallGateSubscriber<IntPtr, string, string, object?> _penumbraGameObjectResourcePathResolved;
+
+        private readonly ICallGateSubscriber<string> _heelsGetApiVersion;
+        private readonly ICallGateSubscriber<float> _heelsGetOffset;
+        private readonly ICallGateSubscriber<float, object?> _heelsOffsetUpdate;
+        private readonly ICallGateSubscriber<GameObject, float, object?> _heelsRegisterPlayer;
+        private readonly ICallGateSubscriber<GameObject, object?> _heelsUnregisterPlayer;
+
         private readonly DalamudUtil _dalamudUtil;
         private readonly ConcurrentQueue<Action> actionQueue = new();
 
@@ -77,6 +85,15 @@ namespace MareSynchronos.Managers
             _penumbraRemoveTemporaryCollection =
                 pi.GetIpcSubscriber<string, int>("Penumbra.RemoveTemporaryCollection");
 
+            _heelsGetApiVersion = pi.GetIpcSubscriber<string>("HeelsPlugin.ApiVersion");
+            _heelsGetOffset = pi.GetIpcSubscriber<float>("HeelsPlugin.GetOffset");
+            _heelsRegisterPlayer = pi.GetIpcSubscriber<GameObject, float, object?>("HeelsPlugin.RegisterPlayer");
+            _heelsUnregisterPlayer = pi.GetIpcSubscriber<GameObject, object?>("HeelsPlugin.UnregisterPlayer");
+            _heelsOffsetUpdate = pi.GetIpcSubscriber<float, object?>("HeelsPlugin.OffsetChanged");
+
+            _heelsOffsetUpdate.Subscribe(HeelsOffsetChange);
+
+
             if (Initialized)
             {
                 PenumbraInitialized?.Invoke();
@@ -108,6 +125,7 @@ namespace MareSynchronos.Managers
         public event VoidDelegate? PenumbraInitialized;
         public event VoidDelegate? PenumbraDisposed;
         public event PenumbraRedrawEvent? PenumbraRedrawEvent;
+        public event HeelsOffsetChange? HeelsOffsetChangeEvent;
         public event PenumbraResourceLoadEvent? PenumbraResourceLoadEvent;
 
         public bool Initialized => CheckPenumbraApi();
@@ -135,6 +153,18 @@ namespace MareSynchronos.Managers
             }
         }
 
+        public bool CheckHeelsApi()
+        {
+            try
+            {
+                return _heelsGetApiVersion.InvokeFunc() == "1.0.1";
+            } 
+            catch
+            {
+                return false;
+            }
+        }
+
         public void Dispose()
         {
             Logger.Verbose("Disposing " + nameof(IpcManager));
@@ -155,6 +185,41 @@ namespace MareSynchronos.Managers
             _penumbraInit.Unsubscribe(PenumbraInit);
             _penumbraObjectIsRedrawn.Unsubscribe(RedrawEvent);
             _penumbraGameObjectResourcePathResolved.Unsubscribe(ResourceLoaded);
+            _heelsOffsetUpdate.Unsubscribe(HeelsOffsetChange);
+        }
+
+        public float GetHeelsOffset()
+        {
+            if (!CheckHeelsApi()) return 0.0f;
+            return _heelsGetOffset.InvokeFunc();
+        }
+
+        public void HeelsSetOffsetForPlayer(float offset, IntPtr character)
+        {
+            if(!CheckHeelsApi()) return;
+            actionQueue.Enqueue(() =>
+            {
+                var gameObj = _dalamudUtil.CreateGameObject(character);
+                if (gameObj != null)
+                {
+                    Logger.Verbose("Applying Heels data to " + character.ToString("X"));
+                    _heelsRegisterPlayer.InvokeAction(gameObj, offset);
+                }
+            });
+        }
+
+        public void HeelsRestoreOffsetForPlayer(IntPtr character)
+        {
+            if (!CheckHeelsApi()) return;
+            actionQueue.Enqueue(() =>
+            {
+                var gameObj = _dalamudUtil.CreateGameObject(character);
+                if (gameObj != null)
+                {
+                    Logger.Verbose("Restoring Heels data to " + character.ToString("X"));
+                    _heelsUnregisterPlayer.InvokeAction(gameObj);
+                }
+            });
         }
 
         public void GlamourerApplyAll(string? customization, IntPtr obj)
@@ -302,6 +367,11 @@ namespace MareSynchronos.Managers
                 }
                 _penumbraSetTemporaryMod.InvokeFunc("MareSynchronos", ret.Item2, modPaths, manipulationData, 0);
             });
+        }
+
+        private void HeelsOffsetChange(float offset)
+        {
+            HeelsOffsetChangeEvent?.Invoke(offset);
         }
 
         private void RedrawEvent(IntPtr objectAddress, int objectTableIndex)
