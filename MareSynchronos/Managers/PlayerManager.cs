@@ -9,6 +9,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using System.Collections.Generic;
 using System.Linq;
 using MareSynchronos.Models;
+using Newtonsoft.Json;
 
 namespace MareSynchronos.Managers
 {
@@ -19,6 +20,7 @@ namespace MareSynchronos.Managers
         private readonly ApiController _apiController;
         private readonly CharacterDataFactory _characterDataFactory;
         private readonly DalamudUtil _dalamudUtil;
+        private readonly TransientResourceManager _transientResourceManager;
         private readonly IpcManager _ipcManager;
         public event PlayerHasChanged? PlayerHasChanged;
         public CharacterCacheDto? LastCreatedCharacterData { get; private set; }
@@ -30,7 +32,7 @@ namespace MareSynchronos.Managers
         private List<PlayerRelatedObject> playerRelatedObjects = new List<PlayerRelatedObject>();
 
         public unsafe PlayerManager(ApiController apiController, IpcManager ipcManager,
-            CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil)
+            CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil, TransientResourceManager transientResourceManager)
         {
             Logger.Verbose("Creating " + nameof(PlayerManager));
 
@@ -38,9 +40,10 @@ namespace MareSynchronos.Managers
             _ipcManager = ipcManager;
             _characterDataFactory = characterDataFactory;
             _dalamudUtil = dalamudUtil;
-
+            _transientResourceManager = transientResourceManager;
             _apiController.Connected += ApiControllerOnConnected;
             _apiController.Disconnected += ApiController_Disconnected;
+            _transientResourceManager.TransientResourceLoaded += HandleTransientResourceLoad;
             _dalamudUtil.DelayedFrameworkUpdate += DalamudUtilOnDelayedFrameworkUpdate;
 
             Logger.Debug("Watching Player, ApiController is Connected: " + _apiController.IsConnected);
@@ -58,6 +61,29 @@ namespace MareSynchronos.Managers
             };
         }
 
+        public void HandleTransientResourceLoad(IntPtr gameObj)
+        {
+            foreach (var obj in playerRelatedObjects)
+            {
+                if (obj.Address == gameObj && !obj.HasUnprocessedUpdate)
+                {
+                    obj.HasUnprocessedUpdate = true;
+                    OnPlayerOrAttachedObjectsChanged();
+                    return;
+                }
+            }
+        }
+
+        private void HeelsOffsetChanged(float change)
+        {
+            var player = playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player);
+            if (LastCreatedCharacterData != null && LastCreatedCharacterData.HeelsOffset != change && !player.IsProcessing)
+            {
+                Logger.Debug("Heels offset changed to " + change);
+                playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player).HasUnprocessedUpdate = true;
+            }
+        }
+
         public void Dispose()
         {
             Logger.Verbose("Disposing " + nameof(PlayerManager));
@@ -67,6 +93,11 @@ namespace MareSynchronos.Managers
 
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
             _dalamudUtil.DelayedFrameworkUpdate -= DalamudUtilOnDelayedFrameworkUpdate;
+
+            _transientResourceManager.TransientResourceLoaded -= HandleTransientResourceLoad;
+
+            _playerChangedCts?.Cancel();
+            _ipcManager.HeelsOffsetChangeEvent -= HeelsOffsetChanged;
         }
 
         private unsafe void DalamudUtilOnDelayedFrameworkUpdate()
@@ -110,6 +141,7 @@ namespace MareSynchronos.Managers
 
             while (!PermanentDataCache.IsReady && !token.IsCancellationRequested)
             {
+                Logger.Verbose("Waiting until cache is ready");
                 await Task.Delay(50, token);
             }
 
@@ -117,7 +149,9 @@ namespace MareSynchronos.Managers
 
             Logger.Verbose("Cache creation complete");
 
-            return PermanentDataCache.ToCharacterCacheDto();
+            var cache = PermanentDataCache.ToCharacterCacheDto();
+            //Logger.Verbose(JsonConvert.SerializeObject(cache, Formatting.Indented));
+            return cache;
         }
 
         private void IpcManager_PenumbraRedrawEvent(IntPtr address, int idx)
@@ -129,6 +163,7 @@ namespace MareSynchronos.Managers
                 if (address == item.Address)
                 {
                     Logger.Debug("Penumbra redraw Event for " + item.ObjectKind);
+                    //_transientResourceManager.CleanSemiTransientResources(item.ObjectKind);
                     item.HasUnprocessedUpdate = true;
                 }
             }
@@ -141,8 +176,6 @@ namespace MareSynchronos.Managers
 
         private void OnPlayerOrAttachedObjectsChanged()
         {
-            if (_dalamudUtil.IsInGpose) return;
-
             var unprocessedObjects = playerRelatedObjects.Where(c => c.HasUnprocessedUpdate).ToList();
             foreach (var unprocessedObject in unprocessedObjects)
             {
@@ -176,7 +209,10 @@ namespace MareSynchronos.Managers
 
             Task.Run(async () =>
             {
-                _dalamudUtil.WaitWhileSelfIsDrawing(token);
+                foreach(var item in unprocessedObjects)
+                {
+                    _dalamudUtil.WaitWhileCharacterIsDrawing("self " + item.ObjectKind.ToString(), item.Address, token);
+                }
 
                 CharacterCacheDto? cacheDto = (await CreateFullCharacterCacheDto(token));
                 if (cacheDto == null || token.IsCancellationRequested) return;

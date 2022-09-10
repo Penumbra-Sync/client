@@ -11,6 +11,7 @@ using MareSynchronos.WebAPI.Utils;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.WebAPI
 {
@@ -304,6 +305,10 @@ namespace MareSynchronos.WebAPI
                     options.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling;
                 })
                 .WithAutomaticReconnect(new ForeverRetryPolicy())
+                .ConfigureLogging(a => {
+                    a.ClearProviders().AddProvider(new DalamudLoggingProvider());
+                    a.SetMinimumLevel(LogLevel.Trace);
+                    })
                 .Build();
         }
 
@@ -334,9 +339,10 @@ namespace MareSynchronos.WebAPI
         {
             if (_mareHub is not null)
             {
+                _uploadCancellationTokenSource?.Cancel();
                 Logger.Info("Stopping existing connection");
                 _mareHub.Closed -= MareHubOnClosed;
-                _mareHub.Reconnecting += MareHubOnReconnecting;
+                _mareHub.Reconnecting -= MareHubOnReconnecting;
                 await _mareHub.StopAsync(token);
                 await _mareHub.DisposeAsync();
                 CurrentUploads.Clear();

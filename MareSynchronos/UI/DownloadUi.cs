@@ -44,6 +44,8 @@ public class DownloadUi : Window, IDisposable
         Flags |= ImGuiWindowFlags.NoTitleBar;
         Flags |= ImGuiWindowFlags.NoDecoration;
 
+        ForceMainWindow = true;
+
         windowSystem.AddWindow(this);
         IsOpen = true;
     }

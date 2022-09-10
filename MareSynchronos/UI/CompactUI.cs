@@ -292,8 +292,8 @@ namespace MareSynchronos.UI
             {
                 if (_characterOrCommentFilter.IsNullOrEmpty()) return true;
                 _configuration.GetCurrentServerUidComments().TryGetValue(p.OtherUID, out var comment);
-                return p.OtherUID.ToLower().Contains(_characterOrCommentFilter.ToLower()) ||
-                       (comment?.ToLower().Contains(_characterOrCommentFilter.ToLower()) ?? false);
+                return p.OtherUID.ToLowerInvariant().Contains(_characterOrCommentFilter.ToLowerInvariant()) ||
+                       (comment?.ToLowerInvariant().Contains(_characterOrCommentFilter.ToLowerInvariant()) ?? false);
             });
 
             if (_configuration.ReverseUserSort) users = users.Reverse();

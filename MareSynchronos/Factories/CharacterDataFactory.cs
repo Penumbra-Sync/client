@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
+using Dalamud.Game;
 using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
@@ -22,16 +24,23 @@ public class CharacterDataFactory
 {
     private readonly DalamudUtil _dalamudUtil;
     private readonly IpcManager _ipcManager;
+    private readonly TransientResourceManager transientResourceManager;
 
-    public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager)
+    public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager, TransientResourceManager transientResourceManager)
     {
         Logger.Verbose("Creating " + nameof(CharacterDataFactory));
 
         _dalamudUtil = dalamudUtil;
         _ipcManager = ipcManager;
+        this.transientResourceManager = transientResourceManager;
     }
 
-    public unsafe CharacterData BuildCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr playerPointer, CancellationToken token)
+    private unsafe bool CheckForPointer(IntPtr playerPointer)
+    {
+        return playerPointer == IntPtr.Zero || ((Character*)playerPointer)->GameObject.GetDrawObject() == null;
+    }
+
+    public CharacterData BuildCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr playerPointer, CancellationToken token)
     {
         if (!_ipcManager.Initialized)
         {
@@ -41,7 +50,7 @@ public class CharacterDataFactory
         bool pointerIsZero = true;
         try
         {
-            pointerIsZero = playerPointer == IntPtr.Zero || ((Character*)playerPointer)->GameObject.GetDrawObject() == null;
+            pointerIsZero = CheckForPointer(playerPointer);
         }
         catch (Exception ex)
         {
@@ -144,7 +153,6 @@ public class CharacterDataFactory
             return;
         }
 
-        //Logger.Verbose("Adding File Replacement for Material " + fileName);
         var mtrlPath = fileName.Split("|")[2];
 
         if (cache.FileReplacements.ContainsKey(objectKind))
@@ -179,11 +187,27 @@ public class CharacterDataFactory
         }
     }
 
+    private void AddReplacement(string varPath, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0, bool doNotReverseResolve = false)
+    {
+        if (varPath.IsNullOrEmpty()) return;
+
+        if (cache.FileReplacements.ContainsKey(objectKind))
+        {
+            if (cache.FileReplacements[objectKind].Any(c => c.GamePaths.Contains(varPath)))
+            {
+                return;
+            }
+        }
+
+        var variousReplacement = CreateFileReplacement(varPath, doNotReverseResolve);
+        DebugPrint(variousReplacement, objectKind, "Various", inheritanceLevel);
+
+        cache.AddFileReplacement(objectKind, variousReplacement);
+    }
+
     private void AddReplacementsFromTexture(string texPath, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0, bool doNotReverseResolve = true)
     {
         if (string.IsNullOrEmpty(texPath)) return;
-
-        //Logger.Verbose("Adding File Replacement for Texture " + texPath);
 
         if (cache.FileReplacements.ContainsKey(objectKind))
         {
@@ -215,14 +239,16 @@ public class CharacterDataFactory
             previousData.FileReplacements[objectKind].Clear();
         }
 
-        Stopwatch st = Stopwatch.StartNew();
         var chara = _dalamudUtil.CreateGameObject(charaPointer)!;
         while (!_dalamudUtil.IsObjectPresent(chara))
         {
             Logger.Verbose("Character is null but it shouldn't be, waiting");
             Thread.Sleep(50);
         }
-        _dalamudUtil.WaitWhileCharacterIsDrawing(charaPointer);
+
+        _dalamudUtil.WaitWhileCharacterIsDrawing(objectKind.ToString(), charaPointer);
+
+        Stopwatch st = Stopwatch.StartNew();
 
         previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
 
@@ -242,47 +268,123 @@ public class CharacterDataFactory
             AddReplacementsFromRenderModel(mdl, objectKind, previousData, 0);
         }
 
+        foreach (var item in previousData.FileReplacements[objectKind])
+        {
+            transientResourceManager.RemoveTransientResource(charaPointer, item);
+        }
+
         if (objectKind == ObjectKind.Player)
         {
-            var weaponObject = (Weapon*)((Object*)human)->ChildObject;
-
-            if ((IntPtr)weaponObject != IntPtr.Zero)
-            {
-                var mainHandWeapon = weaponObject->WeaponRenderModel->RenderModel;
-
-                AddReplacementsFromRenderModel(mainHandWeapon, objectKind, previousData, 0);
-
-                if (weaponObject->NextSibling != (IntPtr)weaponObject)
-                {
-                    var offHandWeapon = ((Weapon*)weaponObject->NextSibling)->WeaponRenderModel->RenderModel;
-
-                    AddReplacementsFromRenderModel(offHandWeapon, objectKind, previousData, 1);
-                }
-            }
-
-            AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId, objectKind, previousData);
-            try
-            {
-                AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->Decal->FileName()).ToString(), objectKind, previousData, 0, false);
-            }
-            catch
-            {
-                Logger.Warn("Could not get Decal data");
-            }
-            try
-            {
-                AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), objectKind, previousData, 0, false);
-            }
-            catch
-            {
-                Logger.Warn("Could not get Legacy Body Decal Data");
-            }
+            AddPlayerSpecificReplacements(previousData, objectKind, charaPointer, human);
         }
+
+        if (objectKind == ObjectKind.Pet)
+        {
+            foreach (var item in previousData.FileReplacements[objectKind])
+            {
+                transientResourceManager.AddSemiTransientResource(objectKind, item);
+            }
+
+            previousData.FileReplacements[objectKind].Clear();
+        }
+
+        ManageSemiTransientData(previousData, objectKind, charaPointer);
 
         st.Stop();
         Logger.Verbose("Building " + objectKind + " Data took " + st.Elapsed);
-
         return previousData;
+    }
+
+    private unsafe void ManageSemiTransientData(CharacterData previousData, ObjectKind objectKind, IntPtr charaPointer)
+    {
+        transientResourceManager.PersistTransientResources(charaPointer, objectKind, CreateFileReplacement);
+
+        foreach (var item in transientResourceManager.GetSemiTransientResources(objectKind))
+        {
+            if (!previousData.FileReplacements.ContainsKey(objectKind))
+            {
+                previousData.FileReplacements.Add(objectKind, new());
+            }
+
+            if (!previousData.FileReplacements[objectKind].Any(k => k.ResolvedPath.ToLowerInvariant() == item.ResolvedPath.ToLowerInvariant()))
+            {
+                if (_ipcManager.PenumbraResolvePath(item.GamePaths.First()).ToLowerInvariant() == item.GamePaths.First().ToLowerInvariant())
+                {
+                    transientResourceManager.RemoveTransientResource(charaPointer, item);
+                }
+                else
+                {
+                    Logger.Verbose("Found semi transient resource: " + item);
+                    previousData.FileReplacements[objectKind].Add(item);
+                }
+            }
+        }
+    }
+
+    private unsafe void AddPlayerSpecificReplacements(CharacterData previousData, ObjectKind objectKind, IntPtr charaPointer, Human* human)
+    {
+        var weaponObject = (Weapon*)((Object*)human)->ChildObject;
+
+        if ((IntPtr)weaponObject != IntPtr.Zero)
+        {
+            var mainHandWeapon = weaponObject->WeaponRenderModel->RenderModel;
+
+            AddReplacementsFromRenderModel(mainHandWeapon, objectKind, previousData, 0);
+
+            foreach (var item in previousData.FileReplacements[objectKind])
+            {
+                transientResourceManager.RemoveTransientResource(charaPointer, item);
+            }
+
+            foreach (var item in transientResourceManager.GetTransientResources((IntPtr)weaponObject))
+            {
+                Logger.Verbose("Found transient weapon resource: " + item);
+                AddReplacement(item, objectKind, previousData, 1, true);
+            }
+
+            if (weaponObject->NextSibling != (IntPtr)weaponObject)
+            {
+                var offHandWeapon = ((Weapon*)weaponObject->NextSibling)->WeaponRenderModel->RenderModel;
+
+                AddReplacementsFromRenderModel(offHandWeapon, objectKind, previousData, 1);
+
+                foreach (var item in previousData.FileReplacements[objectKind])
+                {
+                    transientResourceManager.RemoveTransientResource((IntPtr)offHandWeapon, item);
+                }
+
+                foreach (var item in transientResourceManager.GetTransientResources((IntPtr)offHandWeapon))
+                {
+                    Logger.Verbose("Found transient offhand weapon resource: " + item);
+                    AddReplacement(item, objectKind, previousData, 1, true);
+                }
+            }
+        }
+
+        AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId, objectKind, previousData);
+        try
+        {
+            AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->Decal->FileName()).ToString(), objectKind, previousData, 0, false);
+        }
+        catch
+        {
+            Logger.Warn("Could not get Decal data");
+        }
+        try
+        {
+            AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), objectKind, previousData, 0, false);
+        }
+        catch
+        {
+            Logger.Warn("Could not get Legacy Body Decal Data");
+        }
+
+        foreach (var item in previousData.FileReplacements[objectKind])
+        {
+            transientResourceManager.RemoveTransientResource(charaPointer, item);
+        }
+
+        previousData.HeelsOffset = _ipcManager.GetHeelsOffset();
     }
 
     private void AddReplacementSkeleton(ushort raceSexId, ObjectKind objectKind, CharacterData cache)
@@ -290,8 +392,6 @@ public class CharacterDataFactory
         string raceSexIdString = raceSexId.ToString("0000");
 
         string skeletonPath = $"chara/human/c{raceSexIdString}/skeleton/base/b0001/skl_c{raceSexIdString}b0001.sklb";
-
-        //Logger.Verbose("Adding File Replacement for Skeleton " + skeletonPath);
 
         var replacement = CreateFileReplacement(skeletonPath, true);
         cache.AddFileReplacement(objectKind, replacement);

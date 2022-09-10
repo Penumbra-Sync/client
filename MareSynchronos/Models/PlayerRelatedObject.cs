@@ -19,7 +19,18 @@ namespace MareSynchronos.Models
         public IntPtr Address { get; set; }
         public IntPtr DrawObjectAddress { get; set; }
 
-        private IntPtr CurrentAddress => getAddress.Invoke();
+        private IntPtr CurrentAddress
+        {
+            get
+            {
+                try
+                {
+                    return getAddress.Invoke();
+                }
+                catch
+                { return IntPtr.Zero; }
+            }
+        }
 
         public PlayerRelatedObject(ObjectKind objectKind, IntPtr address, IntPtr drawObjectAddress, Func<IntPtr> getAddress)
         {
@@ -53,7 +64,7 @@ namespace MareSynchronos.Models
                 if (addr || equip || drawObj || nameChange)
                 {
                     _name = name;
-                    Logger.Verbose(ObjectKind + " Changed: " + _name + ", now: " + curPtr + ", " + (IntPtr)chara->GameObject.DrawObject);
+                    Logger.Verbose($"{ObjectKind} changed: {_name}, now: {curPtr:X}, {(IntPtr)chara->GameObject.DrawObject:X}");
 
                     Address = curPtr;
                     DrawObjectAddress = (IntPtr)chara->GameObject.DrawObject;

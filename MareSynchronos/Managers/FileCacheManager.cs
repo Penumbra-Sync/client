@@ -23,6 +23,7 @@ namespace MareSynchronos.Managers
         private readonly CancellationTokenSource _rescanTaskCancellationTokenSource = new();
         private CancellationTokenSource _rescanTaskRunCancellationTokenSource = new();
         private CancellationTokenSource? _scanCancellationTokenSource;
+        private object modifiedFilesLock = new object();
         public FileCacheManager(IpcManager ipcManager, Configuration pluginConfiguration)
         {
             Logger.Verbose("Creating " + nameof(FileCacheManager));
@@ -48,7 +49,7 @@ namespace MareSynchronos.Managers
 
         public string WatchedPenumbraDirectory => (_penumbraDirWatcher?.EnableRaisingEvents ?? false) ? _penumbraDirWatcher!.Path : "Not watched";
 
-        public FileCache? Create(string file, CancellationToken token)
+        public FileCache? Create(string file, CancellationToken? token)
         {
             FileInfo fileInfo = new(file);
             int attempt = 0;
@@ -56,7 +57,7 @@ namespace MareSynchronos.Managers
             {
                 Thread.Sleep(1000);
                 Logger.Debug("Waiting for file release " + fileInfo.FullName + " attempt " + attempt);
-                token.ThrowIfCancellationRequested();
+                token?.ThrowIfCancellationRequested();
             }
 
             if (attempt >= 10) return null;
@@ -64,7 +65,7 @@ namespace MareSynchronos.Managers
             var sha1Hash = Crypto.GetFileHash(fileInfo.FullName);
             return new FileCache()
             {
-                Filepath = fileInfo.FullName.ToLower(),
+                Filepath = fileInfo.FullName.ToLowerInvariant(),
                 Hash = sha1Hash,
                 LastModifiedDate = fileInfo.LastWriteTimeUtc.Ticks.ToString(),
             };
@@ -142,7 +143,10 @@ namespace MareSynchronos.Managers
 
         private void OnModified(object sender, FileSystemEventArgs e)
         {
-            _modifiedFiles.Add(e.FullPath);
+            lock (modifiedFilesLock)
+            {
+                _modifiedFiles.Add(e.FullPath);
+            }
             _ = StartRescan();
         }
 
@@ -189,21 +193,28 @@ namespace MareSynchronos.Managers
 
             Logger.Debug("File changes detected");
 
-            if (!_modifiedFiles.Any()) return;
+            lock (modifiedFilesLock)
+            {
+                if (!_modifiedFiles.Any()) return;
+            }
 
             _rescanTask = Task.Run(async () =>
             {
-                var listCopy = _modifiedFiles.ToList();
-                _modifiedFiles.Clear();
+                List<string> modifiedFilesCopy = new List<string>();
+                lock (modifiedFilesLock)
+                {
+                    modifiedFilesCopy = _modifiedFiles.ToList();
+                    _modifiedFiles.Clear();
+                }
                 await using var db = new FileCacheContext();
-                foreach (var item in listCopy.Distinct())
+                foreach (var item in modifiedFilesCopy.Distinct())
                 {
                     var fi = new FileInfo(item);
                     if (!fi.Exists)
                     {
                         PluginLog.Verbose("Removed: " + item);
 
-                        db.RemoveRange(db.FileCaches.Where(f => f.Filepath.ToLower() == item.ToLower()));
+                        db.RemoveRange(db.FileCaches.Where(f => f.Filepath.ToLower() == item.ToLowerInvariant()));
                     }
                     else
                     {
@@ -211,7 +222,7 @@ namespace MareSynchronos.Managers
                         var fileCache = Create(item, _rescanTaskCancellationTokenSource.Token);
                         if (fileCache != null)
                         {
-                            db.RemoveRange(db.FileCaches.Where(f => f.Filepath.ToLower() == fileCache.Filepath.ToLower()));
+                            db.RemoveRange(db.FileCaches.Where(f => f.Filepath.ToLower() == fileCache.Filepath.ToLowerInvariant()));
                             await db.AddAsync(fileCache, _rescanTaskCancellationTokenSource.Token);
                         }
                     }

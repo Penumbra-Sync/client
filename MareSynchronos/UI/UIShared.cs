@@ -423,7 +423,7 @@ namespace MareSynchronos.UI
                 {
                     if (!success) return;
 
-                    _isPenumbraDirectory = path.ToLower() == _ipcManager.PenumbraModDirectory()?.ToLower();
+                    _isPenumbraDirectory = path.ToLowerInvariant() == _ipcManager.PenumbraModDirectory()?.ToLowerInvariant();
                     _isDirectoryWritable = IsDirectoryWritable(path);
                     _cacheDirectoryHasOtherFilesThanCache = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Any(f => new FileInfo(f).Name.Length != 40);
                     _cacheDirectoryIsValidPath = Regex.IsMatch(path, @"^(?:[a-zA-Z]:\\[\w\s\-\\]+?|\/(?:[\w\s\-\/])+?)$", RegexOptions.ECMAScript);

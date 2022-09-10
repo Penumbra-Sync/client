@@ -14,6 +14,7 @@ using Dalamud.Interface.Windowing;
 using MareSynchronos.UI;
 using MareSynchronos.Utils;
 using System.Runtime.InteropServices;
+using Dalamud.Game.ClientState.Conditions;
 
 namespace MareSynchronos
 {
@@ -31,6 +32,7 @@ namespace MareSynchronos
         private readonly SettingsUi _settingsUi;
         private readonly WindowSystem _windowSystem;
         private PlayerManager? _playerManager;
+        private TransientResourceManager? _transientResourceManager;
         private readonly DalamudUtil _dalamudUtil;
         private OnlinePlayerManager? _characterCacheManager;
         private readonly DownloadUi _downloadUi;
@@ -41,7 +43,7 @@ namespace MareSynchronos
 
 
         public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager,
-            Framework framework, ObjectTable objectTable, ClientState clientState)
+            Framework framework, ObjectTable objectTable, ClientState clientState, Condition condition)
         {
             Logger.Debug("Launching " + Name);
             PluginInterface = pluginInterface;
@@ -59,7 +61,7 @@ namespace MareSynchronos
             new FileCacheContext().Dispose(); // make sure db is initialized I guess
 
             // those can be initialized outside of game login
-            _dalamudUtil = new DalamudUtil(clientState, objectTable, framework);
+            _dalamudUtil = new DalamudUtil(clientState, objectTable, framework, condition);
 
             _apiController = new ApiController(_configuration, _dalamudUtil);
             _ipcManager = new IpcManager(PluginInterface, _dalamudUtil);
@@ -123,7 +125,7 @@ namespace MareSynchronos
             _commandManager.RemoveHandler(CommandName);
             _dalamudUtil.LogIn -= DalamudUtilOnLogIn;
             _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
-
+            
             _uiSharedComponent.Dispose();
             _settingsUi?.Dispose();
             _introUi?.Dispose();
@@ -134,6 +136,8 @@ namespace MareSynchronos
             _ipcManager?.Dispose();
             _playerManager?.Dispose();
             _characterCacheManager?.Dispose();
+            _transientResourceManager?.Dispose();
+            _dalamudUtil.Dispose();
             Logger.Debug("Shut down");
         }
 
@@ -165,6 +169,7 @@ namespace MareSynchronos
             Logger.Debug("Client logout");
             _characterCacheManager?.Dispose();
             _playerManager?.Dispose();
+            _transientResourceManager?.Dispose();
             PluginInterface.UiBuilder.Draw -= Draw;
             PluginInterface.UiBuilder.OpenConfigUi -= OpenUi;
             _commandManager.RemoveHandler(CommandName);
@@ -174,6 +179,7 @@ namespace MareSynchronos
         {
             _characterCacheManager?.Dispose();
             _playerManager?.Dispose();
+            _transientResourceManager?.Dispose();
 
             Task.Run(WaitForPlayerAndLaunchCharacterManager);
         }
@@ -187,10 +193,11 @@ namespace MareSynchronos
 
             try
             {
+                _transientResourceManager = new TransientResourceManager(_ipcManager, _dalamudUtil);
                 var characterCacheFactory =
-                    new CharacterDataFactory(_dalamudUtil, _ipcManager);
+                    new CharacterDataFactory(_dalamudUtil, _ipcManager, _transientResourceManager);
                 _playerManager = new PlayerManager(_apiController, _ipcManager,
-                    characterCacheFactory, _dalamudUtil);
+                    characterCacheFactory, _dalamudUtil, _transientResourceManager);
                 _characterCacheManager = new OnlinePlayerManager(_framework,
                     _apiController, _dalamudUtil, _ipcManager, _playerManager);
             }

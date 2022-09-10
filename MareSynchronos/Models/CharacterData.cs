@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using MareSynchronos.API;
+using MareSynchronos.Utils;
+using Lumina.Excel.GeneratedSheets;
 
 namespace MareSynchronos.Models
 {
@@ -39,16 +41,31 @@ namespace MareSynchronos.Models
 
         public CharacterCacheDto ToCharacterCacheDto()
         {
+            var fileReplacements = FileReplacements.ToDictionary(k => k.Key, k => k.Value.Where(f => f.HasFileReplacement && !f.IsFileSwap).GroupBy(f => f.Hash).Select(g =>
+            {
+                return new FileReplacementDto()
+                {
+                    GamePaths = g.SelectMany(g => g.GamePaths).Distinct().ToArray(),
+                    Hash = g.First().Hash,
+                };
+            }).ToList());
+
+            Logger.Debug("Adding fileSwaps");
+            foreach (var item in FileReplacements)
+            {
+                Logger.Debug("Checking fileSwaps for " + item.Key);
+                var fileSwapsToAdd = item.Value.Where(f => f.IsFileSwap).Select(f => f.ToFileReplacementDto());
+                Logger.Debug("Adding " + fileSwapsToAdd.Count() + " file swaps");
+                foreach (var swap in fileSwapsToAdd)
+                {
+                    Logger.Debug("Adding: " + swap.GamePaths.First() + ":" + swap.FileSwapPath);
+                }
+                fileReplacements[item.Key].AddRange(fileSwapsToAdd);
+            }
+
             return new CharacterCacheDto()
             {
-                FileReplacements = FileReplacements.ToDictionary(k => k.Key, k => k.Value.Where(f => f.HasFileReplacement).GroupBy(f => f.Hash).Select(g =>
-                {
-                    return new FileReplacementDto()
-                    {
-                        GamePaths = g.SelectMany(g => g.GamePaths).Distinct().ToArray(),
-                        Hash = g.First().Hash
-                    };
-                }).ToList()),
+                FileReplacements = fileReplacements,
                 GlamourerData = GlamourerString.ToDictionary(d => d.Key, d => d.Value),
                 ManipulationData = ManipulationString
             };

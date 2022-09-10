@@ -76,6 +76,8 @@ namespace MareSynchronos.WebAPI
             List<DownloadFileDto> downloadFileInfoFromService = new List<DownloadFileDto>();
             downloadFileInfoFromService.AddRange(await _mareHub!.InvokeAsync<List<DownloadFileDto>>(Api.InvokeGetFilesSizes, fileReplacementDto.Select(f => f.Hash).ToList(), ct));
 
+            Logger.Debug("Files with size 0 or less: " + string.Join(", ", downloadFileInfoFromService.Where(f => f.Size <= 0).Select(f => f.Hash)));
+
             CurrentDownloads[currentDownloadId] = downloadFileInfoFromService.Distinct().Select(d => new DownloadFileTransfer(d))
                 .Where(d => d.CanBeTransferred).ToList();
 
@@ -123,9 +125,13 @@ namespace MareSynchronos.WebAPI
             {
                 await using (var db = new FileCacheContext())
                 {
-                    allFilesInDb = CurrentDownloads[currentDownloadId]
+                    var fileCount = CurrentDownloads[currentDownloadId]
                         .Where(c => c.CanBeTransferred)
-                        .All(h => db.FileCaches.Any(f => f.Hash == h.Hash));
+                        .Count(h => db.FileCaches.Any(f => f.Hash == h.Hash));
+                    var totalFiles = CurrentDownloads[currentDownloadId].Count(c => c.CanBeTransferred);
+                    Logger.Debug("Waiting for files to be in the DB, added " + fileCount + " of " + totalFiles);
+
+                    allFilesInDb = fileCount == totalFiles;
                 }
 
                 await Task.Delay(250, ct);
@@ -146,7 +152,7 @@ namespace MareSynchronos.WebAPI
             Logger.Verbose("New Token Created");
 
             List<string> unverifiedUploadHashes = new();
-            foreach (var item in character.FileReplacements.SelectMany(c => c.Value.Select(v => v.Hash).Distinct()).Distinct().ToList())
+            foreach (var item in character.FileReplacements.SelectMany(c => c.Value.Where(f => string.IsNullOrEmpty(f.FileSwapPath)).Select(v => v.Hash).Distinct()).Distinct().ToList())
             {
                 if (!_verifiedUploadedHashes.Contains(item))
                 {

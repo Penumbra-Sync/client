@@ -11,6 +11,8 @@ using System.Collections.Concurrent;
 namespace MareSynchronos.Managers
 {
     public delegate void PenumbraRedrawEvent(IntPtr address, int objTblIdx);
+    public delegate void HeelsOffsetChange(float change);
+    public delegate void PenumbraResourceLoadEvent(IntPtr drawObject, string gamePath, string filePath);
     public class IpcManager : IDisposable
     {
         private readonly ICallGateSubscriber<int> _glamourerApiVersion;
@@ -33,6 +35,14 @@ namespace MareSynchronos.Managers
         private readonly ICallGateSubscriber<string, string[]>? _reverseResolvePlayer;
         private readonly ICallGateSubscriber<string, string, Dictionary<string, string>, string, int, int>
             _penumbraSetTemporaryMod;
+        private readonly ICallGateSubscriber<IntPtr, string, string, object?> _penumbraGameObjectResourcePathResolved;
+
+        private readonly ICallGateSubscriber<string> _heelsGetApiVersion;
+        private readonly ICallGateSubscriber<float> _heelsGetOffset;
+        private readonly ICallGateSubscriber<float, object?> _heelsOffsetUpdate;
+        private readonly ICallGateSubscriber<GameObject, float, object?> _heelsRegisterPlayer;
+        private readonly ICallGateSubscriber<GameObject, object?> _heelsUnregisterPlayer;
+
         private readonly DalamudUtil _dalamudUtil;
         private readonly ConcurrentQueue<Action> actionQueue = new();
 
@@ -58,7 +68,9 @@ namespace MareSynchronos.Managers
             _glamourerApplyOnlyCustomization = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyOnlyCustomizationToCharacter");
             _glamourerApplyOnlyEquipment = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyOnlyEquipmentToCharacter");
             _glamourerRevertCustomization = pi.GetIpcSubscriber<GameObject?, object>("Glamourer.RevertCharacter");
+            _penumbraGameObjectResourcePathResolved = pi.GetIpcSubscriber<IntPtr, string, string, object?>("Penumbra.GameObjectResourcePathResolved");
 
+            _penumbraGameObjectResourcePathResolved.Subscribe(ResourceLoaded);
             _penumbraObjectIsRedrawn.Subscribe(RedrawEvent);
             _penumbraInit.Subscribe(PenumbraInit);
             _penumbraDispose.Subscribe(PenumbraDispose);
@@ -82,6 +94,15 @@ namespace MareSynchronos.Managers
             _dalamudUtil.FrameworkUpdate += HandleActionQueue;
         }
 
+        private void ResourceLoaded(IntPtr ptr, string arg1, string arg2)
+        {
+            if (ptr != IntPtr.Zero && string.Compare(arg1, arg2, true, System.Globalization.CultureInfo.InvariantCulture) != 0)
+            {
+                PenumbraResourceLoadEvent?.Invoke(ptr, arg1, arg2);
+                //Logger.Debug($"Resolved {ptr:X}: {arg1} => {arg2}");
+            }
+        }
+
         private void HandleActionQueue()
         {
             if (actionQueue.TryDequeue(out var action))
@@ -95,6 +116,8 @@ namespace MareSynchronos.Managers
         public event VoidDelegate? PenumbraInitialized;
         public event VoidDelegate? PenumbraDisposed;
         public event PenumbraRedrawEvent? PenumbraRedrawEvent;
+        public event HeelsOffsetChange? HeelsOffsetChangeEvent;
+        public event PenumbraResourceLoadEvent? PenumbraResourceLoadEvent;
 
         public bool Initialized => CheckPenumbraApi();
         public bool CheckGlamourerApi()
@@ -113,7 +136,7 @@ namespace MareSynchronos.Managers
         {
             try
             {
-                return _penumbraApiVersion.InvokeFunc() is { Item1: 4, Item2: >= 11 };
+                return _penumbraApiVersion.InvokeFunc() is { Item1: 4, Item2: >= 13 };
             }
             catch
             {
@@ -125,12 +148,43 @@ namespace MareSynchronos.Managers
         {
             Logger.Verbose("Disposing " + nameof(IpcManager));
 
+            int totalSleepTime = 0;
+            while (actionQueue.Count > 0 && totalSleepTime < 2000)
+            {
+                Logger.Verbose("Waiting for actionqueue to clear...");
+                System.Threading.Thread.Sleep(16);
+                totalSleepTime += 16;
+            }
+
+            Logger.Verbose("Action queue clear or not, disposing");
             _dalamudUtil.FrameworkUpdate -= HandleActionQueue;
             actionQueue.Clear();
 
             _penumbraDispose.Unsubscribe(PenumbraDispose);
             _penumbraInit.Unsubscribe(PenumbraInit);
             _penumbraObjectIsRedrawn.Unsubscribe(RedrawEvent);
+            _penumbraGameObjectResourcePathResolved.Unsubscribe(ResourceLoaded);
+            _heelsOffsetUpdate.Unsubscribe(HeelsOffsetChange);
+        }
+
+        public float GetHeelsOffset()
+        {
+            if (!CheckHeelsApi()) return 0.0f;
+            return _heelsGetOffset.InvokeFunc();
+        }
+
+        public void HeelsSetOffsetForPlayer(float offset, IntPtr character)
+        {
+            if(!CheckHeelsApi()) return;
+            actionQueue.Enqueue(() =>
+            {
+                var gameObj = _dalamudUtil.CreateGameObject(character);
+                if (gameObj != null)
+                {
+                    Logger.Verbose("Applying Heels data to " + character.ToString("X"));
+                    _heelsRegisterPlayer.InvokeAction(gameObj, offset);
+                }
+            });
         }
 
         public void GlamourerApplyAll(string? customization, IntPtr obj)
@@ -246,11 +300,11 @@ namespace MareSynchronos.Managers
             });
         }
 
-        public string? PenumbraResolvePath(string path)
+        public string PenumbraResolvePath(string path)
         {
-            if (!CheckPenumbraApi()) return null;
+            if (!CheckPenumbraApi()) return path;
             var resolvedPath = _penumbraResolvePlayer!.InvokeFunc(path);
-            return resolvedPath;
+            return resolvedPath ?? path;
         }
 
         public string[] PenumbraReverseResolvePlayer(string path)

@@ -1,11 +1,37 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using Dalamud.Logging;
 using Dalamud.Utility;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Utils
 {
-    internal class Logger
+    [ProviderAlias("Dalamud")]
+    public class DalamudLoggingProvider : ILoggerProvider
     {
+        private readonly ConcurrentDictionary<string, Logger> _loggers =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        public DalamudLoggingProvider()
+        {
+        }
+
+        public ILogger CreateLogger(string categoryName)
+        {
+            return _loggers.GetOrAdd(categoryName, name => new Logger(categoryName));
+        }
+
+        public void Dispose()
+        {
+            _loggers.Clear();
+        }
+    }
+
+    internal class Logger : ILogger
+    {
+        private readonly string name;
+
         public static void Info(string info)
         {
             var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
@@ -40,5 +66,47 @@ namespace MareSynchronos.Utils
             PluginLog.Verbose($"[{caller}] {verbose}");
 #endif
         }
+
+        public Logger(string name)
+        {
+            this.name = name;
+        }
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            if (!IsEnabled(logLevel)) return;
+
+            switch (logLevel)
+            {
+                case LogLevel.Debug:
+                    PluginLog.Debug($"[{name}] [{eventId}] {formatter(state, exception)}");
+                    break;
+                case LogLevel.Error:
+                case LogLevel.Critical:
+                    PluginLog.Error($"[{name}] [{eventId}] {formatter(state, exception)}");
+                    break;
+                case LogLevel.Information:
+                    PluginLog.Information($"[{name}] [{eventId}] {formatter(state, exception)}");
+                    break;
+                case LogLevel.Warning:
+                    PluginLog.Warning($"[{name}] [{eventId}] {formatter(state, exception)}");
+                    break;
+                case LogLevel.Trace:
+                default:
+#if DEBUG
+                    PluginLog.Debug($"[{name}] [{eventId}] {formatter(state, exception)}");
+#else
+                    PluginLog.Verbose($"[{name}] {eventId} {state} {formatter(state, exception)}");
+#endif
+                    break;
+            }
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public IDisposable BeginScope<TState>(TState state) => default!;
     }
 }
