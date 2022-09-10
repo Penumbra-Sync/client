@@ -94,7 +94,7 @@ namespace MareSynchronos.Utils
                 case LogLevel.Trace:
                 default:
 #if DEBUG
-                    PluginLog.Debug($"[{name}] [{eventId}] {formatter(state, exception)}");
+                    PluginLog.Verbose($"[{name}] [{eventId}] {formatter(state, exception)}");
 #else
                     PluginLog.Verbose($"[{name}] {eventId} {state} {formatter(state, exception)}");
 #endif

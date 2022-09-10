@@ -238,6 +238,10 @@ public class CharacterDataFactory
         {
             previousData.FileReplacements[objectKind].Clear();
         }
+        else
+        {
+            previousData.FileReplacements.Add(objectKind, new());
+        }
 
         var chara = _dalamudUtil.CreateGameObject(charaPointer)!;
         while (!_dalamudUtil.IsObjectPresent(chara))
