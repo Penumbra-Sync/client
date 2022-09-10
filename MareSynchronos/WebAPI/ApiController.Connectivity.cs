@@ -205,6 +205,7 @@ namespace MareSynchronos.WebAPI
 
                         _mareHub.Closed += MareHubOnClosed;
                         _mareHub.Reconnecting += MareHubOnReconnecting;
+                        _mareHub.Reconnected += MareHubOnReconnected;
                     }
                 }
                 catch (HubException ex)
@@ -245,6 +246,12 @@ namespace MareSynchronos.WebAPI
                     await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token);
                 }
             }
+        }
+
+        private Task MareHubOnReconnected(string? arg)
+        {
+            _ = Task.Run(CreateConnections);
+            return Task.CompletedTask;
         }
 
         private async Task InitializeData(CancellationToken token)
@@ -331,7 +338,6 @@ namespace MareSynchronos.WebAPI
             Logger.Warn(arg?.StackTrace ?? string.Empty);
             Disconnected?.Invoke();
             ServerState = ServerState.Offline;
-            _ = Task.Run(CreateConnections);
             return Task.CompletedTask;
         }
 
@@ -343,6 +349,7 @@ namespace MareSynchronos.WebAPI
                 Logger.Info("Stopping existing connection");
                 _mareHub.Closed -= MareHubOnClosed;
                 _mareHub.Reconnecting -= MareHubOnReconnecting;
+                _mareHub.Reconnected -= MareHubOnReconnected;
                 await _mareHub.StopAsync(token);
                 await _mareHub.DisposeAsync();
                 CurrentUploads.Clear();
