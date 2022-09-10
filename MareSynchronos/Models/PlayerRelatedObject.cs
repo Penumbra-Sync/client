@@ -7,7 +7,7 @@ using Penumbra.GameData.ByteString;
 
 namespace MareSynchronos.Models
 {
-    internal class PlayerRelatedObject
+    public class PlayerRelatedObject
     {
         private readonly Func<IntPtr> getAddress;
 
@@ -46,6 +46,7 @@ namespace MareSynchronos.Models
         public byte? HatState { get; set; }
         public byte? VisorWeaponState { get; set; }
 
+        public bool HasTransientsUpdate { get; set; } = false;
         public bool HasUnprocessedUpdate { get; set; } = false;
         public bool DoNotSendUpdate { get; set; } = false;
         public bool IsProcessing { get; set; } = false;

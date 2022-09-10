@@ -117,6 +117,17 @@ public class CachedPlayer
                     continue;
                 }
             }
+
+            if (objectKind == ObjectKind.Player)
+            {
+                bool heelsOffsetDifferent = _cachedData.HeelsOffset != characterData.HeelsOffset;
+                if (heelsOffsetDifferent)
+                {
+                    Logger.Debug("Updating " + objectKind);
+                    charaDataToUpdate.Add(objectKind);
+                    continue;
+                }
+            }
         }
 
         _cachedData = characterData;
@@ -324,6 +335,7 @@ public class CachedPlayer
             {
                 _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerCharacter);
                 _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerCharacter);
+                _ipcManager.HeelsRestoreOffsetForPlayer(PlayerCharacter);
             }
             else
             {

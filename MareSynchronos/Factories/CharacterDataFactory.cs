@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
-using Dalamud.Game;
 using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
@@ -40,7 +38,7 @@ public class CharacterDataFactory
         return playerPointer == IntPtr.Zero || ((Character*)playerPointer)->GameObject.GetDrawObject() == null;
     }
 
-    public CharacterData BuildCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr playerPointer, CancellationToken token)
+    public CharacterData BuildCharacterData(CharacterData previousData, PlayerRelatedObject playerRelatedObject, CancellationToken token)
     {
         if (!_ipcManager.Initialized)
         {
@@ -50,20 +48,20 @@ public class CharacterDataFactory
         bool pointerIsZero = true;
         try
         {
-            pointerIsZero = CheckForPointer(playerPointer);
+            pointerIsZero = CheckForPointer(playerRelatedObject.Address);
         }
         catch (Exception ex)
         {
-            Logger.Warn("Could not create data for " + objectKind);
+            Logger.Warn("Could not create data for " + playerRelatedObject.ObjectKind);
             Logger.Warn(ex.Message);
             Logger.Warn(ex.StackTrace ?? string.Empty);
         }
 
         if (pointerIsZero)
         {
-            Logger.Verbose("Pointer was zero for " + objectKind);
-            previousData.FileReplacements.Remove(objectKind);
-            previousData.GlamourerString.Remove(objectKind);
+            Logger.Verbose("Pointer was zero for " + playerRelatedObject.ObjectKind);
+            previousData.FileReplacements.Remove(playerRelatedObject.ObjectKind);
+            previousData.GlamourerString.Remove(playerRelatedObject.ObjectKind);
             return previousData;
         }
 
@@ -72,7 +70,7 @@ public class CharacterDataFactory
 
         try
         {
-            return CreateCharacterData(previousData, objectKind, playerPointer, token);
+            return CreateCharacterData(previousData, playerRelatedObject, token);
         }
         catch (OperationCanceledException)
         {
@@ -80,7 +78,7 @@ public class CharacterDataFactory
         }
         catch (Exception e)
         {
-            Logger.Warn("Failed to create " + objectKind + " data");
+            Logger.Warn("Failed to create " + playerRelatedObject.ObjectKind + " data");
             Logger.Warn(e.Message);
             Logger.Warn(e.StackTrace ?? string.Empty);
         }
@@ -232,66 +230,75 @@ public class CharacterDataFactory
         cache.AddFileReplacement(objectKind, texDx11Replacement);
     }
 
-    private unsafe CharacterData CreateCharacterData(CharacterData previousData, ObjectKind objectKind, IntPtr charaPointer, CancellationToken token)
+    private unsafe CharacterData CreateCharacterData(CharacterData previousData, PlayerRelatedObject playerRelatedObject, CancellationToken token)
     {
-        if (previousData.FileReplacements.ContainsKey(objectKind))
-        {
-            previousData.FileReplacements[objectKind].Clear();
-        }
-        else
-        {
-            previousData.FileReplacements.Add(objectKind, new());
-        }
-
-        var chara = _dalamudUtil.CreateGameObject(charaPointer)!;
-        while (!_dalamudUtil.IsObjectPresent(chara))
-        {
-            Logger.Verbose("Character is null but it shouldn't be, waiting");
-            Thread.Sleep(50);
-        }
-
-        _dalamudUtil.WaitWhileCharacterIsDrawing(objectKind.ToString(), charaPointer);
+        var objectKind = playerRelatedObject.ObjectKind;
+        var charaPointer = playerRelatedObject.Address;
 
         Stopwatch st = Stopwatch.StartNew();
 
-        previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
-
-        previousData.GlamourerString[objectKind] = _ipcManager.GlamourerGetCharacterCustomization(charaPointer);
-
-        var human = (Human*)((Character*)charaPointer)->GameObject.GetDrawObject();
-        for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)
+        if (playerRelatedObject.HasUnprocessedUpdate)
         {
-            var mdl = (RenderModel*)human->CharacterBase.ModelArray[mdlIdx];
-            if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
+            Logger.Debug("Handling unprocessed update for " + objectKind);
+
+            if (previousData.FileReplacements.ContainsKey(objectKind))
             {
-                continue;
+                previousData.FileReplacements[objectKind].Clear();
+            }
+            else
+            {
+                previousData.FileReplacements.Add(objectKind, new());
             }
 
-            token.ThrowIfCancellationRequested();
+            var chara = _dalamudUtil.CreateGameObject(charaPointer)!;
+            while (!_dalamudUtil.IsObjectPresent(chara))
+            {
+                Logger.Verbose("Character is null but it shouldn't be, waiting");
+                Thread.Sleep(50);
+            }
 
-            AddReplacementsFromRenderModel(mdl, objectKind, previousData, 0);
-        }
+            _dalamudUtil.WaitWhileCharacterIsDrawing(objectKind.ToString(), charaPointer);
 
-        foreach (var item in previousData.FileReplacements[objectKind])
-        {
-            transientResourceManager.RemoveTransientResource(charaPointer, item);
-        }
+            var human = (Human*)((Character*)charaPointer)->GameObject.GetDrawObject();
+            for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)
+            {
+                var mdl = (RenderModel*)human->CharacterBase.ModelArray[mdlIdx];
+                if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
+                {
+                    continue;
+                }
 
-        if (objectKind == ObjectKind.Player)
-        {
-            AddPlayerSpecificReplacements(previousData, objectKind, charaPointer, human);
-        }
+                token.ThrowIfCancellationRequested();
 
-        if (objectKind == ObjectKind.Pet)
-        {
+                AddReplacementsFromRenderModel(mdl, objectKind, previousData, 0);
+            }
+
             foreach (var item in previousData.FileReplacements[objectKind])
             {
-                transientResourceManager.AddSemiTransientResource(objectKind, item);
+                transientResourceManager.RemoveTransientResource(charaPointer, item);
             }
 
-            previousData.FileReplacements[objectKind].Clear();
+            if (objectKind == ObjectKind.Player)
+            {
+                AddPlayerSpecificReplacements(previousData, objectKind, charaPointer, human);
+            }
+
+            if (objectKind == ObjectKind.Pet)
+            {
+                foreach (var item in previousData.FileReplacements[objectKind])
+                {
+                    transientResourceManager.AddSemiTransientResource(objectKind, item);
+                }
+
+                previousData.FileReplacements[objectKind].Clear();
+            }
         }
 
+        previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
+        previousData.GlamourerString[objectKind] = _ipcManager.GlamourerGetCharacterCustomization(charaPointer);
+        previousData.HeelsOffset = _ipcManager.GetHeelsOffset();
+
+        Logger.Debug("Handling transient update for " + objectKind);
         ManageSemiTransientData(previousData, objectKind, charaPointer);
 
         st.Stop();
@@ -387,8 +394,6 @@ public class CharacterDataFactory
         {
             transientResourceManager.RemoveTransientResource(charaPointer, item);
         }
-
-        previousData.HeelsOffset = _ipcManager.GetHeelsOffset();
     }
 
     private void AddReplacementSkeleton(ushort raceSexId, ObjectKind objectKind, CharacterData cache)

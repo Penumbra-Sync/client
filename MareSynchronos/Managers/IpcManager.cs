@@ -207,16 +207,30 @@ namespace MareSynchronos.Managers
             });
         }
 
+        public void HeelsRestoreOffsetForPlayer(IntPtr character)
+        {
+            if (!CheckHeelsApi()) return;
+            actionQueue.Enqueue(() =>
+            {
+                var gameObj = _dalamudUtil.CreateGameObject(character);
+                if (gameObj != null)
+                {
+                    Logger.Verbose("Restoring Heels data to " + character.ToString("X"));
+                    _heelsUnregisterPlayer.InvokeAction(gameObj);
+                }
+            });
+        }
+
         public void GlamourerApplyAll(string? customization, IntPtr obj)
         {
             if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
             actionQueue.Enqueue(() =>
             {
                 var gameObj = _dalamudUtil.CreateGameObject(obj);
-                if (gameObj != null)
+                if (gameObj is Character c)
                 {
-                    Logger.Verbose("Glamourer applying for " + gameObj);
-                    _glamourerApplyAll!.InvokeAction(customization, gameObj);
+                    Logger.Verbose("Glamourer applying for " + c.Address.ToString("X"));
+                    _glamourerApplyAll!.InvokeAction(customization, c);
                 }
             });
         }
@@ -227,10 +241,10 @@ namespace MareSynchronos.Managers
             actionQueue.Enqueue(() =>
             {
                 var gameObj = _dalamudUtil.CreateGameObject(character);
-                if (gameObj != null)
+                if (gameObj is Character c)
                 {
-                    Logger.Verbose("Glamourer apply only equipment to " + character.ToString("X"));
-                    _glamourerApplyOnlyEquipment!.InvokeAction(customization, gameObj);
+                    Logger.Verbose("Glamourer apply only equipment to " + c.Address.ToString("X"));
+                    _glamourerApplyOnlyEquipment!.InvokeAction(customization, c);
                 }
             });
         }
@@ -241,10 +255,10 @@ namespace MareSynchronos.Managers
             actionQueue.Enqueue(() =>
             {
                 var gameObj = _dalamudUtil.CreateGameObject(character);
-                if (gameObj != null)
+                if (gameObj is Character c)
                 {
-                    Logger.Verbose("Glamourer apply only customization to " + character.ToString("X"));
-                    _glamourerApplyOnlyCustomization!.InvokeAction(customization, gameObj);
+                    Logger.Verbose("Glamourer apply only customization to " + c.Address.ToString("X"));
+                    _glamourerApplyOnlyCustomization!.InvokeAction(customization, c);
                 }
             });
         }
@@ -255,9 +269,9 @@ namespace MareSynchronos.Managers
             try
             {
                 var gameObj = _dalamudUtil.CreateGameObject(character);
-                if (gameObj != null)
+                if (gameObj is Character c)
                 {
-                    var glamourerString = _glamourerGetAllCustomization!.InvokeFunc(gameObj);
+                    var glamourerString = _glamourerGetAllCustomization!.InvokeFunc(c);
                     byte[] bytes = Convert.FromBase64String(glamourerString);
                     // ignore transparency
                     bytes[88] = 128;

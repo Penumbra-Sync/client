@@ -28,6 +28,7 @@ namespace MareSynchronos.Managers
         private readonly Dictionary<ObjectKind, Func<bool>> objectKindsToUpdate = new();
 
         private CancellationTokenSource? _playerChangedCts = new();
+        private CancellationTokenSource _transientUpdateCts = new();
 
         private List<PlayerRelatedObject> playerRelatedObjects = new List<PlayerRelatedObject>();
 
@@ -69,8 +70,19 @@ namespace MareSynchronos.Managers
             {
                 if (obj.Address == gameObj && !obj.HasUnprocessedUpdate)
                 {
-                    obj.HasUnprocessedUpdate = true;
-                    OnPlayerOrAttachedObjectsChanged();
+                    _transientUpdateCts.Cancel();
+                    _transientUpdateCts = new CancellationTokenSource();
+                    var token = _transientUpdateCts.Token;
+                    Task.Run(async () =>
+                    {
+                        Logger.Debug("Delaying transient resource load update");
+                        await Task.Delay(750, token);
+                        if (obj.HasUnprocessedUpdate || token.IsCancellationRequested) return;
+                        Logger.Debug("Firing transient resource load update");
+                        obj.HasTransientsUpdate = true;
+                        OnPlayerOrAttachedObjectsChanged();
+                    }, token);
+
                     return;
                 }
             }
@@ -82,7 +94,7 @@ namespace MareSynchronos.Managers
             if (LastCreatedCharacterData != null && LastCreatedCharacterData.HeelsOffset != change && !player.IsProcessing)
             {
                 Logger.Debug("Heels offset changed to " + change);
-                playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player).HasUnprocessedUpdate = true;
+                playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player).HasTransientsUpdate = true;
             }
         }
 
@@ -129,14 +141,15 @@ namespace MareSynchronos.Managers
 
         private async Task<CharacterCacheDto?> CreateFullCharacterCacheDto(CancellationToken token)
         {
-            foreach (var unprocessedObject in playerRelatedObjects.Where(c => c.HasUnprocessedUpdate).ToList())
+            foreach (var unprocessedObject in playerRelatedObjects.Where(c => c.HasUnprocessedUpdate || c.HasTransientsUpdate).ToList())
             {
                 Logger.Verbose("Building Cache for " + unprocessedObject.ObjectKind);
-                PermanentDataCache = _characterDataFactory.BuildCharacterData(PermanentDataCache, unprocessedObject.ObjectKind, unprocessedObject.Address, token);
+                PermanentDataCache = _characterDataFactory.BuildCharacterData(PermanentDataCache, unprocessedObject, token);
                 if (!token.IsCancellationRequested)
                 {
                     unprocessedObject.HasUnprocessedUpdate = false;
                     unprocessedObject.IsProcessing = false;
+                    unprocessedObject.HasTransientsUpdate = false;
                 }
                 token.ThrowIfCancellationRequested();
             }
@@ -165,7 +178,6 @@ namespace MareSynchronos.Managers
                 if (address == item.Address)
                 {
                     Logger.Debug("Penumbra redraw Event for " + item.ObjectKind);
-                    //_transientResourceManager.CleanSemiTransientResources(item.ObjectKind);
                     item.HasUnprocessedUpdate = true;
                 }
             }
@@ -178,7 +190,7 @@ namespace MareSynchronos.Managers
 
         private void OnPlayerOrAttachedObjectsChanged()
         {
-            var unprocessedObjects = playerRelatedObjects.Where(c => c.HasUnprocessedUpdate).ToList();
+            var unprocessedObjects = playerRelatedObjects.Where(c => c.HasUnprocessedUpdate || c.HasTransientsUpdate).ToList();
             foreach (var unprocessedObject in unprocessedObjects)
             {
                 unprocessedObject.IsProcessing = true;

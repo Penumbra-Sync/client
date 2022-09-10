@@ -2,8 +2,11 @@
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace MareSynchronos.Managers
 {
@@ -16,8 +19,9 @@ namespace MareSynchronos.Managers
 
         public event TransientResourceLoadedEvent? TransientResourceLoaded;
 
-        private Dictionary<IntPtr, HashSet<string>> TransientResources { get; } = new();
-        private Dictionary<ObjectKind, HashSet<FileReplacement>> SemiTransientResources { get; } = new();
+        private ConcurrentDictionary<IntPtr, HashSet<string>> TransientResources { get; } = new();
+        private ConcurrentDictionary<ObjectKind, HashSet<FileReplacement>> SemiTransientResources { get; } = new();
+        private CancellationTokenSource transientInvokeDelayCts = new CancellationTokenSource();
         public TransientResourceManager(IpcManager manager, DalamudUtil dalamudUtil)
         {
             manager.PenumbraResourceLoadEvent += Manager_PenumbraResourceLoadEvent;
@@ -42,7 +46,7 @@ namespace MareSynchronos.Managers
                 if (!dalamudUtil.IsGameObjectPresent(item.Key))
                 {
                     Logger.Debug("Object not present anymore: " + item.Key.ToString("X"));
-                    TransientResources.Remove(item.Key);
+                    TransientResources.TryRemove(item.Key, out _);
                 }
             }
         }
@@ -138,13 +142,23 @@ namespace MareSynchronos.Managers
                     SemiTransientResources[objectKind].RemoveWhere(f => f.GamePaths.First().ToLowerInvariant() == item.ToLowerInvariant());
                 }
 
-                if (!SemiTransientResources[objectKind].Any(f => f.GamePaths.First().ToLowerInvariant() == item.ToLowerInvariant()))
+                try
                 {
-                    Logger.Debug("Persisting " + item.ToLowerInvariant());
-                    var fileReplacement = createFileReplacement(item.ToLowerInvariant(), true);
-                    if (!fileReplacement.HasFileReplacement)
-                        fileReplacement = createFileReplacement(item.ToLowerInvariant(), false);
-                    SemiTransientResources[objectKind].Add(fileReplacement);
+                    if (!SemiTransientResources[objectKind].Any(f => f.GamePaths.First().ToLowerInvariant() == item.ToLowerInvariant()))
+                    {
+                        Logger.Debug("Persisting " + item.ToLowerInvariant());
+
+                        var fileReplacement = createFileReplacement(item.ToLowerInvariant(), true);
+                        if (!fileReplacement.HasFileReplacement)
+                            fileReplacement = createFileReplacement(item.ToLowerInvariant(), false);
+                        SemiTransientResources[objectKind].Add(fileReplacement);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn("Issue during transient file persistence");
+                    Logger.Warn(ex.Message);
+                    Logger.Warn(ex.StackTrace.ToString());
                 }
             }
 

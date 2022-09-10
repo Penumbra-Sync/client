@@ -35,7 +35,7 @@ namespace MareSynchronos.Models
 
         public void SetResolvedPath(string path)
         {
-            ResolvedPath = path.ToLowerInvariant().Replace('/', '\\').Replace(_penumbraDirectory, "").Replace('\\', '/');
+            ResolvedPath = path.ToLowerInvariant();//.Replace('/', '\\').Replace(_penumbraDirectory, "").Replace('\\', '/');
             if (!HasFileReplacement || IsFileSwap) return;
 
             _ = Task.Run(() =>
