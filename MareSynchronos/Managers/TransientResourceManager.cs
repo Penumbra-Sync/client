@@ -18,10 +18,10 @@ namespace MareSynchronos.Managers
         private readonly DalamudUtil dalamudUtil;
 
         public event TransientResourceLoadedEvent? TransientResourceLoaded;
+        public IntPtr[] PlayerRelatedPointers = Array.Empty<IntPtr>();
 
         private ConcurrentDictionary<IntPtr, HashSet<string>> TransientResources { get; } = new();
         private ConcurrentDictionary<ObjectKind, HashSet<FileReplacement>> SemiTransientResources { get; } = new();
-        private CancellationTokenSource transientInvokeDelayCts = new CancellationTokenSource();
         public TransientResourceManager(IpcManager manager, DalamudUtil dalamudUtil)
         {
             manager.PenumbraResourceLoadEvent += Manager_PenumbraResourceLoadEvent;
@@ -81,6 +81,11 @@ namespace MareSynchronos.Managers
 
         private void Manager_PenumbraResourceLoadEvent(IntPtr gameObject, string gamePath, string filePath)
         {
+            if (!PlayerRelatedPointers.Contains(gameObject))
+            {
+                return;
+            }
+
             if (!TransientResources.ContainsKey(gameObject))
             {
                 TransientResources[gameObject] = new();
@@ -115,7 +120,7 @@ namespace MareSynchronos.Managers
         {
             if (TransientResources.ContainsKey(gameObject))
             {
-                TransientResources[gameObject].RemoveWhere(f => fileReplacement.ResolvedPath.ToLowerInvariant() == f.ToLowerInvariant());
+                TransientResources[gameObject].RemoveWhere(f => fileReplacement.GamePaths.Any(g => g.ToLowerInvariant() == f.ToLowerInvariant()));
             }
         }
 
@@ -146,12 +151,15 @@ namespace MareSynchronos.Managers
                 {
                     if (!SemiTransientResources[objectKind].Any(f => f.GamePaths.First().ToLowerInvariant() == item.ToLowerInvariant()))
                     {
-                        Logger.Debug("Persisting " + item.ToLowerInvariant());
 
                         var fileReplacement = createFileReplacement(item.ToLowerInvariant(), true);
                         if (!fileReplacement.HasFileReplacement)
                             fileReplacement = createFileReplacement(item.ToLowerInvariant(), false);
-                        SemiTransientResources[objectKind].Add(fileReplacement);
+                        if (fileReplacement.HasFileReplacement)
+                        {
+                            Logger.Debug("Persisting " + item.ToLowerInvariant());
+                            SemiTransientResources[objectKind].Add(fileReplacement);
+                        }
                     }
                 }
                 catch (Exception ex)

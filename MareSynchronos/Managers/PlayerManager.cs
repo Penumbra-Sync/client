@@ -9,7 +9,6 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using System.Collections.Generic;
 using System.Linq;
 using MareSynchronos.Models;
-using Newtonsoft.Json;
 
 namespace MareSynchronos.Managers
 {
@@ -47,6 +46,7 @@ namespace MareSynchronos.Managers
             _transientResourceManager.TransientResourceLoaded += HandleTransientResourceLoad;
             _dalamudUtil.DelayedFrameworkUpdate += DalamudUtilOnDelayedFrameworkUpdate;
             _ipcManager.HeelsOffsetChangeEvent += HeelsOffsetChanged;
+            _dalamudUtil.FrameworkUpdate += DalamudUtilOnFrameworkUpdate;
 
 
             Logger.Debug("Watching Player, ApiController is Connected: " + _apiController.IsConnected);
@@ -62,6 +62,11 @@ namespace MareSynchronos.Managers
                 new PlayerRelatedObject(ObjectKind.Pet, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.GetPet()),
                 new PlayerRelatedObject(ObjectKind.Companion, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.GetCompanion()),
             };
+        }
+
+        private void DalamudUtilOnFrameworkUpdate()
+        {
+            _transientResourceManager.PlayerRelatedPointers = playerRelatedObjects.Select(f => f.CurrentAddress).ToArray();
         }
 
         public void HandleTransientResourceLoad(IntPtr gameObj)
@@ -106,6 +111,7 @@ namespace MareSynchronos.Managers
 
             _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
             _dalamudUtil.DelayedFrameworkUpdate -= DalamudUtilOnDelayedFrameworkUpdate;
+            _dalamudUtil.FrameworkUpdate -= DalamudUtilOnFrameworkUpdate;
 
             _transientResourceManager.TransientResourceLoaded -= HandleTransientResourceLoad;
 
@@ -222,7 +228,7 @@ namespace MareSynchronos.Managers
 
             Task.Run(async () =>
             {
-                foreach(var item in unprocessedObjects)
+                foreach (var item in unprocessedObjects)
                 {
                     _dalamudUtil.WaitWhileCharacterIsDrawing("self " + item.ObjectKind.ToString(), item.Address, token);
                 }

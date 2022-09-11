@@ -19,7 +19,7 @@ namespace MareSynchronos.Models
         public IntPtr Address { get; set; }
         public IntPtr DrawObjectAddress { get; set; }
 
-        private IntPtr CurrentAddress
+        public IntPtr CurrentAddress
         {
             get
             {
