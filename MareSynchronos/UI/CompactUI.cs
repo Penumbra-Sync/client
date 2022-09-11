@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
@@ -28,6 +28,8 @@ namespace MareSynchronos.UI
         private string _editCharComment = string.Empty;
         private string _editNickEntry = string.Empty;
         private string _pairToAdd = string.Empty;
+        private readonly Stopwatch _timeout = new();
+        private bool _buttonState;
 
         private float _transferPartHeight = 0;
 
@@ -121,6 +123,7 @@ namespace MareSynchronos.UI
         private void DrawFilter()
         {
             var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.ArrowUp);
+            var playButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Play);
             if (!_configuration.ReverseUserSort)
             {
                 if (ImGuiComponents.IconButton(FontAwesomeIcon.ArrowDown))
@@ -140,8 +143,67 @@ namespace MareSynchronos.UI
                 UiShared.AttachToolTip("Sort by oldest additions first");
             }
             ImGui.SameLine();
-            ImGui.SetNextItemWidth(_windowContentWidth - buttonSize.X - ImGui.GetStyle().ItemSpacing.X);
+            
+            var users = GetFilteredUsers().ToList();
+            var userCount = users.Count;
+            
+            var spacing = userCount > 0
+                ? playButtonSize.X + ImGui.GetStyle().ItemSpacing.X * 2
+                : ImGui.GetStyle().ItemSpacing.X;
+            
+            ImGui.SetNextItemWidth(_windowContentWidth - buttonSize.X - spacing);
             ImGui.InputTextWithHint("##filter", "Filter for UID/notes", ref _characterOrCommentFilter, 255);
+
+            if (userCount == 0) return;
+            ImGui.SameLine();
+            
+            var pausedUsers = users.Where(u => u.IsPaused).ToList();
+            var resumedUsers = users.Where(u => !u.IsPaused).ToList();
+            
+            switch (_buttonState)
+            {
+                case true when !pausedUsers.Any():
+                    _buttonState = false;
+                    break;
+                case false when !resumedUsers.Any():
+                    _buttonState = true;
+                    break;
+                case true:
+                    users = pausedUsers;
+                    break;
+                case false:
+                    users = resumedUsers;
+                    break;
+            }
+            
+            var button = _buttonState ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
+            
+            if (!_timeout.IsRunning || _timeout.ElapsedMilliseconds > 15000)
+            {
+                _timeout.Reset();
+                
+                if (ImGuiComponents.IconButton(button))
+                {
+                    if (UiShared.CtrlPressed())
+                    {
+                        Logger.Debug(users.Count.ToString());
+                        foreach (var entry in users)
+                        {
+                            _ = _apiController.SendPairedClientPauseChange(entry.OtherUID, !entry.IsPaused);
+                        }
+                        
+                        _timeout.Start();
+                        _buttonState = !_buttonState;
+                    }
+                }
+                UiShared.AttachToolTip($"Hold Control to {(button == FontAwesomeIcon.Play ? "resume" : "pause")} pairing with {users.Count} out of {userCount} displayed users.");
+            }
+            else
+            {
+                var availableAt = (15000 - _timeout.ElapsedMilliseconds) / 1000;
+                ImGuiComponents.DisabledButton(button);
+                UiShared.AttachToolTip($"Next execution is available at {availableAt} seconds");
+            }
         }
 
         private void DrawPairedClient(ClientPairDto entry)
@@ -288,13 +350,7 @@ namespace MareSynchronos.UI
             var ySize = _transferPartHeight == 0
                 ? 1
                 : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - _transferPartHeight - ImGui.GetCursorPosY();
-            var users = _apiController.PairedClients.Where(p =>
-            {
-                if (_characterOrCommentFilter.IsNullOrEmpty()) return true;
-                _configuration.GetCurrentServerUidComments().TryGetValue(p.OtherUID, out var comment);
-                return p.OtherUID.ToLowerInvariant().Contains(_characterOrCommentFilter.ToLowerInvariant()) ||
-                       (comment?.ToLowerInvariant().Contains(_characterOrCommentFilter.ToLowerInvariant()) ?? false);
-            });
+            var users = GetFilteredUsers();
 
             if (_configuration.ReverseUserSort) users = users.Reverse();
 
@@ -304,6 +360,17 @@ namespace MareSynchronos.UI
                 UiShared.DrawWithID(entry.OtherUID, () => DrawPairedClient(entry));
             }
             ImGui.EndChild();
+        }
+
+        private IEnumerable<ClientPairDto> GetFilteredUsers()
+        {
+            return _apiController.PairedClients.Where(p =>
+            {
+                if (_characterOrCommentFilter.IsNullOrEmpty()) return true;
+                _configuration.GetCurrentServerUidComments().TryGetValue(p.OtherUID, out var comment);
+                return p.OtherUID.ToLowerInvariant().Contains(_characterOrCommentFilter.ToLowerInvariant()) ||
+                       (comment?.ToLowerInvariant().Contains(_characterOrCommentFilter.ToLowerInvariant()) ?? false);
+            });
         }
 
         private void DrawServerStatus()
