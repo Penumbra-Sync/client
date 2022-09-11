@@ -80,7 +80,6 @@ namespace MareSynchronos.Managers
                         if (obj.HasUnprocessedUpdate || token.IsCancellationRequested) return;
                         Logger.Debug("Firing transient resource load update");
                         obj.HasTransientsUpdate = true;
-                        OnPlayerOrAttachedObjectsChanged();
                     }, token);
 
                     return;
@@ -119,7 +118,7 @@ namespace MareSynchronos.Managers
             if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized) return;
 
             playerRelatedObjects.ForEach(k => k.CheckAndUpdateObject());
-            if (playerRelatedObjects.Any(c => c.HasUnprocessedUpdate && !c.IsProcessing))
+            if (playerRelatedObjects.Any(c => (c.HasUnprocessedUpdate || c.HasTransientsUpdate) && !c.IsProcessing))
             {
                 OnPlayerOrAttachedObjectsChanged();
             }
@@ -182,7 +181,7 @@ namespace MareSynchronos.Managers
                 }
             }
 
-            if (playerRelatedObjects.Any(c => c.HasUnprocessedUpdate && (!c.IsProcessing || (c.IsProcessing && c.DoNotSendUpdate))))
+            if (playerRelatedObjects.Any(c => (c.HasUnprocessedUpdate || c.HasTransientsUpdate) && (!c.IsProcessing || (c.IsProcessing && c.DoNotSendUpdate))))
             {
                 OnPlayerOrAttachedObjectsChanged();
             }
