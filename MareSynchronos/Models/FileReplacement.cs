@@ -35,7 +35,7 @@ namespace MareSynchronos.Models
 
         public void SetResolvedPath(string path)
         {
-            ResolvedPath = path.ToLowerInvariant();//.Replace('/', '\\').Replace(_penumbraDirectory, "").Replace('\\', '/');
+            ResolvedPath = path.ToLowerInvariant().Replace('\\', '/');//.Replace('/', '\\').Replace(_penumbraDirectory, "").Replace('\\', '/');
             if (!HasFileReplacement || IsFileSwap) return;
 
             _ = Task.Run(() =>
@@ -43,7 +43,7 @@ namespace MareSynchronos.Models
                 FileCache? fileCache;
                 using (FileCacheContext db = new())
                 {
-                    fileCache = db.FileCaches.FirstOrDefault(f => f.Filepath == path.ToLowerInvariant());
+                    fileCache = db.FileCaches.FirstOrDefault(f => f.Filepath == path.Replace('/', '\\').ToLowerInvariant());
                 }
 
                 if (fileCache != null)
@@ -57,7 +57,7 @@ namespace MareSynchronos.Models
                     {
                         Hash = ComputeHash(fi);
                         using var db = new FileCacheContext();
-                        var newTempCache = db.FileCaches.Single(f => f.Filepath == path.ToLowerInvariant());
+                        var newTempCache = db.FileCaches.Single(f => f.Filepath == path.Replace('/', '\\').ToLowerInvariant());
                         newTempCache.Hash = Hash;
                         db.Update(newTempCache);
                         db.SaveChanges();
@@ -65,7 +65,7 @@ namespace MareSynchronos.Models
                 }
                 else
                 {
-                    Hash = ComputeHash(new FileInfo(path));
+                    Hash = ComputeHash(new FileInfo(path.Replace('/', '\\').ToLowerInvariant()));
                 }
             });
         }

@@ -19,6 +19,7 @@ namespace MareSynchronos.Managers
 
         public event TransientResourceLoadedEvent? TransientResourceLoaded;
         public IntPtr[] PlayerRelatedPointers = Array.Empty<IntPtr>();
+        private readonly string[] FileTypesToHandle = new[] { "tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp" };
 
         private ConcurrentDictionary<IntPtr, HashSet<string>> TransientResources { get; } = new();
         private ConcurrentDictionary<ObjectKind, HashSet<FileReplacement>> SemiTransientResources { get; } = new();
@@ -81,6 +82,10 @@ namespace MareSynchronos.Managers
 
         private void Manager_PenumbraResourceLoadEvent(IntPtr gameObject, string gamePath, string filePath)
         {
+            if (!FileTypesToHandle.Any(type => gamePath.ToLowerInvariant().EndsWith(type)))
+            {
+                return;
+            }
             if (!PlayerRelatedPointers.Contains(gameObject))
             {
                 return;

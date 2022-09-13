@@ -121,7 +121,7 @@ public class CharacterDataFactory
             Logger.Warn("Could not get model data for " + objectKind);
             return;
         }
-        //Logger.Verbose("Adding File Replacement for Model " + mdlPath);
+        //Logger.Verbose("Checking File Replacement for Model " + mdlPath);
 
         FileReplacement mdlFileReplacement = CreateFileReplacement(mdlPath);
         DebugPrint(mdlFileReplacement, objectKind, "Model", inheritanceLevel);
@@ -151,6 +151,7 @@ public class CharacterDataFactory
             return;
         }
 
+        Logger.Verbose("Check File Replacement for Material " + fileName);
         var mtrlPath = fileName.Split("|")[2];
 
         if (cache.FileReplacements.ContainsKey(objectKind))
@@ -180,6 +181,8 @@ public class CharacterDataFactory
             }
 
             if (string.IsNullOrEmpty(texPath)) continue;
+
+            Logger.Verbose("Check File Replacement for Texture " + texPath);
 
             AddReplacementsFromTexture(texPath, objectKind, cache, inheritanceLevel + 1);
         }
