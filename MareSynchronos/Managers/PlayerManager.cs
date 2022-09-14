@@ -230,7 +230,7 @@ namespace MareSynchronos.Managers
             {
                 foreach (var item in unprocessedObjects)
                 {
-                    _dalamudUtil.WaitWhileCharacterIsDrawing("self " + item.ObjectKind.ToString(), item.Address, token);
+                    _dalamudUtil.WaitWhileCharacterIsDrawing("self " + item.ObjectKind.ToString(), item.Address, 10000, token);
                 }
 
                 CharacterCacheDto? cacheDto = (await CreateFullCharacterCacheDto(token));

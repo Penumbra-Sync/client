@@ -121,7 +121,7 @@ public class CharacterDataFactory
             Logger.Warn("Could not get model data for " + objectKind);
             return;
         }
-        //Logger.Verbose("Checking File Replacement for Model " + mdlPath);
+        Logger.Verbose("Checking File Replacement for Model " + mdlPath);
 
         FileReplacement mdlFileReplacement = CreateFileReplacement(mdlPath);
         DebugPrint(mdlFileReplacement, objectKind, "Model", inheritanceLevel);
@@ -151,7 +151,7 @@ public class CharacterDataFactory
             return;
         }
 
-        Logger.Verbose("Check File Replacement for Material " + fileName);
+        Logger.Verbose("Checking File Replacement for Material " + fileName);
         var mtrlPath = fileName.Split("|")[2];
 
         if (cache.FileReplacements.ContainsKey(objectKind))
@@ -182,7 +182,7 @@ public class CharacterDataFactory
 
             if (string.IsNullOrEmpty(texPath)) continue;
 
-            Logger.Verbose("Check File Replacement for Texture " + texPath);
+            Logger.Verbose("Checking File Replacement for Texture " + texPath);
 
             AddReplacementsFromTexture(texPath, objectKind, cache, inheritanceLevel + 1);
         }
@@ -260,7 +260,7 @@ public class CharacterDataFactory
                 Thread.Sleep(50);
             }
 
-            _dalamudUtil.WaitWhileCharacterIsDrawing(objectKind.ToString(), charaPointer);
+            _dalamudUtil.WaitWhileCharacterIsDrawing(objectKind.ToString(), charaPointer, 15000);
 
             var human = (Human*)((Character*)charaPointer)->GameObject.GetDrawObject();
             for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)

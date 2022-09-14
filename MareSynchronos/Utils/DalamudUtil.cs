@@ -195,16 +195,15 @@ namespace MareSynchronos.Utils
             return await _framework.RunOnFrameworkThread(func);
         }
 
-        public unsafe void WaitWhileCharacterIsDrawing(string name, IntPtr characterAddress, CancellationToken? ct = null)
+        public unsafe void WaitWhileCharacterIsDrawing(string name, IntPtr characterAddress, int timeOut = 5000, CancellationToken? ct = null)
         {
             if (!_clientState.IsLoggedIn || characterAddress == IntPtr.Zero) return;
 
             var obj = (GameObject*)characterAddress;
-            const int maxWaitTime = 5000;
             const int tick = 250;
             int curWaitTime = 0;
             // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
-            while ((obj->RenderFlags & 0b100000000000) == 0b100000000000 && (!ct?.IsCancellationRequested ?? true) && curWaitTime < maxWaitTime) // 0b100000000000 is "still rendering" or something
+            while ((obj->RenderFlags & 0b100000000000) == 0b100000000000 && (!ct?.IsCancellationRequested ?? true) && curWaitTime < timeOut) // 0b100000000000 is "still rendering" or something
             {
                 Logger.Verbose($"Waiting for {name} to finish drawing");
                 curWaitTime += tick;
@@ -215,8 +214,6 @@ namespace MareSynchronos.Utils
             // wait quarter a second just in case
             Thread.Sleep(tick);
         }
-
-        public void WaitWhileSelfIsDrawing(CancellationToken? token) => WaitWhileCharacterIsDrawing("self", _clientState.LocalPlayer?.Address ?? IntPtr.Zero, token);
 
         public void Dispose()
         {

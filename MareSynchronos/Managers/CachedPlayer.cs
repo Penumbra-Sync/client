@@ -244,7 +244,7 @@ public class CachedPlayer
 
         if (objectKind == ObjectKind.Player)
         {
-            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, ct);
+            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, 10000, ct);
             ct.ThrowIfCancellationRequested();
             _ipcManager.HeelsSetOffsetForPlayer(_cachedData.HeelsOffset, PlayerCharacter);
             RequestedPenumbraRedraw = true;
@@ -265,7 +265,7 @@ public class CachedPlayer
             if (minionOrMount != null)
             {
                 Logger.Debug($"Request Redraw for Minion/Mount");
-                _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " minion or mount", (IntPtr)minionOrMount, ct);
+                _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " minion or mount", (IntPtr)minionOrMount, 10000, ct);
                 ct.ThrowIfCancellationRequested();
                 if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                 {
@@ -311,7 +311,7 @@ public class CachedPlayer
             if (companion != IntPtr.Zero)
             {
                 Logger.Debug("Request Redraw for Companion");
-                _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " companion", companion, ct);
+                _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " companion", companion, 10000,ct);
                 ct.ThrowIfCancellationRequested();
                 if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                 {
@@ -460,7 +460,7 @@ public class CachedPlayer
             PlayerCharacter = address;
             var cts = new CancellationTokenSource();
             cts.CancelAfter(TimeSpan.FromSeconds(5));
-            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, cts.Token);
+            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, 10000, cts.Token);
             cts.Dispose();
             cts = new CancellationTokenSource();
             cts.CancelAfter(TimeSpan.FromSeconds(5));
