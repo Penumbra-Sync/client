@@ -9,6 +9,9 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using System.Collections.Generic;
 using System.Linq;
 using MareSynchronos.Models;
+#if DEBUG
+using Newtonsoft.Json;
+#endif
 
 namespace MareSynchronos.Managers
 {
@@ -235,6 +238,11 @@ namespace MareSynchronos.Managers
 
                 CharacterCacheDto? cacheDto = (await CreateFullCharacterCacheDto(token));
                 if (cacheDto == null || token.IsCancellationRequested) return;
+
+#if DEBUG
+                var json = JsonConvert.SerializeObject(cacheDto, Formatting.Indented);
+                Logger.Verbose(json);
+#endif
 
                 if ((LastCreatedCharacterData?.GetHashCode() ?? 0) == cacheDto.GetHashCode())
                 {

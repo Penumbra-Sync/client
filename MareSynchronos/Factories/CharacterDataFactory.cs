@@ -320,10 +320,13 @@ public class CharacterDataFactory
                 previousData.FileReplacements.Add(objectKind, new());
             }
 
-            if (!previousData.FileReplacements[objectKind].Any(k => k.ResolvedPath.ToLowerInvariant() == item.ResolvedPath.ToLowerInvariant()))
+            if (!previousData.FileReplacements[objectKind].Any(k => k.GamePaths.Any(p => item.GamePaths.Select(p => p.ToLowerInvariant()).Contains(p.ToLowerInvariant()))))
             {
-                if (_ipcManager.PenumbraResolvePath(item.GamePaths.First()).ToLowerInvariant() == item.GamePaths.First().ToLowerInvariant())
+                var penumResolve = _ipcManager.PenumbraResolvePath(item.GamePaths.First()).ToLowerInvariant();
+                var gamePath = item.GamePaths.First().ToLowerInvariant();
+                if (penumResolve == gamePath)
                 {
+                    Logger.Debug("PenumResolve was same as GamePath, not adding " + item);
                     transientResourceManager.RemoveTransientResource(charaPointer, item);
                 }
                 else

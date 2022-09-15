@@ -143,27 +143,30 @@ namespace MareSynchronos.Managers
 
             var transientResources = resources.ToList();
             Logger.Debug("Persisting " + transientResources.Count + " transient resources");
-            foreach (var item in transientResources)
+            foreach (var gamePath in transientResources)
             {
-                var existingResource = SemiTransientResources[objectKind].Any(f => f.GamePaths.First().ToLowerInvariant() == item.ToLowerInvariant());
+                var existingResource = SemiTransientResources[objectKind].Any(f => f.GamePaths.First().ToLowerInvariant() == gamePath.ToLowerInvariant());
                 if (existingResource)
                 {
-                    Logger.Debug("Semi Transient resource replaced: " + item);
-                    SemiTransientResources[objectKind].RemoveWhere(f => f.GamePaths.First().ToLowerInvariant() == item.ToLowerInvariant());
+                    Logger.Debug("Semi Transient resource replaced: " + gamePath);
+                    SemiTransientResources[objectKind].RemoveWhere(f => f.GamePaths.First().ToLowerInvariant() == gamePath.ToLowerInvariant());
                 }
 
                 try
                 {
-                    if (!SemiTransientResources[objectKind].Any(f => f.GamePaths.First().ToLowerInvariant() == item.ToLowerInvariant()))
+                    var fileReplacement = createFileReplacement(gamePath.ToLowerInvariant(), true);
+                    if (!fileReplacement.HasFileReplacement)
+                        fileReplacement = createFileReplacement(gamePath.ToLowerInvariant(), false);
+                    if (fileReplacement.HasFileReplacement)
                     {
-
-                        var fileReplacement = createFileReplacement(item.ToLowerInvariant(), true);
-                        if (!fileReplacement.HasFileReplacement)
-                            fileReplacement = createFileReplacement(item.ToLowerInvariant(), false);
-                        if (fileReplacement.HasFileReplacement)
+                        Logger.Debug("Persisting " + gamePath.ToLowerInvariant());
+                        if (SemiTransientResources[objectKind].Add(fileReplacement))
                         {
-                            Logger.Debug("Persisting " + item.ToLowerInvariant());
-                            SemiTransientResources[objectKind].Add(fileReplacement);
+                            Logger.Debug("Added " + fileReplacement);
+                        }
+                        else
+                        {
+                            Logger.Debug("Not added " + fileReplacement);
                         }
                     }
                 }

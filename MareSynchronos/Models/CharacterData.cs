@@ -48,7 +48,7 @@ namespace MareSynchronos.Models
             {
                 return new FileReplacementDto()
                 {
-                    GamePaths = g.SelectMany(g => g.GamePaths).Distinct().ToArray(),
+                    GamePaths = g.SelectMany(f => f.GamePaths).Distinct().ToArray(),
                     Hash = g.First().Hash,
                 };
             }).ToList());
