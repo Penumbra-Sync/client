@@ -213,12 +213,25 @@ namespace MareSynchronos
             _fileDialogManager.Draw();
         }
 
-        private void OnCommand(string command, string args)
+        private void OnCommand(string command, string rawArgs)
         {
-            if (string.IsNullOrEmpty(args))
+            var args = rawArgs.Split(new[] { ' ' }, 2);
+            if (args.Length > 0 && args[0].Length > 0)
             {
-                OpenUi();
+                switch (args[0])
+                {
+                    case "rescan":
+                        {
+                            Logger.Debug("Forced rescanning of Penumbra mods and local Mare cache.");
+                            _fileCacheManager.StartInitialScan();
+                            break;
+                        }
+                }
+
+                return;
             }
+
+            OpenUi();
         }
 
         private void OpenUi()
