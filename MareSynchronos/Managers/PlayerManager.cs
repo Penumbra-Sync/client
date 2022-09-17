@@ -240,8 +240,8 @@ namespace MareSynchronos.Managers
                 if (cacheDto == null || token.IsCancellationRequested) return;
 
 #if DEBUG
-                var json = JsonConvert.SerializeObject(cacheDto, Formatting.Indented);
-                Logger.Verbose(json);
+                //var json = JsonConvert.SerializeObject(cacheDto, Formatting.Indented);
+                //Logger.Verbose(json);
 #endif
 
                 if ((LastCreatedCharacterData?.GetHashCode() ?? 0) == cacheDto.GetHashCode())

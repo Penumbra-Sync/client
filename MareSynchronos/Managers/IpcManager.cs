@@ -61,13 +61,12 @@ namespace MareSynchronos.Managers
             _penumbraObjectIsRedrawn = pi.GetIpcSubscriber<IntPtr, int, object?>("Penumbra.GameObjectRedrawn");
             _penumbraGetMetaManipulations =
                 pi.GetIpcSubscriber<string>("Penumbra.GetPlayerMetaManipulations");
-
-            _glamourerApiVersion = pi.GetIpcSubscriber<int>("Glamourer.ApiVersion");
-            _glamourerGetAllCustomization = pi.GetIpcSubscriber<GameObject?, string>("Glamourer.GetAllCustomizationFromCharacter");
-            _glamourerApplyAll = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyAllToCharacter");
-            _glamourerApplyOnlyCustomization = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyOnlyCustomizationToCharacter");
-            _glamourerApplyOnlyEquipment = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyOnlyEquipmentToCharacter");
-            _glamourerRevertCustomization = pi.GetIpcSubscriber<GameObject?, object>("Glamourer.RevertCharacter");
+            _penumbraSetTemporaryMod = pi.GetIpcSubscriber<string, string, Dictionary<string, string>, string, int,
+            int>("Penumbra.AddTemporaryMod");
+            _penumbraCreateTemporaryCollection =
+                pi.GetIpcSubscriber<string, string, bool, (int, string)>("Penumbra.CreateTemporaryCollection");
+            _penumbraRemoveTemporaryCollection =
+                pi.GetIpcSubscriber<string, int>("Penumbra.RemoveTemporaryCollection");
             _penumbraGameObjectResourcePathResolved = pi.GetIpcSubscriber<IntPtr, string, string, object?>("Penumbra.GameObjectResourcePathResolved");
 
             _penumbraGameObjectResourcePathResolved.Subscribe(ResourceLoaded);
@@ -75,15 +74,12 @@ namespace MareSynchronos.Managers
             _penumbraInit.Subscribe(PenumbraInit);
             _penumbraDispose.Subscribe(PenumbraDispose);
 
-            _penumbraSetTemporaryMod =
-                pi
-                    .GetIpcSubscriber<string, string, Dictionary<string, string>, string, int,
-                        int>("Penumbra.AddTemporaryMod");
-
-            _penumbraCreateTemporaryCollection =
-                pi.GetIpcSubscriber<string, string, bool, (int, string)>("Penumbra.CreateTemporaryCollection");
-            _penumbraRemoveTemporaryCollection =
-                pi.GetIpcSubscriber<string, int>("Penumbra.RemoveTemporaryCollection");
+            _glamourerApiVersion = pi.GetIpcSubscriber<int>("Glamourer.ApiVersion");
+            _glamourerGetAllCustomization = pi.GetIpcSubscriber<GameObject?, string>("Glamourer.GetAllCustomizationFromCharacter");
+            _glamourerApplyAll = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyAllToCharacter");
+            _glamourerApplyOnlyCustomization = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyOnlyCustomizationToCharacter");
+            _glamourerApplyOnlyEquipment = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyOnlyEquipmentToCharacter");
+            _glamourerRevertCustomization = pi.GetIpcSubscriber<GameObject?, object>("Glamourer.RevertCharacter");
 
             _heelsGetApiVersion = pi.GetIpcSubscriber<string>("HeelsPlugin.ApiVersion");
             _heelsGetOffset = pi.GetIpcSubscriber<float>("HeelsPlugin.GetOffset");
@@ -98,8 +94,14 @@ namespace MareSynchronos.Managers
                 PenumbraInitialized?.Invoke();
             }
 
-            this._dalamudUtil = dalamudUtil;
+            _dalamudUtil = dalamudUtil;
             _dalamudUtil.FrameworkUpdate += HandleActionQueue;
+            _dalamudUtil.ZoneSwitchEnd += ClearActionQueue;
+        }
+
+        private void ClearActionQueue()
+        {
+            actionQueue.Clear();
         }
 
         private void ResourceLoaded(IntPtr ptr, string arg1, string arg2)
@@ -178,6 +180,7 @@ namespace MareSynchronos.Managers
 
             Logger.Verbose("Action queue clear or not, disposing");
             _dalamudUtil.FrameworkUpdate -= HandleActionQueue;
+            _dalamudUtil.ZoneSwitchEnd -= ClearActionQueue;
             actionQueue.Clear();
 
             _penumbraDispose.Unsubscribe(PenumbraDispose);

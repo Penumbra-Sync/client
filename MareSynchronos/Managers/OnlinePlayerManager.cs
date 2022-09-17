@@ -46,7 +46,7 @@ public class OnlinePlayerManager : IDisposable
 
         _dalamudUtil.LogIn += DalamudUtilOnLogIn;
         _dalamudUtil.LogOut += DalamudUtilOnLogOut;
-        _dalamudUtil.ZoneSwitched += DalamudUtilOnZoneSwitched;
+        _dalamudUtil.ZoneSwitchStart += DalamudUtilOnZoneSwitched;
 
         if (_dalamudUtil.IsLoggedIn)
         {
@@ -145,7 +145,7 @@ public class OnlinePlayerManager : IDisposable
 
         _dalamudUtil.LogIn -= DalamudUtilOnLogIn;
         _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
-        _dalamudUtil.ZoneSwitched -= DalamudUtilOnZoneSwitched;
+        _dalamudUtil.ZoneSwitchStart -= DalamudUtilOnZoneSwitched;
         _dalamudUtil.DelayedFrameworkUpdate -= FrameworkOnUpdate;
     }
 

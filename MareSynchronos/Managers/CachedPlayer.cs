@@ -269,7 +269,7 @@ public class CachedPlayer
                 ct.ThrowIfCancellationRequested();
                 if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                 {
-                    _ipcManager.GlamourerApplyAll(glamourerData, obj: (IntPtr)minionOrMount);
+                    _ipcManager.GlamourerApplyAll(glamourerData, (IntPtr)minionOrMount);
                 }
                 else
                 {
@@ -426,8 +426,8 @@ public class CachedPlayer
     {
         if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized || !_apiController.IsConnected) return;
 
-        PlayerCharacter = _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName!)?.Address ?? IntPtr.Zero;
-        if (PlayerCharacter == IntPtr.Zero)
+        var curPlayerCharacter = _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName!)?.Address ?? IntPtr.Zero;
+        if (PlayerCharacter == IntPtr.Zero || PlayerCharacter != curPlayerCharacter)
         {
             DisposePlayer();
             return;

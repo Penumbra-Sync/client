@@ -35,7 +35,8 @@ namespace MareSynchronos.Utils
         public event ClassJobChanged? ClassJobChanged;
         private uint? classJobId = 0;
         public event FrameworkUpdate? DelayedFrameworkUpdate;
-        public event VoidDelegate? ZoneSwitched;
+        public event VoidDelegate? ZoneSwitchStart;
+        public event VoidDelegate? ZoneSwitchEnd;
         private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
         private bool _sentBetweenAreas = false;
 
@@ -74,15 +75,19 @@ namespace MareSynchronos.Utils
             {
                 if (!_sentBetweenAreas)
                 {
-                    Logger.Debug("Invoking between areas");
+                    Logger.Debug("Zone switch start");
                     _sentBetweenAreas = true;
-                    ZoneSwitched?.Invoke();
+                    ZoneSwitchStart?.Invoke();
                 }
 
                 return;
             }
-
-            _sentBetweenAreas = false;
+            else if (_sentBetweenAreas)
+            {
+                Logger.Debug("Zone switch end");
+                _sentBetweenAreas = false;
+                ZoneSwitchEnd?.Invoke();
+            }
 
             foreach (FrameworkUpdate? frameworkInvocation in (FrameworkUpdate?.GetInvocationList() ?? Array.Empty<FrameworkUpdate>()).Cast<FrameworkUpdate>())
             {
