@@ -198,8 +198,8 @@ namespace MareSynchronos
                     new CharacterDataFactory(_dalamudUtil, _ipcManager, _transientResourceManager);
                 _playerManager = new PlayerManager(_apiController, _ipcManager,
                     characterCacheFactory, _dalamudUtil, _transientResourceManager);
-                _characterCacheManager = new OnlinePlayerManager(_framework,
-                    _apiController, _dalamudUtil, _ipcManager, _playerManager);
+                _characterCacheManager = new OnlinePlayerManager(_apiController,
+                    _dalamudUtil, _ipcManager, _playerManager);
             }
             catch (Exception ex)
             {

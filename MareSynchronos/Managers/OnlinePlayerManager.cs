@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Dalamud.Game;
 using MareSynchronos.API;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
@@ -16,7 +15,6 @@ public class OnlinePlayerManager : IDisposable
 {
     private readonly ApiController _apiController;
     private readonly DalamudUtil _dalamudUtil;
-    private readonly Framework _framework;
     private readonly IpcManager _ipcManager;
     private readonly PlayerManager _playerManager;
     private readonly ConcurrentDictionary<string, CachedPlayer> _onlineCachedPlayers = new();
@@ -27,11 +25,10 @@ public class OnlinePlayerManager : IDisposable
         .Select(p => p.PlayerNameHash).ToList();
     private DateTime _lastPlayerObjectCheck = DateTime.Now;
 
-    public OnlinePlayerManager(Framework framework, ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager, PlayerManager playerManager)
+    public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager, PlayerManager playerManager)
     {
         Logger.Verbose("Creating " + nameof(OnlinePlayerManager));
 
-        _framework = framework;
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
         _ipcManager = ipcManager;
@@ -49,11 +46,17 @@ public class OnlinePlayerManager : IDisposable
 
         _dalamudUtil.LogIn += DalamudUtilOnLogIn;
         _dalamudUtil.LogOut += DalamudUtilOnLogOut;
+        _dalamudUtil.ZoneSwitched += DalamudUtilOnZoneSwitched;
 
         if (_dalamudUtil.IsLoggedIn)
         {
             DalamudUtilOnLogIn();
         }
+    }
+
+    private void DalamudUtilOnZoneSwitched()
+    {
+        DisposePlayers();
     }
 
     private void ApiControllerOnCharacterReceived(object? sender, CharacterReceivedEventArgs e)
@@ -88,12 +91,12 @@ public class OnlinePlayerManager : IDisposable
 
     private void DalamudUtilOnLogOut()
     {
-        _framework.Update -= FrameworkOnUpdate;
+        _dalamudUtil.DelayedFrameworkUpdate -= FrameworkOnUpdate;
     }
 
     private void DalamudUtilOnLogIn()
     {
-        _framework.Update += FrameworkOnUpdate;
+        _dalamudUtil.DelayedFrameworkUpdate += FrameworkOnUpdate;
     }
 
     private void IpcManagerOnPenumbraDisposed()
@@ -140,10 +143,10 @@ public class OnlinePlayerManager : IDisposable
 
         _ipcManager.PenumbraDisposed -= ApiControllerOnDisconnected;
 
-        _framework.Update -= FrameworkOnUpdate;
-
         _dalamudUtil.LogIn -= DalamudUtilOnLogIn;
         _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
+        _dalamudUtil.ZoneSwitched -= DalamudUtilOnZoneSwitched;
+        _dalamudUtil.DelayedFrameworkUpdate -= FrameworkOnUpdate;
     }
 
     private void RestoreAllCharacters()
@@ -202,7 +205,7 @@ public class OnlinePlayerManager : IDisposable
         _onlineCachedPlayers.TryRemove(characterHash, out _);
     }
 
-    private void FrameworkOnUpdate(Framework framework)
+    private void FrameworkOnUpdate()
     {
         if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized || !_apiController.IsConnected) return;
 

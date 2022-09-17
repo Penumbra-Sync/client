@@ -15,7 +15,6 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.WebAPI
 {
-    public delegate void VoidDelegate();
     public delegate void SimpleStringDelegate(string str);
     public enum ServerState
     {

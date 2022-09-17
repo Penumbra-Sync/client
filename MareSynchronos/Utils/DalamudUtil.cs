@@ -20,6 +20,7 @@ namespace MareSynchronos.Utils
     public delegate void ClassJobChanged();
 
     public delegate void FrameworkUpdate();
+    public delegate void VoidDelegate();
 
     public class DalamudUtil : IDisposable
     {
@@ -34,7 +35,9 @@ namespace MareSynchronos.Utils
         public event ClassJobChanged? ClassJobChanged;
         private uint? classJobId = 0;
         public event FrameworkUpdate? DelayedFrameworkUpdate;
+        public event VoidDelegate? ZoneSwitched;
         private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
+        private bool _sentBetweenAreas = false;
 
         public unsafe bool IsGameObjectPresent(IntPtr key)
         {
@@ -69,8 +72,17 @@ namespace MareSynchronos.Utils
         {
             if (_condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51] || IsInGpose)
             {
+                if (!_sentBetweenAreas)
+                {
+                    Logger.Debug("Invoking between areas");
+                    _sentBetweenAreas = true;
+                    ZoneSwitched?.Invoke();
+                }
+
                 return;
             }
+
+            _sentBetweenAreas = false;
 
             foreach (FrameworkUpdate? frameworkInvocation in (FrameworkUpdate?.GetInvocationList() ?? Array.Empty<FrameworkUpdate>()).Cast<FrameworkUpdate>())
             {
