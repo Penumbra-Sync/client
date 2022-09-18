@@ -23,7 +23,6 @@ public class OnlinePlayerManager : IDisposable
 
     private List<string> OnlineVisiblePlayerHashes => _onlineCachedPlayers.Select(p => p.Value).Where(p => p.PlayerCharacter != IntPtr.Zero)
         .Select(p => p.PlayerNameHash).ToList();
-    private DateTime _lastPlayerObjectCheck = DateTime.Now;
 
     public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager, PlayerManager playerManager)
     {
@@ -209,8 +208,6 @@ public class OnlinePlayerManager : IDisposable
     {
         if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized || !_apiController.IsConnected) return;
 
-        if (DateTime.Now < _lastPlayerObjectCheck.AddSeconds(0.25)) return;
-
         var playerCharacters = _dalamudUtil.GetPlayerCharacters();
         foreach (var pChar in playerCharacters)
         {
@@ -236,8 +233,6 @@ public class OnlinePlayerManager : IDisposable
             Logger.Verbose("Has new visible players, pushing character data");
             PushCharacterData(newlyVisiblePlayers);
         }
-
-        _lastPlayerObjectCheck = DateTime.Now;
     }
 
     private void PushCharacterData(List<string> visiblePlayers)

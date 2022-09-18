@@ -406,10 +406,11 @@ public class CachedPlayer
     public void InitializePlayer(IntPtr character, string name, CharacterCacheDto? cache)
     {
         if (!_isDisposed) return;
-        Logger.Debug("Initializing Player " + this + " has cache: " + (cache != null));
         IsVisible = true;
         PlayerName = name;
         PlayerCharacter = character;
+        Logger.Debug("Initializing Player " + this + " has cache: " + (cache != null));
+
         _dalamudUtil.DelayedFrameworkUpdate += DalamudUtilOnDelayedFrameworkUpdate;
         _ipcManager.PenumbraRedrawEvent += IpcManagerOnPenumbraRedrawEvent;
         _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);

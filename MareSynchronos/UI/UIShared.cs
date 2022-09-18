@@ -454,7 +454,7 @@ namespace MareSynchronos.UI
             {
                 ColorTextWrapped("Do not point the cache path directly to the Penumbra directory. If necessary, make a subfolder in it.", ImGuiColors.DalamudRed);
             }
-            else if (!Directory.Exists(cacheDirectory) || !_isDirectoryWritable)
+            else if (!_isDirectoryWritable)
             {
                 ColorTextWrapped("The folder you selected does not exist or cannot be written to. Please provide a valid path.", ImGuiColors.DalamudRed);
             }
