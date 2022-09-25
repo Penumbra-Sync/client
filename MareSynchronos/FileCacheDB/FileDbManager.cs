@@ -131,10 +131,11 @@ public class FileDbManager
 
     private FileCache? MigrateLegacy(FileCache fileCache)
     {
-        if (fileCache.OriginalFilepath.Contains(PenumbraPrefix) || fileCache.OriginalFilepath.Contains(CachePrefix)) return fileCache;
+        if (fileCache.OriginalFilepath.Contains(PenumbraPrefix + "\\") || fileCache.OriginalFilepath.Contains(CachePrefix)) return fileCache;
 
         var fileInfo = new FileInfo(fileCache.OriginalFilepath);
         var penumbraDir = _ipcManager.PenumbraModDirectory()!;
+        if (penumbraDir.Last() != '\\') penumbraDir += "\\";
         // check if it's a cache file
         if (fileInfo.Exists && fileInfo.Name.Length == 40)
         {
@@ -143,7 +144,12 @@ public class FileDbManager
         else if (fileInfo.Exists && fileInfo.FullName.ToLowerInvariant().Contains(penumbraDir))
         {
             // attempt to replace penumbra mod folder path with {penumbra}
-            var newPath = PenumbraPrefix + fileCache.OriginalFilepath.ToLowerInvariant().Replace(_ipcManager.PenumbraModDirectory()!, string.Empty);
+            var newPath = PenumbraPrefix + "\\" + fileCache.OriginalFilepath.ToLowerInvariant().Replace(penumbraDir, string.Empty);
+            MigrateLegacyFilePath(fileCache, newPath);
+        }
+        else if (fileInfo.FullName.ToLowerInvariant().Contains(PenumbraPrefix))
+        {
+            var newPath = PenumbraPrefix + "\\" + fileCache.OriginalFilepath.ToLowerInvariant().Replace(PenumbraPrefix, string.Empty);
             MigrateLegacyFilePath(fileCache, newPath);
         }
         else
@@ -203,9 +209,18 @@ public class FileDbManager
                 LastModifiedDate = cache.LastModifiedDate
             };
             db.Remove(cache);
-            db.FileCaches.Add(newcache);
-            fileCacheToMigrate.UpdateFileCache(newcache);
             db.SaveChanges();
+            var existingCache = db.FileCaches.FirstOrDefault(f => f.Filepath == newPath && f.Hash == cache.Hash);
+            if (existingCache != null)
+            {
+                fileCacheToMigrate.UpdateFileCache(existingCache);
+            }
+            else
+            {
+                db.FileCaches.Add(newcache);
+                fileCacheToMigrate.UpdateFileCache(newcache);
+                db.SaveChanges();
+            }
         }
     }
 

@@ -80,7 +80,7 @@ public class PeriodicFileScanner : IDisposable
         {
             while (!token.IsCancellationRequested)
             {
-                isForced = RecalculateFileCacheSize();
+                isForced |= RecalculateFileCacheSize();
                 if (!_pluginConfiguration.FileScanPaused || isForced)
                 {
                     isForced = false;
