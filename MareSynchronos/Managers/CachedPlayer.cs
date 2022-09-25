@@ -3,32 +3,30 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Logging;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using MareSynchronos.API;
-using MareSynchronos.FileCacheDB;
-using MareSynchronos.Interop;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using Newtonsoft.Json;
 
 namespace MareSynchronos.Managers;
 
 public class CachedPlayer
 {
     private readonly DalamudUtil _dalamudUtil;
+    private readonly FileDbManager fileDbManager;
     private readonly IpcManager _ipcManager;
     private readonly ApiController _apiController;
     private bool _isVisible;
 
-    public CachedPlayer(string nameHash, IpcManager ipcManager, ApiController apiController, DalamudUtil dalamudUtil)
+    public CachedPlayer(string nameHash, IpcManager ipcManager, ApiController apiController, DalamudUtil dalamudUtil, FileDbManager fileDbManager)
     {
         PlayerNameHash = nameHash;
         _ipcManager = ipcManager;
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
+        this.fileDbManager = fileDbManager;
     }
 
     public bool IsVisible
@@ -196,12 +194,11 @@ public class CachedPlayer
         moddedDictionary = new Dictionary<string, string>();
         try
         {
-            using var db = new FileCacheContext();
             foreach (var item in _cachedData.FileReplacements.SelectMany(k => k.Value.Where(v => string.IsNullOrEmpty(v.FileSwapPath))).ToList())
             {
                 foreach (var gamePath in item.GamePaths)
                 {
-                    var fileCache = db.FileCaches.FirstOrDefault(f => f.Hash == item.Hash);
+                    var fileCache = fileDbManager.GetFileCacheByHash(item.Hash);
                     if (fileCache != null)
                     {
                         moddedDictionary[gamePath] = fileCache.Filepath;
@@ -311,7 +308,7 @@ public class CachedPlayer
             if (companion != IntPtr.Zero)
             {
                 Logger.Debug("Request Redraw for Companion");
-                _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " companion", companion, 10000,ct);
+                _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " companion", companion, 10000, ct);
                 ct.ThrowIfCancellationRequested();
                 if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                 {

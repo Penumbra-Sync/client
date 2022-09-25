@@ -7,10 +7,10 @@ using System.Threading.Tasks;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
-using MareSynchronos.Managers;
 using MareSynchronos.Utils;
 using MareSynchronos.Localization;
 using Dalamud.Utility;
+using MareSynchronos.FileCacheDB;
 
 namespace MareSynchronos.UI
 {
@@ -18,7 +18,7 @@ namespace MareSynchronos.UI
     {
         private readonly UiShared _uiShared;
         private readonly Configuration _pluginConfiguration;
-        private readonly FileCacheManager _fileCacheManager;
+        private readonly PeriodicFileScanner _fileCacheManager;
         private readonly WindowSystem _windowSystem;
         private bool _readFirstPage;
 
@@ -53,7 +53,7 @@ namespace MareSynchronos.UI
         }
 
         public IntroUi(WindowSystem windowSystem, UiShared uiShared, Configuration pluginConfiguration,
-            FileCacheManager fileCacheManager) : base("Mare Synchronos Setup")
+            PeriodicFileScanner fileCacheManager) : base("Mare Synchronos Setup")
         {
             Logger.Verbose("Creating " + nameof(IntroUi));
 
@@ -226,7 +226,7 @@ namespace MareSynchronos.UI
 
                     if (ImGui.Button("Start Scan##startScan"))
                     {
-                        _fileCacheManager.StartInitialScan();
+                        _fileCacheManager.InvokeScan();
                     }
                 }
                 else

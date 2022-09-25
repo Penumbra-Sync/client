@@ -5,7 +5,6 @@ using System.Linq;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using LZ4;
@@ -59,7 +58,13 @@ namespace MareSynchronos.WebAPI
 
             string fileName = Path.GetTempFileName();
 
-            await wc.DownloadFileTaskAsync(downloadUri, fileName);
+            ct.Register(wc.CancelAsync);
+
+            try
+            {
+                await wc.DownloadFileTaskAsync(downloadUri, fileName);
+            }
+            catch { }
 
             CurrentDownloads[downloadId].Single(f => f.Hash == hash).Transferred = CurrentDownloads[downloadId].Single(f => f.Hash == hash).Total;
 
@@ -71,6 +76,7 @@ namespace MareSynchronos.WebAPI
 
         public async Task DownloadFiles(int currentDownloadId, List<FileReplacementDto> fileReplacementDto, CancellationToken ct)
         {
+            DownloadStarted?.Invoke();
             Logger.Debug("Downloading files (Download ID " + currentDownloadId + ")");
 
             List<DownloadFileDto> downloadFileInfoFromService = new List<DownloadFileDto>();
@@ -89,23 +95,29 @@ namespace MareSynchronos.WebAPI
                 }
             }
 
-            foreach (var file in CurrentDownloads[currentDownloadId].Where(f => f.CanBeTransferred))
+            await Parallel.ForEachAsync(CurrentDownloads[currentDownloadId].Where(f => f.CanBeTransferred), new ParallelOptions()
+            {
+                MaxDegreeOfParallelism = 5,
+                CancellationToken = ct
+            },
+            async (file, token) =>
             {
                 var hash = file.Hash;
-                var tempFile = await DownloadFile(currentDownloadId, file.Hash, file.DownloadUri, ct);
-                if (ct.IsCancellationRequested)
+                var tempFile = await DownloadFile(currentDownloadId, file.Hash, file.DownloadUri, token);
+                if (token.IsCancellationRequested)
                 {
                     File.Delete(tempFile);
                     Logger.Debug("Detected cancellation, removing " + currentDownloadId);
+                    DownloadFinished?.Invoke();
                     CancelDownload(currentDownloadId);
-                    break;
+                    return;
                 }
 
-                var tempFileData = await File.ReadAllBytesAsync(tempFile, ct);
+                var tempFileData = await File.ReadAllBytesAsync(tempFile, token);
                 var extractedFile = LZ4Codec.Unwrap(tempFileData);
                 File.Delete(tempFile);
                 var filePath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash);
-                await File.WriteAllBytesAsync(filePath, extractedFile, ct);
+                await File.WriteAllBytesAsync(filePath, extractedFile, token);
                 var fi = new FileInfo(filePath);
                 Func<DateTime> RandomDayFunc()
                 {
@@ -118,26 +130,20 @@ namespace MareSynchronos.WebAPI
                 fi.CreationTime = RandomDayFunc().Invoke();
                 fi.LastAccessTime = RandomDayFunc().Invoke();
                 fi.LastWriteTime = RandomDayFunc().Invoke();
-            }
-
-            var allFilesInDb = false;
-            while (!allFilesInDb && !ct.IsCancellationRequested)
-            {
-                await using (var db = new FileCacheContext())
+                try
                 {
-                    var fileCount = CurrentDownloads[currentDownloadId]
-                        .Where(c => c.CanBeTransferred)
-                        .Count(h => db.FileCaches.Any(f => f.Hash == h.Hash));
-                    var totalFiles = CurrentDownloads[currentDownloadId].Count(c => c.CanBeTransferred);
-                    Logger.Debug("Waiting for files to be in the DB, added " + fileCount + " of " + totalFiles);
-
-                    allFilesInDb = fileCount == totalFiles;
+                    _ = _fileDbManager.CreateFileCacheEntity(filePath);
                 }
-
-                await Task.Delay(250, ct);
-            }
+                catch (Exception ex)
+                {
+                    Logger.Warn("Issue adding file to the DB");
+                    Logger.Warn(ex.Message);
+                    Logger.Warn(ex.StackTrace);
+                }
+            });
 
             Logger.Debug("Download complete, removing " + currentDownloadId);
+            DownloadFinished?.Invoke();
             CancelDownload(currentDownloadId);
         }
 

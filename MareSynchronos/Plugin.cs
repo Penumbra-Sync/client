@@ -25,7 +25,7 @@ namespace MareSynchronos
         private readonly CommandManager _commandManager;
         private readonly Framework _framework;
         private readonly Configuration _configuration;
-        private readonly FileCacheManager _fileCacheManager;
+        private readonly PeriodicFileScanner _fileCacheManager;
         private readonly IntroUi _introUi;
         private readonly IpcManager _ipcManager;
         public static DalamudPluginInterface PluginInterface { get; set; }
@@ -37,6 +37,7 @@ namespace MareSynchronos
         private OnlinePlayerManager? _characterCacheManager;
         private readonly DownloadUi _downloadUi;
         private readonly FileDialogManager _fileDialogManager;
+        private readonly FileDbManager _fileDbManager;
         private readonly CompactUi _compactUi;
         private readonly UiShared _uiSharedComponent;
         private readonly Dalamud.Localization _localization;
@@ -52,7 +53,7 @@ namespace MareSynchronos
             _configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
             _configuration.Initialize(PluginInterface);
             _configuration.Migrate();
-            
+
             _localization = new Dalamud.Localization("MareSynchronos.Localization.", "", true);
             _localization.SetupWithLangCode("en");
 
@@ -63,15 +64,16 @@ namespace MareSynchronos
             // those can be initialized outside of game login
             _dalamudUtil = new DalamudUtil(clientState, objectTable, framework, condition);
 
-            _apiController = new ApiController(_configuration, _dalamudUtil);
             _ipcManager = new IpcManager(PluginInterface, _dalamudUtil);
 
             // Compatibility for FileSystemWatchers under OSX
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 Environment.SetEnvironmentVariable("MONO_MANAGED_WATCHER", "enabled");
 
-            _fileCacheManager = new FileCacheManager(_ipcManager, _configuration);
             _fileDialogManager = new FileDialogManager();
+            _fileDbManager = new FileDbManager(_ipcManager, _configuration);
+            _apiController = new ApiController(_configuration, _dalamudUtil, _fileDbManager);
+            _fileCacheManager = new PeriodicFileScanner(_ipcManager, _configuration, _fileDbManager, _apiController);
 
             _uiSharedComponent =
                 new UiShared(_ipcManager, _apiController, _fileCacheManager, _fileDialogManager, _configuration, _dalamudUtil, PluginInterface, _localization);
@@ -101,7 +103,6 @@ namespace MareSynchronos
 
             _dalamudUtil.LogIn += DalamudUtilOnLogIn;
             _dalamudUtil.LogOut += DalamudUtilOnLogOut;
-            _apiController.RegisterFinalized += ApiControllerOnRegisterFinalized;
 
             if (_dalamudUtil.IsLoggedIn)
             {
@@ -109,23 +110,16 @@ namespace MareSynchronos
             }
         }
 
-        private void ApiControllerOnRegisterFinalized()
-        {
-            _introUi.IsOpen = false;
-            _compactUi.IsOpen = true;
-        }
-
         public string Name => "Mare Synchronos";
         public void Dispose()
         {
             Logger.Verbose("Disposing " + Name);
-            _apiController.RegisterFinalized -= ApiControllerOnRegisterFinalized;
             _apiController?.Dispose();
 
             _commandManager.RemoveHandler(CommandName);
             _dalamudUtil.LogIn -= DalamudUtilOnLogIn;
             _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
-            
+
             _uiSharedComponent.Dispose();
             _settingsUi?.Dispose();
             _introUi?.Dispose();
@@ -133,9 +127,9 @@ namespace MareSynchronos
             _compactUi?.Dispose();
 
             _fileCacheManager?.Dispose();
-            _ipcManager?.Dispose();
             _playerManager?.Dispose();
             _characterCacheManager?.Dispose();
+            _ipcManager?.Dispose();
             _transientResourceManager?.Dispose();
             _dalamudUtil.Dispose();
             Logger.Debug("Shut down");
@@ -195,11 +189,11 @@ namespace MareSynchronos
             {
                 _transientResourceManager = new TransientResourceManager(_ipcManager, _dalamudUtil);
                 var characterCacheFactory =
-                    new CharacterDataFactory(_dalamudUtil, _ipcManager, _transientResourceManager);
+                    new CharacterDataFactory(_dalamudUtil, _ipcManager, _transientResourceManager, _fileDbManager);
                 _playerManager = new PlayerManager(_apiController, _ipcManager,
                     characterCacheFactory, _dalamudUtil, _transientResourceManager);
                 _characterCacheManager = new OnlinePlayerManager(_apiController,
-                    _dalamudUtil, _ipcManager, _playerManager);
+                    _dalamudUtil, _ipcManager, _playerManager, _fileDbManager);
             }
             catch (Exception ex)
             {

@@ -11,6 +11,7 @@ using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Plugin;
 using Dalamud.Utility;
 using ImGuiNET;
+using MareSynchronos.FileCacheDB;
 using MareSynchronos.Localization;
 using MareSynchronos.Managers;
 using MareSynchronos.Utils;
@@ -25,13 +26,13 @@ namespace MareSynchronos.UI
 
         private readonly IpcManager _ipcManager;
         private readonly ApiController _apiController;
-        private readonly FileCacheManager _fileCacheManager;
+        private readonly PeriodicFileScanner _cacheScanner;
         private readonly FileDialogManager _fileDialogManager;
         private readonly Configuration _pluginConfiguration;
         private readonly DalamudUtil _dalamudUtil;
         private readonly DalamudPluginInterface _pluginInterface;
         private readonly Dalamud.Localization _localization;
-        public long FileCacheSize => _fileCacheManager.FileCacheSize;
+        public long FileCacheSize => _cacheScanner.FileCacheSize;
         public string PlayerName => _dalamudUtil.PlayerName;
         public bool HasValidPenumbraModPath => !(_ipcManager.PenumbraModDirectory() ?? string.Empty).IsNullOrEmpty() && Directory.Exists(_ipcManager.PenumbraModDirectory());
         public bool EditTrackerPosition { get; set; }
@@ -42,11 +43,12 @@ namespace MareSynchronos.UI
 
         public ApiController ApiController => _apiController;
 
-        public UiShared(IpcManager ipcManager, ApiController apiController, FileCacheManager fileCacheManager, FileDialogManager fileDialogManager, Configuration pluginConfiguration, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization)
+        public UiShared(IpcManager ipcManager, ApiController apiController, PeriodicFileScanner cacheScanner, FileDialogManager fileDialogManager,
+            Configuration pluginConfiguration, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization)
         {
             _ipcManager = ipcManager;
             _apiController = apiController;
-            _fileCacheManager = fileCacheManager;
+            _cacheScanner = cacheScanner;
             _fileDialogManager = fileDialogManager;
             _pluginConfiguration = pluginConfiguration;
             _dalamudUtil = dalamudUtil;
@@ -144,19 +146,23 @@ namespace MareSynchronos.UI
         public void DrawFileScanState()
         {
             ImGui.Text("File Scanner Status");
-            if (_fileCacheManager.IsScanRunning)
+            ImGui.SameLine();
+            if (_cacheScanner.IsScanRunning)
             {
                 ImGui.Text("Scan is running");
                 ImGui.Text("Current Progress:");
                 ImGui.SameLine();
-                ImGui.Text(_fileCacheManager.TotalFiles <= 0
+                ImGui.Text(_cacheScanner.TotalFiles <= 1
                     ? "Collecting files"
-                    : $"Processing {_fileCacheManager.CurrentFileProgress} / {_fileCacheManager.TotalFiles} files");
+                    : $"Processing {_cacheScanner.CurrentFileProgress} / {_cacheScanner.TotalFiles} files");
+            }
+            else if (_pluginConfiguration.FileScanPaused)
+            {
+                ImGui.Text("File scanner is paused");
             }
             else
             {
-                ImGui.Text("Watching Penumbra Directory: " + _fileCacheManager.WatchedPenumbraDirectory);
-                ImGui.Text("Watching Cache Directory: " + _fileCacheManager.WatchedCacheDirectory);
+                ImGui.Text("Next scan in " + _cacheScanner.TimeUntilNextScan);
             }
         }
 
@@ -444,7 +450,7 @@ namespace MareSynchronos.UI
                     {
                         _pluginConfiguration.CacheFolder = path;
                         _pluginConfiguration.Save();
-                        _fileCacheManager.StartWatchers();
+                        _cacheScanner.StartWatchers();
                     }
                 });
             }
@@ -474,6 +480,7 @@ namespace MareSynchronos.UI
                 _pluginConfiguration.MaxLocalCacheInGiB = maxCacheSize;
                 _pluginConfiguration.Save();
             }
+            DrawHelpText("The cache is automatically governed by Mare. It will clear itself automatically once it reaches the set capacity by removing the oldest unused files. You typically do not need to clear it yourself.");
         }
 
         private bool _isDirectoryWritable = false;
@@ -503,14 +510,38 @@ namespace MareSynchronos.UI
             }
         }
 
+        public void RecalculateFileCacheSize()
+        {
+            _cacheScanner.InvokeScan();
+        }
+
         public void DrawParallelScansSetting()
         {
             var parallelScans = _pluginConfiguration.MaxParallelScan;
-            if (ImGui.SliderInt("Parallel File Scans##parallelism", ref parallelScans, 1, 20))
+            if (ImGui.SliderInt("File scan parallelism##parallelism", ref parallelScans, 1, 20))
             {
                 _pluginConfiguration.MaxParallelScan = parallelScans;
                 _pluginConfiguration.Save();
             }
+            DrawHelpText("Decrease to lessen load of file scans. File scans will take longer to execute with less parallel threads.");
+        }
+
+        public void DrawTimeSpanBetweenScansSetting()
+        {
+            var timeSpan = _pluginConfiguration.TimeSpanBetweenScansInSeconds;
+            if (ImGui.SliderInt("Seconds between scans##timespan", ref timeSpan, 20, 60))
+            {
+                _pluginConfiguration.TimeSpanBetweenScansInSeconds = timeSpan;
+                _pluginConfiguration.Save();
+            }
+            DrawHelpText("This is the time in seconds between file scans. Increase it to reduce system load. A too high setting can cause issues when manually fumbling about in the cache or Penumbra mods folders.");
+            var isPaused = _pluginConfiguration.FileScanPaused;
+            if (ImGui.Checkbox("Pause periodic file scan##filescanpause", ref isPaused))
+            {
+                _pluginConfiguration.FileScanPaused = isPaused;
+                _pluginConfiguration.Save();
+            }
+            DrawHelpText("This allows you to stop the periodic scans of your Penumbra and Mare cache directories. This setting will automatically revert itself on restart of Mare.");
         }
 
         public void Dispose()

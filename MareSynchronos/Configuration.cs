@@ -60,6 +60,9 @@ namespace MareSynchronos
 
         public bool ReverseUserSort { get; set; } = true;
 
+        public int TimeSpanBetweenScansInSeconds { get; set; } = 30;
+        public bool FileScanPaused { get; set; } = false;
+
         public bool InitialScanComplete { get; set; } = false;
         public int MaxParallelScan
         {
@@ -205,6 +208,12 @@ namespace MareSynchronos
                 UidServerComments.Remove("wss://v2202207178628194299.powersrv.de:6872");
 
                 Version = 5;
+                Save();
+            }
+
+            if (FileScanPaused)
+            {
+                FileScanPaused = false;
                 Save();
             }
         }

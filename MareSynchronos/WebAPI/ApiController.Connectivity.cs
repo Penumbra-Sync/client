@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using MareSynchronos.API;
+using MareSynchronos.Managers;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
 using Microsoft.AspNetCore.Http.Connections;
@@ -35,7 +36,7 @@ namespace MareSynchronos.WebAPI
 
         private readonly Configuration _pluginConfiguration;
         private readonly DalamudUtil _dalamudUtil;
-
+        private readonly FileDbManager _fileDbManager;
         private CancellationTokenSource _connectionCancellationTokenSource;
 
         private HubConnection? _mareHub;
@@ -48,12 +49,13 @@ namespace MareSynchronos.WebAPI
 
         public bool IsAdmin => _connectionDto?.IsAdmin ?? false;
 
-        public ApiController(Configuration pluginConfiguration, DalamudUtil dalamudUtil)
+        public ApiController(Configuration pluginConfiguration, DalamudUtil dalamudUtil, FileDbManager fileDbManager)
         {
             Logger.Verbose("Creating " + nameof(ApiController));
 
             _pluginConfiguration = pluginConfiguration;
             _dalamudUtil = dalamudUtil;
+            _fileDbManager = fileDbManager;
             _connectionCancellationTokenSource = new CancellationTokenSource();
             _dalamudUtil.LogIn += DalamudUtilOnLogIn;
             _dalamudUtil.LogOut += DalamudUtilOnLogOut;
@@ -80,8 +82,6 @@ namespace MareSynchronos.WebAPI
 
         public event EventHandler<CharacterReceivedEventArgs>? CharacterReceived;
 
-        public event VoidDelegate? RegisterFinalized;
-
         public event VoidDelegate? Connected;
 
         public event VoidDelegate? Disconnected;
@@ -93,6 +93,8 @@ namespace MareSynchronos.WebAPI
         public event SimpleStringDelegate? PairedWithOther;
 
         public event SimpleStringDelegate? UnpairedFromOther;
+        public event VoidDelegate? DownloadStarted;
+        public event VoidDelegate? DownloadFinished;
 
         public ConcurrentDictionary<int, List<DownloadFileTransfer>> CurrentDownloads { get; } = new();
 
@@ -313,7 +315,7 @@ namespace MareSynchronos.WebAPI
                 .WithAutomaticReconnect(new ForeverRetryPolicy())
                 .ConfigureLogging(a => {
                     a.ClearProviders().AddProvider(new DalamudLoggingProvider());
-                    a.SetMinimumLevel(LogLevel.Trace);
+                    a.SetMinimumLevel(LogLevel.Warning);
                     })
                 .Build();
         }

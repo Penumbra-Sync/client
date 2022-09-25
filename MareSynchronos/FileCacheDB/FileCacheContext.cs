@@ -9,7 +9,7 @@ namespace MareSynchronos.FileCacheDB
     public partial class FileCacheContext : DbContext
     {
         private string DbPath { get; set; }
-        public FileCacheContext() 
+        public FileCacheContext()
         {
             DbPath = Path.Combine(Plugin.PluginInterface.ConfigDirectory.FullName, "FileCache.db");
             string oldDbPath = Path.Combine(Plugin.PluginInterface.ConfigDirectory.FullName, "FileCacheDebug.db");
@@ -36,7 +36,7 @@ namespace MareSynchronos.FileCacheDB
         {
         }
 
-        public virtual DbSet<FileCache> FileCaches { get; set; }
+        public virtual DbSet<FileCacheEntity> FileCaches { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -48,7 +48,7 @@ namespace MareSynchronos.FileCacheDB
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            modelBuilder.Entity<FileCache>(entity =>
+            modelBuilder.Entity<FileCacheEntity>(entity =>
             {
                 entity.HasKey(e => new { e.Hash, e.Filepath });
 

@@ -586,6 +586,8 @@ namespace MareSynchronos.UI
         private void DrawFileCacheSettings()
         {
             _uiShared.DrawFileScanState();
+            _uiShared.DrawParallelScansSetting();
+            _uiShared.DrawTimeSpanBetweenScansSetting();
             _uiShared.DrawCacheDirectorySetting();
             ImGui.Text($"Local cache size: {UiShared.ByteToString(_uiShared.FileCacheSize)}");
             ImGui.SameLine();
@@ -597,6 +599,8 @@ namespace MareSynchronos.UI
                     {
                         File.Delete(file);
                     }
+
+                    _uiShared.RecalculateFileCacheSize();
                 });
             }
         }

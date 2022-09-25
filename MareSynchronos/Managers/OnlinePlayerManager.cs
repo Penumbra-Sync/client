@@ -17,6 +17,7 @@ public class OnlinePlayerManager : IDisposable
     private readonly DalamudUtil _dalamudUtil;
     private readonly IpcManager _ipcManager;
     private readonly PlayerManager _playerManager;
+    private readonly FileDbManager _fileDbManager;
     private readonly ConcurrentDictionary<string, CachedPlayer> _onlineCachedPlayers = new();
     private readonly ConcurrentDictionary<string, CharacterCacheDto> _temporaryStoredCharacterCache = new();
     private readonly ConcurrentDictionary<CachedPlayer, CancellationTokenSource> _playerTokenDisposal = new();
@@ -24,7 +25,7 @@ public class OnlinePlayerManager : IDisposable
     private List<string> OnlineVisiblePlayerHashes => _onlineCachedPlayers.Select(p => p.Value).Where(p => p.PlayerCharacter != IntPtr.Zero)
         .Select(p => p.PlayerNameHash).ToList();
 
-    public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager, PlayerManager playerManager)
+    public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager, PlayerManager playerManager, FileDbManager fileDbManager)
     {
         Logger.Verbose("Creating " + nameof(OnlinePlayerManager));
 
@@ -32,7 +33,7 @@ public class OnlinePlayerManager : IDisposable
         _dalamudUtil = dalamudUtil;
         _ipcManager = ipcManager;
         _playerManager = playerManager;
-
+        _fileDbManager = fileDbManager;
         _apiController.PairedClientOnline += ApiControllerOnPairedClientOnline;
         _apiController.PairedClientOffline += ApiControllerOnPairedClientOffline;
         _apiController.PairedWithOther += ApiControllerOnPairedWithOther;
@@ -249,6 +250,6 @@ public class OnlinePlayerManager : IDisposable
 
     private CachedPlayer CreateCachedPlayer(string hashedName)
     {
-        return new CachedPlayer(hashedName, _ipcManager, _apiController, _dalamudUtil);
+        return new CachedPlayer(hashedName, _ipcManager, _apiController, _dalamudUtil, _fileDbManager);
     }
 }

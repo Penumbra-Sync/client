@@ -52,6 +52,7 @@ namespace MareSynchronos.UI
                 Logger.Warn(ex.StackTrace);
             }
             this.WindowName = "Mare Synchronos " + dateTime + "###MareSynchronosMainUI";
+            Toggle();
 #else
             this.WindowName = "Mare Synchronos " + Assembly.GetExecutingAssembly().GetName().Version;
 #endif

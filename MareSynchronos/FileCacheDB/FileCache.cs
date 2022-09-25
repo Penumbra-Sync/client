@@ -1,12 +1,36 @@
 ﻿#nullable disable
 
+
 namespace MareSynchronos.FileCacheDB
 {
-    public partial class FileCache
+
+    public class FileCache
     {
-        public string Hash { get; set; }
-        public string Filepath { get; set; }
-        public string LastModifiedDate { get; set; }
-        public int Version { get; set; }
+        private FileCacheEntity entity;
+        public string Filepath { get; private set; }
+        public string Hash { get; private set; }
+        public string OriginalFilepath => entity.Filepath;
+        public string OriginalHash => entity.Hash;
+        public long LastModifiedDateTicks => long.Parse(entity.LastModifiedDate);
+
+        public FileCache(FileCacheEntity entity)
+        {
+            this.entity = entity;
+        }
+
+        public void SetResolvedFilePath(string filePath)
+        {
+            Filepath = filePath.ToLowerInvariant();
+        }
+
+        public void SetHash(string hash)
+        {
+            Hash = hash;
+        }
+
+        public void UpdateFileCache(FileCacheEntity entity)
+        {
+            this.entity = entity;
+        }
     }
 }

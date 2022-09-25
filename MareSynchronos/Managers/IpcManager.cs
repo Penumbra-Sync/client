@@ -174,11 +174,16 @@ namespace MareSynchronos.Managers
             while (actionQueue.Count > 0 && totalSleepTime < 2000)
             {
                 Logger.Verbose("Waiting for actionqueue to clear...");
+                HandleActionQueue();
                 System.Threading.Thread.Sleep(16);
                 totalSleepTime += 16;
             }
 
-            Logger.Verbose("Action queue clear or not, disposing");
+            if (totalSleepTime >= 2000)
+            {
+                Logger.Verbose("Action queue clear or not, disposing");
+            }
+
             _dalamudUtil.FrameworkUpdate -= HandleActionQueue;
             _dalamudUtil.ZoneSwitchEnd -= ClearActionQueue;
             actionQueue.Clear();
@@ -304,7 +309,7 @@ namespace MareSynchronos.Managers
         public string? PenumbraModDirectory()
         {
             if (!CheckPenumbraApi()) return null;
-            return _penumbraResolveModDir!.InvokeFunc();
+            return _penumbraResolveModDir!.InvokeFunc().ToLowerInvariant();
         }
 
         public void PenumbraRedraw(IntPtr obj)

@@ -101,7 +101,7 @@ namespace MareSynchronos.Managers
                 filePath = filePath.Split("|")[2];
             }
 
-            filePath = filePath.ToLowerInvariant();
+            filePath = filePath.ToLowerInvariant().Replace("\\", "/");
 
             var replacedGamePath = gamePath.ToLowerInvariant().Replace("\\", "/");
 

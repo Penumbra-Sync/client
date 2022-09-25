@@ -23,11 +23,12 @@ public class CharacterDataFactory
     private readonly DalamudUtil _dalamudUtil;
     private readonly IpcManager _ipcManager;
     private readonly TransientResourceManager transientResourceManager;
+    private readonly FileDbManager fileDbManager;
 
-    public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager, TransientResourceManager transientResourceManager)
+    public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager, TransientResourceManager transientResourceManager, FileDbManager fileDbManager)
     {
         Logger.Verbose("Creating " + nameof(CharacterDataFactory));
-
+        this.fileDbManager = fileDbManager;
         _dalamudUtil = dalamudUtil;
         _ipcManager = ipcManager;
         this.transientResourceManager = transientResourceManager;
@@ -416,7 +417,7 @@ public class CharacterDataFactory
 
     private FileReplacement CreateFileReplacement(string path, bool doNotReverseResolve = false)
     {
-        var fileReplacement = new FileReplacement(_ipcManager.PenumbraModDirectory()!);
+        var fileReplacement = new FileReplacement(fileDbManager);
         if (!doNotReverseResolve)
         {
             fileReplacement.GamePaths =
