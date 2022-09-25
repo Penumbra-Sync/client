@@ -70,8 +70,9 @@ public class PeriodicFileScanner : IDisposable
         _scanCancellationTokenSource?.Cancel();
     }
 
-    public void InvokeScan()
+    public void InvokeScan(bool forced = false)
     {
+        bool isForced = forced;
         _scanCancellationTokenSource?.Cancel();
         _scanCancellationTokenSource = new CancellationTokenSource();
         var token = _scanCancellationTokenSource.Token;
@@ -80,8 +81,9 @@ public class PeriodicFileScanner : IDisposable
             while (!token.IsCancellationRequested)
             {
                 RecalculateFileCacheSize();
-                if (!_pluginConfiguration.FileScanPaused)
+                if (!_pluginConfiguration.FileScanPaused || isForced)
                 {
+                    isForced = false;
                     await PeriodicFileScan(token);
                 }
                 _timeUntilNextScan = TimeSpan.FromSeconds(timeBetweenScans);

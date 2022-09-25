@@ -159,6 +159,11 @@ namespace MareSynchronos.UI
             else if (_pluginConfiguration.FileScanPaused)
             {
                 ImGui.Text("File scanner is paused");
+                ImGui.SameLine();
+                if (ImGui.Button("Force Rescan##forcedrescan"))
+                {
+                    _cacheScanner.InvokeScan(true);
+                }
             }
             else
             {
@@ -512,7 +517,7 @@ namespace MareSynchronos.UI
 
         public void RecalculateFileCacheSize()
         {
-            _cacheScanner.InvokeScan();
+            _cacheScanner.InvokeScan(true);
         }
 
         public void DrawParallelScansSetting()

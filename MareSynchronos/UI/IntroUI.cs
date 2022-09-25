@@ -226,7 +226,7 @@ namespace MareSynchronos.UI
 
                     if (ImGui.Button("Start Scan##startScan"))
                     {
-                        _fileCacheManager.InvokeScan();
+                        _fileCacheManager.InvokeScan(true);
                     }
                 }
                 else
