@@ -173,13 +173,11 @@ namespace MareSynchronos.WebAPI
 
                 foreach (var file in filesToUpload.Where(f => !f.IsForbidden))
                 {
-                    await using var db = new FileCacheContext();
                     try
                     {
                         CurrentUploads.Add(new UploadFileTransfer(file)
                         {
-                            Total = new FileInfo(db.FileCaches.FirstOrDefault(f => f.Hash.ToLower() == file.Hash.ToLower())
-                                ?.Filepath ?? string.Empty).Length
+                            Total = new FileInfo(_fileDbManager.GetFileCacheByHash(file.Hash)!.Filepath).Length
                         });
                     }
                     catch (Exception ex)
@@ -189,17 +187,14 @@ namespace MareSynchronos.WebAPI
                     }
                 }
 
-                await using (var db = new FileCacheContext())
+                foreach (var file in filesToUpload.Where(c => c.IsForbidden))
                 {
-                    foreach (var file in filesToUpload.Where(c => c.IsForbidden))
+                    if (ForbiddenTransfers.All(f => f.Hash != file.Hash))
                     {
-                        if (ForbiddenTransfers.All(f => f.Hash != file.Hash))
+                        ForbiddenTransfers.Add(new UploadFileTransfer(file)
                         {
-                            ForbiddenTransfers.Add(new UploadFileTransfer(file)
-                            {
-                                LocalFile = db.FileCaches.FirstOrDefault(f => f.Hash == file.Hash)?.Filepath ?? string.Empty
-                            });
-                        }
+                            LocalFile = _fileDbManager.GetFileCacheByHash(file.Hash)?.Filepath ?? string.Empty
+                        });
                     }
                 }
 
@@ -271,10 +266,9 @@ namespace MareSynchronos.WebAPI
 
         private async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)
         {
-            await using var db = new FileCacheContext();
-            var fileCache = db.FileCaches.First(f => f.Hash == fileHash);
-            return (fileHash, LZ4Codec.WrapHC(await File.ReadAllBytesAsync(fileCache.Filepath, uploadToken), 0,
-                (int)new FileInfo(fileCache.Filepath).Length));
+            var fileCache = _fileDbManager.GetFileCacheByHash(fileHash)!.Filepath;
+            return (fileHash, LZ4Codec.WrapHC(await File.ReadAllBytesAsync(fileCache, uploadToken), 0,
+                (int)new FileInfo(fileCache).Length));
         }
 
         private async Task UploadFile(byte[] compressedFile, string fileHash, CancellationToken uploadToken)

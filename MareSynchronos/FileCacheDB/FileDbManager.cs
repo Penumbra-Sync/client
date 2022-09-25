@@ -34,7 +34,7 @@ public class FileDbManager
 
         if (matchingEntries.Any(f => f.Filepath.Contains(PenumbraPrefix) && matchingEntries.Any(f => f.Filepath.Contains(CachePrefix))))
         {
-            var cachedEntries = matchingEntries.Where(f => f.Filepath.Contains(CachePrefix));
+            var cachedEntries = matchingEntries.Where(f => f.Filepath.Contains(CachePrefix)).ToList();
             DeleteFromDatabase(cachedEntries.Select(f => new FileCache(f)));
             foreach (var entry in cachedEntries)
             {
