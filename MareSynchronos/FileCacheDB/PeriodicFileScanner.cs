@@ -211,7 +211,8 @@ public class PeriodicFileScanner : IDisposable
         {
             if (ct.IsCancellationRequested) return;
 
-            _ = _fileDbManager.CreateFileCacheEntity(file.Key);
+            var entry = _fileDbManager.CreateFileEntry(file.Key);
+            if (entry == null) _ = _fileDbManager.CreateCacheEntry(file.Key);
             Interlocked.Increment(ref currentFileProgress);
         });
 

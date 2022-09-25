@@ -132,7 +132,7 @@ namespace MareSynchronos.WebAPI
                 fi.LastWriteTime = RandomDayFunc().Invoke();
                 try
                 {
-                    _ = _fileDbManager.CreateFileCacheEntity(filePath);
+                    _ = _fileDbManager.CreateCacheEntry(filePath);
                 }
                 catch (Exception ex)
                 {

@@ -1,13 +1,8 @@
-﻿using Dalamud.Logging;
-using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using MareSynchronos.FileCacheDB;
-using System.IO;
 using MareSynchronos.API;
-using MareSynchronos.Utils;
 using System.Text.RegularExpressions;
 using MareSynchronos.Managers;
 
@@ -42,7 +37,6 @@ namespace MareSynchronos.Models
             _ = Task.Run(() =>
             {
                 var cache = fileDbManager.GetFileCacheByPath(ResolvedPath);
-                cache ??= fileDbManager.CreateFileCacheEntity(ResolvedPath);
                 Hash = cache.OriginalHash;
             });
         }

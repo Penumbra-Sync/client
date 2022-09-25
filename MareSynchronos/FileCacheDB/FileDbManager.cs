@@ -61,7 +61,7 @@ public class FileDbManager
 
         if (matchingEntries == null)
         {
-            return CreateFileCacheEntity(path);
+            return CreateFileEntry(path);
         }
 
         var validatedCacheEntry = GetValidatedFileCache(matchingEntries);
@@ -69,20 +69,33 @@ public class FileDbManager
         return validatedCacheEntry;
     }
 
-    public FileCache? CreateFileCacheEntity(string path)
+    public FileCache? CreateCacheEntry(string path)
     {
-        Logger.Verbose("Creating entry for " + path);
+        Logger.Debug("Creating cache entry for " + path);
         FileInfo fi = new FileInfo(path);
         if (!fi.Exists) return null;
-        string prefixedPath = fi.FullName.ToLowerInvariant().Replace(_ipcManager.PenumbraModDirectory()!.ToLowerInvariant(), PenumbraPrefix + "\\")
-            .Replace(_configuration.CacheFolder.ToLowerInvariant(), CachePrefix + "\\").Replace("\\\\", "\\");
-        var hash = Crypto.GetFileHash(path);
+        string prefixedPath = fi.FullName.ToLowerInvariant().Replace(_configuration.CacheFolder.ToLowerInvariant(), CachePrefix + "\\").Replace("\\\\", "\\");
+        return CreateFileCacheEntity(fi, prefixedPath);
+    }
+
+    public FileCache? CreateFileEntry(string path)
+    {
+        Logger.Debug("Creating file entry for " + path);
+        FileInfo fi = new FileInfo(path);
+        if (!fi.Exists) return null;
+        string prefixedPath = fi.FullName.ToLowerInvariant().Replace(_ipcManager.PenumbraModDirectory()!.ToLowerInvariant(), PenumbraPrefix + "\\").Replace("\\\\", "\\");
+        return CreateFileCacheEntity(fi, prefixedPath);
+    }
+
+    private FileCache? CreateFileCacheEntity(FileInfo fileInfo, string prefixedPath)
+    {
+        var hash = Crypto.GetFileHash(fileInfo.FullName);
         lock (_lock)
         {
             var entity = new FileCacheEntity();
             entity.Hash = hash;
             entity.Filepath = prefixedPath;
-            entity.LastModifiedDate = fi.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture);
+            entity.LastModifiedDate = fileInfo.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture);
             try
             {
                 using var db = new FileCacheContext();
@@ -91,10 +104,12 @@ public class FileDbManager
             }
             catch (Exception ex)
             {
-                Logger.Warn("Could not add " + path);
+                Logger.Warn("Could not add " + fileInfo.FullName);
             }
         }
-        return GetFileCacheByPath(prefixedPath)!;
+        var result = GetFileCacheByPath(prefixedPath);
+        Logger.Debug("Creating file cache for " + fileInfo.FullName + " success: " + (result != null));
+        return result;
     }
 
     private FileCache? GetValidatedFileCache(FileCacheEntity e)
