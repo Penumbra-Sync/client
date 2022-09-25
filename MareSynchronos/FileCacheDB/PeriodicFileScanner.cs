@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -84,7 +83,7 @@ public class PeriodicFileScanner : IDisposable
                 if (!_pluginConfiguration.FileScanPaused || isForced)
                 {
                     isForced = false;
-                    await PeriodicFileScan(token);
+                    PeriodicFileScan(token);
                 }
                 _timeUntilNextScan = TimeSpan.FromSeconds(timeBetweenScans);
                 while (_timeUntilNextScan.TotalSeconds >= 0)
@@ -130,7 +129,7 @@ public class PeriodicFileScanner : IDisposable
         return true;
     }
 
-    private async Task PeriodicFileScan(CancellationToken ct)
+    private void PeriodicFileScan(CancellationToken ct)
     {
         TotalFiles = 1;
         var penumbraDir = _ipcManager.PenumbraModDirectory();
@@ -153,68 +152,69 @@ public class PeriodicFileScanner : IDisposable
 
         Logger.Debug("Getting files from " + penumbraDir + " and " + _pluginConfiguration.CacheFolder);
         string[] ext = { ".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp" };
-        var scannedFiles = new ConcurrentDictionary<string, bool>(
-            Directory.EnumerateFiles(penumbraDir, "*.*", SearchOption.AllDirectories)
-                            .Select(s => new FileInfo(s))
-                            .Where(f => ext.Contains(f.Extension) && !f.FullName.Contains(@"\bg\") && !f.FullName.Contains(@"\bgcommon\") && !f.FullName.Contains(@"\ui\"))
-                            .Select(f => f.FullName.ToLowerInvariant())
-                            .Concat(Directory.EnumerateFiles(_pluginConfiguration.CacheFolder, "*.*", SearchOption.AllDirectories)
+        var penumbraFiles = Directory.EnumerateDirectories(penumbraDir)
+                            .SelectMany(d => Directory.EnumerateFiles(d, "*.*", SearchOption.AllDirectories)
+                                                .Select(s => new FileInfo(s))
+                                                .Where(f => ext.Contains(f.Extension) && !f.FullName.Contains(@"\bg\") && !f.FullName.Contains(@"\bgcommon\") && !f.FullName.Contains(@"\ui\"))
+                                                .Select(f => f.FullName.ToLowerInvariant())).ToList();
+
+        var cacheFiles = Directory.EnumerateFiles(_pluginConfiguration.CacheFolder, "*.*", SearchOption.TopDirectoryOnly)
                                 .Where(f => new FileInfo(f).Name.Length == 40)
-                                .Select(s => s.ToLowerInvariant()))
-                            .Select(p => new KeyValuePair<string, bool>(p, false)).ToList());
+                                .Select(s => s.ToLowerInvariant());
+
+        var scannedFiles = new Dictionary<string, bool>(penumbraFiles.Concat(cacheFiles).Select(c => new KeyValuePair<string, bool>(c, false)));
+
         List<FileCacheEntity> fileDbEntries;
         using (var db = new FileCacheContext())
         {
-            fileDbEntries = await db.FileCaches.ToListAsync(cancellationToken: ct);
+            fileDbEntries = db.FileCaches.AsNoTracking().ToList();
         }
-
         TotalFiles = scannedFiles.Count;
 
         Logger.Debug("Database contains " + fileDbEntries.Count + " files, local system contains " + TotalFiles);
         // scan files from database
-        Parallel.ForEach(fileDbEntries.ToList(), new ParallelOptions()
+        var cpuCount = (int)(Environment.ProcessorCount / 2.0f);
+        foreach (var chunk in fileDbEntries.Chunk(cpuCount))
         {
-            MaxDegreeOfParallelism = _pluginConfiguration.MaxParallelScan,
-            CancellationToken = ct,
-        },
-        dbEntry =>
-        {
-            if (ct.IsCancellationRequested) return;
-            try
+            Task[] tasks = chunk.Select(c => Task.Run(() =>
             {
-                var file = _fileDbManager.ValidateFileCache(dbEntry);
-                if (file != null && scannedFiles.ContainsKey(file.Filepath))
+                var file = _fileDbManager.ValidateFileCache(c);
+                if (file != null)
                 {
                     scannedFiles[file.Filepath] = true;
                 }
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn(ex.Message);
-                Logger.Warn(ex.StackTrace);
-            }
 
-            Interlocked.Increment(ref currentFileProgress);
-        });
+                Interlocked.Increment(ref currentFileProgress);
+            })).ToArray();
+
+            Task.WaitAll(tasks, ct);
+
+            Thread.Sleep(3);
+
+            if (ct.IsCancellationRequested) return;
+        }
 
         Logger.Debug("Scanner validated existing db files");
 
         if (ct.IsCancellationRequested) return;
 
         // scan new files
-        Parallel.ForEach(scannedFiles.Where(c => c.Value == false), new ParallelOptions()
+        foreach (var chunk in scannedFiles.Where(c => c.Value == false).Chunk(cpuCount))
         {
-            MaxDegreeOfParallelism = _pluginConfiguration.MaxParallelScan,
-            CancellationToken = ct
-        },
-        file =>
-        {
-            if (ct.IsCancellationRequested) return;
+            Task[] tasks = chunk.Select(c => Task.Run(() =>
+            {
+                var entry = _fileDbManager.CreateFileEntry(c.Key);
+                if (entry == null) _ = _fileDbManager.CreateCacheEntry(c.Key);
 
-            var entry = _fileDbManager.CreateFileEntry(file.Key);
-            if (entry == null) _ = _fileDbManager.CreateCacheEntry(file.Key);
-            Interlocked.Increment(ref currentFileProgress);
-        });
+                Interlocked.Increment(ref currentFileProgress);
+            })).ToArray();
+
+            Task.WaitAll(tasks, ct);
+
+            Thread.Sleep(3);
+
+            if (ct.IsCancellationRequested) return;
+        }
 
         Logger.Debug("Scanner added new files to db");
 

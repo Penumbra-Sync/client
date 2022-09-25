@@ -520,17 +520,6 @@ namespace MareSynchronos.UI
             _cacheScanner.InvokeScan(true);
         }
 
-        public void DrawParallelScansSetting()
-        {
-            var parallelScans = _pluginConfiguration.MaxParallelScan;
-            if (ImGui.SliderInt("File scan parallelism##parallelism", ref parallelScans, 1, 20))
-            {
-                _pluginConfiguration.MaxParallelScan = parallelScans;
-                _pluginConfiguration.Save();
-            }
-            DrawHelpText("Decrease to lessen load of file scans. File scans will take longer to execute with less parallel threads.");
-        }
-
         public void DrawTimeSpanBetweenScansSetting()
         {
             var timeSpan = _pluginConfiguration.TimeSpanBetweenScansInSeconds;

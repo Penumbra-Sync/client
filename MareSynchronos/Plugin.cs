@@ -23,7 +23,6 @@ namespace MareSynchronos
         private const string CommandName = "/mare";
         private readonly ApiController _apiController;
         private readonly CommandManager _commandManager;
-        private readonly Framework _framework;
         private readonly Configuration _configuration;
         private readonly PeriodicFileScanner _fileCacheManager;
         private readonly IntroUi _introUi;
@@ -49,7 +48,6 @@ namespace MareSynchronos
             Logger.Debug("Launching " + Name);
             PluginInterface = pluginInterface;
             _commandManager = commandManager;
-            _framework = framework;
             _configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
             _configuration.Initialize(PluginInterface);
             _configuration.Migrate();
@@ -65,11 +63,6 @@ namespace MareSynchronos
             _dalamudUtil = new DalamudUtil(clientState, objectTable, framework, condition);
 
             _ipcManager = new IpcManager(PluginInterface, _dalamudUtil);
-
-            // Compatibility for FileSystemWatchers under OSX
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                Environment.SetEnvironmentVariable("MONO_MANAGED_WATCHER", "enabled");
-
             _fileDialogManager = new FileDialogManager();
             _fileDbManager = new FileDbManager(_ipcManager, _configuration);
             _apiController = new ApiController(_configuration, _dalamudUtil, _fileDbManager);

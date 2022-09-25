@@ -115,13 +115,10 @@ public class FileDbManager
     private FileCache? GetValidatedFileCache(FileCacheEntity e)
     {
         var fileCache = new FileCache(e);
-
         var resulingFileCache = MigrateLegacy(fileCache);
-
         if (resulingFileCache == null) return null;
 
         resulingFileCache = ReplacePathPrefixes(resulingFileCache);
-
         resulingFileCache = Validate(resulingFileCache);
         return resulingFileCache;
     }
@@ -178,11 +175,11 @@ public class FileDbManager
 
     private FileCache ReplacePathPrefixes(FileCache fileCache)
     {
-        if (fileCache.OriginalFilepath.Contains(PenumbraPrefix))
+        if (fileCache.OriginalFilepath.StartsWith(PenumbraPrefix))
         {
             fileCache.SetResolvedFilePath(fileCache.OriginalFilepath.Replace(PenumbraPrefix, _ipcManager.PenumbraModDirectory()));
         }
-        else if (fileCache.OriginalFilepath.Contains(CachePrefix))
+        else if (fileCache.OriginalFilepath.StartsWith(CachePrefix))
         {
             fileCache.SetResolvedFilePath(fileCache.OriginalFilepath.Replace(CachePrefix, _configuration.CacheFolder));
         }

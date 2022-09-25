@@ -57,26 +57,12 @@ namespace MareSynchronos
         public Dictionary<string, string> ClientSecret { get; set; } = new();
         public Dictionary<string, string> CustomServerList { get; set; } = new();
         public int MaxLocalCacheInGiB { get; set; } = 20;
-
         public bool ReverseUserSort { get; set; } = true;
 
         public int TimeSpanBetweenScansInSeconds { get; set; } = 30;
         public bool FileScanPaused { get; set; } = false;
 
         public bool InitialScanComplete { get; set; } = false;
-        public int MaxParallelScan
-        {
-            get => _maxParallelScan;
-            set
-            {
-                _maxParallelScan = value switch
-                {
-                    < 0 => 1,
-                    > 20 => 10,
-                    _ => value
-                };
-            }
-        }
 
         public bool FullPause { get; set; } = false;
         public Dictionary<string, Dictionary<string, string>> UidServerComments { get; set; } = new();
