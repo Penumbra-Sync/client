@@ -210,12 +210,6 @@ namespace MareSynchronos
                 Version = 5;
                 Save();
             }
-
-            if (FileScanPaused)
-            {
-                FileScanPaused = false;
-                Save();
-            }
         }
     }
 }

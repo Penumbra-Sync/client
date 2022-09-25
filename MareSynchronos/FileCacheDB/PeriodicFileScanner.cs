@@ -230,6 +230,6 @@ public class PeriodicFileScanner : IDisposable
     {
         if (!_ipcManager.Initialized || !_pluginConfiguration.HasValidSetup()) return;
         Logger.Verbose("Penumbra is active, configuration is valid, starting watchers and scan");
-        InvokeScan();
+        InvokeScan(true);
     }
 }
