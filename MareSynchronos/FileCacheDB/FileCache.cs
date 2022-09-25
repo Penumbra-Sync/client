@@ -20,7 +20,7 @@ namespace MareSynchronos.FileCacheDB
 
         public void SetResolvedFilePath(string filePath)
         {
-            Filepath = filePath.ToLowerInvariant();
+            Filepath = filePath.ToLowerInvariant().Replace("\\\\", "\\");
         }
 
         public void SetHash(string hash)
