@@ -80,7 +80,7 @@ public class PeriodicFileScanner : IDisposable
         {
             while (!token.IsCancellationRequested)
             {
-                RecalculateFileCacheSize();
+                isForced = RecalculateFileCacheSize();
                 if (!_pluginConfiguration.FileScanPaused || isForced)
                 {
                     isForced = false;
@@ -101,7 +101,7 @@ public class PeriodicFileScanner : IDisposable
         InvokeScan();
     }
 
-    public void RecalculateFileCacheSize()
+    public bool RecalculateFileCacheSize()
     {
         FileCacheSize = Directory.EnumerateFiles(_pluginConfiguration.CacheFolder).Sum(f =>
         {
@@ -115,7 +115,7 @@ public class PeriodicFileScanner : IDisposable
             }
         });
 
-        if (FileCacheSize < (long)_pluginConfiguration.MaxLocalCacheInGiB * 1024 * 1024 * 1024) return;
+        if (FileCacheSize < (long)_pluginConfiguration.MaxLocalCacheInGiB * 1024 * 1024 * 1024) return false;
 
         var allFiles = Directory.EnumerateFiles(_pluginConfiguration.CacheFolder)
             .Select(f => new FileInfo(f)).OrderBy(f => f.LastAccessTime).ToList();
@@ -126,6 +126,8 @@ public class PeriodicFileScanner : IDisposable
             File.Delete(oldestFile.FullName);
             allFiles.Remove(oldestFile);
         }
+
+        return true;
     }
 
     private async Task PeriodicFileScan(CancellationToken ct)
