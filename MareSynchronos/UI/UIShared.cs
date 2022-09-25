@@ -546,7 +546,7 @@ namespace MareSynchronos.UI
                 _pluginConfiguration.FileScanPaused = isPaused;
                 _pluginConfiguration.Save();
             }
-            DrawHelpText("This allows you to stop the periodic scans of your Penumbra and Mare cache directories. This setting will automatically revert itself on restart of Mare.");
+            DrawHelpText("This allows you to stop the periodic scans of your Penumbra and Mare cache directories. Use this to move the Mare cache and Penumbra mod folders around. If you enable this permanently, run a Force rescan after adding mods to Penumbra.");
         }
 
         public void Dispose()
