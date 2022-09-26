@@ -168,9 +168,8 @@ public class PeriodicFileScanner : IDisposable
         string[] ext = { ".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp" };
         var penumbraFiles = Directory.EnumerateDirectories(penumbraDir)
                             .SelectMany(d => Directory.EnumerateFiles(d, "*.*", SearchOption.AllDirectories)
-                                                .Select(s => new FileInfo(s))
-                                                .Where(f => ext.Contains(f.Extension) && !f.FullName.Contains(@"\bg\") && !f.FullName.Contains(@"\bgcommon\") && !f.FullName.Contains(@"\ui\"))
-                                                .Select(f => f.FullName.ToLowerInvariant())).ToList();
+                                                .Select(s => new FileInfo(s).FullName.ToLowerInvariant())
+                                                .Where(f => ext.Any(e => f.EndsWith(e)) && !f.Contains(@"\bg\") && !f.Contains(@"\bgcommon\") && !f.Contains(@"\ui\"))).ToList();
 
         var cacheFiles = Directory.EnumerateFiles(_pluginConfiguration.CacheFolder, "*.*", SearchOption.TopDirectoryOnly)
                                 .Where(f => new FileInfo(f).Name.Length == 40)
@@ -189,7 +188,7 @@ public class PeriodicFileScanner : IDisposable
             ConcurrentBag<FileCacheEntity> entitiesToRemove = new();
             try
             {
-                foreach (var entry in db.FileCaches.AsNoTracking())
+                foreach (var entry in db.FileCaches.AsNoTracking().ToArray())
                 {
                     var idx = Task.WaitAny(dbTasks, ct);
                     dbTasks[idx] = Task.Run(() =>
@@ -210,6 +209,7 @@ public class PeriodicFileScanner : IDisposable
                         {
                             Logger.Warn("Failed validating " + entry.Filepath);
                             Logger.Warn(ex.Message);
+                            Logger.Warn(ex.StackTrace);
                             entitiesToRemove.Add(entry);
                         }
 
