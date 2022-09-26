@@ -47,7 +47,7 @@ public class FileDbManager
 
     public FileCache? ValidateFileCacheEntity(FileCacheEntity fileCacheEntity)
     {
-        return GetValidatedFileCache(fileCacheEntity);
+        return GetValidatedFileCache(fileCacheEntity, false);
     }
 
     public FileCache? GetFileCacheByPath(string path)
@@ -112,23 +112,26 @@ public class FileDbManager
         return result;
     }
 
-    private FileCache? GetValidatedFileCache(FileCacheEntity e)
+    private FileCache? GetValidatedFileCache(FileCacheEntity e, bool removeOnNonExistence = true)
     {
         var fileCache = new FileCache(e);
         var resulingFileCache = MigrateLegacy(fileCache);
         if (resulingFileCache == null) return null;
 
         resulingFileCache = ReplacePathPrefixes(resulingFileCache);
-        resulingFileCache = Validate(resulingFileCache);
+        resulingFileCache = Validate(resulingFileCache, removeOnNonExistence);
         return resulingFileCache;
     }
 
-    private FileCache? Validate(FileCache fileCache)
+    private FileCache? Validate(FileCache fileCache, bool removeOnNonExistence = true)
     {
         var file = new FileInfo(fileCache.Filepath);
         if (!file.Exists)
         {
-            DeleteFromDatabase(new[] { fileCache });
+            if (removeOnNonExistence)
+            {
+                DeleteFromDatabase(new[] { fileCache });
+            }
             return null;
         }
 
@@ -141,7 +144,7 @@ public class FileDbManager
         return fileCache;
     }
 
-    private FileCache? MigrateLegacy(FileCache fileCache)
+    private FileCache? MigrateLegacy(FileCache fileCache, bool removeOnNonExistence = true)
     {
         if (fileCache.OriginalFilepath.Contains(PenumbraPrefix + "\\") || fileCache.OriginalFilepath.Contains(CachePrefix)) return fileCache;
 
@@ -166,7 +169,10 @@ public class FileDbManager
         }
         else
         {
-            DeleteFromDatabase(new[] { fileCache });
+            if (removeOnNonExistence)
+            {
+                DeleteFromDatabase(new[] { fileCache });
+            }
             return null;
         }
 

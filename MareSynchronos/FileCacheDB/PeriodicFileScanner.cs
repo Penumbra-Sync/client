@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -38,14 +39,23 @@ public class PeriodicFileScanner : IDisposable
 
     private void _apiController_DownloadFinished()
     {
-        InvokeScan();
+        if (fileScanWasRunning)
+        {
+            fileScanWasRunning = false;
+            InvokeScan(true);
+        }
     }
 
     private void _apiController_DownloadStarted()
     {
-        _scanCancellationTokenSource?.Cancel();
+        if (IsScanRunning)
+        {
+            _scanCancellationTokenSource?.Cancel();
+            fileScanWasRunning = true;
+        }
     }
 
+    private bool fileScanWasRunning = false;
     private long currentFileProgress = 0;
     public long CurrentFileProgress => currentFileProgress;
 
@@ -72,6 +82,8 @@ public class PeriodicFileScanner : IDisposable
     public void InvokeScan(bool forced = false)
     {
         bool isForced = forced;
+        TotalFiles = 0;
+        currentFileProgress = 0;
         _scanCancellationTokenSource?.Cancel();
         _scanCancellationTokenSource = new CancellationTokenSource();
         var token = _scanCancellationTokenSource.Token;
@@ -83,6 +95,8 @@ public class PeriodicFileScanner : IDisposable
                 if (!_pluginConfiguration.FileScanPaused || isForced)
                 {
                     isForced = false;
+                    TotalFiles = 0;
+                    currentFileProgress = 0;
                     PeriodicFileScan(token);
                 }
                 _timeUntilNextScan = TimeSpan.FromSeconds(timeBetweenScans);
@@ -163,44 +177,75 @@ public class PeriodicFileScanner : IDisposable
                                 .Select(s => s.ToLowerInvariant());
 
         var scannedFiles = new Dictionary<string, bool>(penumbraFiles.Concat(cacheFiles).Select(c => new KeyValuePair<string, bool>(c, false)));
-
-        List<FileCacheEntity> fileDbEntries;
-        using (var db = new FileCacheContext())
-        {
-            fileDbEntries = db.FileCaches.AsNoTracking().ToList();
-        }
         TotalFiles = scannedFiles.Count;
 
-        Logger.Debug("Database contains " + fileDbEntries.Count + " files, local system contains " + TotalFiles);
+
         // scan files from database
         var cpuCount = (int)(Environment.ProcessorCount / 2.0f);
-        foreach (var chunk in fileDbEntries.Chunk(cpuCount))
+        Task[] dbTasks = Enumerable.Range(0, cpuCount).Select(c => Task.CompletedTask).ToArray();
+        using (var db = new FileCacheContext())
         {
-            Task[] tasks = chunk.Select(c => Task.Run(() =>
+            Logger.Debug("Database contains " + db.FileCaches.Count() + " files, local system contains " + TotalFiles);
+            ConcurrentBag<FileCacheEntity> entitiesToRemove = new();
+            try
             {
-                try
+                foreach (var entry in db.FileCaches.AsNoTracking())
                 {
-                    var file = _fileDbManager.ValidateFileCacheEntity(c);
-                    if (file != null)
+                    var idx = Task.WaitAny(dbTasks, ct);
+                    dbTasks[idx] = Task.Run(() =>
                     {
-                        scannedFiles[file.Filepath] = true;
-                    }
+                        try
+                        {
+                            var file = _fileDbManager.ValidateFileCacheEntity(entry);
+                            if (file != null)
+                            {
+                                scannedFiles[file.Filepath] = true;
+                            }
+                            else
+                            {
+                                entitiesToRemove.Add(entry);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Warn("Failed validating " + entry.Filepath);
+                            Logger.Warn(ex.Message);
+                            entitiesToRemove.Add(entry);
+                        }
+
+                        Interlocked.Increment(ref currentFileProgress);
+                        Thread.Sleep(1);
+                    }, ct);
+
+                    if (ct.IsCancellationRequested) return;
                 }
-                catch (Exception ex)
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn("Error during enumerating FileCaches: " + ex.Message);
+            }
+
+            try
+            {
+                if (entitiesToRemove.Any())
                 {
-                    Logger.Warn("Failed validating " + c.Filepath);
-                    Logger.Warn(ex.Message);
+                    foreach (var entry in entitiesToRemove)
+                    {
+                        Logger.Debug("Removing " + entry.Filepath);
+                        var toRemove = db.FileCaches.First(f => f.Filepath == entry.Filepath && f.Hash == entry.Hash);
+                        db.FileCaches.Remove(toRemove);
+                    }
+
+                    db.SaveChanges();
                 }
-
-                Interlocked.Increment(ref currentFileProgress);
-            })).ToArray();
-
-            Task.WaitAll(tasks, ct);
-
-            Thread.Sleep(3);
-
-            if (ct.IsCancellationRequested) return;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn(ex.Message);
+            }
         }
+
+        Task.WaitAll(dbTasks);
 
         Logger.Debug("Scanner validated existing db files");
 

@@ -152,7 +152,7 @@ namespace MareSynchronos.UI
                 ImGui.Text("Scan is running");
                 ImGui.Text("Current Progress:");
                 ImGui.SameLine();
-                ImGui.Text(_cacheScanner.TotalFiles <= 1
+                ImGui.Text(_cacheScanner.TotalFiles == 1
                     ? "Collecting files"
                     : $"Processing {_cacheScanner.CurrentFileProgress} / {_cacheScanner.TotalFiles} files");
             }
