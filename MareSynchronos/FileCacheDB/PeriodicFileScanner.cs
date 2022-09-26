@@ -178,10 +178,18 @@ public class PeriodicFileScanner : IDisposable
         {
             Task[] tasks = chunk.Select(c => Task.Run(() =>
             {
-                var file = _fileDbManager.ValidateFileCache(c);
-                if (file != null)
+                try
                 {
-                    scannedFiles[file.Filepath] = true;
+                    var file = _fileDbManager.ValidateFileCacheEntity(c);
+                    if (file != null)
+                    {
+                        scannedFiles[file.Filepath] = true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn("Failed validating " + c.Filepath);
+                    Logger.Warn(ex.Message);
                 }
 
                 Interlocked.Increment(ref currentFileProgress);
@@ -203,8 +211,16 @@ public class PeriodicFileScanner : IDisposable
         {
             Task[] tasks = chunk.Select(c => Task.Run(() =>
             {
-                var entry = _fileDbManager.CreateFileEntry(c.Key);
-                if (entry == null) _ = _fileDbManager.CreateCacheEntry(c.Key);
+                try
+                {
+                    var entry = _fileDbManager.CreateFileEntry(c.Key);
+                    if (entry == null) _ = _fileDbManager.CreateCacheEntry(c.Key);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn("Failed adding " + c.Key);
+                    Logger.Warn(ex.Message);
+                }
 
                 Interlocked.Increment(ref currentFileProgress);
             })).ToArray();

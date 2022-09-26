@@ -45,7 +45,7 @@ public class FileDbManager
         return GetValidatedFileCache(matchingEntries.First());
     }
 
-    public FileCache? ValidateFileCache(FileCacheEntity fileCacheEntity)
+    public FileCache? ValidateFileCacheEntity(FileCacheEntity fileCacheEntity)
     {
         return GetValidatedFileCache(fileCacheEntity);
     }
