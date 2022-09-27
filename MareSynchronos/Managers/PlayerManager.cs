@@ -9,6 +9,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using System.Collections.Generic;
 using System.Linq;
 using MareSynchronos.Models;
+using MareSynchronos.FileCacheDB;
 #if DEBUG
 using Newtonsoft.Json;
 #endif
@@ -23,6 +24,7 @@ namespace MareSynchronos.Managers
         private readonly CharacterDataFactory _characterDataFactory;
         private readonly DalamudUtil _dalamudUtil;
         private readonly TransientResourceManager _transientResourceManager;
+        private readonly PeriodicFileScanner _periodicFileScanner;
         private readonly IpcManager _ipcManager;
         public event PlayerHasChanged? PlayerHasChanged;
         public CharacterCacheDto? LastCreatedCharacterData { get; private set; }
@@ -35,7 +37,8 @@ namespace MareSynchronos.Managers
         private List<PlayerRelatedObject> playerRelatedObjects = new List<PlayerRelatedObject>();
 
         public unsafe PlayerManager(ApiController apiController, IpcManager ipcManager,
-            CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil, TransientResourceManager transientResourceManager)
+            CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil, TransientResourceManager transientResourceManager,
+            PeriodicFileScanner periodicFileScanner)
         {
             Logger.Verbose("Creating " + nameof(PlayerManager));
 
@@ -44,6 +47,7 @@ namespace MareSynchronos.Managers
             _characterDataFactory = characterDataFactory;
             _dalamudUtil = dalamudUtil;
             _transientResourceManager = transientResourceManager;
+            _periodicFileScanner = periodicFileScanner;
             _apiController.Connected += ApiControllerOnConnected;
             _apiController.Disconnected += ApiController_Disconnected;
             _transientResourceManager.TransientResourceLoaded += HandleTransientResourceLoad;
@@ -231,12 +235,14 @@ namespace MareSynchronos.Managers
 
             Task.Run(async () =>
             {
+                _periodicFileScanner.HaltScan();
                 foreach (var item in unprocessedObjects)
                 {
                     _dalamudUtil.WaitWhileCharacterIsDrawing("self " + item.ObjectKind.ToString(), item.Address, 10000, token);
                 }
 
                 CharacterCacheDto? cacheDto = (await CreateFullCharacterCacheDto(token));
+                _periodicFileScanner.ResumeScan();
                 if (cacheDto == null || token.IsCancellationRequested) return;
 
 #if DEBUG

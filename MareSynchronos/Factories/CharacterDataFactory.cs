@@ -8,6 +8,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Client.System.Resource;
 using MareSynchronos.API;
+using MareSynchronos.FileCacheDB;
 using MareSynchronos.Interop;
 using MareSynchronos.Managers;
 using MareSynchronos.Models;

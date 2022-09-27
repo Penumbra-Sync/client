@@ -8,6 +8,13 @@ using System.Linq;
 
 namespace MareSynchronos.Managers;
 
+public enum FileState
+{
+    Valid,
+    RequireUpdate,
+    RequireDeletion
+}
+
 public class FileDbManager
 {
     private const string PenumbraPrefix = "{penumbra}";
@@ -45,9 +52,19 @@ public class FileDbManager
         return GetValidatedFileCache(new FileCache(matchingEntries.First()));
     }
 
-    public FileCache? ValidateFileCacheEntity(string hash, string path, string lastModifiedDate)
+    public (FileState, string) ValidateFileCacheEntity(string hash, string path, string lastModifiedDate)
     {
-        return GetValidatedFileCache(new FileCache(hash, path, lastModifiedDate), false);
+        var fileCache = new FileCache(hash, path, lastModifiedDate);
+        if (!fileCache.OriginalFilepath.StartsWith(PenumbraPrefix + "\\") && !fileCache.OriginalFilepath.StartsWith(CachePrefix)) 
+            return (FileState.RequireUpdate, path);
+        fileCache = ReplacePathPrefixes(fileCache);
+        FileInfo fi = new FileInfo(fileCache.Filepath);
+        if (!fi.Exists) 
+            return (FileState.RequireDeletion, fileCache.Filepath);
+        if (fi.LastWriteTimeUtc.Ticks != fileCache.LastModifiedDateTicks) 
+            return (FileState.RequireUpdate, fileCache.Filepath);
+
+        return (FileState.Valid, fileCache.Filepath);
     }
 
     public FileCache? GetFileCacheByPath(string path)
@@ -61,6 +78,7 @@ public class FileDbManager
 
         if (matchingEntries == null)
         {
+            Logger.Debug("Found no entries for " + cleanedPath);
             return CreateFileEntry(path);
         }
 
@@ -104,7 +122,8 @@ public class FileDbManager
             }
             catch (Exception ex)
             {
-                Logger.Warn("Could not add " + fileInfo.FullName);
+                Logger.Warn("Could not add " + fileInfo.FullName ?? String.Empty);
+                Logger.Warn(ex.Message);
             }
         }
         var result = GetFileCacheByPath(prefixedPath);
@@ -112,25 +131,22 @@ public class FileDbManager
         return result;
     }
 
-    private FileCache? GetValidatedFileCache(FileCache fileCache, bool removeOnNonExistence = true)
+    private FileCache? GetValidatedFileCache(FileCache fileCache)
     {
         var resulingFileCache = MigrateLegacy(fileCache);
         if (resulingFileCache == null) return null;
 
         resulingFileCache = ReplacePathPrefixes(resulingFileCache);
-        resulingFileCache = Validate(resulingFileCache, removeOnNonExistence);
+        resulingFileCache = Validate(resulingFileCache);
         return resulingFileCache;
     }
 
-    private FileCache? Validate(FileCache fileCache, bool removeOnNonExistence = true)
+    private FileCache? Validate(FileCache fileCache)
     {
         var file = new FileInfo(fileCache.Filepath);
         if (!file.Exists)
         {
-            if (removeOnNonExistence)
-            {
-                DeleteFromDatabase(new[] { fileCache });
-            }
+            DeleteFromDatabase(new[] { fileCache });
             return null;
         }
 
@@ -143,7 +159,7 @@ public class FileDbManager
         return fileCache;
     }
 
-    private FileCache? MigrateLegacy(FileCache fileCache, bool removeOnNonExistence = true)
+    private FileCache? MigrateLegacy(FileCache fileCache)
     {
         if (fileCache.OriginalFilepath.StartsWith(PenumbraPrefix + "\\") || fileCache.OriginalFilepath.StartsWith(CachePrefix)) return fileCache;
 
@@ -168,10 +184,7 @@ public class FileDbManager
         }
         else
         {
-            if (removeOnNonExistence)
-            {
-                DeleteFromDatabase(new[] { fileCache });
-            }
+            DeleteFromDatabase(new[] { fileCache });
             return null;
         }
 
@@ -214,7 +227,9 @@ public class FileDbManager
             }
             catch (Exception ex)
             {
-                Logger.Warn("Error updating file hash (" + ex.Message + "), returning currently existing");
+                Logger.Warn("Error updating file hash (" + ex.Message + "), returning currently existing" ?? string.Empty);
+                Logger.Warn(ex.InnerException?.Message ?? string.Empty);
+                Logger.Warn(ex.StackTrace ?? string.Empty);
                 using var db = new FileCacheContext();
                 var cache = db.FileCaches.First(f => f.Filepath == markedForUpdate.OriginalFilepath);
                 markedForUpdate.UpdateFileCache(cache);

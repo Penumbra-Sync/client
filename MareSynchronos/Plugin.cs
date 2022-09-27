@@ -24,7 +24,7 @@ namespace MareSynchronos
         private readonly ApiController _apiController;
         private readonly CommandManager _commandManager;
         private readonly Configuration _configuration;
-        private readonly PeriodicFileScanner _fileCacheManager;
+        private readonly PeriodicFileScanner _periodicFileScanner;
         private readonly IntroUi _introUi;
         private readonly IpcManager _ipcManager;
         public static DalamudPluginInterface PluginInterface { get; set; }
@@ -66,14 +66,14 @@ namespace MareSynchronos
             _fileDialogManager = new FileDialogManager();
             _fileDbManager = new FileDbManager(_ipcManager, _configuration);
             _apiController = new ApiController(_configuration, _dalamudUtil, _fileDbManager);
-            _fileCacheManager = new PeriodicFileScanner(_ipcManager, _configuration, _fileDbManager, _apiController);
+            _periodicFileScanner = new PeriodicFileScanner(_ipcManager, _configuration, _fileDbManager, _apiController, _dalamudUtil);
 
             _uiSharedComponent =
-                new UiShared(_ipcManager, _apiController, _fileCacheManager, _fileDialogManager, _configuration, _dalamudUtil, PluginInterface, _localization);
+                new UiShared(_ipcManager, _apiController, _periodicFileScanner, _fileDialogManager, _configuration, _dalamudUtil, PluginInterface, _localization);
             _settingsUi = new SettingsUi(_windowSystem, _uiSharedComponent, _configuration, _apiController);
             _compactUi = new CompactUi(_windowSystem, _uiSharedComponent, _configuration, _apiController);
 
-            _introUi = new IntroUi(_windowSystem, _uiSharedComponent, _configuration, _fileCacheManager);
+            _introUi = new IntroUi(_windowSystem, _uiSharedComponent, _configuration, _periodicFileScanner);
             _settingsUi.SwitchToIntroUi += () =>
             {
                 _introUi.IsOpen = true;
@@ -84,7 +84,7 @@ namespace MareSynchronos
             {
                 _introUi.IsOpen = false;
                 _compactUi.IsOpen = true;
-                _fileCacheManager.StartWatchers();
+                _periodicFileScanner.StartWatchers();
                 ReLaunchCharacterManager();
             };
             _compactUi.OpenSettingsUi += () =>
@@ -119,7 +119,7 @@ namespace MareSynchronos
             _downloadUi?.Dispose();
             _compactUi?.Dispose();
 
-            _fileCacheManager?.Dispose();
+            _periodicFileScanner?.Dispose();
             _playerManager?.Dispose();
             _characterCacheManager?.Dispose();
             _ipcManager?.Dispose();
@@ -184,7 +184,7 @@ namespace MareSynchronos
                 var characterCacheFactory =
                     new CharacterDataFactory(_dalamudUtil, _ipcManager, _transientResourceManager, _fileDbManager);
                 _playerManager = new PlayerManager(_apiController, _ipcManager,
-                    characterCacheFactory, _dalamudUtil, _transientResourceManager);
+                    characterCacheFactory, _dalamudUtil, _transientResourceManager, _periodicFileScanner);
                 _characterCacheManager = new OnlinePlayerManager(_apiController,
                     _dalamudUtil, _ipcManager, _playerManager, _fileDbManager);
             }

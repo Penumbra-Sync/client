@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -18,9 +17,11 @@ public class PeriodicFileScanner : IDisposable
     private readonly Configuration _pluginConfiguration;
     private readonly FileDbManager _fileDbManager;
     private readonly ApiController _apiController;
+    private readonly DalamudUtil _dalamudUtil;
+    private int haltScanRequests = 0;
     private CancellationTokenSource? _scanCancellationTokenSource;
     private Task? _fileScannerTask = null;
-    public PeriodicFileScanner(IpcManager ipcManager, Configuration pluginConfiguration, FileDbManager fileDbManager, ApiController apiController)
+    public PeriodicFileScanner(IpcManager ipcManager, Configuration pluginConfiguration, FileDbManager fileDbManager, ApiController apiController, DalamudUtil dalamudUtil)
     {
         Logger.Verbose("Creating " + nameof(PeriodicFileScanner));
 
@@ -28,27 +29,34 @@ public class PeriodicFileScanner : IDisposable
         _pluginConfiguration = pluginConfiguration;
         _fileDbManager = fileDbManager;
         _apiController = apiController;
+        _dalamudUtil = dalamudUtil;
         _ipcManager.PenumbraInitialized += StartScan;
         if (!string.IsNullOrEmpty(_ipcManager.PenumbraModDirectory()))
         {
             StartScan();
         }
-        _apiController.DownloadStarted += _apiController_DownloadStarted;
-        _apiController.DownloadFinished += _apiController_DownloadFinished;
+        _apiController.DownloadStarted += HaltScan;
+        _apiController.DownloadFinished += ResumeScan;
+        _dalamudUtil.ZoneSwitchStart += HaltScan;
+        _dalamudUtil.ZoneSwitchEnd += ResumeScan;
     }
 
-    private void _apiController_DownloadFinished()
+    public void ResumeScan()
     {
-        if (fileScanWasRunning)
+        Interlocked.Decrement(ref haltScanRequests);
+
+        if (fileScanWasRunning && haltScanRequests == 0)
         {
             fileScanWasRunning = false;
             InvokeScan(true);
         }
     }
 
-    private void _apiController_DownloadStarted()
+    public void HaltScan()
     {
-        if (IsScanRunning)
+        Interlocked.Increment(ref haltScanRequests);
+
+        if (IsScanRunning && haltScanRequests >= 0)
         {
             _scanCancellationTokenSource?.Cancel();
             fileScanWasRunning = true;
@@ -74,8 +82,10 @@ public class PeriodicFileScanner : IDisposable
         Logger.Verbose("Disposing " + nameof(PeriodicFileScanner));
 
         _ipcManager.PenumbraInitialized -= StartScan;
-        _apiController.DownloadStarted -= _apiController_DownloadStarted;
-        _apiController.DownloadFinished -= _apiController_DownloadFinished;
+        _apiController.DownloadStarted -= HaltScan;
+        _apiController.DownloadFinished -= ResumeScan;
+        _dalamudUtil.ZoneSwitchStart -= HaltScan;
+        _dalamudUtil.ZoneSwitchEnd -= ResumeScan;
         _scanCancellationTokenSource?.Cancel();
     }
 
@@ -91,6 +101,11 @@ public class PeriodicFileScanner : IDisposable
         {
             while (!token.IsCancellationRequested)
             {
+                while (haltScanRequests > 0)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+                }
+
                 isForced |= RecalculateFileCacheSize();
                 if (!_pluginConfiguration.FileScanPaused || isForced)
                 {
@@ -98,6 +113,8 @@ public class PeriodicFileScanner : IDisposable
                     TotalFiles = 0;
                     currentFileProgress = 0;
                     PeriodicFileScan(token);
+                    TotalFiles = 0;
+                    currentFileProgress = 0;
                 }
                 _timeUntilNextScan = TimeSpan.FromSeconds(timeBetweenScans);
                 while (_timeUntilNextScan.TotalSeconds >= 0)
@@ -182,6 +199,7 @@ public class PeriodicFileScanner : IDisposable
         Task[] dbTasks = Enumerable.Range(0, cpuCount).Select(c => Task.CompletedTask).ToArray();
 
         ConcurrentBag<Tuple<string, string>> entitiesToRemove = new();
+        ConcurrentBag<string> entitiesToUpdate = new();
         try
         {
             using var ctx = new FileCacheContext();
@@ -200,14 +218,19 @@ public class PeriodicFileScanner : IDisposable
                 {
                     try
                     {
-                        var file = _fileDbManager.ValidateFileCacheEntity(hash, filePath, date);
-                        if (file != null)
+                        var fileState = _fileDbManager.ValidateFileCacheEntity(hash, filePath, date);
+                        switch (fileState.Item1)
                         {
-                            scannedFiles[file.Filepath] = true;
-                        }
-                        else
-                        {
-                            entitiesToRemove.Add(new Tuple<string, string>(hash, filePath));
+                            case FileState.Valid:
+                                scannedFiles[fileState.Item2] = true;
+                                break;
+                            case FileState.RequireDeletion:
+                                entitiesToRemove.Add(new Tuple<string, string>(hash, filePath));
+                                break;
+                            case FileState.RequireUpdate:
+                                scannedFiles[fileState.Item2] = true;
+                                entitiesToUpdate.Add(fileState.Item2);
+                                break;
                         }
                     }
                     catch (Exception ex)
@@ -224,6 +247,10 @@ public class PeriodicFileScanner : IDisposable
 
                 if (ct.IsCancellationRequested) return;
             }
+        }
+        catch (OperationCanceledException)
+        {
+            return;
         }
         catch (Exception ex)
         {
@@ -243,8 +270,22 @@ public class PeriodicFileScanner : IDisposable
                         db.FileCaches.Remove(toRemove);
                     }
 
+                }
+
+                if (entitiesToUpdate.Any())
+                {
+                    foreach (var entry in entitiesToUpdate)
+                    {
+                        Logger.Debug("Updating " + entry);
+                        _fileDbManager.GetFileCacheByPath(entry);
+                    }
+                }
+
+                if (entitiesToUpdate.Any() || entitiesToRemove.Any())
+                {
                     db.SaveChanges();
                 }
+
             }
             catch (Exception ex)
             {

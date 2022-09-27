@@ -75,7 +75,7 @@ namespace MareSynchronos.Utils
             {
                 if (!_sentBetweenAreas)
                 {
-                    Logger.Debug("Zone switch start");
+                    Logger.Debug("Zone switch/Gpose start");
                     _sentBetweenAreas = true;
                     ZoneSwitchStart?.Invoke();
                 }
@@ -84,7 +84,7 @@ namespace MareSynchronos.Utils
             }
             else if (_sentBetweenAreas)
             {
-                Logger.Debug("Zone switch end");
+                Logger.Debug("Zone switch/Gpose end");
                 _sentBetweenAreas = false;
                 ZoneSwitchEnd?.Invoke();
             }
