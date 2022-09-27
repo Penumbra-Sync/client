@@ -42,12 +42,12 @@ public class FileDbManager
             }
         }
 
-        return GetValidatedFileCache(matchingEntries.First());
+        return GetValidatedFileCache(new FileCache(matchingEntries.First()));
     }
 
-    public FileCache? ValidateFileCacheEntity(FileCacheEntity fileCacheEntity)
+    public FileCache? ValidateFileCacheEntity(string hash, string path, string lastModifiedDate)
     {
-        return GetValidatedFileCache(fileCacheEntity, false);
+        return GetValidatedFileCache(new FileCache(hash, path, lastModifiedDate), false);
     }
 
     public FileCache? GetFileCacheByPath(string path)
@@ -64,7 +64,7 @@ public class FileDbManager
             return CreateFileEntry(path);
         }
 
-        var validatedCacheEntry = GetValidatedFileCache(matchingEntries);
+        var validatedCacheEntry = GetValidatedFileCache(new FileCache(matchingEntries));
 
         return validatedCacheEntry;
     }
@@ -112,9 +112,8 @@ public class FileDbManager
         return result;
     }
 
-    private FileCache? GetValidatedFileCache(FileCacheEntity e, bool removeOnNonExistence = true)
+    private FileCache? GetValidatedFileCache(FileCache fileCache, bool removeOnNonExistence = true)
     {
-        var fileCache = new FileCache(e);
         var resulingFileCache = MigrateLegacy(fileCache);
         if (resulingFileCache == null) return null;
 
@@ -146,7 +145,7 @@ public class FileDbManager
 
     private FileCache? MigrateLegacy(FileCache fileCache, bool removeOnNonExistence = true)
     {
-        if (fileCache.OriginalFilepath.Contains(PenumbraPrefix + "\\") || fileCache.OriginalFilepath.Contains(CachePrefix)) return fileCache;
+        if (fileCache.OriginalFilepath.StartsWith(PenumbraPrefix + "\\") || fileCache.OriginalFilepath.StartsWith(CachePrefix)) return fileCache;
 
         var fileInfo = new FileInfo(fileCache.OriginalFilepath);
         var penumbraDir = _ipcManager.PenumbraModDirectory()!;
@@ -197,19 +196,29 @@ public class FileDbManager
     {
         lock (_lock)
         {
-            Logger.Verbose("Updating Hash for " + markedForUpdate.OriginalFilepath);
-            using var db = new FileCacheContext();
-            var cache = db.FileCaches.First(f => f.Filepath == markedForUpdate.OriginalFilepath && f.Hash == markedForUpdate.OriginalHash);
-            var newcache = new FileCacheEntity()
+            try
             {
-                Filepath = cache.Filepath,
-                Hash = markedForUpdate.Hash,
-                LastModifiedDate = lastModifiedDate
-            };
-            db.Remove(cache);
-            db.FileCaches.Add(newcache);
-            markedForUpdate.UpdateFileCache(newcache);
-            db.SaveChanges();
+                Logger.Verbose("Updating Hash for " + markedForUpdate.OriginalFilepath);
+                using var db = new FileCacheContext();
+                var cache = db.FileCaches.First(f => f.Filepath == markedForUpdate.OriginalFilepath && f.Hash == markedForUpdate.OriginalHash);
+                var newcache = new FileCacheEntity()
+                {
+                    Filepath = cache.Filepath,
+                    Hash = markedForUpdate.Hash,
+                    LastModifiedDate = lastModifiedDate
+                };
+                db.Remove(cache);
+                db.FileCaches.Add(newcache);
+                markedForUpdate.UpdateFileCache(newcache);
+                db.SaveChanges();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn("Error updating file hash (" + ex.Message + "), returning currently existing");
+                using var db = new FileCacheContext();
+                var cache = db.FileCaches.First(f => f.Filepath == markedForUpdate.OriginalFilepath);
+                markedForUpdate.UpdateFileCache(cache);
+            }
         }
     }
 

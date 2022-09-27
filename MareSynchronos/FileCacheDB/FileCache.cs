@@ -1,6 +1,8 @@
 ﻿#nullable disable
 
 
+using System;
+
 namespace MareSynchronos.FileCacheDB
 {
 
@@ -9,9 +11,19 @@ namespace MareSynchronos.FileCacheDB
         private FileCacheEntity entity;
         public string Filepath { get; private set; }
         public string Hash { get; private set; }
-        public string OriginalFilepath => entity.Filepath;
-        public string OriginalHash => entity.Hash;
-        public long LastModifiedDateTicks => long.Parse(entity.LastModifiedDate);
+        private string originalFilePathNoEntity = string.Empty;
+        private string originalHashNoEntity = string.Empty;
+        private string originalModifiedDate = string.Empty;
+        public string OriginalFilepath => entity == null ? originalFilePathNoEntity : entity.Filepath;
+        public string OriginalHash => entity == null ? originalHashNoEntity : entity.Hash;
+        public long LastModifiedDateTicks => long.Parse(entity == null ? originalModifiedDate : entity.LastModifiedDate);
+
+        public FileCache(string hash, string path, string lastModifiedDate)
+        {
+            originalHashNoEntity = hash;
+            originalFilePathNoEntity = path;
+            originalModifiedDate = lastModifiedDate;
+        }
 
         public FileCache(FileCacheEntity entity)
         {
