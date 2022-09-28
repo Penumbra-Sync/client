@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Dalamud.Logging;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using MareSynchronos.API;
+using MareSynchronos.FileCache;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
@@ -15,12 +16,12 @@ namespace MareSynchronos.Managers;
 public class CachedPlayer
 {
     private readonly DalamudUtil _dalamudUtil;
-    private readonly FileDbManager fileDbManager;
+    private readonly FileCacheManager fileDbManager;
     private readonly IpcManager _ipcManager;
     private readonly ApiController _apiController;
     private bool _isVisible;
 
-    public CachedPlayer(string nameHash, IpcManager ipcManager, ApiController apiController, DalamudUtil dalamudUtil, FileDbManager fileDbManager)
+    public CachedPlayer(string nameHash, IpcManager ipcManager, ApiController apiController, DalamudUtil dalamudUtil, FileCacheManager fileDbManager)
     {
         PlayerNameHash = nameHash;
         _ipcManager = ipcManager;
@@ -201,7 +202,7 @@ public class CachedPlayer
                     var fileCache = fileDbManager.GetFileCacheByHash(item.Hash);
                     if (fileCache != null)
                     {
-                        moddedDictionary[gamePath] = fileCache.Filepath;
+                        moddedDictionary[gamePath] = fileCache.ResolvedFilepath;
                     }
                     else
                     {

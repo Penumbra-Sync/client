@@ -4,15 +4,15 @@ using System.Text;
 using System.Threading.Tasks;
 using MareSynchronos.API;
 using System.Text.RegularExpressions;
-using MareSynchronos.Managers;
+using MareSynchronos.FileCache;
 
 namespace MareSynchronos.Models
 {
     public class FileReplacement
     {
-        private readonly FileDbManager fileDbManager;
+        private readonly FileCacheManager fileDbManager;
 
-        public FileReplacement(FileDbManager fileDbManager)
+        public FileReplacement(FileCacheManager fileDbManager)
         {
             this.fileDbManager = fileDbManager;
         }
@@ -37,7 +37,7 @@ namespace MareSynchronos.Models
             _ = Task.Run(() =>
             {
                 var cache = fileDbManager.GetFileCacheByPath(ResolvedPath);
-                Hash = cache.OriginalHash;
+                Hash = cache.Hash;
             });
         }
 

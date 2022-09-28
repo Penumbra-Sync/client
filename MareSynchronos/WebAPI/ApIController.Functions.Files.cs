@@ -9,7 +9,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using LZ4;
 using MareSynchronos.API;
-using MareSynchronos.FileCacheDB;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -177,7 +176,7 @@ namespace MareSynchronos.WebAPI
                     {
                         CurrentUploads.Add(new UploadFileTransfer(file)
                         {
-                            Total = new FileInfo(_fileDbManager.GetFileCacheByHash(file.Hash)!.Filepath).Length
+                            Total = new FileInfo(_fileDbManager.GetFileCacheByHash(file.Hash)!.ResolvedFilepath).Length
                         });
                     }
                     catch (Exception ex)
@@ -193,7 +192,7 @@ namespace MareSynchronos.WebAPI
                     {
                         ForbiddenTransfers.Add(new UploadFileTransfer(file)
                         {
-                            LocalFile = _fileDbManager.GetFileCacheByHash(file.Hash)?.Filepath ?? string.Empty
+                            LocalFile = _fileDbManager.GetFileCacheByHash(file.Hash)?.ResolvedFilepath ?? string.Empty
                         });
                     }
                 }
@@ -266,7 +265,7 @@ namespace MareSynchronos.WebAPI
 
         private async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)
         {
-            var fileCache = _fileDbManager.GetFileCacheByHash(fileHash)!.Filepath;
+            var fileCache = _fileDbManager.GetFileCacheByHash(fileHash)!.ResolvedFilepath;
             return (fileHash, LZ4Codec.WrapHC(await File.ReadAllBytesAsync(fileCache, uploadToken), 0,
                 (int)new FileInfo(fileCache).Length));
         }

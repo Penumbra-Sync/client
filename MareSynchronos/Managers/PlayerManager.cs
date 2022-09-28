@@ -9,7 +9,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using System.Collections.Generic;
 using System.Linq;
 using MareSynchronos.Models;
-using MareSynchronos.FileCacheDB;
+using MareSynchronos.FileCache;
 #if DEBUG
 using Newtonsoft.Json;
 #endif

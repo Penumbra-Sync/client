@@ -7,21 +7,20 @@ using System.Threading.Tasks;
 using MareSynchronos.Managers;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using Microsoft.EntityFrameworkCore;
 
-namespace MareSynchronos.FileCacheDB;
+namespace MareSynchronos.FileCache;
 
 public class PeriodicFileScanner : IDisposable
 {
     private readonly IpcManager _ipcManager;
     private readonly Configuration _pluginConfiguration;
-    private readonly FileDbManager _fileDbManager;
+    private readonly FileCacheManager _fileDbManager;
     private readonly ApiController _apiController;
     private readonly DalamudUtil _dalamudUtil;
     private int haltScanRequests = 0;
     private CancellationTokenSource? _scanCancellationTokenSource;
     private Task? _fileScannerTask = null;
-    public PeriodicFileScanner(IpcManager ipcManager, Configuration pluginConfiguration, FileDbManager fileDbManager, ApiController apiController, DalamudUtil dalamudUtil)
+    public PeriodicFileScanner(IpcManager ipcManager, Configuration pluginConfiguration, FileCacheManager fileDbManager, ApiController apiController, DalamudUtil dalamudUtil)
     {
         Logger.Verbose("Creating " + nameof(PeriodicFileScanner));
 
@@ -198,47 +197,33 @@ public class PeriodicFileScanner : IDisposable
         var cpuCount = (int)(Environment.ProcessorCount / 2.0f);
         Task[] dbTasks = Enumerable.Range(0, cpuCount).Select(c => Task.CompletedTask).ToArray();
 
-        ConcurrentBag<Tuple<string, string>> entitiesToRemove = new();
-        ConcurrentBag<string> entitiesToUpdate = new();
+        ConcurrentBag<FileCache> entitiesToRemove = new();
+        ConcurrentBag<FileCache> entitiesToUpdate = new();
         try
         {
-            using var ctx = new FileCacheContext();
-            Logger.Debug("Database contains " + ctx.FileCaches.Count() + " files, local system contains " + TotalFiles);
-            using var cmd = ctx.Database.GetDbConnection().CreateCommand();
-            cmd.CommandText = "SELECT Hash, FilePath, LastModifiedDate FROM FileCache";
-            ctx.Database.OpenConnection();
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
+            foreach (var value in _fileDbManager.GetAllFileCaches())
             {
-                var hash = reader["Hash"].ToString();
-                var filePath = reader["FilePath"].ToString();
-                var date = reader["LastModifiedDate"].ToString();
                 var idx = Task.WaitAny(dbTasks, ct);
                 dbTasks[idx] = Task.Run(() =>
                 {
                     try
                     {
-                        var fileState = _fileDbManager.ValidateFileCacheEntity(hash, filePath, date);
-                        switch (fileState.Item1)
+                        var result = _fileDbManager.ValidateFileCacheEntity(value);
+                        scannedFiles[result.Item2.ResolvedFilepath] = true;
+                        if (result.Item1 == FileState.RequireUpdate)
                         {
-                            case FileState.Valid:
-                                scannedFiles[fileState.Item2] = true;
-                                break;
-                            case FileState.RequireDeletion:
-                                entitiesToRemove.Add(new Tuple<string, string>(hash, filePath));
-                                break;
-                            case FileState.RequireUpdate:
-                                scannedFiles[fileState.Item2] = true;
-                                entitiesToUpdate.Add(fileState.Item2);
-                                break;
+                            entitiesToUpdate.Add(result.Item2);
+                        }
+                        else if (result.Item1 == FileState.RequireDeletion)
+                        {
+                            entitiesToRemove.Add(result.Item2);
                         }
                     }
                     catch (Exception ex)
                     {
-                        Logger.Warn("Failed validating " + filePath);
+                        Logger.Warn("Failed validating " + value.ResolvedFilepath);
                         Logger.Warn(ex.Message);
                         Logger.Warn(ex.StackTrace);
-                        entitiesToRemove.Add(new Tuple<string, string>(hash, filePath));
                     }
 
                     Interlocked.Increment(ref currentFileProgress);
@@ -257,43 +242,22 @@ public class PeriodicFileScanner : IDisposable
             Logger.Warn("Error during enumerating FileCaches: " + ex.Message);
         }
 
-        using (var db = new FileCacheContext())
-        {
-            try
-            {
-                if (entitiesToRemove.Any())
-                {
-                    foreach (var entry in entitiesToRemove)
-                    {
-                        Logger.Debug("Removing " + entry.Item2);
-                        var toRemove = db.FileCaches.First(f => f.Filepath == entry.Item2 && f.Hash == entry.Item1);
-                        db.FileCaches.Remove(toRemove);
-                    }
-
-                }
-
-                if (entitiesToUpdate.Any())
-                {
-                    foreach (var entry in entitiesToUpdate)
-                    {
-                        Logger.Debug("Updating " + entry);
-                        _fileDbManager.GetFileCacheByPath(entry);
-                    }
-                }
-
-                if (entitiesToUpdate.Any() || entitiesToRemove.Any())
-                {
-                    db.SaveChanges();
-                }
-
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn(ex.Message);
-            }
-        }
-
         Task.WaitAll(dbTasks);
+
+        if (entitiesToUpdate.Any() || entitiesToRemove.Any())
+        {
+            foreach (var entity in entitiesToUpdate)
+            {
+                _fileDbManager.UpdateHash(entity);
+            }
+
+            foreach (var entity in entitiesToRemove)
+            {
+                _fileDbManager.RemoveHash(entity);
+            }
+
+            _fileDbManager.WriteOutFullCsv();
+        }
 
         Logger.Debug("Scanner validated existing db files");
 

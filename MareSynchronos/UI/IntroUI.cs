@@ -10,7 +10,7 @@ using ImGuiNET;
 using MareSynchronos.Utils;
 using MareSynchronos.Localization;
 using Dalamud.Utility;
-using MareSynchronos.FileCacheDB;
+using MareSynchronos.FileCache;
 
 namespace MareSynchronos.UI
 {

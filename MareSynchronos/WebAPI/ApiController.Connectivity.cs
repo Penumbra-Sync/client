@@ -6,7 +6,7 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using MareSynchronos.API;
-using MareSynchronos.Managers;
+using MareSynchronos.FileCache;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
 using Microsoft.AspNetCore.Http.Connections;
@@ -36,7 +36,7 @@ namespace MareSynchronos.WebAPI
 
         private readonly Configuration _pluginConfiguration;
         private readonly DalamudUtil _dalamudUtil;
-        private readonly FileDbManager _fileDbManager;
+        private readonly FileCacheManager _fileDbManager;
         private CancellationTokenSource _connectionCancellationTokenSource;
 
         private HubConnection? _mareHub;
@@ -49,7 +49,7 @@ namespace MareSynchronos.WebAPI
 
         public bool IsAdmin => _connectionDto?.IsAdmin ?? false;
 
-        public ApiController(Configuration pluginConfiguration, DalamudUtil dalamudUtil, FileDbManager fileDbManager)
+        public ApiController(Configuration pluginConfiguration, DalamudUtil dalamudUtil, FileCacheManager fileDbManager)
         {
             Logger.Verbose("Creating " + nameof(ApiController));
 

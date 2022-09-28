@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using MareSynchronos.API;
+using MareSynchronos.FileCache;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Utils;
@@ -17,7 +18,7 @@ public class OnlinePlayerManager : IDisposable
     private readonly DalamudUtil _dalamudUtil;
     private readonly IpcManager _ipcManager;
     private readonly PlayerManager _playerManager;
-    private readonly FileDbManager _fileDbManager;
+    private readonly FileCacheManager _fileDbManager;
     private readonly ConcurrentDictionary<string, CachedPlayer> _onlineCachedPlayers = new();
     private readonly ConcurrentDictionary<string, CharacterCacheDto> _temporaryStoredCharacterCache = new();
     private readonly ConcurrentDictionary<CachedPlayer, CancellationTokenSource> _playerTokenDisposal = new();
@@ -25,7 +26,7 @@ public class OnlinePlayerManager : IDisposable
     private List<string> OnlineVisiblePlayerHashes => _onlineCachedPlayers.Select(p => p.Value).Where(p => p.PlayerCharacter != IntPtr.Zero)
         .Select(p => p.PlayerNameHash).ToList();
 
-    public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager, PlayerManager playerManager, FileDbManager fileDbManager)
+    public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager, PlayerManager playerManager, FileCacheManager fileDbManager)
     {
         Logger.Verbose("Creating " + nameof(OnlinePlayerManager));
 

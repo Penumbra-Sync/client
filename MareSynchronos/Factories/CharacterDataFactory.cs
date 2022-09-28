@@ -8,7 +8,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Client.System.Resource;
 using MareSynchronos.API;
-using MareSynchronos.FileCacheDB;
+using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
 using MareSynchronos.Managers;
 using MareSynchronos.Models;
@@ -24,9 +24,9 @@ public class CharacterDataFactory
     private readonly DalamudUtil _dalamudUtil;
     private readonly IpcManager _ipcManager;
     private readonly TransientResourceManager transientResourceManager;
-    private readonly FileDbManager fileDbManager;
+    private readonly FileCacheManager fileDbManager;
 
-    public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager, TransientResourceManager transientResourceManager, FileDbManager fileDbManager)
+    public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager, TransientResourceManager transientResourceManager, FileCacheManager fileDbManager)
     {
         Logger.Verbose("Creating " + nameof(CharacterDataFactory));
         this.fileDbManager = fileDbManager;

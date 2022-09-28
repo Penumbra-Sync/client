@@ -1,6 +1,5 @@
 ﻿using Dalamud.Game.Command;
 using Dalamud.Plugin;
-using MareSynchronos.FileCacheDB;
 using MareSynchronos.Factories;
 using System.Threading.Tasks;
 using Dalamud.Game;
@@ -13,8 +12,8 @@ using MareSynchronos.WebAPI;
 using Dalamud.Interface.Windowing;
 using MareSynchronos.UI;
 using MareSynchronos.Utils;
-using System.Runtime.InteropServices;
 using Dalamud.Game.ClientState.Conditions;
+using MareSynchronos.FileCache;
 
 namespace MareSynchronos
 {
@@ -27,7 +26,7 @@ namespace MareSynchronos
         private readonly PeriodicFileScanner _periodicFileScanner;
         private readonly IntroUi _introUi;
         private readonly IpcManager _ipcManager;
-        public static DalamudPluginInterface PluginInterface { get; set; }
+        private readonly DalamudPluginInterface _pluginInterface;
         private readonly SettingsUi _settingsUi;
         private readonly WindowSystem _windowSystem;
         private PlayerManager? _playerManager;
@@ -36,7 +35,7 @@ namespace MareSynchronos
         private OnlinePlayerManager? _characterCacheManager;
         private readonly DownloadUi _downloadUi;
         private readonly FileDialogManager _fileDialogManager;
-        private readonly FileDbManager _fileDbManager;
+        private readonly FileCacheManager _fileDbManager;
         private readonly CompactUi _compactUi;
         private readonly UiShared _uiSharedComponent;
         private readonly Dalamud.Localization _localization;
@@ -46,10 +45,10 @@ namespace MareSynchronos
             Framework framework, ObjectTable objectTable, ClientState clientState, Condition condition)
         {
             Logger.Debug("Launching " + Name);
-            PluginInterface = pluginInterface;
+            _pluginInterface = pluginInterface;
             _commandManager = commandManager;
-            _configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-            _configuration.Initialize(PluginInterface);
+            _configuration = _pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+            _configuration.Initialize(_pluginInterface);
             _configuration.Migrate();
 
             _localization = new Dalamud.Localization("MareSynchronos.Localization.", "", true);
@@ -57,19 +56,17 @@ namespace MareSynchronos
 
             _windowSystem = new WindowSystem("MareSynchronos");
 
-            new FileCacheContext().Dispose(); // make sure db is initialized I guess
-
             // those can be initialized outside of game login
             _dalamudUtil = new DalamudUtil(clientState, objectTable, framework, condition);
 
-            _ipcManager = new IpcManager(PluginInterface, _dalamudUtil);
+            _ipcManager = new IpcManager(_pluginInterface, _dalamudUtil);
             _fileDialogManager = new FileDialogManager();
-            _fileDbManager = new FileDbManager(_ipcManager, _configuration);
+            _fileDbManager = new FileCacheManager(_ipcManager, _configuration, _pluginInterface.ConfigDirectory.FullName);
             _apiController = new ApiController(_configuration, _dalamudUtil, _fileDbManager);
             _periodicFileScanner = new PeriodicFileScanner(_ipcManager, _configuration, _fileDbManager, _apiController, _dalamudUtil);
 
             _uiSharedComponent =
-                new UiShared(_ipcManager, _apiController, _periodicFileScanner, _fileDialogManager, _configuration, _dalamudUtil, PluginInterface, _localization);
+                new UiShared(_ipcManager, _apiController, _periodicFileScanner, _fileDialogManager, _configuration, _dalamudUtil, _pluginInterface, _localization);
             _settingsUi = new SettingsUi(_windowSystem, _uiSharedComponent, _configuration, _apiController);
             _compactUi = new CompactUi(_windowSystem, _uiSharedComponent, _configuration, _apiController);
 
@@ -120,6 +117,7 @@ namespace MareSynchronos
             _compactUi?.Dispose();
 
             _periodicFileScanner?.Dispose();
+            _fileDbManager?.Dispose();
             _playerManager?.Dispose();
             _characterCacheManager?.Dispose();
             _ipcManager?.Dispose();
@@ -133,8 +131,8 @@ namespace MareSynchronos
         {
             Logger.Debug("Client login");
 
-            PluginInterface.UiBuilder.Draw += Draw;
-            PluginInterface.UiBuilder.OpenConfigUi += OpenUi;
+            _pluginInterface.UiBuilder.Draw += Draw;
+            _pluginInterface.UiBuilder.OpenConfigUi += OpenUi;
             _commandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
             {
                 HelpMessage = "Opens the Mare Synchronos UI"
@@ -157,8 +155,8 @@ namespace MareSynchronos
             _characterCacheManager?.Dispose();
             _playerManager?.Dispose();
             _transientResourceManager?.Dispose();
-            PluginInterface.UiBuilder.Draw -= Draw;
-            PluginInterface.UiBuilder.OpenConfigUi -= OpenUi;
+            _pluginInterface.UiBuilder.Draw -= Draw;
+            _pluginInterface.UiBuilder.OpenConfigUi -= OpenUi;
             _commandManager.RemoveHandler(CommandName);
         }
 

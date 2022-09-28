@@ -11,7 +11,7 @@ using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Plugin;
 using Dalamud.Utility;
 using ImGuiNET;
-using MareSynchronos.FileCacheDB;
+using MareSynchronos.FileCache;
 using MareSynchronos.Localization;
 using MareSynchronos.Managers;
 using MareSynchronos.Utils;
