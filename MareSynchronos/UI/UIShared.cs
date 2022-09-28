@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Dalamud.Interface;
@@ -163,6 +164,15 @@ namespace MareSynchronos.UI
                 if (ImGui.Button("Force Rescan##forcedrescan"))
                 {
                     _cacheScanner.InvokeScan(true);
+                }
+            }
+            else if (_cacheScanner.haltScanLocks.Any(f => f.Value > 0))
+            {
+                ImGui.Text("Halted (" + string.Join(", ", _cacheScanner.haltScanLocks.Where(f => f.Value > 0).Select(locker => locker.Key + ": " + locker.Value + " halt requests")) + ")");
+                ImGui.SameLine();
+                if (ImGui.Button("Reset halt requests##clearlocks"))
+                {
+                    _cacheScanner.ResetLocks();
                 }
             }
             else
@@ -455,7 +465,7 @@ namespace MareSynchronos.UI
                     {
                         _pluginConfiguration.CacheFolder = path;
                         _pluginConfiguration.Save();
-                        _cacheScanner.StartWatchers();
+                        _cacheScanner.StartScan();
                     }
                 });
             }

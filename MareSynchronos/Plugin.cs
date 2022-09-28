@@ -81,7 +81,7 @@ namespace MareSynchronos
             {
                 _introUi.IsOpen = false;
                 _compactUi.IsOpen = true;
-                _periodicFileScanner.StartWatchers();
+                _periodicFileScanner.StartScan();
                 ReLaunchCharacterManager();
             };
             _compactUi.OpenSettingsUi += () =>
@@ -146,6 +146,7 @@ namespace MareSynchronos
                 return;
             }
 
+            _periodicFileScanner.StartScan();
             ReLaunchCharacterManager();
         }
 

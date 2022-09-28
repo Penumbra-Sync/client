@@ -235,14 +235,14 @@ namespace MareSynchronos.Managers
 
             Task.Run(async () =>
             {
-                _periodicFileScanner.HaltScan();
+                _periodicFileScanner.HaltScan("Character creation");
                 foreach (var item in unprocessedObjects)
                 {
                     _dalamudUtil.WaitWhileCharacterIsDrawing("self " + item.ObjectKind.ToString(), item.Address, 10000, token);
                 }
 
                 CharacterCacheDto? cacheDto = (await CreateFullCharacterCacheDto(token));
-                _periodicFileScanner.ResumeScan();
+                _periodicFileScanner.ResumeScan("Character creation");
                 if (cacheDto == null || token.IsCancellationRequested) return;
 
 #if DEBUG

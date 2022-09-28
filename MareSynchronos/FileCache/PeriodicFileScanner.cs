@@ -17,9 +17,9 @@ public class PeriodicFileScanner : IDisposable
     private readonly FileCacheManager _fileDbManager;
     private readonly ApiController _apiController;
     private readonly DalamudUtil _dalamudUtil;
-    private int haltScanRequests = 0;
     private CancellationTokenSource? _scanCancellationTokenSource;
     private Task? _fileScannerTask = null;
+    public ConcurrentDictionary<string, int> haltScanLocks = new();
     public PeriodicFileScanner(IpcManager ipcManager, Configuration pluginConfiguration, FileCacheManager fileDbManager, ApiController apiController, DalamudUtil dalamudUtil)
     {
         Logger.Verbose("Creating " + nameof(PeriodicFileScanner));
@@ -30,32 +30,57 @@ public class PeriodicFileScanner : IDisposable
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
         _ipcManager.PenumbraInitialized += StartScan;
-        if (!string.IsNullOrEmpty(_ipcManager.PenumbraModDirectory()))
-        {
-            StartScan();
-        }
-        _apiController.DownloadStarted += HaltScan;
-        _apiController.DownloadFinished += ResumeScan;
-        _dalamudUtil.ZoneSwitchStart += HaltScan;
-        _dalamudUtil.ZoneSwitchEnd += ResumeScan;
+        _apiController.DownloadStarted += ApiHaltScan;
+        _apiController.DownloadFinished += ApiResumeScan;
+        _dalamudUtil.ZoneSwitchStart += ZoneSwitchHaltScan;
+        _dalamudUtil.ZoneSwitchEnd += ZoneSwitchResumeScan;
     }
 
-    public void ResumeScan()
+    private void ApiHaltScan()
     {
-        Interlocked.Decrement(ref haltScanRequests);
+        HaltScan("Download");
+    }
 
-        if (fileScanWasRunning && haltScanRequests == 0)
+    private void ApiResumeScan()
+    {
+        ResumeScan("Download");
+    }
+
+    private void ZoneSwitchHaltScan()
+    {
+        HaltScan("Zoning/Gpose");
+    }
+
+    private void ZoneSwitchResumeScan()
+    {
+        ResumeScan("Zoning/Gpose");
+    }
+
+    public void ResetLocks()
+    {
+        haltScanLocks.Clear();
+    }
+
+    public void ResumeScan(string source)
+    {
+        if (!haltScanLocks.ContainsKey(source)) haltScanLocks[source] = 0;
+
+        haltScanLocks[source]--;
+        if (haltScanLocks[source] < 0) haltScanLocks[source] = 0;
+
+        if (fileScanWasRunning && haltScanLocks.All(f => f.Value == 0))
         {
             fileScanWasRunning = false;
             InvokeScan(true);
         }
     }
 
-    public void HaltScan()
+    public void HaltScan(string source)
     {
-        Interlocked.Increment(ref haltScanRequests);
+        if (!haltScanLocks.ContainsKey(source)) haltScanLocks[source] = 0;
+        haltScanLocks[source]++;
 
-        if (IsScanRunning && haltScanRequests >= 0)
+        if (IsScanRunning && haltScanLocks.Any(f => f.Value > 0))
         {
             _scanCancellationTokenSource?.Cancel();
             fileScanWasRunning = true;
@@ -81,10 +106,10 @@ public class PeriodicFileScanner : IDisposable
         Logger.Verbose("Disposing " + nameof(PeriodicFileScanner));
 
         _ipcManager.PenumbraInitialized -= StartScan;
-        _apiController.DownloadStarted -= HaltScan;
-        _apiController.DownloadFinished -= ResumeScan;
-        _dalamudUtil.ZoneSwitchStart -= HaltScan;
-        _dalamudUtil.ZoneSwitchEnd -= ResumeScan;
+        _apiController.DownloadStarted -= ApiHaltScan;
+        _apiController.DownloadFinished -= ApiResumeScan;
+        _dalamudUtil.ZoneSwitchStart -= ZoneSwitchHaltScan;
+        _dalamudUtil.ZoneSwitchEnd -= ZoneSwitchResumeScan;
         _scanCancellationTokenSource?.Cancel();
     }
 
@@ -100,7 +125,7 @@ public class PeriodicFileScanner : IDisposable
         {
             while (!token.IsCancellationRequested)
             {
-                while (haltScanRequests > 0)
+                while (haltScanLocks.Any(f => f.Value > 0))
                 {
                     await Task.Delay(TimeSpan.FromSeconds(1));
                 }
@@ -123,11 +148,6 @@ public class PeriodicFileScanner : IDisposable
                 }
             }
         }, token);
-    }
-
-    internal void StartWatchers()
-    {
-        InvokeScan();
     }
 
     public bool RecalculateFileCacheSize()
@@ -306,10 +326,10 @@ public class PeriodicFileScanner : IDisposable
         }
     }
 
-    private void StartScan()
+    public void StartScan()
     {
         if (!_ipcManager.Initialized || !_pluginConfiguration.HasValidSetup()) return;
-        Logger.Verbose("Penumbra is active, configuration is valid, starting watchers and scan");
+        Logger.Verbose("Penumbra is active, configuration is valid, scan");
         InvokeScan(true);
     }
 }
