@@ -157,8 +157,11 @@ public class CachedPlayer
                 while ((toDownloadReplacements = TryCalculateModdedDictionary(out moddedPaths)).Count > 0 && attempts++ <= 10)
                 {
                     Logger.Debug("Downloading missing files for player " + PlayerName + ", kind: " + objectKind);
-                    await _apiController.DownloadFiles(downloadId, toDownloadReplacements, downloadToken);
-                    _apiController.CancelDownload(downloadId);
+                    if (toDownloadReplacements.Any())
+                    {
+                        await _apiController.DownloadFiles(downloadId, toDownloadReplacements, downloadToken);
+                        _apiController.CancelDownload(downloadId);
+                    }
                     if (downloadToken.IsCancellationRequested)
                     {
                         Logger.Verbose("Detected cancellation");

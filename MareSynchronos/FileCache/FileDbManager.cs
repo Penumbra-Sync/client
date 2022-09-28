@@ -50,7 +50,7 @@ public class FileCacheManager : IDisposable
                 var hash = splittedEntry[0];
                 var path = splittedEntry[1];
                 var time = splittedEntry[2];
-                FileCaches[hash] = new FileCache(hash, path, time);
+                FileCaches[path] = new FileCache(hash, path, time);
             }
         }
     }
@@ -58,7 +58,7 @@ public class FileCacheManager : IDisposable
     public void WriteOutFullCsv()
     {
         StringBuilder sb = new StringBuilder();
-        foreach (var entry in FileCaches)
+        foreach (var entry in FileCaches.OrderBy(f => f.Value.PrefixedFilePath))
         {
             sb.AppendLine(entry.Value.CsvEntry);
         }
@@ -68,7 +68,15 @@ public class FileCacheManager : IDisposable
         }
         lock (_fileWriteLock)
         {
-            File.WriteAllText(CsvPath, sb.ToString());
+            try
+            {
+                File.WriteAllText(CsvPath, sb.ToString());
+                File.Delete(CsvBakPath);
+            }
+            catch
+            {
+                File.WriteAllText(CsvBakPath, sb.ToString());
+            }
         }
     }
 
@@ -76,9 +84,9 @@ public class FileCacheManager : IDisposable
 
     public FileCache? GetFileCacheByHash(string hash)
     {
-        if (FileCaches.ContainsKey(hash))
+        if (FileCaches.Any(f => f.Value.Hash == hash))
         {
-            return GetValidatedFileCache(FileCaches[hash]);
+            return GetValidatedFileCache(FileCaches.FirstOrDefault(f => f.Value.Hash == hash).Value);
         }
 
         return null;
@@ -124,7 +132,7 @@ public class FileCacheManager : IDisposable
         var fullName = fi.FullName.ToLowerInvariant();
         if (!fullName.Contains(_configuration.CacheFolder.ToLowerInvariant())) return null;
         string prefixedPath = fullName.Replace(_configuration.CacheFolder.ToLowerInvariant(), CachePrefix + "\\").Replace("\\\\", "\\");
-        return CreateFileCacheEntity(fi, prefixedPath);
+        return CreateFileCacheEntity(fi, prefixedPath, fi.Name.ToUpper());
     }
 
     public FileCache? CreateFileEntry(string path)
@@ -138,16 +146,20 @@ public class FileCacheManager : IDisposable
         return CreateFileCacheEntity(fi, prefixedPath);
     }
 
-    private FileCache? CreateFileCacheEntity(FileInfo fileInfo, string prefixedPath)
+    private FileCache? CreateFileCacheEntity(FileInfo fileInfo, string prefixedPath, string? hash = null)
     {
-        var hash = Crypto.GetFileHash(fileInfo.FullName);
+        if (hash == null)
+        {
+            hash = Crypto.GetFileHash(fileInfo.FullName);
+        }
         var entity = new FileCache(hash, prefixedPath, fileInfo.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture));
-        FileCaches[hash] = entity;
+        entity = ReplacePathPrefixes(entity);
+        FileCaches[prefixedPath] = entity;
         lock (_fileWriteLock)
         {
             File.AppendAllLines(CsvPath, new[] { entity.CsvEntry });
         }
-        var result = GetFileCacheByPath(prefixedPath);
+        var result = GetFileCacheByPath(fileInfo.FullName);
         Logger.Debug("Creating file cache for " + fileInfo.FullName + " success: " + (result != null));
         return result;
     }
@@ -164,7 +176,7 @@ public class FileCacheManager : IDisposable
         var file = new FileInfo(fileCache.ResolvedFilepath);
         if (!file.Exists)
         {
-            FileCaches.Remove(fileCache.Hash, out _);
+            FileCaches.Remove(fileCache.PrefixedFilePath, out _);
             return null;
         }
 
@@ -183,10 +195,11 @@ public class FileCacheManager : IDisposable
 
     public void UpdateHash(FileCache fileCache)
     {
-        var prevHash = fileCache.Hash;
+        Logger.Debug("Updating hash for " + fileCache.ResolvedFilepath);
         fileCache.Hash = Crypto.GetFileHash(fileCache.ResolvedFilepath);
-        FileCaches.Remove(prevHash, out _);
-        FileCaches[fileCache.Hash] = fileCache;
+        fileCache.LastModifiedDateTicks = new FileInfo(fileCache.ResolvedFilepath).LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture);
+        FileCaches.Remove(fileCache.PrefixedFilePath, out _);
+        FileCaches[fileCache.PrefixedFilePath] = fileCache;
     }
 
     private FileCache ReplacePathPrefixes(FileCache fileCache)

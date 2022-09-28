@@ -76,6 +76,23 @@ namespace MareSynchronos.WebAPI
         public async Task DownloadFiles(int currentDownloadId, List<FileReplacementDto> fileReplacementDto, CancellationToken ct)
         {
             DownloadStarted?.Invoke();
+            try
+            {
+                await DownloadFilesInternal(currentDownloadId, fileReplacementDto, ct);
+            }
+            catch
+            {
+                CancelDownload(currentDownloadId);
+            }
+            finally
+            {
+                DownloadFinished?.Invoke();
+            }
+        }
+
+        private async Task DownloadFilesInternal(int currentDownloadId, List<FileReplacementDto> fileReplacementDto, CancellationToken ct)
+        {
+            DownloadStarted?.Invoke();
             Logger.Debug("Downloading files (Download ID " + currentDownloadId + ")");
 
             List<DownloadFileDto> downloadFileInfoFromService = new List<DownloadFileDto>();

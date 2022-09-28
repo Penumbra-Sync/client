@@ -201,27 +201,27 @@ public class PeriodicFileScanner : IDisposable
         ConcurrentBag<FileCache> entitiesToUpdate = new();
         try
         {
-            foreach (var value in _fileDbManager.GetAllFileCaches())
+            foreach (var cache in _fileDbManager.GetAllFileCaches())
             {
                 var idx = Task.WaitAny(dbTasks, ct);
                 dbTasks[idx] = Task.Run(() =>
                 {
                     try
                     {
-                        var result = _fileDbManager.ValidateFileCacheEntity(value);
-                        scannedFiles[result.Item2.ResolvedFilepath] = true;
-                        if (result.Item1 == FileState.RequireUpdate)
+                        var validatedCacheResult = _fileDbManager.ValidateFileCacheEntity(cache);
+                        scannedFiles[validatedCacheResult.Item2.ResolvedFilepath] = true;
+                        if (validatedCacheResult.Item1 == FileState.RequireUpdate)
                         {
-                            entitiesToUpdate.Add(result.Item2);
+                            entitiesToUpdate.Add(validatedCacheResult.Item2);
                         }
-                        else if (result.Item1 == FileState.RequireDeletion)
+                        else if (validatedCacheResult.Item1 == FileState.RequireDeletion)
                         {
-                            entitiesToRemove.Add(result.Item2);
+                            entitiesToRemove.Add(validatedCacheResult.Item2);
                         }
                     }
                     catch (Exception ex)
                     {
-                        Logger.Warn("Failed validating " + value.ResolvedFilepath);
+                        Logger.Warn("Failed validating " + cache.ResolvedFilepath);
                         Logger.Warn(ex.Message);
                         Logger.Warn(ex.StackTrace);
                     }
@@ -278,6 +278,7 @@ public class PeriodicFileScanner : IDisposable
                 {
                     Logger.Warn("Failed adding " + c.Key);
                     Logger.Warn(ex.Message);
+                    Logger.Warn(ex.StackTrace);
                 }
 
                 Interlocked.Increment(ref currentFileProgress);

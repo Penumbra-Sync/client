@@ -8,10 +8,10 @@ namespace MareSynchronos.FileCache;
 
 public class FileCache
 {
-    public string ResolvedFilepath { get; private set; }
+    public string ResolvedFilepath { get; private set; } = string.Empty;
     public string Hash { get; set; }
     public string PrefixedFilePath { get; init; }
-    public string LastModifiedDateTicks { get; init; }
+    public string LastModifiedDateTicks { get; set; }
 
     public FileCache(string hash, string path, string lastModifiedDateTicks)
     {
