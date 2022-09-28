@@ -47,10 +47,17 @@ public class FileCacheManager : IDisposable
             foreach (var entry in entries)
             {
                 var splittedEntry = entry.Split(CsvSplit, StringSplitOptions.None);
-                var hash = splittedEntry[0];
-                var path = splittedEntry[1];
-                var time = splittedEntry[2];
-                FileCaches[path] = new FileCache(hash, path, time);
+                try
+                {
+                    var hash = splittedEntry[0];
+                    var path = splittedEntry[1];
+                    var time = splittedEntry[2];
+                    FileCaches[path] = new FileCache(hash, path, time);
+                }
+                catch (Exception)
+                {
+                    Logger.Warn($"Failed to initialize entry {entry}, ignoring");
+                }
             }
         }
     }
