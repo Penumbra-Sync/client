@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Authors></Authors>
     <Company></Company>
-    <Version>0.4.19</Version>
+    <Version>0.4.20</Version>
     <Description></Description>
     <Copyright></Copyright>
     <PackageProjectUrl>https://github.com/Penumbra-Sync/client</PackageProjectUrl>
@@ -85,9 +85,5 @@
     <EmbeddedResource Include="Localization\de.json" />
     <EmbeddedResource Include="Localization\fr.json" />
   </ItemGroup>
-
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\alpine-x64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-arm&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-arm64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-armel&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-mips64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-musl-x64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-x64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-x86&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\linux-s390x&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\osx-x64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\osx-arm64&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\win-arm&#xD;&#xA;rmdir /S /Q $(ProjectDir)$(OutDir)runtimes\win-arm64&#xD;&#xA;if $(ConfigurationName) == Debug (&#xD;&#xA;del /Q $(ProjectDir)$(OutDir)Mare.7z&#xD;&#xA;&quot;C:\Program Files\7-zip\7z.exe&quot; a $(ProjectDir)$(OutDir)Mare.7z $(ProjectDir)$(OutDir)*&#xD;&#xA;)" />
-  </Target>
 
 </Project>
