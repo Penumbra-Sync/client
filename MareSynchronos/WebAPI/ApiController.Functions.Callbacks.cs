@@ -77,11 +77,40 @@ public partial class ApiController
 
     private void GroupPairChangedCallback(GroupPairDto dto)
     {
+        if (dto.IsRemoved.GetValueOrDefault(false))
+        {
+            GroupPairedClients.RemoveAll(g => g.GroupGID == dto.GroupGID && g.UserUID == dto.UserUID);
+        }
 
+        var existingUser = GroupPairedClients.FirstOrDefault(f => f.GroupGID == dto.GroupGID && f.UserUID == dto.UserUID);
+        if (existingUser == null)
+        {
+            GroupPairedClients.Add(dto);
+            return;
+        }
+
+        existingUser.IsPaused = dto.IsPaused ?? existingUser.IsPaused;
+        existingUser.UserAlias = dto.UserAlias ?? existingUser.UserAlias;
     }
 
     private void GroupChangedCallback(GroupDto dto)
     {
+        if (dto.IsDeleted.GetValueOrDefault(false))
+        {
+            Groups.RemoveAll(g => g.GID == dto.GID);
+            GroupPairedClients.RemoveAll(g => g.GroupGID == dto.GID);
+            return;
+        }
 
+        var existingGroup = Groups.FirstOrDefault(g => g.GID == dto.GID);
+        if (existingGroup == null)
+        {
+            Groups.Add(dto);
+            return;
+        }
+
+        existingGroup.OwnedBy = dto.OwnedBy ?? existingGroup.OwnedBy;
+        existingGroup.InvitesEnabled = dto.InvitesEnabled ?? existingGroup.InvitesEnabled;
+        existingGroup.IsPaused = dto.IsPaused ?? existingGroup.IsPaused;
     }
 }

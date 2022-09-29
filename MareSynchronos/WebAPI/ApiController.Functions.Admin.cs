@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using MareSynchronos.API;
 using Microsoft.AspNetCore.SignalR.Client;
