@@ -13,13 +13,12 @@ namespace MareSynchronos.WebAPI
             _ = CreateConnections();
         }
 
-        private void UpdateLocalClientPairsCallback(ClientPairDto dto, string characterIdentifier)
+        private void UpdateLocalClientPairsCallback(ClientPairDto dto)
         {
             var entry = PairedClients.SingleOrDefault(e => e.OtherUID == dto.OtherUID);
             if (dto.IsRemoved)
             {
                 PairedClients.RemoveAll(p => p.OtherUID == dto.OtherUID);
-                UnpairedFromOther?.Invoke(characterIdentifier);
                 return;
             }
             if (entry == null)
@@ -28,20 +27,9 @@ namespace MareSynchronos.WebAPI
                 return;
             }
 
-            if ((entry.IsPausedFromOthers != dto.IsPausedFromOthers || entry.IsSynced != dto.IsSynced || entry.IsPaused != dto.IsPaused)
-                && !dto.IsPaused && dto.IsSynced && !dto.IsPausedFromOthers)
-            {
-                PairedWithOther?.Invoke(characterIdentifier);
-            }
-
             entry.IsPaused = dto.IsPaused;
             entry.IsPausedFromOthers = dto.IsPausedFromOthers;
             entry.IsSynced = dto.IsSynced;
-
-            if (dto.IsPaused || dto.IsPausedFromOthers || !dto.IsSynced)
-            {
-                UnpairedFromOther?.Invoke(characterIdentifier);
-            }
         }
 
         private Task ReceiveCharacterDataCallback(CharacterCacheDto character, string characterHash)
