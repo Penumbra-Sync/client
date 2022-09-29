@@ -201,15 +201,9 @@ namespace MareSynchronos
 
         private void OnCommand(string command, string args)
         {
-            if (string.IsNullOrEmpty(args))
-            {
-                OpenUi();
-                return;
-            }
+            var splitArgs = args?.ToLowerInvariant().Trim().Split();
 
-            var splitArgs = args.ToLowerInvariant().Trim().Split();
-
-            if (splitArgs.Length == 0)
+            if (splitArgs == null || splitArgs.Length == 0)
             {
                 // Interpret this as toggling the UI
                 OpenUi();
