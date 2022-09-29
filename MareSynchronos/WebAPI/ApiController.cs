@@ -118,6 +118,7 @@ public partial class ApiController : IDisposable
         .ToDictionary(k => k.Key, k => k.Value);
 
     public string UID => _connectionDto?.UID ?? string.Empty;
+    public string DisplayName => string.IsNullOrEmpty(_connectionDto?.Alias) ? (_connectionDto?.UID ?? string.Empty) : _connectionDto.Alias;
     private string ApiUri => _pluginConfiguration.ApiUri;
     public int OnlineUsers => SystemInfoDto.OnlineUsers;
 
@@ -268,6 +269,7 @@ public partial class ApiController : IDisposable
         PairedClients =
             await _mareHub!.InvokeAsync<List<ClientPairDto>>(Api.InvokeUserGetPairedClients, token);
         Groups = await GetGroups();
+        GroupPairedClients.Clear();
         foreach (var group in Groups)
         {
             GroupPairedClients.AddRange(await GetUsersInGroup(group.GID));

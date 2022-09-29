@@ -1,8 +1,10 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using MareSynchronos.API;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
+using Microsoft.AspNetCore.SignalR.Client;
 
 namespace MareSynchronos.WebAPI;
 
@@ -80,6 +82,7 @@ public partial class ApiController
         if (dto.IsRemoved.GetValueOrDefault(false))
         {
             GroupPairedClients.RemoveAll(g => g.GroupGID == dto.GroupGID && g.UserUID == dto.UserUID);
+            return;
         }
 
         var existingUser = GroupPairedClients.FirstOrDefault(f => f.GroupGID == dto.GroupGID && f.UserUID == dto.UserUID);
@@ -93,7 +96,7 @@ public partial class ApiController
         existingUser.UserAlias = dto.UserAlias ?? existingUser.UserAlias;
     }
 
-    private void GroupChangedCallback(GroupDto dto)
+    private async Task GroupChangedCallback(GroupDto dto)
     {
         if (dto.IsDeleted.GetValueOrDefault(false))
         {
@@ -106,6 +109,7 @@ public partial class ApiController
         if (existingGroup == null)
         {
             Groups.Add(dto);
+            GroupPairedClients.AddRange(await _mareHub!.InvokeAsync<List<GroupPairDto>>(Api.InvokeGroupGetUsersInGroup, dto.GID));
             return;
         }
 

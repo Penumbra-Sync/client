@@ -206,46 +206,6 @@ public sealed class Plugin : IDalamudPlugin
         {
             OpenUi();
         }
-
-        var parsed = args.Split(" ", StringSplitOptions.RemoveEmptyEntries);
-
-        if (parsed[0] == "creategroup")
-        {
-            var groupDto = _apiController.CreateGroup().Result;
-            PluginLog.Debug("GID:" + groupDto.GID);
-            PluginLog.Debug("PW:" + groupDto.Password);
-        }
-
-        if (parsed[0] == "joingroup" && parsed.Length == 3)
-        {
-            _ = _apiController.SendGroupJoin(parsed[1], parsed[2]);
-        }
-
-        if (parsed[0] == "listgroups")
-        {
-            foreach (var grp in _apiController.Groups)
-            {
-                PluginLog.Debug("GID: " + grp.GID);
-                PluginLog.Debug("OwnedBy: " + grp.OwnedBy);
-                PluginLog.Debug("Alias: " + grp.Alias);
-                PluginLog.Debug("Invites Enabled: " + grp.InvitesEnabled);
-                PluginLog.Debug("IsPaused: " + grp.IsPaused);
-                PluginLog.Debug("===");
-            }
-        }
-
-        if (parsed[0] == "listgroupusers")
-        {
-            foreach (var grp in _apiController.GroupPairedClients)
-            {
-                PluginLog.Debug("GID: " + grp.GroupGID);
-                PluginLog.Debug("UID: " + grp.UserUID);
-                PluginLog.Debug("Alias: " + grp.UserAlias);
-                PluginLog.Debug("IsPaused: " + grp.IsPaused);
-                PluginLog.Debug("===");
-            }
-
-        }
     }
 
     private void OpenUi()
