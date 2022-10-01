@@ -39,8 +39,8 @@ public class UiShared : IDisposable
     public bool EditTrackerPosition { get; set; }
     public ImFontPtr UidFont { get; private set; }
     public bool UidFontBuilt { get; private set; }
-
     public static bool CtrlPressed() => (GetKeyState(0xA2) & 0x8000) != 0 || (GetKeyState(0xA3) & 0x8000) != 0;
+    public static bool ShiftPressed() => (GetKeyState(0xA1) & 0x8000) != 0 || (GetKeyState(0xA0) & 0x8000) != 0;
 
     public ApiController ApiController => _apiController;
 
@@ -88,8 +88,8 @@ public class UiShared : IDisposable
             }
             catch (Exception ex)
             {
-                Logger.Debug($"Font failed to load. {fontFile}");
-                Logger.Debug(ex.ToString());
+                Logger.Warn($"Font failed to load. {fontFile}");
+                Logger.Warn(ex.ToString());
             }
         }
         else

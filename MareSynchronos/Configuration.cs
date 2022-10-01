@@ -57,7 +57,7 @@ public class Configuration : IPluginConfiguration
     public Dictionary<string, string> ClientSecret { get; set; } = new();
     public Dictionary<string, string> CustomServerList { get; set; } = new();
     public int MaxLocalCacheInGiB { get; set; } = 20;
-    public bool ReverseUserSort { get; set; } = true;
+    public bool ReverseUserSort { get; set; } = false;
 
     public int TimeSpanBetweenScansInSeconds { get; set; } = 30;
     public bool FileScanPaused { get; set; } = false;

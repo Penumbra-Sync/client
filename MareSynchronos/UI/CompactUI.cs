@@ -47,6 +47,8 @@ public class CompactUi : Window, IDisposable
     private bool _errorGroupJoin;
     private bool _errorGroupCreate = false;
     private GroupCreatedDto? _lastCreatedGroup = null;
+    private Dictionary<string, bool> ExpandedGroupState = new Dictionary<string, bool>();
+    private bool showSyncShells = false;
 
     public CompactUi(WindowSystem windowSystem,
         UiShared uiShared, Configuration configuration, ApiController apiController) : base("###MareSynchronosMainUI")
@@ -101,20 +103,52 @@ public class CompactUi : Window, IDisposable
 
         if (_apiController.ServerState is ServerState.Connected)
         {
-            ImGui.Separator();
-            if (ImGui.BeginTabBar("maintabs"))
+            var hasShownSyncShells = showSyncShells;
+
+            ImGui.PushFont(UiBuilder.IconFont);
+            if (!hasShownSyncShells)
             {
-                if (ImGui.BeginTabItem("Individuals"))
-                {
-                    UiShared.DrawWithID("pairlist", DrawPairList);
-                    ImGui.EndTabItem();
-                }
-                if (ImGui.BeginTabItem("Syncshells"))
-                {
-                    UiShared.DrawWithID("synchshells", DrawSyncshells);
-                    ImGui.EndTabItem();
-                }
-                ImGui.EndTabBar();
+                ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonHovered]);
+            }
+            if (ImGui.Button(FontAwesomeIcon.User.ToIconString(), new Vector2((UiShared.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X) / 2, 30)))
+            {
+                showSyncShells = false;
+            }
+            if (!hasShownSyncShells)
+            {
+                ImGui.PopStyleColor();
+            }
+            ImGui.PopFont();
+            UiShared.AttachToolTip("Individual pairs");
+
+            ImGui.SameLine();
+
+            ImGui.PushFont(UiBuilder.IconFont);
+            if (hasShownSyncShells)
+            {
+                ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonHovered]);
+            }
+            if (ImGui.Button(FontAwesomeIcon.UserFriends.ToIconString(), new Vector2((UiShared.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X) / 2, 30)))
+            {
+                showSyncShells = true;
+            }
+            if (hasShownSyncShells)
+            {
+                ImGui.PopStyleColor();
+            }
+            ImGui.PopFont();
+
+            UiShared.AttachToolTip("Syncshells");
+
+            ImGui.Separator();
+            if (!hasShownSyncShells)
+            {
+                UiShared.DrawWithID("pairlist", DrawPairList);
+            }
+            else
+            {
+                UiShared.DrawWithID("syncshells", DrawSyncshells);
+
             }
             ImGui.Separator();
             UiShared.DrawWithID("transfers", DrawTransfers);
@@ -132,7 +166,7 @@ public class CompactUi : Window, IDisposable
     {
         var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Plus);
         ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonSize.X);
-        ImGui.InputTextWithHint("##otheruid", "Other players UID", ref _pairToAdd, 10);
+        ImGui.InputTextWithHint("##otheruid", "Other players UID/GID", ref _pairToAdd, 10);
         ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
         if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
         {
@@ -158,7 +192,7 @@ public class CompactUi : Window, IDisposable
                 _configuration.ReverseUserSort = true;
                 _configuration.Save();
             }
-            UiShared.AttachToolTip("Sort by newest additions first");
+            UiShared.AttachToolTip("Sort by name descending");
         }
         else
         {
@@ -167,7 +201,7 @@ public class CompactUi : Window, IDisposable
                 _configuration.ReverseUserSort = false;
                 _configuration.Save();
             }
-            UiShared.AttachToolTip("Sort by oldest additions first");
+            UiShared.AttachToolTip("Sort by name ascending");
         }
         ImGui.SameLine();
 
@@ -366,7 +400,7 @@ public class CompactUi : Window, IDisposable
     private void DrawSyncshells()
     {
         UiShared.DrawWithID("addsyncshell", DrawAddSyncshell);
-        UiShared.DrawWithID("syncshells", DrawSyncshellList);
+        UiShared.DrawWithID("syncshelllist", DrawSyncshellList);
         _transferPartHeight = ImGui.GetCursorPosY();
     }
 
@@ -385,6 +419,7 @@ public class CompactUi : Window, IDisposable
             : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - _transferPartHeight - ImGui.GetCursorPosY();
         var users = GetFilteredUsers();
 
+        users = users.OrderBy(u => _configuration.GetCurrentServerUidComments().ContainsKey(u.OtherUID) ? _configuration.GetCurrentServerUidComments()[u.OtherUID] : !string.IsNullOrEmpty(u.VanityUID) ? u.VanityUID : u.OtherUID);
         if (_configuration.ReverseUserSort) users = users.Reverse();
 
         ImGui.BeginChild("list", new Vector2(_windowContentWidth, ySize), false);
@@ -399,7 +434,7 @@ public class CompactUi : Window, IDisposable
     {
         var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Plus);
         ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonSize.X);
-        ImGui.InputTextWithHint("##otheruid", "Syncshell ID", ref _syncShellToJoin, 20);
+        ImGui.InputTextWithHint("##syncshellid", "Syncshell GID/Alias", ref _syncShellToJoin, 20);
         ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
         if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
         {
@@ -495,40 +530,62 @@ public class CompactUi : Window, IDisposable
             ? 1
             : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - _transferPartHeight - ImGui.GetCursorPosY();
         ImGui.BeginChild("list", new Vector2(_windowContentWidth, ySize), false);
-        foreach (var entry in _apiController.Groups.ToList())
+        foreach (var entry in _apiController.Groups.OrderBy(g => g.Alias ?? g.GID).ToList())
         {
             UiShared.DrawWithID(entry.GID, () => DrawSyncshell(entry));
         }
         ImGui.EndChild();
     }
 
-    private void DrawSyncshell(GroupDto entry)
+    private void DrawSyncshell(GroupDto group)
     {
-        var name = entry.Alias ?? entry.GID;
-        var pairsInGroup = _apiController.GroupPairedClients.Where(p => p.GroupGID == entry.GID).ToList();
-        if (ImGui.CollapsingHeader(name + " (" + (pairsInGroup.Count + 1) + " users)", ImGuiTreeNodeFlags.DefaultOpen | ImGuiTreeNodeFlags.SpanAvailWidth))
+        var name = group.Alias ?? group.GID;
+        var pairsInGroup = _apiController.GroupPairedClients.Where(p => p.GroupGID == group.GID).ToList();
+        if (!ExpandedGroupState.TryGetValue(group.GID, out bool isExpanded))
         {
-            UiShared.DrawWithID(entry.GID + "settings", () => DrawSyncshellHeader(entry, name));
-            pairsInGroup = pairsInGroup.OrderBy(p => p.UserUID == entry.OwnedBy ? 0 : 1).ThenBy(p => p.UserAlias ?? p.UserUID).ToList();
+            isExpanded = false;
+            ExpandedGroupState.Add(group.GID, isExpanded);
+        }
+        var icon = isExpanded ? FontAwesomeIcon.CaretSquareDown : FontAwesomeIcon.CaretSquareRight;
+        var collapseButton = UiShared.GetIconButtonSize(icon);
+        ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0, 0, 0, 0));
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0, 0, 0, 0));
+        if (ImGuiComponents.IconButton(icon))
+        {
+            ExpandedGroupState[group.GID] = !ExpandedGroupState[group.GID];
+        }
+        ImGui.PopStyleColor(2);
+        ImGui.SameLine();
+        var pauseIcon = (group.IsPaused ?? false) ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
+        if (ImGuiComponents.IconButton(pauseIcon))
+        {
+            _ = _apiController.SendPauseGroup(group.GID, !group.IsPaused ?? false);
+        }
+        UiShared.AttachToolTip(((group.IsPaused ?? false) ? "Resume" : "Pause") + " pairing with all users in this Syncshell");
+        ImGui.SameLine();
+        ImGui.TextUnformatted(group.Alias ?? group.GID);
+        UiShared.AttachToolTip("Users: " + (pairsInGroup.Count + 1) + ", Owner: " + group.OwnedBy);
+
+        ImGui.Indent(collapseButton.X + ImGui.GetStyle().ItemSpacing.X);
+        if (ExpandedGroupState[group.GID])
+        {
+            UiShared.DrawWithID(group.GID + "settings", () => DrawSyncShellButtons(group, name));
+            pairsInGroup = pairsInGroup.OrderBy(p => p.UserUID == group.OwnedBy ? 0 : 1).ThenBy(p => p.UserAlias ?? p.UserUID).ToList();
             foreach (var pair in pairsInGroup)
             {
-                ImGui.Indent(20);
-                UiShared.DrawWithID(entry.GID + pair.UserUID, () => DrawSyncshellPairedClient(pair));
-                ImGui.Unindent(20);
+                ImGui.Indent(ImGui.GetStyle().ItemSpacing.X / 2);
+                UiShared.DrawWithID(group.GID + pair.UserUID, () => DrawSyncshellPairedClient(pair, group.OwnedBy == _apiController.UID, group?.IsPaused ?? false));
+                ImGui.Unindent(ImGui.GetStyle().ItemSpacing.X / 2);
             }
         }
+        ImGui.Unindent(collapseButton.X + ImGui.GetStyle().ItemSpacing.X);
     }
 
-    private void DrawSyncshellHeader(GroupDto entry, string name)
+    private void DrawSyncShellButtons(GroupDto entry, string name)
     {
         bool invitesEnabled = entry.InvitesEnabled ?? true;
         var lockedIcon = invitesEnabled ? FontAwesomeIcon.LockOpen : FontAwesomeIcon.Lock;
 
-        ImGui.PushFont(UiBuilder.IconFont);
-        ImGui.Text(FontAwesomeIcon.Crown.ToIconString());
-        ImGui.PopFont();
-        ImGui.SameLine();
-        UiShared.TextWrapped("Syncshell owner: " + entry.OwnedBy ?? string.Empty);
         if (ImGuiComponents.IconButton(FontAwesomeIcon.ArrowCircleLeft))
         {
             if (UiShared.CtrlPressed())
@@ -537,13 +594,7 @@ public class CompactUi : Window, IDisposable
             }
         }
         UiShared.AttachToolTip("Hold CTRL and click to leave this Syncshell");
-        ImGui.SameLine();
-        var pauseIcon = (entry.IsPaused ?? false) ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
-        if (ImGuiComponents.IconButton(pauseIcon))
-        {
-            _ = _apiController.SendPauseGroup(entry.GID, !entry.IsPaused ?? false);
-        }
-        UiShared.AttachToolTip(((entry.IsPaused ?? false) ? "Resume" : "Pause") + " pairing with all users in this Syncshell");
+
         ImGui.SameLine();
         if (ImGuiComponents.IconButton(FontAwesomeIcon.Copy))
         {
@@ -557,7 +608,7 @@ public class CompactUi : Window, IDisposable
             {
                 _ = _apiController.SendGroupChangeInviteState(entry.GID, !entry.InvitesEnabled ?? true);
             }
-            UiShared.AttachToolTip("Change Syncshell invite state, invites currently " + (invitesEnabled ? "open" : "closed"));
+            UiShared.AttachToolTip("Change Syncshell joining permissions" + Environment.NewLine + "Syncshell is currently " + (invitesEnabled ? "open" : "closed") + " for people to join");
             ImGui.SameLine();
             if (ImGuiComponents.IconButton(FontAwesomeIcon.Passport))
             {
@@ -596,7 +647,8 @@ public class CompactUi : Window, IDisposable
                     _ = _apiController.SendDeleteGroup(entry.GID);
                 }
             }
-            UiShared.AttachToolTip("Hold CTRL and click to delete this Syncshell. WARNING: this action is irreversible.");
+            UiShared.AttachToolTip("Hold CTRL and click to delete this Syncshell. WARNING: this action is irreversible."
+                + Environment.NewLine + "Leaving an owned Syncshell will transfer the ownership to a random person in the Syncshell.");
         }
         else
         {
@@ -605,13 +657,15 @@ public class CompactUi : Window, IDisposable
             ImGui.PushFont(UiBuilder.IconFont);
             ImGui.Text(lockedIcon.ToIconString());
             ImGui.PopFont();
-            UiShared.AttachToolTip(invitesEnabled ? "Group is open for new joiners" : "Group is closed for new joiners");
+            UiShared.AttachToolTip(invitesEnabled ? "Syncshell is open for new joiners" : "Syncshell is closed for new joiners");
         }
     }
 
-    private void DrawSyncshellPairedClient(GroupPairDto entry)
+    private void DrawSyncshellPairedClient(GroupPairDto entry, bool isOwner, bool isPausedByYou)
     {
         var plusButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Plus);
+        var trashButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Trash);
+        var crownButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Crown);
         var entryUID = string.IsNullOrEmpty(entry.UserAlias) ? entry.UserUID : entry.UserAlias;
         var textSize = ImGui.CalcTextSize(entryUID);
         var originalY = ImGui.GetCursorPosY();
@@ -619,7 +673,7 @@ public class CompactUi : Window, IDisposable
 
         var textPos = originalY + plusButtonSize.Y / 2 - textSize.Y / 2;
         ImGui.SetCursorPosY(textPos);
-        if (entry.IsPaused ?? false)
+        if (isPausedByYou || (entry.IsPaused ?? false))
         {
             ImGui.PushFont(UiBuilder.IconFont);
             UiShared.ColorText(FontAwesomeIcon.PauseCircle.ToIconString(), ImGuiColors.DalamudYellow);
@@ -703,10 +757,37 @@ public class CompactUi : Window, IDisposable
             UiShared.AttachToolTip("Hit ENTER to save\nRight click to cancel");
         }
 
-        ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - plusButtonSize.X);
-        ImGui.SetCursorPosY(originalY);
-        if (!_apiController.PairedClients.Any(p => p.OtherUID == entry.UserUID))
+        bool addButtonShown = !_apiController.PairedClients.Any(p => p.OtherUID == entry.UserUID);
+        if (isOwner)
         {
+            ImGui.SetCursorPosY(originalY);
+            var subtractedWidth = addButtonShown ? (ImGui.GetStyle().ItemSpacing.X + plusButtonSize.X) : 0;
+            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - subtractedWidth - trashButtonSize.X - ImGui.GetStyle().ItemSpacing.X - crownButtonSize.X);
+
+            if (ImGuiComponents.IconButton(FontAwesomeIcon.Crown))
+            {
+                if (UiShared.CtrlPressed() && UiShared.ShiftPressed())
+                {
+                    _ = _apiController.ChangeOwnerOfGroup(entry.GroupGID, entry.UserUID);
+                }
+            }
+            UiShared.AttachToolTip("Hold CTRL and SHIFT and click to transfer ownership of this Syncshell to " + (entry.UserAlias ?? entry.UserUID) + Environment.NewLine + "WARNING: This action is irreversible.");
+            ImGui.SameLine();
+            if (ImGuiComponents.IconButton(FontAwesomeIcon.Trash))
+            {
+                if (UiShared.CtrlPressed())
+                {
+                    _ = _apiController.SendRemoveUserFromGroup(entry.GroupGID, entry.UserUID);
+                }
+            }
+            UiShared.AttachToolTip("Hold CTRL and click to remove user " + (entry.UserAlias ?? entry.UserUID) + " from Syncshell");
+        }
+
+        if (addButtonShown)
+        {
+            ImGui.SetCursorPosY(originalY);
+            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - plusButtonSize.X);
+
             if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
             {
                 _ = _apiController.SendPairedClientAddition(entry.UserUID);

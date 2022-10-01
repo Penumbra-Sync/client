@@ -235,14 +235,22 @@ public class PlayerManager : IDisposable
 
         Task.Run(async () =>
         {
-            _periodicFileScanner.HaltScan("Character creation");
-            foreach (var item in unprocessedObjects)
+            CharacterCacheDto? cacheDto = null;
+            try
             {
-                _dalamudUtil.WaitWhileCharacterIsDrawing("self " + item.ObjectKind.ToString(), item.Address, 10000, token);
-            }
+                _periodicFileScanner.HaltScan("Character creation");
+                foreach (var item in unprocessedObjects)
+                {
+                    _dalamudUtil.WaitWhileCharacterIsDrawing("self " + item.ObjectKind.ToString(), item.Address, 10000, token);
+                }
 
-            CharacterCacheDto? cacheDto = (await CreateFullCharacterCacheDto(token));
-            _periodicFileScanner.ResumeScan("Character creation");
+                cacheDto = (await CreateFullCharacterCacheDto(token));
+            }
+            catch { }
+            finally
+            {
+                _periodicFileScanner.ResumeScan("Character creation");
+            }
             if (cacheDto == null || token.IsCancellationRequested) return;
 
 #if DEBUG
