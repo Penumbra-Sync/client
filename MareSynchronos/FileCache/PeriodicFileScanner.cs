@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -203,13 +204,13 @@ public class PeriodicFileScanner : IDisposable
         Logger.Debug("Getting files from " + penumbraDir + " and " + _pluginConfiguration.CacheFolder);
         string[] ext = { ".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp" };
 
-        var scannedFiles = Directory.EnumerateFiles(penumbraDir, "*.*", SearchOption.AllDirectories)
+        var scannedFiles = new ConcurrentDictionary<string, bool>(Directory.EnumerateFiles(penumbraDir, "*.*", SearchOption.AllDirectories)
                             .Select(s => s.ToLowerInvariant())
                             .Where(f => ext.Any(e => f.EndsWith(e)) && !f.Contains(@"\bg\") && !f.Contains(@"\bgcommon\") && !f.Contains(@"\ui\"))
                             .Concat(Directory.EnumerateFiles(_pluginConfiguration.CacheFolder, "*.*", SearchOption.TopDirectoryOnly)
                                 .Where(f => new FileInfo(f).Name.Length == 40)
                                 .Select(s => s.ToLowerInvariant()).ToList())
-                            .ToDictionary(c => c, c => false);
+                            .Select(c => new KeyValuePair<string, bool>(c, false)));
 
         TotalFiles = scannedFiles.Count;
 

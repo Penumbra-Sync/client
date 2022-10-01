@@ -80,10 +80,6 @@ public partial class ApiController : IDisposable
     public event SimpleStringDelegate? PairedClientOffline;
 
     public event SimpleStringDelegate? PairedClientOnline;
-
-    public event SimpleStringDelegate? PairedWithOther;
-
-    public event SimpleStringDelegate? UnpairedFromOther;
     public event VoidDelegate? DownloadStarted;
     public event VoidDelegate? DownloadFinished;
 
