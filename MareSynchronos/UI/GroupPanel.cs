@@ -1,0 +1,495 @@
+﻿using Dalamud.Interface.Colors;
+using Dalamud.Interface.Components;
+using Dalamud.Interface;
+using Dalamud.Utility;
+using ImGuiNET;
+using MareSynchronos.API;
+using MareSynchronos.WebAPI;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Numerics;
+
+namespace MareSynchronos.UI
+{
+    internal class GroupPanel
+    {
+        private readonly CompactUi _mainUi;
+        private UiShared _uiShared;
+        private Configuration _configuration;
+        private ApiController _apiController;
+
+        private readonly Dictionary<string, bool> _showGidForEntry = new();
+        private string _editGroupEntry = string.Empty;
+        private string _editGroupComment = string.Empty;
+        private string _syncShellPassword = string.Empty;
+        private string _syncShellToJoin = string.Empty;
+
+        private bool _showModalEnterPassword;
+        private bool _showModalCreateGroup;
+        private bool _showModalChangePassword;
+        private string _newSyncShellPassword = string.Empty;
+        private bool _isPasswordValid;
+        private bool _errorGroupJoin;
+        private bool _errorGroupCreate = false;
+        private GroupCreatedDto? _lastCreatedGroup = null;
+        private Dictionary<string, bool> ExpandedGroupState = new Dictionary<string, bool>();
+
+        public GroupPanel(CompactUi mainUi, UiShared uiShared, Configuration configuration, ApiController apiController)
+        {
+            _mainUi = mainUi;
+            _uiShared = uiShared;
+            _configuration = configuration;
+            _apiController = apiController;
+        }
+
+        public void DrawSyncshells()
+        {
+            UiShared.DrawWithID("addsyncshell", DrawAddSyncshell);
+            UiShared.DrawWithID("syncshelllist", DrawSyncshellList);
+            _mainUi.TransferPartHeight = ImGui.GetCursorPosY();
+        }
+
+        private void DrawAddSyncshell()
+        {
+            var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Plus);
+            ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonSize.X);
+            ImGui.InputTextWithHint("##syncshellid", "Syncshell GID/Alias", ref _syncShellToJoin, 20);
+            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
+            if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
+            {
+                if (_apiController.Groups.All(w => w.GID != _syncShellToJoin) && !string.IsNullOrEmpty(_syncShellToJoin))
+                {
+                    _errorGroupJoin = false;
+                    _showModalEnterPassword = true;
+                    ImGui.OpenPopup("Enter Syncshell Password");
+                }
+                else
+                {
+                    _lastCreatedGroup = null;
+                    _errorGroupCreate = false;
+                    _showModalCreateGroup = true;
+                    ImGui.OpenPopup("Create Syncshell");
+                }
+            }
+            UiShared.AttachToolTip(_syncShellToJoin.IsNullOrEmpty() ? "Create Syncshell" : "Join Syncshell" + _syncShellToJoin);
+
+            if (ImGui.BeginPopupModal("Enter Syncshell Password", ref _showModalEnterPassword, ImGuiWindowFlags.AlwaysAutoResize))
+            {
+                UiShared.TextWrapped("Before joining any Syncshells please be aware that you will be automatically paired with everyone in the Syncshell.");
+                ImGui.Separator();
+                UiShared.TextWrapped("Enter the password for Syncshell " + _syncShellToJoin + ":");
+                ImGui.InputTextWithHint("##password", _syncShellToJoin + " Password", ref _syncShellPassword, 255, ImGuiInputTextFlags.Password);
+                if (_errorGroupJoin)
+                {
+                    UiShared.ColorTextWrapped("An error occured during joining of this Syncshell: you either have joined the maximum amount of Syncshells (6), it does not exist, the password you entered is wrong, you already joined the Syncshell, the Syncshell is full (100 users) or the Syncshell has closed invites.",
+                        new Vector4(1, 0, 0, 1));
+                }
+                if (ImGui.Button("Join " + _syncShellToJoin))
+                {
+                    var shell = _syncShellToJoin;
+                    var pw = _syncShellPassword;
+                    _errorGroupJoin = !_apiController.SendGroupJoin(shell, pw).Result;
+                    if (!_errorGroupJoin)
+                    {
+                        _syncShellToJoin = string.Empty;
+                        _showModalEnterPassword = false;
+                    }
+                    _syncShellPassword = string.Empty;
+                }
+                ImGui.EndPopup();
+            }
+
+            if (ImGui.BeginPopupModal("Create Syncshell", ref _showModalCreateGroup))
+            {
+                ImGui.SetWindowSize(new(400, 200));
+                UiShared.TextWrapped("Press the button below to create a new Syncshell.");
+                ImGui.SetNextItemWidth(200);
+                if (ImGui.Button("Create Syncshell"))
+                {
+                    try
+                    {
+                        _lastCreatedGroup = _apiController.CreateGroup().Result;
+                    }
+                    catch
+                    {
+                        _errorGroupCreate = true;
+                    }
+                }
+
+                if (_lastCreatedGroup != null)
+                {
+                    ImGui.Separator();
+                    _errorGroupCreate = false;
+                    ImGui.TextUnformatted("Syncshell ID: " + _lastCreatedGroup.GID);
+                    ImGui.TextUnformatted("Syncshell Password: " + _lastCreatedGroup.Password);
+                    ImGui.SameLine();
+                    if (ImGuiComponents.IconButton(FontAwesomeIcon.Copy))
+                    {
+                        ImGui.SetClipboardText(_lastCreatedGroup.Password);
+                    }
+                    UiShared.TextWrapped("You can change the Syncshell password later at any time.");
+                }
+
+                if (_errorGroupCreate)
+                {
+                    UiShared.ColorTextWrapped("You are already owner of the maximum amount of Syncshells (3) or joined the maximum amount of Syncshells (6). Relinquish ownership of your own Syncshells to someone else or leave existing Syncshells.",
+                        new Vector4(1, 0, 0, 1));
+                }
+
+                ImGui.EndPopup();
+            }
+
+
+            ImGuiHelpers.ScaledDummy(2);
+        }
+
+        private void DrawSyncshellList()
+        {
+            var ySize = _mainUi.TransferPartHeight == 0
+                ? 1
+                : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - _mainUi.TransferPartHeight - ImGui.GetCursorPosY();
+            ImGui.BeginChild("list", new Vector2(_mainUi._windowContentWidth, ySize), false);
+            foreach (var entry in _apiController.Groups.OrderBy(g => g.Alias ?? g.GID).ToList())
+            {
+                UiShared.DrawWithID(entry.GID, () => DrawSyncshell(entry));
+            }
+            ImGui.EndChild();
+        }
+
+        private void DrawSyncshell(GroupDto group)
+        {
+            var name = group.Alias ?? group.GID;
+            var pairsInGroup = _apiController.GroupPairedClients.Where(p => p.GroupGID == group.GID).ToList();
+            if (!ExpandedGroupState.TryGetValue(group.GID, out bool isExpanded))
+            {
+                isExpanded = false;
+                ExpandedGroupState.Add(group.GID, isExpanded);
+            }
+            var icon = isExpanded ? FontAwesomeIcon.CaretSquareDown : FontAwesomeIcon.CaretSquareRight;
+            var collapseButton = UiShared.GetIconButtonSize(icon);
+            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0, 0, 0, 0));
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0, 0, 0, 0));
+            if (ImGuiComponents.IconButton(icon))
+            {
+                ExpandedGroupState[group.GID] = !ExpandedGroupState[group.GID];
+            }
+            ImGui.PopStyleColor(2);
+            ImGui.SameLine();
+            var pauseIcon = (group.IsPaused ?? false) ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
+            if (ImGuiComponents.IconButton(pauseIcon))
+            {
+                _ = _apiController.SendPauseGroup(group.GID, !group.IsPaused ?? false);
+            }
+            UiShared.AttachToolTip(((group.IsPaused ?? false) ? "Resume" : "Pause") + " pairing with all users in this Syncshell");
+            ImGui.SameLine();
+
+            var groupName = group.Alias ?? group.GID;
+            var textIsGid = true;
+            _showGidForEntry.TryGetValue(group.GID, out var showGidInsteadOfName);
+            if (!showGidInsteadOfName && _configuration.GetCurrentServerGidComments().TryGetValue(group.GID, out var groupComment))
+            {
+                if (!string.IsNullOrEmpty(groupComment))
+                {
+                    groupName = groupComment;
+                    textIsGid = false;
+                }
+            }
+
+            if (_editGroupEntry != group.GID)
+            {
+                if (textIsGid) ImGui.PushFont(UiBuilder.MonoFont);
+                ImGui.TextUnformatted(groupName);
+                if (textIsGid) ImGui.PopFont();
+                UiShared.AttachToolTip("Left click to switch between GID display and comment" + Environment.NewLine +
+                              "Right click to change comment for " + groupName + Environment.NewLine + Environment.NewLine
+                              + "Users: " + (pairsInGroup.Count + 1) + ", Owner: " + group.OwnedBy);
+                if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
+                {
+                    var prevState = textIsGid;
+                    if (_showGidForEntry.ContainsKey(group.GID))
+                    {
+                        prevState = _showGidForEntry[group.GID];
+                    }
+
+                    _showGidForEntry[group.GID] = !prevState;
+                }
+
+                if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+                {
+                    _configuration.SetCurrentServerGidComment(_editGroupEntry, _editGroupComment);
+                    _configuration.Save();
+                    _editGroupComment = _configuration.GetCurrentServerGidComments().ContainsKey(group.GID)
+                        ? _configuration.GetCurrentServerGidComments()[group.GID]
+                        : string.Empty;
+                    _editGroupEntry = group.GID;
+                }
+            }
+            else
+            {
+                ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX());
+                if (ImGui.InputTextWithHint("", "Comment/Notes", ref _editGroupComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
+                {
+                    _configuration.SetCurrentServerGidComment(group.GID, _editGroupComment);
+                    _configuration.Save();
+                    _editGroupEntry = string.Empty;
+                }
+
+                if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+                {
+                    _editGroupEntry = string.Empty;
+                }
+                UiShared.AttachToolTip("Hit ENTER to save\nRight click to cancel");
+            }
+
+            ImGui.Indent(collapseButton.X + ImGui.GetStyle().ItemSpacing.X);
+            if (ExpandedGroupState[group.GID])
+            {
+                UiShared.DrawWithID(group.GID + "settings", () => DrawSyncShellButtons(group, name));
+                pairsInGroup = pairsInGroup.OrderBy(p => p.UserUID == group.OwnedBy ? 0 : 1).ThenBy(p => p.IsPinned ?? false).ThenBy(p => p.UserAlias ?? p.UserUID).ToList();
+                foreach (var pair in pairsInGroup)
+                {
+                    ImGui.Indent(ImGui.GetStyle().ItemSpacing.X / 2);
+                    UiShared.DrawWithID(group.GID + pair.UserUID, () => DrawSyncshellPairedClient(pair, group.OwnedBy == _apiController.UID, group?.IsPaused ?? false));
+                    ImGui.Unindent(ImGui.GetStyle().ItemSpacing.X / 2);
+                }
+            }
+            ImGui.Unindent(collapseButton.X + ImGui.GetStyle().ItemSpacing.X);
+        }
+
+        private void DrawSyncShellButtons(GroupDto entry, string name)
+        {
+            bool invitesEnabled = entry.InvitesEnabled ?? true;
+            var lockedIcon = invitesEnabled ? FontAwesomeIcon.LockOpen : FontAwesomeIcon.Lock;
+
+            if (ImGuiComponents.IconButton(FontAwesomeIcon.ArrowCircleLeft))
+            {
+                if (UiShared.CtrlPressed())
+                {
+                    _ = _apiController.SendLeaveGroup(entry.GID);
+                }
+            }
+            UiShared.AttachToolTip("Hold CTRL and click to leave this Syncshell" + (entry.OwnedBy != _apiController.UID ? string.Empty : Environment.NewLine
+                + "WARNING: This action is irreverisble" + Environment.NewLine + "Leaving an owned Syncshell will transfer the ownership to a random person in the Syncshell."));
+
+            ImGui.SameLine();
+            if (ImGuiComponents.IconButton(FontAwesomeIcon.Copy))
+            {
+                ImGui.SetClipboardText(entry.Alias ?? entry.GID);
+            }
+            UiShared.AttachToolTip("Copy Syncshell ID to Clipboard");
+            if (entry.OwnedBy == _apiController.UID)
+            {
+                ImGui.SameLine();
+                if (ImGuiComponents.IconButton(lockedIcon))
+                {
+                    _ = _apiController.SendGroupChangeInviteState(entry.GID, !entry.InvitesEnabled ?? true);
+                }
+                UiShared.AttachToolTip("Change Syncshell joining permissions" + Environment.NewLine + "Syncshell is currently " + (invitesEnabled ? "open" : "closed") + " for people to join");
+                ImGui.SameLine();
+                if (ImGuiComponents.IconButton(FontAwesomeIcon.Passport))
+                {
+                    ImGui.OpenPopup("Change Syncshell Password");
+                    _isPasswordValid = true;
+                    _showModalChangePassword = true;
+                }
+                UiShared.AttachToolTip("Change Syncshell Password");
+
+                if (ImGui.BeginPopupModal("Change Syncshell Password", ref _showModalChangePassword, ImGuiWindowFlags.AlwaysAutoResize))
+                {
+                    UiShared.TextWrapped("Enter the new Syncshell password for Syncshell " + name + " here.");
+                    UiShared.TextWrapped("This action is irreversible");
+                    ImGui.InputTextWithHint("##changepw", "New password for " + name, ref _newSyncShellPassword, 255);
+                    if (ImGui.Button("Change password"))
+                    {
+                        var pw = _newSyncShellPassword;
+                        _isPasswordValid = _apiController.ChangeGroupPassword(entry.GID, pw).Result;
+                        _newSyncShellPassword = string.Empty;
+                        if (_isPasswordValid) _showModalChangePassword = false;
+                    }
+
+                    if (!_isPasswordValid)
+                    {
+                        UiShared.ColorTextWrapped("The selected password is too short. It must be at least 10 characters.", new Vector4(1, 0, 0, 1));
+                    }
+
+                    ImGui.EndPopup();
+                }
+
+                ImGui.SameLine();
+                if (ImGuiComponents.IconButton(FontAwesomeIcon.Broom))
+                {
+                    if (UiShared.CtrlPressed())
+                    {
+                        _ = _apiController.SendClearGroup(entry.GID);
+                    }
+                }
+                UiShared.AttachToolTip("Hold CTRL and click to clear this Syncshell." + Environment.NewLine + "WARNING: this action is irreversible." + Environment.NewLine
+                    + "Clearing the Syncshell will remove all not pinned users from it.");
+
+                ImGui.SameLine();
+                if (ImGuiComponents.IconButton(FontAwesomeIcon.Trash))
+                {
+                    if (UiShared.CtrlPressed() && UiShared.ShiftPressed())
+                    {
+                        _ = _apiController.SendDeleteGroup(entry.GID);
+                    }
+                }
+                UiShared.AttachToolTip("Hold CTRL and Shift and click to delete this Syncshell." + Environment.NewLine + "WARNING: this action is irreversible.");
+            }
+            else
+            {
+                ImGui.SameLine();
+                ImGui.SameLine();
+                ImGui.PushFont(UiBuilder.IconFont);
+                ImGui.Text(lockedIcon.ToIconString());
+                ImGui.PopFont();
+                UiShared.AttachToolTip(invitesEnabled ? "Syncshell is open for new joiners" : "Syncshell is closed for new joiners");
+            }
+        }
+
+        private void DrawSyncshellPairedClient(GroupPairDto entry, bool isOwner, bool isPausedByYou)
+        {
+            var plusButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Plus);
+            var trashButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Trash);
+            var crownButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Crown);
+            var entryUID = string.IsNullOrEmpty(entry.UserAlias) ? entry.UserUID : entry.UserAlias;
+            var textSize = ImGui.CalcTextSize(entryUID);
+            var originalY = ImGui.GetCursorPosY();
+            var buttonSizes = plusButtonSize.Y;
+
+            var textPos = originalY + plusButtonSize.Y / 2 - textSize.Y / 2;
+            ImGui.SetCursorPosY(textPos);
+            if (isPausedByYou || (entry.IsPaused ?? false))
+            {
+                ImGui.PushFont(UiBuilder.IconFont);
+                UiShared.ColorText(FontAwesomeIcon.PauseCircle.ToIconString(), ImGuiColors.DalamudYellow);
+                ImGui.PopFont();
+
+                UiShared.AttachToolTip("Pairing status with " + entryUID + " is paused");
+            }
+            else
+            {
+                ImGui.PushFont(UiBuilder.IconFont);
+                UiShared.ColorText(FontAwesomeIcon.Check.ToIconString(), ImGuiColors.ParsedGreen);
+                ImGui.PopFont();
+
+                UiShared.AttachToolTip("You are paired with " + entryUID);
+            }
+
+            if (entry.IsPinned ?? false)
+            {
+                ImGui.SameLine();
+                ImGui.SetCursorPosY(textPos);
+                ImGui.PushFont(UiBuilder.IconFont);
+                ImGui.TextUnformatted(FontAwesomeIcon.Thumbtack.ToIconString());
+                ImGui.PopFont();
+            }
+
+            var textIsUid = true;
+            _mainUi.ShowUidForEntry.TryGetValue(entry.UserUID, out var showUidInsteadOfName);
+            if (!showUidInsteadOfName && _configuration.GetCurrentServerUidComments().TryGetValue(entry.UserUID, out var playerText))
+            {
+                if (string.IsNullOrEmpty(playerText))
+                {
+                    playerText = entryUID;
+                }
+                else
+                {
+                    textIsUid = false;
+                }
+            }
+            else
+            {
+                playerText = entryUID;
+            }
+
+            ImGui.SameLine();
+            if (_mainUi.EditNickEntry != entry.UserUID)
+            {
+                ImGui.SetCursorPosY(textPos);
+                if (textIsUid) ImGui.PushFont(UiBuilder.MonoFont);
+                ImGui.TextUnformatted(playerText);
+                if (textIsUid) ImGui.PopFont();
+                UiShared.AttachToolTip("Left click to switch between UID display and nick" + Environment.NewLine +
+                              "Right click to change nick for " + entryUID);
+                if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
+                {
+                    var prevState = textIsUid;
+                    if (_mainUi.ShowUidForEntry.ContainsKey(entry.UserUID))
+                    {
+                        prevState = _mainUi.ShowUidForEntry[entry.UserUID];
+                    }
+
+                    _mainUi.ShowUidForEntry[entry.UserUID] = !prevState;
+                }
+
+                if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+                {
+                    _configuration.SetCurrentServerUidComment(_mainUi.EditNickEntry, _mainUi.EditUserComment);
+                    _configuration.Save();
+                    _mainUi.EditUserComment = _configuration.GetCurrentServerUidComments().ContainsKey(entry.UserUID)
+                        ? _configuration.GetCurrentServerUidComments()[entry.UserUID]
+                        : string.Empty;
+                    _mainUi.EditNickEntry = entry.UserUID;
+                }
+            }
+            else
+            {
+                ImGui.SetCursorPosY(originalY);
+
+                ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * 2);
+                if (ImGui.InputTextWithHint("", "Nick/Notes", ref _mainUi.EditUserComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
+                {
+                    _configuration.SetCurrentServerUidComment(entry.UserUID, _mainUi.EditUserComment);
+                    _configuration.Save();
+                    _mainUi.EditNickEntry = string.Empty;
+                }
+
+                if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+                {
+                    _mainUi.EditNickEntry = string.Empty;
+                }
+                UiShared.AttachToolTip("Hit ENTER to save\nRight click to cancel");
+            }
+
+            bool addButtonShown = !_apiController.PairedClients.Any(p => p.OtherUID == entry.UserUID);
+            if (isOwner)
+            {
+                ImGui.SetCursorPosY(originalY);
+                var subtractedWidth = addButtonShown ? (ImGui.GetStyle().ItemSpacing.X + plusButtonSize.X) : 0;
+                ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - subtractedWidth - trashButtonSize.X - ImGui.GetStyle().ItemSpacing.X - crownButtonSize.X);
+
+                if (ImGuiComponents.IconButton(FontAwesomeIcon.Crown))
+                {
+                    if (UiShared.CtrlPressed() && UiShared.ShiftPressed())
+                    {
+                        _ = _apiController.ChangeOwnerOfGroup(entry.GroupGID, entry.UserUID);
+                    }
+                }
+                UiShared.AttachToolTip("Hold CTRL and SHIFT and click to transfer ownership of this Syncshell to " + (entry.UserAlias ?? entry.UserUID) + Environment.NewLine + "WARNING: This action is irreversible.");
+                ImGui.SameLine();
+                if (ImGuiComponents.IconButton(FontAwesomeIcon.Trash))
+                {
+                    if (UiShared.CtrlPressed())
+                    {
+                        _ = _apiController.SendRemoveUserFromGroup(entry.GroupGID, entry.UserUID);
+                    }
+                }
+                UiShared.AttachToolTip("Hold CTRL and click to remove user " + (entry.UserAlias ?? entry.UserUID) + " from Syncshell");
+            }
+
+            if (addButtonShown)
+            {
+                ImGui.SetCursorPosY(originalY);
+                ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - plusButtonSize.X);
+
+                if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
+                {
+                    _ = _apiController.SendPairedClientAddition(entry.UserUID);
+                }
+                UiShared.AttachToolTip("Pair with " + entryUID + " individually");
+            }
+        }
+    }
+}

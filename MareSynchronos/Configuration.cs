@@ -26,6 +26,23 @@ public static class ConfigurationExtensions
             : new Dictionary<string, string>();
     }
 
+    public static Dictionary<string, string> GetCurrentServerGidComments(this Configuration configuration)
+    {
+        return configuration.GidServerComments.ContainsKey(configuration.ApiUri)
+            ? configuration.GidServerComments[configuration.ApiUri]
+            : new Dictionary<string, string>();
+    }
+
+    public static void SetCurrentServerGidComment(this Configuration configuration, string gid, string comment)
+    {
+        if (!configuration.GidServerComments.ContainsKey(configuration.ApiUri))
+        {
+            configuration.GidServerComments[configuration.ApiUri] = new Dictionary<string, string>();
+        }
+
+        configuration.GidServerComments[configuration.ApiUri][gid] = comment;
+    }
+
     public static void SetCurrentServerUidComment(this Configuration configuration, string uid, string comment)
     {
         if (!configuration.UidServerComments.ContainsKey(configuration.ApiUri))
@@ -66,6 +83,7 @@ public class Configuration : IPluginConfiguration
 
     public bool FullPause { get; set; } = false;
     public Dictionary<string, Dictionary<string, string>> UidServerComments { get; set; } = new();
+    public Dictionary<string, Dictionary<string, string>> GidServerComments { get; set; } = new();
 
     public Dictionary<string, string> UidComments { get; set; } = new();
     public int Version { get; set; } = 5;

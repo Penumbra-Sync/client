@@ -49,6 +49,18 @@ public partial class ApiController
         await _mareHub!.SendAsync(Api.SendGroupDelete, gid);
     }
 
+    public async Task SendChangeUserPinned(string gid, string uid, bool isPinned)
+    {
+        if (!IsConnected || SecretKey == "-") return;
+        await _mareHub!.SendAsync(Api.SendGroupChangePinned, gid, uid, isPinned);
+    }
+
+    public async Task SendClearGroup(string gid)
+    {
+        if (!IsConnected || SecretKey == "-") return;
+        await _mareHub!.SendAsync(Api.SendGroupClear, gid);
+    }
+
     public async Task SendLeaveGroup(string gid)
     {
         if (!IsConnected || SecretKey == "-") return;

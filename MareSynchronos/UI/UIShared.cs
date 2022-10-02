@@ -548,6 +548,47 @@ public class UiShared : IDisposable
         DrawHelpText("This allows you to stop the periodic scans of your Penumbra and Mare cache directories. Use this to move the Mare cache and Penumbra mod folders around. If you enable this permanently, run a Force rescan after adding mods to Penumbra.");
     }
 
+    private static Vector2 GetIconSize(FontAwesomeIcon icon)
+    {
+        ImGui.PushFont(UiBuilder.IconFont);
+        var iconSize = ImGui.CalcTextSize(icon.ToIconString());
+        ImGui.PopFont();
+        return iconSize;
+    }
+
+    public static bool IconTextButton(FontAwesomeIcon icon, string text)
+    {
+        var buttonClicked = false;
+
+        var iconSize = GetIconSize(icon);
+        var textSize = ImGui.CalcTextSize(text);
+        var padding = ImGui.GetStyle().FramePadding;
+        var spacing = ImGui.GetStyle().ItemSpacing;
+
+        var buttonSizeX = iconSize.X + textSize.X + padding.X * 2 + spacing.X;
+        var buttonSizeY = (iconSize.Y > textSize.Y ? iconSize.Y : textSize.Y) + padding.Y * 2;
+        var buttonSize = new Vector2(buttonSizeX, buttonSizeY);
+
+        if (ImGui.BeginChild(icon.ToIconString() + text, buttonSize))
+        {
+            if (ImGui.Button("", buttonSize))
+            {
+                buttonClicked = true;
+            }
+
+            ImGui.SameLine();
+            ImGui.SetCursorPosX(padding.X);
+            ImGui.PushFont(UiBuilder.IconFont);
+            ImGui.Text(icon.ToIconString());
+            ImGui.PopFont();
+            ImGui.SameLine();
+            ImGui.Text(text);
+            ImGui.EndChild();
+        }
+
+        return buttonClicked;
+    }
+
     public void Dispose()
     {
         _pluginInterface.UiBuilder.BuildFonts -= BuildFont;
