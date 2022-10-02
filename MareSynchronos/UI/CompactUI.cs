@@ -59,7 +59,7 @@ public class CompactUi : Window, IDisposable
         this.WindowName = "Mare Synchronos " + dateTime + "###MareSynchronosMainUI";
         Toggle();
 #else
-        this.WindowName = "Mare Synchronos " + Assembly.GetExecutingAssembly().GetName().Version;
+        this.WindowName = "Mare Synchronos " + Assembly.GetExecutingAssembly().GetName().Version + "###MareSynchronosMainUI";
 #endif
         Logger.Verbose("Creating " + nameof(CompactUi));
 
@@ -72,8 +72,8 @@ public class CompactUi : Window, IDisposable
 
         SizeConstraints = new WindowSizeConstraints()
         {
-            MinimumSize = new Vector2(300, 400),
-            MaximumSize = new Vector2(300, 2000),
+            MinimumSize = new Vector2(350, 400),
+            MaximumSize = new Vector2(350, 2000),
         };
 
         windowSystem.AddWindow(this);

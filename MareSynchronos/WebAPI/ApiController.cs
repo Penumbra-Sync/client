@@ -114,7 +114,7 @@ public partial class ApiController : IDisposable
         .ToDictionary(k => k.Key, k => k.Value);
 
     public string UID => _connectionDto?.UID ?? string.Empty;
-    public string DisplayName => string.IsNullOrEmpty(_connectionDto?.Alias) ? (_connectionDto?.UID ?? string.Empty) : _connectionDto.Alias;
+    public string DisplayName => _connectionDto?.UID ?? string.Empty;
     private string ApiUri => _pluginConfiguration.ApiUri;
     public int OnlineUsers => SystemInfoDto.OnlineUsers;
 
