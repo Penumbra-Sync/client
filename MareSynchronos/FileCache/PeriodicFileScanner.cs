@@ -229,7 +229,8 @@ public class PeriodicFileScanner : IDisposable
                     try
                     {
                         var validatedCacheResult = _fileDbManager.ValidateFileCacheEntity(cache);
-                        scannedFiles[validatedCacheResult.Item2.ResolvedFilepath] = true;
+                        if (validatedCacheResult.Item1 != FileState.RequireDeletion)
+                            scannedFiles[validatedCacheResult.Item2.ResolvedFilepath] = true;
                         if (validatedCacheResult.Item1 == FileState.RequireUpdate)
                         {
                             entitiesToUpdate.Add(validatedCacheResult.Item2);
