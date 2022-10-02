@@ -94,6 +94,7 @@ public partial class ApiController
 
         existingUser.IsPaused = dto.IsPaused ?? existingUser.IsPaused;
         existingUser.UserAlias = dto.UserAlias ?? existingUser.UserAlias;
+        existingUser.IsPinned = dto.IsPinned ?? existingUser.IsPinned;
     }
 
     private async Task GroupChangedCallback(GroupDto dto)

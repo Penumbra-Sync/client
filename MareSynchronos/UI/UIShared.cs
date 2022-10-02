@@ -548,7 +548,7 @@ public class UiShared : IDisposable
         DrawHelpText("This allows you to stop the periodic scans of your Penumbra and Mare cache directories. Use this to move the Mare cache and Penumbra mod folders around. If you enable this permanently, run a Force rescan after adding mods to Penumbra.");
     }
 
-    private static Vector2 GetIconSize(FontAwesomeIcon icon)
+    public static Vector2 GetIconSize(FontAwesomeIcon icon)
     {
         ImGui.PushFont(UiBuilder.IconFont);
         var iconSize = ImGui.CalcTextSize(icon.ToIconString());
