@@ -201,7 +201,7 @@ namespace MareSynchronos
 
         private void OnCommand(string command, string args)
         {
-            var splitArgs = args?.ToLowerInvariant().Trim().Split();
+            var splitArgs = args.ToLowerInvariant().Trim().Split(" ", StringSplitOptions.RemoveEmptyEntries);
 
             if (splitArgs == null || splitArgs.Length == 0)
             {
