@@ -163,7 +163,7 @@ namespace MareSynchronos.UI
                 ? 1
                 : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - _mainUi.TransferPartHeight - ImGui.GetCursorPosY();
             ImGui.BeginChild("list", new Vector2(_mainUi._windowContentWidth, ySize), false);
-            foreach (var entry in _apiController.Groups.OrderBy(g => g.Alias ?? g.GID).ToList())
+            foreach (var entry in _apiController.Groups.OrderBy(g => string.IsNullOrEmpty(g.Alias) ? g.GID : g.Alias).ToList())
             {
                 UiShared.DrawWithID(entry.GID, () => DrawSyncshell(entry));
             }
@@ -197,7 +197,7 @@ namespace MareSynchronos.UI
             UiShared.AttachToolTip(((group.IsPaused ?? false) ? "Resume" : "Pause") + " pairing with all users in this Syncshell");
             ImGui.SameLine();
 
-            var groupName = group.Alias ?? group.GID;
+            var groupName = string.IsNullOrEmpty(group.Alias) ? group.GID : group.Alias;
             var textIsGid = true;
 
             if (string.Equals(group.OwnedBy, _apiController.UID, StringComparison.Ordinal))
@@ -316,7 +316,7 @@ namespace MareSynchronos.UI
 
                 if (UiShared.IconTextButton(FontAwesomeIcon.Copy, "Copy ID"))
                 {
-                    ImGui.SetClipboardText(entry.Alias ?? entry.GID);
+                    ImGui.SetClipboardText(string.IsNullOrEmpty(entry.Alias) ? entry.GID : entry.Alias);
                 }
                 UiShared.AttachToolTip("Copy Syncshell ID to Clipboard");
 
