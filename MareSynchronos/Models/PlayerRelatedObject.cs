@@ -61,7 +61,7 @@ public class PlayerRelatedObject
             bool equip = CompareAndUpdateByteData(chara->EquipSlotData, chara->CustomizeData);
             bool drawObj = (IntPtr)chara->GameObject.DrawObject != DrawObjectAddress;
             var name = new Utf8String(chara->GameObject.Name).ToString();
-            bool nameChange = (name != _name);
+            bool nameChange = (!string.Equals(name, _name, StringComparison.Ordinal));
             if (addr || equip || drawObj || nameChange)
             {
                 _name = name;

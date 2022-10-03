@@ -175,7 +175,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         while (!_dalamudUtil.IsPlayerPresent)
         {
-            await Task.Delay(100);
+            await Task.Delay(100).ConfigureAwait(false);
         }
 
         try

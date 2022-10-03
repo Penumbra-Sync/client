@@ -294,7 +294,7 @@ public class UiShared : IDisposable
                 bool isSelected = _serverSelectionIndex == i;
                 if (ImGui.Selectable(comboEntries[i], isSelected))
                 {
-                    _pluginConfiguration.ApiUri = _apiController.ServerDictionary.Single(k => k.Value == comboEntries[i]).Key;
+                    _pluginConfiguration.ApiUri = _apiController.ServerDictionary.Single(k => string.Equals(k.Value, comboEntries[i], StringComparison.Ordinal)).Key;
                     _pluginConfiguration.Save();
                     _ = _apiController.CreateConnections();
                 }
@@ -451,7 +451,7 @@ public class UiShared : IDisposable
             {
                 if (!success) return;
 
-                _isPenumbraDirectory = path.ToLowerInvariant() == _ipcManager.PenumbraModDirectory()?.ToLowerInvariant();
+                _isPenumbraDirectory = string.Equals(path.ToLowerInvariant(), _ipcManager.PenumbraModDirectory()?.ToLowerInvariant(), StringComparison.Ordinal);
                 _isDirectoryWritable = IsDirectoryWritable(path);
                 _cacheDirectoryHasOtherFilesThanCache = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Any(f => new FileInfo(f).Name.Length != 40);
                 _cacheDirectoryIsValidPath = Regex.IsMatch(path, @"^(?:[a-zA-Z]:\\[\w\s\-\\]+?|\/(?:[\w\s\-\/])+?)$", RegexOptions.ECMAScript);

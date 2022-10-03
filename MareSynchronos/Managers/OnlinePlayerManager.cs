@@ -19,8 +19,8 @@ public class OnlinePlayerManager : IDisposable
     private readonly IpcManager _ipcManager;
     private readonly PlayerManager _playerManager;
     private readonly FileCacheManager _fileDbManager;
-    private readonly ConcurrentDictionary<string, CachedPlayer> _onlineCachedPlayers = new();
-    private readonly ConcurrentDictionary<string, CharacterCacheDto> _temporaryStoredCharacterCache = new();
+    private readonly ConcurrentDictionary<string, CachedPlayer> _onlineCachedPlayers = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, CharacterCacheDto> _temporaryStoredCharacterCache = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<CachedPlayer, CancellationTokenSource> _playerTokenDisposal = new();
 
     private List<string> OnlineVisiblePlayerHashes => _onlineCachedPlayers.Select(p => p.Value).Where(p => p.PlayerCharacter != IntPtr.Zero)
@@ -226,7 +226,7 @@ public class OnlinePlayerManager : IDisposable
             Task.Run(async () =>
             {
                 await _apiController.PushCharacterData(_playerManager.LastCreatedCharacterData,
-                    visiblePlayers);
+                    visiblePlayers).ConfigureAwait(false);
             });
         }
     }

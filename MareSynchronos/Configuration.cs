@@ -23,21 +23,21 @@ public static class ConfigurationExtensions
     {
         return configuration.UidServerComments.ContainsKey(configuration.ApiUri)
             ? configuration.UidServerComments[configuration.ApiUri]
-            : new Dictionary<string, string>();
+            : new Dictionary<string, string>(StringComparer.Ordinal);
     }
 
     public static Dictionary<string, string> GetCurrentServerGidComments(this Configuration configuration)
     {
         return configuration.GidServerComments.ContainsKey(configuration.ApiUri)
             ? configuration.GidServerComments[configuration.ApiUri]
-            : new Dictionary<string, string>();
+            : new Dictionary<string, string>(StringComparer.Ordinal);
     }
 
     public static void SetCurrentServerGidComment(this Configuration configuration, string gid, string comment)
     {
         if (!configuration.GidServerComments.ContainsKey(configuration.ApiUri))
         {
-            configuration.GidServerComments[configuration.ApiUri] = new Dictionary<string, string>();
+            configuration.GidServerComments[configuration.ApiUri] = new Dictionary<string, string>(StringComparer.Ordinal);
         }
 
         configuration.GidServerComments[configuration.ApiUri][gid] = comment;
@@ -47,7 +47,7 @@ public static class ConfigurationExtensions
     {
         if (!configuration.UidServerComments.ContainsKey(configuration.ApiUri))
         {
-            configuration.UidServerComments[configuration.ApiUri] = new Dictionary<string, string>();
+            configuration.UidServerComments[configuration.ApiUri] = new Dictionary<string, string>(StringComparer.Ordinal);
         }
 
         configuration.UidServerComments[configuration.ApiUri][uid] = comment;
@@ -71,8 +71,8 @@ public class Configuration : IPluginConfiguration
     }
 
     public string CacheFolder { get; set; } = string.Empty;
-    public Dictionary<string, string> ClientSecret { get; set; } = new();
-    public Dictionary<string, string> CustomServerList { get; set; } = new();
+    public Dictionary<string, string> ClientSecret { get; set; } = new(StringComparer.Ordinal);
+    public Dictionary<string, string> CustomServerList { get; set; } = new(StringComparer.Ordinal);
     public int MaxLocalCacheInGiB { get; set; } = 20;
     public bool ReverseUserSort { get; set; } = false;
 
@@ -82,10 +82,10 @@ public class Configuration : IPluginConfiguration
     public bool InitialScanComplete { get; set; } = false;
 
     public bool FullPause { get; set; } = false;
-    public Dictionary<string, Dictionary<string, string>> UidServerComments { get; set; } = new();
-    public Dictionary<string, Dictionary<string, string>> GidServerComments { get; set; } = new();
+    public Dictionary<string, Dictionary<string, string>> UidServerComments { get; set; } = new(StringComparer.Ordinal);
+    public Dictionary<string, Dictionary<string, string>> GidServerComments { get; set; } = new(StringComparer.Ordinal);
 
-    public Dictionary<string, string> UidComments { get; set; } = new();
+    public Dictionary<string, string> UidComments { get; set; } = new(StringComparer.Ordinal);
     public int Version { get; set; } = 5;
 
     public bool ShowTransferWindow { get; set; } = true;
@@ -114,10 +114,10 @@ public class Configuration : IPluginConfiguration
         {
             Logger.Debug("Migrating Configuration from V0 to V1");
             Version = 1;
-            ApiUri = ApiUri.Replace("https", "wss");
+            ApiUri = ApiUri.Replace("https", "wss", StringComparison.Ordinal);
             foreach (var kvp in ClientSecret.ToList())
             {
-                var newKey = kvp.Key.Replace("https", "wss");
+                var newKey = kvp.Key.Replace("https", "wss", StringComparison.Ordinal);
                 ClientSecret.Remove(kvp.Key);
                 if (ClientSecret.ContainsKey(newKey))
                 {
@@ -128,7 +128,7 @@ public class Configuration : IPluginConfiguration
                     ClientSecret.Add(newKey, kvp.Value);
                 }
             }
-            UidServerComments.Add(ApiUri, UidComments.ToDictionary(k => k.Key, k => k.Value));
+            UidServerComments.Add(ApiUri, UidComments.ToDictionary(k => k.Key, k => k.Value, StringComparer.Ordinal));
             UidComments.Clear();
             Save();
         }
@@ -136,10 +136,10 @@ public class Configuration : IPluginConfiguration
         if (Version == 1)
         {
             Logger.Debug("Migrating Configuration from V1 to V2");
-            ApiUri = ApiUri.Replace("5001", "5000");
+            ApiUri = ApiUri.Replace("5001", "5000", StringComparison.Ordinal);
             foreach (var kvp in ClientSecret.ToList())
             {
-                var newKey = kvp.Key.Replace("5001", "5000");
+                var newKey = kvp.Key.Replace("5001", "5000", StringComparison.Ordinal);
                 ClientSecret.Remove(kvp.Key);
                 if (ClientSecret.ContainsKey(newKey))
                 {
@@ -153,7 +153,7 @@ public class Configuration : IPluginConfiguration
 
             foreach (var kvp in UidServerComments.ToList())
             {
-                var newKey = kvp.Key.Replace("5001", "5000");
+                var newKey = kvp.Key.Replace("5001", "5000", StringComparison.Ordinal);
                 UidServerComments.Remove(kvp.Key);
                 UidServerComments.Add(newKey, kvp.Value);
             }
@@ -177,10 +177,10 @@ public class Configuration : IPluginConfiguration
         {
             Logger.Debug("Migrating Configuration from V3 to V4");
 
-            ApiUri = ApiUri.Replace("wss://v2202207178628194299.powersrv.de:6871", "wss://v2202207178628194299.powersrv.de:6872");
+            ApiUri = ApiUri.Replace("wss://v2202207178628194299.powersrv.de:6871", "wss://v2202207178628194299.powersrv.de:6872", StringComparison.Ordinal);
             foreach (var kvp in ClientSecret.ToList())
             {
-                var newKey = kvp.Key.Replace("wss://v2202207178628194299.powersrv.de:6871", "wss://v2202207178628194299.powersrv.de:6872");
+                var newKey = kvp.Key.Replace("wss://v2202207178628194299.powersrv.de:6871", "wss://v2202207178628194299.powersrv.de:6872", StringComparison.Ordinal);
                 ClientSecret.Remove(kvp.Key);
                 if (ClientSecret.ContainsKey(newKey))
                 {
@@ -194,7 +194,7 @@ public class Configuration : IPluginConfiguration
 
             foreach (var kvp in UidServerComments.ToList())
             {
-                var newKey = kvp.Key.Replace("wss://v2202207178628194299.powersrv.de:6871", "wss://v2202207178628194299.powersrv.de:6872");
+                var newKey = kvp.Key.Replace("wss://v2202207178628194299.powersrv.de:6871", "wss://v2202207178628194299.powersrv.de:6872", StringComparison.Ordinal);
                 UidServerComments.Remove(kvp.Key);
                 UidServerComments.Add(newKey, kvp.Value);
             }
@@ -207,7 +207,7 @@ public class Configuration : IPluginConfiguration
         {
             Logger.Debug("Migrating Configuration from V4 to V5");
 
-            ApiUri = ApiUri.Replace("wss://v2202207178628194299.powersrv.de:6872", "wss://maresynchronos.com");
+            ApiUri = ApiUri.Replace("wss://v2202207178628194299.powersrv.de:6872", "wss://maresynchronos.com", StringComparison.Ordinal);
             ClientSecret.Remove("wss://v2202207178628194299.powersrv.de:6872");
             UidServerComments.Remove("wss://v2202207178628194299.powersrv.de:6872");
 

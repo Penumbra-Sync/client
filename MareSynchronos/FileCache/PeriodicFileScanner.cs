@@ -20,7 +20,7 @@ public class PeriodicFileScanner : IDisposable
     private readonly DalamudUtil _dalamudUtil;
     private CancellationTokenSource? _scanCancellationTokenSource;
     private Task? _fileScannerTask = null;
-    public ConcurrentDictionary<string, int> haltScanLocks = new();
+    public ConcurrentDictionary<string, int> haltScanLocks = new(StringComparer.Ordinal);
     public PeriodicFileScanner(IpcManager ipcManager, Configuration pluginConfiguration, FileCacheManager fileDbManager, ApiController apiController, DalamudUtil dalamudUtil)
     {
         Logger.Verbose("Creating " + nameof(PeriodicFileScanner));
@@ -128,7 +128,7 @@ public class PeriodicFileScanner : IDisposable
             {
                 while (haltScanLocks.Any(f => f.Value > 0))
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(1));
+                    await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                 }
 
                 isForced |= RecalculateFileCacheSize();
@@ -144,7 +144,7 @@ public class PeriodicFileScanner : IDisposable
                 _timeUntilNextScan = TimeSpan.FromSeconds(timeBetweenScans);
                 while (_timeUntilNextScan.TotalSeconds >= 0)
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(1), token);
+                    await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
                     _timeUntilNextScan -= TimeSpan.FromSeconds(1);
                 }
             }
@@ -206,11 +206,14 @@ public class PeriodicFileScanner : IDisposable
 
         var scannedFiles = new ConcurrentDictionary<string, bool>(Directory.EnumerateFiles(penumbraDir, "*.*", SearchOption.AllDirectories)
                             .Select(s => s.ToLowerInvariant())
-                            .Where(f => ext.Any(e => f.EndsWith(e)) && !f.Contains(@"\bg\") && !f.Contains(@"\bgcommon\") && !f.Contains(@"\ui\"))
+                            .Where(f => ext.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase)) 
+                                && !f.Contains(@"\bg\", StringComparison.OrdinalIgnoreCase) 
+                                && !f.Contains(@"\bgcommon\", StringComparison.OrdinalIgnoreCase) 
+                                && !f.Contains(@"\ui\", StringComparison.OrdinalIgnoreCase))
                             .Concat(Directory.EnumerateFiles(_pluginConfiguration.CacheFolder, "*.*", SearchOption.TopDirectoryOnly)
                                 .Where(f => new FileInfo(f).Name.Length == 40)
                                 .Select(s => s.ToLowerInvariant()).ToList())
-                            .Select(c => new KeyValuePair<string, bool>(c, false)));
+                            .Select(c => new KeyValuePair<string, bool>(c, false)), StringComparer.OrdinalIgnoreCase);
 
         TotalFiles = scannedFiles.Count;
 

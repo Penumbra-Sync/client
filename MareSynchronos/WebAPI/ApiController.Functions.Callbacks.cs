@@ -17,10 +17,10 @@ public partial class ApiController
 
     private void UpdateLocalClientPairsCallback(ClientPairDto dto)
     {
-        var entry = PairedClients.SingleOrDefault(e => e.OtherUID == dto.OtherUID);
+        var entry = PairedClients.SingleOrDefault(e => string.Equals(e.OtherUID, dto.OtherUID, System.StringComparison.Ordinal));
         if (dto.IsRemoved)
         {
-            PairedClients.RemoveAll(p => p.OtherUID == dto.OtherUID);
+            PairedClients.RemoveAll(p => string.Equals(p.OtherUID, dto.OtherUID, System.StringComparison.Ordinal));
             return;
         }
         if (entry == null)
@@ -43,7 +43,7 @@ public partial class ApiController
 
     private void UpdateOrAddBannedUserCallback(BannedUserDto obj)
     {
-        var user = AdminBannedUsers.SingleOrDefault(b => b.CharacterHash == obj.CharacterHash);
+        var user = AdminBannedUsers.SingleOrDefault(b => string.Equals(b.CharacterHash, obj.CharacterHash, System.StringComparison.Ordinal));
         if (user == null)
         {
             AdminBannedUsers.Add(obj);
@@ -56,12 +56,12 @@ public partial class ApiController
 
     private void DeleteBannedUserCallback(BannedUserDto obj)
     {
-        AdminBannedUsers.RemoveAll(a => a.CharacterHash == obj.CharacterHash);
+        AdminBannedUsers.RemoveAll(a => string.Equals(a.CharacterHash, obj.CharacterHash, System.StringComparison.Ordinal));
     }
 
     private void UpdateOrAddForbiddenFileCallback(ForbiddenFileDto obj)
     {
-        var user = AdminForbiddenFiles.SingleOrDefault(b => b.Hash == obj.Hash);
+        var user = AdminForbiddenFiles.SingleOrDefault(b => string.Equals(b.Hash, obj.Hash, System.StringComparison.Ordinal));
         if (user == null)
         {
             AdminForbiddenFiles.Add(obj);
@@ -74,18 +74,18 @@ public partial class ApiController
 
     private void DeleteForbiddenFileCallback(ForbiddenFileDto obj)
     {
-        AdminForbiddenFiles.RemoveAll(f => f.Hash == obj.Hash);
+        AdminForbiddenFiles.RemoveAll(f => string.Equals(f.Hash, obj.Hash, System.StringComparison.Ordinal));
     }
 
     private void GroupPairChangedCallback(GroupPairDto dto)
     {
         if (dto.IsRemoved.GetValueOrDefault(false))
         {
-            GroupPairedClients.RemoveAll(g => g.GroupGID == dto.GroupGID && g.UserUID == dto.UserUID);
+            GroupPairedClients.RemoveAll(g => string.Equals(g.GroupGID, dto.GroupGID, System.StringComparison.Ordinal) && string.Equals(g.UserUID, dto.UserUID, System.StringComparison.Ordinal));
             return;
         }
 
-        var existingUser = GroupPairedClients.FirstOrDefault(f => f.GroupGID == dto.GroupGID && f.UserUID == dto.UserUID);
+        var existingUser = GroupPairedClients.FirstOrDefault(f => string.Equals(f.GroupGID, dto.GroupGID, System.StringComparison.Ordinal) && string.Equals(f.UserUID, dto.UserUID, System.StringComparison.Ordinal));
         if (existingUser == null)
         {
             GroupPairedClients.Add(dto);
@@ -101,16 +101,16 @@ public partial class ApiController
     {
         if (dto.IsDeleted.GetValueOrDefault(false))
         {
-            Groups.RemoveAll(g => g.GID == dto.GID);
-            GroupPairedClients.RemoveAll(g => g.GroupGID == dto.GID);
+            Groups.RemoveAll(g => string.Equals(g.GID, dto.GID, System.StringComparison.Ordinal));
+            GroupPairedClients.RemoveAll(g => string.Equals(g.GroupGID, dto.GID, System.StringComparison.Ordinal));
             return;
         }
 
-        var existingGroup = Groups.FirstOrDefault(g => g.GID == dto.GID);
+        var existingGroup = Groups.FirstOrDefault(g => string.Equals(g.GID, dto.GID, System.StringComparison.Ordinal));
         if (existingGroup == null)
         {
             Groups.Add(dto);
-            GroupPairedClients.AddRange(await _mareHub!.InvokeAsync<List<GroupPairDto>>(Api.InvokeGroupGetUsersInGroup, dto.GID));
+            GroupPairedClients.AddRange(await _mareHub!.InvokeAsync<List<GroupPairDto>>(Api.InvokeGroupGetUsersInGroup, dto.GID).ConfigureAwait(false));
             return;
         }
 

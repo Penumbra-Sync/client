@@ -186,7 +186,7 @@ public class DalamudUtil : IDisposable
     {
         return _objectTable.Where(obj =>
             obj.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player &&
-            obj.Name.ToString() != PlayerName).Select(p => (PlayerCharacter)p).ToList();
+            !string.Equals(obj.Name.ToString(), PlayerName, StringComparison.Ordinal)).Select(p => (PlayerCharacter)p).ToList();
     }
 
     public Dalamud.Game.ClientState.Objects.Types.Character? GetCharacterFromObjectTableByIndex(int index)
@@ -201,7 +201,7 @@ public class DalamudUtil : IDisposable
         foreach (var item in _objectTable)
         {
             if (item.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) continue;
-            if (item.Name.ToString() == characterName) return (PlayerCharacter)item;
+            if (string.Equals(item.Name.ToString(), characterName, StringComparison.Ordinal)) return (PlayerCharacter)item;
         }
 
         return null;
@@ -209,7 +209,7 @@ public class DalamudUtil : IDisposable
 
     public async Task<T> RunOnFrameworkThread<T>(Func<T> func)
     {
-        return await _framework.RunOnFrameworkThread(func);
+        return await _framework.RunOnFrameworkThread(func).ConfigureAwait(false);
     }
 
     public unsafe void WaitWhileCharacterIsDrawing(string name, IntPtr characterAddress, int timeOut = 5000, CancellationToken? ct = null)

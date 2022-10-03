@@ -22,7 +22,7 @@ public class FileCache
 
     public void SetResolvedFilePath(string filePath)
     {
-        ResolvedFilepath = filePath.ToLowerInvariant().Replace("\\\\", "\\");
+        ResolvedFilepath = filePath.ToLowerInvariant().Replace("\\\\", "\\", System.StringComparison.Ordinal);
     }
 
     public string CsvEntry => $"{Hash}{FileCacheManager.CsvSplit}{PrefixedFilePath}{FileCacheManager.CsvSplit}{LastModifiedDateTicks.ToString(CultureInfo.InvariantCulture)}";

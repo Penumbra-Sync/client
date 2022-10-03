@@ -33,8 +33,11 @@ public partial class ApiController : IDisposable
     private HubConnection? _mareHub;
 
     private CancellationTokenSource? _uploadCancellationTokenSource = new();
+    private CancellationTokenSource? _healthCheckTokenSource = new();
 
     private ConnectionDto? _connectionDto;
+    public ServerInfoDto ServerInfo => _connectionDto?.ServerInfo ?? new ServerInfoDto();
+
     public SystemInfoDto SystemInfoDto { get; private set; } = new();
     public bool IsModerator => (_connectionDto?.IsAdmin ?? false) || (_connectionDto?.IsModerator ?? false);
 
@@ -51,7 +54,7 @@ public partial class ApiController : IDisposable
         _dalamudUtil.LogIn += DalamudUtilOnLogIn;
         _dalamudUtil.LogOut += DalamudUtilOnLogOut;
         ServerState = ServerState.Offline;
-        _verifiedUploadedHashes = new();
+        _verifiedUploadedHashes = new(StringComparer.Ordinal);
 
         if (_dalamudUtil.IsLoggedIn)
         {
@@ -61,7 +64,7 @@ public partial class ApiController : IDisposable
 
     private void DalamudUtilOnLogOut()
     {
-        Task.Run(async () => await StopConnection(_connectionCancellationTokenSource.Token));
+        Task.Run(async () => await StopConnection(_connectionCancellationTokenSource.Token).ConfigureAwait(false));
         ServerState = ServerState.Offline;
     }
 
@@ -108,10 +111,10 @@ public partial class ApiController : IDisposable
 
     public bool ServerAlive => ServerState is ServerState.Connected or ServerState.RateLimited or ServerState.Unauthorized or ServerState.Disconnected;
 
-    public Dictionary<string, string> ServerDictionary => new Dictionary<string, string>()
+    public Dictionary<string, string> ServerDictionary => new Dictionary<string, string>(StringComparer.Ordinal)
             { { MainServiceUri, MainServer } }
         .Concat(_pluginConfiguration.CustomServerList)
-        .ToDictionary(k => k.Key, k => k.Value);
+        .ToDictionary(k => k.Key, k => k.Value, StringComparer.Ordinal);
 
     public string UID => _connectionDto?.UID ?? string.Empty;
     public string DisplayName => _connectionDto?.UID ?? string.Empty;
@@ -138,11 +141,11 @@ public partial class ApiController : IDisposable
             Logger.Info("Not recreating Connection, paused");
             ServerState = ServerState.Disconnected;
             _connectionDto = null;
-            await StopConnection(_connectionCancellationTokenSource.Token);
+            await StopConnection(_connectionCancellationTokenSource.Token).ConfigureAwait(false);
             return;
         }
 
-        await StopConnection(_connectionCancellationTokenSource.Token);
+        await StopConnection(_connectionCancellationTokenSource.Token).ConfigureAwait(false);
 
         Logger.Info("Recreating Connection");
 
@@ -154,11 +157,11 @@ public partial class ApiController : IDisposable
         {
             if (string.IsNullOrEmpty(SecretKey))
             {
-                await Task.Delay(TimeSpan.FromSeconds(2));
+                await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
                 continue;
             }
 
-            await StopConnection(token);
+            await StopConnection(token).ConfigureAwait(false);
 
             try
             {
@@ -167,32 +170,32 @@ public partial class ApiController : IDisposable
                 while (!_dalamudUtil.IsPlayerPresent && !token.IsCancellationRequested)
                 {
                     Logger.Debug("Player not loaded in yet, waiting");
-                    await Task.Delay(TimeSpan.FromSeconds(1), token);
+                    await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
                 }
 
                 if (token.IsCancellationRequested) break;
 
                 _mareHub = BuildHubConnection(Api.Path);
 
-                await _mareHub.StartAsync(token);
+                await _mareHub.StartAsync(token).ConfigureAwait(false);
 
                 _mareHub.On<SystemInfoDto>(Api.OnUpdateSystemInfo, (dto) => SystemInfoDto = dto);
 
                 _connectionDto =
-                    await _mareHub.InvokeAsync<ConnectionDto>(Api.InvokeHeartbeat, _dalamudUtil.PlayerNameHashed, token);
+                    await _mareHub.InvokeAsync<ConnectionDto>(Api.InvokeHeartbeat, _dalamudUtil.PlayerNameHashed, token).ConfigureAwait(false);
 
                 ServerState = ServerState.Connected;
 
                 if (_connectionDto.ServerVersion != Api.Version)
                 {
                     ServerState = ServerState.VersionMisMatch;
-                    await StopConnection(token);
+                    await StopConnection(token).ConfigureAwait(false);
                     return;
                 }
 
                 if (ServerState is ServerState.Connected) // user is authorized && server is legit
                 {
-                    await InitializeData(token);
+                    await InitializeData(token).ConfigureAwait(false);
 
                     _mareHub.Closed += MareHubOnClosed;
                     _mareHub.Reconnecting += MareHubOnReconnecting;
@@ -206,7 +209,7 @@ public partial class ApiController : IDisposable
                 Logger.Warn(ex.StackTrace ?? string.Empty);
 
                 ServerState = ServerState.RateLimited;
-                await StopConnection(token);
+                await StopConnection(token).ConfigureAwait(false);
                 return;
             }
             catch (HttpRequestException ex)
@@ -218,14 +221,14 @@ public partial class ApiController : IDisposable
                 if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
                     ServerState = ServerState.Unauthorized;
-                    await StopConnection(token);
+                    await StopConnection(token).ConfigureAwait(false);
                     return;
                 }
                 else
                 {
                     ServerState = ServerState.Offline;
                     Logger.Info("Failed to establish connection, retrying");
-                    await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token);
+                    await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token).ConfigureAwait(false);
                 }
             }
             catch (Exception ex)
@@ -234,7 +237,7 @@ public partial class ApiController : IDisposable
                 Logger.Warn(ex.Message);
                 Logger.Warn(ex.StackTrace ?? string.Empty);
                 Logger.Info("Failed to establish connection, retrying");
-                await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token);
+                await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token).ConfigureAwait(false);
             }
         }
     }
@@ -243,6 +246,21 @@ public partial class ApiController : IDisposable
     {
         _ = Task.Run(CreateConnections);
         return Task.CompletedTask;
+    }
+
+    private async Task ClientHealthCheck(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
+            if (ct.IsCancellationRequested) break;
+            var needsRestart = await _mareHub!.InvokeAsync<bool>(Api.InvokeCheckClientHealth, ct).ConfigureAwait(false);
+            Logger.Debug("Checked Client Health State, healthy: " + !needsRestart);
+            if (needsRestart)
+            {
+                _ = CreateConnections();
+            }
+        }
     }
 
     private async Task InitializeData(CancellationToken token)
@@ -263,22 +281,22 @@ public partial class ApiController : IDisposable
         _mareHub.On<GroupPairDto>(Api.OnGroupUserChange, GroupPairChangedCallback);
 
         PairedClients =
-            await _mareHub!.InvokeAsync<List<ClientPairDto>>(Api.InvokeUserGetPairedClients, token);
-        Groups = await GetGroups();
+            await _mareHub!.InvokeAsync<List<ClientPairDto>>(Api.InvokeUserGetPairedClients, token).ConfigureAwait(false);
+        Groups = await GetGroups().ConfigureAwait(false);
         GroupPairedClients.Clear();
         foreach (var group in Groups)
         {
-            GroupPairedClients.AddRange(await GetUsersInGroup(group.GID));
+            GroupPairedClients.AddRange(await GetUsersInGroup(group.GID).ConfigureAwait(false));
         }
 
         if (IsModerator)
         {
             AdminForbiddenFiles =
                 await _mareHub.InvokeAsync<List<ForbiddenFileDto>>(Api.InvokeAdminGetForbiddenFiles,
-                    token);
+                    token).ConfigureAwait(false);
             AdminBannedUsers =
                 await _mareHub.InvokeAsync<List<BannedUserDto>>(Api.InvokeAdminGetBannedUsers,
-                    token);
+                    token).ConfigureAwait(false);
             _mareHub.On<BannedUserDto>(Api.OnAdminUpdateOrAddBannedUser,
                 UpdateOrAddBannedUserCallback);
             _mareHub.On<BannedUserDto>(Api.OnAdminDeleteBannedUser, DeleteBannedUserCallback);
@@ -287,6 +305,11 @@ public partial class ApiController : IDisposable
             _mareHub.On<ForbiddenFileDto>(Api.OnAdminDeleteForbiddenFile,
                 DeleteForbiddenFileCallback);
         }
+
+        _healthCheckTokenSource?.Cancel();
+        _healthCheckTokenSource?.Dispose();
+        _healthCheckTokenSource = new CancellationTokenSource();
+        _ = ClientHealthCheck(_healthCheckTokenSource.Token);
 
         Connected?.Invoke();
     }
@@ -298,7 +321,7 @@ public partial class ApiController : IDisposable
         _dalamudUtil.LogIn -= DalamudUtilOnLogIn;
         _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
 
-        Task.Run(async () => await StopConnection(_connectionCancellationTokenSource.Token));
+        Task.Run(async () => await StopConnection(_connectionCancellationTokenSource.Token).ConfigureAwait(false));
         _connectionCancellationTokenSource?.Cancel();
     }
 
@@ -332,6 +355,7 @@ public partial class ApiController : IDisposable
 
     private Task MareHubOnReconnecting(Exception? arg)
     {
+        _healthCheckTokenSource?.Cancel();
         ServerState = ServerState.Disconnected;
         Logger.Warn("Connection closed... Reconnecting");
         Logger.Warn(arg?.Message ?? string.Empty);
@@ -350,8 +374,8 @@ public partial class ApiController : IDisposable
             _mareHub.Closed -= MareHubOnClosed;
             _mareHub.Reconnecting -= MareHubOnReconnecting;
             _mareHub.Reconnected -= MareHubOnReconnected;
-            await _mareHub.StopAsync(token);
-            await _mareHub.DisposeAsync();
+            await _mareHub.StopAsync(token).ConfigureAwait(false);
+            await _mareHub.DisposeAsync().ConfigureAwait(false);
             CurrentUploads.Clear();
             CurrentDownloads.Clear();
             _uploadCancellationTokenSource?.Cancel();
@@ -363,7 +387,7 @@ public partial class ApiController : IDisposable
         {
             while (ServerState != ServerState.Offline)
             {
-                await Task.Delay(16);
+                await Task.Delay(16).ConfigureAwait(false);
             }
         }
     }

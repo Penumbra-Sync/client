@@ -33,7 +33,7 @@ public partial class ApiController
 
     public async Task DeleteAllMyFiles()
     {
-        await _mareHub!.SendAsync(Api.SendFileDeleteAllFiles);
+        await _mareHub!.SendAsync(Api.SendFileDeleteAllFiles).ConfigureAwait(false);
     }
 
     private async Task<string> DownloadFile(int downloadId, string hash, Uri downloadUri, CancellationToken ct)
@@ -44,7 +44,7 @@ public partial class ApiController
         {
             try
             {
-                CurrentDownloads[downloadId].Single(f => f.Hash == hash).Transferred = e.BytesReceived;
+                CurrentDownloads[downloadId].Single(f => string.Equals(f.Hash, hash, StringComparison.Ordinal)).Transferred = e.BytesReceived;
             }
             catch (Exception ex)
             {
@@ -61,11 +61,11 @@ public partial class ApiController
 
         try
         {
-            await wc.DownloadFileTaskAsync(downloadUri, fileName);
+            await wc.DownloadFileTaskAsync(downloadUri, fileName).ConfigureAwait(false);
         }
         catch { }
 
-        CurrentDownloads[downloadId].Single(f => f.Hash == hash).Transferred = CurrentDownloads[downloadId].Single(f => f.Hash == hash).Total;
+        CurrentDownloads[downloadId].Single(f => string.Equals(f.Hash, hash, StringComparison.Ordinal)).Transferred = CurrentDownloads[downloadId].Single(f => string.Equals(f.Hash, hash, StringComparison.Ordinal)).Total;
 
         wc.DownloadProgressChanged -= progChanged;
         return fileName;
@@ -78,7 +78,7 @@ public partial class ApiController
         DownloadStarted?.Invoke();
         try
         {
-            await DownloadFilesInternal(currentDownloadId, fileReplacementDto, ct);
+            await DownloadFilesInternal(currentDownloadId, fileReplacementDto, ct).ConfigureAwait(false);
         }
         catch
         {
@@ -94,8 +94,8 @@ public partial class ApiController
     {
         Logger.Debug("Downloading files (Download ID " + currentDownloadId + ")");
 
-        List<DownloadFileDto> downloadFileInfoFromService = new List<DownloadFileDto>();
-        downloadFileInfoFromService.AddRange(await _mareHub!.InvokeAsync<List<DownloadFileDto>>(Api.InvokeGetFilesSizes, fileReplacementDto.Select(f => f.Hash).ToList(), ct));
+        List<DownloadFileDto> downloadFileInfoFromService = new();
+        downloadFileInfoFromService.AddRange(await _mareHub!.InvokeAsync<List<DownloadFileDto>>(Api.InvokeGetFilesSizes, fileReplacementDto.Select(f => f.Hash).ToList(), ct).ConfigureAwait(false));
 
         Logger.Debug("Files with size 0 or less: " + string.Join(", ", downloadFileInfoFromService.Where(f => f.Size <= 0).Select(f => f.Hash)));
 
@@ -104,7 +104,7 @@ public partial class ApiController
 
         foreach (var dto in downloadFileInfoFromService.Where(c => c.IsForbidden))
         {
-            if (ForbiddenTransfers.All(f => f.Hash != dto.Hash))
+            if (ForbiddenTransfers.All(f => !string.Equals(f.Hash, dto.Hash, StringComparison.Ordinal)))
             {
                 ForbiddenTransfers.Add(new DownloadFileTransfer(dto));
             }
@@ -118,7 +118,7 @@ public partial class ApiController
         async (file, token) =>
         {
             var hash = file.Hash;
-            var tempFile = await DownloadFile(currentDownloadId, file.Hash, file.DownloadUri, token);
+            var tempFile = await DownloadFile(currentDownloadId, file.Hash, file.DownloadUri, token).ConfigureAwait(false);
             if (token.IsCancellationRequested)
             {
                 File.Delete(tempFile);
@@ -128,16 +128,16 @@ public partial class ApiController
                 return;
             }
 
-            var tempFileData = await File.ReadAllBytesAsync(tempFile, token);
+            var tempFileData = await File.ReadAllBytesAsync(tempFile, token).ConfigureAwait(false);
             var extractedFile = LZ4Codec.Unwrap(tempFileData);
             File.Delete(tempFile);
             var filePath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash);
-            await File.WriteAllBytesAsync(filePath, extractedFile, token);
+            await File.WriteAllBytesAsync(filePath, extractedFile, token).ConfigureAwait(false);
             var fi = new FileInfo(filePath);
             Func<DateTime> RandomDayFunc()
             {
-                DateTime start = new DateTime(1995, 1, 1);
-                Random gen = new Random();
+                DateTime start = new(1995, 1, 1);
+                Random gen = new();
                 int range = (DateTime.Today - start).Days;
                 return () => start.AddDays(gen.Next(range));
             }
@@ -155,7 +155,7 @@ public partial class ApiController
                 Logger.Warn(ex.Message);
                 Logger.Warn(ex.StackTrace);
             }
-        });
+        }).ConfigureAwait(false);
 
         Logger.Debug("Download complete, removing " + currentDownloadId);
         CancelDownload(currentDownloadId);
@@ -163,7 +163,7 @@ public partial class ApiController
 
     public async Task PushCharacterData(CharacterCacheDto character, List<string> visibleCharacterIds)
     {
-        if (!IsConnected || SecretKey == "-") return;
+        if (!IsConnected || string.Equals(SecretKey, "-", StringComparison.Ordinal)) return;
         Logger.Debug("Sending Character data to service " + ApiUri);
 
         CancelUpload();
@@ -172,7 +172,7 @@ public partial class ApiController
         Logger.Verbose("New Token Created");
 
         List<string> unverifiedUploadHashes = new();
-        foreach (var item in character.FileReplacements.SelectMany(c => c.Value.Where(f => string.IsNullOrEmpty(f.FileSwapPath)).Select(v => v.Hash).Distinct()).Distinct().ToList())
+        foreach (var item in character.FileReplacements.SelectMany(c => c.Value.Where(f => string.IsNullOrEmpty(f.FileSwapPath)).Select(v => v.Hash).Distinct(StringComparer.Ordinal)).Distinct(StringComparer.Ordinal).ToList())
         {
             if (!_verifiedUploadedHashes.Contains(item))
             {
@@ -183,7 +183,7 @@ public partial class ApiController
         if (unverifiedUploadHashes.Any())
         {
             Logger.Debug("Verifying " + unverifiedUploadHashes.Count + " files");
-            var filesToUpload = await _mareHub!.InvokeAsync<List<UploadFileDto>>(Api.InvokeFileSendFiles, unverifiedUploadHashes, uploadToken);
+            var filesToUpload = await _mareHub!.InvokeAsync<List<UploadFileDto>>(Api.InvokeFileSendFiles, unverifiedUploadHashes, uploadToken).ConfigureAwait(false);
 
             foreach (var file in filesToUpload.Where(f => !f.IsForbidden))
             {
@@ -203,7 +203,7 @@ public partial class ApiController
 
             foreach (var file in filesToUpload.Where(c => c.IsForbidden))
             {
-                if (ForbiddenTransfers.All(f => f.Hash != file.Hash))
+                if (ForbiddenTransfers.All(f => !string.Equals(f.Hash, file.Hash, StringComparison.Ordinal)))
                 {
                     ForbiddenTransfers.Add(new UploadFileTransfer(file)
                     {
@@ -217,9 +217,9 @@ public partial class ApiController
             foreach (var file in CurrentUploads.Where(f => f.CanBeTransferred && !f.IsTransferred).ToList())
             {
                 Logger.Debug("Compressing and uploading " + file);
-                var data = await GetCompressedFileData(file.Hash, uploadToken);
-                CurrentUploads.Single(e => e.Hash == data.Item1).Total = data.Item2.Length;
-                await UploadFile(data.Item2, file.Hash, uploadToken);
+                var data = await GetCompressedFileData(file.Hash, uploadToken).ConfigureAwait(false);
+                CurrentUploads.Single(e => string.Equals(e.Hash, data.Item1, StringComparison.Ordinal)).Total = data.Item2.Length;
+                await UploadFile(data.Item2, file.Hash, uploadToken).ConfigureAwait(false);
                 if (!uploadToken.IsCancellationRequested) continue;
                 Logger.Warn("Cancel in filesToUpload loop detected");
                 CurrentUploads.Clear();
@@ -233,12 +233,12 @@ public partial class ApiController
             }
 
             Logger.Debug("Upload tasks complete, waiting for server to confirm");
-            var anyUploadsOpen = await _mareHub!.InvokeAsync<bool>(Api.InvokeFileIsUploadFinished, uploadToken);
+            var anyUploadsOpen = await _mareHub!.InvokeAsync<bool>(Api.InvokeFileIsUploadFinished, uploadToken).ConfigureAwait(false);
             Logger.Debug("Uploads open: " + anyUploadsOpen);
             while (anyUploadsOpen && !uploadToken.IsCancellationRequested)
             {
-                anyUploadsOpen = await _mareHub!.InvokeAsync<bool>(Api.InvokeFileIsUploadFinished, uploadToken);
-                await Task.Delay(TimeSpan.FromSeconds(0.5), uploadToken);
+                anyUploadsOpen = await _mareHub!.InvokeAsync<bool>(Api.InvokeFileIsUploadFinished, uploadToken).ConfigureAwait(false);
+                await Task.Delay(TimeSpan.FromSeconds(0.5), uploadToken).ConfigureAwait(false);
                 Logger.Debug("Waiting for uploads to finish");
             }
 
@@ -257,7 +257,7 @@ public partial class ApiController
         if (!uploadToken.IsCancellationRequested)
         {
             Logger.Info("Pushing character data for " + character.GetHashCode() + " to " + string.Join(", ", visibleCharacterIds));
-            StringBuilder sb = new StringBuilder();
+            StringBuilder sb = new();
             foreach (var item in character.FileReplacements)
             {
                 sb.AppendLine($"FileReplacements for {item.Key}: {item.Value.Count}");
@@ -267,7 +267,7 @@ public partial class ApiController
                 sb.AppendLine($"GlamourerData for {item.Key}: {!string.IsNullOrEmpty(item.Value)}");
             }
             Logger.Debug("Chara data contained: " + Environment.NewLine + sb.ToString());
-            await _mareHub!.InvokeAsync(Api.InvokeUserPushCharacterDataToVisibleClients, character, visibleCharacterIds, uploadToken);
+            await _mareHub!.InvokeAsync(Api.InvokeUserPushCharacterDataToVisibleClients, character, visibleCharacterIds, uploadToken).ConfigureAwait(false);
         }
         else
         {
@@ -281,7 +281,7 @@ public partial class ApiController
     private async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)
     {
         var fileCache = _fileDbManager.GetFileCacheByHash(fileHash)!.ResolvedFilepath;
-        return (fileHash, LZ4Codec.WrapHC(await File.ReadAllBytesAsync(fileCache, uploadToken), 0,
+        return (fileHash, LZ4Codec.WrapHC(await File.ReadAllBytesAsync(fileCache, uploadToken).ConfigureAwait(false), 0,
             (int)new FileInfo(fileCache).Length));
     }
 
@@ -295,15 +295,15 @@ public partial class ApiController
             using var ms = new MemoryStream(compressedFile);
             var buffer = new byte[chunkSize];
             int bytesRead;
-            while ((bytesRead = await ms.ReadAsync(buffer, 0, chunkSize, token)) > 0 && !token.IsCancellationRequested)
+            while ((bytesRead = await ms.ReadAsync(buffer, 0, chunkSize, token).ConfigureAwait(false)) > 0 && !token.IsCancellationRequested)
             {
-                CurrentUploads.Single(f => f.Hash == fileHash).Transferred += bytesRead;
+                CurrentUploads.Single(f => string.Equals(f.Hash, fileHash, StringComparison.Ordinal)).Transferred += bytesRead;
                 token.ThrowIfCancellationRequested();
                 yield return bytesRead == chunkSize ? buffer.ToArray() : buffer.Take(bytesRead).ToArray();
             }
         }
 
-        await _mareHub!.SendAsync(Api.SendFileUploadFileStreamAsync, fileHash, AsyncFileData(uploadToken), uploadToken);
+        await _mareHub!.SendAsync(Api.SendFileUploadFileStreamAsync, fileHash, AsyncFileData(uploadToken), uploadToken).ConfigureAwait(false);
     }
 
     public void CancelDownload(int downloadId)

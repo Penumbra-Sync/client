@@ -82,7 +82,7 @@ public class TransientResourceManager : IDisposable
 
     private void Manager_PenumbraResourceLoadEvent(IntPtr gameObject, string gamePath, string filePath)
     {
-        if (!FileTypesToHandle.Any(type => gamePath.ToLowerInvariant().EndsWith(type)))
+        if (!FileTypesToHandle.Any(type => gamePath.EndsWith(type, StringComparison.OrdinalIgnoreCase)))
         {
             return;
         }
@@ -93,25 +93,25 @@ public class TransientResourceManager : IDisposable
 
         if (!TransientResources.ContainsKey(gameObject))
         {
-            TransientResources[gameObject] = new();
+            TransientResources[gameObject] = new(StringComparer.OrdinalIgnoreCase);
         }
 
-        if (filePath.StartsWith("|"))
+        if (filePath.StartsWith("|", StringComparison.OrdinalIgnoreCase))
         {
             filePath = filePath.Split("|")[2];
         }
 
-        filePath = filePath.ToLowerInvariant().Replace("\\", "/");
+        filePath = filePath.ToLowerInvariant().Replace("\\", "/", StringComparison.OrdinalIgnoreCase);
 
-        var replacedGamePath = gamePath.ToLowerInvariant().Replace("\\", "/");
+        var replacedGamePath = gamePath.ToLowerInvariant().Replace("\\", "/", StringComparison.OrdinalIgnoreCase);
 
         if (TransientResources[gameObject].Contains(replacedGamePath) ||
-            SemiTransientResources.Any(r => r.Value.Any(f => f.GamePaths.First().ToLowerInvariant() == replacedGamePath
-                && f.ResolvedPath.ToLowerInvariant() == filePath)))
+            SemiTransientResources.Any(r => r.Value.Any(f => string.Equals(f.GamePaths.First(), replacedGamePath , StringComparison.OrdinalIgnoreCase) 
+            && string.Equals(f.ResolvedPath, filePath, StringComparison.OrdinalIgnoreCase))))
         {
             Logger.Debug("Not adding " + replacedGamePath + ":" + filePath);
-            Logger.Verbose("SemiTransientAny: " + SemiTransientResources.Any(r => r.Value.Any(f => string.Equals(f.GamePaths.First(), replacedGamePath, StringComparison.OrdinalIgnoreCase) && string.Equals(f.ResolvedPath.ToLowerInvariant(), filePath, StringComparison.OrdinalIgnoreCase))).ToString() + ", TransientAny: " + TransientResources[gameObject].Contains(replacedGamePath));
-                && f.ResolvedPath.ToLowerInvariant() == filePath)).ToString() + ", TransientAny: " + TransientResources[gameObject].Contains(replacedGamePath));
+            Logger.Verbose("SemiTransientAny: " + SemiTransientResources.Any(r => r.Value.Any(f => string.Equals(f.GamePaths.First(), replacedGamePath, StringComparison.OrdinalIgnoreCase) 
+                && string.Equals(f.ResolvedPath, filePath, StringComparison.OrdinalIgnoreCase))).ToString() + ", TransientAny: " + TransientResources[gameObject].Contains(replacedGamePath));
         }
         else
         {
@@ -125,7 +125,7 @@ public class TransientResourceManager : IDisposable
     {
         if (TransientResources.ContainsKey(gameObject))
         {
-            TransientResources[gameObject].RemoveWhere(f => fileReplacement.GamePaths.Any(g => g.ToLowerInvariant() == f.ToLowerInvariant()));
+            TransientResources[gameObject].RemoveWhere(f => fileReplacement.GamePaths.Any(g => string.Equals(g, f, StringComparison.OrdinalIgnoreCase)));
         }
     }
 
@@ -145,11 +145,11 @@ public class TransientResourceManager : IDisposable
         Logger.Debug("Persisting " + transientResources.Count + " transient resources");
         foreach (var gamePath in transientResources)
         {
-            var existingResource = SemiTransientResources[objectKind].Any(f => f.GamePaths.First().ToLowerInvariant() == gamePath.ToLowerInvariant());
+            var existingResource = SemiTransientResources[objectKind].Any(f => string.Equals(f.GamePaths.First(), gamePath, StringComparison.OrdinalIgnoreCase));
             if (existingResource)
             {
                 Logger.Debug("Semi Transient resource replaced: " + gamePath);
-                SemiTransientResources[objectKind].RemoveWhere(f => f.GamePaths.First().ToLowerInvariant() == gamePath.ToLowerInvariant());
+                SemiTransientResources[objectKind].RemoveWhere(f => string.Equals(f.GamePaths.First(), gamePath, StringComparison.OrdinalIgnoreCase));
             }
 
             try
@@ -196,7 +196,7 @@ public class TransientResourceManager : IDisposable
             SemiTransientResources[objectKind] = new HashSet<FileReplacement>();
         }
 
-        if (!SemiTransientResources[objectKind].Any(f => f.ResolvedPath.ToLowerInvariant() == item.ResolvedPath.ToLowerInvariant()))
+        if (!SemiTransientResources[objectKind].Any(f => string.Equals(f.ResolvedPath, item.ResolvedPath, StringComparison.OrdinalIgnoreCase)))
         {
             SemiTransientResources[objectKind].Add(item);
         }

@@ -34,7 +34,7 @@ public class PlayerManager : IDisposable
     private CancellationTokenSource? _playerChangedCts = new();
     private CancellationTokenSource _transientUpdateCts = new();
 
-    private List<PlayerRelatedObject> playerRelatedObjects = new List<PlayerRelatedObject>();
+    private List<PlayerRelatedObject> playerRelatedObjects = new();
 
     public unsafe PlayerManager(ApiController apiController, IpcManager ipcManager,
         CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil, TransientResourceManager transientResourceManager,
@@ -88,7 +88,7 @@ public class PlayerManager : IDisposable
                 Task.Run(async () =>
                 {
                     Logger.Debug("Delaying transient resource load update");
-                    await Task.Delay(750, token);
+                    await Task.Delay(750, token).ConfigureAwait(false);
                     if (obj.HasUnprocessedUpdate || token.IsCancellationRequested) return;
                     Logger.Debug("Firing transient resource load update");
                     obj.HasTransientsUpdate = true;
@@ -169,7 +169,7 @@ public class PlayerManager : IDisposable
         while (!PermanentDataCache.IsReady && !token.IsCancellationRequested)
         {
             Logger.Verbose("Waiting until cache is ready");
-            await Task.Delay(50, token);
+            await Task.Delay(50, token).ConfigureAwait(false);
         }
 
         if (token.IsCancellationRequested) return null;
@@ -215,7 +215,7 @@ public class PlayerManager : IDisposable
         var token = _playerChangedCts.Token;
 
         // fix for redraw from anamnesis
-        while ((!_dalamudUtil.IsPlayerPresent || _dalamudUtil.PlayerName == "--") && !token.IsCancellationRequested)
+        while ((!_dalamudUtil.IsPlayerPresent || string.Equals(_dalamudUtil.PlayerName, "--", StringComparison.Ordinal)) && !token.IsCancellationRequested)
         {
             Logger.Debug("Waiting Until Player is Present");
             Thread.Sleep(100);
@@ -244,7 +244,7 @@ public class PlayerManager : IDisposable
                     _dalamudUtil.WaitWhileCharacterIsDrawing("self " + item.ObjectKind.ToString(), item.Address, 10000, token);
                 }
 
-                cacheDto = (await CreateFullCharacterCacheDto(token));
+                cacheDto = (await CreateFullCharacterCacheDto(token).ConfigureAwait(false));
             }
             catch { }
             finally

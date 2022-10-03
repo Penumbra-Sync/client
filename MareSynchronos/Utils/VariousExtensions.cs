@@ -18,7 +18,7 @@ public static class VariousExtensions
         if (attribute?.InformationalVersion != null)
         {
             var value = attribute.InformationalVersion;
-            var index = value.IndexOf(BuildVersionMetadataPrefix);
+            var index = value.IndexOf(BuildVersionMetadataPrefix, StringComparison.Ordinal);
             if (index > 0)
             {
                 value = value[(index + BuildVersionMetadataPrefix.Length)..];

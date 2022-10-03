@@ -37,12 +37,12 @@ internal class IntroUi : Window, IDisposable
     private Task _timeoutTask;
     private string _timeoutTime;
 
-    private Dictionary<string, string> _languages = new() { { "English", "en" }, { "Deutsch", "de" }, { "Français", "fr" } };
+    private Dictionary<string, string> _languages = new(StringComparer.Ordinal) { { "English", "en" }, { "Deutsch", "de" }, { "Français", "fr" } };
     private int _currentLanguage;
 
-    private bool DarkSoulsCaptchaValid => _darkSoulsCaptcha1.Item2 == _enteredDarkSoulsCaptcha1.Trim()
-        && _darkSoulsCaptcha2.Item2 == _enteredDarkSoulsCaptcha2.Trim()
-        && _darkSoulsCaptcha3.Item2 == _enteredDarkSoulsCaptcha3.Trim();
+    private bool DarkSoulsCaptchaValid => string.Equals(_darkSoulsCaptcha1.Item2, _enteredDarkSoulsCaptcha1.Trim()
+, StringComparison.Ordinal) && string.Equals(_darkSoulsCaptcha2.Item2, _enteredDarkSoulsCaptcha2.Trim()
+, StringComparison.Ordinal) && string.Equals(_darkSoulsCaptcha3.Item2, _enteredDarkSoulsCaptcha3.Trim(), StringComparison.Ordinal);
 
 
     public void Dispose()
@@ -158,7 +158,7 @@ internal class IntroUi : Window, IDisposable
                                 {
                                     _timeoutTime = $"{i}s " + Strings.ToS.RemainingLabel;
                                     Logger.Debug(_timeoutTime);
-                                    await Task.Delay(TimeSpan.FromSeconds(1));
+                                    await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                                 }
                             });
                         }
@@ -286,11 +286,11 @@ internal class IntroUi : Window, IDisposable
 
     private Tuple<string, string> GetCaptchaTuple()
     {
-        Random random = new Random();
+        Random random = new();
         var paragraphIdx = random.Next(TosParagraphs.Length);
         var splitParagraph = TosParagraphs[paragraphIdx].Split(".", StringSplitOptions.RemoveEmptyEntries).Select(c => c.Trim()).ToArray();
         var sentenceIdx = random.Next(splitParagraph.Length);
-        var splitSentence = splitParagraph[sentenceIdx].Split(" ").Select(c => c.Trim()).Select(c => c.Replace(".", "").Replace(",", "").Replace("'", "")).ToArray();
+        var splitSentence = splitParagraph[sentenceIdx].Split(" ").Select(c => c.Trim()).Select(c => c.Replace(".", "", StringComparison.Ordinal).Replace(",", "", StringComparison.Ordinal).Replace("'", "", StringComparison.Ordinal)).ToArray();
         var wordIdx = random.Next(splitSentence.Length);
         return new($"{Strings.ToS.ParagraphLabel} {paragraphIdx + 1}, {Strings.ToS.SentenceLabel} {sentenceIdx + 1}, {Strings.ToS.WordLabel} {wordIdx + 1}", splitSentence[wordIdx]);
     }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
@@ -20,7 +21,7 @@ public class CompactUi : Window, IDisposable
 {
     private readonly ApiController _apiController;
     private readonly Configuration _configuration;
-    public readonly Dictionary<string, bool> ShowUidForEntry = new();
+    public readonly Dictionary<string, bool> ShowUidForEntry = new(StringComparer.Ordinal);
     private readonly UiShared _uiShared;
     private readonly WindowSystem _windowSystem;
     private string _characterOrCommentFilter = string.Empty;
@@ -162,7 +163,7 @@ public class CompactUi : Window, IDisposable
         ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
         if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
         {
-            if (_apiController.PairedClients.All(w => w.OtherUID != _pairToAdd))
+            if (_apiController.PairedClients.All(w => !string.Equals(w.OtherUID, _pairToAdd, StringComparison.Ordinal)))
             {
                 _ = _apiController.SendPairedClientAddition(_pairToAdd);
                 _pairToAdd = string.Empty;
@@ -316,7 +317,7 @@ public class CompactUi : Window, IDisposable
         }
 
         ImGui.SameLine();
-        if (EditNickEntry != entry.OtherUID)
+        if (!string.Equals(EditNickEntry, entry.OtherUID, StringComparison.Ordinal))
         {
             ImGui.SetCursorPosY(textPos);
             if (textIsUid) ImGui.PushFont(UiBuilder.MonoFont);
@@ -415,7 +416,7 @@ public class CompactUi : Window, IDisposable
         ImGui.EndChild();
     }
 
-    
+
 
     private IEnumerable<ClientPairDto> GetFilteredUsers()
     {
@@ -424,17 +425,23 @@ public class CompactUi : Window, IDisposable
             if (_characterOrCommentFilter.IsNullOrEmpty()) return true;
             _configuration.GetCurrentServerUidComments().TryGetValue(p.OtherUID, out var comment);
             var uid = p.VanityUID.IsNullOrEmpty() ? p.OtherUID : p.VanityUID;
-            return uid.ToLowerInvariant().Contains(_characterOrCommentFilter.ToLowerInvariant()) ||
-                   (comment?.ToLowerInvariant().Contains(_characterOrCommentFilter.ToLowerInvariant()) ?? false);
+            return uid.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ||
+                   (comment?.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false);
         });
     }
 
     private void DrawServerStatus()
     {
         var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Link);
-        var userCount = _apiController.OnlineUsers.ToString();
+        var userCount = _apiController.OnlineUsers.ToString(CultureInfo.InvariantCulture);
         var userSize = ImGui.CalcTextSize(userCount);
         var textSize = ImGui.CalcTextSize("Users Online");
+#if DEBUG
+        string shardConnection = $"Connected shard: {_apiController.ServerInfo.ShardName}";
+#else
+        string shardConnection = string.Equals(_apiController.ServerInfo.ShardName, "Main", StringComparison.OrdinalIgnoreCase) ? string.Empty : $"Connected shard: {_apiController.ServerInfo.ShardName}";
+#endif
+        var shardTextSize = ImGui.CalcTextSize(shardConnection);
 
         if (_apiController.ServerState is ServerState.Connected)
         {
@@ -444,6 +451,11 @@ public class CompactUi : Window, IDisposable
             ImGui.SameLine();
             ImGui.AlignTextToFramePadding();
             ImGui.Text("Users Online");
+            ImGui.AlignTextToFramePadding();
+            if (!string.IsNullOrEmpty(shardConnection))
+            {
+                ImGui.TextUnformatted(shardConnection);
+            }
         }
         else
         {

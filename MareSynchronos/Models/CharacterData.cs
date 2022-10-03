@@ -31,10 +31,10 @@ public class CharacterData
 
         if (!FileReplacements.ContainsKey(objectKind)) FileReplacements.Add(objectKind, new List<FileReplacement>());
 
-        var existingReplacement = FileReplacements[objectKind].SingleOrDefault(f => f.ResolvedPath == fileReplacement.ResolvedPath);
+        var existingReplacement = FileReplacements[objectKind].SingleOrDefault(f => string.Equals(f.ResolvedPath, fileReplacement.ResolvedPath, System.StringComparison.OrdinalIgnoreCase));
         if (existingReplacement != null)
         {
-            existingReplacement.GamePaths.AddRange(fileReplacement.GamePaths.Where(e => !existingReplacement.GamePaths.Contains(e)));
+            existingReplacement.GamePaths.AddRange(fileReplacement.GamePaths.Where(e => !existingReplacement.GamePaths.Contains(e, System.StringComparer.OrdinalIgnoreCase)));
         }
         else
         {
@@ -44,11 +44,11 @@ public class CharacterData
 
     public CharacterCacheDto ToCharacterCacheDto()
     {
-        var fileReplacements = FileReplacements.ToDictionary(k => k.Key, k => k.Value.Where(f => f.HasFileReplacement && !f.IsFileSwap).GroupBy(f => f.Hash).Select(g =>
+        var fileReplacements = FileReplacements.ToDictionary(k => k.Key, k => k.Value.Where(f => f.HasFileReplacement && !f.IsFileSwap).GroupBy(f => f.Hash, System.StringComparer.OrdinalIgnoreCase).Select(g =>
         {
             return new FileReplacementDto()
             {
-                GamePaths = g.SelectMany(f => f.GamePaths).Distinct().ToArray(),
+                GamePaths = g.SelectMany(f => f.GamePaths).Distinct(System.StringComparer.OrdinalIgnoreCase).ToArray(),
                 Hash = g.First().Hash,
             };
         }).ToList());

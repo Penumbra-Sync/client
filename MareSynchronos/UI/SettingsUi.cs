@@ -335,7 +335,7 @@ public class SettingsUi : Window, IDisposable
                         });
                     }
                     ImGui.SameLine();
-                    if (onlineUser.UID != _apiController.UID && _apiController.IsAdmin)
+                    if (!string.Equals(onlineUser.UID, _apiController.UID, StringComparison.Ordinal) && _apiController.IsAdmin)
                     {
                         if (!onlineUser.IsModerator)
                         {

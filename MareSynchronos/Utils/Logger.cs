@@ -1,32 +1,10 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using Dalamud.Logging;
 using Dalamud.Utility;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Utils;
-
-[ProviderAlias("Dalamud")]
-public class DalamudLoggingProvider : ILoggerProvider
-{
-    private readonly ConcurrentDictionary<string, Logger> _loggers =
-        new(StringComparer.OrdinalIgnoreCase);
-
-    public DalamudLoggingProvider()
-    {
-    }
-
-    public ILogger CreateLogger(string categoryName)
-    {
-        return _loggers.GetOrAdd(categoryName, name => new Logger(categoryName));
-    }
-
-    public void Dispose()
-    {
-        _loggers.Clear();
-    }
-}
 
 internal class Logger : ILogger
 {
@@ -41,7 +19,7 @@ internal class Logger : ILogger
     public static void Debug(string debug, string stringToHighlight = "")
     {
         var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
-        if (debug.Contains(stringToHighlight) && !stringToHighlight.IsNullOrEmpty())
+        if (debug.Contains(stringToHighlight, StringComparison.Ordinal) && !stringToHighlight.IsNullOrEmpty())
         {
             PluginLog.Warning($"[{caller}] {debug}");
         }

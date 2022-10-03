@@ -158,7 +158,7 @@ public class IpcManager : IDisposable
     {
         try
         {
-            return _heelsGetApiVersion.InvokeFunc() == "1.0.1";
+            return string.Equals(_heelsGetApiVersion.InvokeFunc(), "1.0.1", StringComparison.Ordinal);
         }
         catch
         {

@@ -158,7 +158,7 @@ public class CharacterDataFactory
 
         if (cache.FileReplacements.ContainsKey(objectKind))
         {
-            if (cache.FileReplacements[objectKind].Any(c => c.ResolvedPath.Contains(mtrlPath)))
+            if (cache.FileReplacements[objectKind].Any(c => c.ResolvedPath.Contains(mtrlPath, StringComparison.Ordinal)))
             {
                 return;
             }
@@ -196,7 +196,7 @@ public class CharacterDataFactory
 
         if (cache.FileReplacements.ContainsKey(objectKind))
         {
-            if (cache.FileReplacements[objectKind].Any(c => c.GamePaths.Contains(varPath)))
+            if (cache.FileReplacements[objectKind].Any(c => c.GamePaths.Contains(varPath, StringComparer.Ordinal)))
             {
                 return;
             }
@@ -214,7 +214,7 @@ public class CharacterDataFactory
 
         if (cache.FileReplacements.ContainsKey(objectKind))
         {
-            if (cache.FileReplacements[objectKind].Any(c => c.GamePaths.Contains(texPath)))
+            if (cache.FileReplacements[objectKind].Any(c => c.GamePaths.Contains(texPath, StringComparer.Ordinal)))
             {
                 return;
             }
@@ -225,7 +225,7 @@ public class CharacterDataFactory
 
         cache.AddFileReplacement(objectKind, texFileReplacement);
 
-        if (texPath.Contains("/--")) return;
+        if (texPath.Contains("/--", StringComparison.Ordinal)) return;
 
         var texDx11Replacement =
             CreateFileReplacement(texPath.Insert(texPath.LastIndexOf('/') + 1, "--"), doNotReverseResolve);
@@ -322,11 +322,11 @@ public class CharacterDataFactory
                 previousData.FileReplacements.Add(objectKind, new());
             }
 
-            if (!previousData.FileReplacements[objectKind].Any(k => k.GamePaths.Any(p => item.GamePaths.Select(p => p.ToLowerInvariant()).Contains(p.ToLowerInvariant()))))
+            if (!previousData.FileReplacements[objectKind].Any(k => k.GamePaths.Any(p => item.GamePaths.Contains(p, StringComparer.OrdinalIgnoreCase))))
             {
                 var penumResolve = _ipcManager.PenumbraResolvePath(item.GamePaths.First()).ToLowerInvariant();
                 var gamePath = item.GamePaths.First().ToLowerInvariant();
-                if (penumResolve == gamePath)
+                if (string.Equals(penumResolve, gamePath, StringComparison.Ordinal))
                 {
                     Logger.Debug("PenumResolve was same as GamePath, not adding " + item);
                     transientResourceManager.RemoveTransientResource(charaPointer, item);
