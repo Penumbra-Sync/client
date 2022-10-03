@@ -110,7 +110,7 @@ public class TransientResourceManager : IDisposable
                 && f.ResolvedPath.ToLowerInvariant() == filePath)))
         {
             Logger.Debug("Not adding " + replacedGamePath + ":" + filePath);
-            Logger.Verbose("SemiTransientAny: " + SemiTransientResources.Any(r => r.Value.Any(f => f.GamePaths.First().ToLowerInvariant() == replacedGamePath
+            Logger.Verbose("SemiTransientAny: " + SemiTransientResources.Any(r => r.Value.Any(f => string.Equals(f.GamePaths.First(), replacedGamePath, StringComparison.OrdinalIgnoreCase) && string.Equals(f.ResolvedPath.ToLowerInvariant(), filePath, StringComparison.OrdinalIgnoreCase))).ToString() + ", TransientAny: " + TransientResources[gameObject].Contains(replacedGamePath));
                 && f.ResolvedPath.ToLowerInvariant() == filePath)).ToString() + ", TransientAny: " + TransientResources[gameObject].Contains(replacedGamePath));
         }
         else
