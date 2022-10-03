@@ -437,9 +437,9 @@ public class CompactUi : Window, IDisposable
         var userSize = ImGui.CalcTextSize(userCount);
         var textSize = ImGui.CalcTextSize("Users Online");
 #if DEBUG
-        string shardConnection = $"Connected shard: {_apiController.ServerInfo.ShardName}";
+        string shardConnection = $"Shard: {_apiController.ServerInfo.ShardName}";
 #else
-        string shardConnection = string.Equals(_apiController.ServerInfo.ShardName, "Main", StringComparison.OrdinalIgnoreCase) ? string.Empty : $"Connected shard: {_apiController.ServerInfo.ShardName}";
+        string shardConnection = string.Equals(_apiController.ServerInfo.ShardName, "Main", StringComparison.OrdinalIgnoreCase) ? string.Empty : $"Shard: {_apiController.ServerInfo.ShardName}";
 #endif
         var shardTextSize = ImGui.CalcTextSize(shardConnection);
 
@@ -451,11 +451,6 @@ public class CompactUi : Window, IDisposable
             ImGui.SameLine();
             ImGui.AlignTextToFramePadding();
             ImGui.Text("Users Online");
-            ImGui.AlignTextToFramePadding();
-            if (!string.IsNullOrEmpty(shardConnection))
-            {
-                ImGui.TextUnformatted(shardConnection);
-            }
         }
         else
         {
@@ -476,6 +471,12 @@ public class CompactUi : Window, IDisposable
         }
         ImGui.PopStyleColor();
         UiShared.AttachToolTip(!_configuration.FullPause ? "Disconnect from " + _apiController.ServerDictionary[_configuration.ApiUri] : "Connect to " + _apiController.ServerDictionary[_configuration.ApiUri]);
+
+        if (!string.IsNullOrEmpty(shardConnection))
+        {
+            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth()) / 2 - shardTextSize.X / 2);
+            ImGui.TextUnformatted(shardConnection);
+        }
     }
 
     private void DrawTransfers()

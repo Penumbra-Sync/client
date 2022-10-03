@@ -270,7 +270,7 @@ namespace MareSynchronos.UI
             ImGui.Indent(collapseButton.X);
             if (ExpandedGroupState[group.GID])
             {
-                pairsInGroup = pairsInGroup.OrderBy(p => string.Equals(p.UserUID, group.OwnedBy, StringComparison.Ordinal) ? 0 : 1).ThenBy(p => p.IsPinned ?? false).ThenBy(p => p.UserAlias ?? p.UserUID).ToList();
+                pairsInGroup = pairsInGroup.OrderBy(p => string.Equals(p.UserUID, group.OwnedBy, StringComparison.Ordinal) ? 0 : 1).ThenBy(p => p.IsPinned ?? false ? 0 : 1).ThenBy(p => p.UserAlias ?? p.UserUID).ToList();
                 ImGui.Indent(ImGui.GetStyle().ItemSpacing.X / 2);
                 ImGui.Separator();
                 foreach (var pair in pairsInGroup)
