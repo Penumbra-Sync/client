@@ -6,14 +6,14 @@ using System.Globalization;
 
 namespace MareSynchronos.FileCache;
 
-public class FileCache
+public class FileCacheEntity
 {
     public string ResolvedFilepath { get; private set; } = string.Empty;
     public string Hash { get; set; }
     public string PrefixedFilePath { get; init; }
     public string LastModifiedDateTicks { get; set; }
 
-    public FileCache(string hash, string path, string lastModifiedDateTicks)
+    public FileCacheEntity(string hash, string path, string lastModifiedDateTicks)
     {
         Hash = hash;
         PrefixedFilePath = path;

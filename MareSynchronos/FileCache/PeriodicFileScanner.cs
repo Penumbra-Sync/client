@@ -221,8 +221,8 @@ public class PeriodicFileScanner : IDisposable
         var cpuCount = (int)(Environment.ProcessorCount / 2.0f);
         Task[] dbTasks = Enumerable.Range(0, cpuCount).Select(c => Task.CompletedTask).ToArray();
 
-        ConcurrentBag<FileCache> entitiesToRemove = new();
-        ConcurrentBag<FileCache> entitiesToUpdate = new();
+        ConcurrentBag<FileCacheEntity> entitiesToRemove = new();
+        ConcurrentBag<FileCacheEntity> entitiesToUpdate = new();
         try
         {
             foreach (var cache in _fileDbManager.GetAllFileCaches())

@@ -26,7 +26,7 @@ public class FileCacheManager : IDisposable
     private readonly Configuration _configuration;
     private readonly string CsvPath;
     private string CsvBakPath => CsvPath + ".bak";
-    private readonly ConcurrentDictionary<string, FileCache> FileCaches = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, FileCacheEntity> FileCaches = new(StringComparer.Ordinal);
     public const string CsvSplit = "|";
     private object _fileWriteLock = new();
 
@@ -52,7 +52,7 @@ public class FileCacheManager : IDisposable
                     var hash = splittedEntry[0];
                     var path = splittedEntry[1];
                     var time = splittedEntry[2];
-                    FileCaches[path] = new FileCache(hash, path, time);
+                    FileCaches[path] = new FileCacheEntity(hash, path, time);
                 }
                 catch (Exception)
                 {
@@ -87,9 +87,9 @@ public class FileCacheManager : IDisposable
         }
     }
 
-    public List<FileCache> GetAllFileCaches() => FileCaches.Values.ToList();
+    public List<FileCacheEntity> GetAllFileCaches() => FileCaches.Values.ToList();
 
-    public FileCache? GetFileCacheByHash(string hash)
+    public FileCacheEntity? GetFileCacheByHash(string hash)
     {
         if (FileCaches.Any(f => string.Equals(f.Value.Hash, hash, StringComparison.Ordinal)))
         {
@@ -99,7 +99,7 @@ public class FileCacheManager : IDisposable
         return null;
     }
 
-    public (FileState, FileCache) ValidateFileCacheEntity(FileCache fileCache)
+    public (FileState, FileCacheEntity) ValidateFileCacheEntity(FileCacheEntity fileCache)
     {
         fileCache = ReplacePathPrefixes(fileCache);
         FileInfo fi = new(fileCache.ResolvedFilepath);
@@ -115,7 +115,7 @@ public class FileCacheManager : IDisposable
         return (FileState.Valid, fileCache);
     }
 
-    public FileCache? GetFileCacheByPath(string path)
+    public FileCacheEntity? GetFileCacheByPath(string path)
     {
         var cleanedPath = path.Replace("/", "\\", StringComparison.Ordinal).ToLowerInvariant().Replace(_ipcManager.PenumbraModDirectory()!.ToLowerInvariant(), "", StringComparison.Ordinal);
         var entry = FileCaches.FirstOrDefault(f => f.Value.ResolvedFilepath.EndsWith(cleanedPath, StringComparison.Ordinal)).Value;
@@ -131,7 +131,7 @@ public class FileCacheManager : IDisposable
         return validatedCacheEntry;
     }
 
-    public FileCache? CreateCacheEntry(string path)
+    public FileCacheEntity? CreateCacheEntry(string path)
     {
         Logger.Debug("Creating cache entry for " + path);
         FileInfo fi = new(path);
@@ -142,7 +142,7 @@ public class FileCacheManager : IDisposable
         return CreateFileCacheEntity(fi, prefixedPath, fi.Name.ToUpper(CultureInfo.InvariantCulture));
     }
 
-    public FileCache? CreateFileEntry(string path)
+    public FileCacheEntity? CreateFileEntry(string path)
     {
         Logger.Debug("Creating file entry for " + path);
         FileInfo fi = new(path);
@@ -153,13 +153,13 @@ public class FileCacheManager : IDisposable
         return CreateFileCacheEntity(fi, prefixedPath);
     }
 
-    private FileCache? CreateFileCacheEntity(FileInfo fileInfo, string prefixedPath, string? hash = null)
+    private FileCacheEntity? CreateFileCacheEntity(FileInfo fileInfo, string prefixedPath, string? hash = null)
     {
         if (hash == null)
         {
             hash = Crypto.GetFileHash(fileInfo.FullName);
         }
-        var entity = new FileCache(hash, prefixedPath, fileInfo.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture));
+        var entity = new FileCacheEntity(hash, prefixedPath, fileInfo.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture));
         entity = ReplacePathPrefixes(entity);
         FileCaches[prefixedPath] = entity;
         lock (_fileWriteLock)
@@ -171,14 +171,14 @@ public class FileCacheManager : IDisposable
         return result;
     }
 
-    private FileCache? GetValidatedFileCache(FileCache fileCache)
+    private FileCacheEntity? GetValidatedFileCache(FileCacheEntity fileCache)
     {
         var resulingFileCache = ReplacePathPrefixes(fileCache);
         resulingFileCache = Validate(resulingFileCache);
         return resulingFileCache;
     }
 
-    private FileCache? Validate(FileCache fileCache)
+    private FileCacheEntity? Validate(FileCacheEntity fileCache)
     {
         var file = new FileInfo(fileCache.ResolvedFilepath);
         if (!file.Exists)
@@ -195,12 +195,12 @@ public class FileCacheManager : IDisposable
         return fileCache;
     }
 
-    public void RemoveHash(FileCache entity)
+    public void RemoveHash(FileCacheEntity entity)
     {
         FileCaches.Remove(entity.Hash, out _);
     }
 
-    public void UpdateHash(FileCache fileCache)
+    public void UpdateHash(FileCacheEntity fileCache)
     {
         Logger.Debug("Updating hash for " + fileCache.ResolvedFilepath);
         fileCache.Hash = Crypto.GetFileHash(fileCache.ResolvedFilepath);
@@ -209,7 +209,7 @@ public class FileCacheManager : IDisposable
         FileCaches[fileCache.PrefixedFilePath] = fileCache;
     }
 
-    private FileCache ReplacePathPrefixes(FileCache fileCache)
+    private FileCacheEntity ReplacePathPrefixes(FileCacheEntity fileCache)
     {
         if (fileCache.PrefixedFilePath.StartsWith(PenumbraPrefix, StringComparison.OrdinalIgnoreCase))
         {
