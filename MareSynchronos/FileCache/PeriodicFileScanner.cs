@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -19,7 +20,7 @@ public class PeriodicFileScanner : IDisposable
     private readonly DalamudUtil _dalamudUtil;
     private CancellationTokenSource? _scanCancellationTokenSource;
     private Task? _fileScannerTask = null;
-    public ConcurrentDictionary<string, int> haltScanLocks = new();
+    public ConcurrentDictionary<string, int> haltScanLocks = new(StringComparer.Ordinal);
     public PeriodicFileScanner(IpcManager ipcManager, Configuration pluginConfiguration, FileCacheManager fileDbManager, ApiController apiController, DalamudUtil dalamudUtil)
     {
         Logger.Verbose("Creating " + nameof(PeriodicFileScanner));
@@ -127,7 +128,7 @@ public class PeriodicFileScanner : IDisposable
             {
                 while (haltScanLocks.Any(f => f.Value > 0))
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(1));
+                    await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                 }
 
                 isForced |= RecalculateFileCacheSize();
@@ -143,7 +144,7 @@ public class PeriodicFileScanner : IDisposable
                 _timeUntilNextScan = TimeSpan.FromSeconds(timeBetweenScans);
                 while (_timeUntilNextScan.TotalSeconds >= 0)
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(1), token);
+                    await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
                     _timeUntilNextScan -= TimeSpan.FromSeconds(1);
                 }
             }
@@ -203,13 +204,16 @@ public class PeriodicFileScanner : IDisposable
         Logger.Debug("Getting files from " + penumbraDir + " and " + _pluginConfiguration.CacheFolder);
         string[] ext = { ".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp" };
 
-        var scannedFiles = Directory.EnumerateFiles(penumbraDir, "*.*", SearchOption.AllDirectories)
+        var scannedFiles = new ConcurrentDictionary<string, bool>(Directory.EnumerateFiles(penumbraDir, "*.*", SearchOption.AllDirectories)
                             .Select(s => s.ToLowerInvariant())
-                            .Where(f => ext.Any(e => f.EndsWith(e)) && !f.Contains(@"\bg\") && !f.Contains(@"\bgcommon\") && !f.Contains(@"\ui\"))
+                            .Where(f => ext.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase)) 
+                                && !f.Contains(@"\bg\", StringComparison.OrdinalIgnoreCase) 
+                                && !f.Contains(@"\bgcommon\", StringComparison.OrdinalIgnoreCase) 
+                                && !f.Contains(@"\ui\", StringComparison.OrdinalIgnoreCase))
                             .Concat(Directory.EnumerateFiles(_pluginConfiguration.CacheFolder, "*.*", SearchOption.TopDirectoryOnly)
                                 .Where(f => new FileInfo(f).Name.Length == 40)
                                 .Select(s => s.ToLowerInvariant()).ToList())
-                            .ToDictionary(c => c, c => false);
+                            .Select(c => new KeyValuePair<string, bool>(c, false)), StringComparer.OrdinalIgnoreCase);
 
         TotalFiles = scannedFiles.Count;
 
@@ -217,8 +221,8 @@ public class PeriodicFileScanner : IDisposable
         var cpuCount = (int)(Environment.ProcessorCount / 2.0f);
         Task[] dbTasks = Enumerable.Range(0, cpuCount).Select(c => Task.CompletedTask).ToArray();
 
-        ConcurrentBag<FileCache> entitiesToRemove = new();
-        ConcurrentBag<FileCache> entitiesToUpdate = new();
+        ConcurrentBag<FileCacheEntity> entitiesToRemove = new();
+        ConcurrentBag<FileCacheEntity> entitiesToUpdate = new();
         try
         {
             foreach (var cache in _fileDbManager.GetAllFileCaches())
@@ -280,7 +284,7 @@ public class PeriodicFileScanner : IDisposable
             _fileDbManager.WriteOutFullCsv();
         }
 
-        Logger.Debug("Scanner validated existing db files");
+        Logger.Verbose("Scanner validated existing db files");
 
         if (ct.IsCancellationRequested) return;
 
@@ -311,7 +315,7 @@ public class PeriodicFileScanner : IDisposable
 
         Task.WaitAll(dbTasks);
 
-        Logger.Debug("Scanner added new files to db");
+        Logger.Verbose("Scanner added new files to db");
 
         Logger.Debug("Scan complete");
         TotalFiles = 0;

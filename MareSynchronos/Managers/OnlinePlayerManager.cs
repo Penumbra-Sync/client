@@ -19,8 +19,8 @@ public class OnlinePlayerManager : IDisposable
     private readonly IpcManager _ipcManager;
     private readonly PlayerManager _playerManager;
     private readonly FileCacheManager _fileDbManager;
-    private readonly ConcurrentDictionary<string, CachedPlayer> _onlineCachedPlayers = new();
-    private readonly ConcurrentDictionary<string, CharacterCacheDto> _temporaryStoredCharacterCache = new();
+    private readonly ConcurrentDictionary<string, CachedPlayer> _onlineCachedPlayers = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, CharacterCacheDto> _temporaryStoredCharacterCache = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<CachedPlayer, CancellationTokenSource> _playerTokenDisposal = new();
 
     private List<string> OnlineVisiblePlayerHashes => _onlineCachedPlayers.Select(p => p.Value).Where(p => p.PlayerCharacter != IntPtr.Zero)
@@ -37,8 +37,6 @@ public class OnlinePlayerManager : IDisposable
         _fileDbManager = fileDbManager;
         _apiController.PairedClientOnline += ApiControllerOnPairedClientOnline;
         _apiController.PairedClientOffline += ApiControllerOnPairedClientOffline;
-        _apiController.PairedWithOther += ApiControllerOnPairedWithOther;
-        _apiController.UnpairedFromOther += ApiControllerOnUnpairedFromOther;
         _apiController.Connected += ApiControllerOnConnected;
         _apiController.Disconnected += ApiControllerOnDisconnected;
         _apiController.CharacterReceived += ApiControllerOnCharacterReceived;
@@ -137,8 +135,6 @@ public class OnlinePlayerManager : IDisposable
 
         _apiController.PairedClientOnline -= ApiControllerOnPairedClientOnline;
         _apiController.PairedClientOffline -= ApiControllerOnPairedClientOffline;
-        _apiController.PairedWithOther -= ApiControllerOnPairedWithOther;
-        _apiController.UnpairedFromOther -= ApiControllerOnUnpairedFromOther;
         _apiController.Disconnected -= ApiControllerOnDisconnected;
         _apiController.Connected -= ApiControllerOnConnected;
 
@@ -167,20 +163,6 @@ public class OnlinePlayerManager : IDisposable
         Logger.Debug("Player online: " + charHash);
         AddPlayer(charHash);
         return;
-    }
-
-    private void ApiControllerOnPairedWithOther(string charHash)
-    {
-        if (string.IsNullOrEmpty(charHash)) return;
-        Logger.Debug("Pairing with " + charHash);
-        AddPlayer(charHash);
-    }
-
-    private void ApiControllerOnUnpairedFromOther(string? characterHash)
-    {
-        if (string.IsNullOrEmpty(characterHash)) return;
-        Logger.Debug("Unpairing from " + characterHash);
-        RemovePlayer(characterHash);
     }
 
     private void AddPlayer(string characterNameHash)
@@ -244,7 +226,7 @@ public class OnlinePlayerManager : IDisposable
             Task.Run(async () =>
             {
                 await _apiController.PushCharacterData(_playerManager.LastCreatedCharacterData,
-                    visiblePlayers);
+                    visiblePlayers).ConfigureAwait(false);
             });
         }
     }

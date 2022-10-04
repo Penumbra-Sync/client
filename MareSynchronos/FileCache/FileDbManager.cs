@@ -26,9 +26,9 @@ public class FileCacheManager : IDisposable
     private readonly Configuration _configuration;
     private readonly string CsvPath;
     private string CsvBakPath => CsvPath + ".bak";
-    private readonly ConcurrentDictionary<string, FileCache> FileCaches = new();
+    private readonly ConcurrentDictionary<string, FileCacheEntity> FileCaches = new(StringComparer.Ordinal);
     public const string CsvSplit = "|";
-    private object _fileWriteLock = new object();
+    private object _fileWriteLock = new();
 
     public FileCacheManager(IpcManager ipcManager, Configuration configuration, string configDirectoryName)
     {
@@ -52,7 +52,7 @@ public class FileCacheManager : IDisposable
                     var hash = splittedEntry[0];
                     var path = splittedEntry[1];
                     var time = splittedEntry[2];
-                    FileCaches[path] = new FileCache(hash, path, time);
+                    FileCaches[path] = new FileCacheEntity(hash, path, time);
                 }
                 catch (Exception)
                 {
@@ -64,7 +64,7 @@ public class FileCacheManager : IDisposable
 
     public void WriteOutFullCsv()
     {
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new();
         foreach (var entry in FileCaches.OrderBy(f => f.Value.PrefixedFilePath))
         {
             sb.AppendLine(entry.Value.CsvEntry);
@@ -87,19 +87,19 @@ public class FileCacheManager : IDisposable
         }
     }
 
-    public List<FileCache> GetAllFileCaches() => FileCaches.Values.ToList();
+    public List<FileCacheEntity> GetAllFileCaches() => FileCaches.Values.ToList();
 
-    public FileCache? GetFileCacheByHash(string hash)
+    public FileCacheEntity? GetFileCacheByHash(string hash)
     {
-        if (FileCaches.Any(f => f.Value.Hash == hash))
+        if (FileCaches.Any(f => string.Equals(f.Value.Hash, hash, StringComparison.Ordinal)))
         {
-            return GetValidatedFileCache(FileCaches.FirstOrDefault(f => f.Value.Hash == hash).Value);
+            return GetValidatedFileCache(FileCaches.FirstOrDefault(f => string.Equals(f.Value.Hash, hash, StringComparison.Ordinal)).Value);
         }
 
         return null;
     }
 
-    public (FileState, FileCache) ValidateFileCacheEntity(FileCache fileCache)
+    public (FileState, FileCacheEntity) ValidateFileCacheEntity(FileCacheEntity fileCache)
     {
         fileCache = ReplacePathPrefixes(fileCache);
         FileInfo fi = new(fileCache.ResolvedFilepath);
@@ -107,7 +107,7 @@ public class FileCacheManager : IDisposable
         {
             return (FileState.RequireDeletion, fileCache);
         }
-        if (fi.LastWriteTimeUtc.Ticks.ToString() != fileCache.LastModifiedDateTicks)
+        if (!string.Equals(fi.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture), fileCache.LastModifiedDateTicks, StringComparison.Ordinal))
         {
             return (FileState.RequireUpdate, fileCache);
         }
@@ -115,10 +115,10 @@ public class FileCacheManager : IDisposable
         return (FileState.Valid, fileCache);
     }
 
-    public FileCache? GetFileCacheByPath(string path)
+    public FileCacheEntity? GetFileCacheByPath(string path)
     {
-        var cleanedPath = path.Replace("/", "\\").ToLowerInvariant().Replace(_ipcManager.PenumbraModDirectory()!.ToLowerInvariant(), "");
-        var entry = FileCaches.FirstOrDefault(f => f.Value.ResolvedFilepath.EndsWith(cleanedPath)).Value;
+        var cleanedPath = path.Replace("/", "\\", StringComparison.Ordinal).ToLowerInvariant().Replace(_ipcManager.PenumbraModDirectory()!.ToLowerInvariant(), "", StringComparison.Ordinal);
+        var entry = FileCaches.FirstOrDefault(f => f.Value.ResolvedFilepath.EndsWith(cleanedPath, StringComparison.Ordinal)).Value;
 
         if (entry == null)
         {
@@ -131,35 +131,35 @@ public class FileCacheManager : IDisposable
         return validatedCacheEntry;
     }
 
-    public FileCache? CreateCacheEntry(string path)
+    public FileCacheEntity? CreateCacheEntry(string path)
     {
-        Logger.Debug("Creating cache entry for " + path);
+        Logger.Verbose("Creating cache entry for " + path);
         FileInfo fi = new(path);
         if (!fi.Exists) return null;
         var fullName = fi.FullName.ToLowerInvariant();
-        if (!fullName.Contains(_configuration.CacheFolder.ToLowerInvariant())) return null;
-        string prefixedPath = fullName.Replace(_configuration.CacheFolder.ToLowerInvariant(), CachePrefix + "\\").Replace("\\\\", "\\");
-        return CreateFileCacheEntity(fi, prefixedPath, fi.Name.ToUpper());
+        if (!fullName.Contains(_configuration.CacheFolder.ToLowerInvariant(), StringComparison.Ordinal)) return null;
+        string prefixedPath = fullName.Replace(_configuration.CacheFolder.ToLowerInvariant(), CachePrefix + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
+        return CreateFileCacheEntity(fi, prefixedPath, fi.Name.ToUpper(CultureInfo.InvariantCulture));
     }
 
-    public FileCache? CreateFileEntry(string path)
+    public FileCacheEntity? CreateFileEntry(string path)
     {
-        Logger.Debug("Creating file entry for " + path);
+        Logger.Verbose("Creating file entry for " + path);
         FileInfo fi = new(path);
         if (!fi.Exists) return null;
         var fullName = fi.FullName.ToLowerInvariant();
-        if (!fullName.Contains(_ipcManager.PenumbraModDirectory()!.ToLowerInvariant())) return null;
-        string prefixedPath = fullName.Replace(_ipcManager.PenumbraModDirectory()!.ToLowerInvariant(), PenumbraPrefix + "\\").Replace("\\\\", "\\");
+        if (!fullName.Contains(_ipcManager.PenumbraModDirectory()!.ToLowerInvariant(), StringComparison.Ordinal)) return null;
+        string prefixedPath = fullName.Replace(_ipcManager.PenumbraModDirectory()!.ToLowerInvariant(), PenumbraPrefix + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
         return CreateFileCacheEntity(fi, prefixedPath);
     }
 
-    private FileCache? CreateFileCacheEntity(FileInfo fileInfo, string prefixedPath, string? hash = null)
+    private FileCacheEntity? CreateFileCacheEntity(FileInfo fileInfo, string prefixedPath, string? hash = null)
     {
         if (hash == null)
         {
             hash = Crypto.GetFileHash(fileInfo.FullName);
         }
-        var entity = new FileCache(hash, prefixedPath, fileInfo.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture));
+        var entity = new FileCacheEntity(hash, prefixedPath, fileInfo.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture));
         entity = ReplacePathPrefixes(entity);
         FileCaches[prefixedPath] = entity;
         lock (_fileWriteLock)
@@ -171,14 +171,14 @@ public class FileCacheManager : IDisposable
         return result;
     }
 
-    private FileCache? GetValidatedFileCache(FileCache fileCache)
+    private FileCacheEntity? GetValidatedFileCache(FileCacheEntity fileCache)
     {
         var resulingFileCache = ReplacePathPrefixes(fileCache);
         resulingFileCache = Validate(resulingFileCache);
         return resulingFileCache;
     }
 
-    private FileCache? Validate(FileCache fileCache)
+    private FileCacheEntity? Validate(FileCacheEntity fileCache)
     {
         var file = new FileInfo(fileCache.ResolvedFilepath);
         if (!file.Exists)
@@ -187,7 +187,7 @@ public class FileCacheManager : IDisposable
             return null;
         }
 
-        if (file.LastWriteTimeUtc.Ticks.ToString() != fileCache.LastModifiedDateTicks)
+        if (!string.Equals(file.LastWriteTimeUtc.Ticks.ToString(), fileCache.LastModifiedDateTicks, StringComparison.Ordinal))
         {
             UpdateHash(fileCache);
         }
@@ -195,12 +195,12 @@ public class FileCacheManager : IDisposable
         return fileCache;
     }
 
-    public void RemoveHash(FileCache entity)
+    public void RemoveHash(FileCacheEntity entity)
     {
         FileCaches.Remove(entity.Hash, out _);
     }
 
-    public void UpdateHash(FileCache fileCache)
+    public void UpdateHash(FileCacheEntity fileCache)
     {
         Logger.Debug("Updating hash for " + fileCache.ResolvedFilepath);
         fileCache.Hash = Crypto.GetFileHash(fileCache.ResolvedFilepath);
@@ -209,15 +209,15 @@ public class FileCacheManager : IDisposable
         FileCaches[fileCache.PrefixedFilePath] = fileCache;
     }
 
-    private FileCache ReplacePathPrefixes(FileCache fileCache)
+    private FileCacheEntity ReplacePathPrefixes(FileCacheEntity fileCache)
     {
-        if (fileCache.PrefixedFilePath.StartsWith(PenumbraPrefix))
+        if (fileCache.PrefixedFilePath.StartsWith(PenumbraPrefix, StringComparison.OrdinalIgnoreCase))
         {
-            fileCache.SetResolvedFilePath(fileCache.PrefixedFilePath.Replace(PenumbraPrefix, _ipcManager.PenumbraModDirectory()));
+            fileCache.SetResolvedFilePath(fileCache.PrefixedFilePath.Replace(PenumbraPrefix, _ipcManager.PenumbraModDirectory(), StringComparison.Ordinal));
         }
-        else if (fileCache.PrefixedFilePath.StartsWith(CachePrefix))
+        else if (fileCache.PrefixedFilePath.StartsWith(CachePrefix, StringComparison.OrdinalIgnoreCase))
         {
-            fileCache.SetResolvedFilePath(fileCache.PrefixedFilePath.Replace(CachePrefix, _configuration.CacheFolder));
+            fileCache.SetResolvedFilePath(fileCache.PrefixedFilePath.Replace(CachePrefix, _configuration.CacheFolder, StringComparison.Ordinal));
         }
 
         return fileCache;

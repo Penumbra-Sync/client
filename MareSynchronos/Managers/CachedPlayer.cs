@@ -71,7 +71,7 @@ public class CachedPlayer
         if (characterData.GetHashCode() == _cachedData.GetHashCode()) return;
 
         bool updateModdedPaths = false;
-        List<ObjectKind> charaDataToUpdate = new List<ObjectKind>();
+        List<ObjectKind> charaDataToUpdate = new();
         foreach (var objectKind in Enum.GetValues<ObjectKind>())
         {
             _cachedData.FileReplacements.TryGetValue(objectKind, out var existingFileReplacements);
@@ -108,7 +108,7 @@ public class CachedPlayer
 
             if (hasNewAndOldGlamourerData)
             {
-                bool glamourerDataDifferent = _cachedData.GlamourerData[objectKind] != characterData.GlamourerData[objectKind];
+                bool glamourerDataDifferent = !string.Equals(_cachedData.GlamourerData[objectKind], characterData.GlamourerData[objectKind], StringComparison.Ordinal);
                 if (glamourerDataDifferent)
                 {
                     Logger.Debug("Updating " + objectKind);
@@ -159,7 +159,7 @@ public class CachedPlayer
                     Logger.Debug("Downloading missing files for player " + PlayerName + ", kind: " + objectKind);
                     if (toDownloadReplacements.Any())
                     {
-                        await _apiController.DownloadFiles(downloadId, toDownloadReplacements, downloadToken);
+                        await _apiController.DownloadFiles(downloadId, toDownloadReplacements, downloadToken).ConfigureAwait(false);
                         _apiController.CancelDownload(downloadId);
                     }
                     if (downloadToken.IsCancellationRequested)
@@ -168,7 +168,7 @@ public class CachedPlayer
                         return;
                     }
 
-                    if ((TryCalculateModdedDictionary(out moddedPaths)).All(c => _apiController.ForbiddenTransfers.Any(f => f.Hash == c.Hash)))
+                    if ((TryCalculateModdedDictionary(out moddedPaths)).All(c => _apiController.ForbiddenTransfers.Any(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
                     {
                         break;
                     }
@@ -195,7 +195,7 @@ public class CachedPlayer
     private List<FileReplacementDto> TryCalculateModdedDictionary(out Dictionary<string, string> moddedDictionary)
     {
         List<FileReplacementDto> missingFiles = new();
-        moddedDictionary = new Dictionary<string, string>();
+        moddedDictionary = new Dictionary<string, string>(StringComparer.Ordinal);
         try
         {
             foreach (var item in _cachedData.FileReplacements.SelectMany(k => k.Value.Where(v => string.IsNullOrEmpty(v.FileSwapPath))).ToList())
@@ -454,7 +454,7 @@ public class CachedPlayer
     private void IpcManagerOnPenumbraRedrawEvent(IntPtr address, int idx)
     {
         var player = _dalamudUtil.GetCharacterFromObjectTableByIndex(idx);
-        if (player == null || player.Name.ToString() != PlayerName) return;
+        if (player == null || !string.Equals(player.Name.ToString(), PlayerName, StringComparison.OrdinalIgnoreCase)) return;
         if (!_penumbraRedrawEventTask?.IsCompleted ?? false) return;
 
         _penumbraRedrawEventTask = Task.Run(() =>
