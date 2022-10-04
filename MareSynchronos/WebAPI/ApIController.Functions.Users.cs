@@ -24,7 +24,7 @@ public partial class ApiController
     public async Task SendPairedClientAddition(string uid)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(Api.SendUserPairedClientAddition, uid).ConfigureAwait(false);
+        await _mareHub!.SendAsync(Api.SendUserPairedClientAddition, uid.Trim()).ConfigureAwait(false);
     }
 
     public async Task SendPairedClientPauseChange(string uid, bool paused)

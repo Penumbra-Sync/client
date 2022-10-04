@@ -34,7 +34,7 @@ public partial class ApiController
     public async Task<bool> SendGroupJoin(string gid, string password)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return false;
-        return await _mareHub!.InvokeAsync<bool>(Api.InvokeGroupJoin, gid, password).ConfigureAwait(false);
+        return await _mareHub!.InvokeAsync<bool>(Api.InvokeGroupJoin, gid.Trim(), password).ConfigureAwait(false);
     }
 
     public async Task SendGroupChangeInviteState(string gid, bool opened)
