@@ -472,7 +472,7 @@ public class CompactUi : Window, IDisposable
         ImGui.PopStyleColor();
         UiShared.AttachToolTip(!_configuration.FullPause ? "Disconnect from " + _apiController.ServerDictionary[_configuration.ApiUri] : "Connect to " + _apiController.ServerDictionary[_configuration.ApiUri]);
 
-        if (!string.IsNullOrEmpty(shardConnection))
+        if (!string.IsNullOrEmpty(_apiController.ServerInfo.ShardName))
         {
             ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth()) / 2 - shardTextSize.X / 2);
             ImGui.TextUnformatted(shardConnection);
