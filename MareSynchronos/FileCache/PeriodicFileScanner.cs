@@ -283,7 +283,7 @@ public class PeriodicFileScanner : IDisposable
             _fileDbManager.WriteOutFullCsv();
         }
 
-        Logger.Debug("Scanner validated existing db files");
+        Logger.Verbose("Scanner validated existing db files");
 
         if (ct.IsCancellationRequested) return;
 
@@ -314,7 +314,7 @@ public class PeriodicFileScanner : IDisposable
 
         Task.WaitAll(dbTasks);
 
-        Logger.Debug("Scanner added new files to db");
+        Logger.Verbose("Scanner added new files to db");
 
         Logger.Debug("Scan complete");
         TotalFiles = 0;

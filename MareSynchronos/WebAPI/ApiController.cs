@@ -355,6 +355,7 @@ public partial class ApiController : IDisposable
 
     private Task MareHubOnReconnecting(Exception? arg)
     {
+        _connectionDto = null;
         _healthCheckTokenSource?.Cancel();
         ServerState = ServerState.Disconnected;
         Logger.Warn("Connection closed... Reconnecting");

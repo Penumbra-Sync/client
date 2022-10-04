@@ -328,7 +328,7 @@ public class CharacterDataFactory
                 var gamePath = item.GamePaths.First().ToLowerInvariant();
                 if (string.Equals(penumResolve, gamePath, StringComparison.Ordinal))
                 {
-                    Logger.Debug("PenumResolve was same as GamePath, not adding " + item);
+                    Logger.Verbose("PenumResolve was same as GamePath, not adding " + item);
                     transientResourceManager.RemoveTransientResource(charaPointer, item);
                 }
                 else

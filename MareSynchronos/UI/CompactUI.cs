@@ -159,7 +159,7 @@ public class CompactUi : Window, IDisposable
     {
         var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Plus);
         ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonSize.X);
-        ImGui.InputTextWithHint("##otheruid", "Other players UID/GID", ref _pairToAdd, 10);
+        ImGui.InputTextWithHint("##otheruid", "Other players UID/Alias", ref _pairToAdd, 20);
         ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
         if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
         {

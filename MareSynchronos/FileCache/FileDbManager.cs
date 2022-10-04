@@ -133,7 +133,7 @@ public class FileCacheManager : IDisposable
 
     public FileCacheEntity? CreateCacheEntry(string path)
     {
-        Logger.Debug("Creating cache entry for " + path);
+        Logger.Verbose("Creating cache entry for " + path);
         FileInfo fi = new(path);
         if (!fi.Exists) return null;
         var fullName = fi.FullName.ToLowerInvariant();
@@ -144,7 +144,7 @@ public class FileCacheManager : IDisposable
 
     public FileCacheEntity? CreateFileEntry(string path)
     {
-        Logger.Debug("Creating file entry for " + path);
+        Logger.Verbose("Creating file entry for " + path);
         FileInfo fi = new(path);
         if (!fi.Exists) return null;
         var fullName = fi.FullName.ToLowerInvariant();

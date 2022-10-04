@@ -109,7 +109,7 @@ public class TransientResourceManager : IDisposable
             SemiTransientResources.Any(r => r.Value.Any(f => string.Equals(f.GamePaths.First(), replacedGamePath , StringComparison.OrdinalIgnoreCase) 
             && string.Equals(f.ResolvedPath, filePath, StringComparison.OrdinalIgnoreCase))))
         {
-            Logger.Debug("Not adding " + replacedGamePath + ":" + filePath);
+            Logger.Verbose("Not adding " + replacedGamePath + ":" + filePath);
             Logger.Verbose("SemiTransientAny: " + SemiTransientResources.Any(r => r.Value.Any(f => string.Equals(f.GamePaths.First(), replacedGamePath, StringComparison.OrdinalIgnoreCase) 
                 && string.Equals(f.ResolvedPath, filePath, StringComparison.OrdinalIgnoreCase))).ToString() + ", TransientAny: " + TransientResources[gameObject].Contains(replacedGamePath));
         }
