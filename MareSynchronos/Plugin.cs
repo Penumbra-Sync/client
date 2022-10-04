@@ -202,10 +202,31 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnCommand(string command, string args)
     {
-        if (string.IsNullOrEmpty(args))
-        {
-            OpenUi();
-        }
+            var splitArgs = args.ToLowerInvariant().Trim().Split(" ", StringSplitOptions.RemoveEmptyEntries);
+
+            if (splitArgs == null || splitArgs.Length == 0)
+            {
+                // Interpret this as toggling the UI
+                OpenUi();
+                return;
+            }
+
+            if (splitArgs[0] == "toggle")
+            {
+                var fullPause = splitArgs.Length > 1 ? splitArgs[1] switch
+                {
+                    "on" => false,
+                    "off" => true,
+                    _ => !_configuration.FullPause,
+                } : !_configuration.FullPause;
+
+                if (fullPause != _configuration.FullPause)
+                {
+                    _configuration.FullPause = fullPause;
+                    _configuration.Save();
+                    _ = _apiController.CreateConnections();
+                }
+            }
     }
 
     private void OpenUi()
