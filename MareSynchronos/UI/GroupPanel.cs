@@ -31,7 +31,7 @@ namespace MareSynchronos.UI
         private bool _showModalCreateGroup;
         private bool _showModalChangePassword;
         private bool _showModalBanUser;
-        private bool _showModalBanList;
+        private bool _showModalBanList = false;
         private string _newSyncShellPassword = string.Empty;
         private string _banReason = string.Empty;
         private bool _isPasswordValid;
@@ -40,6 +40,9 @@ namespace MareSynchronos.UI
         private GroupCreatedDto? _lastCreatedGroup = null;
         private readonly Dictionary<string, bool> ExpandedGroupState = new(StringComparer.Ordinal);
         private List<BannedGroupUserDto> _bannedUsers = new();
+        private bool _modalBanListOpened;
+        private bool _banUserPopupOpen;
+        private bool _modalChangePwOpened;
 
         public GroupPanel(CompactUi mainUi, UiShared uiShared, Configuration configuration, ApiController apiController)
         {
@@ -60,7 +63,7 @@ namespace MareSynchronos.UI
         {
             var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Plus);
             ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonSize.X);
-            ImGui.InputTextWithHint("##syncshellid", "Syncshell GID/Alias", ref _syncShellToJoin, 20);
+            ImGui.InputTextWithHint("##syncshellid", "Syncshell GID/Alias (leave empty to create)", ref _syncShellToJoin, 20);
             ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
 
             bool userCanJoinMoreGroups = _apiController.Groups.Count < _apiController.ServerInfo.MaxGroupsJoinedByUser;
@@ -214,8 +217,7 @@ namespace MareSynchronos.UI
                 UiShared.AttachToolTip("You are the owner of Syncshell " + groupName);
                 ImGui.SameLine();
             }
-
-            if (group.IsModerator ?? false)
+            else if (group.IsModerator ?? false)
             {
                 ImGui.PushFont(UiBuilder.IconFont);
                 ImGui.Text(FontAwesomeIcon.UserShield.ToIconString());
@@ -282,6 +284,86 @@ namespace MareSynchronos.UI
 
             UiShared.DrawWithID(group.GID + "settings", () => DrawSyncShellButtons(group, name));
 
+            if (_showModalBanList && !_modalBanListOpened)
+            {
+                _modalBanListOpened = true;
+                ImGui.OpenPopup("Manage Banlist for " + group.GID);
+            }
+
+            if (!_showModalBanList) _modalBanListOpened = false;
+
+            if (ImGui.BeginPopupModal("Manage Banlist for " + group.GID, ref _showModalBanList))
+            {
+                ImGui.SetWindowSize(new Vector2(700, 300));
+                if (UiShared.IconTextButton(FontAwesomeIcon.Retweet, "Refresh Banlist from Server"))
+                {
+                    _bannedUsers = _apiController.GetBannedUsersForGroup(group.GID).Result;
+                }
+
+                if (ImGui.BeginTable("bannedusertable" + group.GID, 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp))
+                {
+                    ImGui.TableSetupColumn("UID", ImGuiTableColumnFlags.None, 1);
+                    ImGui.TableSetupColumn("By", ImGuiTableColumnFlags.None, 1);
+                    ImGui.TableSetupColumn("Date", ImGuiTableColumnFlags.None, 2);
+                    ImGui.TableSetupColumn("Reason", ImGuiTableColumnFlags.None, 3);
+                    ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.None, 1);
+
+                    ImGui.TableHeadersRow();
+
+                    foreach (var bannedUser in _bannedUsers.ToList())
+                    {
+                        ImGui.TableNextColumn();
+                        ImGui.TextUnformatted(bannedUser.UID);
+                        ImGui.TableNextColumn();
+                        ImGui.TextUnformatted(bannedUser.BannedBy);
+                        ImGui.TableNextColumn();
+                        ImGui.TextUnformatted(bannedUser.BannedOn.ToLocalTime().ToString(CultureInfo.CurrentCulture));
+                        ImGui.TableNextColumn();
+                        UiShared.TextWrapped(bannedUser.Reason);
+                        ImGui.TableNextColumn();
+                        if (UiShared.IconTextButton(FontAwesomeIcon.Check, "Unban"))
+                        {
+                            _ = _apiController.UnbanUserFromGroup(group.GID, bannedUser.UID);
+                            _bannedUsers.RemoveAll(b => string.Equals(b.UID, bannedUser.UID, StringComparison.Ordinal));
+                        }
+                        ImGui.TableNextColumn();
+                    }
+
+                    ImGui.EndTable();
+                }
+                ImGui.EndPopup();
+            }
+
+            if (_showModalChangePassword && !_modalChangePwOpened)
+            {
+                _modalChangePwOpened = true;
+                ImGui.OpenPopup("Change Syncshell Password");
+            }
+
+            if (!_showModalChangePassword) _modalChangePwOpened = false;
+
+
+            if (ImGui.BeginPopupModal("Change Syncshell Password", ref _showModalChangePassword, ImGuiWindowFlags.AlwaysAutoResize))
+            {
+                UiShared.TextWrapped("Enter the new Syncshell password for Syncshell " + name + " here.");
+                UiShared.TextWrapped("This action is irreversible");
+                ImGui.InputTextWithHint("##changepw", "New password for " + name, ref _newSyncShellPassword, 255);
+                if (ImGui.Button("Change password"))
+                {
+                    var pw = _newSyncShellPassword;
+                    _isPasswordValid = _apiController.ChangeGroupPassword(group.GID, pw).Result;
+                    _newSyncShellPassword = string.Empty;
+                    if (_isPasswordValid) _showModalChangePassword = false;
+                }
+
+                if (!_isPasswordValid)
+                {
+                    UiShared.ColorTextWrapped("The selected password is too short. It must be at least 10 characters.", new Vector4(1, 0, 0, 1));
+                }
+
+                ImGui.EndPopup();
+            }
+
             ImGui.Indent(collapseButton.X);
             if (ExpandedGroupState[group.GID])
             {
@@ -298,6 +380,7 @@ namespace MareSynchronos.UI
                         string.Equals(group.OwnedBy, _apiController.UID, StringComparison.Ordinal),
                         group.IsModerator ?? false,
                         group?.IsPaused ?? false));
+
                 }
 
                 ImGui.Separator();
@@ -367,32 +450,10 @@ namespace MareSynchronos.UI
                         if (UiShared.IconTextButton(FontAwesomeIcon.Passport, "Change Password"))
                         {
                             ImGui.CloseCurrentPopup();
-                            ImGui.OpenPopup("Change Syncshell Password");
                             _isPasswordValid = true;
                             _showModalChangePassword = true;
                         }
                         UiShared.AttachToolTip("Change Syncshell Password");
-
-                        if (ImGui.BeginPopupModal("Change Syncshell Password", ref _showModalChangePassword, ImGuiWindowFlags.AlwaysAutoResize))
-                        {
-                            UiShared.TextWrapped("Enter the new Syncshell password for Syncshell " + name + " here.");
-                            UiShared.TextWrapped("This action is irreversible");
-                            ImGui.InputTextWithHint("##changepw", "New password for " + name, ref _newSyncShellPassword, 255);
-                            if (ImGui.Button("Change password"))
-                            {
-                                var pw = _newSyncShellPassword;
-                                _isPasswordValid = _apiController.ChangeGroupPassword(entry.GID, pw).Result;
-                                _newSyncShellPassword = string.Empty;
-                                if (_isPasswordValid) _showModalChangePassword = false;
-                            }
-
-                            if (!_isPasswordValid)
-                            {
-                                UiShared.ColorTextWrapped("The selected password is too short. It must be at least 10 characters.", new Vector4(1, 0, 0, 1));
-                            }
-
-                            ImGui.EndPopup();
-                        }
                     }
 
                     if (UiShared.IconTextButton(FontAwesomeIcon.Broom, "Clear Syncshell"))
@@ -411,49 +472,6 @@ namespace MareSynchronos.UI
                         ImGui.CloseCurrentPopup();
                         _showModalBanList = true;
                         _bannedUsers = new();
-                        ImGui.OpenPopup("Manage Banlist for " + entry.GID);
-                    }
-
-                    if (ImGui.BeginPopupModal("Manage Banlist for " + entry.GID, ref _showModalBanList))
-                    {
-                        ImGui.SetWindowSize(new Vector2(700, 300));
-                        if (UiShared.IconTextButton(FontAwesomeIcon.Retweet, "Refresh Banlist from Server"))
-                        {
-                            _bannedUsers = _apiController.GetBannedUsersForGroup(entry.GID).Result;
-                        }
-
-                        if (ImGui.BeginTable("bannedusertable" + entry.GID, 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp))
-                        {
-                            ImGui.TableSetupColumn("UID", ImGuiTableColumnFlags.None, 1);
-                            ImGui.TableSetupColumn("By", ImGuiTableColumnFlags.None, 1);
-                            ImGui.TableSetupColumn("Date", ImGuiTableColumnFlags.None, 2);
-                            ImGui.TableSetupColumn("Reason", ImGuiTableColumnFlags.None, 3);
-                            ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.None, 1);
-
-                            ImGui.TableHeadersRow();
-
-                            foreach (var bannedUser in _bannedUsers.ToList())
-                            {
-                                ImGui.TableNextColumn();
-                                ImGui.TextUnformatted(bannedUser.UID);
-                                ImGui.TableNextColumn();
-                                ImGui.TextUnformatted(bannedUser.BannedBy);
-                                ImGui.TableNextColumn();
-                                ImGui.TextUnformatted(bannedUser.BannedOn.ToLocalTime().ToString(CultureInfo.CurrentCulture));
-                                ImGui.TableNextColumn();
-                                UiShared.TextWrapped(bannedUser.Reason);
-                                ImGui.TableNextColumn();
-                                if (UiShared.IconTextButton(FontAwesomeIcon.Check, "Unban"))
-                                {
-                                    _ = _apiController.UnbanUserFromGroup(entry.GID, bannedUser.UID);
-                                    _bannedUsers.RemoveAll(b => string.Equals(b.UID, bannedUser.UID, StringComparison.Ordinal));
-                                }
-                                ImGui.TableNextColumn();
-                            }
-
-                            ImGui.EndTable();
-                        }
-                        ImGui.EndPopup();
                     }
 
                     if (isOwner)
@@ -651,25 +669,8 @@ namespace MareSynchronos.UI
                     {
                         _showModalBanUser = true;
                         ImGui.CloseCurrentPopup();
-                        ImGui.OpenPopup("Ban User");
                     }
                     UiShared.AttachToolTip("Ban user from this Syncshell");
-
-                    if (ImGui.BeginPopupModal("Ban User", ref _showModalBanUser))
-                    {
-                        ImGui.SetWindowSize(new Vector2(300, 200));
-                        UiShared.TextWrapped("User " + (entry.UserAlias ?? entry.UserUID) + " will be banned and removed from this Syncshell.");
-                        ImGui.InputTextWithHint("##banreason", "Ban Reason", ref _banReason, 255);
-                        if (ImGui.Button("Ban User"))
-                        {
-                            ImGui.CloseCurrentPopup();
-                            var reason = _banReason;
-                            _ = _apiController.BanUserFromGroup(entry.GroupGID, entry.UserUID, reason);
-                            _banReason = string.Empty;
-                        }
-                        UiShared.TextWrapped("The reason will be displayed in the banlist. The current server-side alias if present (Vanity ID) will automatically be attached to the reason.");
-                        ImGui.EndPopup();
-                    }
                 }
 
                 if (isOwner)
@@ -695,6 +696,30 @@ namespace MareSynchronos.UI
                     }
                     UiShared.AttachToolTip("Hold CTRL and SHIFT and click to transfer ownership of this Syncshell to " + (entry.UserAlias ?? entry.UserUID) + Environment.NewLine + "WARNING: This action is irreversible.");
                 }
+                ImGui.EndPopup();
+            }
+
+            if (_showModalBanUser && !_banUserPopupOpen)
+            {
+                ImGui.OpenPopup("Ban User");
+                _banUserPopupOpen = true;
+            }
+
+            if (!_showModalBanUser) _banUserPopupOpen = false;
+
+            if (ImGui.BeginPopupModal("Ban User", ref _showModalBanUser))
+            {
+                ImGui.SetWindowSize(new Vector2(300, 200));
+                UiShared.TextWrapped("User " + (entry.UserAlias ?? entry.UserUID) + " will be banned and removed from this Syncshell.");
+                ImGui.InputTextWithHint("##banreason", "Ban Reason", ref _banReason, 255);
+                if (ImGui.Button("Ban User"))
+                {
+                    ImGui.CloseCurrentPopup();
+                    var reason = _banReason;
+                    _ = _apiController.BanUserFromGroup(entry.GroupGID, entry.UserUID, reason);
+                    _banReason = string.Empty;
+                }
+                UiShared.TextWrapped("The reason will be displayed in the banlist. The current server-side alias if present (Vanity ID) will automatically be attached to the reason.");
                 ImGui.EndPopup();
             }
         }
