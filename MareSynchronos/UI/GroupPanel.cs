@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Text;
+using System.Globalization;
 
 namespace MareSynchronos.UI
 {
@@ -30,6 +31,7 @@ namespace MareSynchronos.UI
         private bool _showModalCreateGroup;
         private bool _showModalChangePassword;
         private bool _showModalBanUser;
+        private bool _showModalBanList;
         private string _newSyncShellPassword = string.Empty;
         private string _banReason = string.Empty;
         private bool _isPasswordValid;
@@ -37,6 +39,7 @@ namespace MareSynchronos.UI
         private bool _errorGroupCreate = false;
         private GroupCreatedDto? _lastCreatedGroup = null;
         private readonly Dictionary<string, bool> ExpandedGroupState = new(StringComparer.Ordinal);
+        private List<BannedGroupUserDto> _bannedUsers = new();
 
         public GroupPanel(CompactUi mainUi, UiShared uiShared, Configuration configuration, ApiController apiController)
         {
@@ -282,6 +285,7 @@ namespace MareSynchronos.UI
                 foreach (var pair in pairsInGroup)
                 {
                     UiShared.DrawWithID(group.GID + pair.UserUID, () => DrawSyncshellPairedClient(pair,
+                        group.OwnedBy!,
                         string.Equals(group.OwnedBy, _apiController.UID, StringComparison.Ordinal),
                         group.IsModerator ?? false,
                         group?.IsPaused ?? false));
@@ -330,23 +334,11 @@ namespace MareSynchronos.UI
                 }
                 UiShared.AttachToolTip("Copy Syncshell ID to Clipboard");
 
-                if (UiShared.IconTextButton(FontAwesomeIcon.UserSecret, "Copy Notes"))
+                if (UiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Copy Notes"))
                 {
-                    var entries = _apiController.GroupPairedClients.Where(p => string.Equals(p.GroupGID, entry.GID, StringComparison.Ordinal));
-                    var comments = _configuration.GetCurrentServerUidComments();
-                    StringBuilder sb = new();
-                    sb.AppendLine("##MARE_SYNCHRONOS_USER_NOTES_START##");
-                    foreach (var userEntry in entries)
-                    {
-                        if (comments.TryGetValue(userEntry.UserUID, out var comment))
-                        {
-                            sb.AppendLine(userEntry.UserUID + ":\"" + comment + "\"");
-                        }
-                    }
-                    sb.AppendLine("##MARE_SYNCHRONOS_USER_NOTES_END##");
-                    ImGui.SetClipboardText(sb.ToString());
+                    ImGui.SetClipboardText(_uiShared.GetNotes(entry.GID));
                 }
-                UiShared.AttachToolTip("Copies all your notes for all users in this Syncshell to the clipboard");
+                UiShared.AttachToolTip("Copies all your notes for all users in this Syncshell to the clipboard." + Environment.NewLine + "They can be imported via Settings -> Privacy -> Import Notes from Clipboard");
 
                 if (isOwner || (entry.IsModerator ?? false))
                 {
@@ -402,7 +394,51 @@ namespace MareSynchronos.UI
 
                     if (UiShared.IconTextButton(FontAwesomeIcon.Ban, "Manage Banlist"))
                     {
-                        // todo: show banlist
+                        _showModalBanList = true;
+                        _bannedUsers = new();
+                        ImGui.OpenPopup("Manage Banlist for " + entry.GID);
+                    }
+
+                    if (ImGui.BeginPopupModal("Manage Banlist for " + entry.GID, ref _showModalBanList))
+                    {
+                        ImGui.SetWindowSize(new Vector2(700, 300));
+                        if (UiShared.IconTextButton(FontAwesomeIcon.Retweet, "Refresh Banlist from Server"))
+                        {
+                            _bannedUsers = _apiController.GetBannedUsersForGroup(entry.GID).Result;
+                        }
+
+                        if (ImGui.BeginTable("bannedusertable" + entry.GID, 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp))
+                        {
+                            ImGui.TableSetupColumn("UID", ImGuiTableColumnFlags.None, 1);
+                            ImGui.TableSetupColumn("By", ImGuiTableColumnFlags.None, 1);
+                            ImGui.TableSetupColumn("Date", ImGuiTableColumnFlags.None, 2);
+                            ImGui.TableSetupColumn("Reason", ImGuiTableColumnFlags.None, 3);
+                            ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.None, 1);
+
+                            ImGui.TableHeadersRow();
+
+                            foreach (var bannedUser in _bannedUsers.ToList())
+                            {
+                                ImGui.TableNextColumn();
+                                ImGui.TextUnformatted(bannedUser.UID);
+                                ImGui.TableNextColumn();
+                                ImGui.TextUnformatted(bannedUser.BannedBy);
+                                ImGui.TableNextColumn();
+                                ImGui.TextUnformatted(bannedUser.BannedOn.ToLocalTime().ToString(CultureInfo.CurrentCulture));
+                                ImGui.TableNextColumn();
+                                UiShared.TextWrapped(bannedUser.Reason);
+                                ImGui.TableNextColumn();
+                                if (UiShared.IconTextButton(FontAwesomeIcon.Check, "Unban"))
+                                {
+                                    _ = _apiController.UnbanUserFromGroup(entry.GID, bannedUser.UID);
+                                    _bannedUsers.RemoveAll(b => string.Equals(b.UID, bannedUser.UID, StringComparison.Ordinal));
+                                }
+                                ImGui.TableNextColumn();
+                            }
+
+                            ImGui.EndTable();
+                        }
+                        ImGui.EndPopup();
                     }
 
                     if (isOwner)
@@ -422,7 +458,7 @@ namespace MareSynchronos.UI
             }
         }
 
-        private void DrawSyncshellPairedClient(GroupPairDto entry, bool isOwner, bool isModerator, bool isPausedByYou)
+        private void DrawSyncshellPairedClient(GroupPairDto entry, string ownerUid, bool isOwner, bool isModerator, bool isPausedByYou)
         {
             var plusButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Plus);
             var barButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Bars);
@@ -579,27 +615,34 @@ namespace MareSynchronos.UI
                         _ = _apiController.SendRemoveUserFromGroup(entry.GroupGID, entry.UserUID);
                     }
                 }
-                UiShared.AttachToolTip("Hold CTRL and click to remove user " + (entry.UserAlias ?? entry.UserUID) + " from Syncshell");
-                if (UiShared.IconTextButton(FontAwesomeIcon.UserSlash, "Ban User"))
-                {
-                    _showModalBanUser = true;
-                    ImGui.OpenPopup("Ban User");
-                }
-                UiShared.AttachToolTip("Ban user from this Syncshell");
 
-                if (ImGui.BeginPopupModal("Ban User", ref _showModalBanUser))
+                var userIsMod = string.Equals(entry.UserUID, ownerUid, StringComparison.Ordinal);
+                var userIsOwner = string.Equals(entry.UserAlias, ownerUid, StringComparison.Ordinal);
+                if ((!entry.IsModerator ?? false) && !(userIsMod || userIsOwner))
                 {
-                    ImGui.SetWindowSize(new Vector2(300, 200));
-                    UiShared.TextWrapped("User " + (entry.UserAlias ?? entry.UserUID) + " will be banned and removed from this Syncshell.");
-                    ImGui.InputTextWithHint("##banreason", "Ban Reason", ref _banReason, 255);
-                    if (ImGui.Button("Ban User"))
+
+                    UiShared.AttachToolTip("Hold CTRL and click to remove user " + (entry.UserAlias ?? entry.UserUID) + " from Syncshell");
+                    if (UiShared.IconTextButton(FontAwesomeIcon.UserSlash, "Ban User"))
                     {
-                        var reason = _banReason;
-                        _ = _apiController.BanUserFromGroup(entry.GroupGID, entry.UserUID, reason);
-                        _banReason = string.Empty;
+                        _showModalBanUser = true;
+                        ImGui.OpenPopup("Ban User");
                     }
-                    UiShared.TextWrapped("The reason will be displayed in the banlist. The current server-side alias if present (Vanity ID) will automatically be attached to the reason.");
-                    ImGui.EndPopup();
+                    UiShared.AttachToolTip("Ban user from this Syncshell");
+
+                    if (ImGui.BeginPopupModal("Ban User", ref _showModalBanUser))
+                    {
+                        ImGui.SetWindowSize(new Vector2(300, 200));
+                        UiShared.TextWrapped("User " + (entry.UserAlias ?? entry.UserUID) + " will be banned and removed from this Syncshell.");
+                        ImGui.InputTextWithHint("##banreason", "Ban Reason", ref _banReason, 255);
+                        if (ImGui.Button("Ban User"))
+                        {
+                            var reason = _banReason;
+                            _ = _apiController.BanUserFromGroup(entry.GroupGID, entry.UserUID, reason);
+                            _banReason = string.Empty;
+                        }
+                        UiShared.TextWrapped("The reason will be displayed in the banlist. The current server-side alias if present (Vanity ID) will automatically be attached to the reason.");
+                        ImGui.EndPopup();
+                    }
                 }
 
                 if (isOwner)

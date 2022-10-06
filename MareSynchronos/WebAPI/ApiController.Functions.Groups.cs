@@ -106,6 +106,6 @@ public partial class ApiController
     public async Task SetModeratorForGroup(string gid, string uid, bool isModerator)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(Api.SendAdminChangeModeratorStatus, gid, uid, isModerator).ConfigureAwait(false);
+        await _mareHub!.SendAsync(Api.SendGroupSetModerator, gid, uid, isModerator).ConfigureAwait(false);
     }
 }

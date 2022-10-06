@@ -589,6 +589,63 @@ public class UiShared : IDisposable
         return buttonClicked;
     }
 
+    private const string NotesStart = "##MARE_SYNCHRONOS_USER_NOTES_START##";
+    private const string NotesEnd = "##MARE_SYNCHRONOS_USER_NOTES_END##";
+
+    public string GetNotes(string? gid = null)
+    {
+        var comments = _pluginConfiguration.GetCurrentServerUidComments();
+        StringBuilder sb = new();
+        sb.AppendLine(NotesStart);
+        foreach (var userEntry in comments.Where(c => !string.IsNullOrEmpty(c.Key)))
+        {
+            if (gid != null)
+            {
+                if (!ApiController.GroupPairedClients.Any(p => string.Equals(p.GroupGID, gid, StringComparison.Ordinal) && string.Equals(p.UserUID, userEntry.Key, StringComparison.Ordinal))) continue;
+            }
+
+            sb.AppendLine(userEntry.Key + ":\"" + userEntry.Value + "\"");
+        }
+        sb.AppendLine(NotesEnd);
+
+        return sb.ToString();
+    }
+
+    public bool ApplyNotesFromClipboard(string notes, bool overwrite)
+    {
+        var splitNotes = notes.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).ToList();
+        var splitNotesStart = splitNotes.FirstOrDefault();
+        var splitNotesEnd = splitNotes.LastOrDefault();
+        if (!string.Equals(splitNotesStart, NotesStart) || !string.Equals(splitNotesEnd, NotesEnd))
+        {
+            return false;
+        }
+
+        splitNotes.RemoveAll(n => string.Equals(n, NotesStart) || string.Equals(n, NotesEnd));
+
+        var comments = _pluginConfiguration.GetCurrentServerUidComments();
+
+        foreach (var note in splitNotes)
+        {
+            try
+            {
+                var splittedEntry = note.Split(":", 2, StringSplitOptions.RemoveEmptyEntries);
+                var uid = splittedEntry[0];
+                var comment = splittedEntry[1].Trim('"');
+                if (comments.ContainsKey(uid) && !overwrite) continue;
+                _pluginConfiguration.SetCurrentServerUidComment(uid, comment);
+            }
+            catch
+            {
+                Logger.Warn("Could not parse " + note);
+            }
+        }
+
+        _pluginConfiguration.Save();
+
+        return true;
+    }
+
     public void Dispose()
     {
         _pluginInterface.UiBuilder.BuildFonts -= BuildFont;

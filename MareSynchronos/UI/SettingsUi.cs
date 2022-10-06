@@ -24,6 +24,9 @@ public class SettingsUi : Window, IDisposable
     private readonly ApiController _apiController;
     private readonly UiShared _uiShared;
     public event SwitchUi? SwitchToIntroUi;
+    private bool _overwriteExistingLabels = false;
+    private bool? _notesSuccessfullyApplied = null;
+    private string _lastTab = string.Empty;
 
     public SettingsUi(WindowSystem windowSystem,
         UiShared uiShared, Configuration configuration, ApiController apiController) : base("Mare Synchronos Settings")
@@ -97,6 +100,12 @@ public class SettingsUi : Window, IDisposable
                 ImGui.EndTabItem();
             }
 
+            if (ImGui.BeginTabItem("Privacy"))
+            {
+                DrawPrivacy();
+                ImGui.EndTabItem();
+            }
+
             if (_apiController.IsConnected && _apiController.IsModerator)
             {
                 if (ImGui.BeginTabItem("Administration"))
@@ -115,8 +124,43 @@ public class SettingsUi : Window, IDisposable
     private string _bannedUserHashEntry = string.Empty;
     private string _bannedUserReasonEntry = string.Empty;
 
+    private void DrawPrivacy()
+    {
+        if (!string.Equals(_lastTab, "Privacy", StringComparison.OrdinalIgnoreCase))
+        {
+            _notesSuccessfullyApplied = null;
+        }
+
+        _lastTab = "Privacy";
+        if (UiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Export all your user notes to clipboard"))
+        {
+            ImGui.SetClipboardText(_uiShared.GetNotes());
+        }
+        if (UiShared.IconTextButton(FontAwesomeIcon.FileImport, "Import notes from clipboard"))
+        {
+            _notesSuccessfullyApplied = null;
+            var notes = ImGui.GetClipboardText();
+            _notesSuccessfullyApplied = _uiShared.ApplyNotesFromClipboard(notes, _overwriteExistingLabels);
+        }
+
+        ImGui.SameLine();
+        ImGui.Checkbox("Overwrite existing notes", ref _overwriteExistingLabels);
+        UiShared.DrawHelpText("If this option is selected all already existing notes for UIDs will be overwritten by the imported notes.");
+        if (_notesSuccessfullyApplied.HasValue && _notesSuccessfullyApplied.Value)
+        {
+            UiShared.ColorTextWrapped("User Notes successfully imported", ImGuiColors.HealerGreen);
+        }
+        else if (_notesSuccessfullyApplied.HasValue && !_notesSuccessfullyApplied.Value)
+        {
+            UiShared.ColorTextWrapped("Attempt to import notes from clipboard failed. Check formatting and try again", ImGuiColors.DalamudRed);
+        }
+    }
+
+
+
     private void DrawAdministration()
     {
+        _lastTab = "Administration";
         if (ImGui.TreeNode("Forbidden Files Changes"))
         {
             if (ImGui.BeginTable("ForbiddenFilesTable", 3, ImGuiTableFlags.RowBg))
@@ -370,6 +414,7 @@ public class SettingsUi : Window, IDisposable
 
     private void DrawUserAdministration(bool serverAlive)
     {
+        _lastTab = "UserAdministration";
         if (serverAlive)
         {
             if (ImGui.Button("Delete all my files"))
@@ -472,6 +517,7 @@ public class SettingsUi : Window, IDisposable
 
     private void DrawBlockedTransfers()
     {
+        _lastTab = "BlockedTransfers";
         UiShared.ColorTextWrapped("Files that you attempted to upload or download that were forbidden to be transferred by their creators will appear here. " +
                              "If you see file paths from your drive here, then those files were not allowed to be uploaded. If you see hashes, those files were not allowed to be downloaded. " +
                              "Ask your paired friend to send you the mod in question through other means, acquire the mod yourself or pester the mod creator to allow it to be sent over Mare.",
@@ -505,6 +551,7 @@ public class SettingsUi : Window, IDisposable
 
     private void DrawCurrentTransfers()
     {
+        _lastTab = "Transfers";
         bool showTransferWindow = _configuration.ShowTransferWindow;
         if (ImGui.Checkbox("Show separate Transfer window while transfers are active", ref showTransferWindow))
         {
@@ -585,6 +632,7 @@ public class SettingsUi : Window, IDisposable
 
     private void DrawFileCacheSettings()
     {
+        _lastTab = "FileCache";
         _uiShared.DrawFileScanState();
         _uiShared.DrawTimeSpanBetweenScansSetting();
         _uiShared.DrawCacheDirectorySetting();
