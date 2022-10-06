@@ -11,7 +11,6 @@ using System.Threading.Tasks;
 using MareSynchronos.API;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
-using System.Diagnostics;
 using Dalamud.Utility;
 
 namespace MareSynchronos.UI;
@@ -27,6 +26,7 @@ public class SettingsUi : Window, IDisposable
     private bool _overwriteExistingLabels = false;
     private bool? _notesSuccessfullyApplied = null;
     private string _lastTab = string.Empty;
+    private bool _openPopupOnAddition;
 
     public SettingsUi(WindowSystem windowSystem,
         UiShared uiShared, Configuration configuration, ApiController apiController) : base("Mare Synchronos Settings")
@@ -43,6 +43,7 @@ public class SettingsUi : Window, IDisposable
         _windowSystem = windowSystem;
         _apiController = apiController;
         _uiShared = uiShared;
+        _openPopupOnAddition = _configuration.OpenPopupOnAdd;
         windowSystem.AddWindow(this);
     }
 
@@ -73,6 +74,12 @@ public class SettingsUi : Window, IDisposable
         ImGui.Separator();
         if (ImGui.BeginTabBar("mainTabBar"))
         {
+            if (ImGui.BeginTabItem("General"))
+            {
+                DrawGeneral();
+                ImGui.EndTabItem();
+            }
+
             if (ImGui.BeginTabItem("Cache Settings"))
             {
                 DrawFileCacheSettings();
@@ -100,12 +107,6 @@ public class SettingsUi : Window, IDisposable
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("Privacy"))
-            {
-                DrawPrivacy();
-                ImGui.EndTabItem();
-            }
-
             if (_apiController.IsConnected && _apiController.IsModerator)
             {
                 if (ImGui.BeginTabItem("Administration"))
@@ -124,14 +125,14 @@ public class SettingsUi : Window, IDisposable
     private string _bannedUserHashEntry = string.Empty;
     private string _bannedUserReasonEntry = string.Empty;
 
-    private void DrawPrivacy()
+    private void DrawGeneral()
     {
-        if (!string.Equals(_lastTab, "Privacy", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(_lastTab, "General", StringComparison.OrdinalIgnoreCase))
         {
             _notesSuccessfullyApplied = null;
         }
 
-        _lastTab = "Privacy";
+        _lastTab = "General";
         if (UiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Export all your user notes to clipboard"))
         {
             ImGui.SetClipboardText(_uiShared.GetNotes());
@@ -154,9 +155,14 @@ public class SettingsUi : Window, IDisposable
         {
             UiShared.ColorTextWrapped("Attempt to import notes from clipboard failed. Check formatting and try again", ImGuiColors.DalamudRed);
         }
+        ImGui.Separator();
+        if (ImGui.Checkbox("Open Notes Popup on user addition", ref _openPopupOnAddition))
+        {
+            _configuration.OpenPopupOnAdd = _openPopupOnAddition;
+            _configuration.Save();
+        }
+        UiShared.DrawHelpText("This will open a popup that allows you to set the notes for a user after successfully adding them to your individual pairs.");
     }
-
-
 
     private void DrawAdministration()
     {

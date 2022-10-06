@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
+using System.Runtime.Serialization.Formatters;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
@@ -36,10 +37,12 @@ public class CompactUi : Window, IDisposable
 
     public float TransferPartHeight = 0;
     public float _windowContentWidth = 0;
-
+    private bool _showModalForUserAddition = false;
 
     private bool showSyncShells = false;
     private GroupPanel groupPanel;
+    private ClientPairDto? _lastAddedUser;
+    private string _lastAddedUserComment = string.Empty;
 
     public CompactUi(WindowSystem windowSystem,
         UiShared uiShared, Configuration configuration, ApiController apiController) : base("###MareSynchronosMainUI")
@@ -89,6 +92,8 @@ public class CompactUi : Window, IDisposable
 
     public override void Draw()
     {
+        _showModalForUserAddition = _configuration.OpenPopupOnAdd;
+
         _windowContentWidth = UiShared.GetWindowContentRegionWidth();
         UiShared.DrawWithID("header", DrawUIDHeader);
         ImGui.Separator();
@@ -146,6 +151,38 @@ public class CompactUi : Window, IDisposable
             ImGui.Separator();
             UiShared.DrawWithID("transfers", DrawTransfers);
             TransferPartHeight = ImGui.GetCursorPosY() - TransferPartHeight;
+        }
+
+        if (_showModalForUserAddition && _apiController.LastAddedUser != null)
+        {
+            _lastAddedUser = _apiController.LastAddedUser;
+            _apiController.LastAddedUser = null;
+            ImGui.OpenPopup("Set Notes for New User");
+            _showModalForUserAddition = true;
+            _lastAddedUserComment = string.Empty;
+        }
+
+        if (ImGui.BeginPopupModal("Set Notes for New User", ref _showModalForUserAddition, ImGuiWindowFlags.AlwaysAutoResize))
+        {
+            if (_lastAddedUser == null)
+            {
+                _showModalForUserAddition = false;
+            }
+            else
+            {
+                var uid = string.IsNullOrEmpty(_lastAddedUser!.VanityUID) ? _lastAddedUser.OtherUID : _lastAddedUser.VanityUID;
+                UiShared.TextWrapped($"You have successfully added {uid}. Set a local note for the user in the field below:");
+                ImGui.InputTextWithHint("##noteforuser", $"Note for {uid}", ref _lastAddedUserComment, 100);
+                if (UiShared.IconTextButton(FontAwesomeIcon.Save, "Save Note"))
+                {
+                    _configuration.SetCurrentServerUidComment(_lastAddedUser.OtherUID, _lastAddedUserComment);
+                    _lastAddedUser = null;
+                    _lastAddedUserComment = string.Empty;
+                    _configuration.Save();
+                    _showModalForUserAddition = false;
+                }
+            }
+            ImGui.EndPopup();
         }
     }
 

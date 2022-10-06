@@ -10,6 +10,8 @@ namespace MareSynchronos.WebAPI;
 
 public partial class ApiController
 {
+    public ClientPairDto? LastAddedUser { get; set; }
+
     private void UserForcedReconnectCallback()
     {
         _ = CreateConnections();
@@ -25,6 +27,7 @@ public partial class ApiController
         }
         if (entry == null)
         {
+            LastAddedUser = dto;
             PairedClients.Add(dto);
             return;
         }
