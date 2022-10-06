@@ -608,18 +608,18 @@ namespace MareSynchronos.UI
                     _ = _apiController.SendChangeUserPinned(entry.GroupGID, entry.UserUID, !entry.IsPinned ?? false);
                 }
                 UiShared.AttachToolTip("Pin this user to the Syncshell. Pinned users will not be deleted in case of a manually initiated Syncshell clean");
-                if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Remove user"))
-                {
-                    if (UiShared.CtrlPressed())
-                    {
-                        _ = _apiController.SendRemoveUserFromGroup(entry.GroupGID, entry.UserUID);
-                    }
-                }
 
                 var userIsMod = string.Equals(entry.UserUID, ownerUid, StringComparison.Ordinal);
                 var userIsOwner = string.Equals(entry.UserAlias, ownerUid, StringComparison.Ordinal);
                 if ((!entry.IsModerator ?? false) && !(userIsMod || userIsOwner))
                 {
+                    if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Remove user"))
+                    {
+                        if (UiShared.CtrlPressed())
+                        {
+                            _ = _apiController.SendRemoveUserFromGroup(entry.GroupGID, entry.UserUID);
+                        }
+                    }
 
                     UiShared.AttachToolTip("Hold CTRL and click to remove user " + (entry.UserAlias ?? entry.UserUID) + " from Syncshell");
                     if (UiShared.IconTextButton(FontAwesomeIcon.UserSlash, "Ban User"))
