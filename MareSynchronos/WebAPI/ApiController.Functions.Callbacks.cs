@@ -95,6 +95,7 @@ public partial class ApiController
         existingUser.IsPaused = dto.IsPaused ?? existingUser.IsPaused;
         existingUser.UserAlias = dto.UserAlias ?? existingUser.UserAlias;
         existingUser.IsPinned = dto.IsPinned ?? existingUser.IsPinned;
+        existingUser.IsModerator = dto.IsModerator ?? existingUser.IsModerator;
     }
 
     private async Task GroupChangedCallback(GroupDto dto)
@@ -117,5 +118,6 @@ public partial class ApiController
         existingGroup.OwnedBy = dto.OwnedBy ?? existingGroup.OwnedBy;
         existingGroup.InvitesEnabled = dto.InvitesEnabled ?? existingGroup.InvitesEnabled;
         existingGroup.IsPaused = dto.IsPaused ?? existingGroup.IsPaused;
+        existingGroup.IsModerator = dto.IsModerator ?? existingGroup.IsModerator;
     }
 }

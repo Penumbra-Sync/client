@@ -84,4 +84,28 @@ public partial class ApiController
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
         await _mareHub!.SendAsync(Api.SendGroupChangeOwner, gid, uid).ConfigureAwait(false);
     }
+
+    public async Task BanUserFromGroup(string gid, string uid, string reason)
+    {
+        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
+        await _mareHub!.SendAsync(Api.SendBanUserFromGroup, gid, uid, reason).ConfigureAwait(false);
+    }
+
+    public async Task UnbanUserFromGroup(string gid, string uid)
+    {
+        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
+        await _mareHub!.SendAsync(Api.SendUnbanUserFromGroup, gid, uid).ConfigureAwait(false);
+    }
+
+    public async Task<List<BannedGroupUserDto>> GetBannedUsersForGroup(string gid)
+    {
+        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return new();
+        return await _mareHub!.InvokeAsync<List<BannedGroupUserDto>>(Api.InvokeGetBannedUsersForGroup, gid).ConfigureAwait(false);
+    }
+
+    public async Task SetModeratorForGroup(string gid, string uid, bool isModerator)
+    {
+        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
+        await _mareHub!.SendAsync(Api.SendAdminChangeModeratorStatus, gid, uid, isModerator).ConfigureAwait(false);
+    }
 }

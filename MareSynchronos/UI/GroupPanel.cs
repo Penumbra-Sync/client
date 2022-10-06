@@ -28,7 +28,9 @@ namespace MareSynchronos.UI
         private bool _showModalEnterPassword;
         private bool _showModalCreateGroup;
         private bool _showModalChangePassword;
+        private bool _showModalBanUser;
         private string _newSyncShellPassword = string.Empty;
+        private string _banReason = string.Empty;
         private bool _isPasswordValid;
         private bool _errorGroupJoin;
         private bool _errorGroupCreate = false;
@@ -270,12 +272,18 @@ namespace MareSynchronos.UI
             ImGui.Indent(collapseButton.X);
             if (ExpandedGroupState[group.GID])
             {
-                pairsInGroup = pairsInGroup.OrderBy(p => string.Equals(p.UserUID, group.OwnedBy, StringComparison.Ordinal) ? 0 : 1).ThenBy(p => p.IsPinned ?? false ? 0 : 1).ThenBy(p => p.UserAlias ?? p.UserUID).ToList();
+                pairsInGroup = pairsInGroup.OrderBy(p => string.Equals(p.UserUID, group.OwnedBy, StringComparison.Ordinal) ? 0 : 1)
+                    .ThenBy(p => p.IsModerator ?? false ? 0 : 1)
+                    .ThenBy(p => p.IsPinned ?? false ? 0 : 1)
+                    .ThenBy(p => p.UserAlias ?? p.UserUID).ToList();
                 ImGui.Indent(ImGui.GetStyle().ItemSpacing.X / 2);
                 ImGui.Separator();
                 foreach (var pair in pairsInGroup)
                 {
-                    UiShared.DrawWithID(group.GID + pair.UserUID, () => DrawSyncshellPairedClient(pair, string.Equals(group.OwnedBy, _apiController.UID, StringComparison.Ordinal), group?.IsPaused ?? false));
+                    UiShared.DrawWithID(group.GID + pair.UserUID, () => DrawSyncshellPairedClient(pair, 
+                        string.Equals(group.OwnedBy, _apiController.UID, StringComparison.Ordinal), 
+                        group.IsModerator ?? false,
+                        group?.IsPaused ?? false));
                 }
 
                 ImGui.Separator();
@@ -290,6 +298,7 @@ namespace MareSynchronos.UI
             var lockedIcon = invitesEnabled ? FontAwesomeIcon.LockOpen : FontAwesomeIcon.Lock;
             var iconSize = UiShared.GetIconSize(lockedIcon);
             var barbuttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Bars);
+            var isOwner = string.Equals(entry.OwnedBy, _apiController.UID, StringComparison.Ordinal);
 
             ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - barbuttonSize.X - iconSize.X - ImGui.GetStyle().ItemSpacing.X);
             ImGui.PushFont(UiBuilder.IconFont);
@@ -320,43 +329,46 @@ namespace MareSynchronos.UI
                 }
                 UiShared.AttachToolTip("Copy Syncshell ID to Clipboard");
 
-                if (string.Equals(entry.OwnedBy, _apiController.UID, StringComparison.Ordinal))
+                if (isOwner || (entry.IsModerator ?? false))
                 {
                     ImGui.Separator();
 
-                    if (UiShared.IconTextButton(lockedIcon, invitesEnabled ? "Lock Syncshell" : "Unlock Syncshell"))
+                    if (isOwner)
                     {
-                        _ = _apiController.SendGroupChangeInviteState(entry.GID, !entry.InvitesEnabled ?? true);
-                    }
-                    UiShared.AttachToolTip("Change Syncshell joining permissions" + Environment.NewLine + "Syncshell is currently " + (invitesEnabled ? "open" : "closed") + " for people to join");
-
-                    if (UiShared.IconTextButton(FontAwesomeIcon.Passport, "Change Password"))
-                    {
-                        ImGui.OpenPopup("Change Syncshell Password");
-                        _isPasswordValid = true;
-                        _showModalChangePassword = true;
-                    }
-                    UiShared.AttachToolTip("Change Syncshell Password");
-
-                    if (ImGui.BeginPopupModal("Change Syncshell Password", ref _showModalChangePassword, ImGuiWindowFlags.AlwaysAutoResize))
-                    {
-                        UiShared.TextWrapped("Enter the new Syncshell password for Syncshell " + name + " here.");
-                        UiShared.TextWrapped("This action is irreversible");
-                        ImGui.InputTextWithHint("##changepw", "New password for " + name, ref _newSyncShellPassword, 255);
-                        if (ImGui.Button("Change password"))
+                        if (UiShared.IconTextButton(lockedIcon, invitesEnabled ? "Lock Syncshell" : "Unlock Syncshell"))
                         {
-                            var pw = _newSyncShellPassword;
-                            _isPasswordValid = _apiController.ChangeGroupPassword(entry.GID, pw).Result;
-                            _newSyncShellPassword = string.Empty;
-                            if (_isPasswordValid) _showModalChangePassword = false;
+                            _ = _apiController.SendGroupChangeInviteState(entry.GID, !entry.InvitesEnabled ?? true);
                         }
+                        UiShared.AttachToolTip("Change Syncshell joining permissions" + Environment.NewLine + "Syncshell is currently " + (invitesEnabled ? "open" : "closed") + " for people to join");
 
-                        if (!_isPasswordValid)
+                        if (UiShared.IconTextButton(FontAwesomeIcon.Passport, "Change Password"))
                         {
-                            UiShared.ColorTextWrapped("The selected password is too short. It must be at least 10 characters.", new Vector4(1, 0, 0, 1));
+                            ImGui.OpenPopup("Change Syncshell Password");
+                            _isPasswordValid = true;
+                            _showModalChangePassword = true;
                         }
+                        UiShared.AttachToolTip("Change Syncshell Password");
 
-                        ImGui.EndPopup();
+                        if (ImGui.BeginPopupModal("Change Syncshell Password", ref _showModalChangePassword, ImGuiWindowFlags.AlwaysAutoResize))
+                        {
+                            UiShared.TextWrapped("Enter the new Syncshell password for Syncshell " + name + " here.");
+                            UiShared.TextWrapped("This action is irreversible");
+                            ImGui.InputTextWithHint("##changepw", "New password for " + name, ref _newSyncShellPassword, 255);
+                            if (ImGui.Button("Change password"))
+                            {
+                                var pw = _newSyncShellPassword;
+                                _isPasswordValid = _apiController.ChangeGroupPassword(entry.GID, pw).Result;
+                                _newSyncShellPassword = string.Empty;
+                                if (_isPasswordValid) _showModalChangePassword = false;
+                            }
+
+                            if (!_isPasswordValid)
+                            {
+                                UiShared.ColorTextWrapped("The selected password is too short. It must be at least 10 characters.", new Vector4(1, 0, 0, 1));
+                            }
+
+                            ImGui.EndPopup();
+                        }
                     }
 
                     if (UiShared.IconTextButton(FontAwesomeIcon.Broom, "Clear Syncshell"))
@@ -369,21 +381,29 @@ namespace MareSynchronos.UI
                     UiShared.AttachToolTip("Hold CTRL and click to clear this Syncshell." + Environment.NewLine + "WARNING: this action is irreversible." + Environment.NewLine
                         + "Clearing the Syncshell will remove all not pinned users from it.");
 
-                    if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Syncshell"))
+                    if (UiShared.IconTextButton(FontAwesomeIcon.Ban, "Manage Banlist"))
                     {
-                        if (UiShared.CtrlPressed() && UiShared.ShiftPressed())
-                        {
-                            _ = _apiController.SendDeleteGroup(entry.GID);
-                        }
+                        // todo: show banlist
                     }
-                    UiShared.AttachToolTip("Hold CTRL and Shift and click to delete this Syncshell." + Environment.NewLine + "WARNING: this action is irreversible.");
+
+                    if (isOwner)
+                    {
+                        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Syncshell"))
+                        {
+                            if (UiShared.CtrlPressed() && UiShared.ShiftPressed())
+                            {
+                                _ = _apiController.SendDeleteGroup(entry.GID);
+                            }
+                        }
+                        UiShared.AttachToolTip("Hold CTRL and Shift and click to delete this Syncshell." + Environment.NewLine + "WARNING: this action is irreversible.");
+                    }
                 }
 
                 ImGui.EndPopup();
             }
         }
 
-        private void DrawSyncshellPairedClient(GroupPairDto entry, bool isOwner, bool isPausedByYou)
+        private void DrawSyncshellPairedClient(GroupPairDto entry, bool isOwner, bool isModerator, bool isPausedByYou)
         {
             var plusButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Plus);
             var barButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Bars);
@@ -411,14 +431,26 @@ namespace MareSynchronos.UI
                 UiShared.AttachToolTip("You are paired with " + entryUID);
             }
 
-            if (entry.IsPinned ?? false)
+            if (entry.IsModerator ?? false)
             {
                 ImGui.SameLine();
                 ImGui.SetCursorPosY(textPos);
                 ImGui.PushFont(UiBuilder.IconFont);
-                ImGui.TextUnformatted(FontAwesomeIcon.Thumbtack.ToIconString());
+                ImGui.TextUnformatted(FontAwesomeIcon.UserShield.ToIconString());
                 ImGui.PopFont();
-                UiShared.AttachToolTip("User is pinned in this Syncshell");
+                UiShared.AttachToolTip("User is moderator of this Syncshell");
+            }
+            else
+            {
+                if (entry.IsPinned ?? false)
+                {
+                    ImGui.SameLine();
+                    ImGui.SetCursorPosY(textPos);
+                    ImGui.PushFont(UiBuilder.IconFont);
+                    ImGui.TextUnformatted(FontAwesomeIcon.Thumbtack.ToIconString());
+                    ImGui.PopFont();
+                    UiShared.AttachToolTip("User is pinned in this Syncshell");
+                }
             }
 
             var textIsUid = true;
@@ -502,7 +534,7 @@ namespace MareSynchronos.UI
                 UiShared.AttachToolTip("Pair with " + entryUID + " individually");
             }
 
-            if (isOwner)
+            if (isOwner || isModerator)
             {
                 ImGui.SetCursorPosY(originalY);
                 var subtractedWidth = plusButtonShown ? (plusButtonSize.X) : 0;
@@ -521,14 +553,6 @@ namespace MareSynchronos.UI
                     _ = _apiController.SendChangeUserPinned(entry.GroupGID, entry.UserUID, !entry.IsPinned ?? false);
                 }
                 UiShared.AttachToolTip("Pin this user to the Syncshell. Pinned users will not be deleted in case of a manually initiated Syncshell clean");
-                if (UiShared.IconTextButton(FontAwesomeIcon.Crown, "Transfer Ownership"))
-                {
-                    if (UiShared.CtrlPressed() && UiShared.ShiftPressed())
-                    {
-                        _ = _apiController.ChangeOwnerOfGroup(entry.GroupGID, entry.UserUID);
-                    }
-                }
-                UiShared.AttachToolTip("Hold CTRL and SHIFT and click to transfer ownership of this Syncshell to " + (entry.UserAlias ?? entry.UserUID) + Environment.NewLine + "WARNING: This action is irreversible.");
                 if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Remove user"))
                 {
                     if (UiShared.CtrlPressed())
@@ -537,6 +561,49 @@ namespace MareSynchronos.UI
                     }
                 }
                 UiShared.AttachToolTip("Hold CTRL and click to remove user " + (entry.UserAlias ?? entry.UserUID) + " from Syncshell");
+                if (UiShared.IconTextButton(FontAwesomeIcon.UserSlash, "Ban User"))
+                {
+                    _showModalBanUser = true;
+                    ImGui.OpenPopup("Ban User");
+                }
+                UiShared.AttachToolTip("Ban user from this Syncshell");
+
+                if (ImGui.BeginPopupModal("Ban User", ref _showModalBanUser))
+                {
+                    ImGui.SetWindowSize(new Vector2(300, 200));
+                    UiShared.TextWrapped("User " + (entry.UserAlias ?? entry.UserUID) + " will be banned and removed from this Syncshell.");
+                    ImGui.InputTextWithHint("##banreason", "Ban Reason", ref _banReason, 255);
+                    if (ImGui.Button("Ban User"))
+                    {
+                        var reason = _banReason;
+                        _ = _apiController.BanUserFromGroup(entry.GroupGID, entry.UserUID, reason);
+                        _banReason = string.Empty;
+                    }
+                    UiShared.TextWrapped("The reason will be displayed in the banlist. The current server-side alias if present (Vanity ID) will automatically be attached to the reason.");
+                    ImGui.EndPopup();
+                }
+
+                if (isOwner)
+                {
+                    string modText = (entry.IsModerator ?? false) ? "Demod user" : "Mod user";
+                    if (UiShared.IconTextButton(FontAwesomeIcon.UserShield, modText))
+                    {
+                        if (UiShared.CtrlPressed())
+                        {
+                            _ = _apiController.SetModeratorForGroup(entry.GroupGID, entry.UserUID, !entry.IsModerator ?? false);
+                        }
+                    }
+                    UiShared.AttachToolTip("Hold CTRL to change the moderator status for " + (entry.UserAlias ?? entry.UserUID) + Environment.NewLine +
+                        "Moderators can kick, ban/unban, pin/unpin users and clear the Syncshell.");
+                    if (UiShared.IconTextButton(FontAwesomeIcon.Crown, "Transfer Ownership"))
+                    {
+                        if (UiShared.CtrlPressed() && UiShared.ShiftPressed())
+                        {
+                            _ = _apiController.ChangeOwnerOfGroup(entry.GroupGID, entry.UserUID);
+                        }
+                    }
+                    UiShared.AttachToolTip("Hold CTRL and SHIFT and click to transfer ownership of this Syncshell to " + (entry.UserAlias ?? entry.UserUID) + Environment.NewLine + "WARNING: This action is irreversible.");
+                }
                 ImGui.EndPopup();
             }
         }
