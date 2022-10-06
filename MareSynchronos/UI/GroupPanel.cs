@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Text;
 
 namespace MareSynchronos.UI
 {
@@ -280,8 +281,8 @@ namespace MareSynchronos.UI
                 ImGui.Separator();
                 foreach (var pair in pairsInGroup)
                 {
-                    UiShared.DrawWithID(group.GID + pair.UserUID, () => DrawSyncshellPairedClient(pair, 
-                        string.Equals(group.OwnedBy, _apiController.UID, StringComparison.Ordinal), 
+                    UiShared.DrawWithID(group.GID + pair.UserUID, () => DrawSyncshellPairedClient(pair,
+                        string.Equals(group.OwnedBy, _apiController.UID, StringComparison.Ordinal),
                         group.IsModerator ?? false,
                         group?.IsPaused ?? false));
                 }
@@ -328,6 +329,24 @@ namespace MareSynchronos.UI
                     ImGui.SetClipboardText(string.IsNullOrEmpty(entry.Alias) ? entry.GID : entry.Alias);
                 }
                 UiShared.AttachToolTip("Copy Syncshell ID to Clipboard");
+
+                if (UiShared.IconTextButton(FontAwesomeIcon.UserSecret, "Copy Notes"))
+                {
+                    var entries = _apiController.GroupPairedClients.Where(p => string.Equals(p.GroupGID, entry.GID, StringComparison.Ordinal));
+                    var comments = _configuration.GetCurrentServerUidComments();
+                    StringBuilder sb = new();
+                    sb.AppendLine("##MARE_SYNCHRONOS_USER_NOTES_START##");
+                    foreach (var userEntry in entries)
+                    {
+                        if (comments.TryGetValue(userEntry.UserUID, out var comment))
+                        {
+                            sb.AppendLine(userEntry.UserUID + ":\"" + comment + "\"");
+                        }
+                    }
+                    sb.AppendLine("##MARE_SYNCHRONOS_USER_NOTES_END##");
+                    ImGui.SetClipboardText(sb.ToString());
+                }
+                UiShared.AttachToolTip("Copies all your notes for all users in this Syncshell to the clipboard");
 
                 if (isOwner || (entry.IsModerator ?? false))
                 {
