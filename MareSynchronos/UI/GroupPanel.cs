@@ -215,6 +215,15 @@ namespace MareSynchronos.UI
                 ImGui.SameLine();
             }
 
+            if (group.IsModerator ?? false)
+            {
+                ImGui.PushFont(UiBuilder.IconFont);
+                ImGui.Text(FontAwesomeIcon.UserShield.ToIconString());
+                ImGui.PopFont();
+                UiShared.AttachToolTip("You are a moderator of Syncshell " + groupName);
+                ImGui.SameLine();
+            }
+
             _showGidForEntry.TryGetValue(group.GID, out var showGidInsteadOfName);
             if (!showGidInsteadOfName && _configuration.GetCurrentServerGidComments().TryGetValue(group.GID, out var groupComment))
             {
@@ -473,8 +482,8 @@ namespace MareSynchronos.UI
             var textSize = ImGui.CalcTextSize(entryUID);
             var originalY = ImGui.GetCursorPosY();
             var buttonSizes = plusButtonSize.Y;
-            var userIsMod = string.Equals(entry.UserUID, ownerUid, StringComparison.Ordinal);
-            var userIsOwner = string.Equals(entry.UserAlias, ownerUid, StringComparison.Ordinal);
+            var userIsMod = entry.IsModerator ?? false;
+            var userIsOwner = string.Equals(entryUID, ownerUid, StringComparison.Ordinal);
 
             var textPos = originalY + plusButtonSize.Y / 2 - textSize.Y / 2;
             ImGui.SetCursorPosY(textPos);
@@ -495,7 +504,16 @@ namespace MareSynchronos.UI
                 UiShared.AttachToolTip("You are paired with " + entryUID);
             }
 
-            if (entry.IsModerator ?? false)
+            if (userIsOwner)
+            {
+                ImGui.SameLine();
+                ImGui.SetCursorPosY(textPos);
+                ImGui.PushFont(UiBuilder.IconFont);
+                ImGui.TextUnformatted(FontAwesomeIcon.Crown.ToIconString());
+                ImGui.PopFont();
+                UiShared.AttachToolTip("User is owner of this Syncshell");
+            }
+            else if (userIsMod)
             {
                 ImGui.SameLine();
                 ImGui.SetCursorPosY(textPos);
@@ -504,17 +522,14 @@ namespace MareSynchronos.UI
                 ImGui.PopFont();
                 UiShared.AttachToolTip("User is moderator of this Syncshell");
             }
-            else
+            else if (entry.IsPinned ?? false)
             {
-                if (entry.IsPinned ?? false)
-                {
-                    ImGui.SameLine();
-                    ImGui.SetCursorPosY(textPos);
-                    ImGui.PushFont(UiBuilder.IconFont);
-                    ImGui.TextUnformatted(FontAwesomeIcon.Thumbtack.ToIconString());
-                    ImGui.PopFont();
-                    UiShared.AttachToolTip("User is pinned in this Syncshell");
-                }
+                ImGui.SameLine();
+                ImGui.SetCursorPosY(textPos);
+                ImGui.PushFont(UiBuilder.IconFont);
+                ImGui.TextUnformatted(FontAwesomeIcon.Thumbtack.ToIconString());
+                ImGui.PopFont();
+                UiShared.AttachToolTip("User is pinned in this Syncshell");
             }
 
             var textIsUid = true;
