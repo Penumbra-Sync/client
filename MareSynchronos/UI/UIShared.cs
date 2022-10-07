@@ -605,22 +605,18 @@ public class UiShared : IDisposable
         var buttonSizeY = (iconSize.Y > textSize.Y ? iconSize.Y : textSize.Y) + padding.Y * 2;
         var buttonSize = new Vector2(buttonSizeX, buttonSizeY);
 
-        if (ImGui.BeginChild(icon.ToIconString() + text, buttonSize))
+        if (ImGui.Button("###" + icon.ToIconString() + text, buttonSize))
         {
-            if (ImGui.Button("", buttonSize))
-            {
-                buttonClicked = true;
-            }
-
-            ImGui.SameLine();
-            ImGui.SetCursorPosX(padding.X);
-            ImGui.PushFont(UiBuilder.IconFont);
-            ImGui.Text(icon.ToIconString());
-            ImGui.PopFont();
-            ImGui.SameLine();
-            ImGui.Text(text);
-            ImGui.EndChild();
+            buttonClicked = true;
         }
+
+        ImGui.SameLine();
+        ImGui.SetCursorPosX(ImGui.GetCursorPosX() - buttonSize.X - padding.X);
+        ImGui.PushFont(UiBuilder.IconFont);
+        ImGui.Text(icon.ToIconString());
+        ImGui.PopFont();
+        ImGui.SameLine();
+        ImGui.Text(text);
 
         return buttonClicked;
     }
