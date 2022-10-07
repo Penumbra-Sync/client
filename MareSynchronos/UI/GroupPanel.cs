@@ -629,7 +629,10 @@ namespace MareSynchronos.UI
             if (plusButtonShown)
             {
                 ImGui.SetCursorPosY(originalY);
-                ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - plusButtonSize.X - (isOwner ? barButtonSize.X + ImGui.GetStyle().ItemSpacing.X : 0));
+                var barWidth = isOwner || (isModerator && !userIsMod && !userIsOwner)
+                    ? barButtonSize.X + ImGui.GetStyle().ItemSpacing.X
+                    : 0;
+                ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - plusButtonSize.X - barWidth);
 
                 if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
                 {
@@ -641,7 +644,6 @@ namespace MareSynchronos.UI
             if (isOwner || (isModerator && !userIsMod && !userIsOwner))
             {
                 ImGui.SetCursorPosY(originalY);
-                var subtractedWidth = plusButtonShown ? (plusButtonSize.X) : 0;
                 ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - barButtonSize.X);
 
                 if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
