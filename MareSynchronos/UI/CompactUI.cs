@@ -165,7 +165,7 @@ public class CompactUi : Window, IDisposable
         {
             if (_apiController.PairedClients.All(w => !string.Equals(w.OtherUID, _pairToAdd, StringComparison.Ordinal)))
             {
-                _ = _apiController.SendPairedClientAddition(_pairToAdd);
+                _ = _apiController.UserAddPair(_pairToAdd);
                 _pairToAdd = string.Empty;
             }
         }
@@ -243,7 +243,7 @@ public class CompactUi : Window, IDisposable
                     Logger.Debug(users.Count.ToString());
                     foreach (var entry in users)
                     {
-                        _ = _apiController.SendPairedClientPauseChange(entry.OtherUID, !entry.IsPaused);
+                        _ = _apiController.UserChangePairPauseStatus(entry.OtherUID, !entry.IsPaused);
                     }
 
                     _timeout.Start();
@@ -371,7 +371,7 @@ public class CompactUi : Window, IDisposable
         {
             if (UiShared.CtrlPressed())
             {
-                _ = _apiController.SendPairedClientRemoval(entry.OtherUID);
+                _ = _apiController.UserRemovePair(entry.OtherUID);
             }
         }
         UiShared.AttachToolTip("Hold CTRL and click to unpair permanently from " + entryUID);
@@ -382,7 +382,7 @@ public class CompactUi : Window, IDisposable
             ImGui.SetCursorPosY(originalY);
             if (ImGuiComponents.IconButton(pauseIcon))
             {
-                _ = _apiController.SendPairedClientPauseChange(entry.OtherUID, !entry.IsPaused);
+                _ = _apiController.UserChangePairPauseStatus(entry.OtherUID, !entry.IsPaused);
             }
             UiShared.AttachToolTip(!entry.IsPaused
                 ? "Pause pairing with " + entryUID

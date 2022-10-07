@@ -79,7 +79,7 @@ public class OnlinePlayerManager : IDisposable
 
     private void ApiControllerOnConnected()
     {
-        var apiTask = _apiController.GetOnlineCharacters();
+        var apiTask = _apiController.UserGetOnlineCharacters();
 
         Task.WaitAll(apiTask);
 

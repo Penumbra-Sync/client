@@ -146,14 +146,14 @@ public class SettingsUi : Window, IDisposable
                         if (ImGui.Button(
                                 FontAwesomeIcon.Upload.ToIconString() + "##updateFile" + forbiddenFile.Hash))
                         {
-                            _ = _apiController.AddOrUpdateForbiddenFileEntry(forbiddenFile);
+                            _ = _apiController.AdminUpdateOrAddForbiddenFile(forbiddenFile);
                         }
 
                         ImGui.SameLine();
                         if (ImGui.Button(FontAwesomeIcon.Trash.ToIconString() + "##deleteFile" +
                                          forbiddenFile.Hash))
                         {
-                            _ = _apiController.DeleteForbiddenFileEntry(forbiddenFile);
+                            _ = _apiController.AdminDeleteForbiddenFile(forbiddenFile);
                         }
 
                         ImGui.PopFont();
@@ -171,7 +171,7 @@ public class SettingsUi : Window, IDisposable
                     ImGui.PushFont(UiBuilder.IconFont);
                     if (ImGui.Button(FontAwesomeIcon.Plus.ToIconString() + "##addForbiddenFile"))
                     {
-                        _ = _apiController.AddOrUpdateForbiddenFileEntry(new ForbiddenFileDto()
+                        _ = _apiController.AdminUpdateOrAddForbiddenFile(new ForbiddenFileDto()
                         {
                             ForbiddenBy = _forbiddenFileHashForbiddenBy,
                             Hash = _forbiddenFileHashEntry
@@ -221,7 +221,7 @@ public class SettingsUi : Window, IDisposable
                         if (ImGui.Button(FontAwesomeIcon.Upload.ToIconString() + "##updateUser" +
                                          bannedUser.CharacterHash))
                         {
-                            _ = _apiController.AddOrUpdateBannedUserEntry(bannedUser);
+                            _ = _apiController.AdminUpdateOrAddBannedUser(bannedUser);
                         }
 
                         ImGui.SameLine();
@@ -230,7 +230,7 @@ public class SettingsUi : Window, IDisposable
                     if (ImGui.Button(FontAwesomeIcon.Trash.ToIconString() + "##deleteUser" +
                                      bannedUser.CharacterHash))
                     {
-                        _ = _apiController.DeleteBannedUserEntry(bannedUser);
+                        _ = _apiController.AdminDeleteBannedUser(bannedUser);
                     }
 
                     ImGui.PopFont();
@@ -255,7 +255,7 @@ public class SettingsUi : Window, IDisposable
                 ImGui.PushFont(UiBuilder.IconFont);
                 if (ImGui.Button(FontAwesomeIcon.Plus.ToIconString() + "##addForbiddenFile"))
                 {
-                    _ = _apiController.AddOrUpdateBannedUserEntry(new BannedUserDto()
+                    _ = _apiController.AdminUpdateOrAddBannedUser(new BannedUserDto()
                     {
                         CharacterHash = _forbiddenFileHashForbiddenBy,
                         Reason = _forbiddenFileHashEntry
@@ -328,7 +328,7 @@ public class SettingsUi : Window, IDisposable
                     if (ImGui.Button(FontAwesomeIcon.SkullCrossbones.ToIconString() + "##onlineUserBan" +
                                      onlineUser.CharacterNameHash))
                     {
-                        _ = _apiController.AddOrUpdateBannedUserEntry(new BannedUserDto
+                        _ = _apiController.AdminUpdateOrAddBannedUser(new BannedUserDto
                         {
                             CharacterHash = onlineUser.CharacterNameHash,
                             Reason = "Banned by " + _uiShared.PlayerName
@@ -343,7 +343,7 @@ public class SettingsUi : Window, IDisposable
                                              "##onlineUserModerator" +
                                              onlineUser.CharacterNameHash))
                             {
-                                _apiController.PromoteToModerator(onlineUser.UID);
+                                _apiController.AdminChangeModeratorStatus(onlineUser.UID, true);
                             }
                         }
                         else
@@ -352,7 +352,7 @@ public class SettingsUi : Window, IDisposable
                                              "##onlineUserNonModerator" +
                                              onlineUser.CharacterNameHash))
                             {
-                                _apiController.DemoteFromModerator(onlineUser.UID);
+                                _apiController.AdminChangeModeratorStatus(onlineUser.UID, false);
                             }
                         }
                     }
@@ -389,7 +389,7 @@ public class SettingsUi : Window, IDisposable
                 ImGui.Separator();
                 if (ImGui.Button("Delete everything", new Vector2(150, 0)))
                 {
-                    Task.Run(() => _apiController.DeleteAllMyFiles());
+                    Task.Run(() => _apiController.FilesDeleteAll());
                     ImGui.CloseCurrentPopup();
                     _deleteFilesPopupModalShown = false;
                 }
@@ -423,7 +423,7 @@ public class SettingsUi : Window, IDisposable
                 ImGui.Separator();
                 if (ImGui.Button("Delete account", new Vector2(150, 0)))
                 {
-                    Task.Run(() => _apiController.DeleteAccount());
+                    Task.Run(() => _apiController.UserDelete());
                     ImGui.CloseCurrentPopup();
                     _deleteAccountPopupModalShown = false;
                     SwitchToIntroUi?.Invoke();
