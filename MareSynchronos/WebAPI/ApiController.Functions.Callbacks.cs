@@ -10,6 +10,8 @@ namespace MareSynchronos.WebAPI;
 
 public partial class ApiController
 {
+    public ClientPairDto? LastAddedUser { get; set; }
+
     public void OnUserUpdateClientPairs(Action<ClientPairDto> act)
     {
         if (_initialized) return;
@@ -86,6 +88,7 @@ public partial class ApiController
         }
         if (entry == null)
         {
+            LastAddedUser = dto;
             PairedClients.Add(dto);
             return Task.CompletedTask;
         }
