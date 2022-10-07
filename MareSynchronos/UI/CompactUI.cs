@@ -160,7 +160,7 @@ public class CompactUi : Window, IDisposable
             _lastAddedUserComment = string.Empty;
         }
 
-        if (ImGui.BeginPopupModal("Set Notes for New User", ref _showModalForUserAddition, ImGuiWindowFlags.AlwaysAutoResize))
+        if (ImGui.BeginPopupModal("Set Notes for New User", ref _showModalForUserAddition, UiShared.PopupWindowFlags))
         {
             if (_lastAddedUser == null)
             {
@@ -180,6 +180,7 @@ public class CompactUi : Window, IDisposable
                     _showModalForUserAddition = false;
                 }
             }
+            UiShared.SetScaledWindowSize(275);
             ImGui.EndPopup();
         }
     }

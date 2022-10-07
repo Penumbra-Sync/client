@@ -431,28 +431,31 @@ public class SettingsUi : Window, IDisposable
 
             UiShared.DrawHelpText("Completely deletes all your uploaded files on the service.");
 
-            if (ImGui.BeginPopupModal("Delete all your files?", ref _deleteFilesPopupModalShown,
-                    ImGuiWindowFlags.AlwaysAutoResize))
+            if (ImGui.BeginPopupModal("Delete all your files?", ref _deleteFilesPopupModalShown, UiShared.PopupWindowFlags))
             {
                 UiShared.TextWrapped(
                     "All your own uploaded files on the service will be deleted.\nThis operation cannot be undone.");
                 ImGui.Text("Are you sure you want to continue?");
                 ImGui.Separator();
-                if (ImGui.Button("Delete everything", new Vector2(150, 0)))
+                ImGui.Spacing();
+
+                var buttonSize = (ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X -
+                                 ImGui.GetStyle().ItemSpacing.X) / 2;
+                
+                if (ImGui.Button("Delete everything", new Vector2(buttonSize, 0)))
                 {
                     Task.Run(() => _apiController.DeleteAllMyFiles());
-                    ImGui.CloseCurrentPopup();
                     _deleteFilesPopupModalShown = false;
                 }
 
                 ImGui.SameLine();
 
-                if (ImGui.Button("Cancel##cancelDelete", new Vector2(150, 0)))
+                if (ImGui.Button("Cancel##cancelDelete", new Vector2(buttonSize, 0)))
                 {
-                    ImGui.CloseCurrentPopup();
                     _deleteFilesPopupModalShown = false;
                 }
 
+                UiShared.SetScaledWindowSize(325);
                 ImGui.EndPopup();
             }
 
@@ -464,30 +467,33 @@ public class SettingsUi : Window, IDisposable
 
             UiShared.DrawHelpText("Completely deletes your account and all uploaded files to the service.");
 
-            if (ImGui.BeginPopupModal("Delete your account?", ref _deleteAccountPopupModalShown,
-                    ImGuiWindowFlags.AlwaysAutoResize))
+            if (ImGui.BeginPopupModal("Delete your account?", ref _deleteAccountPopupModalShown, UiShared.PopupWindowFlags))
             {
                 UiShared.TextWrapped(
                     "Your account and all associated files and data on the service will be deleted.");
                 UiShared.TextWrapped("Your UID will be removed from all pairing lists.");
                 ImGui.Text("Are you sure you want to continue?");
                 ImGui.Separator();
-                if (ImGui.Button("Delete account", new Vector2(150, 0)))
+                ImGui.Spacing();
+                
+                var buttonSize = (ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X -
+                                  ImGui.GetStyle().ItemSpacing.X) / 2;
+                
+                if (ImGui.Button("Delete account", new Vector2(buttonSize, 0)))
                 {
                     Task.Run(() => _apiController.DeleteAccount());
-                    ImGui.CloseCurrentPopup();
                     _deleteAccountPopupModalShown = false;
                     SwitchToIntroUi?.Invoke();
                 }
 
                 ImGui.SameLine();
 
-                if (ImGui.Button("Cancel##cancelDelete", new Vector2(150, 0)))
+                if (ImGui.Button("Cancel##cancelDelete", new Vector2(buttonSize, 0)))
                 {
-                    ImGui.CloseCurrentPopup();
                     _deleteAccountPopupModalShown = false;
                 }
 
+                UiShared.SetScaledWindowSize(325);
                 ImGui.EndPopup();
             }
         }

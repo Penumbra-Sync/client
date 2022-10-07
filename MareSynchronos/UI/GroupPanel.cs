@@ -95,11 +95,12 @@ namespace MareSynchronos.UI
                 ? (userCanCreateMoreGroups ? "Create Syncshell" : $"You cannot create more than {_apiController.ServerInfo.MaxGroupsCreatedByUser} Syncshells")
                 : (userCanJoinMoreGroups ? "Join Syncshell" + _syncShellToJoin : $"You cannot join more than {_apiController.ServerInfo.MaxGroupsJoinedByUser} Syncshells"));
 
-            if (ImGui.BeginPopupModal("Enter Syncshell Password", ref _showModalEnterPassword, ImGuiWindowFlags.AlwaysAutoResize))
+            if (ImGui.BeginPopupModal("Enter Syncshell Password", ref _showModalEnterPassword, UiShared.PopupWindowFlags))
             {
                 UiShared.TextWrapped("Before joining any Syncshells please be aware that you will be automatically paired with everyone in the Syncshell.");
                 ImGui.Separator();
                 UiShared.TextWrapped("Enter the password for Syncshell " + _syncShellToJoin + ":");
+                ImGui.SetNextItemWidth(-1);
                 ImGui.InputTextWithHint("##password", _syncShellToJoin + " Password", ref _syncShellPassword, 255, ImGuiInputTextFlags.Password);
                 if (_errorGroupJoin)
                 {
@@ -119,12 +120,12 @@ namespace MareSynchronos.UI
                     }
                     _syncShellPassword = string.Empty;
                 }
+                UiShared.SetScaledWindowSize(290);
                 ImGui.EndPopup();
             }
 
-            if (ImGui.BeginPopupModal("Create Syncshell", ref _showModalCreateGroup))
+            if (ImGui.BeginPopupModal("Create Syncshell", ref _showModalCreateGroup, UiShared.PopupWindowFlags))
             {
-                ImGui.SetWindowSize(new(400, 200));
                 UiShared.TextWrapped("Press the button below to create a new Syncshell.");
                 ImGui.SetNextItemWidth(200);
                 if (ImGui.Button("Create Syncshell"))
@@ -145,6 +146,7 @@ namespace MareSynchronos.UI
                     ImGui.Separator();
                     _errorGroupCreate = false;
                     ImGui.TextUnformatted("Syncshell ID: " + _lastCreatedGroup.GID);
+                    ImGui.AlignTextToFramePadding();
                     ImGui.TextUnformatted("Syncshell Password: " + _lastCreatedGroup.Password);
                     ImGui.SameLine();
                     if (ImGuiComponents.IconButton(FontAwesomeIcon.Copy))
@@ -160,6 +162,7 @@ namespace MareSynchronos.UI
                         new Vector4(1, 0, 0, 1));
                 }
 
+                UiShared.SetScaledWindowSize(350);
                 ImGui.EndPopup();
             }
 
@@ -292,9 +295,8 @@ namespace MareSynchronos.UI
 
             if (!_showModalBanList) _modalBanListOpened = false;
 
-            if (ImGui.BeginPopupModal("Manage Banlist for " + group.GID, ref _showModalBanList))
+            if (ImGui.BeginPopupModal("Manage Banlist for " + group.GID, ref _showModalBanList, UiShared.PopupWindowFlags))
             {
-                ImGui.SetWindowSize(new Vector2(700, 300));
                 if (UiShared.IconTextButton(FontAwesomeIcon.Retweet, "Refresh Banlist from Server"))
                 {
                     _bannedUsers = _apiController.GetBannedUsersForGroup(group.GID).Result;
@@ -331,6 +333,7 @@ namespace MareSynchronos.UI
 
                     ImGui.EndTable();
                 }
+                UiShared.SetScaledWindowSize(700, 300);
                 ImGui.EndPopup();
             }
 
@@ -343,10 +346,11 @@ namespace MareSynchronos.UI
             if (!_showModalChangePassword) _modalChangePwOpened = false;
 
 
-            if (ImGui.BeginPopupModal("Change Syncshell Password", ref _showModalChangePassword, ImGuiWindowFlags.AlwaysAutoResize))
+            if (ImGui.BeginPopupModal("Change Syncshell Password", ref _showModalChangePassword, UiShared.PopupWindowFlags))
             {
                 UiShared.TextWrapped("Enter the new Syncshell password for Syncshell " + name + " here.");
                 UiShared.TextWrapped("This action is irreversible");
+                ImGui.SetNextItemWidth(-1);
                 ImGui.InputTextWithHint("##changepw", "New password for " + name, ref _newSyncShellPassword, 255);
                 if (ImGui.Button("Change password"))
                 {
@@ -361,6 +365,7 @@ namespace MareSynchronos.UI
                     UiShared.ColorTextWrapped("The selected password is too short. It must be at least 10 characters.", new Vector4(1, 0, 0, 1));
                 }
 
+                UiShared.SetScaledWindowSize(290);
                 ImGui.EndPopup();
             }
 
@@ -707,9 +712,8 @@ namespace MareSynchronos.UI
 
             if (!_showModalBanUser) _banUserPopupOpen = false;
 
-            if (ImGui.BeginPopupModal("Ban User", ref _showModalBanUser))
+            if (ImGui.BeginPopupModal("Ban User", ref _showModalBanUser, UiShared.PopupWindowFlags))
             {
-                ImGui.SetWindowSize(new Vector2(300, 200));
                 UiShared.TextWrapped("User " + (entry.UserAlias ?? entry.UserUID) + " will be banned and removed from this Syncshell.");
                 ImGui.InputTextWithHint("##banreason", "Ban Reason", ref _banReason, 255);
                 if (ImGui.Button("Ban User"))
@@ -720,6 +724,7 @@ namespace MareSynchronos.UI
                     _banReason = string.Empty;
                 }
                 UiShared.TextWrapped("The reason will be displayed in the banlist. The current server-side alias if present (Vanity ID) will automatically be attached to the reason.");
+                UiShared.SetScaledWindowSize(300);
                 ImGui.EndPopup();
             }
         }
