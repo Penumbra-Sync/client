@@ -160,7 +160,7 @@ public class CompactUi : Window, IDisposable
             _lastAddedUserComment = string.Empty;
         }
 
-        if (ImGui.BeginPopupModal("Set Notes for New User", ref _showModalForUserAddition, ImGuiWindowFlags.AlwaysAutoResize))
+        if (ImGui.BeginPopupModal("Set Notes for New User", ref _showModalForUserAddition, UiShared.PopupWindowFlags))
         {
             if (_lastAddedUser == null)
             {
@@ -180,6 +180,7 @@ public class CompactUi : Window, IDisposable
                     _showModalForUserAddition = false;
                 }
             }
+            UiShared.SetScaledWindowSize(275);
             ImGui.EndPopup();
         }
     }
@@ -477,14 +478,15 @@ public class CompactUi : Window, IDisposable
         string shardConnection = string.Equals(_apiController.ServerInfo.ShardName, "Main", StringComparison.OrdinalIgnoreCase) ? string.Empty : $"Shard: {_apiController.ServerInfo.ShardName}";
 #endif
         var shardTextSize = ImGui.CalcTextSize(shardConnection);
+        var printShard = !string.IsNullOrEmpty(_apiController.ServerInfo.ShardName) && shardConnection != string.Empty;
 
         if (_apiController.ServerState is ServerState.Connected)
         {
-            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X) / 2 - (userSize.X + textSize.X) / 2);
-            ImGui.AlignTextToFramePadding();
+            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X) / 2 - (userSize.X + textSize.X) / 2 - ImGui.GetStyle().ItemSpacing.X / 2);
+            if (!printShard) ImGui.AlignTextToFramePadding();
             ImGui.TextColored(ImGuiColors.ParsedGreen, userCount);
             ImGui.SameLine();
-            ImGui.AlignTextToFramePadding();
+            if (!printShard) ImGui.AlignTextToFramePadding();
             ImGui.Text("Users Online");
         }
         else
@@ -492,8 +494,19 @@ public class CompactUi : Window, IDisposable
             ImGui.AlignTextToFramePadding();
             ImGui.TextColored(ImGuiColors.DalamudRed, "Not connected to any server");
         }
+        
+        if (printShard)
+        {
+            ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImGui.GetStyle().ItemSpacing.Y);
+            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X) / 2 - shardTextSize.X / 2);
+            ImGui.TextUnformatted(shardConnection);
+        }
 
         ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
+        if (printShard)
+        {
+            ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ((userSize.Y + textSize.Y) / 2 + shardTextSize.Y) / 2 - ImGui.GetStyle().ItemSpacing.Y + buttonSize.Y / 2);
+        }
         var color = UiShared.GetBoolColor(!_configuration.FullPause);
         var connectedIcon = !_configuration.FullPause ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
 
@@ -506,12 +519,6 @@ public class CompactUi : Window, IDisposable
         }
         ImGui.PopStyleColor();
         UiShared.AttachToolTip(!_configuration.FullPause ? "Disconnect from " + _apiController.ServerDictionary[_configuration.ApiUri] : "Connect to " + _apiController.ServerDictionary[_configuration.ApiUri]);
-
-        if (!string.IsNullOrEmpty(_apiController.ServerInfo.ShardName))
-        {
-            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth()) / 2 - shardTextSize.X / 2);
-            ImGui.TextUnformatted(shardConnection);
-        }
     }
 
     private void DrawTransfers()

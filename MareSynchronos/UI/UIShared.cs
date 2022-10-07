@@ -41,6 +41,10 @@ public class UiShared : IDisposable
     public bool UidFontBuilt { get; private set; }
     public static bool CtrlPressed() => (GetKeyState(0xA2) & 0x8000) != 0 || (GetKeyState(0xA3) & 0x8000) != 0;
     public static bool ShiftPressed() => (GetKeyState(0xA1) & 0x8000) != 0 || (GetKeyState(0xA0) & 0x8000) != 0;
+    
+    public static ImGuiWindowFlags PopupWindowFlags = ImGuiWindowFlags.NoResize |
+                                           ImGuiWindowFlags.NoScrollbar |
+                                           ImGuiWindowFlags.NoScrollWithMouse;
 
     public ApiController ApiController => _apiController;
 
@@ -96,6 +100,38 @@ public class UiShared : IDisposable
         {
             Logger.Debug($"Font doesn't exist. {fontFile}");
         }
+    }
+
+    public static void SetScaledWindowSize(float width, bool centerWindow = true)
+    {
+        var newLineHeight = ImGui.GetCursorPosY();
+        ImGui.NewLine();
+        newLineHeight = ImGui.GetCursorPosY() - newLineHeight;
+        var x = width * ImGuiHelpers.GlobalScale;
+        var y = ImGui.GetCursorPos().Y + ImGui.GetWindowContentRegionMin().Y - newLineHeight * 2 - ImGui.GetStyle().ItemSpacing.Y;
+
+        if (centerWindow)
+        {
+            var center = ImGui.GetMainViewport().GetCenter();
+            ImGui.SetWindowPos(new Vector2(center.X - x / 2, center.Y - y / 2));
+        }
+        
+        ImGui.SetWindowSize(new Vector2(x, y));
+    }
+    
+    public static void SetScaledWindowSize(float width, float height, bool centerWindow = true)
+    {
+        ImGui.SameLine();
+        var x = width * ImGuiHelpers.GlobalScale;
+        var y = height * ImGuiHelpers.GlobalScale;
+
+        if (centerWindow)
+        {
+            var center = ImGui.GetMainViewport().GetCenter();
+            ImGui.SetWindowPos(new Vector2(center.X - x / 2, center.Y - y / 2));
+        }
+        
+        ImGui.SetWindowSize(new Vector2(x, y));
     }
 
     public static void DrawWithID(string id, Action drawSubSection)
@@ -569,22 +605,18 @@ public class UiShared : IDisposable
         var buttonSizeY = (iconSize.Y > textSize.Y ? iconSize.Y : textSize.Y) + padding.Y * 2;
         var buttonSize = new Vector2(buttonSizeX, buttonSizeY);
 
-        if (ImGui.BeginChild(icon.ToIconString() + text, buttonSize))
+        if (ImGui.Button("###" + icon.ToIconString() + text, buttonSize))
         {
-            if (ImGui.Button("", buttonSize))
-            {
-                buttonClicked = true;
-            }
-
-            ImGui.SameLine();
-            ImGui.SetCursorPosX(padding.X);
-            ImGui.PushFont(UiBuilder.IconFont);
-            ImGui.Text(icon.ToIconString());
-            ImGui.PopFont();
-            ImGui.SameLine();
-            ImGui.Text(text);
-            ImGui.EndChild();
+            buttonClicked = true;
         }
+
+        ImGui.SameLine();
+        ImGui.SetCursorPosX(ImGui.GetCursorPosX() - buttonSize.X - padding.X);
+        ImGui.PushFont(UiBuilder.IconFont);
+        ImGui.Text(icon.ToIconString());
+        ImGui.PopFont();
+        ImGui.SameLine();
+        ImGui.Text(text);
 
         return buttonClicked;
     }
