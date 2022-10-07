@@ -92,8 +92,6 @@ public class CompactUi : Window, IDisposable
 
     public override void Draw()
     {
-        _showModalForUserAddition = _configuration.OpenPopupOnAdd;
-
         _windowContentWidth = UiShared.GetWindowContentRegionWidth();
         UiShared.DrawWithID("header", DrawUIDHeader);
         ImGui.Separator();
@@ -153,7 +151,7 @@ public class CompactUi : Window, IDisposable
             TransferPartHeight = ImGui.GetCursorPosY() - TransferPartHeight;
         }
 
-        if (_showModalForUserAddition && _apiController.LastAddedUser != null)
+        if (_configuration.OpenPopupOnAdd && _apiController.LastAddedUser != null)
         {
             _lastAddedUser = _apiController.LastAddedUser;
             _apiController.LastAddedUser = null;
