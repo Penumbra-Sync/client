@@ -708,6 +708,12 @@ namespace MareSynchronos.UI
                 ImGui.EndPopup();
             }
 
+            if (!plusButtonShown && !(isOwner || (isModerator && !userIsMod && !userIsOwner)))
+            {
+                ImGui.SameLine();
+                ImGui.Dummy(barButtonSize with { X = 0 });
+            }
+
             if (_showModalBanUser && !_banUserPopupOpen)
             {
                 ImGui.OpenPopup("Ban User");
