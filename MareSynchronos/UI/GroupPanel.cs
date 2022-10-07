@@ -302,7 +302,7 @@ namespace MareSynchronos.UI
                     _bannedUsers = _apiController.GetBannedUsersForGroup(group.GID).Result;
                 }
 
-                if (ImGui.BeginTable("bannedusertable" + group.GID, 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp))
+                if (ImGui.BeginTable("bannedusertable" + group.GID, 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.ScrollY))
                 {
                     ImGui.TableSetupColumn("UID", ImGuiTableColumnFlags.None, 1);
                     ImGui.TableSetupColumn("By", ImGuiTableColumnFlags.None, 1);
@@ -328,7 +328,6 @@ namespace MareSynchronos.UI
                             _ = _apiController.UnbanUserFromGroup(group.GID, bannedUser.UID);
                             _bannedUsers.RemoveAll(b => string.Equals(b.UID, bannedUser.UID, StringComparison.Ordinal));
                         }
-                        ImGui.TableNextColumn();
                     }
 
                     ImGui.EndTable();
