@@ -478,7 +478,7 @@ namespace MareSynchronos.UI
                     {
                         ImGui.CloseCurrentPopup();
                         _showModalBanList = true;
-                        _bannedUsers = new();
+                        _bannedUsers = _apiController.GetBannedUsersForGroup(entry.GID).Result;
                     }
 
                     if (isOwner)
