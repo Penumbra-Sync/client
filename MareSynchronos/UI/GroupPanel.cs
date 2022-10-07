@@ -398,15 +398,17 @@ namespace MareSynchronos.UI
             bool invitesEnabled = entry.InvitesEnabled ?? true;
             var lockedIcon = invitesEnabled ? FontAwesomeIcon.LockOpen : FontAwesomeIcon.Lock;
             var iconSize = UiShared.GetIconSize(lockedIcon);
+            var diffLockUnlockIcons = invitesEnabled ? 0 : (UiShared.GetIconSize(FontAwesomeIcon.LockOpen).X - iconSize.X) / 2;
             var barbuttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Bars);
             var isOwner = string.Equals(entry.OwnedBy, _apiController.UID, StringComparison.Ordinal);
 
-            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - barbuttonSize.X - iconSize.X - ImGui.GetStyle().ItemSpacing.X);
+            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - barbuttonSize.X - iconSize.X - diffLockUnlockIcons - ImGui.GetStyle().ItemSpacing.X);
             ImGui.PushFont(UiBuilder.IconFont);
             ImGui.Text(lockedIcon.ToIconString());
             ImGui.PopFont();
             UiShared.AttachToolTip(invitesEnabled ? "Syncshell is open for new joiners" : "Syncshell is closed for new joiners");
             ImGui.SameLine();
+            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + diffLockUnlockIcons);
             if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
             {
                 ImGui.OpenPopup("ShellPopup");
