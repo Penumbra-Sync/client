@@ -1,5 +1,4 @@
 ﻿using MareSynchronos.API;
-using MareSynchronos.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -7,105 +6,105 @@ using System.Threading.Tasks;
 namespace MareSynchronos.WebAPI;
 public partial class ApiController
 {
-    public async Task<GroupCreatedDto> CreateGroup()
+    public async Task<GroupCreatedDto> GroupCreate()
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return new GroupCreatedDto();
-        return await _mareHub!.InvokeAsync<GroupCreatedDto>(Api.InvokeGroupCreate).ConfigureAwait(false);
+        return await _mareHub!.InvokeAsync<GroupCreatedDto>(nameof(GroupCreate)).ConfigureAwait(false);
     }
 
-    public async Task<bool> ChangeGroupPassword(string gid, string newpassword)
+    public async Task<bool> GroupChangePassword(string gid, string newpassword)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return false;
-        return await _mareHub!.InvokeAsync<bool>(Api.InvokeGroupChangePassword, gid, newpassword).ConfigureAwait(false);
+        return await _mareHub!.InvokeAsync<bool>(nameof(GroupChangePassword), gid, newpassword).ConfigureAwait(false);
     }
 
-    public async Task<List<GroupDto>> GetGroups()
+    public async Task<List<GroupDto>> GroupsGetAll()
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return new List<GroupDto>();
-        return await _mareHub!.InvokeAsync<List<GroupDto>>(Api.InvokeGroupGetGroups).ConfigureAwait(false);
+        return await _mareHub!.InvokeAsync<List<GroupDto>>(nameof(GroupsGetAll)).ConfigureAwait(false);
     }
 
-    public async Task<List<GroupPairDto>> GetUsersInGroup(string gid)
+    public async Task<List<GroupPairDto>> GroupsGetUsersInGroup(string gid)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return new List<GroupPairDto>();
-        return await _mareHub!.InvokeAsync<List<GroupPairDto>>(Api.InvokeGroupGetUsersInGroup, gid).ConfigureAwait(false);
+        return await _mareHub!.InvokeAsync<List<GroupPairDto>>(nameof(GroupsGetUsersInGroup), gid).ConfigureAwait(false);
     }
 
-    public async Task<bool> SendGroupJoin(string gid, string password)
+    public async Task<bool> GroupJoin(string gid, string password)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return false;
-        return await _mareHub!.InvokeAsync<bool>(Api.InvokeGroupJoin, gid.Trim(), password).ConfigureAwait(false);
+        return await _mareHub!.InvokeAsync<bool>(nameof(GroupJoin), gid.Trim(), password).ConfigureAwait(false);
     }
 
-    public async Task SendGroupChangeInviteState(string gid, bool opened)
+    public async Task GroupChangeInviteState(string gid, bool opened)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(Api.SendGroupChangeInviteState, gid, opened).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(GroupChangeInviteState), gid, opened).ConfigureAwait(false);
     }
 
-    public async Task SendDeleteGroup(string gid)
+    public async Task GroupDelete(string gid)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(Api.SendGroupDelete, gid).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(GroupDelete), gid).ConfigureAwait(false);
     }
 
-    public async Task SendChangeUserPinned(string gid, string uid, bool isPinned)
+    public async Task GroupChangePinned(string gid, string uid, bool isPinned)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(Api.SendGroupChangePinned, gid, uid, isPinned).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(GroupChangePinned), gid, uid, isPinned).ConfigureAwait(false);
     }
 
-    public async Task SendClearGroup(string gid)
+    public async Task GroupClear(string gid)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(Api.SendGroupClear, gid).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(GroupClear), gid).ConfigureAwait(false);
     }
 
-    public async Task SendLeaveGroup(string gid)
+    public async Task GroupLeave(string gid)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(Api.SendGroupLeave, gid).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(GroupLeave), gid).ConfigureAwait(false);
     }
 
-    public async Task SendPauseGroup(string gid, bool isPaused)
+    public async Task GroupChangePauseState(string gid, bool isPaused)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(Api.SendGroupPause, gid, isPaused).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(GroupChangePauseState), gid, isPaused).ConfigureAwait(false);
     }
 
-    public async Task SendRemoveUserFromGroup(string gid, string uid)
+    public async Task GroupRemoveUser(string gid, string uid)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(Api.SendGroupRemoveUser, gid, uid).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(GroupRemoveUser), gid, uid).ConfigureAwait(false);
     }
 
-    public async Task ChangeOwnerOfGroup(string gid, string uid)
+    public async Task GroupChangeOwnership(string gid, string uid)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(Api.SendGroupChangeOwner, gid, uid).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(GroupChangeOwnership), gid, uid).ConfigureAwait(false);
     }
 
-    public async Task BanUserFromGroup(string gid, string uid, string reason)
+    public async Task GroupBanUser(string gid, string uid, string reason)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(Api.SendBanUserFromGroup, gid, uid, reason).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(GroupBanUser), gid, uid, reason).ConfigureAwait(false);
     }
 
-    public async Task UnbanUserFromGroup(string gid, string uid)
+    public async Task GroupUnbanUser(string gid, string uid)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(Api.SendUnbanUserFromGroup, gid, uid).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(GroupUnbanUser), gid, uid).ConfigureAwait(false);
     }
 
-    public async Task<List<BannedGroupUserDto>> GetBannedUsersForGroup(string gid)
+    public async Task<List<BannedGroupUserDto>> GroupGetBannedUsers(string gid)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return new();
-        return await _mareHub!.InvokeAsync<List<BannedGroupUserDto>>(Api.InvokeGetBannedUsersForGroup, gid).ConfigureAwait(false);
+        return await _mareHub!.InvokeAsync<List<BannedGroupUserDto>>(nameof(GroupGetBannedUsers), gid).ConfigureAwait(false);
     }
 
-    public async Task SetModeratorForGroup(string gid, string uid, bool isModerator)
+    public async Task GroupSetModerator(string gid, string uid, bool isModerator)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(Api.SendGroupSetModerator, gid, uid, isModerator).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(GroupSetModerator), gid, uid, isModerator).ConfigureAwait(false);
     }
 }
