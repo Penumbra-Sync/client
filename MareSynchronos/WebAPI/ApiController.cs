@@ -251,7 +251,7 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     private async Task ClientHealthCheck(CancellationToken ct)
     {
-        while (!ct.IsCancellationRequested)
+        while (!ct.IsCancellationRequested && _mareHub != null)
         {
             await Task.Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
             if (ct.IsCancellationRequested) break;
@@ -313,6 +313,7 @@ public partial class ApiController : IDisposable, IMareHubClient
 
         Task.Run(async () => await StopConnection(_connectionCancellationTokenSource.Token).ConfigureAwait(false));
         _connectionCancellationTokenSource?.Cancel();
+        _healthCheckTokenSource?.Cancel();
     }
 
     private HubConnection BuildHubConnection(string hubName)
@@ -361,6 +362,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         if (_mareHub is not null)
         {
             _initialized = false;
+            _healthCheckTokenSource?.Cancel();
             _uploadCancellationTokenSource?.Cancel();
             Logger.Info("Stopping existing connection");
             _mareHub.Closed -= MareHubOnClosed;
