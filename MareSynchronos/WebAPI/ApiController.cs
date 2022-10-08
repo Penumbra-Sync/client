@@ -18,12 +18,12 @@ namespace MareSynchronos.WebAPI;
 
 public delegate void SimpleStringDelegate(string str);
 
-public partial class ApiController : IDisposable
+public partial class ApiController : IDisposable, IMareHubClient
 {
     public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
     public const string MainServiceUri = "wss://maresynchronos.com";
 
-    public readonly int[] SupportedServerVersions = { Api.Version };
+    public readonly int[] SupportedServerVersions = { IMareHub.ApiVersion };
 
     private readonly Configuration _pluginConfiguration;
     private readonly DalamudUtil _dalamudUtil;
@@ -122,6 +122,8 @@ public partial class ApiController : IDisposable
     public int OnlineUsers => SystemInfoDto.OnlineUsers;
 
     private ServerState _serverState;
+    private bool _initialized;
+
     public ServerState ServerState
     {
         get => _serverState;
@@ -175,18 +177,17 @@ public partial class ApiController : IDisposable
 
                 if (token.IsCancellationRequested) break;
 
-                _mareHub = BuildHubConnection(Api.Path);
+                _mareHub = BuildHubConnection(IMareHub.Path);
 
                 await _mareHub.StartAsync(token).ConfigureAwait(false);
 
-                _mareHub.On<SystemInfoDto>(Api.OnUpdateSystemInfo, (dto) => SystemInfoDto = dto);
+                OnUpdateSystemInfo((dto) => Client_UpdateSystemInfo(dto));
 
-                _connectionDto =
-                    await _mareHub.InvokeAsync<ConnectionDto>(Api.InvokeHeartbeat, _dalamudUtil.PlayerNameHashed, token).ConfigureAwait(false);
+                _connectionDto = await Heartbeat(_dalamudUtil.PlayerNameHashed).ConfigureAwait(false);
 
                 ServerState = ServerState.Connected;
 
-                if (_connectionDto.ServerVersion != Api.Version)
+                if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
                 {
                     ServerState = ServerState.VersionMisMatch;
                     await StopConnection(token).ConfigureAwait(false);
@@ -254,7 +255,7 @@ public partial class ApiController : IDisposable
         {
             await Task.Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
             if (ct.IsCancellationRequested) break;
-            var needsRestart = await _mareHub!.InvokeAsync<bool>(Api.InvokeCheckClientHealth, ct).ConfigureAwait(false);
+            var needsRestart = await CheckClientHealth().ConfigureAwait(false);
             Logger.Debug("Checked Client Health State, healthy: " + !needsRestart);
             if (needsRestart)
             {
@@ -268,42 +269,30 @@ public partial class ApiController : IDisposable
         if (_mareHub == null) return;
 
         Logger.Debug("Initializing data");
-        _mareHub.On<ClientPairDto>(Api.OnUserUpdateClientPairs,
-            UpdateLocalClientPairsCallback);
-        _mareHub.On<CharacterCacheDto, string>(Api.OnUserReceiveCharacterData,
-            ReceiveCharacterDataCallback);
-        _mareHub.On<string>(Api.OnUserRemoveOnlinePairedPlayer,
-            (s) => PairedClientOffline?.Invoke(s));
-        _mareHub.On<string>(Api.OnUserAddOnlinePairedPlayer,
-            (s) => PairedClientOnline?.Invoke(s));
-        _mareHub.On(Api.OnAdminForcedReconnect, UserForcedReconnectCallback);
-        _mareHub.On<GroupDto>(Api.OnGroupChange, GroupChangedCallback);
-        _mareHub.On<GroupPairDto>(Api.OnGroupUserChange, GroupPairChangedCallback);
+        OnUserUpdateClientPairs((dto) => Client_UserUpdateClientPairs(dto));
+        OnUserChangePairedPlayer((ident, online) => Client_UserChangePairedPlayer(ident, online));
+        OnUserReceiveCharacterData((dto, ident) => Client_UserReceiveCharacterData(dto, ident));
+        OnGroupChange(async (dto) => await Client_GroupChange(dto).ConfigureAwait(false));
+        OnGroupUserChange((dto) => Client_GroupUserChange(dto));
 
-        PairedClients =
-            await _mareHub!.InvokeAsync<List<ClientPairDto>>(Api.InvokeUserGetPairedClients, token).ConfigureAwait(false);
-        Groups = await GetGroups().ConfigureAwait(false);
+        OnAdminForcedReconnect(() => Client_AdminForcedReconnect());
+
+        PairedClients = await UserGetPairedClients().ConfigureAwait(false);
+        Groups = await GroupsGetAll().ConfigureAwait(false);
         GroupPairedClients.Clear();
         foreach (var group in Groups)
         {
-            GroupPairedClients.AddRange(await GetUsersInGroup(group.GID).ConfigureAwait(false));
+            GroupPairedClients.AddRange(await GroupsGetUsersInGroup(group.GID).ConfigureAwait(false));
         }
 
         if (IsModerator)
         {
-            AdminForbiddenFiles =
-                await _mareHub.InvokeAsync<List<ForbiddenFileDto>>(Api.InvokeAdminGetForbiddenFiles,
-                    token).ConfigureAwait(false);
-            AdminBannedUsers =
-                await _mareHub.InvokeAsync<List<BannedUserDto>>(Api.InvokeAdminGetBannedUsers,
-                    token).ConfigureAwait(false);
-            _mareHub.On<BannedUserDto>(Api.OnAdminUpdateOrAddBannedUser,
-                UpdateOrAddBannedUserCallback);
-            _mareHub.On<BannedUserDto>(Api.OnAdminDeleteBannedUser, DeleteBannedUserCallback);
-            _mareHub.On<ForbiddenFileDto>(Api.OnAdminUpdateOrAddForbiddenFile,
-                UpdateOrAddForbiddenFileCallback);
-            _mareHub.On<ForbiddenFileDto>(Api.OnAdminDeleteForbiddenFile,
-                DeleteForbiddenFileCallback);
+            AdminForbiddenFiles = await AdminGetForbiddenFiles().ConfigureAwait(false);
+            AdminBannedUsers = await AdminGetBannedUsers().ConfigureAwait(false);
+            OnAdminUpdateOrAddBannedUser((dto) => Client_AdminUpdateOrAddBannedUser(dto));
+            OnAdminDeleteBannedUser((dto) => Client_AdminDeleteBannedUser(dto));
+            OnAdminUpdateOrAddForbiddenFile(dto => Client_AdminUpdateOrAddForbiddenFile(dto));
+            OnAdminDeleteForbiddenFile(dto => Client_AdminDeleteForbiddenFile(dto));
         }
 
         _healthCheckTokenSource?.Cancel();
@@ -311,6 +300,7 @@ public partial class ApiController : IDisposable
         _healthCheckTokenSource = new CancellationTokenSource();
         _ = ClientHealthCheck(_healthCheckTokenSource.Token);
 
+        _initialized = true;
         Connected?.Invoke();
     }
 
@@ -370,6 +360,7 @@ public partial class ApiController : IDisposable
     {
         if (_mareHub is not null)
         {
+            _initialized = false;
             _uploadCancellationTokenSource?.Cancel();
             Logger.Info("Stopping existing connection");
             _mareHub.Closed -= MareHubOnClosed;
@@ -391,5 +382,15 @@ public partial class ApiController : IDisposable
                 await Task.Delay(16).ConfigureAwait(false);
             }
         }
+    }
+
+    public async Task<ConnectionDto> Heartbeat(string characterIdentification)
+    {
+        return await _mareHub!.InvokeAsync<ConnectionDto>(nameof(Heartbeat), characterIdentification).ConfigureAwait(false);
+    }
+
+    public async Task<bool> CheckClientHealth()
+    {
+        return await _mareHub!.InvokeAsync<bool>(nameof(CheckClientHealth)).ConfigureAwait(false);
     }
 }

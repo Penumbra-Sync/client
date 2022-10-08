@@ -7,36 +7,46 @@ namespace MareSynchronos.WebAPI;
 
 public partial class ApiController
 {
-    public async Task DeleteAccount()
+    public async Task UserDelete()
     {
         _pluginConfiguration.ClientSecret.Remove(ApiUri);
         _pluginConfiguration.Save();
-        await _mareHub!.SendAsync(Api.SendFileDeleteAllFiles).ConfigureAwait(false);
-        await _mareHub!.SendAsync(Api.SendUserDeleteAccount).ConfigureAwait(false);
+        await FilesDeleteAll().ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(UserDelete)).ConfigureAwait(false);
         await CreateConnections().ConfigureAwait(false);
     }
 
-    public async Task<List<string>> GetOnlineCharacters()
+    public async Task UserPushData(CharacterCacheDto characterCache, List<string> visibleCharacterIds)
     {
-        return await _mareHub!.InvokeAsync<List<string>>(Api.InvokeUserGetOnlineCharacters).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(UserPushData), characterCache, visibleCharacterIds).ConfigureAwait(false);
     }
 
-    public async Task SendPairedClientAddition(string uid)
+    public async Task<List<ClientPairDto>> UserGetPairedClients()
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(Api.SendUserPairedClientAddition, uid.Trim()).ConfigureAwait(false);
+        return await _mareHub!.InvokeAsync<List<ClientPairDto>>(nameof(UserGetPairedClients)).ConfigureAwait(false);
     }
 
-    public async Task SendPairedClientPauseChange(string uid, bool paused)
+    public async Task<List<string>> UserGetOnlineCharacters()
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(Api.SendUserPairedClientPauseChange, uid, paused).ConfigureAwait(false);
+        return await _mareHub!.InvokeAsync<List<string>>(nameof(UserGetOnlineCharacters)).ConfigureAwait(false);
     }
 
-    public async Task SendPairedClientRemoval(string uid)
+    public async Task UserAddPair(string uid)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(Api.SendUserPairedClientRemoval, uid).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(UserAddPair), uid.Trim()).ConfigureAwait(false);
+    }
+
+    public async Task UserChangePairPauseStatus(string uid, bool paused)
+    {
+        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
+        await _mareHub!.SendAsync(nameof(UserChangePairPauseStatus), uid, paused).ConfigureAwait(false);
+    }
+
+    public async Task UserRemovePair(string uid)
+    {
+        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
+        await _mareHub!.SendAsync(nameof(UserRemovePair), uid).ConfigureAwait(false);
     }
 }
 

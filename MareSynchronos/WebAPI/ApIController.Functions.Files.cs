@@ -20,20 +20,25 @@ public partial class ApiController
     private readonly HashSet<string> _verifiedUploadedHashes;
 
     private int _downloadId = 0;
-    public void CancelUpload()
+    public async void CancelUpload()
     {
         if (_uploadCancellationTokenSource != null)
         {
             Logger.Debug("Cancelling upload");
             _uploadCancellationTokenSource?.Cancel();
-            _mareHub!.SendAsync(Api.SendFileAbortUpload);
             CurrentUploads.Clear();
+            await FilesAbortUpload().ConfigureAwait(false);
         }
     }
 
-    public async Task DeleteAllMyFiles()
+    public async Task FilesAbortUpload()
     {
-        await _mareHub!.SendAsync(Api.SendFileDeleteAllFiles).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(FilesAbortUpload)).ConfigureAwait(false);
+    }
+
+    public async Task FilesDeleteAll()
+    {
+        await _mareHub!.SendAsync(nameof(FilesDeleteAll)).ConfigureAwait(false);
     }
 
     private async Task<string> DownloadFile(int downloadId, string hash, Uri downloadUri, CancellationToken ct)
@@ -95,7 +100,7 @@ public partial class ApiController
         Logger.Debug("Downloading files (Download ID " + currentDownloadId + ")");
 
         List<DownloadFileDto> downloadFileInfoFromService = new();
-        downloadFileInfoFromService.AddRange(await _mareHub!.InvokeAsync<List<DownloadFileDto>>(Api.InvokeGetFilesSizes, fileReplacementDto.Select(f => f.Hash).ToList(), ct).ConfigureAwait(false));
+        downloadFileInfoFromService.AddRange(await FilesGetSizes(fileReplacementDto.Select(f => f.Hash).ToList()).ConfigureAwait(false));
 
         Logger.Debug("Files with size 0 or less: " + string.Join(", ", downloadFileInfoFromService.Where(f => f.Size <= 0).Select(f => f.Hash)));
 
@@ -183,7 +188,7 @@ public partial class ApiController
         if (unverifiedUploadHashes.Any())
         {
             Logger.Debug("Verifying " + unverifiedUploadHashes.Count + " files");
-            var filesToUpload = await _mareHub!.InvokeAsync<List<UploadFileDto>>(Api.InvokeFileSendFiles, unverifiedUploadHashes, uploadToken).ConfigureAwait(false);
+            var filesToUpload = await FilesSend(unverifiedUploadHashes).ConfigureAwait(false);
 
             foreach (var file in filesToUpload.Where(f => !f.IsForbidden))
             {
@@ -233,11 +238,11 @@ public partial class ApiController
             }
 
             Logger.Debug("Upload tasks complete, waiting for server to confirm");
-            var anyUploadsOpen = await _mareHub!.InvokeAsync<bool>(Api.InvokeFileIsUploadFinished, uploadToken).ConfigureAwait(false);
+            var anyUploadsOpen = await FilesIsUploadFinished().ConfigureAwait(false);
             Logger.Debug("Uploads open: " + anyUploadsOpen);
             while (anyUploadsOpen && !uploadToken.IsCancellationRequested)
             {
-                anyUploadsOpen = await _mareHub!.InvokeAsync<bool>(Api.InvokeFileIsUploadFinished, uploadToken).ConfigureAwait(false);
+                anyUploadsOpen = await FilesIsUploadFinished().ConfigureAwait(false);
                 await Task.Delay(TimeSpan.FromSeconds(0.5), uploadToken).ConfigureAwait(false);
                 Logger.Debug("Waiting for uploads to finish");
             }
@@ -267,7 +272,7 @@ public partial class ApiController
                 sb.AppendLine($"GlamourerData for {item.Key}: {!string.IsNullOrEmpty(item.Value)}");
             }
             Logger.Debug("Chara data contained: " + Environment.NewLine + sb.ToString());
-            await _mareHub!.InvokeAsync(Api.InvokeUserPushCharacterDataToVisibleClients, character, visibleCharacterIds, uploadToken).ConfigureAwait(false);
+            await UserPushData(character, visibleCharacterIds).ConfigureAwait(false);
         }
         else
         {
@@ -303,8 +308,29 @@ public partial class ApiController
             }
         }
 
-        await _mareHub!.SendAsync(Api.SendFileUploadFileStreamAsync, fileHash, AsyncFileData(uploadToken), uploadToken).ConfigureAwait(false);
+        await FilesUploadStreamAsync(fileHash, AsyncFileData(uploadToken)).ConfigureAwait(false);
     }
+
+    public async Task FilesUploadStreamAsync(string hash, IAsyncEnumerable<byte[]> fileContent)
+    {
+        await _mareHub!.SendAsync(nameof(FilesUploadStreamAsync), hash, fileContent).ConfigureAwait(false);
+    }
+
+    public async Task<bool> FilesIsUploadFinished()
+    {
+        return await _mareHub!.InvokeAsync<bool>(nameof(FilesIsUploadFinished)).ConfigureAwait(false);
+    }
+
+    public async Task<List<DownloadFileDto>> FilesGetSizes(List<string> hashes)
+    {
+        return await _mareHub!.InvokeAsync<List<DownloadFileDto>>(nameof(FilesGetSizes), hashes).ConfigureAwait(false);
+    }
+
+    public async Task<List<UploadFileDto>> FilesSend(List<string> fileListHashes)
+    {
+        return await _mareHub!.InvokeAsync<List<UploadFileDto>>(nameof(FilesSend), fileListHashes).ConfigureAwait(false);
+    }
+
 
     public void CancelDownload(int downloadId)
     {

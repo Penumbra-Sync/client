@@ -8,40 +8,50 @@ namespace MareSynchronos.WebAPI;
 
 public partial class ApiController
 {
-    public async Task AddOrUpdateForbiddenFileEntry(ForbiddenFileDto forbiddenFile)
+    public async Task AdminUpdateOrAddForbiddenFile(ForbiddenFileDto forbiddenFile)
     {
-        await _mareHub!.SendAsync(Api.SendAdminUpdateOrAddForbiddenFile, forbiddenFile).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(AdminUpdateOrAddForbiddenFile), forbiddenFile).ConfigureAwait(false);
     }
 
-    public async Task DeleteForbiddenFileEntry(ForbiddenFileDto forbiddenFile)
+    public async Task AdminDeleteForbiddenFile(ForbiddenFileDto forbiddenFile)
     {
-        await _mareHub!.SendAsync(Api.SendAdminDeleteForbiddenFile, forbiddenFile).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(AdminDeleteForbiddenFile), forbiddenFile).ConfigureAwait(false);
     }
 
-    public async Task AddOrUpdateBannedUserEntry(BannedUserDto bannedUser)
+    public async Task AdminUpdateOrAddBannedUser(BannedUserDto bannedUser)
     {
-        await _mareHub!.SendAsync(Api.SendAdminUpdateOrAddBannedUser, bannedUser).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(AdminUpdateOrAddBannedUser), bannedUser).ConfigureAwait(false);
     }
 
-    public async Task DeleteBannedUserEntry(BannedUserDto bannedUser)
+    public async Task AdminDeleteBannedUser(BannedUserDto bannedUser)
     {
-        await _mareHub!.SendAsync(Api.SendAdminDeleteBannedUser, bannedUser).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(AdminDeleteBannedUser), bannedUser).ConfigureAwait(false);
     }
 
     public async Task RefreshOnlineUsers()
     {
-        AdminOnlineUsers = await _mareHub!.InvokeAsync<List<OnlineUserDto>>(Api.InvokeAdminGetOnlineUsers).ConfigureAwait(false);
+        AdminOnlineUsers = await AdminGetOnlineUsers().ConfigureAwait(false);
+    }
+
+    public async Task<List<OnlineUserDto>> AdminGetOnlineUsers()
+    {
+        return await _mareHub!.InvokeAsync<List<OnlineUserDto>>(nameof(AdminGetOnlineUsers)).ConfigureAwait(false);
     }
 
     public List<OnlineUserDto> AdminOnlineUsers { get; set; } = new List<OnlineUserDto>();
 
-    public void PromoteToModerator(string onlineUserUID)
+    public async Task AdminChangeModeratorStatus(string onlineUserUID, bool isModerator)
     {
-        _mareHub!.SendAsync(Api.SendAdminChangeModeratorStatus, onlineUserUID, true);
+        await _mareHub!.SendAsync(nameof(AdminChangeModeratorStatus), onlineUserUID, isModerator).ConfigureAwait(false);
     }
 
-    public void DemoteFromModerator(string onlineUserUID)
+    public async Task<List<ForbiddenFileDto>> AdminGetForbiddenFiles()
     {
-        _mareHub!.SendAsync(Api.SendAdminChangeModeratorStatus, onlineUserUID, false);
+        return await _mareHub!.InvokeAsync<List<ForbiddenFileDto>>(nameof(AdminGetForbiddenFiles)).ConfigureAwait(false);
+    }
+
+    public async Task<List<BannedUserDto>> AdminGetBannedUsers()
+    {
+        return await _mareHub!.InvokeAsync<List<BannedUserDto>>(nameof(AdminGetBannedUsers)).ConfigureAwait(false);
     }
 }
