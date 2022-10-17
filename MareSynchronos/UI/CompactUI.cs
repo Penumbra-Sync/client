@@ -631,11 +631,11 @@ public class CompactUi : Window, IDisposable
         return _apiController.ServerState switch
         {
             ServerState.Disconnected => "You are currently disconnected from the Mare Synchronos server.",
-            ServerState.Unauthorized => "Your account is not present on the server anymore or you are banned.",
+            ServerState.Unauthorized => "The account associated with your used secret key is not present on the server anymore or you are tempbanned. To check the latter disconnect and reconnect in 15 minutes.",
             ServerState.Offline => "Your selected Mare Synchronos server is currently offline.",
             ServerState.VersionMisMatch =>
                 "Your plugin or the server you are connecting to is out of date. Please update your plugin now. If you already did so, contact the server provider to update their server to the latest version.",
-            ServerState.RateLimited => "You are rate limited for (re)connecting too often. Wait and try again later.",
+            ServerState.RateLimited => "You are rate limited for (re)connecting too often. Disconnect, wait 10 minutes and try again.",
             ServerState.Connected => string.Empty,
             _ => string.Empty
         };

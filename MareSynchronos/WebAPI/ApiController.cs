@@ -205,6 +205,14 @@ public partial class ApiController : IDisposable, IMareHubClient
             }
             catch (HubException ex)
             {
+                if (ex.Message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase))
+                {
+                    Logger.Warn(ex.Message);
+                    ServerState = ServerState.Unauthorized;
+                    await StopConnection(token).ConfigureAwait(false);
+                    return;
+                }
+
                 Logger.Warn(ex.GetType().ToString());
                 Logger.Warn(ex.Message);
                 Logger.Warn(ex.StackTrace ?? string.Empty);
