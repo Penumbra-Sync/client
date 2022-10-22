@@ -73,7 +73,7 @@ public class Configuration : IPluginConfiguration
     public string CacheFolder { get; set; } = string.Empty;
     public Dictionary<string, string> ClientSecret { get; set; } = new(StringComparer.Ordinal);
     public Dictionary<string, string> CustomServerList { get; set; } = new(StringComparer.Ordinal);
-    public int MaxLocalCacheInGiB { get; set; } = 20;
+    public double MaxLocalCacheInGiB { get; set; } = 20;
     public bool ReverseUserSort { get; set; } = false;
 
     public int TimeSpanBetweenScansInSeconds { get; set; } = 30;

@@ -16,6 +16,7 @@ using MareSynchronos.Utils;
 using Penumbra.GameData.ByteString;
 using Penumbra.Interop.Structs;
 using Object = FFXIVClientStructs.FFXIV.Client.Graphics.Scene.Object;
+using Weapon = MareSynchronos.Interop.Weapon;
 
 namespace MareSynchronos.Factories;
 

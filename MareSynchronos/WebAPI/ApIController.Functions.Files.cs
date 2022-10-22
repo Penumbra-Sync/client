@@ -139,7 +139,7 @@ public partial class ApiController
             var filePath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash);
             await File.WriteAllBytesAsync(filePath, extractedFile, token).ConfigureAwait(false);
             var fi = new FileInfo(filePath);
-            Func<DateTime> RandomDayFunc()
+            Func<DateTime> RandomDayInThePast()
             {
                 DateTime start = new(1995, 1, 1);
                 Random gen = new();
@@ -147,9 +147,9 @@ public partial class ApiController
                 return () => start.AddDays(gen.Next(range));
             }
 
-            fi.CreationTime = RandomDayFunc().Invoke();
-            fi.LastAccessTime = RandomDayFunc().Invoke();
-            fi.LastWriteTime = RandomDayFunc().Invoke();
+            fi.CreationTime = RandomDayInThePast().Invoke();
+            fi.LastAccessTime = DateTime.Today;
+            fi.LastWriteTime = RandomDayInThePast().Invoke();
             try
             {
                 _ = _fileDbManager.CreateCacheEntry(filePath);

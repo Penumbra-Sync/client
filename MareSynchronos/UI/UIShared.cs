@@ -525,8 +525,8 @@ public class UiShared : IDisposable
                              "Restrict yourself to latin letters (A-Z), underscores (_), dashes (-) and arabic numbers (0-9).", ImGuiColors.DalamudRed);
         }
 
-        int maxCacheSize = _pluginConfiguration.MaxLocalCacheInGiB;
-        if (ImGui.SliderInt("Maximum Cache Size in GB", ref maxCacheSize, 1, 50, "%d GB"))
+        float maxCacheSize = (float)_pluginConfiguration.MaxLocalCacheInGiB;
+        if (ImGui.SliderFloat("Maximum Cache Size in GiB", ref maxCacheSize, 1f, 200f, "%.2f GiB"))
         {
             _pluginConfiguration.MaxLocalCacheInGiB = maxCacheSize;
             _pluginConfiguration.Save();
