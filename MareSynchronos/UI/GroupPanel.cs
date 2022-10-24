@@ -382,7 +382,7 @@ namespace MareSynchronos.UI
 
             if (ImGui.BeginPopupModal("Create Bulk One-Time Invites", ref _showModalBulkOneTimeInvites, UiShared.PopupWindowFlags))
             {
-                UiShared.TextWrapped("This allows you to create up to 100 invites at once for the Syncshell " + name + "." + Environment.NewLine
+                UiShared.TextWrapped("This allows you to create up to 100 one-time invites at once for the Syncshell " + name + "." + Environment.NewLine
                     + "The invites are valid for 24h after creation and will be automatically invalidated on the server after.");
                 ImGui.Separator();
                 if (_bulkOneTimeInvites.Count == 0)

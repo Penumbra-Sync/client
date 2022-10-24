@@ -213,7 +213,7 @@ internal class IntroUi : Window, IDisposable
                                      "Additionally, a local cache folder must be set where Mare Synchronos will download its local file cache to. " +
                                      "Once the Cache Folder is set and the scan complete, this page will automatically forward to registration at a service.");
                 UiShared.TextWrapped("Note: The initial scan, depending on the amount of mods you have, might take a while. Please wait until it is completed.");
-                UiShared.ColorTextWrapped("Warning: once past this step you should not delete the FileCache.db of Mare Synchronos in the Plugin Configurations folder of Dalamud. " +
+                UiShared.ColorTextWrapped("Warning: once past this step you should not delete the FileCache.csv of Mare Synchronos in the Plugin Configurations folder of Dalamud. " +
                                           "Otherwise on the next launch a full re-scan of the file cache database will be initiated.", ImGuiColors.DalamudYellow);
                 _uiShared.DrawCacheDirectorySetting();
             }
@@ -238,7 +238,7 @@ internal class IntroUi : Window, IDisposable
             ImGui.Separator();
             UiShared.TextWrapped("To be able to use Mare Synchronos you will have to register an account.");
             UiShared.TextWrapped("For the official Mare Synchronos Servers the account creation will be handled on the official Mare Synchronos Discord. Due to security risks for the server, there is no way to handle this senisibly otherwise.");
-            UiShared.TextWrapped("If you want to register at the main server \"" + WebAPI.ApiController.MainServer + "\" join the Discord and follow the instructions as described in #registration.");
+            UiShared.TextWrapped("If you want to register at the main server \"" + WebAPI.ApiController.MainServer + "\" join the Discord and follow the instructions as described in #mare-commands.");
 
             if (ImGui.Button("Join the Mare Synchronos Discord"))
             {
