@@ -402,6 +402,9 @@ namespace MareSynchronos.UI
                         ImGui.SetClipboardText(string.Join(Environment.NewLine, _bulkOneTimeInvites));
                     }
                 }
+
+                UiShared.SetScaledWindowSize(290);
+                ImGui.EndPopup();
             }
 
             ImGui.Indent(collapseButton.X);
