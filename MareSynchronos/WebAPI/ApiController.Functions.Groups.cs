@@ -107,4 +107,10 @@ public partial class ApiController
         if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
         await _mareHub!.SendAsync(nameof(GroupSetModerator), gid, uid, isModerator).ConfigureAwait(false);
     }
+
+    public async Task<List<string>> GroupCreateTempInvite(string gid, int amount)
+    {
+        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return new();
+        return await _mareHub!.InvokeAsync<List<string>>(nameof(GroupCreateTempInvite), gid, amount).ConfigureAwait(false);
+    }
 }
