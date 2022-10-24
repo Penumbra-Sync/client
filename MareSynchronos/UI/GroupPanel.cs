@@ -396,8 +396,8 @@ namespace MareSynchronos.UI
                 }
                 else
                 {
-                    UiShared.TextWrapped("A total of " + _bulkOneTimeInvites.Count + " have been created.");
-                    if (UiShared.IconTextButton(FontAwesomeIcon.Copy, "Copy to clipboard"))
+                    UiShared.TextWrapped("A total of " + _bulkOneTimeInvites.Count + " invites have been created.");
+                    if (UiShared.IconTextButton(FontAwesomeIcon.Copy, "Copy invites to clipboard"))
                     {
                         ImGui.SetClipboardText(string.Join(Environment.NewLine, _bulkOneTimeInvites));
                     }
