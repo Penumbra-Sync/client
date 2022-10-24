@@ -32,6 +32,7 @@ namespace MareSynchronos.UI
         private bool _showModalChangePassword;
         private bool _showModalBanUser;
         private bool _showModalBanList = false;
+        private bool _showModalBulkOneTimeInvites = false;
         private string _newSyncShellPassword = string.Empty;
         private string _banReason = string.Empty;
         private bool _isPasswordValid;
@@ -40,9 +41,12 @@ namespace MareSynchronos.UI
         private GroupCreatedDto? _lastCreatedGroup = null;
         private readonly Dictionary<string, bool> ExpandedGroupState = new(StringComparer.Ordinal);
         private List<BannedGroupUserDto> _bannedUsers = new();
+        private List<string> _bulkOneTimeInvites = new();
         private bool _modalBanListOpened;
+        private bool _modalBulkOneTimeInvitesOpened;
         private bool _banUserPopupOpen;
         private bool _modalChangePwOpened;
+        private int _bulkInviteCount = 10;
 
         public GroupPanel(CompactUi mainUi, UiShared uiShared, Configuration configuration, ApiController apiController)
         {
@@ -368,6 +372,38 @@ namespace MareSynchronos.UI
                 ImGui.EndPopup();
             }
 
+            if (_showModalBulkOneTimeInvites && !_modalBulkOneTimeInvitesOpened)
+            {
+                _modalBulkOneTimeInvitesOpened = true;
+                ImGui.OpenPopup("Create Bulk One-Time Invites");
+            }
+
+            if (!_showModalBulkOneTimeInvites) _modalBulkOneTimeInvitesOpened = false;
+
+            if (ImGui.BeginPopupModal("Create Bulk One-Time Invites", ref _showModalBulkOneTimeInvites, UiShared.PopupWindowFlags))
+            {
+                UiShared.TextWrapped("This allows you to create up to 100 invites at once for the Syncshell " + name + "." + Environment.NewLine
+                    + "The invites are valid for 24h after creation and will be automatically invalidated on the server after.");
+                ImGui.Separator();
+                if (_bulkOneTimeInvites.Count == 0)
+                {
+                    ImGui.SetNextItemWidth(-1);
+                    ImGui.SliderInt("Amount##bulkinvites", ref _bulkInviteCount, 1, 100);
+                    if (UiShared.IconTextButton(FontAwesomeIcon.MailBulk, "Create invites"))
+                    {
+                        _bulkOneTimeInvites = _apiController.GroupCreateTempInvite(group.GID, _bulkInviteCount).Result;
+                    }
+                }
+                else
+                {
+                    UiShared.TextWrapped("A total of " + _bulkOneTimeInvites.Count + " have been created.");
+                    if (UiShared.IconTextButton(FontAwesomeIcon.Copy, "Copy to clipboard"))
+                    {
+                        ImGui.SetClipboardText(string.Join(Environment.NewLine, _bulkOneTimeInvites));
+                    }
+                }
+            }
+
             ImGui.Indent(collapseButton.X);
             if (ExpandedGroupState[group.GID])
             {
@@ -473,6 +509,21 @@ namespace MareSynchronos.UI
                     }
                     UiShared.AttachToolTip("Hold CTRL and click to clear this Syncshell." + Environment.NewLine + "WARNING: this action is irreversible." + Environment.NewLine
                         + "Clearing the Syncshell will remove all not pinned users from it.");
+
+                    if (UiShared.IconTextButton(FontAwesomeIcon.Envelope, "Single one-time invite"))
+                    {
+                        ImGui.CloseCurrentPopup();
+                        ImGui.SetClipboardText(_apiController.GroupCreateTempInvite(entry.GID, 1).Result.FirstOrDefault() ?? string.Empty);
+                    }
+                    UiShared.AttachToolTip("Creates a single-use password for joining the syncshell which is valid for 24h and copies it to the clipboard.");
+
+                    if (UiShared.IconTextButton(FontAwesomeIcon.MailBulk, "Bulk one-time invites"))
+                    {
+                        ImGui.CloseCurrentPopup();
+                        _showModalBulkOneTimeInvites = true;
+                        _bulkOneTimeInvites.Clear();
+                    }
+                    UiShared.AttachToolTip("Opens a dialog to create up to 100 single-use passwords for joining the syncshell.");
 
                     if (UiShared.IconTextButton(FontAwesomeIcon.Ban, "Manage Banlist"))
                     {
