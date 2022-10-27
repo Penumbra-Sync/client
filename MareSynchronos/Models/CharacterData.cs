@@ -25,6 +25,9 @@ public class CharacterData
     [JsonProperty]
     public float HeelsOffset { get; set; } = 0f;
 
+    [JsonProperty]
+    public string CustomizePlusScale { get; set; } = string.Empty;
+
     public void AddFileReplacement(ObjectKind objectKind, FileReplacement fileReplacement)
     {
         if (!fileReplacement.HasFileReplacement) return;
@@ -71,7 +74,8 @@ public class CharacterData
             FileReplacements = fileReplacements,
             GlamourerData = GlamourerString.ToDictionary(d => d.Key, d => d.Value),
             ManipulationData = ManipulationString,
-            HeelsOffset = HeelsOffset
+            HeelsOffset = HeelsOffset,
+            CustomizePlusData = CustomizePlusScale
         };
     }
 

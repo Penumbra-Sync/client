@@ -53,6 +53,7 @@ public class PlayerManager : IDisposable
         _transientResourceManager.TransientResourceLoaded += HandleTransientResourceLoad;
         _dalamudUtil.DelayedFrameworkUpdate += DalamudUtilOnDelayedFrameworkUpdate;
         _ipcManager.HeelsOffsetChangeEvent += HeelsOffsetChanged;
+        _ipcManager.CustomizePlusScaleChange += CustomizePlusChanged;
         _dalamudUtil.FrameworkUpdate += DalamudUtilOnFrameworkUpdate;
 
 
@@ -105,7 +106,18 @@ public class PlayerManager : IDisposable
         if (LastCreatedCharacterData != null && LastCreatedCharacterData.HeelsOffset != change && !player.IsProcessing)
         {
             Logger.Debug("Heels offset changed to " + change);
-            playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player).HasTransientsUpdate = true;
+            player.HasTransientsUpdate = true;
+        }
+    }
+
+    private void CustomizePlusChanged(string? change)
+    {
+        change ??= string.Empty;
+        var player = playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player);
+        if (LastCreatedCharacterData != null && LastCreatedCharacterData.CustomizePlusData != change && !player.IsProcessing)
+        {
+            Logger.Debug("CustomizePlus data changed to " + change);
+            player.HasTransientsUpdate = true;
         }
     }
 
@@ -124,6 +136,7 @@ public class PlayerManager : IDisposable
 
         _playerChangedCts?.Cancel();
         _ipcManager.HeelsOffsetChangeEvent -= HeelsOffsetChanged;
+        _ipcManager.CustomizePlusScaleChange -= CustomizePlusChanged;
     }
 
     private unsafe void DalamudUtilOnDelayedFrameworkUpdate()
@@ -241,7 +254,7 @@ public class PlayerManager : IDisposable
                 _periodicFileScanner.HaltScan("Character creation");
                 foreach (var item in unprocessedObjects)
                 {
-                    _dalamudUtil.WaitWhileCharacterIsDrawing("self " + item.ObjectKind.ToString(), item.Address, 10000, token);
+                    _dalamudUtil.WaitWhileCharacterIsDrawing("self " + item.ObjectKind.ToString(), item.Address, item.ObjectKind == ObjectKind.MinionOrMount ? 1000 : 10000, token);
                 }
 
                 cacheDto = (await CreateFullCharacterCacheDto(token).ConfigureAwait(false));

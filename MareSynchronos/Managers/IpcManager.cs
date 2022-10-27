@@ -4,15 +4,16 @@ using System;
 using System.Collections.Generic;
 using Dalamud.Game.ClientState.Objects.Types;
 using MareSynchronos.Utils;
-using MareSynchronos.WebAPI;
 using Action = System.Action;
 using System.Collections.Concurrent;
+using System.Text;
 
 namespace MareSynchronos.Managers;
 
 public delegate void PenumbraRedrawEvent(IntPtr address, int objTblIdx);
 public delegate void HeelsOffsetChange(float change);
 public delegate void PenumbraResourceLoadEvent(IntPtr drawObject, string gamePath, string filePath);
+public delegate void CustomizePlusScaleChange(string? scale);
 public class IpcManager : IDisposable
 {
     private readonly ICallGateSubscriber<int> _glamourerApiVersion;
@@ -42,6 +43,12 @@ public class IpcManager : IDisposable
     private readonly ICallGateSubscriber<float, object?> _heelsOffsetUpdate;
     private readonly ICallGateSubscriber<GameObject, float, object?> _heelsRegisterPlayer;
     private readonly ICallGateSubscriber<GameObject, object?> _heelsUnregisterPlayer;
+
+    private readonly ICallGateSubscriber<string> _customizePlusApiVersion;
+    private readonly ICallGateSubscriber<string, string> _customizePlusGetBodyScale;
+    private readonly ICallGateSubscriber<string, Character?, object> _customizePlusSetBodyScaleToCharacter;
+    private readonly ICallGateSubscriber<Character?, object> _customizePlusRevert;
+    private readonly ICallGateSubscriber<string?, object> _customizePlusOnScaleUpdate;
 
     private readonly DalamudUtil _dalamudUtil;
     private readonly ConcurrentQueue<Action> actionQueue = new();
@@ -89,6 +96,14 @@ public class IpcManager : IDisposable
 
         _heelsOffsetUpdate.Subscribe(HeelsOffsetChange);
 
+        _customizePlusApiVersion = pi.GetIpcSubscriber<string>("CustomizePlus.GetApiVersion");
+        _customizePlusGetBodyScale = pi.GetIpcSubscriber<string, string>("CustomizePlus.GetBodyScale");
+        _customizePlusRevert = pi.GetIpcSubscriber<Character?, object>("CustomizePlus.RevertCharacter");
+        _customizePlusSetBodyScaleToCharacter = pi.GetIpcSubscriber<string, Character?, object>("CustomizePlus.SetBodyScaleToCharacter");
+        _customizePlusOnScaleUpdate = pi.GetIpcSubscriber<string?, object>("CustomizePlus.OnScaleUpdate");
+
+        _customizePlusOnScaleUpdate.Subscribe(OnCustomizePlusScaleChange);
+
         if (Initialized)
         {
             PenumbraInitialized?.Invoke();
@@ -128,6 +143,7 @@ public class IpcManager : IDisposable
     public event PenumbraRedrawEvent? PenumbraRedrawEvent;
     public event HeelsOffsetChange? HeelsOffsetChangeEvent;
     public event PenumbraResourceLoadEvent? PenumbraResourceLoadEvent;
+    public event CustomizePlusScaleChange? CustomizePlusScaleChange;
 
     public bool Initialized => CheckPenumbraApi();
     public bool CheckGlamourerApi()
@@ -159,6 +175,18 @@ public class IpcManager : IDisposable
         try
         {
             return string.Equals(_heelsGetApiVersion.InvokeFunc(), "1.0.1", StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public bool CheckCustomizePlusApi()
+    {
+        try
+        {
+            return string.Equals(_customizePlusApiVersion.InvokeFunc(), "1.0", StringComparison.Ordinal);
         }
         catch
         {
@@ -225,6 +253,43 @@ public class IpcManager : IDisposable
             {
                 Logger.Verbose("Restoring Heels data to " + character.ToString("X"));
                 _heelsUnregisterPlayer.InvokeAction(gameObj);
+            }
+        });
+    }
+
+    public string GetCustomizePlusScale()
+    {
+        if (!CheckCustomizePlusApi()) return string.Empty;
+        var scale = _customizePlusGetBodyScale.InvokeFunc(_dalamudUtil.PlayerName);
+        if(string.IsNullOrEmpty(scale)) return string.Empty;
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes(scale));
+    }
+
+    public void CustomizePlusSetBodyScale(IntPtr character, string scale)
+    {
+        if (!CheckCustomizePlusApi() || string.IsNullOrEmpty(scale)) return;
+        actionQueue.Enqueue(() =>
+        {
+            var gameObj = _dalamudUtil.CreateGameObject(character);
+            if (gameObj is Character c)
+            {
+                string decodedScale = Encoding.UTF8.GetString(Convert.FromBase64String(scale));
+                Logger.Verbose("CustomizePlus applying for " + c.Address.ToString("X"));
+                _customizePlusSetBodyScaleToCharacter!.InvokeAction(decodedScale, c);
+            }
+        });
+    }
+
+    public void CustomizePlusRevert(IntPtr character)
+    {
+        if (!CheckCustomizePlusApi()) return;
+        actionQueue.Enqueue(() =>
+        {
+            var gameObj = _dalamudUtil.CreateGameObject(character);
+            if (gameObj is Character c)
+            {
+                Logger.Verbose("CustomizePlus reverting for " + c.Address.ToString("X"));
+                _customizePlusRevert!.InvokeAction(c);
             }
         });
     }
@@ -390,6 +455,12 @@ public class IpcManager : IDisposable
     private void HeelsOffsetChange(float offset)
     {
         HeelsOffsetChangeEvent?.Invoke(offset);
+    }
+
+    private void OnCustomizePlusScaleChange(string? scale)
+    {
+        if (scale != null) scale = Convert.ToBase64String(Encoding.UTF8.GetBytes(scale));
+        CustomizePlusScaleChange?.Invoke(scale);
     }
 
     private void PenumbraDispose()

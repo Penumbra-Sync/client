@@ -263,7 +263,7 @@ public class CharacterDataFactory
                 Thread.Sleep(50);
             }
 
-            _dalamudUtil.WaitWhileCharacterIsDrawing(objectKind.ToString(), charaPointer, 15000);
+            _dalamudUtil.WaitWhileCharacterIsDrawing(objectKind.ToString(), charaPointer, objectKind == ObjectKind.MinionOrMount ? 1000 : 15000);
 
             var human = (Human*)((Character*)charaPointer)->GameObject.GetDrawObject();
             for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)
@@ -303,6 +303,7 @@ public class CharacterDataFactory
         previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
         previousData.GlamourerString[objectKind] = _ipcManager.GlamourerGetCharacterCustomization(charaPointer);
         previousData.HeelsOffset = _ipcManager.GetHeelsOffset();
+        previousData.CustomizePlusScale = _ipcManager.GetCustomizePlusScale();
 
         Logger.Debug("Handling transient update for " + objectKind);
         ManageSemiTransientData(previousData, objectKind, charaPointer);

@@ -41,7 +41,7 @@ public class UiShared : IDisposable
     public bool UidFontBuilt { get; private set; }
     public static bool CtrlPressed() => (GetKeyState(0xA2) & 0x8000) != 0 || (GetKeyState(0xA3) & 0x8000) != 0;
     public static bool ShiftPressed() => (GetKeyState(0xA1) & 0x8000) != 0 || (GetKeyState(0xA0) & 0x8000) != 0;
-    
+
     public static ImGuiWindowFlags PopupWindowFlags = ImGuiWindowFlags.NoResize |
                                            ImGuiWindowFlags.NoScrollbar |
                                            ImGuiWindowFlags.NoScrollWithMouse;
@@ -115,10 +115,10 @@ public class UiShared : IDisposable
             var center = ImGui.GetMainViewport().GetCenter();
             ImGui.SetWindowPos(new Vector2(center.X - x / 2, center.Y - y / 2));
         }
-        
+
         ImGui.SetWindowSize(new Vector2(x, y));
     }
-    
+
     public static void SetScaledWindowSize(float width, float height, bool centerWindow = true)
     {
         ImGui.SameLine();
@@ -130,7 +130,7 @@ public class UiShared : IDisposable
             var center = ImGui.GetMainViewport().GetCenter();
             ImGui.SetWindowPos(new Vector2(center.X - x / 2, center.Y - y / 2));
         }
-        
+
         ImGui.SetWindowSize(new Vector2(x, y));
     }
 
@@ -154,10 +154,12 @@ public class UiShared : IDisposable
         var penumbraExists = _ipcManager.CheckPenumbraApi();
         var glamourerExists = _ipcManager.CheckGlamourerApi();
         var heelsExists = _ipcManager.CheckHeelsApi();
+        var customizeExists = _ipcManager.CheckCustomizePlusApi();
 
         var penumbraColor = penumbraExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         var glamourerColor = glamourerExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         var heelsColor = heelsExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
+        var customizeColor = customizeExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         ImGui.Text("Penumbra:");
         ImGui.SameLine();
         ImGui.TextColored(penumbraColor, penumbraExists ? "Available" : "Unavailable");
@@ -170,6 +172,10 @@ public class UiShared : IDisposable
         ImGui.Text("Heels:");
         ImGui.SameLine();
         ImGui.TextColored(heelsColor, heelsExists ? "Available" : "Unavailable");
+        ImGui.SameLine();
+        ImGui.Text("Customize+:");
+        ImGui.SameLine();
+        ImGui.TextColored(customizeColor, customizeExists ? "Available" : "Unavailable");
 
         if (!penumbraExists || !glamourerExists)
         {
