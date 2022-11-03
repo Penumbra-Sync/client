@@ -25,7 +25,7 @@ public class FileReplacement
 
     public bool IsFileSwap => !Regex.IsMatch(ResolvedPath, @"^[a-zA-Z]:(/|\\)", RegexOptions.ECMAScript) && !string.Equals(GamePaths.First(), ResolvedPath, System.StringComparison.Ordinal);
 
-    public string Hash { get; set; } = string.Empty;
+    public string Hash { get; private set; } = string.Empty;
 
     public string ResolvedPath { get; set; } = string.Empty;
 
@@ -39,6 +39,14 @@ public class FileReplacement
             var cache = fileDbManager.GetFileCacheByPath(ResolvedPath);
             Hash = cache.Hash;
         });
+    }
+
+    public bool Verify()
+    {
+        var cache = fileDbManager.GetFileCacheByPath(ResolvedPath);
+        if (cache == null) return false;
+        Hash = cache.Hash;
+        return true;
     }
 
     public FileReplacementDto ToFileReplacementDto()

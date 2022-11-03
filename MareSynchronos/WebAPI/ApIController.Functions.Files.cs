@@ -187,6 +187,8 @@ public partial class ApiController
 
         if (unverifiedUploadHashes.Any())
         {
+            unverifiedUploadHashes = unverifiedUploadHashes.Where(h => _fileDbManager.GetFileCacheByHash(h) != null).ToList();
+
             Logger.Debug("Verifying " + unverifiedUploadHashes.Count + " files");
             var filesToUpload = await FilesSend(unverifiedUploadHashes).ConfigureAwait(false);
 
@@ -235,16 +237,24 @@ public partial class ApiController
             {
                 var compressedSize = CurrentUploads.Sum(c => c.Total);
                 Logger.Debug($"Compressed {totalSize} to {compressedSize} ({(compressedSize / (double)totalSize):P2})");
-            }
 
-            Logger.Debug("Upload tasks complete, waiting for server to confirm");
-            var anyUploadsOpen = await FilesIsUploadFinished().ConfigureAwait(false);
-            Logger.Debug("Uploads open: " + anyUploadsOpen);
-            while (anyUploadsOpen && !uploadToken.IsCancellationRequested)
-            {
-                anyUploadsOpen = await FilesIsUploadFinished().ConfigureAwait(false);
-                await Task.Delay(TimeSpan.FromSeconds(0.5), uploadToken).ConfigureAwait(false);
-                Logger.Debug("Waiting for uploads to finish");
+                Logger.Debug("Upload tasks complete, waiting for server to confirm");
+                var anyUploadsOpen = await FilesIsUploadFinished().ConfigureAwait(false);
+                Logger.Debug("Uploads open: " + anyUploadsOpen);
+                double timeWaited = 0;
+                const double waitStep = 1.0d;
+                while (anyUploadsOpen && !uploadToken.IsCancellationRequested && timeWaited < 5)
+                {
+                    anyUploadsOpen = await FilesIsUploadFinished().ConfigureAwait(false);
+                    timeWaited += waitStep;
+                    await Task.Delay(TimeSpan.FromSeconds(waitStep), uploadToken).ConfigureAwait(false);
+                    Logger.Debug("Waiting for uploads to finish");
+                }
+
+                if(timeWaited > waitStep)
+                {
+                    await FilesAbortUpload().ConfigureAwait(false);
+                }
             }
 
             foreach (var item in unverifiedUploadHashes)

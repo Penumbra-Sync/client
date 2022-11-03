@@ -106,11 +106,11 @@ public class TransientResourceManager : IDisposable
         var replacedGamePath = gamePath.ToLowerInvariant().Replace("\\", "/", StringComparison.OrdinalIgnoreCase);
 
         if (TransientResources[gameObject].Contains(replacedGamePath) ||
-            SemiTransientResources.Any(r => r.Value.Any(f => string.Equals(f.GamePaths.First(), replacedGamePath , StringComparison.OrdinalIgnoreCase) 
+            SemiTransientResources.Any(r => r.Value.Any(f => string.Equals(f.GamePaths.First(), replacedGamePath, StringComparison.OrdinalIgnoreCase)
             && string.Equals(f.ResolvedPath, filePath, StringComparison.OrdinalIgnoreCase))))
         {
             Logger.Verbose("Not adding " + replacedGamePath + ":" + filePath);
-            Logger.Verbose("SemiTransientAny: " + SemiTransientResources.Any(r => r.Value.Any(f => string.Equals(f.GamePaths.First(), replacedGamePath, StringComparison.OrdinalIgnoreCase) 
+            Logger.Verbose("SemiTransientAny: " + SemiTransientResources.Any(r => r.Value.Any(f => string.Equals(f.GamePaths.First(), replacedGamePath, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(f.ResolvedPath, filePath, StringComparison.OrdinalIgnoreCase))).ToString() + ", TransientAny: " + TransientResources[gameObject].Contains(replacedGamePath));
         }
         else
@@ -140,6 +140,8 @@ public class TransientResourceManager : IDisposable
         {
             return;
         }
+
+        SemiTransientResources[objectKind].RemoveWhere(p => !p.Verify());
 
         var transientResources = resources.ToList();
         Logger.Debug("Persisting " + transientResources.Count + " transient resources");
