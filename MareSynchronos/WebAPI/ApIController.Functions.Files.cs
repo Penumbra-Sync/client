@@ -239,21 +239,12 @@ public partial class ApiController
                 Logger.Debug($"Compressed {totalSize} to {compressedSize} ({(compressedSize / (double)totalSize):P2})");
 
                 Logger.Debug("Upload tasks complete, waiting for server to confirm");
-                var anyUploadsOpen = await FilesIsUploadFinished().ConfigureAwait(false);
-                Logger.Debug("Uploads open: " + anyUploadsOpen);
-                double timeWaited = 0;
+                Logger.Debug("Uploads open: " + CurrentUploads.Any(c => c.IsInTransfer));
                 const double waitStep = 1.0d;
-                while (anyUploadsOpen && !uploadToken.IsCancellationRequested && timeWaited < 5)
+                while (CurrentUploads.Any(c => c.IsInTransfer) && !uploadToken.IsCancellationRequested)
                 {
-                    anyUploadsOpen = await FilesIsUploadFinished().ConfigureAwait(false);
-                    timeWaited += waitStep;
                     await Task.Delay(TimeSpan.FromSeconds(waitStep), uploadToken).ConfigureAwait(false);
                     Logger.Debug("Waiting for uploads to finish");
-                }
-
-                if(timeWaited > waitStep)
-                {
-                    await FilesAbortUpload().ConfigureAwait(false);
                 }
             }
 
