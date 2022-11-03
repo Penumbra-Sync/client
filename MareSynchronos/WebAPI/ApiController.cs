@@ -320,9 +320,11 @@ public partial class ApiController : IDisposable, IMareHubClient
         _dalamudUtil.LogIn -= DalamudUtilOnLogIn;
         _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
 
+        ServerState = ServerState.Offline;
         Task.Run(async () => await StopConnection(_connectionCancellationTokenSource.Token).ConfigureAwait(false));
         _connectionCancellationTokenSource?.Cancel();
         _healthCheckTokenSource?.Cancel();
+        _uploadCancellationTokenSource?.Cancel();
     }
 
     private HubConnection BuildHubConnection(string hubName)
