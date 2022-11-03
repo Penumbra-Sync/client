@@ -36,7 +36,7 @@ public class FileReplacement
 
         _ = Task.Run(() =>
         {
-            var cache = fileDbManager.GetFileCacheByPath(ResolvedPath);
+            var cache = fileDbManager.GetFileCacheByPath(ResolvedPath)!;
             Hash = cache.Hash;
         });
     }

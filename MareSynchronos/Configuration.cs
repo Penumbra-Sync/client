@@ -58,7 +58,6 @@ public static class ConfigurationExtensions
 public class Configuration : IPluginConfiguration
 {
     private string _apiUri = string.Empty;
-    private int _maxParallelScan = 10;
     [NonSerialized]
     private DalamudPluginInterface? _pluginInterface;
 
