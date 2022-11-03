@@ -267,6 +267,7 @@ public partial class ApiController : IDisposable, IMareHubClient
             Logger.Debug("Checked Client Health State, healthy: " + !needsRestart);
             if (needsRestart)
             {
+                ServerState = ServerState.Offline;
                 _ = CreateConnections();
             }
         }
@@ -380,7 +381,6 @@ public partial class ApiController : IDisposable, IMareHubClient
             await _mareHub.DisposeAsync().ConfigureAwait(false);
             CurrentUploads.Clear();
             CurrentDownloads.Clear();
-            _uploadCancellationTokenSource?.Cancel();
             Disconnected?.Invoke();
             _mareHub = null;
         }
