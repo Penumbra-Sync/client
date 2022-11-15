@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using MareSynchronos.API;
+using MareSynchronos.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
 
 namespace MareSynchronos.WebAPI;
@@ -18,7 +20,14 @@ public partial class ApiController
 
     public async Task UserPushData(CharacterCacheDto characterCache, List<string> visibleCharacterIds)
     {
-        await _mareHub!.SendAsync(nameof(UserPushData), characterCache, visibleCharacterIds).ConfigureAwait(false);
+        try
+        {
+            await _mareHub!.InvokeAsync(nameof(UserPushData), characterCache, visibleCharacterIds).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Failed to Push character data: " + ex.Message);
+        }
     }
 
     public async Task<List<ClientPairDto>> UserGetPairedClients()
