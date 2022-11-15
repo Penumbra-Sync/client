@@ -68,7 +68,10 @@ public partial class ApiController
         {
             await wc.DownloadFileTaskAsync(downloadUri, fileName).ConfigureAwait(false);
         }
-        catch { }
+        catch (Exception ex) {
+            Logger.Warn(ex.Message);
+            Logger.Warn(ex.StackTrace);
+        }
 
         CurrentDownloads[downloadId].Single(f => string.Equals(f.Hash, hash, StringComparison.Ordinal)).Transferred = CurrentDownloads[downloadId].Single(f => string.Equals(f.Hash, hash, StringComparison.Ordinal)).Total;
 

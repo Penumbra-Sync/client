@@ -197,12 +197,13 @@ public class FileCacheManager : IDisposable
 
     public void RemoveHash(FileCacheEntity entity)
     {
-        FileCaches.Remove(entity.Hash, out _);
+        Logger.Verbose("Removing " + entity.ResolvedFilepath);
+        FileCaches.Remove(entity.PrefixedFilePath, out _);
     }
 
     public void UpdateHash(FileCacheEntity fileCache)
     {
-        Logger.Debug("Updating hash for " + fileCache.ResolvedFilepath);
+        Logger.Verbose("Updating hash for " + fileCache.ResolvedFilepath);
         fileCache.Hash = Crypto.GetFileHash(fileCache.ResolvedFilepath);
         fileCache.LastModifiedDateTicks = new FileInfo(fileCache.ResolvedFilepath).LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture);
         FileCaches.Remove(fileCache.PrefixedFilePath, out _);

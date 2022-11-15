@@ -237,10 +237,12 @@ public class PeriodicFileScanner : IDisposable
                             scannedFiles[validatedCacheResult.Item2.ResolvedFilepath] = true;
                         if (validatedCacheResult.Item1 == FileState.RequireUpdate)
                         {
+                            Logger.Verbose("To update: " + validatedCacheResult.Item2.ResolvedFilepath);
                             entitiesToUpdate.Add(validatedCacheResult.Item2);
                         }
                         else if (validatedCacheResult.Item1 == FileState.RequireDeletion)
                         {
+                            Logger.Verbose("To delete: " + validatedCacheResult.Item2.ResolvedFilepath);
                             entitiesToRemove.Add(validatedCacheResult.Item2);
                         }
                     }
