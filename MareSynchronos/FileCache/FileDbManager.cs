@@ -36,9 +36,12 @@ public class FileCacheManager : IDisposable
         _configuration = configuration;
         CsvPath = Path.Combine(configDirectoryName, "FileCache.csv");
 
-        if (File.Exists(CsvBakPath))
+        lock (_fileWriteLock)
         {
-            File.Move(CsvBakPath, CsvPath, true);
+            if (File.Exists(CsvBakPath))
+            {
+                File.Move(CsvBakPath, CsvPath, true);
+            }
         }
 
         if (File.Exists(CsvPath))

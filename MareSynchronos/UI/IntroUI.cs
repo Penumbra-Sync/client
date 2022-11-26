@@ -26,24 +26,11 @@ internal class IntroUi : Window, IDisposable
 
     private string[] TosParagraphs;
 
-    private Tuple<string, string> _darkSoulsCaptcha1 = new(string.Empty, string.Empty);
-    private Tuple<string, string> _darkSoulsCaptcha2 = new(string.Empty, string.Empty);
-    private Tuple<string, string> _darkSoulsCaptcha3 = new(string.Empty, string.Empty);
-    private string _enteredDarkSoulsCaptcha1 = string.Empty;
-    private string _enteredDarkSoulsCaptcha2 = string.Empty;
-    private string _enteredDarkSoulsCaptcha3 = string.Empty;
-
-    private bool _failedOnce = false;
     private Task _timeoutTask;
-    private string _timeoutTime;
+    private string _timeoutLabel;
 
     private Dictionary<string, string> _languages = new(StringComparer.Ordinal) { { "English", "en" }, { "Deutsch", "de" }, { "Français", "fr" } };
     private int _currentLanguage;
-
-    private bool DarkSoulsCaptchaValid => string.Equals(_darkSoulsCaptcha1.Item2, _enteredDarkSoulsCaptcha1.Trim()
-, StringComparison.Ordinal) && string.Equals(_darkSoulsCaptcha2.Item2, _enteredDarkSoulsCaptcha2.Trim()
-, StringComparison.Ordinal) && string.Equals(_darkSoulsCaptcha3.Item2, _enteredDarkSoulsCaptcha3.Trim(), StringComparison.Ordinal);
-
 
     public void Dispose()
     {
@@ -93,6 +80,15 @@ internal class IntroUi : Window, IDisposable
             if (ImGui.Button("Next##toAgreement"))
             {
                 _readFirstPage = true;
+                _timeoutTask = Task.Run(async () =>
+                {
+                    for (int i = 60; i > 0; i--)
+                    {
+                        _timeoutLabel = $"{Strings.ToS.ButtonWillBeAvailableIn} {i}s";
+                        Logger.Debug(_timeoutLabel);
+                        await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
+                    }
+                });
             }
         }
         else if (!_pluginConfiguration.AcceptedAgreement && _readFirstPage)
@@ -134,63 +130,17 @@ internal class IntroUi : Window, IDisposable
             UiShared.TextWrapped(TosParagraphs[5]);
 
             ImGui.Separator();
-            if ((!_pluginConfiguration.DarkSoulsAgreement || DarkSoulsCaptchaValid) && (_timeoutTask?.IsCompleted ?? true))
+            if (_timeoutTask?.IsCompleted ?? true)
             {
                 if (ImGui.Button(Strings.ToS.AgreeLabel + "##toSetup"))
                 {
-                    _enteredDarkSoulsCaptcha1 = string.Empty;
-                    _enteredDarkSoulsCaptcha2 = string.Empty;
-                    _enteredDarkSoulsCaptcha3 = string.Empty;
-
-                    if (UiShared.CtrlPressed())
-                    {
-                        _pluginConfiguration.AcceptedAgreement = true;
-                        _pluginConfiguration.Save();
-                    }
-                    else
-                    {
-                        if (!_failedOnce)
-                        {
-                            _failedOnce = true;
-                            _timeoutTask = Task.Run(async () =>
-                            {
-                                for (int i = 60; i > 0; i--)
-                                {
-                                    _timeoutTime = $"{i}s " + Strings.ToS.RemainingLabel;
-                                    Logger.Debug(_timeoutTime);
-                                    await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
-                                }
-                            });
-                        }
-                        else
-                        {
-                            _pluginConfiguration.DarkSoulsAgreement = true;
-                            _pluginConfiguration.Save();
-                            GenerateDarkSoulsAgreementCaptcha();
-                        }
-                    }
+                    _pluginConfiguration.AcceptedAgreement = true;
+                    _pluginConfiguration.Save();
                 }
             }
             else
             {
-                if (_failedOnce && (!_timeoutTask?.IsCompleted ?? true))
-                {
-                    UiShared.ColorTextWrapped(Strings.ToS.FailedLabel, ImGuiColors.DalamudYellow);
-                    UiShared.TextWrapped(Strings.ToS.TimeoutLabel);
-                    UiShared.TextWrapped(_timeoutTime);
-                }
-                else
-                {
-                    UiShared.ColorTextWrapped(Strings.ToS.FailedAgainLabel, ImGuiColors.DalamudYellow);
-                    UiShared.TextWrapped(Strings.ToS.PuzzleLabel);
-                    UiShared.TextWrapped(Strings.ToS.PuzzleDescLabel);
-                    ImGui.SetNextItemWidth(100);
-                    ImGui.InputText(_darkSoulsCaptcha1.Item1, ref _enteredDarkSoulsCaptcha1, 255);
-                    ImGui.SetNextItemWidth(100);
-                    ImGui.InputText(_darkSoulsCaptcha2.Item1, ref _enteredDarkSoulsCaptcha2, 255);
-                    ImGui.SetNextItemWidth(100);
-                    ImGui.InputText(_darkSoulsCaptcha3.Item1, ref _enteredDarkSoulsCaptcha3, 255);
-                }
+                UiShared.TextWrapped(_timeoutLabel);
             }
         }
         else if (_pluginConfiguration.AcceptedAgreement
@@ -270,28 +220,5 @@ internal class IntroUi : Window, IDisposable
         }
 
         TosParagraphs = new[] { Strings.ToS.Paragraph1, Strings.ToS.Paragraph2, Strings.ToS.Paragraph3, Strings.ToS.Paragraph4, Strings.ToS.Paragraph5, Strings.ToS.Paragraph6 };
-
-        if (_pluginConfiguration.DarkSoulsAgreement)
-        {
-            GenerateDarkSoulsAgreementCaptcha();
-        }
-    }
-
-    private void GenerateDarkSoulsAgreementCaptcha()
-    {
-        _darkSoulsCaptcha1 = GetCaptchaTuple();
-        _darkSoulsCaptcha2 = GetCaptchaTuple();
-        _darkSoulsCaptcha3 = GetCaptchaTuple();
-    }
-
-    private Tuple<string, string> GetCaptchaTuple()
-    {
-        Random random = new();
-        var paragraphIdx = random.Next(TosParagraphs.Length);
-        var splitParagraph = TosParagraphs[paragraphIdx].Split(".", StringSplitOptions.RemoveEmptyEntries).Select(c => c.Trim()).ToArray();
-        var sentenceIdx = random.Next(splitParagraph.Length);
-        var splitSentence = splitParagraph[sentenceIdx].Split(" ").Select(c => c.Trim()).Select(c => c.Replace(".", "", StringComparison.Ordinal).Replace(",", "", StringComparison.Ordinal).Replace("'", "", StringComparison.Ordinal)).ToArray();
-        var wordIdx = random.Next(splitSentence.Length);
-        return new($"{Strings.ToS.ParagraphLabel} {paragraphIdx + 1}, {Strings.ToS.SentenceLabel} {sentenceIdx + 1}, {Strings.ToS.WordLabel} {wordIdx + 1}", splitSentence[wordIdx]);
     }
 }

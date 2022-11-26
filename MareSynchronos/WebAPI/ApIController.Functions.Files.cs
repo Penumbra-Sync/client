@@ -56,6 +56,7 @@ public partial class ApiController
                 Logger.Warn("Could not set download progress for " + hash);
                 Logger.Warn(ex.Message);
                 Logger.Warn(ex.StackTrace ?? string.Empty);
+                wc.CancelAsync();
             }
         };
         wc.DownloadProgressChanged += progChanged;
@@ -131,7 +132,6 @@ public partial class ApiController
             {
                 File.Delete(tempFile);
                 Logger.Debug("Detected cancellation, removing " + currentDownloadId);
-                DownloadFinished?.Invoke();
                 CancelDownload(currentDownloadId);
                 return;
             }

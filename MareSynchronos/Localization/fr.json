@@ -32,47 +32,15 @@
     "description": "ToSStrings..ctor"
   },
   "Paragraph6": {
-    "message": "Ce service et ses composants vous sont fournis en l'état. En cas d'abus, veuillez contacter darkarchon#4313 sur Discord ou rejoindre le serveur Discord Mare Synchronos. Pour accepters ces conditions d'utilisation, veuillez tenir la touche CTRL enfoncée en cliquant sur le bouton 'J'accepte'.",
+    "message": "Ce service et ses composants vous sont fournis en l'état. En cas d'abus rejoindre le serveur Discord Mare Synchronos.",
     "description": "ToSStrings..ctor"
   },
   "AgreeLabel": {
     "message": "J'accept",
     "description": "ToSStrings..ctor"
   },
-  "RemainingLabel": {
-    "message": "restants",
-    "description": "ToSStrings..ctor"
-  },
-  "FailedLabel": {
-    "message": "Bravo! Vous n'avez donc pas lu les conditions d'utilisation suffisament en détail.",
-    "description": "ToSStrings..ctor"
-  },
-  "TimeoutLabel": {
-    "message": "C'est pas bien grave, vous avez droit à 1 minute de répit pour vous relire et tenter une seconde fois. Si vous ignorez à nouveau les conditions d'utilisation, un petit puzzle agaçant vous sera proposé.",
-    "description": "ToSStrings..ctor"
-  },
-  "FailedAgainLabel": {
-    "message": "Bravo, vous avez encore ignoré les consignes écrites dans les conditions d'utilisation.",
-    "description": "ToSStrings..ctor"
-  },
-  "PuzzleLabel": {
-    "message": "Chose promise, chose dûe. Voici votre puzzle casse-pied:",
-    "description": "ToSStrings..ctor"
-  },
-  "PuzzleDescLabel": {
-    "message": "Entrez les 3 mots suivants tirés des conditions d'utilisation, sans ponctuation, pour rendre le bouton 'J'accepte' de nouveau visible.",
-    "description": "ToSStrings..ctor"
-  },
-  "ParagraphLabel": {
-    "message": "Paragraphe",
-    "description": "ToSStrings..ctor"
-  },
-  "SentenceLabel": {
-    "message": "Phrase",
-    "description": "ToSStrings..ctor"
-  },
-  "WordLabel": {
-    "message": "Mot",
+  "ButtonWillBeAvailableIn": {
+    "message": "Bouton \"J'accept\" disposible dans",
     "description": "ToSStrings..ctor"
   }
 }

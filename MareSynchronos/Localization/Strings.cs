@@ -34,33 +34,11 @@ public static class Strings
             "The service holds no information about which mod files belong to which mod.");
 
         public readonly string Paragraph6 = Loc.Localize("Paragraph6",
-            "This service is provided as-is. In case of abuse, contact darkarchon#4313 on Discord or join the Mare Synchronos Discord. " +
-            "To accept those conditions hold CTRL while clicking 'I agree'");
+            "This service is provided as-is. In case of abuse join the Mare Synchronos Discord.");
 
         public readonly string AgreeLabel = Loc.Localize("AgreeLabel", "I agree");
 
-        public readonly string RemainingLabel = Loc.Localize("RemainingLabel", "remaining");
-
-        public readonly string FailedLabel = Loc.Localize("FailedLabel",
-            "Congratulations. You have failed to read the agreements.");
-
-        public readonly string TimeoutLabel = Loc.Localize("TimeoutLabel",
-            "I'm going to give you 1 minute to read the agreements carefully again. If you fail once more you will have to solve an annoying puzzle.");
-
-        public readonly string FailedAgainLabel = Loc.Localize("FailedAgainLabel",
-            "Congratulations. You have failed to read the agreements. Again.");
-
-        public readonly string PuzzleLabel = Loc.Localize("PuzzleLabel",
-            "I did warn you. Here's your annoying puzzle:");
-
-        public readonly string PuzzleDescLabel = Loc.Localize("PuzzleDescLabel",
-            "Enter the following 3 words from the agreement exactly as described without punctuation to make the \"I agree\" button visible again.");
-
-        public readonly string ParagraphLabel = Loc.Localize("ParagraphLabel", "Paragraph");
-
-        public readonly string SentenceLabel = Loc.Localize("SentenceLabel", "Sentence");
-
-        public readonly string WordLabel = Loc.Localize("WordLabel", "Word");
+        public readonly string ButtonWillBeAvailableIn = Loc.Localize("ButtonWillBeAvailableIn", "'I agree' button will be available in");
     }
 
     public static ToSStrings ToS { get; set; } = new();

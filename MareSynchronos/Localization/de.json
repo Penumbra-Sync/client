@@ -32,47 +32,15 @@
     "description": "ToSStrings..ctor"
   },
   "Paragraph6": {
-    "message": "Dieser Dienst wird ohne Gewähr angeboten. Im Falle eines Missbrauchs kontaktiert darkarchon#4313 auf Discord oder tretet dem Mare Synchronos Discord bei. Um diese Konditionen zu akzeptieren, halte STRG gedrückt während du \"Ich Stimme zu\" klickst.",
+    "message": "Dieser Dienst wird ohne Gewähr angeboten. Im Falle eines Missbrauchs tretet dem Mare Synchronos Discord bei.",
     "description": "ToSStrings..ctor"
   },
   "AgreeLabel": {
     "message": "Ich Stimme zu",
     "description": "ToSStrings..ctor"
   },
-  "RemainingLabel": {
-    "message": "übrig",
-    "description": "ToSStrings..ctor"
-  },
-  "FailedLabel": {
-    "message": "Gratulation. Du bist daran gescheitert die Nutzungsbedingungen zu lesen.",
-    "description": "ToSStrings..ctor"
-  },
-  "TimeoutLabel": {
-    "message": "Ich gebe dir nun 1 Minute um die Nutzungsbedingungen nochmals sorgfälig zu lesen. Falls du wieder daran scheiterst, musst du ein nerviges Puzzle lösen.",
-    "description": "ToSStrings..ctor"
-  },
-  "FailedAgainLabel": {
-    "message": "Gratulation. Du bist daran gescheitert die Nutzungsbedingungen zu lesen. Schon wieder.",
-    "description": "ToSStrings..ctor"
-  },
-  "PuzzleLabel": {
-    "message": "Ich habe dich gewarnt. Hier ist dein nerviges Puzzle:",
-    "description": "ToSStrings..ctor"
-  },
-  "PuzzleDescLabel": {
-    "message": "Gib die 3 folgenden Wörter der Nutzungsbedingungen ohne Zeichensetzung exakt wie im Text ein um den \"Ich Stimme zu\" Knopf wieder sichtbar zu machen.",
-    "description": "ToSStrings..ctor"
-  },
-  "ParagraphLabel": {
-    "message": "Paragraph",
-    "description": "ToSStrings..ctor"
-  },
-  "SentenceLabel": {
-    "message": "Satz",
-    "description": "ToSStrings..ctor"
-  },
-  "WordLabel": {
-    "message": "Wort",
+  "ButtonWillBeAvailableIn": {
+    "message": "\"Ich stimme zu\" Knopf verfügbar in",
     "description": "ToSStrings..ctor"
   }
 }
