@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
+using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
@@ -41,43 +41,33 @@ public partial class ApiController
         await _mareHub!.SendAsync(nameof(FilesDeleteAll)).ConfigureAwait(false);
     }
 
-    private async Task<string> DownloadFile(int downloadId, string hash, Uri downloadUri, CancellationToken ct)
+    private async Task<string> DownloadFileHttpClient(Uri url, IProgress<long> progress, CancellationToken ct)
     {
-        using WebClient wc = new();
-        wc.Headers.Add("Authorization", SecretKey);
-        DownloadProgressChangedEventHandler progChanged = (s, e) =>
+        using var client = new HttpClient();
+        client.DefaultRequestHeaders.Add("Authorization", SecretKey);
+
+        var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        var fileName = Path.GetTempFileName();
+        var fileStream = File.Create(fileName);
+        await using (fileStream.ConfigureAwait(false))
         {
-            try
+            var bufferSize = response.Content.Headers.ContentLength > 1024 * 1024 ? 4096 : 1024;
+            var buffer = new byte[bufferSize];
+
+            var bytesRead = 0;
+            while ((bytesRead = await (await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false)).ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
             {
-                CurrentDownloads[downloadId].Single(f => string.Equals(f.Hash, hash, StringComparison.Ordinal)).Transferred = e.BytesReceived;
+                ct.ThrowIfCancellationRequested();
+
+                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct).ConfigureAwait(false);
+
+                progress.Report(bytesRead);
             }
-            catch (Exception ex)
-            {
-                Logger.Warn("Could not set download progress for " + hash);
-                Logger.Warn(ex.Message);
-                Logger.Warn(ex.StackTrace ?? string.Empty);
-                wc.CancelAsync();
-            }
-        };
-        wc.DownloadProgressChanged += progChanged;
 
-        string fileName = Path.GetTempFileName();
-
-        ct.Register(wc.CancelAsync);
-
-        try
-        {
-            await wc.DownloadFileTaskAsync(downloadUri, fileName).ConfigureAwait(false);
+            return fileName;
         }
-        catch (Exception ex) {
-            Logger.Warn(ex.Message);
-            Logger.Warn(ex.StackTrace);
-        }
-
-        CurrentDownloads[downloadId].Single(f => string.Equals(f.Hash, hash, StringComparison.Ordinal)).Transferred = CurrentDownloads[downloadId].Single(f => string.Equals(f.Hash, hash, StringComparison.Ordinal)).Total;
-
-        wc.DownloadProgressChanged -= progChanged;
-        return fileName;
     }
 
     public int GetDownloadId() => _downloadId++;
@@ -126,8 +116,17 @@ public partial class ApiController
         },
         async (file, token) =>
         {
+            Logger.Debug($"Downloading {file.DownloadUri}");
             var hash = file.Hash;
-            var tempFile = await DownloadFile(currentDownloadId, file.Hash, file.DownloadUri, token).ConfigureAwait(false);
+            Progress<long> progress = new((bytesDownloaded) =>
+            {
+                if (!CurrentDownloads.TryGetValue(currentDownloadId, out var downloads)) return;
+
+                var download = downloads.FirstOrDefault(f => string.Equals(f.Hash, hash, StringComparison.OrdinalIgnoreCase));
+                if (download != null) download.Transferred += bytesDownloaded;
+            });
+
+            var tempFile = await DownloadFileHttpClient(file.DownloadUri, progress, token).ConfigureAwait(false);
             if (token.IsCancellationRequested)
             {
                 File.Delete(tempFile);
