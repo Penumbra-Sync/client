@@ -73,7 +73,11 @@ public partial class ApiController
         }
         catch
         {
-            File.Delete(fileName);
+            try
+            {
+                File.Delete(fileName);
+            }
+            catch { }
             throw;
         }
     }
