@@ -50,23 +50,31 @@ public partial class ApiController
         response.EnsureSuccessStatusCode();
 
         var fileName = Path.GetTempFileName();
-        var fileStream = File.Create(fileName);
-        await using (fileStream.ConfigureAwait(false))
+        try
         {
-            var bufferSize = response.Content.Headers.ContentLength > 1024 * 1024 ? 4096 : 1024;
-            var buffer = new byte[bufferSize];
-
-            var bytesRead = 0;
-            while ((bytesRead = await (await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false)).ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+            var fileStream = File.Create(fileName);
+            await using (fileStream.ConfigureAwait(false))
             {
-                ct.ThrowIfCancellationRequested();
+                var bufferSize = response.Content.Headers.ContentLength > 1024 * 1024 ? 4096 : 1024;
+                var buffer = new byte[bufferSize];
 
-                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct).ConfigureAwait(false);
+                var bytesRead = 0;
+                while ((bytesRead = await (await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false)).ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+                {
+                    ct.ThrowIfCancellationRequested();
 
-                progress.Report(bytesRead);
+                    await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct).ConfigureAwait(false);
+
+                    progress.Report(bytesRead);
+                }
+
+                return fileName;
             }
-
-            return fileName;
+        }
+        catch
+        {
+            File.Delete(fileName);
+            throw;
         }
     }
 
