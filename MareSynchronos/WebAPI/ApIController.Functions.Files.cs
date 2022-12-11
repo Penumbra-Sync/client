@@ -120,10 +120,7 @@ public partial class ApiController
             var hash = file.Hash;
             Progress<long> progress = new((bytesDownloaded) =>
             {
-                if (!CurrentDownloads.TryGetValue(currentDownloadId, out var downloads)) return;
-
-                var download = downloads.FirstOrDefault(f => string.Equals(f.Hash, hash, StringComparison.OrdinalIgnoreCase));
-                if (download != null) download.Transferred += bytesDownloaded;
+                file.Transferred += bytesDownloaded;
             });
 
             var tempFile = await DownloadFileHttpClient(file.DownloadUri, progress, token).ConfigureAwait(false);
