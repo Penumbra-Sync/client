@@ -36,10 +36,11 @@ public sealed class Plugin : IDalamudPlugin
     private OnlinePlayerManager? _characterCacheManager;
     private readonly DownloadUi _downloadUi;
     private readonly FileDialogManager _fileDialogManager;
-    private readonly FileCacheManager _fileDbManager;
+    private readonly FileCacheManager _fileCacheManager;
     private readonly CompactUi _compactUi;
     private readonly UiShared _uiSharedComponent;
     private readonly Dalamud.Localization _localization;
+    private readonly FileReplacementFactory _fileReplacementFactory;
 
 
     public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager,
@@ -62,9 +63,10 @@ public sealed class Plugin : IDalamudPlugin
 
         _ipcManager = new IpcManager(_pluginInterface, _dalamudUtil);
         _fileDialogManager = new FileDialogManager();
-        _fileDbManager = new FileCacheManager(_ipcManager, _configuration, _pluginInterface.ConfigDirectory.FullName);
-        _apiController = new ApiController(_configuration, _dalamudUtil, _fileDbManager);
-        _periodicFileScanner = new PeriodicFileScanner(_ipcManager, _configuration, _fileDbManager, _apiController, _dalamudUtil);
+        _fileCacheManager = new FileCacheManager(_ipcManager, _configuration, _pluginInterface.ConfigDirectory.FullName);
+        _apiController = new ApiController(_configuration, _dalamudUtil, _fileCacheManager);
+        _periodicFileScanner = new PeriodicFileScanner(_ipcManager, _configuration, _fileCacheManager, _apiController, _dalamudUtil);
+        _fileReplacementFactory = new FileReplacementFactory(_fileCacheManager, _ipcManager);
 
         _uiSharedComponent =
             new UiShared(_ipcManager, _apiController, _periodicFileScanner, _fileDialogManager, _configuration, _dalamudUtil, _pluginInterface, _localization);
@@ -118,7 +120,7 @@ public sealed class Plugin : IDalamudPlugin
         _compactUi?.Dispose();
 
         _periodicFileScanner?.Dispose();
-        _fileDbManager?.Dispose();
+        _fileCacheManager?.Dispose();
         _playerManager?.Dispose();
         _characterCacheManager?.Dispose();
         _ipcManager?.Dispose();
@@ -180,13 +182,13 @@ public sealed class Plugin : IDalamudPlugin
 
         try
         {
-            _transientResourceManager = new TransientResourceManager(_ipcManager, _dalamudUtil);
+            _transientResourceManager = new TransientResourceManager(_ipcManager, _dalamudUtil, _fileReplacementFactory, _pluginInterface.ConfigDirectory.FullName);
             var characterCacheFactory =
-                new CharacterDataFactory(_dalamudUtil, _ipcManager, _transientResourceManager, _fileDbManager);
+                new CharacterDataFactory(_dalamudUtil, _ipcManager, _transientResourceManager, _fileReplacementFactory);
             _playerManager = new PlayerManager(_apiController, _ipcManager,
                 characterCacheFactory, _dalamudUtil, _transientResourceManager, _periodicFileScanner);
             _characterCacheManager = new OnlinePlayerManager(_apiController,
-                _dalamudUtil, _ipcManager, _playerManager, _fileDbManager);
+                _dalamudUtil, _ipcManager, _playerManager, _fileCacheManager);
         }
         catch (Exception ex)
         {

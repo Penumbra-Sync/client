@@ -10,14 +10,6 @@ using System.Text;
 
 namespace MareSynchronos.FileCache;
 
-
-public enum FileState
-{
-    Valid,
-    RequireUpdate,
-    RequireDeletion
-}
-
 public class FileCacheManager : IDisposable
 {
     private const string PenumbraPrefix = "{penumbra}";
@@ -225,6 +217,11 @@ public class FileCacheManager : IDisposable
         }
 
         return fileCache;
+    }
+
+    public string ResolveFileReplacement(string gamePath)
+    {
+        return _ipcManager.PenumbraResolvePath(gamePath);
     }
 
     public void Dispose()

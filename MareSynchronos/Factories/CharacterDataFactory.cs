@@ -8,7 +8,6 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Client.System.Resource;
 using MareSynchronos.API;
-using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
 using MareSynchronos.Managers;
 using MareSynchronos.Models;
@@ -24,16 +23,16 @@ public class CharacterDataFactory
 {
     private readonly DalamudUtil _dalamudUtil;
     private readonly IpcManager _ipcManager;
-    private readonly TransientResourceManager transientResourceManager;
-    private readonly FileCacheManager fileDbManager;
+    private readonly TransientResourceManager _transientResourceManager;
+    private readonly FileReplacementFactory _fileReplacementFactory;
 
-    public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager, TransientResourceManager transientResourceManager, FileCacheManager fileDbManager)
+    public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager, TransientResourceManager transientResourceManager, FileReplacementFactory fileReplacementFactory)
     {
         Logger.Verbose("Creating " + nameof(CharacterDataFactory));
-        this.fileDbManager = fileDbManager;
         _dalamudUtil = dalamudUtil;
         _ipcManager = ipcManager;
-        this.transientResourceManager = transientResourceManager;
+        _transientResourceManager = transientResourceManager;
+        _fileReplacementFactory = fileReplacementFactory;
     }
 
     private unsafe bool CheckForPointer(IntPtr playerPointer)
@@ -281,7 +280,7 @@ public class CharacterDataFactory
 
             foreach (var item in previousData.FileReplacements[objectKind])
             {
-                transientResourceManager.RemoveTransientResource(charaPointer, item);
+                _transientResourceManager.RemoveTransientResource(charaPointer, item);
             }
 
             if (objectKind == ObjectKind.Player)
@@ -293,7 +292,7 @@ public class CharacterDataFactory
             {
                 foreach (var item in previousData.FileReplacements[objectKind])
                 {
-                    transientResourceManager.AddSemiTransientResource(objectKind, item);
+                    _transientResourceManager.AddSemiTransientResource(objectKind, item);
                 }
 
                 previousData.FileReplacements[objectKind].Clear();
@@ -315,9 +314,9 @@ public class CharacterDataFactory
 
     private unsafe void ManageSemiTransientData(CharacterData previousData, ObjectKind objectKind, IntPtr charaPointer)
     {
-        transientResourceManager.PersistTransientResources(charaPointer, objectKind, CreateFileReplacement);
+        _transientResourceManager.PersistTransientResources(charaPointer, objectKind, CreateFileReplacement);
 
-        foreach (var item in transientResourceManager.GetSemiTransientResources(objectKind))
+        foreach (var item in _transientResourceManager.GetSemiTransientResources(objectKind))
         {
             if (!previousData.FileReplacements.ContainsKey(objectKind))
             {
@@ -331,7 +330,7 @@ public class CharacterDataFactory
                 if (string.Equals(penumResolve, gamePath, StringComparison.Ordinal))
                 {
                     Logger.Verbose("PenumResolve was same as GamePath, not adding " + item);
-                    transientResourceManager.RemoveTransientResource(charaPointer, item);
+                    _transientResourceManager.RemoveTransientResource(charaPointer, item);
                 }
                 else
                 {
@@ -354,10 +353,10 @@ public class CharacterDataFactory
 
             foreach (var item in previousData.FileReplacements[objectKind])
             {
-                transientResourceManager.RemoveTransientResource(charaPointer, item);
+                _transientResourceManager.RemoveTransientResource(charaPointer, item);
             }
 
-            foreach (var item in transientResourceManager.GetTransientResources((IntPtr)weaponObject))
+            foreach (var item in _transientResourceManager.GetTransientResources((IntPtr)weaponObject))
             {
                 Logger.Verbose("Found transient weapon resource: " + item);
                 AddReplacement(item, objectKind, previousData, 1, true);
@@ -371,10 +370,10 @@ public class CharacterDataFactory
 
                 foreach (var item in previousData.FileReplacements[objectKind])
                 {
-                    transientResourceManager.RemoveTransientResource((IntPtr)offHandWeapon, item);
+                    _transientResourceManager.RemoveTransientResource((IntPtr)offHandWeapon, item);
                 }
 
-                foreach (var item in transientResourceManager.GetTransientResources((IntPtr)offHandWeapon))
+                foreach (var item in _transientResourceManager.GetTransientResources((IntPtr)offHandWeapon))
                 {
                     Logger.Verbose("Found transient offhand weapon resource: " + item);
                     AddReplacement(item, objectKind, previousData, 1, true);
@@ -402,7 +401,7 @@ public class CharacterDataFactory
 
         foreach (var item in previousData.FileReplacements[objectKind])
         {
-            transientResourceManager.RemoveTransientResource(charaPointer, item);
+            _transientResourceManager.RemoveTransientResource(charaPointer, item);
         }
     }
 
@@ -420,17 +419,14 @@ public class CharacterDataFactory
 
     private FileReplacement CreateFileReplacement(string path, bool doNotReverseResolve = false)
     {
-        var fileReplacement = new FileReplacement(fileDbManager);
+        var fileReplacement = _fileReplacementFactory.Create();
         if (!doNotReverseResolve)
         {
-            fileReplacement.GamePaths =
-                _ipcManager.PenumbraReverseResolvePlayer(path).ToList();
-            fileReplacement.SetResolvedPath(path);
+            fileReplacement.ReverseResolvePath(path);
         }
         else
         {
-            fileReplacement.GamePaths = new List<string> { path };
-            fileReplacement.SetResolvedPath(_ipcManager.PenumbraResolvePath(path)!);
+            fileReplacement.ResolvePath(path);
         }
 
         return fileReplacement;
