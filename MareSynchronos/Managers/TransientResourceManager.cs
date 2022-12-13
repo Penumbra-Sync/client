@@ -42,13 +42,22 @@ public class TransientResourceManager : IDisposable
             int restored = 0;
             foreach (var line in persistentEntities)
             {
-                var fileReplacement = fileReplacementFactory.Create();
-                fileReplacement.ResolvePath(line);
-                if (fileReplacement.HasFileReplacement)
+                try
                 {
-                    Logger.Debug("Loaded persistent transient resource " + line);
-                    SemiTransientResources[ObjectKind.Player].Add(fileReplacement);
-                    restored++;
+                    var fileReplacement = fileReplacementFactory.Create();
+                    fileReplacement.ResolvePath(line);
+                    if (fileReplacement.HasFileReplacement)
+                    {
+                        Logger.Debug("Loaded persistent transient resource " + line);
+                        SemiTransientResources[ObjectKind.Player].Add(fileReplacement);
+                        restored++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn("Error during loading persistent transient resource " + line);
+                    Logger.Warn(ex.Message);
+                    Logger.Warn(ex.StackTrace);
                 }
             }
 
