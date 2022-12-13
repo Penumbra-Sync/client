@@ -39,15 +39,20 @@ public class TransientResourceManager : IDisposable
         {
             var persistentEntities = File.ReadAllLines(PersistentDataCache);
             SemiTransientResources.TryAdd(ObjectKind.Player, new HashSet<FileReplacement>());
+            int restored = 0;
             foreach (var line in persistentEntities)
             {
                 var fileReplacement = fileReplacementFactory.Create();
                 fileReplacement.ResolvePath(line);
                 if (fileReplacement.HasFileReplacement)
                 {
+                    Logger.Debug("Loaded persistent transient resource " + line);
                     SemiTransientResources[ObjectKind.Player].Add(fileReplacement);
+                    restored++;
                 }
             }
+
+            Logger.Debug($"Restored {restored}/{persistentEntities.Count()} semi persistent resources");
         }
     }
 

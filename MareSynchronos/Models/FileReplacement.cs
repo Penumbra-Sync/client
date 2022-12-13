@@ -6,7 +6,7 @@ using MareSynchronos.API;
 using System.Text.RegularExpressions;
 using MareSynchronos.FileCache;
 using MareSynchronos.Managers;
-using System;
+using MareSynchronos.Utils;
 
 namespace MareSynchronos.Models;
 
@@ -50,15 +50,24 @@ public class FileReplacement
         if (!IsFileSwap)
         {
             var cache = fileDbManager.GetFileCacheByPath(ResolvedPath);
-            if (cache == null) return false;
+            if (cache == null)
+            {
+                Logger.Warn("Replacement Failed verification: " + GamePaths.First());
+                return false;
+            }
             Hash = cache.Hash;
             return true;
         }
 
-        var resolvedPath = fileDbManager.ResolveFileReplacement(GamePaths.First());
-        ResolvedPath = resolvedPath.ToLowerInvariant();
+        ResolvePath(GamePaths.First());
 
-        return IsFileSwap;
+        var success = IsFileSwap;
+        if (!success)
+        {
+            Logger.Warn("FileSwap Failed verification: " + GamePaths.First());
+        }
+
+        return success;
     }
 
     public FileReplacementDto ToFileReplacementDto()

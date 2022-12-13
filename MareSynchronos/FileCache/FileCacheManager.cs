@@ -47,7 +47,7 @@ public class FileCacheManager : IDisposable
                     var hash = splittedEntry[0];
                     var path = splittedEntry[1];
                     var time = splittedEntry[2];
-                    FileCaches[path] = new FileCacheEntity(hash, path, time);
+                    FileCaches[path] = ReplacePathPrefixes(new FileCacheEntity(hash, path, time));
                 }
                 catch (Exception)
                 {
@@ -112,8 +112,8 @@ public class FileCacheManager : IDisposable
 
     public FileCacheEntity? GetFileCacheByPath(string path)
     {
-        var cleanedPath = path.Replace("/", "\\", StringComparison.Ordinal).ToLowerInvariant().Replace(_ipcManager.PenumbraModDirectory()!.ToLowerInvariant(), "", StringComparison.Ordinal);
-        var entry = FileCaches.FirstOrDefault(f => f.Value.ResolvedFilepath.EndsWith(cleanedPath, StringComparison.Ordinal)).Value;
+        var cleanedPath = path.Replace("/", "\\", StringComparison.OrdinalIgnoreCase).ToLowerInvariant().Replace(_ipcManager.PenumbraModDirectory()!.ToLowerInvariant(), "", StringComparison.OrdinalIgnoreCase);
+        var entry = FileCaches.FirstOrDefault(f => f.Value.ResolvedFilepath.EndsWith(cleanedPath, StringComparison.OrdinalIgnoreCase)).Value;
 
         if (entry == null)
         {
