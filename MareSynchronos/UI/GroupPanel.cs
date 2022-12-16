@@ -483,16 +483,16 @@ namespace MareSynchronos.UI
                 {
                     ImGui.Separator();
 
+                    var changedToIcon = !invitesEnabled ? FontAwesomeIcon.LockOpen : FontAwesomeIcon.Lock;
+                    if (UiShared.IconTextButton(changedToIcon, invitesEnabled ? "Lock Syncshell" : "Unlock Syncshell"))
+                    {
+                        ImGui.CloseCurrentPopup();
+                        _ = _apiController.GroupChangeInviteState(entry.GID, !entry.InvitesEnabled ?? true);
+                    }
+                    UiShared.AttachToolTip("Change Syncshell joining permissions" + Environment.NewLine + "Syncshell is currently " + (invitesEnabled ? "open" : "closed") + " for people to join");
+
                     if (isOwner)
                     {
-                        var changedToIcon = !invitesEnabled ? FontAwesomeIcon.LockOpen : FontAwesomeIcon.Lock;
-                        if (UiShared.IconTextButton(changedToIcon, invitesEnabled ? "Lock Syncshell" : "Unlock Syncshell"))
-                        {
-                            ImGui.CloseCurrentPopup();
-                            _ = _apiController.GroupChangeInviteState(entry.GID, !entry.InvitesEnabled ?? true);
-                        }
-                        UiShared.AttachToolTip("Change Syncshell joining permissions" + Environment.NewLine + "Syncshell is currently " + (invitesEnabled ? "open" : "closed") + " for people to join");
-
                         if (UiShared.IconTextButton(FontAwesomeIcon.Passport, "Change Password"))
                         {
                             ImGui.CloseCurrentPopup();
