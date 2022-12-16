@@ -202,7 +202,7 @@ public class PeriodicFileScanner : IDisposable
         }
 
         Logger.Debug("Getting files from " + penumbraDir + " and " + _pluginConfiguration.CacheFolder);
-        string[] ext = { ".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp" };
+        string[] ext = { ".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk" };
 
         var scannedFiles = new ConcurrentDictionary<string, bool>(Directory.EnumerateFiles(penumbraDir, "*.*", SearchOption.AllDirectories)
                             .Select(s => s.ToLowerInvariant())

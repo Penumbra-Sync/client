@@ -21,7 +21,7 @@ public class TransientResourceManager : IDisposable
 
     public event TransientResourceLoadedEvent? TransientResourceLoaded;
     public IntPtr[] PlayerRelatedPointers = Array.Empty<IntPtr>();
-    private readonly string[] FileTypesToHandle = new[] { "tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp" };
+    private readonly string[] FileTypesToHandle = new[] { "tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk" };
     private string PersistentDataCache => Path.Combine(configurationDirectory, "PersistentTransientData.lst");
 
     private ConcurrentDictionary<IntPtr, HashSet<string>> TransientResources { get; } = new();

@@ -188,6 +188,17 @@ public class CharacterDataFactory
 
             AddReplacementsFromTexture(texPath, objectKind, cache, inheritanceLevel + 1);
         }
+
+        try
+        {
+            var shpkPath = "shader/sm5/shpk/" + new Utf8String(mtrlResourceHandle->ShpkString).ToString();
+            Logger.Verbose("Checking File Replacement for Shader " + shpkPath);
+            AddReplacementsFromShader(shpkPath, objectKind, cache, inheritanceLevel + 1);
+        }
+        catch
+        {
+            Logger.Verbose("Could not find shpk for Material " + fileName);
+        }
     }
 
     private void AddReplacement(string varPath, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0, bool doNotReverseResolve = false)
@@ -206,6 +217,23 @@ public class CharacterDataFactory
         DebugPrint(variousReplacement, objectKind, "Various", inheritanceLevel);
 
         cache.AddFileReplacement(objectKind, variousReplacement);
+    }
+
+    private void AddReplacementsFromShader(string shpkPath, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0)
+    {
+        if (string.IsNullOrEmpty(shpkPath)) return;
+
+        if (cache.FileReplacements.ContainsKey(objectKind))
+        {
+            if (cache.FileReplacements[objectKind].Any(c => c.GamePaths.Contains(shpkPath, StringComparer.Ordinal)))
+            {
+                return;
+            }
+        }
+
+        var shpkFileReplacement = CreateFileReplacement(shpkPath, true);
+        DebugPrint(shpkFileReplacement, objectKind, "Shader", inheritanceLevel);
+        cache.AddFileReplacement(objectKind, shpkFileReplacement);
     }
 
     private void AddReplacementsFromTexture(string texPath, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0, bool doNotReverseResolve = true)
