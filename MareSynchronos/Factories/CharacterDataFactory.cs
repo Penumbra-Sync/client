@@ -12,9 +12,9 @@ using MareSynchronos.Interop;
 using MareSynchronos.Managers;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
-using Penumbra.GameData.ByteString;
 using Penumbra.Interop.Structs;
 using Object = FFXIVClientStructs.FFXIV.Client.Graphics.Scene.Object;
+using Penumbra.String;
 using Weapon = MareSynchronos.Interop.Weapon;
 
 namespace MareSynchronos.Factories;
@@ -116,7 +116,7 @@ public class CharacterDataFactory
         string mdlPath;
         try
         {
-            mdlPath = new Utf8String(mdl->ResourceHandle->FileName()).ToString();
+            mdlPath = new ByteString(mdl->ResourceHandle->FileName()).ToString();
         }
         catch
         {
@@ -144,7 +144,7 @@ public class CharacterDataFactory
         string fileName;
         try
         {
-            fileName = new Utf8String(mtrl->ResourceHandle->FileName()).ToString();
+            fileName = new ByteString(mtrl->ResourceHandle->FileName()).ToString();
 
         }
         catch
@@ -175,7 +175,7 @@ public class CharacterDataFactory
             string? texPath = null;
             try
             {
-                texPath = new Utf8String(mtrlResourceHandle->TexString(resIdx)).ToString();
+                texPath = new ByteString(mtrlResourceHandle->TexString(resIdx)).ToString();
             }
             catch
             {
@@ -191,7 +191,7 @@ public class CharacterDataFactory
 
         try
         {
-            var shpkPath = "shader/sm5/shpk/" + new Utf8String(mtrlResourceHandle->ShpkString).ToString();
+            var shpkPath = "shader/sm5/shpk/" + new ByteString(mtrlResourceHandle->ShpkString).ToString();
             Logger.Verbose("Checking File Replacement for Shader " + shpkPath);
             AddReplacementsFromShader(shpkPath, objectKind, cache, inheritanceLevel + 1);
         }
@@ -412,7 +412,7 @@ public class CharacterDataFactory
         AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId, objectKind, previousData);
         try
         {
-            AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->Decal->FileName()).ToString(), objectKind, previousData, 0, false);
+            AddReplacementsFromTexture(new ByteString(((HumanExt*)human)->Decal->FileName()).ToString(), objectKind, previousData, 0, false);
         }
         catch
         {
@@ -420,7 +420,7 @@ public class CharacterDataFactory
         }
         try
         {
-            AddReplacementsFromTexture(new Utf8String(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), objectKind, previousData, 0, false);
+            AddReplacementsFromTexture(new ByteString(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), objectKind, previousData, 0, false);
         }
         catch
         {

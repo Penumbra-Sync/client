@@ -1,6 +1,3 @@
 [submodule "MareAPI"]
 	path = MareAPI
 	url = https://github.com/Penumbra-Sync/api.git
-[submodule "Penumbra"]
-	path = Penumbra
-	url = https://github.com/xivdev/Penumbra.git

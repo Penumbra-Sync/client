@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -45,9 +46,37 @@ public partial class ApiController
     {
         using var client = new HttpClient();
         client.DefaultRequestHeaders.Add("Authorization", SecretKey);
+        int attempts = 0;
+        bool failed = true;
+        const int maxAttempts = 10;
 
-        var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+        HttpResponseMessage response = null!;
+        HttpStatusCode? lastError = HttpStatusCode.OK;
+        while (failed && attempts < maxAttempts && !ct.IsCancellationRequested)
+        {
+            try
+            {
+                response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
+                failed = false;
+            }
+            catch (HttpRequestException ex)
+            {
+                Logger.Warn($"Attempt {attempts}: Error during download of {url}, HttpStatusCode: {ex.StatusCode}");
+                lastError = ex.StatusCode;
+                if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized)
+                {
+                    break;
+                }
+                attempts++;
+                await Task.Delay(TimeSpan.FromSeconds(new Random().Next(1, 5)), ct).ConfigureAwait(false);
+            }
+        }
+
+        if (failed)
+        {
+            throw new Exception($"Http error {lastError} after {maxAttempts} attempts (cancelled: {ct.IsCancellationRequested}): {url}");
+        }
 
         var fileName = Path.GetTempFileName();
         try
@@ -68,11 +97,13 @@ public partial class ApiController
                     progress.Report(bytesRead);
                 }
 
+                Logger.Debug($"{url} downloaded to {fileName}");
                 return fileName;
             }
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.Warn($"Error during file download of {url}", ex);
             try
             {
                 File.Delete(fileName);
@@ -123,7 +154,7 @@ public partial class ApiController
 
         await Parallel.ForEachAsync(CurrentDownloads[currentDownloadId].Where(f => f.CanBeTransferred), new ParallelOptions()
         {
-            MaxDegreeOfParallelism = 5,
+            MaxDegreeOfParallelism = 2,
             CancellationToken = ct
         },
         async (file, token) =>

@@ -3,7 +3,7 @@ using MareSynchronos.API;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using System.Runtime.InteropServices;
 using MareSynchronos.Utils;
-using Penumbra.GameData.ByteString;
+using Penumbra.String;
 
 namespace MareSynchronos.Models;
 
@@ -60,7 +60,7 @@ public class PlayerRelatedObject
             bool addr = Address == IntPtr.Zero || Address != curPtr;
             bool equip = CompareAndUpdateByteData(chara->EquipSlotData, chara->CustomizeData);
             bool drawObj = (IntPtr)chara->GameObject.DrawObject != DrawObjectAddress;
-            var name = new Utf8String(chara->GameObject.Name).ToString();
+            var name = new ByteString(chara->GameObject.Name).ToString();
             bool nameChange = (!string.Equals(name, _name, StringComparison.Ordinal));
             if (addr || equip || drawObj || nameChange)
             {

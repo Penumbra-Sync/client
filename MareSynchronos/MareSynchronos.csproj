@@ -33,6 +33,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="6.0.8" />
+    <PackageReference Include="Penumbra.Api" Version="1.0.3" />
+    <PackageReference Include="Penumbra.String" Version="1.0.0" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -41,7 +43,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MareAPI\MareSynchronosAPI\MareSynchronos.API.csproj" />
-    <ProjectReference Include="..\Penumbra\Penumbra.GameData\Penumbra.GameData.csproj" />
   </ItemGroup>
 
   <ItemGroup>
