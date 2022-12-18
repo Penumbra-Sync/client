@@ -182,6 +182,8 @@ public class CachedPlayer
                     {
                         break;
                     }
+
+                    await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
                 }
 
                 ApplyBaseData(moddedPaths);

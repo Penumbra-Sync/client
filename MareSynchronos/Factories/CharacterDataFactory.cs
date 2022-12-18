@@ -344,6 +344,15 @@ public class CharacterDataFactory
     {
         _transientResourceManager.PersistTransientResources(charaPointer, objectKind, CreateFileReplacement);
 
+        // get rid of items that have no file replacements anymore
+        foreach (var entry in previousData.FileReplacements.ToList())
+        {
+            foreach (var item in entry.Value.ToList())
+            {
+                if (!item.HasFileReplacement) previousData.FileReplacements[entry.Key].Remove(item);
+            }
+        }
+
         foreach (var item in _transientResourceManager.GetSemiTransientResources(objectKind))
         {
             if (!previousData.FileReplacements.ContainsKey(objectKind))

@@ -29,6 +29,7 @@ public class TransientResourceManager : IDisposable
     public TransientResourceManager(IpcManager manager, DalamudUtil dalamudUtil, FileReplacementFactory fileReplacementFactory, string configurationDirectory)
     {
         manager.PenumbraResourceLoadEvent += Manager_PenumbraResourceLoadEvent;
+        manager.PenumbraModSettingChanged += Manager_PenumbraModSettingChanged;
         this.manager = manager;
         this.dalamudUtil = dalamudUtil;
         this.fileReplacementFactory = fileReplacementFactory;
@@ -55,13 +56,28 @@ public class TransientResourceManager : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn("Error during loading persistent transient resource " + line);
-                    Logger.Warn(ex.Message);
-                    Logger.Warn(ex.StackTrace);
+                    Logger.Warn("Error during loading persistent transient resource " + line, ex);
                 }
             }
 
             Logger.Debug($"Restored {restored}/{persistentEntities.Count()} semi persistent resources");
+        }
+    }
+
+    private void Manager_PenumbraModSettingChanged()
+    {
+        bool successfulValidation = true;
+        Logger.Debug("Penumbra Mod Settings changed, verifying SemiTransientResources");
+        foreach (var item in SemiTransientResources)
+        {
+            item.Value.RemoveWhere(p =>
+            {
+                var verified = p.Verify();
+                successfulValidation &= verified;
+                return !verified;
+            });
+            if (!successfulValidation)
+                TransientResourceLoaded?.Invoke(dalamudUtil.PlayerPointer);
         }
     }
 
@@ -139,8 +155,10 @@ public class TransientResourceManager : IDisposable
         var replacedGamePath = gamePath.ToLowerInvariant().Replace("\\", "/", StringComparison.OrdinalIgnoreCase);
 
         if (TransientResources[gameObject].Contains(replacedGamePath) ||
-            SemiTransientResources.Any(r => r.Value.Any(f => string.Equals(f.GamePaths.First(), replacedGamePath, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(f.ResolvedPath, filePath, StringComparison.OrdinalIgnoreCase))))
+            SemiTransientResources.Any(r => r.Value.Any(f =>
+                string.Equals(f.GamePaths.First(), replacedGamePath, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(f.ResolvedPath, filePath, StringComparison.OrdinalIgnoreCase))
+            ))
         {
             Logger.Verbose("Not adding " + replacedGamePath + ":" + filePath);
             Logger.Verbose("SemiTransientAny: " + SemiTransientResources.Any(r => r.Value.Any(f => string.Equals(f.GamePaths.First(), replacedGamePath, StringComparison.OrdinalIgnoreCase)
@@ -207,9 +225,7 @@ public class TransientResourceManager : IDisposable
             }
             catch (Exception ex)
             {
-                Logger.Warn("Issue during transient file persistence");
-                Logger.Warn(ex.Message);
-                Logger.Warn(ex.StackTrace.ToString());
+                Logger.Warn("Issue during transient file persistence", ex);
             }
         }
 
@@ -225,6 +241,7 @@ public class TransientResourceManager : IDisposable
         dalamudUtil.FrameworkUpdate -= DalamudUtil_FrameworkUpdate;
         manager.PenumbraResourceLoadEvent -= Manager_PenumbraResourceLoadEvent;
         dalamudUtil.ClassJobChanged -= DalamudUtil_ClassJobChanged;
+        manager.PenumbraModSettingChanged -= Manager_PenumbraModSettingChanged;
         TransientResources.Clear();
         SemiTransientResources.Clear();
         if (SemiTransientResources.ContainsKey(ObjectKind.Player))

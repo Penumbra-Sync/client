@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection.Metadata.Ecma335;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Game;
@@ -202,6 +203,18 @@ public class DalamudUtil : IDisposable
         {
             if (item.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) continue;
             if (string.Equals(item.Name.ToString(), characterName, StringComparison.Ordinal)) return (PlayerCharacter)item;
+        }
+
+        return null;
+    }
+
+    public int? GetIndexFromObjectTableByName(string characterName)
+    {
+        for (int i = 0; i < _objectTable.Length; i++)
+        {
+            if (_objectTable[i] == null) continue;
+            if (_objectTable[i]!.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) continue;
+            if (string.Equals(_objectTable[i]!.Name.ToString(), characterName, StringComparison.Ordinal)) return i;
         }
 
         return null;

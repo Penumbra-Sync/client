@@ -7,6 +7,8 @@ using MareSynchronos.Utils;
 using Action = System.Action;
 using System.Collections.Concurrent;
 using System.Text;
+using Penumbra.Api.Enums;
+using Penumbra.Api.Helpers;
 
 namespace MareSynchronos.Managers;
 
@@ -22,21 +24,24 @@ public class IpcManager : IDisposable
     private readonly ICallGateSubscriber<GameObject?, object> _glamourerRevertCustomization;
     private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyOnlyEquipment;
     private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyOnlyCustomization;
-    private readonly ICallGateSubscriber<(int, int)> _penumbraApiVersion;
-    private readonly ICallGateSubscriber<string, string, bool, (int, string)> _penumbraCreateTemporaryCollection;
-    private readonly ICallGateSubscriber<string> _penumbraGetMetaManipulations;
-    private readonly ICallGateSubscriber<object> _penumbraInit;
-    private readonly ICallGateSubscriber<object> _penumbraDispose;
-    private readonly ICallGateSubscriber<IntPtr, int, object?> _penumbraObjectIsRedrawn;
-    private readonly ICallGateSubscriber<string, int, object>? _penumbraRedraw;
-    private readonly ICallGateSubscriber<GameObject, int, object>? _penumbraRedrawObject;
-    private readonly ICallGateSubscriber<string, int> _penumbraRemoveTemporaryCollection;
-    private readonly ICallGateSubscriber<string>? _penumbraResolveModDir;
-    private readonly ICallGateSubscriber<string, string>? _penumbraResolvePlayer;
-    private readonly ICallGateSubscriber<string, string[]>? _reverseResolvePlayer;
-    private readonly ICallGateSubscriber<string, string, Dictionary<string, string>, string, int, int>
-        _penumbraSetTemporaryMod;
-    private readonly ICallGateSubscriber<IntPtr, string, string, object?> _penumbraGameObjectResourcePathResolved;
+
+    private readonly FuncSubscriber<(int, int)> _penumbraApiVersion;
+    private readonly FuncSubscriber<string, PenumbraApiEc> _penumbraCreateNamedTemporaryCollection;
+    private readonly FuncSubscriber<string> _penumbraGetMetaManipulations;
+    private readonly EventSubscriber _penumbraInit;
+    private readonly EventSubscriber _penumbraDispose;
+    private readonly EventSubscriber<nint, int> _penumbraObjectIsRedrawn;
+    private readonly ActionSubscriber<string, RedrawType> _penumbraRedraw;
+    private readonly ActionSubscriber<GameObject, RedrawType> _penumbraRedrawObject;
+    private readonly FuncSubscriber<string, PenumbraApiEc> _penumbraRemoveTemporaryCollection;
+    private readonly FuncSubscriber<string, string, int, PenumbraApiEc> _penumbraRemoveTemporaryMod;
+    private readonly FuncSubscriber<string, int, bool, PenumbraApiEc> _penumbraAssignTemporaryCollection;
+    private readonly FuncSubscriber<string> _penumbraResolveModDir;
+    private readonly FuncSubscriber<string, string> _penumbraResolvePlayer;
+    private readonly FuncSubscriber<string, string[]> _reverseResolvePlayer;
+    private readonly FuncSubscriber<string, string, Dictionary<string, string>, string, int, PenumbraApiEc> _penumbraAddTemporaryMod;
+    private readonly EventSubscriber<nint, string, string> _penumbraGameObjectResourcePathResolved;
+    private readonly EventSubscriber<ModSettingChange, string, string, bool> _penumbraModSettingChanged;
 
     private readonly ICallGateSubscriber<string> _heelsGetApiVersion;
     private readonly ICallGateSubscriber<float> _heelsGetOffset;
@@ -57,29 +62,24 @@ public class IpcManager : IDisposable
     {
         Logger.Verbose("Creating " + nameof(IpcManager));
 
-        _penumbraInit = pi.GetIpcSubscriber<object>("Penumbra.Initialized");
-        _penumbraDispose = pi.GetIpcSubscriber<object>("Penumbra.Disposed");
-        _penumbraResolvePlayer = pi.GetIpcSubscriber<string, string>("Penumbra.ResolvePlayerPath");
-        _penumbraResolveModDir = pi.GetIpcSubscriber<string>("Penumbra.GetModDirectory");
-        _penumbraRedraw = pi.GetIpcSubscriber<string, int, object>("Penumbra.RedrawObjectByName");
-        _penumbraRedrawObject = pi.GetIpcSubscriber<GameObject, int, object>("Penumbra.RedrawObject");
-        _reverseResolvePlayer = pi.GetIpcSubscriber<string, string[]>("Penumbra.ReverseResolvePlayerPath");
-        _penumbraApiVersion = pi.GetIpcSubscriber<(int, int)>("Penumbra.ApiVersions");
-        _penumbraObjectIsRedrawn = pi.GetIpcSubscriber<IntPtr, int, object?>("Penumbra.GameObjectRedrawn");
-        _penumbraGetMetaManipulations =
-            pi.GetIpcSubscriber<string>("Penumbra.GetPlayerMetaManipulations");
-        _penumbraSetTemporaryMod = pi.GetIpcSubscriber<string, string, Dictionary<string, string>, string, int,
-        int>("Penumbra.AddTemporaryMod");
-        _penumbraCreateTemporaryCollection =
-            pi.GetIpcSubscriber<string, string, bool, (int, string)>("Penumbra.CreateTemporaryCollection");
-        _penumbraRemoveTemporaryCollection =
-            pi.GetIpcSubscriber<string, int>("Penumbra.RemoveTemporaryCollection");
-        _penumbraGameObjectResourcePathResolved = pi.GetIpcSubscriber<IntPtr, string, string, object?>("Penumbra.GameObjectResourcePathResolved");
+        _penumbraInit = Penumbra.Api.Ipc.Initialized.Subscriber(pi, () => PenumbraInit());
+        _penumbraDispose = Penumbra.Api.Ipc.Disposed.Subscriber(pi, () => PenumbraDispose());
+        _penumbraResolvePlayer = Penumbra.Api.Ipc.ResolvePlayerPath.Subscriber(pi);
+        _penumbraResolveModDir = Penumbra.Api.Ipc.GetModDirectory.Subscriber(pi);
+        _penumbraRedraw = Penumbra.Api.Ipc.RedrawObjectByName.Subscriber(pi);
+        _penumbraRedrawObject = Penumbra.Api.Ipc.RedrawObject.Subscriber(pi);
+        _reverseResolvePlayer = Penumbra.Api.Ipc.ReverseResolvePlayerPath.Subscriber(pi);
+        _penumbraApiVersion = Penumbra.Api.Ipc.ApiVersions.Subscriber(pi);
+        _penumbraObjectIsRedrawn = Penumbra.Api.Ipc.GameObjectRedrawn.Subscriber(pi, (ptr, idx) => RedrawEvent((IntPtr)ptr, idx));
+        _penumbraGetMetaManipulations = Penumbra.Api.Ipc.GetPlayerMetaManipulations.Subscriber(pi);
+        _penumbraAddTemporaryMod = Penumbra.Api.Ipc.AddTemporaryMod.Subscriber(pi);
+        _penumbraCreateNamedTemporaryCollection = Penumbra.Api.Ipc.CreateNamedTemporaryCollection.Subscriber(pi);
+        _penumbraRemoveTemporaryCollection = Penumbra.Api.Ipc.RemoveTemporaryCollectionByName.Subscriber(pi);
+        _penumbraRemoveTemporaryMod = Penumbra.Api.Ipc.RemoveTemporaryMod.Subscriber(pi);
+        _penumbraAssignTemporaryCollection = Penumbra.Api.Ipc.AssignTemporaryCollection.Subscriber(pi);
 
-        _penumbraGameObjectResourcePathResolved.Subscribe(ResourceLoaded);
-        _penumbraObjectIsRedrawn.Subscribe(RedrawEvent);
-        _penumbraInit.Subscribe(PenumbraInit);
-        _penumbraDispose.Subscribe(PenumbraDispose);
+        _penumbraGameObjectResourcePathResolved = Penumbra.Api.Ipc.GameObjectResourcePathResolved.Subscriber(pi, (ptr, arg1, arg2) => ResourceLoaded((IntPtr)ptr, arg1, arg2));
+        _penumbraModSettingChanged = Penumbra.Api.Ipc.ModSettingChanged.Subscriber(pi, (modsetting, a, b, c) => PenumbraModSettingChangedHandler());
 
         _glamourerApiVersion = pi.GetIpcSubscriber<int>("Glamourer.ApiVersion");
         _glamourerGetAllCustomization = pi.GetIpcSubscriber<GameObject?, string>("Glamourer.GetAllCustomizationFromCharacter");
@@ -114,6 +114,11 @@ public class IpcManager : IDisposable
         _dalamudUtil.ZoneSwitchEnd += ClearActionQueue;
     }
 
+    private void PenumbraModSettingChangedHandler()
+    {
+        PenumbraModSettingChanged?.Invoke();
+    }
+
     private void ClearActionQueue()
     {
         actionQueue.Clear();
@@ -124,7 +129,6 @@ public class IpcManager : IDisposable
         if (ptr != IntPtr.Zero && string.Compare(arg1, arg2, true, System.Globalization.CultureInfo.InvariantCulture) != 0)
         {
             PenumbraResourceLoadEvent?.Invoke(ptr, arg1, arg2);
-            //Logger.Debug($"Resolved {ptr:X}: {arg1} => {arg2}");
         }
     }
 
@@ -138,6 +142,7 @@ public class IpcManager : IDisposable
         }
     }
 
+    public event VoidDelegate? PenumbraModSettingChanged;
     public event VoidDelegate? PenumbraInitialized;
     public event VoidDelegate? PenumbraDisposed;
     public event PenumbraRedrawEvent? PenumbraRedrawEvent;
@@ -162,7 +167,7 @@ public class IpcManager : IDisposable
     {
         try
         {
-            return _penumbraApiVersion.InvokeFunc() is { Item1: 4, Item2: >= 13 };
+            return _penumbraApiVersion.Invoke() is { Item1: 4, Item2: >= 13 };
         }
         catch
         {
@@ -216,10 +221,11 @@ public class IpcManager : IDisposable
         _dalamudUtil.ZoneSwitchEnd -= ClearActionQueue;
         actionQueue.Clear();
 
-        _penumbraDispose.Unsubscribe(PenumbraDispose);
-        _penumbraInit.Unsubscribe(PenumbraInit);
-        _penumbraObjectIsRedrawn.Unsubscribe(RedrawEvent);
-        _penumbraGameObjectResourcePathResolved.Unsubscribe(ResourceLoaded);
+        _penumbraGameObjectResourcePathResolved.Dispose();
+        _penumbraDispose.Dispose();
+        _penumbraInit.Dispose();
+        _penumbraObjectIsRedrawn.Dispose();
+        _penumbraModSettingChanged.Dispose();
         _heelsOffsetUpdate.Unsubscribe(HeelsOffsetChange);
     }
 
@@ -261,7 +267,7 @@ public class IpcManager : IDisposable
     {
         if (!CheckCustomizePlusApi()) return string.Empty;
         var scale = _customizePlusGetBodyScale.InvokeFunc(_dalamudUtil.PlayerName);
-        if(string.IsNullOrEmpty(scale)) return string.Empty;
+        if (string.IsNullOrEmpty(scale)) return string.Empty;
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(scale));
     }
 
@@ -368,13 +374,13 @@ public class IpcManager : IDisposable
     public string PenumbraGetMetaManipulations()
     {
         if (!CheckPenumbraApi()) return string.Empty;
-        return _penumbraGetMetaManipulations.InvokeFunc();
+        return _penumbraGetMetaManipulations.Invoke();
     }
 
     public string? PenumbraModDirectory()
     {
         if (!CheckPenumbraApi()) return null;
-        return _penumbraResolveModDir!.InvokeFunc().ToLowerInvariant();
+        return _penumbraResolveModDir!.Invoke().ToLowerInvariant();
     }
 
     public void PenumbraRedraw(IntPtr obj)
@@ -386,7 +392,7 @@ public class IpcManager : IDisposable
             if (gameObj != null)
             {
                 Logger.Verbose("Redrawing " + gameObj);
-                _penumbraRedrawObject!.InvokeAction(gameObj, 0);
+                _penumbraRedrawObject!.Invoke(gameObj, RedrawType.Redraw);
             }
         });
     }
@@ -394,7 +400,7 @@ public class IpcManager : IDisposable
     public void PenumbraRedraw(string actorName)
     {
         if (!CheckPenumbraApi()) return;
-        actionQueue.Enqueue(() => _penumbraRedraw!.InvokeAction(actorName, 0));
+        actionQueue.Enqueue(() => _penumbraRedraw!.Invoke(actorName, RedrawType.Redraw));
     }
 
     public void PenumbraRemoveTemporaryCollection(string characterName)
@@ -402,22 +408,26 @@ public class IpcManager : IDisposable
         if (!CheckPenumbraApi()) return;
         actionQueue.Enqueue(() =>
         {
-            Logger.Verbose("Removing temp collection for " + characterName);
-            _penumbraRemoveTemporaryCollection.InvokeFunc(characterName);
+            var collName = "Mare_" + characterName;
+            Logger.Verbose("Removing temp collection for " + collName);
+            var ret = _penumbraRemoveTemporaryMod.Invoke("MaraChara", collName, 0);
+            Logger.Verbose("RemoveTemporaryMod: " + ret);
+            var ret2 = _penumbraRemoveTemporaryCollection.Invoke(collName);
+            Logger.Verbose("RemoveTemporaryCollection: " + ret2);
         });
     }
 
     public string PenumbraResolvePath(string path)
     {
         if (!CheckPenumbraApi()) return path;
-        var resolvedPath = _penumbraResolvePlayer!.InvokeFunc(path);
+        var resolvedPath = _penumbraResolvePlayer!.Invoke(path);
         return resolvedPath ?? path;
     }
 
     public string[] PenumbraReverseResolvePlayer(string path)
     {
         if (!CheckPenumbraApi()) return new[] { path };
-        var resolvedPaths = _reverseResolvePlayer!.InvokeFunc(path);
+        var resolvedPaths = _reverseResolvePlayer.Invoke(path);
         if (resolvedPaths.Length == 0)
         {
             resolvedPaths = new[] { path };
@@ -431,13 +441,23 @@ public class IpcManager : IDisposable
 
         actionQueue.Enqueue(() =>
         {
-            var ret = _penumbraCreateTemporaryCollection.InvokeFunc("MareSynchronos", characterName, true);
-            Logger.Verbose("Assigning temp mods for " + ret.Item2);
+            var idx = _dalamudUtil.GetIndexFromObjectTableByName(characterName);
+            if (idx == null)
+            {
+                return;
+            }
+            var collName = "Mare_" + characterName;
+            var ret = _penumbraCreateNamedTemporaryCollection.Invoke(collName);
+            Logger.Verbose("Creating Temp Collection " + collName + ", Success: " + ret);
+            var retAssign = _penumbraAssignTemporaryCollection.Invoke(collName, idx.Value, true);
+            Logger.Verbose("Assigning Temp Collection " + collName + " to index " + idx.Value);
             foreach (var mod in modPaths)
             {
                 Logger.Verbose(mod.Key + " => " + mod.Value);
             }
-            _penumbraSetTemporaryMod.InvokeFunc("MareSynchronos", ret.Item2, modPaths, manipulationData, 0);
+
+            var ret2 = _penumbraAddTemporaryMod.Invoke("MareChara", collName, modPaths, manipulationData, 0);
+            Logger.Verbose("Setting temp mods for " + collName + ", Success: " + ret2);
         });
     }
 
@@ -449,7 +469,7 @@ public class IpcManager : IDisposable
     private void PenumbraInit()
     {
         PenumbraInitialized?.Invoke();
-        _penumbraRedraw!.InvokeAction("self", 0);
+        _penumbraRedraw!.Invoke("self", RedrawType.Redraw);
     }
 
     private void HeelsOffsetChange(float offset)
