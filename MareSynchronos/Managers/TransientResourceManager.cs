@@ -7,6 +7,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace MareSynchronos.Managers;
 
@@ -16,7 +17,6 @@ public class TransientResourceManager : IDisposable
 {
     private readonly IpcManager manager;
     private readonly DalamudUtil dalamudUtil;
-    private readonly FileReplacementFactory fileReplacementFactory;
     private readonly string configurationDirectory;
 
     public event TransientResourceLoadedEvent? TransientResourceLoaded;
@@ -32,7 +32,6 @@ public class TransientResourceManager : IDisposable
         manager.PenumbraModSettingChanged += Manager_PenumbraModSettingChanged;
         this.manager = manager;
         this.dalamudUtil = dalamudUtil;
-        this.fileReplacementFactory = fileReplacementFactory;
         this.configurationDirectory = configurationDirectory;
         dalamudUtil.FrameworkUpdate += DalamudUtil_FrameworkUpdate;
         dalamudUtil.ClassJobChanged += DalamudUtil_ClassJobChanged;
@@ -67,18 +66,21 @@ public class TransientResourceManager : IDisposable
     private void Manager_PenumbraModSettingChanged()
     {
         bool successfulValidation = true;
-        Logger.Debug("Penumbra Mod Settings changed, verifying SemiTransientResources");
-        foreach (var item in SemiTransientResources)
+        Task.Run(() =>
         {
-            item.Value.RemoveWhere(p =>
+            Logger.Debug("Penumbra Mod Settings changed, verifying SemiTransientResources");
+            foreach (var item in SemiTransientResources)
             {
-                var verified = p.Verify();
-                successfulValidation &= verified;
-                return !verified;
-            });
-            if (!successfulValidation)
-                TransientResourceLoaded?.Invoke(dalamudUtil.PlayerPointer);
-        }
+                item.Value.RemoveWhere(p =>
+                {
+                    var verified = p.Verify();
+                    successfulValidation &= verified;
+                    return !verified;
+                });
+                if (!successfulValidation)
+                    TransientResourceLoaded?.Invoke(dalamudUtil.PlayerPointer);
+            }
+        });
     }
 
     private void DalamudUtil_ClassJobChanged()
