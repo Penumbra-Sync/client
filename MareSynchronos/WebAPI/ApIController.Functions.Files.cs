@@ -39,6 +39,7 @@ public partial class ApiController
 
     public async Task FilesDeleteAll()
     {
+        _verifiedUploadedHashes.Clear();
         await _mareHub!.SendAsync(nameof(FilesDeleteAll)).ConfigureAwait(false);
     }
 
@@ -356,7 +357,7 @@ public partial class ApiController
 
     public async Task FilesUploadStreamAsync(string hash, IAsyncEnumerable<byte[]> fileContent)
     {
-        await _mareHub!.SendAsync(nameof(FilesUploadStreamAsync), hash, fileContent).ConfigureAwait(false);
+        await _mareHub!.InvokeAsync(nameof(FilesUploadStreamAsync), hash, fileContent).ConfigureAwait(false);
     }
 
     public async Task<bool> FilesIsUploadFinished()

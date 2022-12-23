@@ -167,7 +167,7 @@ public class IpcManager : IDisposable
     {
         try
         {
-            return _penumbraApiVersion.Invoke() is { Item1: 4, Item2: >= 13 };
+            return _penumbraApiVersion.Invoke() is { Item1: 4, Item2: >= 17 };
         }
         catch
         {
