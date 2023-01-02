@@ -31,8 +31,8 @@ public partial class ApiController : IDisposable, IMareHubClient
     private readonly DalamudUtil _dalamudUtil;
     private readonly FileCacheManager _fileDbManager;
     private CancellationTokenSource _connectionCancellationTokenSource;
-    private string _jwtToken = string.Empty;
-    private KeyValuePair<string, string> AuthorizationJwtHeader => new("Authorization", "Bearer " + _jwtToken);
+    private Dictionary<string, string> _jwtToken = new(StringComparer.Ordinal);
+    private KeyValuePair<string, string> AuthorizationJwtHeader => new("Authorization", "Bearer " + _jwtToken[ApiUri]);
 
     private HubConnection? _mareHub;
 
@@ -173,7 +173,7 @@ public partial class ApiController : IDisposable, IMareHubClient
             {
                 Logger.Debug("Building connection");
 
-                if (string.IsNullOrEmpty(_jwtToken) || forceGetToken)
+                if (!_jwtToken.TryGetValue(ApiUri, out var jwtToken) || forceGetToken)
                 {
                     Logger.Debug("Requesting new JWT token");
                     using HttpClient httpClient = new();
@@ -187,7 +187,7 @@ public partial class ApiController : IDisposable, IMareHubClient
                         new KeyValuePair<string, string>("auth", auth)
                     })).ConfigureAwait(false);
                     result.EnsureSuccessStatusCode();
-                    _jwtToken = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    _jwtToken[ApiUri] = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
                     Logger.Debug("JWT Token Success");
                 }
 
