@@ -512,7 +512,7 @@ public class SettingsUi : Window, IDisposable
             {
                 _configuration.FullPause = marePaused;
                 _configuration.Save();
-                Task.Run(_apiController.CreateConnections);
+                Task.Run(() => _apiController.CreateConnections(false));
             }
 
             UiShared.DrawHelpText("Completely pauses the sync and clears your current data (not uploaded files) on the service.");

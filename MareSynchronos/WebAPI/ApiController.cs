@@ -3,6 +3,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using MareSynchronos.API;
@@ -29,6 +31,8 @@ public partial class ApiController : IDisposable, IMareHubClient
     private readonly DalamudUtil _dalamudUtil;
     private readonly FileCacheManager _fileDbManager;
     private CancellationTokenSource _connectionCancellationTokenSource;
+    private string _jwtToken = string.Empty;
+    private KeyValuePair<string, string> AuthorizationJwtHeader => new("Authorization", "Bearer " + _jwtToken);
 
     private HubConnection? _mareHub;
 
@@ -70,7 +74,7 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     private void DalamudUtilOnLogIn()
     {
-        Task.Run(CreateConnections);
+        Task.Run(() => CreateConnections(true));
     }
 
 
@@ -134,7 +138,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         }
     }
 
-    public async Task CreateConnections()
+    public async Task CreateConnections(bool forceGetToken = false)
     {
         Logger.Debug("CreateConnections called");
 
@@ -168,6 +172,24 @@ public partial class ApiController : IDisposable, IMareHubClient
             try
             {
                 Logger.Debug("Building connection");
+
+                if (string.IsNullOrEmpty(_jwtToken) || forceGetToken)
+                {
+                    Logger.Debug("Requesting new JWT token");
+                    using HttpClient httpClient = new();
+                    var postUri = new Uri(new Uri(ApiUri
+                        .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
+                        .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)), MareAuth.AuthFullPath);
+                    using var sha256 = SHA256.Create();
+                    var auth = BitConverter.ToString(sha256.ComputeHash(Encoding.UTF8.GetBytes(SecretKey))).Replace("-", "", StringComparison.OrdinalIgnoreCase);
+                    var result = await httpClient.PostAsync(postUri, new FormUrlEncodedContent(new[]
+                    {
+                        new KeyValuePair<string, string>("auth", auth)
+                    })).ConfigureAwait(false);
+                    result.EnsureSuccessStatusCode();
+                    _jwtToken = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    Logger.Debug("JWT Token Success");
+                }
 
                 while (!_dalamudUtil.IsPlayerPresent && !token.IsCancellationRequested)
                 {
@@ -253,7 +275,7 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     private Task MareHubOnReconnected(string? arg)
     {
-        _ = Task.Run(CreateConnections);
+        _ = Task.Run(() => CreateConnections(false));
         return Task.CompletedTask;
     }
 
@@ -332,7 +354,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         return new HubConnectionBuilder()
             .WithUrl(ApiUri + hubName, options =>
             {
-                options.Headers.Add("Authorization", SecretKey);
+                options.Headers.Add(AuthorizationJwtHeader);
                 options.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling;
             })
             .WithAutomaticReconnect(new ForeverRetryPolicy())
