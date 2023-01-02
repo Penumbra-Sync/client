@@ -46,24 +46,26 @@ public partial class ApiController
     private async Task<string> DownloadFileHttpClient(Uri url, IProgress<long> progress, CancellationToken ct)
     {
         using var client = new HttpClient();
-        client.DefaultRequestHeaders.Add("Authorization", SecretKey);
+        client.DefaultRequestHeaders.Add(AuthorizationJwtHeader.Key, AuthorizationJwtHeader.Value);
         int attempts = 0;
         bool failed = true;
         const int maxAttempts = 10;
 
         HttpResponseMessage response = null!;
         HttpStatusCode? lastError = HttpStatusCode.OK;
+        var bypassUrl = new Uri(url, "?nocache=" + DateTime.UtcNow.Ticks);
+
         while (failed && attempts < maxAttempts && !ct.IsCancellationRequested)
         {
             try
             {
-                response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                response = await client.GetAsync(bypassUrl, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
                 failed = false;
             }
             catch (HttpRequestException ex)
             {
-                Logger.Warn($"Attempt {attempts}: Error during download of {url}, HttpStatusCode: {ex.StatusCode}");
+                Logger.Warn($"Attempt {attempts}: Error during download of {bypassUrl}, HttpStatusCode: {ex.StatusCode}");
                 lastError = ex.StatusCode;
                 if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized)
                 {
@@ -98,13 +100,13 @@ public partial class ApiController
                     progress.Report(bytesRead);
                 }
 
-                Logger.Debug($"{url} downloaded to {fileName}");
+                Logger.Debug($"{bypassUrl} downloaded to {fileName}");
                 return fileName;
             }
         }
         catch (Exception ex)
         {
-            Logger.Warn($"Error during file download of {url}", ex);
+            Logger.Warn($"Error during file download of {bypassUrl}", ex);
             try
             {
                 File.Delete(fileName);
