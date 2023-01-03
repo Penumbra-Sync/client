@@ -20,6 +20,8 @@ namespace MareSynchronos.WebAPI;
 
 public delegate void SimpleStringDelegate(string str);
 
+public record JwtCache(string ApiUrl, string CharaIdent, string SecretKey);
+
 public partial class ApiController : IDisposable, IMareHubClient
 {
     public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
@@ -31,8 +33,8 @@ public partial class ApiController : IDisposable, IMareHubClient
     private readonly DalamudUtil _dalamudUtil;
     private readonly FileCacheManager _fileDbManager;
     private CancellationTokenSource _connectionCancellationTokenSource;
-    private Dictionary<string, string> _jwtToken = new(StringComparer.Ordinal);
-    private KeyValuePair<string, string> AuthorizationJwtHeader => new("Authorization", "Bearer " + _jwtToken[SecretKey]);
+    private Dictionary<JwtCache, string> _jwtToken = new();
+    private KeyValuePair<string, string> AuthorizationJwtHeader => new("Authorization", "Bearer " + _jwtToken.GetValueOrDefault(new JwtCache(ApiUri, _dalamudUtil.PlayerNameHashed, SecretKey), string.Empty));
 
     private HubConnection? _mareHub;
 
@@ -173,9 +175,9 @@ public partial class ApiController : IDisposable, IMareHubClient
             {
                 Logger.Debug("Building connection");
 
-                if (!_jwtToken.TryGetValue(SecretKey, out var jwtToken) || forceGetToken)
+                if (!_jwtToken.TryGetValue(new JwtCache(ApiUri, _dalamudUtil.PlayerNameHashed, SecretKey), out var jwtToken) || forceGetToken)
                 {
-                    Logger.Debug("Requesting new JWT token");
+                    Logger.Debug("Requesting new JWT");
                     using HttpClient httpClient = new();
                     var postUri = new Uri(new Uri(ApiUri
                         .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
@@ -184,11 +186,12 @@ public partial class ApiController : IDisposable, IMareHubClient
                     var auth = BitConverter.ToString(sha256.ComputeHash(Encoding.UTF8.GetBytes(SecretKey))).Replace("-", "", StringComparison.OrdinalIgnoreCase);
                     var result = await httpClient.PostAsync(postUri, new FormUrlEncodedContent(new[]
                     {
-                        new KeyValuePair<string, string>("auth", auth)
+                        new KeyValuePair<string, string>("auth", auth),
+                        new KeyValuePair<string, string>("charaIdent", _dalamudUtil.PlayerNameHashed)
                     })).ConfigureAwait(false);
                     result.EnsureSuccessStatusCode();
-                    _jwtToken[SecretKey] = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
-                    Logger.Debug("JWT Token Success");
+                    _jwtToken[new JwtCache(ApiUri, _dalamudUtil.PlayerNameHashed, SecretKey)] = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    Logger.Debug("JWT Success");
                 }
 
                 while (!_dalamudUtil.IsPlayerPresent && !token.IsCancellationRequested)
@@ -205,7 +208,7 @@ public partial class ApiController : IDisposable, IMareHubClient
 
                 OnUpdateSystemInfo((dto) => Client_UpdateSystemInfo(dto));
 
-                _connectionDto = await Heartbeat(_dalamudUtil.PlayerNameHashed).ConfigureAwait(false);
+                _connectionDto = await GetConnectionDto().ConfigureAwait(false);
 
                 ServerState = ServerState.Connected;
 
@@ -421,6 +424,11 @@ public partial class ApiController : IDisposable, IMareHubClient
     public async Task<ConnectionDto> Heartbeat(string characterIdentification)
     {
         return await _mareHub!.InvokeAsync<ConnectionDto>(nameof(Heartbeat), characterIdentification).ConfigureAwait(false);
+    }
+
+    public async Task<ConnectionDto> GetConnectionDto()
+    {
+        return await _mareHub!.InvokeAsync<ConnectionDto>(nameof(GetConnectionDto)).ConfigureAwait(false);
     }
 
     public async Task<bool> CheckClientHealth()
