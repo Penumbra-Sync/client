@@ -27,6 +27,7 @@ public class SettingsUi : Window, IDisposable
     private bool? _notesSuccessfullyApplied = null;
     private string _lastTab = string.Empty;
     private bool _openPopupOnAddition;
+    private bool _hideInfoMessages;
 
     public SettingsUi(WindowSystem windowSystem,
         UiShared uiShared, Configuration configuration, ApiController apiController) : base("Mare Synchronos Settings")
@@ -44,6 +45,7 @@ public class SettingsUi : Window, IDisposable
         _apiController = apiController;
         _uiShared = uiShared;
         _openPopupOnAddition = _configuration.OpenPopupOnAdd;
+        _hideInfoMessages = _configuration.HideInfoMessages;
         windowSystem.AddWindow(this);
     }
 
@@ -163,6 +165,12 @@ public class SettingsUi : Window, IDisposable
             _configuration.Save();
         }
         UiShared.DrawHelpText("This will open a popup that allows you to set the notes for a user after successfully adding them to your individual pairs.");
+        if (ImGui.Checkbox("Hide Server Info Messages", ref _hideInfoMessages))
+        {
+            _configuration.HideInfoMessages = _hideInfoMessages;
+            _configuration.Save();
+        }
+        UiShared.DrawHelpText("Enabling this will not print any \"Info\" labeled messages into the game chat.");
     }
 
     private void DrawAdministration()
@@ -442,7 +450,7 @@ public class SettingsUi : Window, IDisposable
 
                 var buttonSize = (ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X -
                                  ImGui.GetStyle().ItemSpacing.X) / 2;
-                
+
                 if (ImGui.Button("Delete everything", new Vector2(buttonSize, 0)))
                 {
                     Task.Run(() => _apiController.FilesDeleteAll());
@@ -476,10 +484,10 @@ public class SettingsUi : Window, IDisposable
                 ImGui.Text("Are you sure you want to continue?");
                 ImGui.Separator();
                 ImGui.Spacing();
-                
+
                 var buttonSize = (ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X -
                                   ImGui.GetStyle().ItemSpacing.X) / 2;
-                
+
                 if (ImGui.Button("Delete account", new Vector2(buttonSize, 0)))
                 {
                     Task.Run(() => _apiController.UserDelete());

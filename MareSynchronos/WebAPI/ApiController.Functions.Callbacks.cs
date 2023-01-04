@@ -234,7 +234,10 @@ public partial class ApiController
                 break;
             case MessageSeverity.Information:
                 Logger.Info(message);
-                _dalamudUtil.PrintInfoChat(message);
+                if (!_pluginConfiguration.HideInfoMessages)
+                {
+                    _dalamudUtil.PrintInfoChat(message);
+                }
                 break;
         }
 
