@@ -30,10 +30,22 @@ internal class Logger : ILogger
         }
     }
 
+    public static void Error(string msg, Exception ex)
+    {
+        var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
+        PluginLog.Error($"[{caller}] {msg} {Environment.NewLine} Exception: {ex.Message} {Environment.NewLine} {ex.StackTrace}");
+    }
+
     public static void Warn(string msg, Exception ex)
     {
         var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
         PluginLog.Warning($"[{caller}] {msg} {Environment.NewLine} Exception: {ex.Message} {Environment.NewLine} {ex.StackTrace}");
+    }
+
+    public static void Error(string msg)
+    {
+        var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
+        PluginLog.Error($"[{caller}] {msg}");
     }
 
     public static void Warn(string warn)

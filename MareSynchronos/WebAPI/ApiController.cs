@@ -12,7 +12,6 @@ using MareSynchronos.FileCache;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
 using Microsoft.AspNetCore.Http.Connections;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
 
@@ -43,6 +42,7 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     private ConnectionDto? _connectionDto;
     public ServerInfoDto ServerInfo => _connectionDto?.ServerInfo ?? new ServerInfoDto();
+    public string AuthFailureMessage { get; private set; } = string.Empty;
 
     public SystemInfoDto SystemInfoDto { get; private set; } = new();
     public bool IsModerator => (_connectionDto?.IsAdmin ?? false) || (_connectionDto?.IsModerator ?? false);
@@ -169,6 +169,8 @@ public partial class ApiController : IDisposable, IMareHubClient
                 continue;
             }
 
+            AuthFailureMessage = string.Empty;
+
             await StopConnection(token).ConfigureAwait(false);
 
             try
@@ -189,6 +191,7 @@ public partial class ApiController : IDisposable, IMareHubClient
                         new KeyValuePair<string, string>("auth", auth),
                         new KeyValuePair<string, string>("charaIdent", _dalamudUtil.PlayerNameHashed)
                     })).ConfigureAwait(false);
+                    AuthFailureMessage = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
                     result.EnsureSuccessStatusCode();
                     _jwtToken[new JwtCache(ApiUri, _dalamudUtil.PlayerNameHashed, SecretKey)] = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
                     Logger.Debug("JWT Success");
@@ -206,6 +209,7 @@ public partial class ApiController : IDisposable, IMareHubClient
 
                 await _mareHub.StartAsync(token).ConfigureAwait(false);
 
+                OnReceiveServerMessage((sev, msg) => Client_ReceiveServerMessage(sev, msg));
                 OnUpdateSystemInfo((dto) => Client_UpdateSystemInfo(dto));
 
                 _connectionDto = await GetConnectionDto().ConfigureAwait(false);
@@ -227,24 +231,6 @@ public partial class ApiController : IDisposable, IMareHubClient
                     _mareHub.Reconnecting += MareHubOnReconnecting;
                     _mareHub.Reconnected += MareHubOnReconnected;
                 }
-            }
-            catch (HubException ex)
-            {
-                if (ex.Message.Contains("unauthorized", StringComparison.OrdinalIgnoreCase))
-                {
-                    Logger.Warn(ex.Message);
-                    ServerState = ServerState.Unauthorized;
-                    await StopConnection(token).ConfigureAwait(false);
-                    return;
-                }
-
-                Logger.Warn(ex.GetType().ToString());
-                Logger.Warn(ex.Message);
-                Logger.Warn(ex.StackTrace ?? string.Empty);
-
-                ServerState = ServerState.RateLimited;
-                await StopConnection(token).ConfigureAwait(false);
-                return;
             }
             catch (HttpRequestException ex)
             {
