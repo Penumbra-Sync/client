@@ -18,7 +18,7 @@ namespace MareSynchronos.WebAPI;
 
 public partial class ApiController
 {
-    private readonly HashSet<string> _verifiedUploadedHashes;
+    private readonly Dictionary<string, DateTime> _verifiedUploadedHashes;
 
     private int _downloadId = 0;
     public async void CancelUpload()
@@ -224,8 +224,14 @@ public partial class ApiController
         List<string> unverifiedUploadHashes = new();
         foreach (var item in character.FileReplacements.SelectMany(c => c.Value.Where(f => string.IsNullOrEmpty(f.FileSwapPath)).Select(v => v.Hash).Distinct(StringComparer.Ordinal)).Distinct(StringComparer.Ordinal).ToList())
         {
-            if (!_verifiedUploadedHashes.Contains(item))
+            if (!_verifiedUploadedHashes.TryGetValue(item, out var verifiedTime))
             {
+                verifiedTime = DateTime.MinValue;
+            }
+
+            if (verifiedTime < DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(10)))
+            {
+                Logger.Verbose("Verifying " + item + ", last verified: " + verifiedTime);
                 unverifiedUploadHashes.Add(item);
             }
         }
@@ -295,7 +301,7 @@ public partial class ApiController
 
             foreach (var item in unverifiedUploadHashes)
             {
-                _verifiedUploadedHashes.Add(item);
+                _verifiedUploadedHashes[item] = DateTime.UtcNow;
             }
 
             CurrentUploads.Clear();
