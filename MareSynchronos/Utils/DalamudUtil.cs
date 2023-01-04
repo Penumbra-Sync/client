@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection.Metadata.Ecma335;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Game;
@@ -9,6 +8,8 @@ using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
+using Dalamud.Game.Gui;
+using Dalamud.Game.Text.SeStringHandling;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
@@ -29,6 +30,7 @@ public class DalamudUtil : IDisposable
     private readonly ObjectTable _objectTable;
     private readonly Framework _framework;
     private readonly Condition _condition;
+    private readonly ChatGui _chatGui;
 
     public event LogIn? LogIn;
     public event LogOut? LogOut;
@@ -54,12 +56,13 @@ public class DalamudUtil : IDisposable
         return false;
     }
 
-    public DalamudUtil(ClientState clientState, ObjectTable objectTable, Framework framework, Condition condition)
+    public DalamudUtil(ClientState clientState, ObjectTable objectTable, Framework framework, Condition condition, ChatGui chatGui)
     {
         _clientState = clientState;
         _objectTable = objectTable;
         _framework = framework;
         _condition = condition;
+        _chatGui = chatGui;
         _clientState.Login += ClientStateOnLogin;
         _clientState.Logout += ClientStateOnLogout;
         _framework.Update += FrameworkOnUpdate;
@@ -68,6 +71,24 @@ public class DalamudUtil : IDisposable
             classJobId = _clientState.LocalPlayer!.ClassJob.Id;
             ClientStateOnLogin(null, EventArgs.Empty);
         }
+    }
+
+    public void PrintInfoChat(string message)
+    {
+        SeStringBuilder se = new SeStringBuilder().AddText("[Mare Synchronos] Info: ").AddItalics(message);
+        _chatGui.Print(se.BuiltString);
+    }
+
+    public void PrintWarnChat(string message)
+    {
+        SeStringBuilder se = new SeStringBuilder().AddText("[Mare Synchronos] ").AddUiForeground("Warning: " + message, 31).AddUiForegroundOff();
+        _chatGui.Print(se.BuiltString);
+    }
+
+    public void PrintErrorChat(string message)
+    {
+        SeStringBuilder se = new SeStringBuilder().AddText("[Mare Synchronos] ").AddUiForeground("Error: ", 534).AddItalicsOn().AddUiForeground(message, 534).AddUiForegroundOff().AddItalicsOff();
+        _chatGui.Print(se.BuiltString);
     }
 
     private void FrameworkOnUpdate(Framework framework)

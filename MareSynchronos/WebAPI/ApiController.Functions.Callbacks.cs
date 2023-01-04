@@ -78,6 +78,12 @@ public partial class ApiController
         _mareHub!.On(nameof(Client_AdminUpdateOrAddForbiddenFile), act);
     }
 
+    public void OnReceiveServerMessage(Action<MessageSeverity, string> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_ReceiveServerMessage), act);
+    }
+
     public Task Client_UserUpdateClientPairs(ClientPairDto dto)
     {
         var entry = PairedClients.SingleOrDefault(e => string.Equals(e.OtherUID, dto.OtherUID, System.StringComparison.Ordinal));
@@ -209,6 +215,27 @@ public partial class ApiController
         else
         {
             user.ForbiddenBy = dto.ForbiddenBy;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task Client_ReceiveServerMessage(MessageSeverity severity, string message)
+    {
+        switch (severity)
+        {
+            case MessageSeverity.Error:
+                Logger.Error(message);
+                _dalamudUtil.PrintErrorChat(message);
+                break;
+            case MessageSeverity.Warning:
+                Logger.Warn(message);
+                _dalamudUtil.PrintWarnChat(message);
+                break;
+            case MessageSeverity.Information:
+                Logger.Info(message);
+                _dalamudUtil.PrintInfoChat(message);
+                break;
         }
 
         return Task.CompletedTask;

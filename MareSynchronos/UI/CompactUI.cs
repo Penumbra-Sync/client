@@ -494,7 +494,7 @@ public class CompactUi : Window, IDisposable
             ImGui.AlignTextToFramePadding();
             ImGui.TextColored(ImGuiColors.DalamudRed, "Not connected to any server");
         }
-        
+
         if (printShard)
         {
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImGui.GetStyle().ItemSpacing.Y);
@@ -631,7 +631,7 @@ public class CompactUi : Window, IDisposable
         return _apiController.ServerState switch
         {
             ServerState.Disconnected => "You are currently disconnected from the Mare Synchronos server.",
-            ServerState.Unauthorized => "The account associated with your used secret key is not present on the server anymore or you are tempbanned. To check the latter disconnect and reconnect in 15 minutes.",
+            ServerState.Unauthorized => "Server Response: " + _apiController.AuthFailureMessage,
             ServerState.Offline => "Your selected Mare Synchronos server is currently offline.",
             ServerState.VersionMisMatch =>
                 "Your plugin or the server you are connecting to is out of date. Please update your plugin now. If you already did so, contact the server provider to update their server to the latest version.",

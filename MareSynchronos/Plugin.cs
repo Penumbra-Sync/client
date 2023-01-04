@@ -14,7 +14,7 @@ using MareSynchronos.UI;
 using MareSynchronos.Utils;
 using Dalamud.Game.ClientState.Conditions;
 using MareSynchronos.FileCache;
-using Dalamud.Logging;
+using Dalamud.Game.Gui;
 
 namespace MareSynchronos;
 
@@ -23,6 +23,7 @@ public sealed class Plugin : IDalamudPlugin
     private const string CommandName = "/mare";
     private readonly ApiController _apiController;
     private readonly CommandManager _commandManager;
+    private readonly ChatGui _chatGui;
     private readonly Configuration _configuration;
     private readonly PeriodicFileScanner _periodicFileScanner;
     private readonly IntroUi _introUi;
@@ -44,7 +45,8 @@ public sealed class Plugin : IDalamudPlugin
 
 
     public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager,
-        Framework framework, ObjectTable objectTable, ClientState clientState, Condition condition)
+        Framework framework, ObjectTable objectTable, ClientState clientState, Condition condition,
+        ChatGui chatGui)
     {
         Logger.Debug("Launching " + Name);
         _pluginInterface = pluginInterface;
@@ -59,7 +61,7 @@ public sealed class Plugin : IDalamudPlugin
         _windowSystem = new WindowSystem("MareSynchronos");
 
         // those can be initialized outside of game login
-        _dalamudUtil = new DalamudUtil(clientState, objectTable, framework, condition);
+        _dalamudUtil = new DalamudUtil(clientState, objectTable, framework, condition, chatGui);
 
         _ipcManager = new IpcManager(_pluginInterface, _dalamudUtil);
         _fileDialogManager = new FileDialogManager();
