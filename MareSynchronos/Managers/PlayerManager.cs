@@ -179,13 +179,15 @@ public class PlayerManager : IDisposable
             token.ThrowIfCancellationRequested();
         }
 
-        while (!PermanentDataCache.IsReady && !token.IsCancellationRequested)
+        int timeOut = 10000;
+        while (!PermanentDataCache.IsReady && !token.IsCancellationRequested && timeOut >= 0)
         {
-            Logger.Verbose("Waiting until cache is ready");
+            Logger.Verbose("Waiting until cache is ready (Timeout: " + TimeSpan.FromMilliseconds(timeOut) + ")");
             await Task.Delay(50, token).ConfigureAwait(false);
+            timeOut -= 50;
         }
 
-        if (token.IsCancellationRequested) return null;
+        if (token.IsCancellationRequested || timeOut <= 0) return null;
 
         Logger.Verbose("Cache creation complete");
 

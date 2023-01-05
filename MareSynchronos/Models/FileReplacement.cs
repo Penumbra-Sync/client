@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using MareSynchronos.FileCache;
 using MareSynchronos.Managers;
 using MareSynchronos.Utils;
+using System;
 
 namespace MareSynchronos.Models;
 
@@ -40,8 +41,16 @@ public class FileReplacement
 
         _ = Task.Run(() =>
         {
-            var cache = fileDbManager.GetFileCacheByPath(ResolvedPath)!;
-            Hash = cache.Hash;
+            try
+            {
+                var cache = fileDbManager.GetFileCacheByPath(ResolvedPath)!;
+                Hash = cache.Hash;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn("Could not set Hash for " + ResolvedPath + ", resetting to original");
+                ResolvedPath = GamePaths.First();
+            }
         });
     }
 

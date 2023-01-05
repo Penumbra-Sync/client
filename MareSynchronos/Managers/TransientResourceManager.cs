@@ -155,6 +155,7 @@ public class TransientResourceManager : IDisposable
         filePath = filePath.ToLowerInvariant().Replace("\\", "/", StringComparison.OrdinalIgnoreCase);
 
         var replacedGamePath = gamePath.ToLowerInvariant().Replace("\\", "/", StringComparison.OrdinalIgnoreCase);
+        if (string.Equals(filePath, replacedGamePath, StringComparison.OrdinalIgnoreCase)) return;
 
         if (TransientResources[gameObject].Contains(replacedGamePath) ||
             SemiTransientResources.Any(r => r.Value.Any(f =>

@@ -9,6 +9,7 @@ using System.Collections.Concurrent;
 using System.Text;
 using Penumbra.Api.Enums;
 using Penumbra.Api.Helpers;
+using System.Threading.Tasks;
 
 namespace MareSynchronos.Managers;
 
@@ -126,10 +127,13 @@ public class IpcManager : IDisposable
 
     private void ResourceLoaded(IntPtr ptr, string arg1, string arg2)
     {
-        if (ptr != IntPtr.Zero && string.Compare(arg1, arg2, true, System.Globalization.CultureInfo.InvariantCulture) != 0)
+        Task.Run(() =>
         {
-            PenumbraResourceLoadEvent?.Invoke(ptr, arg1, arg2);
-        }
+            if (ptr != IntPtr.Zero && string.Compare(arg1, arg2, true, System.Globalization.CultureInfo.InvariantCulture) != 0)
+            {
+                PenumbraResourceLoadEvent?.Invoke(ptr, arg1, arg2);
+            }
+        });
     }
 
     private void HandleActionQueue()
