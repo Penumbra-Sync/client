@@ -47,9 +47,9 @@ public partial class ApiController
     {
         using var client = new HttpClient();
         client.DefaultRequestHeaders.Add(AuthorizationJwtHeader.Key, AuthorizationJwtHeader.Value);
-        int attempts = 0;
+        int attempts = 1;
         bool failed = true;
-        const int maxAttempts = 10;
+        const int maxAttempts = 16;
 
         HttpResponseMessage response = null!;
         HttpStatusCode? lastError = HttpStatusCode.OK;
@@ -66,13 +66,14 @@ public partial class ApiController
             catch (HttpRequestException ex)
             {
                 Logger.Warn($"Attempt {attempts}: Error during download of {bypassUrl}, HttpStatusCode: {ex.StatusCode}");
+                bypassUrl = new Uri(url, "?nocache=" + DateTime.UtcNow.Ticks);
                 lastError = ex.StatusCode;
                 if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized)
                 {
                     break;
                 }
                 attempts++;
-                await Task.Delay(TimeSpan.FromSeconds(new Random().Next(1, 5)), ct).ConfigureAwait(false);
+                await Task.Delay(TimeSpan.FromSeconds(new Random().NextDouble() * 2), ct).ConfigureAwait(false);
             }
         }
 
@@ -155,55 +156,60 @@ public partial class ApiController
             }
         }
 
-        await Parallel.ForEachAsync(CurrentDownloads[currentDownloadId].Where(f => f.CanBeTransferred), new ParallelOptions()
+        var downloadGroups = CurrentDownloads[currentDownloadId].Where(f => f.CanBeTransferred).GroupBy(f => f.DownloadUri.Host, StringComparer.Ordinal);
+
+        await Parallel.ForEachAsync(downloadGroups, new ParallelOptions()
         {
-            MaxDegreeOfParallelism = 2,
+            MaxDegreeOfParallelism = downloadGroups.Count(),
             CancellationToken = ct
         },
-        async (file, token) =>
+        async (fileGroup, token) =>
         {
-            Logger.Debug($"Downloading {file.DownloadUri}");
-            var hash = file.Hash;
-            Progress<long> progress = new((bytesDownloaded) =>
+            foreach (var file in fileGroup)
             {
-                file.Transferred += bytesDownloaded;
-            });
+                Logger.Debug($"Downloading {file.DownloadUri}");
+                var hash = file.Hash;
+                Progress<long> progress = new((bytesDownloaded) =>
+                {
+                    file.Transferred += bytesDownloaded;
+                });
 
-            var tempFile = await DownloadFileHttpClient(file.DownloadUri, progress, token).ConfigureAwait(false);
-            if (token.IsCancellationRequested)
-            {
+                var tempFile = await DownloadFileHttpClient(file.DownloadUri, progress, token).ConfigureAwait(false);
+                if (token.IsCancellationRequested)
+                {
+                    File.Delete(tempFile);
+                    Logger.Debug("Detected cancellation, removing " + currentDownloadId);
+                    CancelDownload(currentDownloadId);
+                    return;
+                }
+
+                var tempFileData = await File.ReadAllBytesAsync(tempFile, token).ConfigureAwait(false);
+                var extractedFile = LZ4Codec.Unwrap(tempFileData);
                 File.Delete(tempFile);
-                Logger.Debug("Detected cancellation, removing " + currentDownloadId);
-                CancelDownload(currentDownloadId);
-                return;
-            }
+                var filePath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash);
+                await File.WriteAllBytesAsync(filePath, extractedFile, token).ConfigureAwait(false);
+                var fi = new FileInfo(filePath);
+                Func<DateTime> RandomDayInThePast()
+                {
+                    DateTime start = new(1995, 1, 1);
+                    Random gen = new();
+                    int range = (DateTime.Today - start).Days;
+                    return () => start.AddDays(gen.Next(range));
+                }
 
-            var tempFileData = await File.ReadAllBytesAsync(tempFile, token).ConfigureAwait(false);
-            var extractedFile = LZ4Codec.Unwrap(tempFileData);
-            File.Delete(tempFile);
-            var filePath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash);
-            await File.WriteAllBytesAsync(filePath, extractedFile, token).ConfigureAwait(false);
-            var fi = new FileInfo(filePath);
-            Func<DateTime> RandomDayInThePast()
-            {
-                DateTime start = new(1995, 1, 1);
-                Random gen = new();
-                int range = (DateTime.Today - start).Days;
-                return () => start.AddDays(gen.Next(range));
-            }
-
-            fi.CreationTime = RandomDayInThePast().Invoke();
-            fi.LastAccessTime = DateTime.Today;
-            fi.LastWriteTime = RandomDayInThePast().Invoke();
-            try
-            {
-                _ = _fileDbManager.CreateCacheEntry(filePath);
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn("Issue adding file to the DB");
-                Logger.Warn(ex.Message);
-                Logger.Warn(ex.StackTrace);
+                fi.CreationTime = RandomDayInThePast().Invoke();
+                fi.LastAccessTime = DateTime.Today;
+                fi.LastWriteTime = RandomDayInThePast().Invoke();
+                try
+                {
+                    _ = _fileDbManager.CreateCacheEntry(filePath);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn("Issue adding file to the DB");
+                    Logger.Warn(ex.Message);
+                    Logger.Warn(ex.StackTrace);
+                }
             }
         }).ConfigureAwait(false);
 
