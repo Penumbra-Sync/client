@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using MareSynchronos.API;
 using MareSynchronos.FileCache;
+using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Utils;
@@ -19,14 +20,16 @@ public class OnlinePlayerManager : IDisposable
     private readonly IpcManager _ipcManager;
     private readonly PlayerManager _playerManager;
     private readonly FileCacheManager _fileDbManager;
+    private readonly Configuration _configuration;
     private readonly ConcurrentDictionary<string, CachedPlayer> _onlineCachedPlayers = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, CharacterCacheDto> _temporaryStoredCharacterCache = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<CachedPlayer, CancellationTokenSource> _playerTokenDisposal = new();
+    private readonly ConcurrentDictionary<string, OptionalPluginWarning> _shownWarnings = new(StringComparer.Ordinal);
 
     private List<string> OnlineVisiblePlayerHashes => _onlineCachedPlayers.Select(p => p.Value).Where(p => p.PlayerCharacter != IntPtr.Zero)
         .Select(p => p.PlayerNameHash).ToList();
 
-    public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager, PlayerManager playerManager, FileCacheManager fileDbManager)
+    public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager, PlayerManager playerManager, FileCacheManager fileDbManager, Configuration configuration)
     {
         Logger.Verbose("Creating " + nameof(OnlinePlayerManager));
 
@@ -35,6 +38,7 @@ public class OnlinePlayerManager : IDisposable
         _ipcManager = ipcManager;
         _playerManager = playerManager;
         _fileDbManager = fileDbManager;
+        _configuration = configuration;
         _apiController.PairedClientOnline += ApiControllerOnPairedClientOnline;
         _apiController.PairedClientOffline += ApiControllerOnPairedClientOffline;
         _apiController.Connected += ApiControllerOnConnected;
@@ -60,10 +64,15 @@ public class OnlinePlayerManager : IDisposable
 
     private void ApiControllerOnCharacterReceived(object? sender, CharacterReceivedEventArgs e)
     {
+        if (!_shownWarnings.ContainsKey(e.CharacterNameHash)) _shownWarnings[e.CharacterNameHash] = new()
+        {
+            ShownCustomizePlusWarning = _configuration.DisableOptionalPluginWarnings,
+            ShownHeelsWarning = _configuration.DisableOptionalPluginWarnings,
+        };
         if (_onlineCachedPlayers.TryGetValue(e.CharacterNameHash, out var visiblePlayer) && visiblePlayer.IsVisible)
         {
             Logger.Debug("Received data and applying to " + e.CharacterNameHash);
-            visiblePlayer.ApplyCharacterData(e.CharacterData);
+            visiblePlayer.ApplyCharacterData(e.CharacterData, _shownWarnings[e.CharacterNameHash]);
         }
         else
         {
@@ -205,7 +214,12 @@ public class OnlinePlayerManager : IDisposable
             if (existingPlayer != null)
             {
                 _temporaryStoredCharacterCache.TryRemove(hashedName, out var cache);
-                existingPlayer.InitializePlayer(pChar.Address, pChar.Name.ToString(), cache);
+                if (!_shownWarnings.ContainsKey(hashedName)) _shownWarnings[hashedName] = new()
+                {
+                    ShownCustomizePlusWarning = _configuration.DisableOptionalPluginWarnings,
+                    ShownHeelsWarning = _configuration.DisableOptionalPluginWarnings,
+                };
+                existingPlayer.InitializePlayer(pChar.Address, pChar.Name.ToString(), cache, _shownWarnings[hashedName]);
             }
         }
 

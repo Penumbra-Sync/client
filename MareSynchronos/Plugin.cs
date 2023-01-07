@@ -190,7 +190,7 @@ public sealed class Plugin : IDalamudPlugin
             _playerManager = new PlayerManager(_apiController, _ipcManager,
                 characterCacheFactory, _dalamudUtil, _transientResourceManager, _periodicFileScanner);
             _characterCacheManager = new OnlinePlayerManager(_apiController,
-                _dalamudUtil, _ipcManager, _playerManager, _fileCacheManager);
+                _dalamudUtil, _ipcManager, _playerManager, _fileCacheManager, _configuration);
         }
         catch (Exception ex)
         {

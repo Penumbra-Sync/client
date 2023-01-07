@@ -28,6 +28,7 @@ public class SettingsUi : Window, IDisposable
     private string _lastTab = string.Empty;
     private bool _openPopupOnAddition;
     private bool _hideInfoMessages;
+    private bool _disableOptionalPluginsWarnings;
 
     public SettingsUi(WindowSystem windowSystem,
         UiShared uiShared, Configuration configuration, ApiController apiController) : base("Mare Synchronos Settings")
@@ -46,6 +47,7 @@ public class SettingsUi : Window, IDisposable
         _uiShared = uiShared;
         _openPopupOnAddition = _configuration.OpenPopupOnAdd;
         _hideInfoMessages = _configuration.HideInfoMessages;
+        _disableOptionalPluginsWarnings = _configuration.DisableOptionalPluginWarnings;
         windowSystem.AddWindow(this);
     }
 
@@ -171,6 +173,12 @@ public class SettingsUi : Window, IDisposable
             _configuration.Save();
         }
         UiShared.DrawHelpText("Enabling this will not print any \"Info\" labeled messages into the game chat.");
+        if (ImGui.Checkbox("Disable optional plugin warnings", ref _disableOptionalPluginsWarnings))
+        {
+            _configuration.DisableOptionalPluginWarnings = _disableOptionalPluginsWarnings;
+            _configuration.Save();
+        }
+        UiShared.DrawHelpText("Enabling this will not print any \"Warning\" labeled messages for missing optional plugins Heels or Customize+ in the game chat.");
     }
 
     private void DrawAdministration()

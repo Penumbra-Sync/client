@@ -80,6 +80,7 @@ public class Configuration : IPluginConfiguration
 
     public bool FullPause { get; set; } = false;
     public bool HideInfoMessages { get; set; } = false;
+    public bool DisableOptionalPluginWarnings { get; set; } = false;
     public Dictionary<string, Dictionary<string, string>> UidServerComments { get; set; } = new(StringComparer.Ordinal);
     public Dictionary<string, Dictionary<string, string>> GidServerComments { get; set; } = new(StringComparer.Ordinal);
 
