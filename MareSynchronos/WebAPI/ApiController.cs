@@ -63,7 +63,6 @@ public partial class ApiController : IDisposable, IMareHubClient
         _dalamudUtil.LogOut += DalamudUtilOnLogOut;
         ServerState = ServerState.Offline;
         _verifiedUploadedHashes = new(StringComparer.Ordinal);
-        _httpClient = new();
 
         if (_dalamudUtil.IsLoggedIn)
         {
@@ -146,6 +145,9 @@ public partial class ApiController : IDisposable, IMareHubClient
     public async Task CreateConnections(bool forceGetToken = false)
     {
         Logger.Debug("CreateConnections called");
+
+        _httpClient?.Dispose();
+        _httpClient = new();
 
         if (_pluginConfiguration.FullPause)
         {
