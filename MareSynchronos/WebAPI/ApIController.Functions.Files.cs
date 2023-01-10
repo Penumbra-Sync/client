@@ -106,7 +106,7 @@ public partial class ApiController
         HttpResponseMessage response = null!;
         HttpStatusCode? lastError = HttpStatusCode.OK;
 
-        var requestUrl = new Uri(fileTransfer.DownloadUri, MareFiles.CacheGetFullPath + "?requestId=" + requestId.ToString());
+        var requestUrl = new Uri(fileTransfer.DownloadUri, MareFiles.FilesGetFullPath + "?requestId=" + requestId.ToString());
 
         Logger.Debug($"Downloading {requestUrl} for file {fileTransfer.Hash}");
         while (failed && attempts < maxAttempts && !ct.IsCancellationRequested)
