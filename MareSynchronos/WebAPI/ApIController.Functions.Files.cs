@@ -216,7 +216,7 @@ public partial class ApiController
             }
         }
 
-        var downloadGroups = CurrentDownloads[currentDownloadId].Where(f => f.CanBeTransferred).GroupBy(f => f.DownloadUri.Host, StringComparer.Ordinal);
+        var downloadGroups = CurrentDownloads[currentDownloadId].Where(f => f.CanBeTransferred).GroupBy(f => f.DownloadUri.Host + f.DownloadUri.Port, StringComparer.Ordinal);
 
         await Parallel.ForEachAsync(downloadGroups, new ParallelOptions()
         {
