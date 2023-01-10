@@ -669,16 +669,22 @@ public class SettingsUi : Window, IDisposable
         ImGui.SameLine();
         if (ImGui.Button("Clear local cache"))
         {
-            Task.Run(() =>
+            if (UiShared.CtrlPressed())
             {
-                foreach (var file in Directory.GetFiles(_configuration.CacheFolder))
+                Task.Run(() =>
                 {
-                    File.Delete(file);
-                }
+                    foreach (var file in Directory.GetFiles(_configuration.CacheFolder))
+                    {
+                        File.Delete(file);
+                    }
 
-                _uiShared.RecalculateFileCacheSize();
-            });
+                    _uiShared.RecalculateFileCacheSize();
+                });
+            }
         }
+        UiShared.AttachToolTip("You normally do not need to do this. This will solely remove all downloaded data from all players and will require you to re-download everything again." + Environment.NewLine
+            + "Mares Cache is self-clearing and will not surpass the limit you have set it to." + Environment.NewLine
+            + "If you still think you need to do this hold CTRL while pressing the button.");
     }
 
     public override void OnClose()
