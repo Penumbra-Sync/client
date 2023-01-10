@@ -45,11 +45,9 @@ public partial class ApiController
         await _mareHub!.SendAsync(nameof(FilesDeleteAll)).ConfigureAwait(false);
     }
 
-    private async Task<QueueRequestDto> GetRequest(DownloadFileTransfer downloadFileTransfer)
+    private async Task<QueueRequestDto> GetQueueRequestDto(DownloadFileTransfer downloadFileTransfer)
     {
-        using var requestMessage = new HttpRequestMessage(HttpMethod.Get, new Uri(downloadFileTransfer.DownloadUri, MareFiles.RequestRequestFileFullPath + "?file=" + downloadFileTransfer.Hash));
-        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Authorization);
-        var response = await _httpClient.SendAsync(requestMessage).ConfigureAwait(false);
+        var response = await SendRequestAsync(HttpMethod.Get, new Uri(downloadFileTransfer.DownloadUri, MareFiles.RequestRequestFileFullPath + "?file=" + downloadFileTransfer.Hash), "").ConfigureAwait(false);
         return JsonConvert.DeserializeObject<QueueRequestDto>(await response.Content.ReadAsStringAsync().ConfigureAwait(false))!;
     }
 
@@ -57,11 +55,8 @@ public partial class ApiController
     {
         while (!ct.IsCancellationRequested)
         {
-            var url = new Uri(fileTransfer.DownloadUri, MareFiles.RequestCheckQueueFullPath + "?requestId=" + requestId.ToString());
-            using var requestMessage = new HttpRequestMessage(HttpMethod.Get, url);
-            requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Authorization);
             await Task.Delay(250, ct).ConfigureAwait(false);
-            var queueResponse = await _httpClient.SendAsync(requestMessage, ct).ConfigureAwait(false);
+            var queueResponse = await SendRequestAsync(HttpMethod.Get, new Uri(fileTransfer.DownloadUri, MareFiles.RequestCheckQueueFullPath + "?requestId=" + requestId.ToString()), "").ConfigureAwait(false);
             try
             {
                 queueResponse.EnsureSuccessStatusCode();
@@ -79,7 +74,7 @@ public partial class ApiController
                     case HttpStatusCode.BadRequest:
                         // rerequest queue
                         Logger.Debug($"Rerequesting {fileTransfer.Hash}");
-                        var dto = await GetRequest(fileTransfer).ConfigureAwait(false);
+                        var dto = await GetQueueRequestDto(fileTransfer).ConfigureAwait(false);
                         requestId = dto.RequestId;
                         break;
                     default:
@@ -96,7 +91,7 @@ public partial class ApiController
 
     private async Task<string> DownloadFileHttpClient(DownloadFileTransfer fileTransfer, IProgress<long> progress, CancellationToken ct)
     {
-        var queueRequest = await GetRequest(fileTransfer).ConfigureAwait(false);
+        var queueRequest = await GetQueueRequestDto(fileTransfer).ConfigureAwait(false);
 
         Logger.Debug($"GUID {queueRequest.RequestId} for file {fileTransfer.Hash}, queue status {queueRequest.QueueStatus}");
 
@@ -112,15 +107,13 @@ public partial class ApiController
         HttpStatusCode? lastError = HttpStatusCode.OK;
 
         var requestUrl = new Uri(fileTransfer.DownloadUri, MareFiles.CacheGetFullPath + "?requestId=" + requestId.ToString());
-        using var requestMessage = new HttpRequestMessage(HttpMethod.Get, requestUrl);
-        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Authorization);
 
         Logger.Debug($"Downloading {requestUrl} for file {fileTransfer.Hash}");
         while (failed && attempts < maxAttempts && !ct.IsCancellationRequested)
         {
             try
             {
-                response = await _httpClient.SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                response = await SendRequestAsync(HttpMethod.Get, requestUrl, "", ct).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
                 failed = false;
             }
@@ -196,6 +189,18 @@ public partial class ApiController
         }
     }
 
+    private async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, Uri uri, string content, CancellationToken? ct = null)
+    {
+        using var requestMessage = new HttpRequestMessage(method, uri);
+        requestMessage.Content = new StringContent(content);
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Authorization);
+
+        if (ct.HasValue)
+            return await _httpClient.SendAsync(requestMessage, ct.Value).ConfigureAwait(false);
+
+        return await _httpClient.SendAsync(requestMessage).ConfigureAwait(false);
+    }
+
     private async Task DownloadFilesInternal(int currentDownloadId, List<FileReplacementDto> fileReplacementDto, CancellationToken ct)
     {
         Logger.Debug("Downloading files (Download ID " + currentDownloadId + ")");
@@ -226,10 +231,8 @@ public partial class ApiController
         async (fileGroup, token) =>
         {
             // let server predownload files
-            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, new Uri(fileGroup.First().DownloadUri, MareFiles.RequestEnqueueFullPath));
-            requestMessage.Content = new StringContent(JsonConvert.SerializeObject(fileGroup.Select(c => c.Hash)));
-            requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Authorization);
-            await _httpClient.SendAsync(requestMessage, token).ConfigureAwait(false);
+            SendRequestAsync(HttpMethod.Post, new Uri(fileGroup.First().DownloadUri, MareFiles.RequestEnqueueFullPath),
+                JsonConvert.SerializeObject(fileGroup.Select(c => c.Hash)), token).Start();
 
             foreach (var file in fileGroup)
             {
