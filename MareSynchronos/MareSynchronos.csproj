@@ -26,15 +26,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="DalamudPackager" Version="2.1.8" />
+    <PackageReference Include="DalamudPackager" Version="2.1.10" />
     <PackageReference Include="lz4net" Version="1.0.15.93" />
-    <PackageReference Include="Meziantou.Analyzer" Version="1.0.733">
+    <PackageReference Include="Meziantou.Analyzer" Version="2.0.4">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="6.0.8" />
-    <PackageReference Include="Penumbra.Api" Version="1.0.3" />
-    <PackageReference Include="Penumbra.String" Version="1.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="7.0.1" />
+    <PackageReference Include="Penumbra.Api" Version="1.0.5" />
+    <PackageReference Include="Penumbra.String" Version="1.0.1" />
   </ItemGroup>
 
   <PropertyGroup>

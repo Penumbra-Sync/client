@@ -33,7 +33,7 @@ public partial class ApiController : IDisposable, IMareHubClient
     private readonly FileCacheManager _fileDbManager;
     private CancellationTokenSource _connectionCancellationTokenSource;
     private Dictionary<JwtCache, string> _jwtToken = new();
-    private KeyValuePair<string, string> AuthorizationJwtHeader => new("Authorization", "Bearer " + _jwtToken.GetValueOrDefault(new JwtCache(ApiUri, _dalamudUtil.PlayerNameHashed, SecretKey), string.Empty));
+    private string Authorization => _jwtToken.GetValueOrDefault(new JwtCache(ApiUri, _dalamudUtil.PlayerNameHashed, SecretKey), string.Empty);
 
     private HubConnection? _mareHub;
 
@@ -49,6 +49,8 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     public bool IsAdmin => _connectionDto?.IsAdmin ?? false;
 
+    private HttpClient _httpClient;
+
     public ApiController(Configuration pluginConfiguration, DalamudUtil dalamudUtil, FileCacheManager fileDbManager)
     {
         Logger.Verbose("Creating " + nameof(ApiController));
@@ -61,6 +63,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         _dalamudUtil.LogOut += DalamudUtilOnLogOut;
         ServerState = ServerState.Offline;
         _verifiedUploadedHashes = new(StringComparer.Ordinal);
+        _httpClient = new();
 
         if (_dalamudUtil.IsLoggedIn)
         {
@@ -343,7 +346,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         return new HubConnectionBuilder()
             .WithUrl(ApiUri + hubName, options =>
             {
-                options.Headers.Add(AuthorizationJwtHeader);
+                options.Headers.Add("Authorization", "Bearer " + Authorization);
                 options.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling;
             })
             .WithAutomaticReconnect(new ForeverRetryPolicy())
