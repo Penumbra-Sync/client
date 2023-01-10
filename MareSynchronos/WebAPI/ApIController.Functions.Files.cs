@@ -45,12 +45,12 @@ public partial class ApiController
         await _mareHub!.SendAsync(nameof(FilesDeleteAll)).ConfigureAwait(false);
     }
 
-    private async Task<Guid> GetRequestId(DownloadFileTransfer downloadFileTransfer)
+    private async Task<QueueRequestDto> GetRequest(DownloadFileTransfer downloadFileTransfer)
     {
         using var requestMessage = new HttpRequestMessage(HttpMethod.Get, new Uri(downloadFileTransfer.DownloadUri, MareFiles.RequestRequestFileFullPath + "?file=" + downloadFileTransfer.Hash));
         requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Authorization);
         var response = await _httpClient.SendAsync(requestMessage).ConfigureAwait(false);
-        return Guid.Parse(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
+        return JsonConvert.DeserializeObject<QueueRequestDto>(await response.Content.ReadAsStringAsync().ConfigureAwait(false))!;
     }
 
     private async Task<Guid> WaitForQueue(DownloadFileTransfer fileTransfer, Guid requestId, CancellationToken ct)
@@ -60,6 +60,7 @@ public partial class ApiController
             var url = new Uri(fileTransfer.DownloadUri, MareFiles.RequestCheckQueueFullPath + "?requestId=" + requestId.ToString());
             using var requestMessage = new HttpRequestMessage(HttpMethod.Get, url);
             requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Authorization);
+            await Task.Delay(250, ct).ConfigureAwait(false);
             var queueResponse = await _httpClient.SendAsync(requestMessage, ct).ConfigureAwait(false);
             try
             {
@@ -78,7 +79,8 @@ public partial class ApiController
                     case HttpStatusCode.BadRequest:
                         // rerequest queue
                         Logger.Debug($"Rerequesting {fileTransfer.Hash}");
-                        requestId = await GetRequestId(fileTransfer).ConfigureAwait(false);
+                        var dto = await GetRequest(fileTransfer).ConfigureAwait(false);
+                        requestId = dto.RequestId;
                         break;
                     default:
                         Logger.Warn($"Unclear response from server: {fileTransfer.Hash} ({requestId}): {ex.StatusCode}");
@@ -94,11 +96,13 @@ public partial class ApiController
 
     private async Task<string> DownloadFileHttpClient(DownloadFileTransfer fileTransfer, IProgress<long> progress, CancellationToken ct)
     {
-        var requestId = await GetRequestId(fileTransfer).ConfigureAwait(false);
+        var queueRequest = await GetRequest(fileTransfer).ConfigureAwait(false);
 
-        Logger.Debug($"GUID {requestId} for file {fileTransfer.Hash}");
+        Logger.Debug($"GUID {queueRequest.RequestId} for file {fileTransfer.Hash}, queue status {queueRequest.QueueStatus}");
 
-        requestId = await WaitForQueue(fileTransfer, requestId, ct).ConfigureAwait(false);
+        var requestId = queueRequest.QueueStatus == QueueStatus.Ready
+            ? queueRequest.RequestId
+            : await WaitForQueue(fileTransfer, queueRequest.RequestId, ct).ConfigureAwait(false);
 
         int attempts = 1;
         bool failed = true;
