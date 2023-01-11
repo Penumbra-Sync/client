@@ -177,21 +177,21 @@ public class DalamudUtil : IDisposable
 
     public unsafe IntPtr GetMinion()
     {
-        return (IntPtr)((FFXIVClientStructs.FFXIV.Client.Game.Character.Character*)PlayerPointer)->CompanionObject;
+        return (IntPtr)((Character*)PlayerPointer)->CompanionObject;
     }
 
     public unsafe IntPtr GetPet(IntPtr? playerPointer = null)
     {
         var mgr = CharacterManager.Instance();
         if (playerPointer == null) playerPointer = PlayerPointer;
-        return (IntPtr)mgr->LookupPetByOwnerObject((FFXIVClientStructs.FFXIV.Client.Game.Character.BattleChara*)playerPointer);
+        return (IntPtr)mgr->LookupPetByOwnerObject((BattleChara*)playerPointer);
     }
 
     public unsafe IntPtr GetCompanion(IntPtr? playerPointer = null)
     {
         var mgr = CharacterManager.Instance();
         if (playerPointer == null) playerPointer = PlayerPointer;
-        return (IntPtr)mgr->LookupBuddyByOwnerObject((FFXIVClientStructs.FFXIV.Client.Game.Character.BattleChara*)playerPointer);
+        return (IntPtr)mgr->LookupBuddyByOwnerObject((BattleChara*)playerPointer);
     }
 
     public string PlayerName => _clientState.LocalPlayer?.Name.ToString() ?? "--";

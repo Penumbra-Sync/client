@@ -33,7 +33,7 @@ public partial class ApiController : IDisposable, IMareHubClient
     private readonly FileCacheManager _fileDbManager;
     private CancellationTokenSource _connectionCancellationTokenSource;
     private Dictionary<JwtCache, string> _jwtToken = new();
-    private KeyValuePair<string, string> AuthorizationJwtHeader => new("Authorization", "Bearer " + _jwtToken.GetValueOrDefault(new JwtCache(ApiUri, _dalamudUtil.PlayerNameHashed, SecretKey), string.Empty));
+    private string Authorization => _jwtToken.GetValueOrDefault(new JwtCache(ApiUri, _dalamudUtil.PlayerNameHashed, SecretKey), string.Empty);
 
     private HubConnection? _mareHub;
 
@@ -48,6 +48,8 @@ public partial class ApiController : IDisposable, IMareHubClient
     public bool IsModerator => (_connectionDto?.IsAdmin ?? false) || (_connectionDto?.IsModerator ?? false);
 
     public bool IsAdmin => _connectionDto?.IsAdmin ?? false;
+
+    private HttpClient _httpClient;
 
     public ApiController(Configuration pluginConfiguration, DalamudUtil dalamudUtil, FileCacheManager fileDbManager)
     {
@@ -144,6 +146,9 @@ public partial class ApiController : IDisposable, IMareHubClient
     {
         Logger.Debug("CreateConnections called");
 
+        _httpClient?.Dispose();
+        _httpClient = new();
+
         if (_pluginConfiguration.FullPause)
         {
             Logger.Info("Not recreating Connection, paused");
@@ -181,9 +186,9 @@ public partial class ApiController : IDisposable, IMareHubClient
                 {
                     Logger.Debug("Requesting new JWT");
                     using HttpClient httpClient = new();
-                    var postUri = new Uri(new Uri(ApiUri
+                    var postUri = MareAuth.AuthFullPath(new Uri(ApiUri
                         .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
-                        .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)), MareAuth.AuthFullPath);
+                        .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)));
                     using var sha256 = SHA256.Create();
                     var auth = BitConverter.ToString(sha256.ComputeHash(Encoding.UTF8.GetBytes(SecretKey))).Replace("-", "", StringComparison.OrdinalIgnoreCase);
                     var result = await httpClient.PostAsync(postUri, new FormUrlEncodedContent(new[]
@@ -343,7 +348,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         return new HubConnectionBuilder()
             .WithUrl(ApiUri + hubName, options =>
             {
-                options.Headers.Add(AuthorizationJwtHeader);
+                options.Headers.Add("Authorization", "Bearer " + Authorization);
                 options.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling;
             })
             .WithAutomaticReconnect(new ForeverRetryPolicy())
