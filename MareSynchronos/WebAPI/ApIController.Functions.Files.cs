@@ -47,7 +47,7 @@ public partial class ApiController
 
     private async Task<QueueRequestDto> GetQueueRequestDto(DownloadFileTransfer downloadFileTransfer)
     {
-        var response = await SendRequestAsync(HttpMethod.Get, new Uri(downloadFileTransfer.DownloadUri, MareFiles.RequestRequestFileFullPath + "?file=" + downloadFileTransfer.Hash), "").ConfigureAwait(false);
+        var response = await SendRequestAsync(HttpMethod.Get, MareFiles.RequestRequestFileFullPath(downloadFileTransfer.DownloadUri, downloadFileTransfer.Hash), "").ConfigureAwait(false);
         return JsonConvert.DeserializeObject<QueueRequestDto>(await response.Content.ReadAsStringAsync().ConfigureAwait(false))!;
     }
 
@@ -56,7 +56,7 @@ public partial class ApiController
         while (!ct.IsCancellationRequested)
         {
             await Task.Delay(250, ct).ConfigureAwait(false);
-            var queueResponse = await SendRequestAsync(HttpMethod.Get, new Uri(fileTransfer.DownloadUri, MareFiles.RequestCheckQueueFullPath + "?requestId=" + requestId.ToString()), "").ConfigureAwait(false);
+            var queueResponse = await SendRequestAsync(HttpMethod.Get, MareFiles.RequestCheckQueueFullPath(fileTransfer.DownloadUri, requestId), "").ConfigureAwait(false);
             try
             {
                 queueResponse.EnsureSuccessStatusCode();
@@ -106,7 +106,7 @@ public partial class ApiController
         HttpResponseMessage response = null!;
         HttpStatusCode? lastError = HttpStatusCode.OK;
 
-        var requestUrl = new Uri(fileTransfer.DownloadUri, MareFiles.FilesGetFullPath + "?requestId=" + requestId.ToString());
+        var requestUrl = MareFiles.CacheGetFullPath(fileTransfer.DownloadUri, requestId);
 
         Logger.Debug($"Downloading {requestUrl} for file {fileTransfer.Hash}");
         while (failed && attempts < maxAttempts && !ct.IsCancellationRequested)
@@ -231,7 +231,7 @@ public partial class ApiController
         async (fileGroup, token) =>
         {
             // let server predownload files
-            SendRequestAsync(HttpMethod.Post, new Uri(fileGroup.First().DownloadUri, MareFiles.RequestEnqueueFullPath),
+            SendRequestAsync(HttpMethod.Post, MareFiles.RequestEnqueueFullPath(fileGroup.First().DownloadUri),
                 JsonConvert.SerializeObject(fileGroup.Select(c => c.Hash)), token).Start();
 
             foreach (var file in fileGroup)

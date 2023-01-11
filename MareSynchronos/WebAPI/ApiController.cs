@@ -186,9 +186,9 @@ public partial class ApiController : IDisposable, IMareHubClient
                 {
                     Logger.Debug("Requesting new JWT");
                     using HttpClient httpClient = new();
-                    var postUri = new Uri(new Uri(ApiUri
+                    var postUri = MareAuth.AuthFullPath(new Uri(ApiUri
                         .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
-                        .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)), MareAuth.AuthFullPath);
+                        .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)));
                     using var sha256 = SHA256.Create();
                     var auth = BitConverter.ToString(sha256.ComputeHash(Encoding.UTF8.GetBytes(SecretKey))).Replace("-", "", StringComparison.OrdinalIgnoreCase);
                     var result = await httpClient.PostAsync(postUri, new FormUrlEncodedContent(new[]
