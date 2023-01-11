@@ -5,6 +5,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
@@ -47,7 +48,7 @@ public partial class ApiController
 
     private async Task<QueueRequestDto> GetQueueRequestDto(DownloadFileTransfer downloadFileTransfer)
     {
-        var response = await SendRequestAsync(HttpMethod.Get, MareFiles.RequestRequestFileFullPath(downloadFileTransfer.DownloadUri, downloadFileTransfer.Hash), "").ConfigureAwait(false);
+        var response = await SendRequestAsync<object>(HttpMethod.Get, MareFiles.RequestRequestFileFullPath(downloadFileTransfer.DownloadUri, downloadFileTransfer.Hash)).ConfigureAwait(false);
         return JsonConvert.DeserializeObject<QueueRequestDto>(await response.Content.ReadAsStringAsync().ConfigureAwait(false))!;
     }
 
@@ -56,7 +57,7 @@ public partial class ApiController
         while (!ct.IsCancellationRequested)
         {
             await Task.Delay(250, ct).ConfigureAwait(false);
-            var queueResponse = await SendRequestAsync(HttpMethod.Get, MareFiles.RequestCheckQueueFullPath(fileTransfer.DownloadUri, requestId), "").ConfigureAwait(false);
+            var queueResponse = await SendRequestAsync<object>(HttpMethod.Get, MareFiles.RequestCheckQueueFullPath(fileTransfer.DownloadUri, requestId)).ConfigureAwait(false);
             try
             {
                 queueResponse.EnsureSuccessStatusCode();
@@ -113,7 +114,7 @@ public partial class ApiController
         {
             try
             {
-                response = await SendRequestAsync(HttpMethod.Get, requestUrl, "", ct).ConfigureAwait(false);
+                response = await SendRequestAsync<object>(HttpMethod.Get, requestUrl, ct: ct).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
                 failed = false;
             }
@@ -189,11 +190,23 @@ public partial class ApiController
         }
     }
 
-    private async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, Uri uri, string content, CancellationToken? ct = null)
+    private async Task<HttpResponseMessage> SendRequestAsync<T>(HttpMethod method, Uri uri, T content = default, CancellationToken? ct = null) where T : class
     {
         using var requestMessage = new HttpRequestMessage(method, uri);
-        requestMessage.Content = new StringContent(content);
+        if (content != default)
+        {
+            requestMessage.Content = JsonContent.Create(content);
+        }
         requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Authorization);
+
+        if (content != default)
+        {
+            Logger.Debug("Sending " + method + " to " + uri + " (Content: " + await (((JsonContent)requestMessage.Content).ReadAsStringAsync()) + ")");
+        }
+        else
+        {
+            Logger.Debug("Sending " + method + " to " + uri);
+        }
 
         if (ct.HasValue)
             return await _httpClient.SendAsync(requestMessage, ct.Value).ConfigureAwait(false);
@@ -231,12 +244,11 @@ public partial class ApiController
         async (fileGroup, token) =>
         {
             // let server predownload files
-            SendRequestAsync(HttpMethod.Post, MareFiles.RequestEnqueueFullPath(fileGroup.First().DownloadUri),
-                JsonConvert.SerializeObject(fileGroup.Select(c => c.Hash)), token).Start();
+            await SendRequestAsync(HttpMethod.Post, MareFiles.RequestEnqueueFullPath(fileGroup.First().DownloadUri),
+                fileGroup.Select(c => c.Hash), token).ConfigureAwait(false);
 
             foreach (var file in fileGroup)
             {
-                Logger.Debug($"Downloading {file.DownloadUri}");
                 var hash = file.Hash;
                 Progress<long> progress = new((bytesDownloaded) =>
                 {
