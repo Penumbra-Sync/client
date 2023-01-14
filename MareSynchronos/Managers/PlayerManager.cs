@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Linq;
 using MareSynchronos.Models;
 using MareSynchronos.FileCache;
+using MareSynchronos.UI;
 #if DEBUG
 using Newtonsoft.Json;
 #endif
@@ -25,6 +26,7 @@ public class PlayerManager : IDisposable
     private readonly DalamudUtil _dalamudUtil;
     private readonly TransientResourceManager _transientResourceManager;
     private readonly PeriodicFileScanner _periodicFileScanner;
+    private readonly SettingsUi _settingsUi;
     private readonly IpcManager _ipcManager;
     public event PlayerHasChanged? PlayerHasChanged;
     public CharacterCacheDto? LastCreatedCharacterData { get; private set; }
@@ -38,7 +40,7 @@ public class PlayerManager : IDisposable
 
     public unsafe PlayerManager(ApiController apiController, IpcManager ipcManager,
         CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil, TransientResourceManager transientResourceManager,
-        PeriodicFileScanner periodicFileScanner)
+        PeriodicFileScanner periodicFileScanner, SettingsUi settingsUi)
     {
         Logger.Verbose("Creating " + nameof(PlayerManager));
 
@@ -48,6 +50,7 @@ public class PlayerManager : IDisposable
         _dalamudUtil = dalamudUtil;
         _transientResourceManager = transientResourceManager;
         _periodicFileScanner = periodicFileScanner;
+        _settingsUi = settingsUi;
         _apiController.Connected += ApiControllerOnConnected;
         _apiController.Disconnected += ApiController_Disconnected;
         _transientResourceManager.TransientResourceLoaded += HandleTransientResourceLoad;
@@ -267,6 +270,8 @@ public class PlayerManager : IDisposable
                 _periodicFileScanner.ResumeScan("Character creation");
             }
             if (cacheDto == null || token.IsCancellationRequested) return;
+
+            _settingsUi.LastCreatedCharacterData = cacheDto;
 
 #if DEBUG
             //var json = JsonConvert.SerializeObject(cacheDto, Formatting.Indented);

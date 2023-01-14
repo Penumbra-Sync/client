@@ -188,7 +188,7 @@ public sealed class Plugin : IDalamudPlugin
             var characterCacheFactory =
                 new CharacterDataFactory(_dalamudUtil, _ipcManager, _transientResourceManager, _fileReplacementFactory);
             _playerManager = new PlayerManager(_apiController, _ipcManager,
-                characterCacheFactory, _dalamudUtil, _transientResourceManager, _periodicFileScanner);
+                characterCacheFactory, _dalamudUtil, _transientResourceManager, _periodicFileScanner, _settingsUi);
             _characterCacheManager = new OnlinePlayerManager(_apiController,
                 _dalamudUtil, _ipcManager, _playerManager, _fileCacheManager, _configuration);
         }
