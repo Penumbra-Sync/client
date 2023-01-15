@@ -61,6 +61,7 @@ public partial class ApiController
 
     private async Task WaitForDownloadReady(DownloadFileTransfer downloadFileTransfer, Guid requestId, CancellationToken ct)
     {
+        bool alreadyCancelled = false;
         try
         {
             while (!ct.IsCancellationRequested && _downloadReady.TryGetValue(requestId, out bool isReady) && !isReady)
@@ -76,6 +77,7 @@ public partial class ApiController
             try
             {
                 await SendRequestAsync<object>(HttpMethod.Get, MareFiles.RequestCancelFullPath(downloadFileTransfer.DownloadUri, requestId), ct).ConfigureAwait(false);
+                alreadyCancelled = true;
             }
             catch { }
 
@@ -83,6 +85,14 @@ public partial class ApiController
         }
         finally
         {
+            if (ct.IsCancellationRequested && !alreadyCancelled)
+            {
+                try
+                {
+                    await SendRequestAsync<object>(HttpMethod.Get, MareFiles.RequestCancelFullPath(downloadFileTransfer.DownloadUri, requestId), ct).ConfigureAwait(false);
+                }
+                catch { }
+            }
             _downloadReady.Remove(requestId, out _);
         }
     }
