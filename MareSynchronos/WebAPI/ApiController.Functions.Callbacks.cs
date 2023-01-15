@@ -84,6 +84,12 @@ public partial class ApiController
         _mareHub!.On(nameof(Client_ReceiveServerMessage), act);
     }
 
+    public void OnDownloadReady(Action<Guid> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_DownloadReady), act);
+    }
+
     public Task Client_UserUpdateClientPairs(ClientPairDto dto)
     {
         var entry = PairedClients.SingleOrDefault(e => string.Equals(e.OtherUID, dto.OtherUID, System.StringComparison.Ordinal));
@@ -241,6 +247,13 @@ public partial class ApiController
                 break;
         }
 
+        return Task.CompletedTask;
+    }
+
+    public Task Client_DownloadReady(Guid requestId)
+    {
+        Logger.Debug($"Server sent {requestId} ready");
+        _downloadReady[requestId] = true;
         return Task.CompletedTask;
     }
 }

@@ -168,8 +168,10 @@ public class CachedPlayer
         }
 
         _downloadCancellationTokenSource?.Cancel();
+        _downloadCancellationTokenSource?.Dispose();
         _downloadCancellationTokenSource = new CancellationTokenSource();
         var downloadToken = _downloadCancellationTokenSource.Token;
+
         var downloadId = _apiController.GetDownloadId();
         Task.Run(async () =>
         {
@@ -218,8 +220,6 @@ public class CachedPlayer
             Logger.Debug("Download Task was cancelled");
             _apiController.CancelDownload(downloadId);
         });
-
-        _downloadCancellationTokenSource = null;
     }
 
     private List<FileReplacementDto> TryCalculateModdedDictionary(out Dictionary<string, string> moddedDictionary)
