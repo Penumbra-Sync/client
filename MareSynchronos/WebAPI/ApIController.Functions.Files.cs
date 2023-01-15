@@ -16,7 +16,6 @@ using MareSynchronos.API;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
-using Newtonsoft.Json;
 
 namespace MareSynchronos.WebAPI;
 
@@ -60,16 +59,32 @@ public partial class ApiController
         return requestId;
     }
 
-    private async Task WaitForDownloadReady(Guid requestId, CancellationToken ct)
+    private async Task WaitForDownloadReady(DownloadFileTransfer downloadFileTransfer, Guid requestId, CancellationToken ct)
     {
-        while (!ct.IsCancellationRequested && _downloadReady.TryGetValue(requestId, out bool isReady) && !isReady)
+        try
         {
-            Logger.Verbose($"Waiting for {requestId} to become ready for download");
-            await Task.Delay(250, ct).ConfigureAwait(false);
-        }
+            while (!ct.IsCancellationRequested && _downloadReady.TryGetValue(requestId, out bool isReady) && !isReady)
+            {
+                Logger.Verbose($"Waiting for {requestId} to become ready for download");
+                await Task.Delay(250, ct).ConfigureAwait(false);
+            }
 
-        Logger.Debug($"Download {requestId} ready");
-        _downloadReady.Remove(requestId, out _);
+            Logger.Debug($"Download {requestId} ready");
+        }
+        catch (TaskCanceledException)
+        {
+            try
+            {
+                await SendRequestAsync<object>(HttpMethod.Get, MareFiles.RequestCancelFullPath(downloadFileTransfer.DownloadUri, requestId), ct).ConfigureAwait(false);
+            }
+            catch { }
+
+            throw;
+        }
+        finally
+        {
+            _downloadReady.Remove(requestId, out _);
+        }
     }
 
     private async Task<string> DownloadFileHttpClient(DownloadFileTransfer fileTransfer, IProgress<long> progress, CancellationToken ct)
@@ -78,7 +93,7 @@ public partial class ApiController
 
         Logger.Debug($"GUID {requestId} for file {fileTransfer.Hash} on server {fileTransfer.DownloadUri}");
 
-        await WaitForDownloadReady(requestId, ct).ConfigureAwait(false);
+        await WaitForDownloadReady(fileTransfer, requestId, ct).ConfigureAwait(false);
 
         HttpResponseMessage response = null!;
         var requestUrl = MareFiles.CacheGetFullPath(fileTransfer.DownloadUri, requestId);
