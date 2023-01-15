@@ -56,7 +56,7 @@ public partial class ApiController
     {
         while (!ct.IsCancellationRequested)
         {
-            await Task.Delay(250, ct).ConfigureAwait(false);
+            await Task.Delay(500, ct).ConfigureAwait(false);
             var queueResponse = await SendRequestAsync<object>(HttpMethod.Get, MareFiles.RequestCheckQueueFullPath(fileTransfer.DownloadUri, requestId)).ConfigureAwait(false);
             try
             {
@@ -83,7 +83,7 @@ public partial class ApiController
                         break;
                 }
 
-                await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
+                await Task.Delay(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
             }
         }
 
