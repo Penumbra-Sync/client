@@ -214,9 +214,10 @@ public class CachedPlayer
                 ApplyCustomizationData(kind, downloadToken);
             }
 
-            _downloadCancellationTokenSource = null;
         }, downloadToken).ContinueWith(task =>
         {
+            _downloadCancellationTokenSource = null;
+
             if (!task.IsCanceled) return;
 
             Logger.Debug("Download Task was cancelled");
