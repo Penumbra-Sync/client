@@ -264,6 +264,21 @@ public class UiShared : IDisposable
         ImGui.TextUnformatted(text);
         ImGui.PopTextWrapPos();
     }
+    
+    public static void FontTextUnformatted(string text, ImFontPtr font)
+    {
+        ImGui.PushFont(font);
+        ImGui.TextUnformatted(text);
+        ImGui.PopFont();
+    }
+    
+    public static void FontText(Action textAction, ImFontPtr font)
+    {
+        ImGui.PushFont(font);
+        textAction();
+        ImGui.PopFont();
+    }
+
 
     public static Vector4 GetCpuLoadColor(double input) => input < 50 ? ImGuiColors.ParsedGreen :
         input < 90 ? ImGuiColors.DalamudYellow : ImGuiColors.DalamudRed;
