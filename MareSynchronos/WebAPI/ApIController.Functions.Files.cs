@@ -123,9 +123,10 @@ public partial class ApiController
             }
         }
 
-        var fileName = Path.GetTempFileName();
         try
         {
+            var fileName = Path.GetTempFileName();
+
             var fileStream = File.Create(fileName);
             await using (fileStream.ConfigureAwait(false))
             {
