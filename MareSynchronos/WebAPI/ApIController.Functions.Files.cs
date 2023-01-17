@@ -98,7 +98,7 @@ public partial class ApiController
         }
     }
 
-    private async Task<string> DownloadFileHttpClient(DownloadFileTransfer fileTransfer, IProgress<long> progress, CancellationToken ct)
+    private async Task DownloadFileHttpClient(DownloadFileTransfer fileTransfer, string tempPath, IProgress<long> progress, CancellationToken ct)
     {
         var requestId = await GetQueueRequest(fileTransfer, ct).ConfigureAwait(false);
 
@@ -124,12 +124,9 @@ public partial class ApiController
             }
         }
 
-        var fileName = "";
         try
         {
-            fileName = Path.GetTempFileName();
-
-            var fileStream = File.Create(fileName);
+            var fileStream = File.Create(tempPath);
             await using (fileStream.ConfigureAwait(false))
             {
                 var bufferSize = response.Content.Headers.ContentLength > 1024 * 1024 ? 4096 : 1024;
@@ -145,8 +142,7 @@ public partial class ApiController
                     progress.Report(bytesRead);
                 }
 
-                Logger.Debug($"{requestUrl} downloaded to {fileName}");
-                return fileName;
+                Logger.Debug($"{requestUrl} downloaded to {tempPath}");
             }
         }
         catch (Exception ex)
@@ -154,8 +150,8 @@ public partial class ApiController
             Logger.Warn($"Error during file download of {requestUrl}", ex);
             try
             {
-                if (!fileName.IsNullOrEmpty())
-                    File.Delete(fileName);
+                if (!tempPath.IsNullOrEmpty())
+                    File.Delete(tempPath);
             }
             catch { }
             throw;
@@ -246,18 +242,27 @@ public partial class ApiController
                     file.Transferred += bytesDownloaded;
                 });
 
-                var tempFile = await DownloadFileHttpClient(file, progress, token).ConfigureAwait(false);
-                if (token.IsCancellationRequested)
+                var tempPath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash + ".tmp");
+                try
                 {
-                    File.Delete(tempFile);
-                    Logger.Debug("Detetokened cancellation, removing " + currentDownloadId);
+                    await DownloadFileHttpClient(file, tempPath, progress, token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    File.Delete(tempPath);
+                    Logger.Debug("Detected cancellation, removing " + currentDownloadId);
                     CancelDownload(currentDownloadId);
                     return;
                 }
+                catch (Exception ex)
+                {
+                    Logger.Error("Error during download of " + file.Hash, ex);
+                    return;
+                }
 
-                var tempFileData = await File.ReadAllBytesAsync(tempFile, token).ConfigureAwait(false);
+                var tempFileData = await File.ReadAllBytesAsync(tempPath, token).ConfigureAwait(false);
                 var extratokenedFile = LZ4Codec.Unwrap(tempFileData);
-                File.Delete(tempFile);
+                File.Delete(tempPath);
                 var filePath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash);
                 await File.WriteAllBytesAsync(filePath, extratokenedFile, token).ConfigureAwait(false);
                 var fi = new FileInfo(filePath);

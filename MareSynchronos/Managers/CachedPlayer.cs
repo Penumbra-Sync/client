@@ -66,7 +66,7 @@ public class CachedPlayer
         Logger.Debug("Received data for " + this);
 
         Logger.Debug("Checking for files to download for player " + PlayerName);
-        Logger.Debug("Hash for data is " + characterData.GetHashCode());
+        Logger.Debug("Hash for data is " + characterData.GetHashCode() + ", current cache hash is " + _cachedData.GetHashCode());
 
         if (characterData.GetHashCode() == _cachedData.GetHashCode()) return;
 
@@ -434,9 +434,11 @@ public class CachedPlayer
         finally
         {
             _cachedData = new();
+            var tempPlayerName = PlayerName;
             PlayerName = string.Empty;
             PlayerCharacter = IntPtr.Zero;
             IsVisible = false;
+            Logger.Debug("Disposing " + tempPlayerName + " complete");
         }
     }
 
