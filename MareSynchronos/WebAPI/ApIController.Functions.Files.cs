@@ -11,6 +11,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Dalamud.Utility;
 using LZ4;
 using MareSynchronos.API;
 using MareSynchronos.Utils;
@@ -123,9 +124,10 @@ public partial class ApiController
             }
         }
 
+        var fileName = "";
         try
         {
-            var fileName = Path.GetTempFileName();
+            fileName = Path.GetTempFileName();
 
             var fileStream = File.Create(fileName);
             await using (fileStream.ConfigureAwait(false))
@@ -152,7 +154,8 @@ public partial class ApiController
             Logger.Warn($"Error during file download of {requestUrl}", ex);
             try
             {
-                File.Delete(fileName);
+                if (!fileName.IsNullOrEmpty())
+                    File.Delete(fileName);
             }
             catch { }
             throw;
