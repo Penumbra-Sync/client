@@ -65,7 +65,7 @@ public partial class ApiController
         bool alreadyCancelled = false;
         try
         {
-            CancellationTokenSource localTimeoutCts = new CancellationTokenSource();
+            CancellationTokenSource localTimeoutCts = new();
             localTimeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
             CancellationTokenSource composite = CancellationTokenSource.CreateLinkedTokenSource(downloadCt, localTimeoutCts.Token);
 
@@ -85,7 +85,7 @@ public partial class ApiController
                         req.EnsureSuccessStatusCode();
                         localTimeoutCts.Dispose();
                         composite.Dispose();
-                        localTimeoutCts = new CancellationTokenSource();
+                        localTimeoutCts = new();
                         localTimeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
                         composite = CancellationTokenSource.CreateLinkedTokenSource(downloadCt, localTimeoutCts.Token);
                     }
