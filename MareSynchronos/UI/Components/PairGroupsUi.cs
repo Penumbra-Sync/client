@@ -54,10 +54,9 @@ namespace MareSynchronos.UI.Components
         {
             var resultFolderName = $"{tag}";
 
-            // Draw the folder icon
-            UiShared.FontTextUnformatted(FontAwesomeIcon.Folder.ToIconString(), UiBuilder.IconFont);
+            UiShared.FontText(FontAwesomeIcon.Folder.ToIconString(), UiBuilder.IconFont);
             ImGui.SameLine();
-            UiShared.FontTextUnformatted(resultFolderName, UiBuilder.DefaultFont);
+            UiShared.FontText(resultFolderName, UiBuilder.DefaultFont);
             if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
             {
                 ToggleTagOpen(tag);
@@ -92,6 +91,14 @@ namespace MareSynchronos.UI.Components
                     PauseRemainingPairs(availablePairsInThisTag);
                 }
             }
+            if (allArePaused)
+            {
+                UiShared.AttachToolTip($"Resume pairing with all pairs in {tag}");
+            }
+            else
+            {
+                UiShared.AttachToolTip($"Pause pairing with all pairs in {tag}");
+            }
 
             var buttonDeleteOffset = windowX + windowWidth - trashButtonX;
             ImGui.SameLine(buttonDeleteOffset);
@@ -99,7 +106,6 @@ namespace MareSynchronos.UI.Components
             {
                 _tagHandler.RemoveTag(tag);
             }
-
             UiShared.AttachToolTip($"Delete Group {tag} (Will not delete the pairs)");
         }
 
@@ -117,7 +123,7 @@ namespace MareSynchronos.UI.Components
         {
             // This is probably just dumb. Somehow, just setting the cursor position to the icon lenght
             // does not really push the child rendering further. So we'll just add two whitespaces and call it a day?
-            UiShared.FontTextUnformatted("    ", UiBuilder.DefaultFont);
+            UiShared.FontText("    ", UiBuilder.DefaultFont);
             ImGui.SameLine();
             _clientRenderFn(pair);
         }

@@ -1,9 +1,7 @@
 ﻿using System.Collections.Generic;
 using Dalamud.Interface;
-using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
 using Dalamud.Utility;
-using FFXIVClientStructs.FFXIV.Client.UI;
 using ImGuiNET;
 using MareSynchronos.API;
 using MareSynchronos.UI.Handlers;
@@ -13,10 +11,14 @@ namespace MareSynchronos.UI.Components
     public class SelectGroupForPairUi
     {
         /// <summary>
-        /// Is the UI open or closed?
+        /// Should the panel show, yes/no
         /// </summary>
-        private bool _open;
+        private bool _show;
 
+        /// <summary>
+        /// Has the panel already been opened?
+        /// This is used to prevent double opening
+        /// </summary>
         private bool _opened;
 
         /// <summary>
@@ -35,7 +37,7 @@ namespace MareSynchronos.UI.Components
 
         public SelectGroupForPairUi(TagHandler tagHandler, Configuration configuration)
         {
-            _open = false;
+            _show = false;
             _pair = null;
             _tagHandler = tagHandler;
             _configuration = configuration;
@@ -44,7 +46,11 @@ namespace MareSynchronos.UI.Components
         public void Open(ClientPairDto pair)
         {
             _pair = pair;
-            _open = true;
+            // Using "_show" here to de-couple the opening of the popup
+            // The popup name is derived from the name the user currently sees, which is
+            // based on the showUidForEntry dictionary.
+            // We'd have to derive the name here to open it popup modal here, when the Open() is called
+            _show = true;
         }
 
 
@@ -57,26 +63,28 @@ namespace MareSynchronos.UI.Components
             
             var name = PairName(showUidForEntry, _pair.OtherUID);
             var popupName = $"Chose Groups for {name}";
-            if (_open && !_opened)
+            // Is the popup supposed to show but did not open yet? Open it
+            if (_show && !_opened)
             {
                 ImGui.OpenPopup(popupName);
                 _opened = true;
             }
 
-            if (!_open)
+            // Is the popup not supposed to show? Set _opened to false so we can re-open it.
+            if (!_show)
             {
                 _opened = false;
             }
             
-            if (ImGui.BeginPopupModal(popupName, ref _open, UiShared.PopupWindowFlags))
+            if (ImGui.BeginPopupModal(popupName, ref _show, UiShared.PopupWindowFlags))
             {
-                UiShared.FontTextUnformatted($"Select the groups you want {name} to be in.", UiBuilder.DefaultFont);
+                UiShared.FontText($"Select the groups you want {name} to be in.", UiBuilder.DefaultFont);
                 foreach (var tag in _tagHandler.GetAllTagsSorted())
                 {
                     UiShared.DrawWithID($"groups-pair-{_pair.OtherUID}-{tag}", () => DrawGroupName(_pair, tag));
                 }
                 
-                UiShared.FontTextUnformatted($"Create a new group for {name}.", UiBuilder.DefaultFont);
+                UiShared.FontText($"Create a new group for {name}.", UiBuilder.DefaultFont);
                 if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
                 {
                     HandleAddTag();
@@ -94,7 +102,7 @@ namespace MareSynchronos.UI.Components
             }
             else
             {
-                _open = false;
+                _show = false;
             }
         }
         
@@ -102,8 +110,7 @@ namespace MareSynchronos.UI.Components
         {
             bool hasTagBefore = _tagHandler.HasTag(pair, name);
             bool hasTag = hasTagBefore;
-            ImGui.Checkbox(name, ref hasTag);
-            if (hasTagBefore != hasTag)
+            if (ImGui.Checkbox(name, ref hasTag))
             {
                 if (hasTag)
                 {

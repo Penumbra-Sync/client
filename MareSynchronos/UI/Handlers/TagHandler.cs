@@ -18,16 +18,16 @@ namespace MareSynchronos.UI.Handlers
 
         public void AddTag(string tag)
         {
-            _configuration.AvailablePairTags.Add(tag);
+            GetAvailableTagsForCurrentServer().Add(tag);
             _configuration.Save();
         }
 
         public void RemoveTag(string tag)
         {
             // First remove the tag from teh available pair tags
-            _configuration.AvailablePairTags.Remove(tag);
+            GetAvailableTagsForCurrentServer().Remove(tag);
             // Then also clean up the tag in all the pairs
-            _configuration.UidPairedUserTags.Keys
+            GetUidTagDictionaryForCurrentServer().Keys
                 .ToList()
                 .ForEach(otherUid => RemoveTagFromPairedUid(otherUid, tag));
             _configuration.Save();
@@ -58,14 +58,14 @@ namespace MareSynchronos.UI.Handlers
 
         public List<string> GetAllTagsSorted()
         {
-            var result = _configuration.AvailablePairTags.ToList();
-            result.Sort(StringComparer.OrdinalIgnoreCase);
-            return result;
+            return GetAvailableTagsForCurrentServer()
+                .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
 
         public HashSet<string> GetOtherUidsForTag(string tag)
         {
-            return _configuration.UidPairedUserTags
+            return GetUidTagDictionaryForCurrentServer()
                 .Where(pair => pair.Value.Contains(tag, StringComparer.Ordinal))
                 .Select(pair => pair.Key)
                 .ToHashSet(StringComparer.Ordinal);
@@ -73,9 +73,10 @@ namespace MareSynchronos.UI.Handlers
 
         public void AddTagToPairedUid(ClientPairDto pair, string tagName)
         {
-            var tagsForPair = _configuration.UidPairedUserTags.GetValueOrDefault(pair.OtherUID, new List<string>());
+            var tagDictionary = GetUidTagDictionaryForCurrentServer();
+            var tagsForPair = tagDictionary.GetValueOrDefault(pair.OtherUID, new List<string>());
             tagsForPair.Add(tagName);
-            _configuration.UidPairedUserTags[pair.OtherUID] = tagsForPair;
+            tagDictionary[pair.OtherUID] = tagsForPair;
             _configuration.Save();
         }
         
@@ -87,27 +88,48 @@ namespace MareSynchronos.UI.Handlers
 
         public bool HasTag(ClientPairDto pair, string tagName)
         {
-            var tagsForPair = _configuration.UidPairedUserTags.GetValueOrDefault(pair.OtherUID, new List<string>());
+            var tagsForPair = GetUidTagDictionaryForCurrentServer().GetValueOrDefault(pair.OtherUID, new List<string>());
             return tagsForPair.Contains(tagName, StringComparer.Ordinal);
         }
 
         public bool HasAnyTag(ClientPairDto pair)
         {
-            return _configuration.UidPairedUserTags.ContainsKey(pair.OtherUID);
+            return GetUidTagDictionaryForCurrentServer().ContainsKey(pair.OtherUID);
         }
         
         private void RemoveTagFromPairedUid(string otherUid, string tagName)
         {
-            var tagsForPair = _configuration.UidPairedUserTags.GetValueOrDefault(otherUid, new List<string>());
+            var tagsForPair = GetUidTagDictionaryForCurrentServer().GetValueOrDefault(otherUid, new List<string>());
             tagsForPair.Remove(tagName);
-            if (tagsForPair.Count <= 0)
+            if (!tagsForPair.Any())
             {
-                _configuration.UidPairedUserTags.Remove(otherUid);
+                // No more entries in list -> we can kick out that entry completely
+                GetUidTagDictionaryForCurrentServer().Remove(otherUid);
             }
             else
             {
-                _configuration.UidPairedUserTags[otherUid] = tagsForPair;
+                GetUidTagDictionaryForCurrentServer()[otherUid] = tagsForPair;
             }
+        }
+
+        private Dictionary<string, List<string>> GetUidTagDictionaryForCurrentServer()
+        {
+            if (!_configuration.UidPairedUserTags.ContainsKey(_configuration.ApiUri))
+            {
+                _configuration.UidPairedUserTags.Add(_configuration.ApiUri, new(StringComparer.Ordinal));
+            }
+
+            return _configuration.UidPairedUserTags[_configuration.ApiUri];
+        }
+        
+        private HashSet<string> GetAvailableTagsForCurrentServer()
+        {
+            if (!_configuration.AvailablePairTags.ContainsKey(_configuration.ApiUri))
+            {
+                _configuration.AvailablePairTags.Add(_configuration.ApiUri, new(StringComparer.Ordinal));
+            }
+
+            return _configuration.AvailablePairTags[_configuration.ApiUri];
         }
     }
 }

@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Reflection;
-using System.Runtime.Serialization.Formatters;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
@@ -78,7 +77,7 @@ public class CompactUi : Window, IDisposable
         _uiShared = uiShared;
         _configuration = configuration;
         _apiController = apiController;
-        _tagHandler = new TagHandler(_configuration);
+        _tagHandler = new(_configuration);
 
         groupPanel = new(this, uiShared, configuration, apiController);
         _selectGroupForPairUi = new(_tagHandler, configuration);
@@ -451,6 +450,7 @@ public class CompactUi : Window, IDisposable
         {
             _selectGroupForPairUi.Open(entry);
         }
+        UiShared.AttachToolTip("Chose pair groups for " + entryUID);
         
         if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Unpair Permanently"))
         {

@@ -91,13 +91,14 @@ public class Configuration : IPluginConfiguration
     /// <summary>
     /// Each paired user can have multiple tags. Each tag will create a category, and the user will
     /// be displayed into that category.
-    /// The dictionary maps the OtherUID of the <see cref="ClientPairDto"/> to a list of tags.
+    /// The dictionary first maps a server URL to a dictionary, and that
+    /// dictionary maps the OtherUID of the <see cref="ClientPairDto"/> to a list of tags.
     /// </summary>
-    public Dictionary<string, List<string>> UidPairedUserTags = new(StringComparer.Ordinal);
+    public Dictionary<string, Dictionary<string, List<string>>> UidPairedUserTags = new(StringComparer.Ordinal);
     /// <summary>
-    /// Also store a list of all tags that have been created.
+    /// A dictionary that maps a server URL to the tags the user has added for that server.
     /// </summary>
-    public HashSet<string> AvailablePairTags = new(StringComparer.Ordinal);
+    public Dictionary<string, HashSet<string>> AvailablePairTags = new(StringComparer.Ordinal);
 
     public HashSet<string> OpenPairTags = new(StringComparer.Ordinal);
     public int Version { get; set; } = 5;
