@@ -60,16 +60,44 @@ public partial class ApiController
         return requestId;
     }
 
-    private async Task WaitForDownloadReady(DownloadFileTransfer downloadFileTransfer, Guid requestId, CancellationToken ct)
+    private async Task WaitForDownloadReady(DownloadFileTransfer downloadFileTransfer, Guid requestId, CancellationToken downloadCt)
     {
         bool alreadyCancelled = false;
         try
         {
-            while (!ct.IsCancellationRequested && _downloadReady.TryGetValue(requestId, out bool isReady) && !isReady)
+            CancellationTokenSource localTimeoutCts = new CancellationTokenSource();
+            localTimeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+            CancellationTokenSource composite = CancellationTokenSource.CreateLinkedTokenSource(downloadCt, localTimeoutCts.Token);
+
+            while (_downloadReady.TryGetValue(requestId, out bool isReady) && !isReady)
             {
-                Logger.Verbose($"Waiting for {requestId} to become ready for download");
-                await Task.Delay(250, ct).ConfigureAwait(false);
+                try
+                {
+                    await Task.Delay(250, composite.Token).ConfigureAwait(false);
+                }
+                catch (TaskCanceledException)
+                {
+                    if (downloadCt.IsCancellationRequested) throw;
+
+                    var req = await SendRequestAsync<object>(HttpMethod.Get, MareFiles.RequestCheckQueueFullPath(downloadFileTransfer.DownloadUri, requestId, downloadFileTransfer.Hash), downloadCt).ConfigureAwait(false);
+                    try
+                    {
+                        req.EnsureSuccessStatusCode();
+                        localTimeoutCts.Dispose();
+                        composite.Dispose();
+                        localTimeoutCts = new CancellationTokenSource();
+                        localTimeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+                        composite = CancellationTokenSource.CreateLinkedTokenSource(downloadCt, localTimeoutCts.Token);
+                    }
+                    catch (HttpRequestException)
+                    {
+                        throw;
+                    }
+                }
             }
+
+            localTimeoutCts.Dispose();
+            composite.Dispose();
 
             Logger.Debug($"Download {requestId} ready");
         }
@@ -77,7 +105,7 @@ public partial class ApiController
         {
             try
             {
-                await SendRequestAsync<object>(HttpMethod.Get, MareFiles.RequestCancelFullPath(downloadFileTransfer.DownloadUri, requestId), ct).ConfigureAwait(false);
+                await SendRequestAsync<object>(HttpMethod.Get, MareFiles.RequestCancelFullPath(downloadFileTransfer.DownloadUri, requestId), downloadCt).ConfigureAwait(false);
                 alreadyCancelled = true;
             }
             catch { }
@@ -86,11 +114,11 @@ public partial class ApiController
         }
         finally
         {
-            if (ct.IsCancellationRequested && !alreadyCancelled)
+            if (downloadCt.IsCancellationRequested && !alreadyCancelled)
             {
                 try
                 {
-                    await SendRequestAsync<object>(HttpMethod.Get, MareFiles.RequestCancelFullPath(downloadFileTransfer.DownloadUri, requestId), ct).ConfigureAwait(false);
+                    await SendRequestAsync<object>(HttpMethod.Get, MareFiles.RequestCancelFullPath(downloadFileTransfer.DownloadUri, requestId), downloadCt).ConfigureAwait(false);
                 }
                 catch { }
             }
@@ -184,7 +212,7 @@ public partial class ApiController
         {
             requestMessage.Content = JsonContent.Create(content);
         }
-        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", Authorization);
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", this.Authorization);
 
         if (content != default)
         {
