@@ -114,22 +114,22 @@ namespace MareSynchronos.UI.Handlers
 
         private Dictionary<string, List<string>> GetUidTagDictionaryForCurrentServer()
         {
-            if (!_configuration.UidPairedUserTags.ContainsKey(_configuration.ApiUri))
+            if (!_configuration.UidServerPairedUserTags.ContainsKey(_configuration.ApiUri))
             {
-                _configuration.UidPairedUserTags.Add(_configuration.ApiUri, new(StringComparer.Ordinal));
+                _configuration.UidServerPairedUserTags.Add(_configuration.ApiUri, new(StringComparer.Ordinal));
             }
 
-            return _configuration.UidPairedUserTags[_configuration.ApiUri];
+            return _configuration.UidServerPairedUserTags[_configuration.ApiUri];
         }
         
         private HashSet<string> GetAvailableTagsForCurrentServer()
         {
-            if (!_configuration.AvailablePairTags.ContainsKey(_configuration.ApiUri))
+            if (!_configuration.ServerAvailablePairTags.ContainsKey(_configuration.ApiUri))
             {
-                _configuration.AvailablePairTags.Add(_configuration.ApiUri, new(StringComparer.Ordinal));
+                _configuration.ServerAvailablePairTags.Add(_configuration.ApiUri, new(StringComparer.Ordinal));
             }
 
-            return _configuration.AvailablePairTags[_configuration.ApiUri];
+            return _configuration.ServerAvailablePairTags[_configuration.ApiUri];
         }
     }
 }

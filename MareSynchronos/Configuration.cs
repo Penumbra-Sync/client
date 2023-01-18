@@ -94,11 +94,11 @@ public class Configuration : IPluginConfiguration
     /// The dictionary first maps a server URL to a dictionary, and that
     /// dictionary maps the OtherUID of the <see cref="ClientPairDto"/> to a list of tags.
     /// </summary>
-    public Dictionary<string, Dictionary<string, List<string>>> UidPairedUserTags = new(StringComparer.Ordinal);
+    public Dictionary<string, Dictionary<string, List<string>>> UidServerPairedUserTags = new(StringComparer.Ordinal);
     /// <summary>
     /// A dictionary that maps a server URL to the tags the user has added for that server.
     /// </summary>
-    public Dictionary<string, HashSet<string>> AvailablePairTags = new(StringComparer.Ordinal);
+    public Dictionary<string, HashSet<string>> ServerAvailablePairTags = new(StringComparer.Ordinal);
 
     public HashSet<string> OpenPairTags = new(StringComparer.Ordinal);
     public int Version { get; set; } = 5;
