@@ -205,13 +205,13 @@ public partial class ApiController
         }
     }
 
-    private async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, Uri uri, CancellationToken? ct = null)
+    private async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, Uri uri, CancellationToken ct)
     {
         using var requestMessage = new HttpRequestMessage(method, uri);
         return await SendRequestInternalAsync(requestMessage, ct).ConfigureAwait(false);
     }
 
-    private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage, CancellationToken? ct = null)
+    private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage, CancellationToken ct)
     {
         requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", this.Authorization);
 
@@ -224,13 +224,10 @@ public partial class ApiController
             Logger.Debug("Sending " + requestMessage.Method + " to " + requestMessage.RequestUri);
         }
 
-        if (ct.HasValue)
-            return await _httpClient.SendAsync(requestMessage, ct.Value).ConfigureAwait(false);
-
-        return await _httpClient.SendAsync(requestMessage).ConfigureAwait(false);
+        return await _httpClient.SendAsync(requestMessage, ct).ConfigureAwait(false);
     }
 
-    private async Task<HttpResponseMessage> SendRequestAsync<T>(HttpMethod method, Uri uri, T content, CancellationToken? ct = null) where T : class
+    private async Task<HttpResponseMessage> SendRequestAsync<T>(HttpMethod method, Uri uri, T content, CancellationToken ct) where T : class
     {
         using var requestMessage = new HttpRequestMessage(method, uri);
         requestMessage.Content = JsonContent.Create(content);
