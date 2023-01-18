@@ -17,11 +17,6 @@ namespace MareSynchronos.Utils;
 
 public delegate void PlayerChange(Dalamud.Game.ClientState.Objects.Types.Character actor);
 
-public delegate void LogIn();
-public delegate void LogOut();
-public delegate void ClassJobChanged();
-
-public delegate void FrameworkUpdate();
 public delegate void VoidDelegate();
 
 public class DalamudUtil : IDisposable
@@ -32,12 +27,12 @@ public class DalamudUtil : IDisposable
     private readonly Condition _condition;
     private readonly ChatGui _chatGui;
 
-    public event LogIn? LogIn;
-    public event LogOut? LogOut;
-    public event FrameworkUpdate? FrameworkUpdate;
-    public event ClassJobChanged? ClassJobChanged;
+    public event VoidDelegate? LogIn;
+    public event VoidDelegate? LogOut;
+    public event VoidDelegate? FrameworkUpdate;
+    public event VoidDelegate? ClassJobChanged;
     private uint? classJobId = 0;
-    public event FrameworkUpdate? DelayedFrameworkUpdate;
+    public event VoidDelegate? DelayedFrameworkUpdate;
     public event VoidDelegate? ZoneSwitchStart;
     public event VoidDelegate? ZoneSwitchEnd;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
@@ -63,8 +58,6 @@ public class DalamudUtil : IDisposable
         _framework = framework;
         _condition = condition;
         _chatGui = chatGui;
-        _clientState.Login += ClientStateOnLogin;
-        _clientState.Logout += ClientStateOnLogout;
         _framework.Update += FrameworkOnUpdate;
         if (IsLoggedIn)
         {
@@ -111,7 +104,7 @@ public class DalamudUtil : IDisposable
             ZoneSwitchEnd?.Invoke();
         }
 
-        foreach (FrameworkUpdate? frameworkInvocation in (FrameworkUpdate?.GetInvocationList() ?? Array.Empty<FrameworkUpdate>()).Cast<FrameworkUpdate>())
+        foreach (VoidDelegate? frameworkInvocation in (FrameworkUpdate?.GetInvocationList() ?? Array.Empty<VoidDelegate>()).Cast<VoidDelegate>())
         {
             try
             {
@@ -125,6 +118,22 @@ public class DalamudUtil : IDisposable
         }
 
         if (DateTime.Now < _delayedFrameworkUpdateCheck.AddSeconds(1)) return;
+
+        var localPlayer = _clientState.LocalPlayer;
+
+        if (localPlayer != null && !IsLoggedIn)
+        {
+            Logger.Debug("Logged in");
+            IsLoggedIn = true;
+            LogIn?.Invoke();
+        }
+        else if (localPlayer == null && IsLoggedIn)
+        {
+            Logger.Debug("Logged out");
+            IsLoggedIn = false;
+            LogOut?.Invoke();
+        }
+
         if (_clientState.LocalPlayer != null && _clientState.LocalPlayer.IsValid())
         {
             var newclassJobId = _clientState.LocalPlayer.ClassJob.Id;
@@ -136,7 +145,7 @@ public class DalamudUtil : IDisposable
             }
         }
 
-        foreach (FrameworkUpdate? frameworkInvocation in (DelayedFrameworkUpdate?.GetInvocationList() ?? Array.Empty<FrameworkUpdate>()).Cast<FrameworkUpdate>())
+        foreach (VoidDelegate? frameworkInvocation in (DelayedFrameworkUpdate?.GetInvocationList() ?? Array.Empty<VoidDelegate>()).Cast<VoidDelegate>())
         {
             try
             {
@@ -166,7 +175,7 @@ public class DalamudUtil : IDisposable
         return _objectTable.CreateObjectReference(reference);
     }
 
-    public bool IsLoggedIn => _clientState.IsLoggedIn;
+    public bool IsLoggedIn { get; private set; }
 
     public bool IsPlayerPresent => _clientState.LocalPlayer != null && _clientState.LocalPlayer.IsValid();
 

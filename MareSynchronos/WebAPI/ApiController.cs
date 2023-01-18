@@ -299,6 +299,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         OnUserReceiveCharacterData((dto, ident) => Client_UserReceiveCharacterData(dto, ident));
         OnGroupChange(async (dto) => await Client_GroupChange(dto).ConfigureAwait(false));
         OnGroupUserChange((dto) => Client_GroupUserChange(dto));
+        OnDownloadReady((guid) => Client_DownloadReady(guid));
 
         OnAdminForcedReconnect(() => Client_AdminForcedReconnect());
 

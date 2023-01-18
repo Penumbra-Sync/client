@@ -69,7 +69,8 @@ public class CompactUi : Window, IDisposable
         this.WindowName = "Mare Synchronos " + dateTime + "###MareSynchronosMainUI";
         Toggle();
 #else
-        this.WindowName = "Mare Synchronos " + Assembly.GetExecutingAssembly().GetName().Version + "###MareSynchronosMainUI";
+        var ver = Assembly.GetExecutingAssembly().GetName().Version;
+        this.WindowName = "Mare Synchronos " + ver.Major + "." + ver.Minor + "." + ver.Build + "###MareSynchronosMainUI";
 #endif
         Logger.Verbose("Creating " + nameof(CompactUi));
 

@@ -66,7 +66,7 @@ public class CachedPlayer
         Logger.Debug("Received data for " + this);
 
         Logger.Debug("Checking for files to download for player " + PlayerName);
-        Logger.Debug("Hash for data is " + characterData.GetHashCode());
+        Logger.Debug("Hash for data is " + characterData.GetHashCode() + ", current cache hash is " + _cachedData.GetHashCode());
 
         if (characterData.GetHashCode() == _cachedData.GetHashCode()) return;
 
@@ -168,8 +168,10 @@ public class CachedPlayer
         }
 
         _downloadCancellationTokenSource?.Cancel();
+        _downloadCancellationTokenSource?.Dispose();
         _downloadCancellationTokenSource = new CancellationTokenSource();
         var downloadToken = _downloadCancellationTokenSource.Token;
+
         var downloadId = _apiController.GetDownloadId();
         Task.Run(async () =>
         {
@@ -211,15 +213,16 @@ public class CachedPlayer
             {
                 ApplyCustomizationData(kind, downloadToken);
             }
+
         }, downloadToken).ContinueWith(task =>
         {
+            _downloadCancellationTokenSource = null;
+
             if (!task.IsCanceled) return;
 
             Logger.Debug("Download Task was cancelled");
             _apiController.CancelDownload(downloadId);
         });
-
-        _downloadCancellationTokenSource = null;
     }
 
     private List<FileReplacementDto> TryCalculateModdedDictionary(out Dictionary<string, string> moddedDictionary)
@@ -415,6 +418,7 @@ public class CachedPlayer
             _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName);
             _downloadCancellationTokenSource?.Cancel();
             _downloadCancellationTokenSource?.Dispose();
+            _downloadCancellationTokenSource = null;
             if (PlayerCharacter != IntPtr.Zero)
             {
                 foreach (var item in _cachedData.FileReplacements)
@@ -430,9 +434,11 @@ public class CachedPlayer
         finally
         {
             _cachedData = new();
+            var tempPlayerName = PlayerName;
             PlayerName = string.Empty;
             PlayerCharacter = IntPtr.Zero;
             IsVisible = false;
+            Logger.Debug("Disposing " + tempPlayerName + " complete");
         }
     }
 
