@@ -105,7 +105,7 @@ public partial class ApiController
         {
             try
             {
-                await SendRequestAsync(HttpMethod.Get, MareFiles.RequestCancelFullPath(downloadFileTransfer.DownloadUri, requestId), downloadCt).ConfigureAwait(false);
+                await SendRequestAsync(HttpMethod.Get, MareFiles.RequestCancelFullPath(downloadFileTransfer.DownloadUri, requestId)).ConfigureAwait(false);
                 alreadyCancelled = true;
             }
             catch { }
@@ -118,7 +118,7 @@ public partial class ApiController
             {
                 try
                 {
-                    await SendRequestAsync(HttpMethod.Get, MareFiles.RequestCancelFullPath(downloadFileTransfer.DownloadUri, requestId), downloadCt).ConfigureAwait(false);
+                    await SendRequestAsync(HttpMethod.Get, MareFiles.RequestCancelFullPath(downloadFileTransfer.DownloadUri, requestId)).ConfigureAwait(false);
                 }
                 catch { }
             }
@@ -205,13 +205,13 @@ public partial class ApiController
         }
     }
 
-    private async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, Uri uri, CancellationToken ct)
+    private async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, Uri uri, CancellationToken? ct = null)
     {
         using var requestMessage = new HttpRequestMessage(method, uri);
         return await SendRequestInternalAsync(requestMessage, ct).ConfigureAwait(false);
     }
 
-    private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage, CancellationToken ct)
+    private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage, CancellationToken? ct = null)
     {
         requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", this.Authorization);
 
@@ -224,7 +224,9 @@ public partial class ApiController
             Logger.Debug("Sending " + requestMessage.Method + " to " + requestMessage.RequestUri);
         }
 
-        return await _httpClient.SendAsync(requestMessage, ct).ConfigureAwait(false);
+        if(ct != null)
+            return await _httpClient.SendAsync(requestMessage, ct.Value).ConfigureAwait(false);
+        return await _httpClient.SendAsync(requestMessage).ConfigureAwait(false);
     }
 
     private async Task<HttpResponseMessage> SendRequestAsync<T>(HttpMethod method, Uri uri, T content, CancellationToken ct) where T : class
