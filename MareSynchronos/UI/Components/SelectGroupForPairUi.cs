@@ -61,19 +61,19 @@ public class SelectGroupForPairUi
             return;
         }
 
-        var name = PairName(showUidForEntry, _pair.OtherUID);
+        // Is the popup not supposed to show? Set _opened to false so we can re-open it.
+        if (!_show)
+        {
+            _opened = false;
+        }
+
+        var name = PairName(showUidForEntry, _pair.OtherUID, _pair.VanityUID);
         var popupName = $"Choose Groups for {name}";
         // Is the popup supposed to show but did not open yet? Open it
         if (_show && !_opened)
         {
             ImGui.OpenPopup(popupName);
             _opened = true;
-        }
-
-        // Is the popup not supposed to show? Set _opened to false so we can re-open it.
-        if (!_show)
-        {
-            _opened = false;
         }
 
         if (ImGui.BeginPopupModal(popupName, ref _show, UiShared.PopupWindowFlags))
@@ -136,17 +136,13 @@ public class SelectGroupForPairUi
         }
     }
 
-    private string PairName(Dictionary<string, bool> showUidForEntry, string otherUid)
+    private string PairName(Dictionary<string, bool> showUidForEntry, string otherUid, string vanityUid)
     {
         showUidForEntry.TryGetValue(otherUid, out var showUidInsteadOfName);
         _configuration.GetCurrentServerUidComments().TryGetValue(otherUid, out var playerText);
-        if (showUidInsteadOfName)
+        if (showUidInsteadOfName || string.IsNullOrEmpty(playerText))
         {
-            playerText = otherUid;
-        }
-        else if (string.IsNullOrEmpty(playerText))
-        {
-            playerText = otherUid;
+            playerText = string.IsNullOrEmpty(vanityUid) ? otherUid : vanityUid;
         }
         return playerText;
     }

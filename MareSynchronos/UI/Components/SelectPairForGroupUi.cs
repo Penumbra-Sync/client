@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using Dalamud.Interface;
+using FFXIVClientStructs.FFXIV.Common.Math;
 using ImGuiNET;
 using MareSynchronos.API;
 using MareSynchronos.UI.Handlers;
@@ -40,7 +41,8 @@ public class SelectPairForGroupUi
 
         if (_show && !_opened)
         {
-            ImGui.SetWindowSize(new System.Numerics.Vector2(300, 400));
+            ImGui.SetNextWindowSize(new Vector2(300, 400));
+            ImGui.SetNextWindowSizeConstraints(new Vector2(300, 400), new Vector2(300, 1000));
             ImGui.OpenPopup(popupName);
             _opened = true;
         }
@@ -48,10 +50,10 @@ public class SelectPairForGroupUi
         if (ImGui.BeginPopupModal(popupName, ref _show))
         {
             UiShared.FontText($"Select users for group {_tag}", UiBuilder.DefaultFont);
-            foreach (var item in pairs.OrderBy(p => string.IsNullOrEmpty(p.VanityUID) ? p.OtherUID : p.VanityUID, System.StringComparer.OrdinalIgnoreCase).ToList())
+            foreach (var item in pairs.OrderBy(p => PairName(showUidForEntry, p.OtherUID, p.VanityUID), System.StringComparer.OrdinalIgnoreCase).ToList())
             {
                 var isInGroup = _peopleInGroup.Contains(item.OtherUID);
-                if (ImGui.Checkbox(PairName(showUidForEntry, item.OtherUID), ref isInGroup))
+                if (ImGui.Checkbox(PairName(showUidForEntry, item.OtherUID, item.VanityUID), ref isInGroup))
                 {
                     if (isInGroup)
                     {
@@ -72,17 +74,13 @@ public class SelectPairForGroupUi
         }
     }
 
-    private string PairName(Dictionary<string, bool> showUidForEntry, string otherUid)
+    private string PairName(Dictionary<string, bool> showUidForEntry, string otherUid, string vanityUid)
     {
         showUidForEntry.TryGetValue(otherUid, out var showUidInsteadOfName);
         _configuration.GetCurrentServerUidComments().TryGetValue(otherUid, out var playerText);
-        if (showUidInsteadOfName)
+        if (showUidInsteadOfName || string.IsNullOrEmpty(playerText))
         {
-            playerText = otherUid;
-        }
-        else if (string.IsNullOrEmpty(playerText))
-        {
-            playerText = otherUid;
+            playerText = string.IsNullOrEmpty(vanityUid) ? otherUid : vanityUid;
         }
         return playerText;
     }
