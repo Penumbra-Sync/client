@@ -6,7 +6,6 @@ using Dalamud.Interface.Components;
 using ImGuiNET;
 using MareSynchronos.API;
 using MareSynchronos.UI.Handlers;
-using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.UI.Components
@@ -28,8 +27,7 @@ namespace MareSynchronos.UI.Components
         {
             // Only render those tags that actually have pairs in them, otherwise
             // we can end up with a bunch of useless pair groups
-            var tagsWithPairsInThem = _tagHandler.GetAllTagsSorted()
-                .Where(tag => _tagHandler.GetOtherUidsForTag(tag).Count >= 1);
+            var tagsWithPairsInThem = _tagHandler.GetAllTagsSorted();
             foreach (var tag in tagsWithPairsInThem)
             {
                 UiShared.DrawWithID($"group-{tag}", () => DrawCategory(tag, availablePairs));
@@ -42,11 +40,14 @@ namespace MareSynchronos.UI.Components
             var availablePairsInThisTag = availablePairs
                 .Where(pair => otherUidsTaggedWithTag.Contains(pair.OtherUID))
                 .ToList();
-            DrawName(tag);
-            UiShared.DrawWithID($"group-{tag}-buttons", () => DrawButtons(tag, availablePairsInThisTag));
-            if (_tagHandler.IsTagOpen(tag))
+            if (availablePairsInThisTag.Any())
             {
-                DrawPairs(tag, availablePairsInThisTag);
+                DrawName(tag);
+                UiShared.DrawWithID($"group-{tag}-buttons", () => DrawButtons(tag, availablePairsInThisTag));
+                if (_tagHandler.IsTagOpen(tag))
+                {
+                    DrawPairs(tag, availablePairsInThisTag);
+                }
             }
         }
 
@@ -54,7 +55,13 @@ namespace MareSynchronos.UI.Components
         {
             var resultFolderName = $"{tag}";
 
-            UiShared.FontText(FontAwesomeIcon.Folder.ToIconString(), UiBuilder.IconFont);
+            //  FontAwesomeIcon.CaretSquareDown : FontAwesomeIcon.CaretSquareRight
+            var icon = _tagHandler.IsTagOpen(tag) ? FontAwesomeIcon.CaretSquareDown : FontAwesomeIcon.CaretSquareRight;
+            UiShared.FontText(icon.ToIconString(), UiBuilder.IconFont);
+            if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
+            {
+                ToggleTagOpen(tag);
+            }
             ImGui.SameLine();
             UiShared.FontText(resultFolderName, UiBuilder.DefaultFont);
             if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
@@ -111,7 +118,6 @@ namespace MareSynchronos.UI.Components
 
         private void DrawPairs(string tag, List<ClientPairDto> availablePairsInThisCategory)
         {
-            Logger.Debug($"Available pairs in {tag}: ${availablePairsInThisCategory.ToString()}");
             ImGui.Separator();
             // These are all the OtherUIDs that are tagged with this tag
             availablePairsInThisCategory
