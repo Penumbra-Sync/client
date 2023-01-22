@@ -16,6 +16,7 @@ public class SelectPairForGroupUi
     private string _tag = string.Empty;
     private readonly TagHandler _tagHandler;
     private readonly Configuration _configuration;
+    private string _filter = string.Empty;
 
     public SelectPairForGroupUi(TagHandler tagHandler, Configuration configuration)
     {
@@ -42,15 +43,17 @@ public class SelectPairForGroupUi
         if (_show && !_opened)
         {
             ImGui.SetNextWindowSize(new Vector2(300, 400));
-            ImGui.SetNextWindowSizeConstraints(new Vector2(300, 400), new Vector2(300, 1000));
             ImGui.OpenPopup(popupName);
             _opened = true;
         }
 
-        if (ImGui.BeginPopupModal(popupName, ref _show))
+        ImGui.SetNextWindowSizeConstraints(new Vector2(300, 400), new Vector2(300, 1000));
+        if (ImGui.BeginPopupModal(popupName, ref _show, ImGuiWindowFlags.Popup | ImGuiWindowFlags.Modal))
         {
             UiShared.FontText($"Select users for group {_tag}", UiBuilder.DefaultFont);
-            foreach (var item in pairs.OrderBy(p => PairName(showUidForEntry, p.OtherUID, p.VanityUID), System.StringComparer.OrdinalIgnoreCase).ToList())
+            ImGui.InputTextWithHint("##filter", "Filter", ref _filter, 255, ImGuiInputTextFlags.None);
+            foreach (var item in pairs.OrderBy(p => PairName(showUidForEntry, p.OtherUID, p.VanityUID), System.StringComparer.OrdinalIgnoreCase)
+                .Where(p => string.IsNullOrEmpty(_filter) || PairName(showUidForEntry, p.OtherUID, p.VanityUID).Contains(_filter, System.StringComparison.OrdinalIgnoreCase)).ToList())
             {
                 var isInGroup = _peopleInGroup.Contains(item.OtherUID);
                 if (ImGui.Checkbox(PairName(showUidForEntry, item.OtherUID, item.VanityUID), ref isInGroup))
@@ -70,6 +73,7 @@ public class SelectPairForGroupUi
         }
         else
         {
+            _filter = string.Empty;
             _show = false;
         }
     }
