@@ -107,31 +107,35 @@ public class UiShared : IDisposable
         var newLineHeight = ImGui.GetCursorPosY();
         ImGui.NewLine();
         newLineHeight = ImGui.GetCursorPosY() - newLineHeight;
-        var x = width * ImGuiHelpers.GlobalScale;
         var y = ImGui.GetCursorPos().Y + ImGui.GetWindowContentRegionMin().Y - newLineHeight * 2 - ImGui.GetStyle().ItemSpacing.Y;
+
+        SetScaledWindowSize(width, y, centerWindow, scaledHeight: true);
+    }
+
+    public static void SetScaledWindowSize(float width, float height, bool centerWindow = true, bool scaledHeight = false)
+    {
+        ImGui.SameLine();
+        var x = width * ImGuiHelpers.GlobalScale;
+        var y = scaledHeight ? height : height * ImGuiHelpers.GlobalScale;
 
         if (centerWindow)
         {
-            var center = ImGui.GetMainViewport().GetCenter();
-            ImGui.SetWindowPos(new Vector2(center.X - x / 2, center.Y - y / 2));
+            CenterWindow(x, y);
         }
 
         ImGui.SetWindowSize(new Vector2(x, y));
     }
-
-    public static void SetScaledWindowSize(float width, float height, bool centerWindow = true)
+    
+    private static void CenterWindow(float width, float height, ImGuiCond cond = ImGuiCond.None)
     {
-        ImGui.SameLine();
-        var x = width * ImGuiHelpers.GlobalScale;
-        var y = height * ImGuiHelpers.GlobalScale;
-
-        if (centerWindow)
-        {
-            var center = ImGui.GetMainViewport().GetCenter();
-            ImGui.SetWindowPos(new Vector2(center.X - x / 2, center.Y - y / 2));
-        }
-
-        ImGui.SetWindowSize(new Vector2(x, y));
+        var center = ImGui.GetMainViewport().GetCenter();
+        ImGui.SetWindowPos(new Vector2(center.X - width / 2, center.Y - height / 2), cond);
+    }
+    
+    public static void CenterNextWindow(float width, float height, ImGuiCond cond = ImGuiCond.None)
+    {
+        var center = ImGui.GetMainViewport().GetCenter();
+        ImGui.SetNextWindowPos(new Vector2(center.X - width / 2, center.Y - height / 2), cond);
     }
 
     public static void DrawWithID(string id, Action drawSubSection)
