@@ -274,7 +274,8 @@ namespace MareSynchronos.UI
             }
             else
             {
-                ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX());
+                var buttonSizes = UiShared.GetIconButtonSize(FontAwesomeIcon.Bars).X + UiShared.GetIconSize(FontAwesomeIcon.LockOpen).X;
+                ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * 2);
                 if (ImGui.InputTextWithHint("", "Comment/Notes", ref _editGroupComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
                 {
                     _configuration.SetCurrentServerGidComment(group.GID, _editGroupComment);
@@ -560,11 +561,10 @@ namespace MareSynchronos.UI
             var entryUID = string.IsNullOrEmpty(entry.UserAlias) ? entry.UserUID : entry.UserAlias;
             var textSize = ImGui.CalcTextSize(entryUID);
             var originalY = ImGui.GetCursorPosY();
-            var buttonSizes = plusButtonSize.Y;
             var userIsMod = entry.IsModerator ?? false;
             var userIsOwner = string.Equals(entryUID, ownerUid, StringComparison.Ordinal);
 
-            var textPos = originalY + plusButtonSize.Y / 2 - textSize.Y / 2;
+            var textPos = originalY + barButtonSize.Y / 2 - textSize.Y / 2;
             ImGui.SetCursorPosY(textPos);
             if (isPausedByYou || (entry.IsPaused ?? false))
             {
@@ -628,6 +628,8 @@ namespace MareSynchronos.UI
             {
                 playerText = entryUID;
             }
+            
+            bool plusButtonShown = !_apiController.PairedClients.Any(p => string.Equals(p.OtherUID, entry.UserUID, StringComparison.Ordinal));
 
             ImGui.SameLine();
             if (!string.Equals(_mainUi.EditNickEntry, entry.UserUID, StringComparison.Ordinal))
@@ -662,8 +664,10 @@ namespace MareSynchronos.UI
             else
             {
                 ImGui.SetCursorPosY(originalY);
+                var buttonSizes = (plusButtonShown ? plusButtonSize.X : 0) + barButtonSize.X;
+                var buttons = plusButtonShown ? 2 : 1;
 
-                ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * 2);
+                ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * buttons);
                 if (ImGui.InputTextWithHint("", "Nick/Notes", ref _mainUi.EditUserComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
                 {
                     _configuration.SetCurrentServerUidComment(entry.UserUID, _mainUi.EditUserComment);
@@ -678,15 +682,13 @@ namespace MareSynchronos.UI
                 UiShared.AttachToolTip("Hit ENTER to save\nRight click to cancel");
             }
 
-            bool plusButtonShown = !_apiController.PairedClients.Any(p => string.Equals(p.OtherUID, entry.UserUID, StringComparison.Ordinal));
-
             if (plusButtonShown)
             {
-                ImGui.SetCursorPosY(originalY);
                 var barWidth = isOwner || (isModerator && !userIsMod && !userIsOwner)
                     ? barButtonSize.X + ImGui.GetStyle().ItemSpacing.X
                     : 0;
                 ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - plusButtonSize.X - barWidth);
+                ImGui.SetCursorPosY(originalY);
 
                 if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
                 {
@@ -697,8 +699,8 @@ namespace MareSynchronos.UI
 
             if (isOwner || (isModerator && !userIsMod && !userIsOwner))
             {
-                ImGui.SetCursorPosY(originalY);
                 ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - barButtonSize.X);
+                ImGui.SetCursorPosY(originalY);
 
                 if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
                 {

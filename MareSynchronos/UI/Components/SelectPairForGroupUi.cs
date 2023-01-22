@@ -33,6 +33,10 @@ public class SelectPairForGroupUi
 
     public void Draw(List<ClientPairDto> pairs, Dictionary<string, bool> showUidForEntry)
     {
+        var workHeight = ImGui.GetMainViewport().WorkSize.Y / ImGuiHelpers.GlobalScale;
+        var minSize = new Vector2(300, workHeight < 400 ? workHeight : 400) * ImGuiHelpers.GlobalScale;
+        var maxSize = new Vector2(300, 1000) * ImGuiHelpers.GlobalScale;
+        
         var popupName = $"Choose Users for Group {_tag}";
 
         if (!_show)
@@ -42,12 +46,13 @@ public class SelectPairForGroupUi
 
         if (_show && !_opened)
         {
-            ImGui.SetNextWindowSize(new Vector2(300, 400));
+            ImGui.SetNextWindowSize(minSize);
+            UiShared.CenterNextWindow(minSize.X, minSize.Y, ImGuiCond.Always);
             ImGui.OpenPopup(popupName);
             _opened = true;
         }
 
-        ImGui.SetNextWindowSizeConstraints(new Vector2(300, 400), new Vector2(300, 1000));
+        ImGui.SetNextWindowSizeConstraints(minSize, maxSize);
         if (ImGui.BeginPopupModal(popupName, ref _show, ImGuiWindowFlags.Popup | ImGuiWindowFlags.Modal))
         {
             UiShared.FontText($"Select users for group {_tag}", UiBuilder.DefaultFont);
@@ -70,6 +75,7 @@ public class SelectPairForGroupUi
                     }
                 }
             }
+            ImGui.EndPopup();
         }
         else
         {

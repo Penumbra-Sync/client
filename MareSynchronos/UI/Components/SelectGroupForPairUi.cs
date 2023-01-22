@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Numerics;
 using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Utility;
@@ -14,12 +15,6 @@ public class SelectGroupForPairUi
     /// Should the panel show, yes/no
     /// </summary>
     private bool _show;
-
-    /// <summary>
-    /// Has the panel already been opened?
-    /// This is used to prevent double opening
-    /// </summary>
-    private bool _opened;
 
     /// <summary>
     /// The group UI is always open for a specific pair. This defines which pair the UI is open for.
@@ -61,29 +56,32 @@ public class SelectGroupForPairUi
             return;
         }
 
-        // Is the popup not supposed to show? Set _opened to false so we can re-open it.
-        if (!_show)
-        {
-            _opened = false;
-        }
-
         var name = PairName(showUidForEntry, _pair.OtherUID, _pair.VanityUID);
         var popupName = $"Choose Groups for {name}";
         // Is the popup supposed to show but did not open yet? Open it
-        if (_show && !_opened)
+        if (_show)
         {
             ImGui.OpenPopup(popupName);
-            _opened = true;
+            _show = false;
         }
 
-        if (ImGui.BeginPopupModal(popupName, ref _show, UiShared.PopupWindowFlags))
+        if (ImGui.BeginPopup(popupName))
         {
+            var tags = _tagHandler.GetAllTagsSorted();
+            var childHeight = tags.Count != 0 ? tags.Count * 25 : 1;
+            var childSize = new Vector2(0, childHeight > 100 ? 100 : childHeight) * ImGuiHelpers.GlobalScale;
+            
             UiShared.FontText($"Select the groups you want {name} to be in.", UiBuilder.DefaultFont);
-            foreach (var tag in _tagHandler.GetAllTagsSorted())
+            if (ImGui.BeginChild(name + "##listGroups", childSize))
             {
-                UiShared.DrawWithID($"groups-pair-{_pair.OtherUID}-{tag}", () => DrawGroupName(_pair, tag));
+                foreach (var tag in tags)
+                {
+                    UiShared.DrawWithID($"groups-pair-{_pair.OtherUID}-{tag}", () => DrawGroupName(_pair, tag));
+                }
+                ImGui.EndChild();
             }
 
+            ImGui.Separator();
             UiShared.FontText($"Create a new group for {name}.", UiBuilder.DefaultFont);
             if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
             {
@@ -97,19 +95,14 @@ public class SelectGroupForPairUi
                     HandleAddTag();
                 }
             }
-            UiShared.SetScaledWindowSize(375);
             ImGui.EndPopup();
-        }
-        else
-        {
-            _show = false;
         }
     }
 
     private void DrawGroupName(ClientPairDto pair, string name)
     {
-        bool hasTagBefore = _tagHandler.HasTag(pair, name);
-        bool hasTag = hasTagBefore;
+        var hasTagBefore = _tagHandler.HasTag(pair, name);
+        var hasTag = hasTagBefore;
         if (ImGui.Checkbox(name, ref hasTag))
         {
             if (hasTag)
