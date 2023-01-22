@@ -7,7 +7,7 @@ using System.Text;
 
 namespace MareSynchronos.Export;
 
-internal record MareCharaFileData
+public record MareCharaFileData
 {
     public string Description { get; set; } = string.Empty;
     public string GlamourerData { get; set; } = string.Empty;
