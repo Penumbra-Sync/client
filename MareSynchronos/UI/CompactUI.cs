@@ -47,8 +47,9 @@ public class CompactUi : Window, IDisposable
     private string _lastAddedUserComment = string.Empty;
 
     private readonly SelectGroupForPairUi _selectGroupForPairUi;
+    private readonly SelectPairForGroupUi _selectPairsForGroupUi;
     private readonly PairGroupsUi _pairGroupsUi;
-    
+
     public CompactUi(WindowSystem windowSystem,
         UiShared uiShared, Configuration configuration, ApiController apiController) : base("###MareSynchronosMainUI")
     {
@@ -81,7 +82,8 @@ public class CompactUi : Window, IDisposable
 
         groupPanel = new(this, uiShared, configuration, apiController);
         _selectGroupForPairUi = new(_tagHandler, configuration);
-        _pairGroupsUi = new(_tagHandler, DrawPairedClient, apiController);
+        _selectPairsForGroupUi = new(_tagHandler, configuration);
+        _pairGroupsUi = new(_tagHandler, DrawPairedClient, apiController, _selectPairsForGroupUi);
 
         SizeConstraints = new WindowSizeConstraints()
         {
@@ -157,8 +159,9 @@ public class CompactUi : Window, IDisposable
             }
             ImGui.Separator();
             UiShared.DrawWithID("transfers", DrawTransfers);
-            UiShared.DrawWithID("grouping-popup", () => _selectGroupForPairUi.Draw(ShowUidForEntry));
             TransferPartHeight = ImGui.GetCursorPosY() - TransferPartHeight;
+            UiShared.DrawWithID("group-user-popup", () => _selectPairsForGroupUi.Draw(_apiController.PairedClients, ShowUidForEntry));
+            UiShared.DrawWithID("grouping-popup", () => _selectGroupForPairUi.Draw(ShowUidForEntry));
         }
 
         if (_configuration.OpenPopupOnAdd && _apiController.LastAddedUser != null)
@@ -318,7 +321,7 @@ public class CompactUi : Window, IDisposable
         var buttonSizes = pauseIconSize.Y + trashButtonSize.Y + barButtonSize.Y;
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
         var windowEndX = ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth();
-   
+
 
         var textPos = originalY + pauseIconSize.Y / 2 - textSize.Y / 2;
         ImGui.SetCursorPosY(textPos);
@@ -431,7 +434,7 @@ public class CompactUi : Window, IDisposable
         // Flyout Menu
         ImGui.SameLine(windowEndX - barButtonSize.X);
         ImGui.SetCursorPosY(originalY);
-    
+
         if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
         {
             ImGui.OpenPopup("User Flyout Menu");
@@ -450,8 +453,8 @@ public class CompactUi : Window, IDisposable
         {
             _selectGroupForPairUi.Open(entry);
         }
-        UiShared.AttachToolTip("Chose pair groups for " + entryUID);
-        
+        UiShared.AttachToolTip("Choose pair groups for " + entryUID);
+
         if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Unpair Permanently"))
         {
             if (UiShared.CtrlPressed())

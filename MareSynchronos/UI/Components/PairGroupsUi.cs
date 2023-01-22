@@ -15,12 +15,14 @@ namespace MareSynchronos.UI.Components
         private readonly Action<ClientPairDto> _clientRenderFn;
         private readonly TagHandler _tagHandler;
         private readonly ApiController _apiController;
+        private readonly SelectPairForGroupUi _selectGroupForPairUi;
 
-        public PairGroupsUi(TagHandler tagHandler, Action<ClientPairDto> clientRenderFn, ApiController apiController)
+        public PairGroupsUi(TagHandler tagHandler, Action<ClientPairDto> clientRenderFn, ApiController apiController, SelectPairForGroupUi selectGroupForPairUi)
         {
             _clientRenderFn = clientRenderFn;
             _tagHandler = tagHandler;
             _apiController = apiController;
+            _selectGroupForPairUi = selectGroupForPairUi;
         }
 
         public void Draw(List<ClientPairDto> availablePairs)
@@ -74,13 +76,13 @@ namespace MareSynchronos.UI.Components
         {
             var allArePaused = availablePairsInThisTag.All(pair => pair.IsPaused);
             var pauseButton = allArePaused ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
-            var trashButtonX = UiShared.GetIconButtonSize(FontAwesomeIcon.Trash).X;
+            var flyoutMenuX = UiShared.GetIconButtonSize(FontAwesomeIcon.Bars).X;
             var pauseButtonX = UiShared.GetIconButtonSize(pauseButton).X;
             var windowX = ImGui.GetWindowContentRegionMin().X;
             var windowWidth = UiShared.GetWindowContentRegionWidth();
             var spacingX = ImGui.GetStyle().ItemSpacing.X;
 
-            var buttonPauseOffset = windowX + windowWidth - trashButtonX - spacingX - pauseButtonX;
+            var buttonPauseOffset = windowX + windowWidth - flyoutMenuX - spacingX - pauseButtonX;
             ImGui.SameLine(buttonPauseOffset);
             if (ImGuiComponents.IconButton(pauseButton))
             {
@@ -107,13 +109,37 @@ namespace MareSynchronos.UI.Components
                 UiShared.AttachToolTip($"Pause pairing with all pairs in {tag}");
             }
 
-            var buttonDeleteOffset = windowX + windowWidth - trashButtonX;
+            var buttonDeleteOffset = windowX + windowWidth - flyoutMenuX;
             ImGui.SameLine(buttonDeleteOffset);
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.Trash))
+            if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
             {
-                _tagHandler.RemoveTag(tag);
+                ImGui.OpenPopup("Group Flyout Menu");
+
             }
-            UiShared.AttachToolTip($"Delete Group {tag} (Will not delete the pairs)");
+
+            if (ImGui.BeginPopup("Group Flyout Menu"))
+            {
+                UiShared.DrawWithID($"buttons-{tag}", () => DrawGroupMenu(tag));
+                ImGui.EndPopup();
+            }
+        }
+
+        private void DrawGroupMenu(string tag)
+        {
+            if (UiShared.IconTextButton(FontAwesomeIcon.Users, "Add people to " + tag))
+            {
+                _selectGroupForPairUi.Open(tag);
+            }
+            UiShared.AttachToolTip($"Add more users to Group {tag}");
+
+            if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete " + tag))
+            {
+                if (UiShared.CtrlPressed())
+                {
+                    _tagHandler.RemoveTag(tag);
+                }
+            }
+            UiShared.AttachToolTip($"Delete Group {tag} (Will not delete the pairs)" + Environment.NewLine + "Hold CTRL to delete");
         }
 
         private void DrawPairs(string tag, List<ClientPairDto> availablePairsInThisCategory)
