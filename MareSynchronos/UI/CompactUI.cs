@@ -313,12 +313,11 @@ public class CompactUi : Window, IDisposable
     {
         var pauseIcon = entry.IsPaused ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
         var pauseIconSize = UiShared.GetIconButtonSize(pauseIcon);
-        var trashButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Trash);
         var barButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Bars);
         var entryUID = string.IsNullOrEmpty(entry.VanityUID) ? entry.OtherUID : entry.VanityUID;
         var textSize = ImGui.CalcTextSize(entryUID);
         var originalY = ImGui.GetCursorPosY();
-        var buttonSizes = pauseIconSize.Y + trashButtonSize.Y + barButtonSize.Y;
+        var buttonSizes = pauseIconSize.Y + barButtonSize.Y;
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
         var windowEndX = ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth();
 
@@ -402,7 +401,7 @@ public class CompactUi : Window, IDisposable
         {
             ImGui.SetCursorPosY(originalY);
 
-            ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * 3);
+            ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * 2);
             if (ImGui.InputTextWithHint("", "Nick/Notes", ref EditUserComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
             {
                 _configuration.SetCurrentServerUidComment(entry.OtherUID, EditUserComment);
