@@ -4,8 +4,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using MareSynchronos.API;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
+using Microsoft.Extensions.Primitives;
 
 namespace MareSynchronos;
 
@@ -85,6 +87,20 @@ public class Configuration : IPluginConfiguration
     public Dictionary<string, Dictionary<string, string>> GidServerComments { get; set; } = new(StringComparer.Ordinal);
 
     public Dictionary<string, string> UidComments { get; set; } = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Each paired user can have multiple tags. Each tag will create a category, and the user will
+    /// be displayed into that category.
+    /// The dictionary first maps a server URL to a dictionary, and that
+    /// dictionary maps the OtherUID of the <see cref="ClientPairDto"/> to a list of tags.
+    /// </summary>
+    public Dictionary<string, Dictionary<string, List<string>>> UidServerPairedUserTags = new(StringComparer.Ordinal);
+    /// <summary>
+    /// A dictionary that maps a server URL to the tags the user has added for that server.
+    /// </summary>
+    public Dictionary<string, HashSet<string>> ServerAvailablePairTags = new(StringComparer.Ordinal);
+
+    public HashSet<string> OpenPairTags = new(StringComparer.Ordinal);
     public int Version { get; set; } = 5;
 
     public bool ShowTransferWindow { get; set; } = true;
