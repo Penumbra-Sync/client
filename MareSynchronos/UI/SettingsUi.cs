@@ -13,6 +13,7 @@ using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
 using Dalamud.Utility;
 using Newtonsoft.Json;
+using MareSynchronos.Export;
 
 namespace MareSynchronos.UI;
 
@@ -22,6 +23,7 @@ public class SettingsUi : Window, IDisposable
     private readonly Configuration _configuration;
     private readonly WindowSystem _windowSystem;
     private readonly ApiController _apiController;
+    private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly UiShared _uiShared;
     public CharacterCacheDto LastCreatedCharacterData { private get; set; }
 
@@ -34,7 +36,7 @@ public class SettingsUi : Window, IDisposable
     private bool _disableOptionalPluginsWarnings;
 
     public SettingsUi(WindowSystem windowSystem,
-        UiShared uiShared, Configuration configuration, ApiController apiController) : base("Mare Synchronos Settings")
+        UiShared uiShared, Configuration configuration, ApiController apiController, MareCharaFileManager mareCharaFileManager) : base("Mare Synchronos Settings")
     {
         Logger.Verbose("Creating " + nameof(SettingsUi));
 
@@ -47,6 +49,7 @@ public class SettingsUi : Window, IDisposable
         _configuration = configuration;
         _windowSystem = windowSystem;
         _apiController = apiController;
+        _mareCharaFileManager = mareCharaFileManager;
         _uiShared = uiShared;
         _openPopupOnAddition = _configuration.OpenPopupOnAdd;
         _hideInfoMessages = _configuration.HideInfoMessages;
@@ -558,7 +561,49 @@ public class SettingsUi : Window, IDisposable
             }
         }
         UiShared.AttachToolTip("Use this when reporting mods being rejected from the server.");
+
+        if (!_mareCharaFileManager.CurrentlyWorking)
+        {
+            ImGui.InputTextWithHint("FilePath Save##charaDataSave", "Save to file...", ref _charaFileSavePath, 255);
+            if (UiShared.IconTextButton(FontAwesomeIcon.Copy, "[DEBUG] Save Mare Chara Data"))
+            {
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        _mareCharaFileManager.SaveMareCharaFile(LastCreatedCharacterData, "TestData", _charaFileSavePath);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error("Error saving data", ex);
+                    }
+                });
+            }
+
+            ImGui.InputTextWithHint("FilePath Load##charaDataLoad", "Load from file...", ref _charaFileLoadPath, 255);
+            if (UiShared.IconTextButton(FontAwesomeIcon.FileUpload, "[DEBUG] Load Mare Chara Data"))
+            {
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        _mareCharaFileManager.LoadMareCharaFile(_charaFileLoadPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error("Error Loading Data", ex);
+                    }
+                });
+            }
+        }
+        else
+        {
+            ImGui.TextUnformatted("Mare Chara File Manager is working...");
+        }
     }
+
+    private string _charaFileSavePath = string.Empty;
+    private string _charaFileLoadPath = string.Empty;
 
     private void DrawBlockedTransfers()
     {

@@ -15,6 +15,7 @@ using MareSynchronos.Utils;
 using Dalamud.Game.ClientState.Conditions;
 using MareSynchronos.FileCache;
 using Dalamud.Game.Gui;
+using MareSynchronos.Export;
 
 namespace MareSynchronos;
 
@@ -42,6 +43,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly UiShared _uiSharedComponent;
     private readonly Dalamud.Localization _localization;
     private readonly FileReplacementFactory _fileReplacementFactory;
+    private readonly MareCharaFileManager _mareCharaFileManager;
 
 
     public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager,
@@ -69,11 +71,13 @@ public sealed class Plugin : IDalamudPlugin
         _apiController = new ApiController(_configuration, _dalamudUtil, _fileCacheManager);
         _periodicFileScanner = new PeriodicFileScanner(_ipcManager, _configuration, _fileCacheManager, _apiController, _dalamudUtil);
         _fileReplacementFactory = new FileReplacementFactory(_fileCacheManager, _ipcManager);
+        _mareCharaFileManager = new(_fileCacheManager);
 
         _uiSharedComponent =
             new UiShared(_ipcManager, _apiController, _periodicFileScanner, _fileDialogManager, _configuration, _dalamudUtil, _pluginInterface, _localization);
-        _settingsUi = new SettingsUi(_windowSystem, _uiSharedComponent, _configuration, _apiController);
+        _settingsUi = new SettingsUi(_windowSystem, _uiSharedComponent, _configuration, _apiController, _mareCharaFileManager);
         _compactUi = new CompactUi(_windowSystem, _uiSharedComponent, _configuration, _apiController);
+
 
         _introUi = new IntroUi(_windowSystem, _uiSharedComponent, _configuration, _periodicFileScanner);
         _settingsUi.SwitchToIntroUi += () =>
@@ -206,31 +210,31 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnCommand(string command, string args)
     {
-            var splitArgs = args.ToLowerInvariant().Trim().Split(" ", StringSplitOptions.RemoveEmptyEntries);
+        var splitArgs = args.ToLowerInvariant().Trim().Split(" ", StringSplitOptions.RemoveEmptyEntries);
 
-            if (splitArgs == null || splitArgs.Length == 0)
+        if (splitArgs == null || splitArgs.Length == 0)
+        {
+            // Interpret this as toggling the UI
+            OpenUi();
+            return;
+        }
+
+        if (splitArgs[0] == "toggle")
+        {
+            var fullPause = splitArgs.Length > 1 ? splitArgs[1] switch
             {
-                // Interpret this as toggling the UI
-                OpenUi();
-                return;
-            }
+                "on" => false,
+                "off" => true,
+                _ => !_configuration.FullPause,
+            } : !_configuration.FullPause;
 
-            if (splitArgs[0] == "toggle")
+            if (fullPause != _configuration.FullPause)
             {
-                var fullPause = splitArgs.Length > 1 ? splitArgs[1] switch
-                {
-                    "on" => false,
-                    "off" => true,
-                    _ => !_configuration.FullPause,
-                } : !_configuration.FullPause;
-
-                if (fullPause != _configuration.FullPause)
-                {
-                    _configuration.FullPause = fullPause;
-                    _configuration.Save();
-                    _ = _apiController.CreateConnections();
-                }
+                _configuration.FullPause = fullPause;
+                _configuration.Save();
+                _ = _apiController.CreateConnections();
             }
+        }
     }
 
     private void OpenUi()
