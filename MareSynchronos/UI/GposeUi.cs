@@ -16,27 +16,31 @@ public class GposeUi : Window, IDisposable
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly DalamudUtil _dalamudUtil;
     private readonly FileDialogManager _fileDialogManager;
+    private readonly Configuration _configuration;
 
-    public GposeUi(WindowSystem windowSystem, MareCharaFileManager mareCharaFileManager, DalamudUtil dalamudUtil, FileDialogManager fileDialogManager) : base("Mare Synchronos Gpose Import UI###MareSynchronosGposeUI")
+    public GposeUi(WindowSystem windowSystem, MareCharaFileManager mareCharaFileManager, DalamudUtil dalamudUtil, FileDialogManager fileDialogManager, Configuration configuration) : base("Mare Synchronos Gpose Import UI###MareSynchronosGposeUI")
     {
         _windowSystem = windowSystem;
         _mareCharaFileManager = mareCharaFileManager;
         _dalamudUtil = dalamudUtil;
         _fileDialogManager = fileDialogManager;
+        _configuration = configuration;
         _dalamudUtil.GposeStart += StartGpose;
         _dalamudUtil.GposeEnd += EndGpose;
         IsOpen = _dalamudUtil.IsInGpose;
+        Flags = ImGuiWindowFlags.AlwaysAutoResize;
         _windowSystem.AddWindow(this);
     }
 
     private void EndGpose()
     {
         IsOpen = false;
+        _mareCharaFileManager.ClearMareCharaFile();
     }
 
     private void StartGpose()
     {
-        IsOpen = true;
+        IsOpen = _configuration.OpenGposeImportOnGposeStart;
     }
 
     public void Dispose()
@@ -50,24 +54,34 @@ public class GposeUi : Window, IDisposable
     {
         if (!_dalamudUtil.IsInGpose) IsOpen = false;
 
-        UiShared.SetScaledWindowSize(300, 120, false);
         if (!_mareCharaFileManager.CurrentlyWorking)
         {
-            if (UiShared.IconTextButton(FontAwesomeIcon.FolderOpen, "Load MCDF and apply"))
+            if (UiShared.IconTextButton(FontAwesomeIcon.FolderOpen, "Load MCDF"))
             {
                 _fileDialogManager.OpenFileDialog("Pick MCDF file", ".mcdf", (success, path) =>
                 {
                     if (!success) return;
 
-                    Task.Run(() => _mareCharaFileManager.LoadMareCharaFile(path, _dalamudUtil.GposeTargetGameObject));
+                    Task.Run(() => _mareCharaFileManager.LoadMareCharaFile(path));
                 });
             }
             UiShared.AttachToolTip("Applies it to the currently selected GPose actor");
+            if (_mareCharaFileManager.LoadedCharaFile != null)
+            {
+                UiShared.TextWrapped("Loaded file: " + _mareCharaFileManager.LoadedCharaFile.FilePath);
+                UiShared.TextWrapped("File Description: " + _mareCharaFileManager.LoadedCharaFile.CharaFileData.Description);
+                if (UiShared.IconTextButton(FontAwesomeIcon.Check, "Apply loaded MCDF"))
+                {
+                    Task.Run(async () => await _mareCharaFileManager.ApplyMareCharaFile(_dalamudUtil.GposeTargetGameObject).ConfigureAwait(false));
+                }
+                UiShared.AttachToolTip("Applies it to the currently selected GPose actor");
+                UiShared.ColorTextWrapped("Warning: redrawing or changing the character will revert all applied mods.", ImGuiColors.DalamudYellow);
+            }
         }
         else
         {
             UiShared.ColorTextWrapped("Loading Character...", ImGuiColors.DalamudYellow);
         }
-        UiShared.TextWrapped("You can disable the automatic loading of this window in the Mare settings and open it manually with /mare gpose");
+        UiShared.TextWrapped("Hint: You can disable the automatic loading of this window in the Mare settings and open it manually with /mare gpose");
     }
 }

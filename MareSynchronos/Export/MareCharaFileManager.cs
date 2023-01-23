@@ -1,23 +1,24 @@
 ﻿using System.Linq;
 
-namespace MareSynchronos.Export;
-
 using Dalamud.Game.ClientState.Objects.Types;
 using LZ4;
-using API;
-using FileCache;
-using Managers;
-using Utils;
+using MareSynchronos.API;
+using MareSynchronos.FileCache;
+using MareSynchronos.Managers;
+using MareSynchronos.Utils;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 
+namespace MareSynchronos.Export;
 public class MareCharaFileManager
 {
     private readonly FileCacheManager _manager;
     private readonly IpcManager _ipcManager;
     private readonly DalamudUtil _dalamudUtil;
     private readonly MareCharaFileDataFactory _factory;
+    public MareCharaFileHeader? LoadedCharaFile { get; private set; }
     public bool CurrentlyWorking { get; private set; } = false;
 
     public MareCharaFileManager(FileCacheManager manager, IpcManager ipcManager, DalamudUtil dalamudUtil)
@@ -25,23 +26,47 @@ public class MareCharaFileManager
         _factory = new(manager);
         _manager = manager;
         _ipcManager = ipcManager;
-        this._dalamudUtil = dalamudUtil;
+        _dalamudUtil = dalamudUtil;
     }
 
-    public void LoadMareCharaFile(string filePath, GameObject charaTarget)
+    public void ClearMareCharaFile()
+    {
+        LoadedCharaFile = null;
+    }
+
+    public void LoadMareCharaFile(string filePath)
     {
         CurrentlyWorking = true;
         try
         {
             using var unwrapped = File.OpenRead(filePath);
             using var lz4Stream = new LZ4Stream(unwrapped, LZ4StreamMode.Decompress, LZ4StreamFlags.HighCompression);
-            var charaFile = MareCharaFileHeader.FromStream(lz4Stream);
+            using var reader = new BinaryReader(lz4Stream);
+            LoadedCharaFile = MareCharaFileHeader.FromBinaryReader(filePath, reader);
             Logger.Debug("Read Mare Chara File");
-            Logger.Debug("Version: " + charaFile.Version);
+            Logger.Debug("Version: " + LoadedCharaFile.Version);
+
+        }
+        catch { throw; }
+        finally { CurrentlyWorking = false; }
+    }
+
+    public async Task ApplyMareCharaFile(GameObject charaTarget)
+    {
+        Dictionary<string, string> extractedFiles = new();
+        CurrentlyWorking = true;
+        try
+        {
+            if (LoadedCharaFile == null || charaTarget == null || !File.Exists(LoadedCharaFile.FilePath)) return;
+
+            using var unwrapped = File.OpenRead(LoadedCharaFile.FilePath);
+            using var lz4Stream = new LZ4Stream(unwrapped, LZ4StreamMode.Decompress, LZ4StreamFlags.HighCompression);
+            using var reader = new BinaryReader(lz4Stream);
+            LoadedCharaFile.AdvanceReaderToData(reader);
             Logger.Debug("Applying to " + charaTarget.Name.TextValue);
-            var extractedFiles = ExtractFilesFromCharaFile(charaFile, lz4Stream);
+            extractedFiles = ExtractFilesFromCharaFile(LoadedCharaFile, reader);
             Dictionary<string, string> fileSwaps = new(StringComparer.Ordinal);
-            foreach (var fileSwap in charaFile.CharaFileData.FileSwaps)
+            foreach (var fileSwap in LoadedCharaFile.CharaFileData.FileSwaps)
             {
                 foreach (var path in fileSwap.GamePaths)
                 {
@@ -52,41 +77,44 @@ public class MareCharaFileManager
             _ipcManager.PenumbraRemoveTemporaryCollection(charaTarget.Name.TextValue);
             _ipcManager.PenumbraSetTemporaryMods(charaTarget.Name.TextValue,
                 extractedFiles.Union(fileSwaps).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal),
-                charaFile.CharaFileData.ManipulationData);
-            _ipcManager.GlamourerApplyAll(charaFile.CharaFileData.GlamourerData, charaTarget.Address);
-            _ipcManager.ToggleGposeQueueMode(false);
-            System.Threading.Thread.Sleep(2000);
-            _ipcManager.ToggleGposeQueueMode(true);
+                LoadedCharaFile.CharaFileData.ManipulationData);
+            _ipcManager.GlamourerApplyAll(LoadedCharaFile.CharaFileData.GlamourerData, charaTarget.Address);
+            _dalamudUtil.WaitWhileGposeCharacterIsDrawing(charaTarget.Address);
             _ipcManager.PenumbraRemoveTemporaryCollection(charaTarget.Name.TextValue);
             _ipcManager.ToggleGposeQueueMode(false);
+        }
+        catch { throw; }
+        finally
+        {
+            CurrentlyWorking = false;
+
             Logger.Debug("Clearing local files");
             foreach (var file in extractedFiles)
             {
                 File.Delete(file.Value);
             }
         }
-        catch { throw; }
-        finally { CurrentlyWorking = false; }
     }
 
-    private Dictionary<string, string> ExtractFilesFromCharaFile(MareCharaFileHeader charaFileHeader, Stream stream)
+    private Dictionary<string, string> ExtractFilesFromCharaFile(MareCharaFileHeader charaFileHeader, BinaryReader reader)
     {
         Dictionary<string, string> gamePathToFilePath = new(StringComparer.Ordinal);
+        int i = 0;
         foreach (var fileData in charaFileHeader.CharaFileData.Files)
         {
-            var fileName = Path.GetTempFileName();
+            var fileName = Path.Combine(Path.GetTempPath(), "mare_" + (i++) + ".tmp");
             var length = fileData.Length;
             var bufferSize = 4 * 1024 * 1024;
-            var buffer = new byte[bufferSize > length ? (int) length : bufferSize];
+            var buffer = new byte[bufferSize];
             using var fs = File.OpenWrite(fileName);
+            using var wr = new BinaryWriter(fs);
             while (length > 0)
             {
                 if (length < bufferSize) bufferSize = (int)length;
-                var bytesRead = stream.Read(buffer, 0, bufferSize);
-                fs.Write(buffer, 0, bytesRead);
+                buffer = reader.ReadBytes(bufferSize);
+                wr.Write(length > bufferSize ? buffer : buffer.Take((int)length).ToArray());
                 length -= bufferSize;
             }
-            fs.Flush();
             foreach (var path in fileData.GamePaths)
             {
                 gamePathToFilePath[path] = fileName;
@@ -107,20 +135,27 @@ public class MareCharaFileManager
             var mareCharaFileData = _factory.Create(description, dto);
             MareCharaFileHeader output = new(MareCharaFileHeader.CurrentVersion, mareCharaFileData);
 
-            using var fs = File.OpenWrite(filePath);
+            using var fs = new FileStream(filePath, FileMode.Create);
             using var lz4 = new LZ4Stream(fs, LZ4StreamMode.Compress, LZ4StreamFlags.HighCompression);
-            output.WriteToStream(lz4);
+            using var writer = new BinaryWriter(lz4);
+            output.WriteToStream(writer);
+            var bufferSize = 4 * 1024 * 1024;
+            byte[] buffer = new byte[bufferSize];
 
             if (dto.FileReplacements.TryGetValue(ObjectKind.Player, out var replacement))
             {
                 foreach (var file in replacement.Select(item => _manager.GetFileCacheByHash(item.Hash)).Where(file => file != null))
                 {
-                    lz4.Write(File.ReadAllBytes(file.ResolvedFilepath));
+                    var length = new FileInfo(file.ResolvedFilepath).Length;
+                    using var fsRead = File.OpenRead(file.ResolvedFilepath);
+                    using var br = new BinaryReader(fsRead);
+                    int readBytes = 0;
+                    while ((readBytes = br.Read(buffer, 0, bufferSize)) > 0)
+                    {
+                        writer.Write(readBytes == bufferSize ? buffer : buffer.Take(readBytes).ToArray());
+                    }
                 }
             }
-
-            lz4.Flush();
-            fs.Flush();
         }
         catch { throw; }
         finally { CurrentlyWorking = false; }

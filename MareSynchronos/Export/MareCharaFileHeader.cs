@@ -1,5 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using Lumina.Extensions;
+using System.Collections.Generic;
 using System.IO;
+using System.Runtime.CompilerServices;
 
 namespace MareSynchronos.Export;
 
@@ -9,11 +11,10 @@ public record MareCharaFileHeader(byte Version, MareCharaFileData CharaFileData)
 
     public byte Version { get; set; } = Version;
     public MareCharaFileData CharaFileData { get; set; } = CharaFileData;
+    public string FilePath { get; private set; }
 
-    public void WriteToStream(Stream stream)
+    public void WriteToStream(BinaryWriter writer)
     {
-        using var writer = new BinaryWriter(stream);
-
         writer.Write('M');
         writer.Write('C');
         writer.Write('D');
@@ -24,36 +25,8 @@ public record MareCharaFileHeader(byte Version, MareCharaFileData CharaFileData)
         writer.Write(charaFileDataArray);
     }
 
-    public byte[] ToArray()
+    public static MareCharaFileHeader? FromBinaryReader(string path, BinaryReader reader)
     {
-        using var stream = new MemoryStream();
-
-        WriteToStream(stream);
-
-        return stream.ToArray();
-    }
-
-    public static MareCharaFileData? HeaderFromStream(Stream stream)
-    {
-        using var reader = new BinaryReader(stream);
-
-        var chars = new string(reader.ReadChars(4));
-        if (!string.Equals(chars, "MCDF", System.StringComparison.Ordinal)) throw new System.Exception("Not a Mare Chara File");
-
-        var version = reader.ReadByte();
-        if (version == 1)
-        {
-            var dataLength = reader.ReadInt32();
-            return MareCharaFileData.FromByteArray(reader.ReadBytes(dataLength));
-        }
-
-        return null;
-    }
-
-    public static MareCharaFileHeader? FromStream(Stream stream)
-    {
-        using var reader = new BinaryReader(stream);
-
         var chars = new string(reader.ReadChars(4));
         if (!string.Equals(chars, "MCDF", System.StringComparison.Ordinal)) throw new System.Exception("Not a Mare Chara File");
 
@@ -65,8 +38,20 @@ public record MareCharaFileHeader(byte Version, MareCharaFileData CharaFileData)
             var dataLength = reader.ReadInt32();
 
             decoded = new(version, MareCharaFileData.FromByteArray(reader.ReadBytes(dataLength)));
+            decoded.FilePath = path;
         }
 
         return decoded;
+    }
+
+    public void AdvanceReaderToData(BinaryReader reader)
+    {
+        reader.ReadChars(4);
+        var version = reader.ReadByte();
+        if (version == 1)
+        {
+            var length = reader.ReadInt32();
+            _ = reader.ReadBytes(length);
+        }
     }
 }

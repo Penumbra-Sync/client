@@ -299,6 +299,30 @@ public class DalamudUtil : IDisposable
         Thread.Sleep(tick);
     }
 
+    public unsafe void DisableDraw(IntPtr characterAddress)
+    {
+        var obj = (GameObject*)characterAddress;
+        obj->DisableDraw();
+    }
+
+    public unsafe void WaitWhileGposeCharacterIsDrawing(IntPtr characterAddress, int timeOut = 5000)
+    {
+        Thread.Sleep(500);
+        var obj = (GameObject*)characterAddress;
+        const int tick = 250;
+        int curWaitTime = 0;
+        Logger.Verbose("RenderFlags:" + obj->RenderFlags.ToString("X"));
+        // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
+        while (obj->RenderFlags != 0x00 && curWaitTime < timeOut)
+        {
+            Logger.Verbose($"Waiting for gpose actor to finish drawing");
+            curWaitTime += tick;
+            Thread.Sleep(tick);
+        }
+
+        Thread.Sleep(tick * 2);
+    }
+
     public void Dispose()
     {
         _clientState.Login -= ClientStateOnLogin;

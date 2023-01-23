@@ -14,6 +14,7 @@ using MareSynchronos.WebAPI.Utils;
 using Dalamud.Utility;
 using Newtonsoft.Json;
 using MareSynchronos.Export;
+using Dalamud.Interface.Style;
 
 namespace MareSynchronos.UI;
 
@@ -37,7 +38,8 @@ public class SettingsUi : Window, IDisposable
     private bool _wasOpen = false;
 
     public SettingsUi(WindowSystem windowSystem,
-        UiShared uiShared, Configuration configuration, ApiController apiController, MareCharaFileManager mareCharaFileManager) : base("Mare Synchronos Settings")
+        UiShared uiShared, Configuration configuration, ApiController apiController,
+        MareCharaFileManager mareCharaFileManager) : base("Mare Synchronos Settings")
     {
         Logger.Verbose("Creating " + nameof(SettingsUi));
 
@@ -109,9 +111,9 @@ public class SettingsUi : Window, IDisposable
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("Cache Settings"))
+            if (ImGui.BeginTabItem("Export & Storage"))
             {
-                DrawFileCacheSettings();
+                DrawFileStorageSettings();
                 ImGui.EndTabItem();
             }
 
@@ -162,6 +164,7 @@ public class SettingsUi : Window, IDisposable
         }
 
         _lastTab = "General";
+        UiShared.FontText("Notes", _uiShared.UidFont);
         if (UiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Export all your user notes to clipboard"))
         {
             ImGui.SetClipboardText(_uiShared.GetNotes());
@@ -184,7 +187,6 @@ public class SettingsUi : Window, IDisposable
         {
             UiShared.ColorTextWrapped("Attempt to import notes from clipboard failed. Check formatting and try again", ImGuiColors.DalamudRed);
         }
-        ImGui.Separator();
         if (ImGui.Checkbox("Open Notes Popup on user addition", ref _openPopupOnAddition))
         {
             _apiController.LastAddedUser = null;
@@ -192,6 +194,9 @@ public class SettingsUi : Window, IDisposable
             _configuration.Save();
         }
         UiShared.DrawHelpText("This will open a popup that allows you to set the notes for a user after successfully adding them to your individual pairs.");
+
+        ImGui.Separator();
+        UiShared.FontText("Server Messages", _uiShared.UidFont);
         if (ImGui.Checkbox("Hide Server Info Messages", ref _hideInfoMessages))
         {
             _configuration.HideInfoMessages = _hideInfoMessages;
@@ -542,7 +547,7 @@ public class SettingsUi : Window, IDisposable
 
         if (!_configuration.FullPause)
         {
-            UiShared.ColorTextWrapped("Note: to change servers you need to disconnect from your current Mare Synchronos server.", ImGuiColors.DalamudYellow);
+            UiShared.ColorTextWrapped("Note: to change servers or your secret key you need to disconnect from your current Mare Synchronos server.", ImGuiColors.DalamudYellow);
         }
 
         var marePaused = _configuration.FullPause;
@@ -568,6 +573,10 @@ public class SettingsUi : Window, IDisposable
             _uiShared.DrawServiceSelection(() => { });
         }
 
+        ImGui.Separator();
+
+        UiShared.FontText("Debug", _uiShared.UidFont);
+
         if (UiShared.IconTextButton(FontAwesomeIcon.Copy, "[DEBUG] Copy Last created Character Data to clipboard"))
         {
             if (LastCreatedCharacterData != null)
@@ -580,29 +589,6 @@ public class SettingsUi : Window, IDisposable
             }
         }
         UiShared.AttachToolTip("Use this when reporting mods being rejected from the server.");
-
-        if (!_mareCharaFileManager.CurrentlyWorking)
-        {
-            ImGui.InputTextWithHint("FilePath Save##charaDataSave", "Save to file...", ref _charaFileSavePath, 255);
-            if (UiShared.IconTextButton(FontAwesomeIcon.Copy, "[DEBUG] Save Mare Chara Data"))
-            {
-                Task.Run(() =>
-                {
-                    try
-                    {
-                        _mareCharaFileManager.SaveMareCharaFile(LastCreatedCharacterData, "TestData", _charaFileSavePath);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Error("Error saving data", ex);
-                    }
-                });
-            }
-        }
-        else
-        {
-            ImGui.TextUnformatted("Mare Chara File Manager is working...");
-        }
     }
 
     private string _charaFileSavePath = string.Empty;
@@ -723,15 +709,74 @@ public class SettingsUi : Window, IDisposable
         }
     }
 
-    private void DrawFileCacheSettings()
+    private bool _readExport = false;
+    private string _exportDescription = string.Empty;
+
+    private void DrawFileStorageSettings()
     {
         _lastTab = "FileCache";
+
+        UiShared.FontText("Export MCDF", _uiShared.UidFont);
+
+        UiShared.TextWrapped("This feature allows you to pack your character into a MCDF file and manually send it to other people. MCDF files can officially only be imported during GPose through Mare. " +
+            "Be aware that the possibility exists that people write unffocial custom exporters to extract the containing data.");
+
+        ImGui.Checkbox("##readExport", ref _readExport);
+        ImGui.SameLine();
+        UiShared.TextWrapped("I understand that by exporting my character data and sending it to other people I am giving away my current character appearance irrerevokably");
+
+        if (_readExport)
+        {
+            if (!_mareCharaFileManager.CurrentlyWorking)
+            {
+                ImGui.Indent();
+                ImGui.InputTextWithHint("Export Descriptor", "This description will be shown on loading the data", ref _exportDescription, 255);
+                if (UiShared.IconTextButton(FontAwesomeIcon.Save, "Export Character as MCDF"))
+                {
+                    _uiShared.FileDialogManager.SaveFileDialog("Export Character to file", ".mcdf", "export.mcdf", ".mcdf", (success, path) =>
+                    {
+                        if (!success) return;
+
+                        Task.Run(() =>
+                        {
+                            try
+                            {
+                                _mareCharaFileManager.SaveMareCharaFile(LastCreatedCharacterData, _exportDescription, path);
+                                _exportDescription = string.Empty;
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Error("Error saving data", ex);
+                            }
+                        });
+                    });
+                }
+                ImGui.Unindent();
+            }
+            else
+            {
+                UiShared.ColorTextWrapped("Export in progress", ImGuiColors.DalamudYellow);
+            }
+        }
+        bool openInGpose = _configuration.OpenGposeImportOnGposeStart;
+        if (ImGui.Checkbox("Open MCDF import menu when GPose loads", ref openInGpose))
+        {
+            _configuration.OpenGposeImportOnGposeStart = openInGpose;
+            _configuration.Save();
+        }
+        UiShared.DrawHelpText("This will automatically open the import menu when loading into Gpose. If unchecked you can open the menu manually with /mare gpose");
+
+
+        ImGui.Separator();
+
+        UiShared.FontText("Storage", _uiShared.UidFont);
+
         _uiShared.DrawFileScanState();
         _uiShared.DrawTimeSpanBetweenScansSetting();
         _uiShared.DrawCacheDirectorySetting();
-        ImGui.Text($"Local cache size: {UiShared.ByteToString(_uiShared.FileCacheSize)}");
+        ImGui.Text($"Local storage size: {UiShared.ByteToString(_uiShared.FileCacheSize)}");
         ImGui.SameLine();
-        if (ImGui.Button("Clear local cache"))
+        if (ImGui.Button("Clear local storage"))
         {
             if (UiShared.CtrlPressed())
             {
@@ -747,7 +792,7 @@ public class SettingsUi : Window, IDisposable
             }
         }
         UiShared.AttachToolTip("You normally do not need to do this. This will solely remove all downloaded data from all players and will require you to re-download everything again." + Environment.NewLine
-            + "Mares Cache is self-clearing and will not surpass the limit you have set it to." + Environment.NewLine
+            + "Mares storage is self-clearing and will not surpass the limit you have set it to." + Environment.NewLine
             + "If you still think you need to do this hold CTRL while pressing the button.");
     }
 
