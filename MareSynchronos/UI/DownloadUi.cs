@@ -14,6 +14,7 @@ public class DownloadUi : Window, IDisposable
     private readonly Configuration _pluginConfiguration;
     private readonly ApiController _apiController;
     private readonly UiShared _uiShared;
+    private bool _wasOpen = false;
 
     public void Dispose()
     {
@@ -52,6 +53,13 @@ public class DownloadUi : Window, IDisposable
 
     public override void PreDraw()
     {
+        if (_uiShared.IsInGpose)
+        {
+            _wasOpen = IsOpen;
+            IsOpen = false;
+        }
+
+
         base.PreDraw();
         if (_uiShared.EditTrackerPosition)
         {

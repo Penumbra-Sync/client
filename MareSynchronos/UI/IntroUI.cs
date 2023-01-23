@@ -62,6 +62,8 @@ internal class IntroUi : Window, IDisposable
 
     public override void Draw()
     {
+        if (_uiShared.IsInGpose) return;
+
         if (!_pluginConfiguration.AcceptedAgreement && !_readFirstPage)
         {
             if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
@@ -149,7 +151,7 @@ internal class IntroUi : Window, IDisposable
                      || !Directory.Exists(_pluginConfiguration.CacheFolder)))
         {
             if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
-            ImGui.TextUnformatted("File Cache Setup");
+            ImGui.TextUnformatted("File Storage Setup");
             if (_uiShared.UidFontBuilt) ImGui.PopFont();
             ImGui.Separator();
 
@@ -160,11 +162,12 @@ internal class IntroUi : Window, IDisposable
             else
             {
                 UiShared.TextWrapped("To not unnecessary download files already present on your computer, Mare Synchronos will have to scan your Penumbra mod directory. " +
-                                     "Additionally, a local cache folder must be set where Mare Synchronos will download its local file cache to. " +
-                                     "Once the Cache Folder is set and the scan complete, this page will automatically forward to registration at a service.");
+                                     "Additionally, a local storage folder must be set where Mare Synchronos will download other character files to. " +
+                                     "Once the storage folder is set and the scan complete, this page will automatically forward to registration at a service.");
                 UiShared.TextWrapped("Note: The initial scan, depending on the amount of mods you have, might take a while. Please wait until it is completed.");
                 UiShared.ColorTextWrapped("Warning: once past this step you should not delete the FileCache.csv of Mare Synchronos in the Plugin Configurations folder of Dalamud. " +
                                           "Otherwise on the next launch a full re-scan of the file cache database will be initiated.", ImGuiColors.DalamudYellow);
+                UiShared.ColorTextWrapped("Warning: if the scan is hanging and does nothing for a long time, chances are high your Penumbra folder is not set up properly.", ImGuiColors.DalamudYellow);
                 _uiShared.DrawCacheDirectorySetting();
             }
 

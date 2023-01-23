@@ -28,7 +28,7 @@ public class UiShared : IDisposable
     private readonly IpcManager _ipcManager;
     private readonly ApiController _apiController;
     private readonly PeriodicFileScanner _cacheScanner;
-    private readonly FileDialogManager _fileDialogManager;
+    public readonly FileDialogManager FileDialogManager;
     private readonly Configuration _pluginConfiguration;
     private readonly DalamudUtil _dalamudUtil;
     private readonly DalamudPluginInterface _pluginInterface;
@@ -39,6 +39,9 @@ public class UiShared : IDisposable
     public bool EditTrackerPosition { get; set; }
     public ImFontPtr UidFont { get; private set; }
     public bool UidFontBuilt { get; private set; }
+    public bool IsInGpose => _dalamudUtil.IsInGpose;
+    public event VoidDelegate? GposeStart;
+    public event VoidDelegate? GposeEnd;
     public static bool CtrlPressed() => (GetKeyState(0xA2) & 0x8000) != 0 || (GetKeyState(0xA3) & 0x8000) != 0;
     public static bool ShiftPressed() => (GetKeyState(0xA1) & 0x8000) != 0 || (GetKeyState(0xA0) & 0x8000) != 0;
 
@@ -54,7 +57,7 @@ public class UiShared : IDisposable
         _ipcManager = ipcManager;
         _apiController = apiController;
         _cacheScanner = cacheScanner;
-        _fileDialogManager = fileDialogManager;
+        FileDialogManager = fileDialogManager;
         _pluginConfiguration = pluginConfiguration;
         _dalamudUtil = dalamudUtil;
         _pluginInterface = pluginInterface;
@@ -63,6 +66,19 @@ public class UiShared : IDisposable
 
         _pluginInterface.UiBuilder.BuildFonts += BuildFont;
         _pluginInterface.UiBuilder.RebuildFonts();
+
+        _dalamudUtil.GposeStart += _dalamudUtil_GposeStart;
+        _dalamudUtil.GposeEnd += _dalamudUtil_GposeEnd;
+    }
+
+    private void _dalamudUtil_GposeEnd()
+    {
+        GposeEnd?.Invoke();
+    }
+
+    private void _dalamudUtil_GposeStart()
+    {
+        GposeStart?.Invoke();
     }
 
     public static float GetWindowContentRegionWidth()
@@ -268,7 +284,7 @@ public class UiShared : IDisposable
         ImGui.TextUnformatted(text);
         ImGui.PopTextWrapPos();
     }
-    
+
     public static void FontText(string text, ImFontPtr font)
     {
         ImGui.PushFont(font);
@@ -490,16 +506,16 @@ public class UiShared : IDisposable
 
     public void DrawCacheDirectorySetting()
     {
-        ColorTextWrapped("Note: The cache folder should be somewhere close to root (i.e. C:\\MareCache) in a new empty folder. DO NOT point this to your game folder. DO NOT point this to your Penumbra folder.", ImGuiColors.DalamudYellow);
+        ColorTextWrapped("Note: The storage folder should be somewhere close to root (i.e. C:\\MareStorage) in a new empty folder. DO NOT point this to your game folder. DO NOT point this to your Penumbra folder.", ImGuiColors.DalamudYellow);
         var cacheDirectory = _pluginConfiguration.CacheFolder;
-        ImGui.InputText("Cache Folder##cache", ref cacheDirectory, 255, ImGuiInputTextFlags.ReadOnly);
+        ImGui.InputText("Storage Folder##cache", ref cacheDirectory, 255, ImGuiInputTextFlags.ReadOnly);
 
         ImGui.SameLine();
         ImGui.PushFont(UiBuilder.IconFont);
         string folderIcon = FontAwesomeIcon.Folder.ToIconString();
         if (ImGui.Button(folderIcon + "##chooseCacheFolder"))
         {
-            _fileDialogManager.OpenFolderDialog("Pick Mare Synchronos Cache Folder", (success, path) =>
+            FileDialogManager.OpenFolderDialog("Pick Mare Synchronos Storage Folder", (success, path) =>
             {
                 if (!success) return;
 
@@ -525,7 +541,7 @@ public class UiShared : IDisposable
 
         if (_isPenumbraDirectory)
         {
-            ColorTextWrapped("Do not point the cache path directly to the Penumbra directory. If necessary, make a subfolder in it.", ImGuiColors.DalamudRed);
+            ColorTextWrapped("Do not point the storage path directly to the Penumbra directory. If necessary, make a subfolder in it.", ImGuiColors.DalamudRed);
         }
         else if (!_isDirectoryWritable)
         {
@@ -533,7 +549,7 @@ public class UiShared : IDisposable
         }
         else if (_cacheDirectoryHasOtherFilesThanCache)
         {
-            ColorTextWrapped("Your selected directory has files inside that are not Mare related. Use an empty directory or a previous Mare cache directory only.", ImGuiColors.DalamudRed);
+            ColorTextWrapped("Your selected directory has files inside that are not Mare related. Use an empty directory or a previous Mare storage directory only.", ImGuiColors.DalamudRed);
         }
         else if (!_cacheDirectoryIsValidPath)
         {
@@ -542,12 +558,12 @@ public class UiShared : IDisposable
         }
 
         float maxCacheSize = (float)_pluginConfiguration.MaxLocalCacheInGiB;
-        if (ImGui.SliderFloat("Maximum Cache Size in GiB", ref maxCacheSize, 1f, 200f, "%.2f GiB"))
+        if (ImGui.SliderFloat("Maximum Storage Size in GiB", ref maxCacheSize, 1f, 200f, "%.2f GiB"))
         {
             _pluginConfiguration.MaxLocalCacheInGiB = maxCacheSize;
             _pluginConfiguration.Save();
         }
-        DrawHelpText("The cache is automatically governed by Mare. It will clear itself automatically once it reaches the set capacity by removing the oldest unused files. You typically do not need to clear it yourself.");
+        DrawHelpText("The storage is automatically governed by Mare. It will clear itself automatically once it reaches the set capacity by removing the oldest unused files. You typically do not need to clear it yourself.");
     }
 
     private bool _isDirectoryWritable = false;
@@ -697,5 +713,7 @@ public class UiShared : IDisposable
     public void Dispose()
     {
         _pluginInterface.UiBuilder.BuildFonts -= BuildFont;
+        _dalamudUtil.GposeStart -= _dalamudUtil_GposeStart;
+        _dalamudUtil.GposeEnd -= _dalamudUtil_GposeEnd;
     }
 }
