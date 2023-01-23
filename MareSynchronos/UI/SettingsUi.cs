@@ -726,9 +726,10 @@ public class SettingsUi : Window, IDisposable
 
         if (_readExport)
         {
+            ImGui.Indent();
+
             if (!_mareCharaFileManager.CurrentlyWorking)
             {
-                ImGui.Indent();
                 ImGui.InputTextWithHint("Export Descriptor", "This description will be shown on loading the data", ref _exportDescription, 255);
                 if (UiShared.IconTextButton(FontAwesomeIcon.Save, "Export Character as MCDF"))
                 {
@@ -750,12 +751,13 @@ public class SettingsUi : Window, IDisposable
                         });
                     });
                 }
-                ImGui.Unindent();
             }
             else
             {
                 UiShared.ColorTextWrapped("Export in progress", ImGuiColors.DalamudYellow);
             }
+
+            ImGui.Unindent();
         }
         bool openInGpose = _configuration.OpenGposeImportOnGposeStart;
         if (ImGui.Checkbox("Open MCDF import window when GPose loads", ref openInGpose))
