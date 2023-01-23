@@ -751,7 +751,8 @@ public class SettingsUi : Window, IDisposable
                         });
                     });
                 }
-                UiShared.ColorTextWrapped("Note: For best results make sure you have everything you want to be shared equipped and redraw your character before exporting.", ImGuiColors.DalamudYellow);
+                UiShared.ColorTextWrapped("Note: For best results make sure you have everything you want to be shared as well as the correct character appearance" +
+                    " equipped and redraw your character before exporting.", ImGuiColors.DalamudYellow);
             }
             else
             {
