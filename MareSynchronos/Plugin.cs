@@ -73,7 +73,7 @@ public sealed class Plugin : IDalamudPlugin
         _apiController = new ApiController(_configuration, _dalamudUtil, _fileCacheManager);
         _periodicFileScanner = new PeriodicFileScanner(_ipcManager, _configuration, _fileCacheManager, _apiController, _dalamudUtil);
         _fileReplacementFactory = new FileReplacementFactory(_fileCacheManager, _ipcManager);
-        _mareCharaFileManager = new(_fileCacheManager, _ipcManager, _dalamudUtil);
+        _mareCharaFileManager = new(_fileCacheManager, _ipcManager, _configuration, _dalamudUtil);
 
         _uiSharedComponent =
             new UiShared(_ipcManager, _apiController, _periodicFileScanner, _fileDialogManager, _configuration, _dalamudUtil, _pluginInterface, _localization);
