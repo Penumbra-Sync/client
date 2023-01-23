@@ -14,7 +14,6 @@ using MareSynchronos.WebAPI.Utils;
 using Dalamud.Utility;
 using Newtonsoft.Json;
 using MareSynchronos.Export;
-using Dalamud.Interface.Style;
 
 namespace MareSynchronos.UI;
 
@@ -719,11 +718,11 @@ public class SettingsUi : Window, IDisposable
         UiShared.FontText("Export MCDF", _uiShared.UidFont);
 
         UiShared.TextWrapped("This feature allows you to pack your character into a MCDF file and manually send it to other people. MCDF files can officially only be imported during GPose through Mare. " +
-            "Be aware that the possibility exists that people write unffocial custom exporters to extract the containing data.");
+            "Be aware that the possibility exists that people write unoffocial custom exporters to extract the containing data.");
 
         ImGui.Checkbox("##readExport", ref _readExport);
         ImGui.SameLine();
-        UiShared.TextWrapped("I understand that by exporting my character data and sending it to other people I am giving away my current character appearance irrerevokably");
+        UiShared.TextWrapped("I understand that by exporting my character data and sending it to other people I am giving away my current character appearance irrevocably. People I am sharing my data with have the ability to share it with other people without limitations.");
 
         if (_readExport)
         {
@@ -759,7 +758,7 @@ public class SettingsUi : Window, IDisposable
             }
         }
         bool openInGpose = _configuration.OpenGposeImportOnGposeStart;
-        if (ImGui.Checkbox("Open MCDF import menu when GPose loads", ref openInGpose))
+        if (ImGui.Checkbox("Open MCDF import window when GPose loads", ref openInGpose))
         {
             _configuration.OpenGposeImportOnGposeStart = openInGpose;
             _configuration.Save();
@@ -770,6 +769,9 @@ public class SettingsUi : Window, IDisposable
         ImGui.Separator();
 
         UiShared.FontText("Storage", _uiShared.UidFont);
+
+        UiShared.TextWrapped("Mare stores downloaded files from paired people permanently. This is to improve loading performance and requiring less downloads. " +
+            "The storage governs itself by clearing data beyond the set storage size. Please set the storage size accordingly. It is not necessary to manually clear the storage.");
 
         _uiShared.DrawFileScanState();
         _uiShared.DrawTimeSpanBetweenScansSetting();
