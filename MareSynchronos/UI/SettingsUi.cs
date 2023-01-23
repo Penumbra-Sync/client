@@ -34,6 +34,7 @@ public class SettingsUi : Window, IDisposable
     private bool _openPopupOnAddition;
     private bool _hideInfoMessages;
     private bool _disableOptionalPluginsWarnings;
+    private bool _wasOpen = false;
 
     public SettingsUi(WindowSystem windowSystem,
         UiShared uiShared, Configuration configuration, ApiController apiController, MareCharaFileManager mareCharaFileManager) : base("Mare Synchronos Settings")
@@ -54,12 +55,30 @@ public class SettingsUi : Window, IDisposable
         _openPopupOnAddition = _configuration.OpenPopupOnAdd;
         _hideInfoMessages = _configuration.HideInfoMessages;
         _disableOptionalPluginsWarnings = _configuration.DisableOptionalPluginWarnings;
+
+        _uiShared.GposeStart += _uiShared_GposeStart;
+        _uiShared.GposeEnd += _uiShared_GposeEnd;
+
         windowSystem.AddWindow(this);
+    }
+
+    private void _uiShared_GposeEnd()
+    {
+        IsOpen = _wasOpen;
+    }
+
+    private void _uiShared_GposeStart()
+    {
+        _wasOpen = IsOpen;
+        IsOpen = false;
     }
 
     public void Dispose()
     {
         Logger.Verbose("Disposing " + nameof(SettingsUi));
+
+        _uiShared.GposeStart -= _uiShared_GposeStart;
+        _uiShared.GposeEnd -= _uiShared_GposeEnd;
 
         _windowSystem.RemoveWindow(this);
     }
@@ -576,22 +595,6 @@ public class SettingsUi : Window, IDisposable
                     catch (Exception ex)
                     {
                         Logger.Error("Error saving data", ex);
-                    }
-                });
-            }
-
-            ImGui.InputTextWithHint("FilePath Load##charaDataLoad", "Load from file...", ref _charaFileLoadPath, 255);
-            if (UiShared.IconTextButton(FontAwesomeIcon.FileUpload, "[DEBUG] Load Mare Chara Data"))
-            {
-                Task.Run(() =>
-                {
-                    try
-                    {
-                        _mareCharaFileManager.LoadMareCharaFile(_charaFileLoadPath);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.Error("Error Loading Data", ex);
                     }
                 });
             }

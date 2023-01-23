@@ -40,6 +40,7 @@ public class CompactUi : Window, IDisposable
     public float TransferPartHeight = 0;
     public float _windowContentWidth = 0;
     private bool _showModalForUserAddition = false;
+    private bool _wasOpen = false;
 
     private bool showSyncShells = false;
     private GroupPanel groupPanel;
@@ -85,6 +86,9 @@ public class CompactUi : Window, IDisposable
         _selectPairsForGroupUi = new(_tagHandler, configuration);
         _pairGroupsUi = new(_tagHandler, DrawPairedClient, apiController, _selectPairsForGroupUi);
 
+        _uiShared.GposeStart += UiShared_GposeStart;
+        _uiShared.GposeEnd += UiShared_GposeEnd;
+
         SizeConstraints = new WindowSizeConstraints()
         {
             MinimumSize = new Vector2(350, 400),
@@ -94,10 +98,23 @@ public class CompactUi : Window, IDisposable
         windowSystem.AddWindow(this);
     }
 
+    private void UiShared_GposeEnd()
+    {
+        IsOpen = _wasOpen;
+    }
+
+    private void UiShared_GposeStart()
+    {
+        _wasOpen = IsOpen;
+        IsOpen = false;
+    }
+
     public event SwitchUi? OpenSettingsUi;
     public void Dispose()
     {
         Logger.Verbose("Disposing " + nameof(CompactUi));
+        _uiShared.GposeStart -= UiShared_GposeStart;
+        _uiShared.GposeEnd -= UiShared_GposeEnd;
         _windowSystem.RemoveWindow(this);
     }
 

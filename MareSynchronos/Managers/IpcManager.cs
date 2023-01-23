@@ -57,7 +57,10 @@ public class IpcManager : IDisposable
     private readonly ICallGateSubscriber<string?, object> _customizePlusOnScaleUpdate;
 
     private readonly DalamudUtil _dalamudUtil;
-    private readonly ConcurrentQueue<Action> actionQueue = new();
+    private bool inGposeQueueMode = false;
+    private ConcurrentQueue<Action> actionQueue => inGposeQueueMode ? gposeActionQueue : normalQueue;
+    private readonly ConcurrentQueue<Action> normalQueue = new();
+    private readonly ConcurrentQueue<Action> gposeActionQueue = new();
 
     public IpcManager(DalamudPluginInterface pi, DalamudUtil dalamudUtil)
     {
@@ -112,7 +115,23 @@ public class IpcManager : IDisposable
 
         _dalamudUtil = dalamudUtil;
         _dalamudUtil.FrameworkUpdate += HandleActionQueue;
+        _dalamudUtil.GposeFrameworkUpdate += HandleGposeActionQueue;
         _dalamudUtil.ZoneSwitchEnd += ClearActionQueue;
+    }
+
+    private void HandleGposeActionQueue()
+    {
+        if (gposeActionQueue.TryDequeue(out var action))
+        {
+            if (action == null) return;
+            Logger.Debug("Execution action in gpose queue: " + action.Method);
+            action();
+        }
+    }
+
+    public void ToggleGposeQueueMode()
+    {
+        inGposeQueueMode = !inGposeQueueMode;
     }
 
     private void PenumbraModSettingChangedHandler()
@@ -223,6 +242,7 @@ public class IpcManager : IDisposable
 
         _dalamudUtil.FrameworkUpdate -= HandleActionQueue;
         _dalamudUtil.ZoneSwitchEnd -= ClearActionQueue;
+        _dalamudUtil.GposeFrameworkUpdate -= HandleGposeActionQueue;
         actionQueue.Clear();
 
         _penumbraGameObjectResourcePathResolved.Dispose();

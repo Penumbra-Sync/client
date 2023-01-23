@@ -8,10 +8,13 @@ using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
+using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Gui;
 using Dalamud.Game.Text.SeStringHandling;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
+
 
 namespace MareSynchronos.Utils;
 
@@ -35,8 +38,12 @@ public class DalamudUtil : IDisposable
     public event VoidDelegate? DelayedFrameworkUpdate;
     public event VoidDelegate? ZoneSwitchStart;
     public event VoidDelegate? ZoneSwitchEnd;
+    public event VoidDelegate? GposeStart;
+    public event VoidDelegate? GposeEnd;
+    public event VoidDelegate? GposeFrameworkUpdate;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
     private bool _sentBetweenAreas = false;
+    public bool IsInGpose { get; private set; } = false;
 
     public unsafe bool IsGameObjectPresent(IntPtr key)
     {
@@ -84,8 +91,21 @@ public class DalamudUtil : IDisposable
         _chatGui.Print(se.BuiltString);
     }
 
-    private void FrameworkOnUpdate(Framework framework)
+    private unsafe void FrameworkOnUpdate(Framework framework)
     {
+        if (GposeTarget != null && !IsInGpose)
+        {
+            Logger.Debug("Gpose start");
+            IsInGpose = true;
+            GposeStart?.Invoke();
+        }
+        else if (GposeTarget == null && IsInGpose)
+        {
+            Logger.Debug("Gpose end");
+            IsInGpose = false;
+            GposeEnd?.Invoke();
+        }
+
         if (_condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51] || IsInGpose)
         {
             if (!_sentBetweenAreas)
@@ -94,6 +114,8 @@ public class DalamudUtil : IDisposable
                 _sentBetweenAreas = true;
                 ZoneSwitchStart?.Invoke();
             }
+
+            if (IsInGpose) GposeFrameworkUpdate?.Invoke();
 
             return;
         }
@@ -175,6 +197,10 @@ public class DalamudUtil : IDisposable
         return _objectTable.CreateObjectReference(reference);
     }
 
+    public unsafe GameObject* GposeTarget => TargetSystem.Instance()->GPoseTarget;
+
+    public unsafe Dalamud.Game.ClientState.Objects.Types.GameObject? GposeTargetGameObject => GposeTarget == null ? null : _objectTable[GposeTarget->ObjectIndex];
+
     public bool IsLoggedIn { get; private set; }
 
     public bool IsPlayerPresent => _clientState.LocalPlayer != null && _clientState.LocalPlayer.IsValid();
@@ -186,21 +212,21 @@ public class DalamudUtil : IDisposable
 
     public unsafe IntPtr GetMinion()
     {
-        return (IntPtr)((Character*)PlayerPointer)->CompanionObject;
+        return (IntPtr)((FFXIVClientStructs.FFXIV.Client.Game.Character.Character*)PlayerPointer)->CompanionObject;
     }
 
     public unsafe IntPtr GetPet(IntPtr? playerPointer = null)
     {
         var mgr = CharacterManager.Instance();
         if (playerPointer == null) playerPointer = PlayerPointer;
-        return (IntPtr)mgr->LookupPetByOwnerObject((BattleChara*)playerPointer);
+        return (IntPtr)mgr->LookupPetByOwnerObject((FFXIVClientStructs.FFXIV.Client.Game.Character.BattleChara*)playerPointer);
     }
 
     public unsafe IntPtr GetCompanion(IntPtr? playerPointer = null)
     {
         var mgr = CharacterManager.Instance();
         if (playerPointer == null) playerPointer = PlayerPointer;
-        return (IntPtr)mgr->LookupBuddyByOwnerObject((BattleChara*)playerPointer);
+        return (IntPtr)mgr->LookupBuddyByOwnerObject((FFXIVClientStructs.FFXIV.Client.Game.Character.BattleChara*)playerPointer);
     }
 
     public string PlayerName => _clientState.LocalPlayer?.Name.ToString() ?? "--";
@@ -210,8 +236,6 @@ public class DalamudUtil : IDisposable
     public PlayerCharacter PlayerCharacter => _clientState.LocalPlayer!;
 
     public string PlayerNameHashed => Crypto.GetHash256(PlayerName + _clientState.LocalPlayer!.HomeWorld.Id);
-
-    public bool IsInGpose => _objectTable[201] != null;
 
     public List<PlayerCharacter> GetPlayerCharacters()
     {

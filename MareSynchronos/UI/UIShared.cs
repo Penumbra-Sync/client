@@ -39,6 +39,9 @@ public class UiShared : IDisposable
     public bool EditTrackerPosition { get; set; }
     public ImFontPtr UidFont { get; private set; }
     public bool UidFontBuilt { get; private set; }
+    public bool IsInGpose => _dalamudUtil.IsInGpose;
+    public event VoidDelegate? GposeStart;
+    public event VoidDelegate? GposeEnd;
     public static bool CtrlPressed() => (GetKeyState(0xA2) & 0x8000) != 0 || (GetKeyState(0xA3) & 0x8000) != 0;
     public static bool ShiftPressed() => (GetKeyState(0xA1) & 0x8000) != 0 || (GetKeyState(0xA0) & 0x8000) != 0;
 
@@ -63,6 +66,19 @@ public class UiShared : IDisposable
 
         _pluginInterface.UiBuilder.BuildFonts += BuildFont;
         _pluginInterface.UiBuilder.RebuildFonts();
+
+        _dalamudUtil.GposeStart += _dalamudUtil_GposeStart;
+        _dalamudUtil.GposeEnd += _dalamudUtil_GposeEnd;
+    }
+
+    private void _dalamudUtil_GposeEnd()
+    {
+        GposeEnd?.Invoke();
+    }
+
+    private void _dalamudUtil_GposeStart()
+    {
+        GposeStart?.Invoke();
     }
 
     public static float GetWindowContentRegionWidth()
@@ -264,7 +280,7 @@ public class UiShared : IDisposable
         ImGui.TextUnformatted(text);
         ImGui.PopTextWrapPos();
     }
-    
+
     public static void FontText(string text, ImFontPtr font)
     {
         ImGui.PushFont(font);
@@ -693,5 +709,7 @@ public class UiShared : IDisposable
     public void Dispose()
     {
         _pluginInterface.UiBuilder.BuildFonts -= BuildFont;
+        _dalamudUtil.GposeStart -= _dalamudUtil_GposeStart;
+        _dalamudUtil.GposeEnd -= _dalamudUtil_GposeEnd;
     }
 }

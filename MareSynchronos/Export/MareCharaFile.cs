@@ -6,9 +6,16 @@ namespace MareSynchronos.Export;
 public record MareCharaFile
 {
     public static readonly byte CurrentVersion = 1;
+
     public byte Version { get; set; }
-    public MareCharaFileData? CharaFileData { get; set; }
+    public MareCharaFileData CharaFileData { get; set; }
     public List<byte[]> FileData { get; set; } = new();
+
+    public MareCharaFile(byte currentVersion, MareCharaFileData mareCharaFileData)
+    {
+        Version = currentVersion;
+        CharaFileData = mareCharaFileData;
+    }
 
     public void WriteToStream(Stream stream)
     {
@@ -54,19 +61,21 @@ public record MareCharaFile
         return null;
     }
 
-    public static MareCharaFile FromStream(Stream stream)
+    public static MareCharaFile? FromStream(Stream stream)
     {
         using var reader = new BinaryReader(stream);
 
         var chars = new string(reader.ReadChars(4));
         if (!string.Equals(chars, "MCFD", System.StringComparison.Ordinal)) throw new System.Exception("Not a Mare Chara File");
 
-        MareCharaFile decoded = new();
-        decoded.Version = reader.ReadByte();
-        if (decoded.Version == 1)
+        MareCharaFile? decoded = null;
+
+        var version = reader.ReadByte();
+        if (version == 1)
         {
             var dataLength = reader.ReadInt32();
-            decoded.CharaFileData = MareCharaFileData.FromByteArray(reader.ReadBytes(dataLength));
+
+            decoded = new(version, MareCharaFileData.FromByteArray(reader.ReadBytes(dataLength)));
 
             foreach (var file in decoded.CharaFileData.Files)
             {

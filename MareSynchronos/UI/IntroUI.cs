@@ -62,6 +62,8 @@ internal class IntroUi : Window, IDisposable
 
     public override void Draw()
     {
+        if (_uiShared.IsInGpose) return;
+
         if (!_pluginConfiguration.AcceptedAgreement && !_readFirstPage)
         {
             if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);

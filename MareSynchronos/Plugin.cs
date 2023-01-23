@@ -44,6 +44,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly Dalamud.Localization _localization;
     private readonly FileReplacementFactory _fileReplacementFactory;
     private readonly MareCharaFileManager _mareCharaFileManager;
+    private readonly GposeUi _gposeUi;
 
 
     public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager,
@@ -52,6 +53,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         Logger.Debug("Launching " + Name);
         _pluginInterface = pluginInterface;
+        _pluginInterface.UiBuilder.DisableGposeUiHide = true;
         _commandManager = commandManager;
         _configuration = _pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         _configuration.Initialize(_pluginInterface);
@@ -71,13 +73,13 @@ public sealed class Plugin : IDalamudPlugin
         _apiController = new ApiController(_configuration, _dalamudUtil, _fileCacheManager);
         _periodicFileScanner = new PeriodicFileScanner(_ipcManager, _configuration, _fileCacheManager, _apiController, _dalamudUtil);
         _fileReplacementFactory = new FileReplacementFactory(_fileCacheManager, _ipcManager);
-        _mareCharaFileManager = new(_fileCacheManager);
+        _mareCharaFileManager = new(_fileCacheManager, _ipcManager, _dalamudUtil);
 
         _uiSharedComponent =
             new UiShared(_ipcManager, _apiController, _periodicFileScanner, _fileDialogManager, _configuration, _dalamudUtil, _pluginInterface, _localization);
         _settingsUi = new SettingsUi(_windowSystem, _uiSharedComponent, _configuration, _apiController, _mareCharaFileManager);
         _compactUi = new CompactUi(_windowSystem, _uiSharedComponent, _configuration, _apiController);
-
+        _gposeUi = new GposeUi(_windowSystem, _mareCharaFileManager, _dalamudUtil, _fileDialogManager);
 
         _introUi = new IntroUi(_windowSystem, _uiSharedComponent, _configuration, _periodicFileScanner);
         _settingsUi.SwitchToIntroUi += () =>
@@ -124,6 +126,7 @@ public sealed class Plugin : IDalamudPlugin
         _introUi?.Dispose();
         _downloadUi?.Dispose();
         _compactUi?.Dispose();
+        _gposeUi?.Dispose();
 
         _periodicFileScanner?.Dispose();
         _fileCacheManager?.Dispose();
@@ -234,6 +237,10 @@ public sealed class Plugin : IDalamudPlugin
                 _configuration.Save();
                 _ = _apiController.CreateConnections();
             }
+        }
+        else if (splitArgs[0] == "gpose")
+        {
+            _gposeUi.Toggle();
         }
     }
 
