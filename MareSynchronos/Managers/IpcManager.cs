@@ -129,9 +129,9 @@ public class IpcManager : IDisposable
         }
     }
 
-    public void ToggleGposeQueueMode()
+    public void ToggleGposeQueueMode(bool on)
     {
-        inGposeQueueMode = !inGposeQueueMode;
+        inGposeQueueMode = on;
     }
 
     private void PenumbraModSettingChangedHandler()
@@ -142,6 +142,7 @@ public class IpcManager : IDisposable
     private void ClearActionQueue()
     {
         actionQueue.Clear();
+        gposeActionQueue.Clear();
     }
 
     private void ResourceLoaded(IntPtr ptr, string arg1, string arg2)

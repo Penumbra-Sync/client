@@ -3,19 +3,12 @@ using System.IO;
 
 namespace MareSynchronos.Export;
 
-public record MareCharaFile
+public record MareCharaFileHeader(byte Version, MareCharaFileData CharaFileData)
 {
     public static readonly byte CurrentVersion = 1;
 
-    public byte Version { get; set; }
-    public MareCharaFileData CharaFileData { get; set; }
-    public List<byte[]> FileData { get; set; } = new();
-
-    public MareCharaFile(byte currentVersion, MareCharaFileData mareCharaFileData)
-    {
-        Version = currentVersion;
-        CharaFileData = mareCharaFileData;
-    }
+    public byte Version { get; set; } = Version;
+    public MareCharaFileData CharaFileData { get; set; } = CharaFileData;
 
     public void WriteToStream(Stream stream)
     {
@@ -23,16 +16,12 @@ public record MareCharaFile
 
         writer.Write('M');
         writer.Write('C');
-        writer.Write('F');
         writer.Write('D');
+        writer.Write('F');
         writer.Write(Version);
         var charaFileDataArray = CharaFileData.ToByteArray();
         writer.Write(charaFileDataArray.Length);
         writer.Write(charaFileDataArray);
-        foreach (var fileData in FileData)
-        {
-            writer.Write(fileData);
-        }
     }
 
     public byte[] ToArray()
@@ -49,7 +38,7 @@ public record MareCharaFile
         using var reader = new BinaryReader(stream);
 
         var chars = new string(reader.ReadChars(4));
-        if (!string.Equals(chars, "MCFD", System.StringComparison.Ordinal)) throw new System.Exception("Not a Mare Chara File");
+        if (!string.Equals(chars, "MCDF", System.StringComparison.Ordinal)) throw new System.Exception("Not a Mare Chara File");
 
         var version = reader.ReadByte();
         if (version == 1)
@@ -61,14 +50,14 @@ public record MareCharaFile
         return null;
     }
 
-    public static MareCharaFile? FromStream(Stream stream)
+    public static MareCharaFileHeader? FromStream(Stream stream)
     {
         using var reader = new BinaryReader(stream);
 
         var chars = new string(reader.ReadChars(4));
-        if (!string.Equals(chars, "MCFD", System.StringComparison.Ordinal)) throw new System.Exception("Not a Mare Chara File");
+        if (!string.Equals(chars, "MCDF", System.StringComparison.Ordinal)) throw new System.Exception("Not a Mare Chara File");
 
-        MareCharaFile? decoded = null;
+        MareCharaFileHeader? decoded = null;
 
         var version = reader.ReadByte();
         if (version == 1)
@@ -76,22 +65,6 @@ public record MareCharaFile
             var dataLength = reader.ReadInt32();
 
             decoded = new(version, MareCharaFileData.FromByteArray(reader.ReadBytes(dataLength)));
-
-            foreach (var file in decoded.CharaFileData.Files)
-            {
-                List<byte> data = new List<byte>();
-                var length = file.Length;
-                int bytesToRead = 0;
-                while (length > 0)
-                {
-                    if (length > int.MaxValue) bytesToRead = int.MaxValue;
-                    else bytesToRead = (int)length;
-                    length -= bytesToRead;
-                    data.AddRange(reader.ReadBytes(bytesToRead));
-                }
-
-                decoded.FileData.Add(data.ToArray());
-            }
         }
 
         return decoded;
