@@ -9,8 +9,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using System.Text;
 using System.Globalization;
+using MareSynchronos.API.Dto.Group;
+using MareSynchronos.API.Dto.User;
 
 namespace MareSynchronos.UI
 {
@@ -38,7 +39,7 @@ namespace MareSynchronos.UI
         private bool _isPasswordValid;
         private bool _errorGroupJoin;
         private bool _errorGroupCreate = false;
-        private GroupCreatedDto? _lastCreatedGroup = null;
+        private GroupPasswordDto? _lastCreatedGroup = null;
         private readonly Dictionary<string, bool> ExpandedGroupState = new(StringComparer.Ordinal);
         private List<BannedGroupUserDto> _bannedUsers = new();
         private List<string> _bulkOneTimeInvites = new();
@@ -71,11 +72,12 @@ namespace MareSynchronos.UI
             ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
 
             bool userCanJoinMoreGroups = _apiController.Groups.Count < _apiController.ServerInfo.MaxGroupsJoinedByUser;
-            bool userCanCreateMoreGroups = _apiController.Groups.Count(u => string.Equals(u.OwnedBy, _apiController.UID, StringComparison.Ordinal)) < _apiController.ServerInfo.MaxGroupsCreatedByUser;
+            bool userCanCreateMoreGroups = _apiController.Groups.Count(u => string.Equals(u.Value.Owner.UID, _apiController.UID, StringComparison.Ordinal)) < _apiController.ServerInfo.MaxGroupsCreatedByUser;
 
             if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
             {
-                if (_apiController.Groups.All(w => !string.Equals(w.GID, _syncShellToJoin, StringComparison.Ordinal)) && !string.IsNullOrEmpty(_syncShellToJoin))
+                if (_apiController.Groups.All(w => !string.Equals(w.Value.Group.GID, _syncShellToJoin, StringComparison.Ordinal) && !string.Equals(w.Value.Group.Alias, _syncShellToJoin, StringComparison.Ordinal))
+                    && !string.IsNullOrEmpty(_syncShellToJoin))
                 {
                     if (userCanJoinMoreGroups)
                     {
@@ -116,7 +118,7 @@ namespace MareSynchronos.UI
                 {
                     var shell = _syncShellToJoin;
                     var pw = _syncShellPassword;
-                    _errorGroupJoin = !_apiController.GroupJoin(shell, pw).Result;
+                    _errorGroupJoin = !_apiController.GroupJoin(new(new GroupData(shell), pw)).Result;
                     if (!_errorGroupJoin)
                     {
                         _syncShellToJoin = string.Empty;
@@ -149,7 +151,7 @@ namespace MareSynchronos.UI
                 {
                     ImGui.Separator();
                     _errorGroupCreate = false;
-                    ImGui.TextUnformatted("Syncshell ID: " + _lastCreatedGroup.GID);
+                    ImGui.TextUnformatted("Syncshell ID: " + _lastCreatedGroup.Group.GID);
                     ImGui.AlignTextToFramePadding();
                     ImGui.TextUnformatted("Syncshell Password: " + _lastCreatedGroup.Password);
                     ImGui.SameLine();
@@ -179,21 +181,21 @@ namespace MareSynchronos.UI
                 ? 1
                 : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - _mainUi.TransferPartHeight - ImGui.GetCursorPosY();
             ImGui.BeginChild("list", new Vector2(_mainUi._windowContentWidth, ySize), false);
-            foreach (var entry in _apiController.Groups.OrderBy(g => string.IsNullOrEmpty(g.Alias) ? g.GID : g.Alias).ToList())
+            foreach (var entry in _apiController.Groups.OrderBy(g => string.IsNullOrEmpty(g.Value.Group.Alias) ? g.Value.Group.GID : g.Value.Group.Alias).ToList())
             {
-                UiShared.DrawWithID(entry.GID, () => DrawSyncshell(entry));
+                UiShared.DrawWithID(entry.Value.Group.GID, () => DrawSyncshell(entry.Value));
             }
             ImGui.EndChild();
         }
 
-        private void DrawSyncshell(GroupDto group)
+        private void DrawSyncshell(GroupFullInfoDto groupDto)
         {
-            var name = group.Alias ?? group.GID;
-            var pairsInGroup = _apiController.GroupPairedClients.Where(p => string.Equals(p.GroupGID, group.GID, StringComparison.Ordinal)).ToList();
-            if (!ExpandedGroupState.TryGetValue(group.GID, out bool isExpanded))
+            var name = groupDto.Group.Alias ?? groupDto.GID;
+            var pairsInGroup = _apiController.GroupPairedClients.Where(p => string.Equals(p.Value.GID, groupDto.GID, StringComparison.Ordinal)).ToList();
+            if (!ExpandedGroupState.TryGetValue(groupDto.GID, out bool isExpanded))
             {
                 isExpanded = false;
-                ExpandedGroupState.Add(group.GID, isExpanded);
+                ExpandedGroupState.Add(groupDto.GID, isExpanded);
             }
             var icon = isExpanded ? FontAwesomeIcon.CaretSquareDown : FontAwesomeIcon.CaretSquareRight;
             var collapseButton = UiShared.GetIconButtonSize(icon);
@@ -201,22 +203,23 @@ namespace MareSynchronos.UI
             ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0, 0, 0, 0));
             if (ImGuiComponents.IconButton(icon))
             {
-                ExpandedGroupState[group.GID] = !ExpandedGroupState[group.GID];
+                ExpandedGroupState[groupDto.GID] = !ExpandedGroupState[groupDto.GID];
             }
             ImGui.PopStyleColor(2);
             ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + collapseButton.X);
-            var pauseIcon = (group.IsPaused ?? false) ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
+            var pauseIcon = groupDto.GroupUserPermissions.HasFlag(GroupUserPermissions.Paused) ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
             if (ImGuiComponents.IconButton(pauseIcon))
             {
-                _ = _apiController.GroupChangePauseState(group.GID, !group.IsPaused ?? false);
+                var userPerm = groupDto.GroupUserPermissions ^ GroupUserPermissions.Paused;
+                _ = _apiController.GroupChangeIndividualPermissionState(new GroupPairUserPermissionDto(groupDto.Group, new UserData(_apiController.UID), userPerm));
             }
-            UiShared.AttachToolTip(((group.IsPaused ?? false) ? "Resume" : "Pause") + " pairing with all users in this Syncshell");
+            UiShared.AttachToolTip((groupDto.GroupUserPermissions.HasFlag(GroupUserPermissions.Paused) ? "Resume" : "Pause") + " pairing with all users in this Syncshell");
             ImGui.SameLine();
 
-            var groupName = string.IsNullOrEmpty(group.Alias) ? group.GID : group.Alias;
             var textIsGid = true;
+            string groupName = groupDto.GroupAliasOrGID;
 
-            if (string.Equals(group.OwnedBy, _apiController.UID, StringComparison.Ordinal))
+            if (string.Equals(groupDto.OwnerUID, _apiController.UID, StringComparison.Ordinal))
             {
                 ImGui.PushFont(UiBuilder.IconFont);
                 ImGui.Text(FontAwesomeIcon.Crown.ToIconString());
@@ -224,7 +227,7 @@ namespace MareSynchronos.UI
                 UiShared.AttachToolTip("You are the owner of Syncshell " + groupName);
                 ImGui.SameLine();
             }
-            else if (group.IsModerator ?? false)
+            else if (groupDto.GroupUserInfo.HasFlag(GroupUserInfo.IsModerator))
             {
                 ImGui.PushFont(UiBuilder.IconFont);
                 ImGui.Text(FontAwesomeIcon.UserShield.ToIconString());
@@ -233,8 +236,8 @@ namespace MareSynchronos.UI
                 ImGui.SameLine();
             }
 
-            _showGidForEntry.TryGetValue(group.GID, out var showGidInsteadOfName);
-            if (!showGidInsteadOfName && _configuration.GetCurrentServerGidComments().TryGetValue(group.GID, out var groupComment))
+            _showGidForEntry.TryGetValue(groupDto.GID, out var showGidInsteadOfName);
+            if (!showGidInsteadOfName && _configuration.GetCurrentServerGidComments().TryGetValue(groupDto.GID, out var groupComment))
             {
                 if (!string.IsNullOrEmpty(groupComment))
                 {
@@ -243,33 +246,33 @@ namespace MareSynchronos.UI
                 }
             }
 
-            if (!string.Equals(_editGroupEntry, group.GID, StringComparison.Ordinal))
+            if (!string.Equals(_editGroupEntry, groupDto.GID, StringComparison.Ordinal))
             {
                 if (textIsGid) ImGui.PushFont(UiBuilder.MonoFont);
                 ImGui.TextUnformatted(groupName);
                 if (textIsGid) ImGui.PopFont();
                 UiShared.AttachToolTip("Left click to switch between GID display and comment" + Environment.NewLine +
                               "Right click to change comment for " + groupName + Environment.NewLine + Environment.NewLine
-                              + "Users: " + (pairsInGroup.Count + 1) + ", Owner: " + group.OwnedBy);
+                              + "Users: " + (pairsInGroup.Count + 1) + ", Owner: " + groupDto.OwnerAliasOrUID);
                 if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
                 {
                     var prevState = textIsGid;
-                    if (_showGidForEntry.ContainsKey(group.GID))
+                    if (_showGidForEntry.ContainsKey(groupDto.GID))
                     {
-                        prevState = _showGidForEntry[group.GID];
+                        prevState = _showGidForEntry[groupDto.GID];
                     }
 
-                    _showGidForEntry[group.GID] = !prevState;
+                    _showGidForEntry[groupDto.GID] = !prevState;
                 }
 
                 if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
                 {
                     _configuration.SetCurrentServerGidComment(_editGroupEntry, _editGroupComment);
                     _configuration.Save();
-                    _editGroupComment = _configuration.GetCurrentServerGidComments().ContainsKey(group.GID)
-                        ? _configuration.GetCurrentServerGidComments()[group.GID]
+                    _editGroupComment = _configuration.GetCurrentServerGidComments().ContainsKey(groupDto.GID)
+                        ? _configuration.GetCurrentServerGidComments()[groupDto.GID]
                         : string.Empty;
-                    _editGroupEntry = group.GID;
+                    _editGroupEntry = groupDto.GID;
                 }
             }
             else
@@ -278,7 +281,7 @@ namespace MareSynchronos.UI
                 ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * 2);
                 if (ImGui.InputTextWithHint("", "Comment/Notes", ref _editGroupComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
                 {
-                    _configuration.SetCurrentServerGidComment(group.GID, _editGroupComment);
+                    _configuration.SetCurrentServerGidComment(groupDto.GID, _editGroupComment);
                     _configuration.Save();
                     _editGroupEntry = string.Empty;
                 }
@@ -290,26 +293,27 @@ namespace MareSynchronos.UI
                 UiShared.AttachToolTip("Hit ENTER to save\nRight click to cancel");
             }
 
-            UiShared.DrawWithID(group.GID + "settings", () => DrawSyncShellButtons(group, name));
+            UiShared.DrawWithID(groupDto.GID + "settings", () => DrawSyncShellButtons(groupDto, name));
 
             if (_showModalBanList && !_modalBanListOpened)
             {
                 _modalBanListOpened = true;
-                ImGui.OpenPopup("Manage Banlist for " + group.GID);
+                ImGui.OpenPopup("Manage Banlist for " + groupDto.GID);
             }
 
             if (!_showModalBanList) _modalBanListOpened = false;
 
-            if (ImGui.BeginPopupModal("Manage Banlist for " + group.GID, ref _showModalBanList, UiShared.PopupWindowFlags))
+            if (ImGui.BeginPopupModal("Manage Banlist for " + groupDto.GID, ref _showModalBanList, UiShared.PopupWindowFlags))
             {
                 if (UiShared.IconTextButton(FontAwesomeIcon.Retweet, "Refresh Banlist from Server"))
                 {
-                    _bannedUsers = _apiController.GroupGetBannedUsers(group.GID).Result;
+                    _bannedUsers = _apiController.GroupGetBannedUsers(groupDto).Result;
                 }
 
-                if (ImGui.BeginTable("bannedusertable" + group.GID, 5, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.ScrollY))
+                if (ImGui.BeginTable("bannedusertable" + groupDto.GID, 6, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.ScrollY))
                 {
                     ImGui.TableSetupColumn("UID", ImGuiTableColumnFlags.None, 1);
+                    ImGui.TableSetupColumn("Alias", ImGuiTableColumnFlags.None, 1);
                     ImGui.TableSetupColumn("By", ImGuiTableColumnFlags.None, 1);
                     ImGui.TableSetupColumn("Date", ImGuiTableColumnFlags.None, 2);
                     ImGui.TableSetupColumn("Reason", ImGuiTableColumnFlags.None, 3);
@@ -322,6 +326,8 @@ namespace MareSynchronos.UI
                         ImGui.TableNextColumn();
                         ImGui.TextUnformatted(bannedUser.UID);
                         ImGui.TableNextColumn();
+                        ImGui.TextUnformatted(bannedUser.UserAlias ?? string.Empty);
+                        ImGui.TableNextColumn();
                         ImGui.TextUnformatted(bannedUser.BannedBy);
                         ImGui.TableNextColumn();
                         ImGui.TextUnformatted(bannedUser.BannedOn.ToLocalTime().ToString(CultureInfo.CurrentCulture));
@@ -330,7 +336,7 @@ namespace MareSynchronos.UI
                         ImGui.TableNextColumn();
                         if (UiShared.IconTextButton(FontAwesomeIcon.Check, "Unban"))
                         {
-                            _ = _apiController.GroupUnbanUser(group.GID, bannedUser.UID);
+                            _ = _apiController.GroupUnbanUser(bannedUser);
                             _bannedUsers.RemoveAll(b => string.Equals(b.UID, bannedUser.UID, StringComparison.Ordinal));
                         }
                     }
@@ -359,7 +365,7 @@ namespace MareSynchronos.UI
                 if (ImGui.Button("Change password"))
                 {
                     var pw = _newSyncShellPassword;
-                    _isPasswordValid = _apiController.GroupChangePassword(group.GID, pw).Result;
+                    _isPasswordValid = _apiController.GroupChangePassword(new(groupDto.Group, pw)).Result;
                     _newSyncShellPassword = string.Empty;
                     if (_isPasswordValid) _showModalChangePassword = false;
                 }
@@ -392,7 +398,7 @@ namespace MareSynchronos.UI
                     ImGui.SliderInt("Amount##bulkinvites", ref _bulkInviteCount, 1, 100);
                     if (UiShared.IconTextButton(FontAwesomeIcon.MailBulk, "Create invites"))
                     {
-                        _bulkOneTimeInvites = _apiController.GroupCreateTempInvite(group.GID, _bulkInviteCount).Result;
+                        _bulkOneTimeInvites = _apiController.GroupCreateTempInvite(groupDto, _bulkInviteCount).Result;
                     }
                 }
                 else
@@ -409,21 +415,21 @@ namespace MareSynchronos.UI
             }
 
             ImGui.Indent(collapseButton.X);
-            if (ExpandedGroupState[group.GID])
+            if (ExpandedGroupState[groupDto.GID])
             {
-                pairsInGroup = pairsInGroup.OrderBy(p => string.Equals(p.UserUID, group.OwnedBy, StringComparison.Ordinal) ? 0 : 1)
-                    .ThenBy(p => p.IsModerator ?? false ? 0 : 1)
-                    .ThenBy(p => p.IsPinned ?? false ? 0 : 1)
-                    .ThenBy(p => p.UserAlias ?? p.UserUID).ToList();
+                pairsInGroup = pairsInGroup.OrderBy(p => string.Equals(p.Value.User.UID, groupDto.OwnerUID, StringComparison.Ordinal) ? 0 : 1)
+                    .ThenBy(p => p.Value.GroupPairStatusInfo.HasFlag(GroupUserInfo.IsModerator) ? 0 : 1)
+                    .ThenBy(p => p.Value.GroupPairStatusInfo.HasFlag(GroupUserInfo.IsPinned) ? 0 : 1)
+                    .ThenBy(p => p.Value.UserAliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
                 ImGui.Indent(ImGui.GetStyle().ItemSpacing.X / 2);
                 ImGui.Separator();
                 foreach (var pair in pairsInGroup)
                 {
-                    UiShared.DrawWithID(group.GID + pair.UserUID, () => DrawSyncshellPairedClient(pair,
-                        group.OwnedBy!,
-                        string.Equals(group.OwnedBy, _apiController.UID, StringComparison.Ordinal),
-                        group.IsModerator ?? false,
-                        group?.IsPaused ?? false));
+                    UiShared.DrawWithID(groupDto.GID + pair.Value.User.UID, () => DrawSyncshellPairedClient(pair.Value,
+                        groupDto.OwnerUID,
+                        string.Equals(groupDto.OwnerUID, _apiController.UID, StringComparison.Ordinal),
+                        groupDto.GroupUserInfo.HasFlag(GroupUserInfo.IsModerator),
+                        groupDto.GroupUserInfo.HasFlag(GroupUserInfo.IsPinned)));
 
                 }
 
@@ -433,14 +439,14 @@ namespace MareSynchronos.UI
             ImGui.Unindent(collapseButton.X);
         }
 
-        private void DrawSyncShellButtons(GroupDto entry, string name)
+        private void DrawSyncShellButtons(GroupFullInfoDto groupDto, string name)
         {
-            bool invitesEnabled = entry.InvitesEnabled ?? true;
+            bool invitesEnabled = !groupDto.GroupPermissions.HasFlag(GroupPermissions.DisableInvites);
             var lockedIcon = invitesEnabled ? FontAwesomeIcon.LockOpen : FontAwesomeIcon.Lock;
             var iconSize = UiShared.GetIconSize(lockedIcon);
             var diffLockUnlockIcons = invitesEnabled ? 0 : (UiShared.GetIconSize(FontAwesomeIcon.LockOpen).X - iconSize.X) / 2;
             var barbuttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Bars);
-            var isOwner = string.Equals(entry.OwnedBy, _apiController.UID, StringComparison.Ordinal);
+            var isOwner = string.Equals(groupDto.OwnerUID, _apiController.UID, StringComparison.Ordinal);
 
             ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - barbuttonSize.X - iconSize.X - diffLockUnlockIcons - ImGui.GetStyle().ItemSpacing.X);
             ImGui.PushFont(UiBuilder.IconFont);
@@ -460,27 +466,27 @@ namespace MareSynchronos.UI
                 {
                     if (UiShared.CtrlPressed())
                     {
-                        _ = _apiController.GroupLeave(entry.GID);
+                        _ = _apiController.GroupLeave(groupDto);
                     }
                 }
-                UiShared.AttachToolTip("Hold CTRL and click to leave this Syncshell" + (!string.Equals(entry.OwnedBy, _apiController.UID, StringComparison.Ordinal) ? string.Empty : Environment.NewLine
+                UiShared.AttachToolTip("Hold CTRL and click to leave this Syncshell" + (!string.Equals(groupDto.OwnerUID, _apiController.UID, StringComparison.Ordinal) ? string.Empty : Environment.NewLine
                     + "WARNING: This action is irreverisble" + Environment.NewLine + "Leaving an owned Syncshell will transfer the ownership to a random person in the Syncshell."));
 
                 if (UiShared.IconTextButton(FontAwesomeIcon.Copy, "Copy ID"))
                 {
                     ImGui.CloseCurrentPopup();
-                    ImGui.SetClipboardText(string.IsNullOrEmpty(entry.Alias) ? entry.GID : entry.Alias);
+                    ImGui.SetClipboardText(groupDto.GroupAliasOrGID);
                 }
                 UiShared.AttachToolTip("Copy Syncshell ID to Clipboard");
 
                 if (UiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Copy Notes"))
                 {
                     ImGui.CloseCurrentPopup();
-                    ImGui.SetClipboardText(_uiShared.GetNotes(entry.GID));
+                    ImGui.SetClipboardText(_uiShared.GetNotes(groupDto.GID));
                 }
                 UiShared.AttachToolTip("Copies all your notes for all users in this Syncshell to the clipboard." + Environment.NewLine + "They can be imported via Settings -> Privacy -> Import Notes from Clipboard");
 
-                if (isOwner || (entry.IsModerator ?? false))
+                if (isOwner || groupDto.GroupUserInfo.HasFlag(GroupUserInfo.IsModerator))
                 {
                     ImGui.Separator();
 
@@ -488,7 +494,8 @@ namespace MareSynchronos.UI
                     if (UiShared.IconTextButton(changedToIcon, invitesEnabled ? "Lock Syncshell" : "Unlock Syncshell"))
                     {
                         ImGui.CloseCurrentPopup();
-                        _ = _apiController.GroupChangeInviteState(entry.GID, !entry.InvitesEnabled ?? true);
+                        var groupPerm = groupDto.GroupPermissions ^ GroupPermissions.DisableInvites;
+                        _apiController.GroupChangeGroupPermissionState(new GroupPermissionDto(groupDto.Group, groupPerm));
                     }
                     UiShared.AttachToolTip("Change Syncshell joining permissions" + Environment.NewLine + "Syncshell is currently " + (invitesEnabled ? "open" : "closed") + " for people to join");
 
@@ -508,7 +515,7 @@ namespace MareSynchronos.UI
                         if (UiShared.CtrlPressed())
                         {
                             ImGui.CloseCurrentPopup();
-                            _ = _apiController.GroupClear(entry.GID);
+                            _ = _apiController.GroupClear(groupDto);
                         }
                     }
                     UiShared.AttachToolTip("Hold CTRL and click to clear this Syncshell." + Environment.NewLine + "WARNING: this action is irreversible." + Environment.NewLine
@@ -517,7 +524,7 @@ namespace MareSynchronos.UI
                     if (UiShared.IconTextButton(FontAwesomeIcon.Envelope, "Single one-time invite"))
                     {
                         ImGui.CloseCurrentPopup();
-                        ImGui.SetClipboardText(_apiController.GroupCreateTempInvite(entry.GID, 1).Result.FirstOrDefault() ?? string.Empty);
+                        ImGui.SetClipboardText(_apiController.GroupCreateTempInvite(groupDto, 1).Result.FirstOrDefault() ?? string.Empty);
                     }
                     UiShared.AttachToolTip("Creates a single-use password for joining the syncshell which is valid for 24h and copies it to the clipboard.");
 
@@ -533,7 +540,7 @@ namespace MareSynchronos.UI
                     {
                         ImGui.CloseCurrentPopup();
                         _showModalBanList = true;
-                        _bannedUsers = _apiController.GroupGetBannedUsers(entry.GID).Result;
+                        _bannedUsers = _apiController.GroupGetBannedUsers(groupDto).Result;
                     }
 
                     if (isOwner)
@@ -543,7 +550,7 @@ namespace MareSynchronos.UI
                             if (UiShared.CtrlPressed() && UiShared.ShiftPressed())
                             {
                                 ImGui.CloseCurrentPopup();
-                                _ = _apiController.GroupDelete(entry.GID);
+                                _ = _apiController.GroupDelete(groupDto);
                             }
                         }
                         UiShared.AttachToolTip("Hold CTRL and Shift and click to delete this Syncshell." + Environment.NewLine + "WARNING: this action is irreversible.");
@@ -554,19 +561,21 @@ namespace MareSynchronos.UI
             }
         }
 
-        private void DrawSyncshellPairedClient(GroupPairDto entry, string ownerUid, bool isOwner, bool isModerator, bool isPausedByYou)
+        private void DrawSyncshellPairedClient(GroupPairFullInfoDto entry, string ownerUid, bool isOwner, bool isModerator, bool isPausedByYou)
         {
             var plusButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Plus);
             var barButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Bars);
-            var entryUID = string.IsNullOrEmpty(entry.UserAlias) ? entry.UserUID : entry.UserAlias;
+            var entryUID = entry.UserAliasOrUID;
             var textSize = ImGui.CalcTextSize(entryUID);
             var originalY = ImGui.GetCursorPosY();
-            var userIsMod = entry.IsModerator ?? false;
+            var userIsMod = entry.GroupPairStatusInfo.HasFlag(GroupUserInfo.IsModerator);
             var userIsOwner = string.Equals(entryUID, ownerUid, StringComparison.Ordinal);
+            var isPinned = entry.GroupPairStatusInfo.HasFlag(GroupUserInfo.IsPinned);
+            var isPaused = entry.GroupUserPermissions.HasFlag(GroupUserPermissions.Paused);
 
             var textPos = originalY + barButtonSize.Y / 2 - textSize.Y / 2;
             ImGui.SetCursorPosY(textPos);
-            if (isPausedByYou || (entry.IsPaused ?? false))
+            if (isPausedByYou || isPaused)
             {
                 ImGui.PushFont(UiBuilder.IconFont);
                 UiShared.ColorText(FontAwesomeIcon.PauseCircle.ToIconString(), ImGuiColors.DalamudYellow);
@@ -601,7 +610,7 @@ namespace MareSynchronos.UI
                 ImGui.PopFont();
                 UiShared.AttachToolTip("User is moderator of this Syncshell");
             }
-            else if (entry.IsPinned ?? false)
+            else if (isPinned)
             {
                 ImGui.SameLine();
                 ImGui.SetCursorPosY(textPos);
@@ -612,8 +621,8 @@ namespace MareSynchronos.UI
             }
 
             var textIsUid = true;
-            _mainUi.ShowUidForEntry.TryGetValue(entry.UserUID, out var showUidInsteadOfName);
-            if (!showUidInsteadOfName && _configuration.GetCurrentServerUidComments().TryGetValue(entry.UserUID, out var playerText))
+            _mainUi.ShowUidForEntry.TryGetValue(entry.UID, out var showUidInsteadOfName);
+            if (!showUidInsteadOfName && _configuration.GetCurrentServerUidComments().TryGetValue(entry.UID, out var playerText))
             {
                 if (string.IsNullOrEmpty(playerText))
                 {
@@ -628,11 +637,11 @@ namespace MareSynchronos.UI
             {
                 playerText = entryUID;
             }
-            
-            bool plusButtonShown = !_apiController.PairedClients.Any(p => string.Equals(p.OtherUID, entry.UserUID, StringComparison.Ordinal));
+
+            bool plusButtonShown = !_apiController.PairedClients.Any(p => string.Equals(p.OtherUID, entry.UID, StringComparison.Ordinal));
 
             ImGui.SameLine();
-            if (!string.Equals(_mainUi.EditNickEntry, entry.UserUID, StringComparison.Ordinal))
+            if (!string.Equals(_mainUi.EditNickEntry, entry.UID, StringComparison.Ordinal))
             {
                 ImGui.SetCursorPosY(textPos);
                 if (textIsUid) ImGui.PushFont(UiBuilder.MonoFont);
@@ -643,22 +652,22 @@ namespace MareSynchronos.UI
                 if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
                 {
                     var prevState = textIsUid;
-                    if (_mainUi.ShowUidForEntry.ContainsKey(entry.UserUID))
+                    if (_mainUi.ShowUidForEntry.ContainsKey(entry.UID))
                     {
-                        prevState = _mainUi.ShowUidForEntry[entry.UserUID];
+                        prevState = _mainUi.ShowUidForEntry[entry.UID];
                     }
 
-                    _mainUi.ShowUidForEntry[entry.UserUID] = !prevState;
+                    _mainUi.ShowUidForEntry[entry.UID] = !prevState;
                 }
 
                 if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
                 {
                     _configuration.SetCurrentServerUidComment(_mainUi.EditNickEntry, _mainUi.EditUserComment);
                     _configuration.Save();
-                    _mainUi.EditUserComment = _configuration.GetCurrentServerUidComments().ContainsKey(entry.UserUID)
-                        ? _configuration.GetCurrentServerUidComments()[entry.UserUID]
+                    _mainUi.EditUserComment = _configuration.GetCurrentServerUidComments().ContainsKey(entry.UID)
+                        ? _configuration.GetCurrentServerUidComments()[entry.UID]
                         : string.Empty;
-                    _mainUi.EditNickEntry = entry.UserUID;
+                    _mainUi.EditNickEntry = entry.UID;
                 }
             }
             else
@@ -670,7 +679,7 @@ namespace MareSynchronos.UI
                 ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * buttons);
                 if (ImGui.InputTextWithHint("", "Nick/Notes", ref _mainUi.EditUserComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
                 {
-                    _configuration.SetCurrentServerUidComment(entry.UserUID, _mainUi.EditUserComment);
+                    _configuration.SetCurrentServerUidComment(entry.UID, _mainUi.EditUserComment);
                     _configuration.Save();
                     _mainUi.EditNickEntry = string.Empty;
                 }
@@ -692,7 +701,7 @@ namespace MareSynchronos.UI
 
                 if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
                 {
-                    _ = _apiController.UserAddPair(entry.UserUID);
+                    _ = _apiController.UserAddPair(entry.UID);
                 }
                 UiShared.AttachToolTip("Pair with " + entryUID + " individually");
             }
@@ -710,13 +719,14 @@ namespace MareSynchronos.UI
 
             if (ImGui.BeginPopup("Popup"))
             {
-                if ((!entry.IsModerator ?? false) && !(userIsMod || userIsOwner))
+                if ((!isModerator) && !(userIsMod || userIsOwner))
                 {
-                    var pinText = (entry?.IsPinned ?? false) ? "Unpin user" : "Pin user";
+                    var pinText = isPinned ? "Unpin user" : "Pin user";
                     if (UiShared.IconTextButton(FontAwesomeIcon.Thumbtack, pinText))
                     {
                         ImGui.CloseCurrentPopup();
-                        _ = _apiController.GroupChangePinned(entry.GroupGID, entry.UserUID, !entry.IsPinned ?? false);
+                        var userInfo = entry.GroupPairStatusInfo ^ GroupUserInfo.IsPinned;
+                        _ = _apiController.GroupSetUserInfo(new GroupPairUserInfoDto(entry.Group, entry.User, userInfo));
                     }
                     UiShared.AttachToolTip("Pin this user to the Syncshell. Pinned users will not be deleted in case of a manually initiated Syncshell clean");
 
@@ -725,11 +735,11 @@ namespace MareSynchronos.UI
                         if (UiShared.CtrlPressed())
                         {
                             ImGui.CloseCurrentPopup();
-                            _ = _apiController.GroupRemoveUser(entry.GroupGID, entry.UserUID);
+                            _ = _apiController.GroupRemoveUser(entry);
                         }
                     }
 
-                    UiShared.AttachToolTip("Hold CTRL and click to remove user " + (entry.UserAlias ?? entry.UserUID) + " from Syncshell");
+                    UiShared.AttachToolTip("Hold CTRL and click to remove user " + (entry.UserAliasOrUID) + " from Syncshell");
                     if (UiShared.IconTextButton(FontAwesomeIcon.UserSlash, "Ban User"))
                     {
                         _showModalBanUser = true;
@@ -740,26 +750,27 @@ namespace MareSynchronos.UI
 
                 if (isOwner)
                 {
-                    string modText = (entry.IsModerator ?? false) ? "Demod user" : "Mod user";
+                    string modText = userIsMod ? "Demod user" : "Mod user";
                     if (UiShared.IconTextButton(FontAwesomeIcon.UserShield, modText))
                     {
                         if (UiShared.CtrlPressed())
                         {
                             ImGui.CloseCurrentPopup();
-                            _ = _apiController.GroupSetModerator(entry.GroupGID, entry.UserUID, !entry.IsModerator ?? false);
+                            var userInfo = entry.GroupPairStatusInfo ^ GroupUserInfo.IsModerator;
+                            _ = _apiController.GroupSetUserInfo(new GroupPairUserInfoDto(entry.Group, entry.User, userInfo));
                         }
                     }
-                    UiShared.AttachToolTip("Hold CTRL to change the moderator status for " + (entry.UserAlias ?? entry.UserUID) + Environment.NewLine +
+                    UiShared.AttachToolTip("Hold CTRL to change the moderator status for " + (entry.UserAliasOrUID) + Environment.NewLine +
                         "Moderators can kick, ban/unban, pin/unpin users and clear the Syncshell.");
                     if (UiShared.IconTextButton(FontAwesomeIcon.Crown, "Transfer Ownership"))
                     {
                         if (UiShared.CtrlPressed() && UiShared.ShiftPressed())
                         {
                             ImGui.CloseCurrentPopup();
-                            _ = _apiController.GroupChangeOwnership(entry.GroupGID, entry.UserUID);
+                            _ = _apiController.GroupChangeOwnership(entry);
                         }
                     }
-                    UiShared.AttachToolTip("Hold CTRL and SHIFT and click to transfer ownership of this Syncshell to " + (entry.UserAlias ?? entry.UserUID) + Environment.NewLine + "WARNING: This action is irreversible.");
+                    UiShared.AttachToolTip("Hold CTRL and SHIFT and click to transfer ownership of this Syncshell to " + (entry.UserAliasOrUID) + Environment.NewLine + "WARNING: This action is irreversible.");
                 }
                 ImGui.EndPopup();
             }
@@ -780,13 +791,13 @@ namespace MareSynchronos.UI
 
             if (ImGui.BeginPopupModal("Ban User", ref _showModalBanUser, UiShared.PopupWindowFlags))
             {
-                UiShared.TextWrapped("User " + (entry.UserAlias ?? entry.UserUID) + " will be banned and removed from this Syncshell.");
+                UiShared.TextWrapped("User " + (entry.UserAliasOrUID) + " will be banned and removed from this Syncshell.");
                 ImGui.InputTextWithHint("##banreason", "Ban Reason", ref _banReason, 255);
                 if (ImGui.Button("Ban User"))
                 {
                     ImGui.CloseCurrentPopup();
                     var reason = _banReason;
-                    _ = _apiController.GroupBanUser(entry.GroupGID, entry.UserUID, reason);
+                    _ = _apiController.GroupBanUser(entry, reason);
                     _banReason = string.Empty;
                 }
                 UiShared.TextWrapped("The reason will be displayed in the banlist. The current server-side alias if present (Vanity ID) will automatically be attached to the reason.");

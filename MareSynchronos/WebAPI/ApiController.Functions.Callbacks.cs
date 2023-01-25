@@ -2,6 +2,8 @@
 using System.Linq;
 using System.Threading.Tasks;
 using MareSynchronos.API;
+using MareSynchronos.API.Dto.Group;
+using MareSynchronos.API.Routes;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -34,18 +36,6 @@ public partial class ApiController
     {
         if (_initialized) return;
         _mareHub!.On(nameof(Client_UserChangePairedPlayer), act);
-    }
-
-    public void OnGroupChange(Action<GroupDto> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_GroupChange), act);
-    }
-
-    public void OnGroupUserChange(Action<GroupPairDto> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_GroupUserChange), act);
     }
 
     public void OnAdminForcedReconnect(Action act)
@@ -90,6 +80,104 @@ public partial class ApiController
         _mareHub!.On(nameof(Client_DownloadReady), act);
     }
 
+    public void OnGroupSendFullInfo(Action<GroupFullInfoDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupSendFullInfo), act);
+    }
+
+    public Task Client_GroupSendFullInfo(GroupFullInfoDto dto)
+    {
+        Groups[dto] = dto;
+        return Task.CompletedTask;
+    }
+
+    public void OnGroupSendInfo(Action<GroupInfoDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupSendInfo), act);
+    }
+
+    public Task Client_GroupSendInfo(GroupInfoDto dto)
+    {
+        Groups[dto].Group = dto.Group;
+        Groups[dto].Owner = dto.Owner;
+        Groups[dto].GroupPermissions = dto.GroupPermissions;
+        return Task.CompletedTask;
+    }
+
+    public void OnGroupDelete(Action<GroupDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupDelete), act);
+    }
+
+    public Task Client_GroupDelete(GroupDto dto)
+    {
+        Groups.TryRemove(dto, out _);
+        return Task.CompletedTask;
+    }
+
+    public void OnGroupPairJoined(Action<GroupPairFullInfoDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupPairJoined), act);
+    }
+
+    public Task Client_GroupPairJoined(GroupPairFullInfoDto dto)
+    {
+        GroupPairedClients[dto] = dto;
+        return Task.CompletedTask;
+    }
+
+    public void OnGroupPairLeft(Action<GroupPairDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupPairLeft), act);
+    }
+
+    public Task Client_GroupPairLeft(GroupPairDto dto)
+    {
+        GroupPairedClients.TryRemove(dto, out _);
+        return Task.CompletedTask;
+    }
+
+    public void OnGroupChangePermissions(Action<GroupPermissionDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupChangePermissions), act);
+    }
+
+    public Task Client_GroupChangePermissions(GroupPermissionDto dto)
+    {
+        Groups[dto].GroupPermissions = dto.Permissions;
+        return Task.CompletedTask;
+    }
+
+    public void OnGroupPairChangePermissions(Action<GroupPairUserPermissionDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupPairChangePermissions), act);
+    }
+
+    public Task Client_GroupPairChangePermissions(GroupPairUserPermissionDto dto)
+    {
+        GroupPairedClients[dto].GroupUserPermissions = dto.GroupPairPermissions;
+        return Task.CompletedTask;
+    }
+
+    public void OnGroupPairChangeUserInfo(Action<GroupPairUserInfoDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupPairChangeUserInfo), act);
+    }
+
+    public Task Client_GroupPairChangeUserInfo(GroupPairUserInfoDto dto)
+    {
+        GroupPairedClients[dto].GroupPairStatusInfo = dto.GroupUserInfo;
+        return Task.CompletedTask;
+    }
+
     public Task Client_UserUpdateClientPairs(ClientPairDto dto)
     {
         var entry = PairedClients.SingleOrDefault(e => string.Equals(e.OtherUID, dto.OtherUID, System.StringComparison.Ordinal));
@@ -129,52 +217,6 @@ public partial class ApiController
     {
         if (isOnline) PairedClientOnline?.Invoke(characterIdent);
         else PairedClientOffline?.Invoke(characterIdent);
-        return Task.CompletedTask;
-    }
-
-    public async Task Client_GroupChange(GroupDto dto)
-    {
-        if (dto.IsDeleted.GetValueOrDefault(false))
-        {
-            Groups.RemoveAll(g => string.Equals(g.GID, dto.GID, System.StringComparison.Ordinal));
-            GroupPairedClients.RemoveAll(g => string.Equals(g.GroupGID, dto.GID, System.StringComparison.Ordinal));
-            return;
-        }
-
-        var existingGroup = Groups.FirstOrDefault(g => string.Equals(g.GID, dto.GID, System.StringComparison.Ordinal));
-        if (existingGroup == null)
-        {
-            Groups.Add(dto);
-            GroupPairedClients.AddRange(await GroupsGetUsersInGroup(dto.GID).ConfigureAwait(false));
-            return;
-        }
-
-        existingGroup.OwnedBy = dto.OwnedBy ?? existingGroup.OwnedBy;
-        existingGroup.InvitesEnabled = dto.InvitesEnabled ?? existingGroup.InvitesEnabled;
-        existingGroup.IsPaused = dto.IsPaused ?? existingGroup.IsPaused;
-        existingGroup.IsModerator = dto.IsModerator ?? existingGroup.IsModerator;
-    }
-
-    public Task Client_GroupUserChange(GroupPairDto dto)
-    {
-        if (dto.IsRemoved.GetValueOrDefault(false))
-        {
-            GroupPairedClients.RemoveAll(g => string.Equals(g.GroupGID, dto.GroupGID, System.StringComparison.Ordinal) && string.Equals(g.UserUID, dto.UserUID, System.StringComparison.Ordinal));
-            return Task.CompletedTask;
-        }
-
-        var existingUser = GroupPairedClients.FirstOrDefault(f => string.Equals(f.GroupGID, dto.GroupGID, System.StringComparison.Ordinal) && string.Equals(f.UserUID, dto.UserUID, System.StringComparison.Ordinal));
-        if (existingUser == null)
-        {
-            GroupPairedClients.Add(dto);
-            return Task.CompletedTask;
-        }
-
-        existingUser.IsPaused = dto.IsPaused ?? existingUser.IsPaused;
-        existingUser.UserAlias = dto.UserAlias ?? existingUser.UserAlias;
-        existingUser.IsPinned = dto.IsPinned ?? existingUser.IsPinned;
-        existingUser.IsModerator = dto.IsModerator ?? existingUser.IsModerator;
-
         return Task.CompletedTask;
     }
 

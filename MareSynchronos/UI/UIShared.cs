@@ -665,7 +665,7 @@ public class UiShared : IDisposable
         {
             if (gid != null)
             {
-                if (!ApiController.GroupPairedClients.Any(p => string.Equals(p.GroupGID, gid, StringComparison.Ordinal) && string.Equals(p.UserUID, userEntry.Key, StringComparison.Ordinal))) continue;
+                if (!ApiController.GroupPairedClients.Any(p => string.Equals(p.Key.Group.GID, gid, StringComparison.Ordinal) && string.Equals(p.Key.User.UID, userEntry.Key, StringComparison.Ordinal))) continue;
             }
 
             sb.AppendLine(userEntry.Key + ":\"" + userEntry.Value + "\"");

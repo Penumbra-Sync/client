@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using MareSynchronos.API.Routes;
 using MareSynchronos.API;
 using MareSynchronos.FileCache;
 using MareSynchronos.Utils;
@@ -14,6 +15,7 @@ using MareSynchronos.WebAPI.Utils;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
+using MareSynchronos.API.Dto.Group;
 
 namespace MareSynchronos.WebAPI;
 
@@ -111,8 +113,8 @@ public partial class ApiController : IDisposable, IMareHubClient
     public bool IsUploading => CurrentUploads.Count > 0;
 
     public List<ClientPairDto> PairedClients { get; set; } = new();
-    public List<GroupPairDto> GroupPairedClients { get; set; } = new();
-    public List<GroupDto> Groups { get; set; } = new();
+    public ConcurrentDictionary<GroupPairDto, GroupPairFullInfoDto> GroupPairedClients { get; set; } = new(new GroupPairDtoComparer());
+    public ConcurrentDictionary<GroupDto, GroupFullInfoDto> Groups { get; set; } = new(new GroupDtoComparer());
 
     public string SecretKey => _pluginConfiguration.ClientSecret.ContainsKey(ApiUri)
         ? _pluginConfiguration.ClientSecret[ApiUri] : string.Empty;
@@ -297,18 +299,25 @@ public partial class ApiController : IDisposable, IMareHubClient
         OnUserUpdateClientPairs((dto) => Client_UserUpdateClientPairs(dto));
         OnUserChangePairedPlayer((ident, online) => Client_UserChangePairedPlayer(ident, online));
         OnUserReceiveCharacterData((dto, ident) => Client_UserReceiveCharacterData(dto, ident));
-        OnGroupChange(async (dto) => await Client_GroupChange(dto).ConfigureAwait(false));
-        OnGroupUserChange((dto) => Client_GroupUserChange(dto));
+        OnGroupSendFullInfo((dto) => Client_GroupSendFullInfo(dto));
         OnDownloadReady((guid) => Client_DownloadReady(guid));
 
         OnAdminForcedReconnect(() => Client_AdminForcedReconnect());
 
         PairedClients = await UserGetPairedClients().ConfigureAwait(false);
-        Groups = await GroupsGetAll().ConfigureAwait(false);
+        Groups.Clear();
+        foreach (var entry in await GroupsGetAll().ConfigureAwait(false))
+        {
+            Groups[entry] = entry;
+        }
         GroupPairedClients.Clear();
         foreach (var group in Groups)
         {
-            GroupPairedClients.AddRange(await GroupsGetUsersInGroup(group.GID).ConfigureAwait(false));
+            var users = await GroupsGetUsersInGroup(group.Value).ConfigureAwait(false);
+            foreach (var user in users)
+            {
+                GroupPairedClients[user] = user;
+            }
         }
 
         if (IsModerator)

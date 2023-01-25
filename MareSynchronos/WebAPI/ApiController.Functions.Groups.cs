@@ -1,4 +1,5 @@
 ﻿using MareSynchronos.API;
+using MareSynchronos.API.Dto.Group;
 using Microsoft.AspNetCore.SignalR.Client;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -6,111 +7,110 @@ using System.Threading.Tasks;
 namespace MareSynchronos.WebAPI;
 public partial class ApiController
 {
-    public async Task<GroupCreatedDto> GroupCreate()
+    private void CheckConnection()
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return new GroupCreatedDto();
-        return await _mareHub!.InvokeAsync<GroupCreatedDto>(nameof(GroupCreate)).ConfigureAwait(false);
+        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) throw new System.Exception("Not connected");
     }
 
-    public async Task<bool> GroupChangePassword(string gid, string newpassword)
+    public async Task<List<BannedGroupUserDto>> GroupGetBannedUsers(GroupDto group)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return false;
-        return await _mareHub!.InvokeAsync<bool>(nameof(GroupChangePassword), gid, newpassword).ConfigureAwait(false);
+        CheckConnection();
+        return await _mareHub!.InvokeAsync<List<BannedGroupUserDto>>(nameof(GroupGetBannedUsers), group).ConfigureAwait(false);
     }
 
-    public async Task<List<GroupDto>> GroupsGetAll()
+    public async Task GroupClear(GroupDto group)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return new List<GroupDto>();
-        return await _mareHub!.InvokeAsync<List<GroupDto>>(nameof(GroupsGetAll)).ConfigureAwait(false);
+        CheckConnection();
+        await _mareHub!.SendAsync(nameof(GroupClear), group).ConfigureAwait(false);
     }
 
-    public async Task<List<GroupPairDto>> GroupsGetUsersInGroup(string gid)
+    public async Task GroupChangeOwnership(GroupPairDto groupPair)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return new List<GroupPairDto>();
-        return await _mareHub!.InvokeAsync<List<GroupPairDto>>(nameof(GroupsGetUsersInGroup), gid).ConfigureAwait(false);
+        CheckConnection();
+        await _mareHub!.SendAsync(nameof(GroupChangeOwnership), groupPair).ConfigureAwait(false);
     }
 
-    public async Task<bool> GroupJoin(string gid, string password)
+    public async Task<bool> GroupChangePassword(GroupPasswordDto groupPassword)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return false;
-        return await _mareHub!.InvokeAsync<bool>(nameof(GroupJoin), gid.Trim(), password).ConfigureAwait(false);
+        CheckConnection();
+        return await _mareHub!.InvokeAsync<bool>(nameof(GroupChangePassword), groupPassword).ConfigureAwait(false);
     }
 
-    public async Task GroupChangeInviteState(string gid, bool opened)
+    public async Task<GroupPasswordDto> GroupCreate()
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(nameof(GroupChangeInviteState), gid, opened).ConfigureAwait(false);
+        CheckConnection();
+        return await _mareHub!.InvokeAsync<GroupPasswordDto>(nameof(GroupCreate)).ConfigureAwait(false);
     }
 
-    public async Task GroupDelete(string gid)
+    public async Task<List<GroupFullInfoDto>> GroupsGetAll()
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(nameof(GroupDelete), gid).ConfigureAwait(false);
+        CheckConnection();
+        return await _mareHub!.InvokeAsync<List<GroupFullInfoDto>>(nameof(GroupsGetAll)).ConfigureAwait(false);
     }
 
-    public async Task GroupChangePinned(string gid, string uid, bool isPinned)
+    public async Task<List<GroupPairFullInfoDto>> GroupsGetUsersInGroup(GroupDto group)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(nameof(GroupChangePinned), gid, uid, isPinned).ConfigureAwait(false);
+        CheckConnection();
+        return await _mareHub!.InvokeAsync<List<GroupPairFullInfoDto>>(nameof(GroupsGetUsersInGroup), group).ConfigureAwait(false);
     }
 
-    public async Task GroupClear(string gid)
+    public async Task GroupBanUser(GroupPairDto dto, string reason)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(nameof(GroupClear), gid).ConfigureAwait(false);
+        CheckConnection();
+        await _mareHub!.SendAsync(nameof(GroupBanUser), dto, reason).ConfigureAwait(false);
     }
 
-    public async Task GroupLeave(string gid)
+    public async Task GroupChangeGroupPermissionState(GroupPermissionDto dto)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(nameof(GroupLeave), gid).ConfigureAwait(false);
+        CheckConnection();
+        await _mareHub!.SendAsync(nameof(GroupChangeGroupPermissionState), dto).ConfigureAwait(false);
     }
 
-    public async Task GroupChangePauseState(string gid, bool isPaused)
+    public async Task GroupChangeIndividualPermissionState(GroupPairUserPermissionDto dto)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(nameof(GroupChangePauseState), gid, isPaused).ConfigureAwait(false);
+        CheckConnection();
+        await _mareHub!.SendAsync(nameof(GroupChangeIndividualPermissionState), dto).ConfigureAwait(false);
     }
 
-    public async Task GroupRemoveUser(string gid, string uid)
+    public async Task GroupDelete(GroupDto group)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(nameof(GroupRemoveUser), gid, uid).ConfigureAwait(false);
+        CheckConnection();
+        await _mareHub!.SendAsync(nameof(GroupDelete), group).ConfigureAwait(false);
     }
 
-    public async Task GroupChangeOwnership(string gid, string uid)
+    public async Task<bool> GroupJoin(GroupPasswordDto passwordedGroup)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(nameof(GroupChangeOwnership), gid, uid).ConfigureAwait(false);
+        CheckConnection();
+        return await _mareHub!.InvokeAsync<bool>(nameof(GroupJoin), passwordedGroup).ConfigureAwait(false);
     }
 
-    public async Task GroupBanUser(string gid, string uid, string reason)
+    public async Task GroupLeave(GroupDto group)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(nameof(GroupBanUser), gid, uid, reason).ConfigureAwait(false);
+        CheckConnection();
+        await _mareHub!.SendAsync(nameof(GroupLeave), group).ConfigureAwait(false);
     }
 
-    public async Task GroupUnbanUser(string gid, string uid)
+    public async Task GroupRemoveUser(GroupPairDto groupPair)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(nameof(GroupUnbanUser), gid, uid).ConfigureAwait(false);
+        CheckConnection();
+        await _mareHub!.SendAsync(nameof(GroupRemoveUser), groupPair).ConfigureAwait(false);
     }
 
-    public async Task<List<BannedGroupUserDto>> GroupGetBannedUsers(string gid)
+    public async Task GroupUnbanUser(GroupPairDto groupPair)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return new();
-        return await _mareHub!.InvokeAsync<List<BannedGroupUserDto>>(nameof(GroupGetBannedUsers), gid).ConfigureAwait(false);
+        CheckConnection();
+        await _mareHub!.SendAsync(nameof(GroupUnbanUser), groupPair).ConfigureAwait(false);
     }
 
-    public async Task GroupSetModerator(string gid, string uid, bool isModerator)
+    public async Task GroupSetUserInfo(GroupPairUserInfoDto userInfo)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(nameof(GroupSetModerator), gid, uid, isModerator).ConfigureAwait(false);
+        CheckConnection();
+        await _mareHub!.SendAsync(nameof(GroupSetUserInfo), userInfo).ConfigureAwait(false);
     }
 
-    public async Task<List<string>> GroupCreateTempInvite(string gid, int amount)
+    public async Task<List<string>> GroupCreateTempInvite(GroupDto group, int amount)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return new();
-        return await _mareHub!.InvokeAsync<List<string>>(nameof(GroupCreateTempInvite), gid, amount).ConfigureAwait(false);
+        CheckConnection();
+        return await _mareHub!.InvokeAsync<List<string>>(nameof(GroupCreateTempInvite), group, amount).ConfigureAwait(false);
     }
 }
