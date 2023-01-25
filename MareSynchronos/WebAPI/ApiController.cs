@@ -299,10 +299,17 @@ public partial class ApiController : IDisposable, IMareHubClient
         OnUserUpdateClientPairs((dto) => Client_UserUpdateClientPairs(dto));
         OnUserChangePairedPlayer((ident, online) => Client_UserChangePairedPlayer(ident, online));
         OnUserReceiveCharacterData((dto, ident) => Client_UserReceiveCharacterData(dto, ident));
-        OnGroupSendFullInfo((dto) => Client_GroupSendFullInfo(dto));
         OnDownloadReady((guid) => Client_DownloadReady(guid));
-
         OnAdminForcedReconnect(() => Client_AdminForcedReconnect());
+
+        OnGroupChangePermissions((dto) => Client_GroupChangePermissions(dto));
+        OnGroupDelete((dto) => Client_GroupDelete(dto));
+        OnGroupPairChangePermissions((dto) => Client_GroupPairChangePermissions(dto));
+        OnGroupPairChangeUserInfo((dto) => Client_GroupPairChangeUserInfo(dto));
+        OnGroupPairJoined((dto) => Client_GroupPairJoined(dto));
+        OnGroupPairLeft((dto) => Client_GroupPairLeft(dto));
+        OnGroupSendFullInfo((dto) => Client_GroupSendFullInfo(dto));
+        OnGroupSendInfo((dto) => Client_GroupSendInfo(dto));
 
         PairedClients = await UserGetPairedClients().ConfigureAwait(false);
         Groups.Clear();

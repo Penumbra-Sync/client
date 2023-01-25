@@ -3,7 +3,6 @@ using Dalamud.Interface.Components;
 using Dalamud.Interface;
 using Dalamud.Utility;
 using ImGuiNET;
-using MareSynchronos.API;
 using MareSynchronos.WebAPI;
 using System;
 using System.Collections.Generic;
