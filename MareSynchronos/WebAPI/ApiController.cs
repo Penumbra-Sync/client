@@ -297,12 +297,16 @@ public partial class ApiController : IDisposable, IMareHubClient
         if (_mareHub == null) return;
 
         Logger.Debug("Initializing data");
-        OnUserUpdateClientPairs((dto) => Client_UserUpdateClientPairs(dto));
-        OnUserChangePairedPlayer((ident, online) => Client_UserChangePairedPlayer(ident, online));
         OnDownloadReady((guid) => Client_DownloadReady(guid));
         OnAdminForcedReconnect(() => Client_AdminForcedReconnect());
 
+        OnUserSendOffline((dto) => Client_UserSendOffline(dto));
+        OnUserAddClientPair((dto) => Client_UserAddClientPair(dto));
         OnUserReceiveCharacterData((dto) => Client_UserReceiveCharacterData(dto));
+        OnUserRemoveClientPair(dto => Client_UserRemoveClientPair(dto));
+        OnUserSendOnline(dto => Client_UserSendOnline(dto));
+        OnUserUpdateOtherPairPermissions(dto => Client_UserUpdateOtherPairPermissions(dto));
+        OnUserUpdateSelfPairPermissions(dto => Client_UserUpdateSelfPairPermissions(dto));
 
         OnGroupChangePermissions((dto) => Client_GroupChangePermissions(dto));
         OnGroupDelete((dto) => Client_GroupDelete(dto));
@@ -314,7 +318,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         OnGroupSendInfo((dto) => Client_GroupSendInfo(dto));
 
         PairedClients.Clear();
-        foreach(var userPair in await UserGetPairedClients().ConfigureAwait(false))
+        foreach (var userPair in await UserGetPairedClients().ConfigureAwait(false))
         {
             PairedClients[userPair] = userPair;
         }
@@ -333,7 +337,7 @@ public partial class ApiController : IDisposable, IMareHubClient
             }
         }
 
-        foreach(var entry in await UserGetOnlineCharacters().ConfigureAwait(false))
+        foreach (var entry in await UserGetOnlinePairs().ConfigureAwait(false))
         {
             PairedClientOnline?.Invoke(entry);
         }

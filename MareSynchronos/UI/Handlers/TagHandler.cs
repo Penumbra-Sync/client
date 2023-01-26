@@ -1,4 +1,5 @@
-﻿using MareSynchronos.WebAPI;
+﻿using MareSynchronos.API.Dto.User;
+using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.UI.Handlers
 {
@@ -67,30 +68,30 @@ namespace MareSynchronos.UI.Handlers
                 .ToHashSet(StringComparer.Ordinal);
         }
 
-        public void AddTagToPairedUid(ClientPairDto pair, string tagName)
+        public void AddTagToPairedUid(UserPairDto pair, string tagName)
         {
             var tagDictionary = GetUidTagDictionaryForCurrentServer();
-            var tagsForPair = tagDictionary.GetValueOrDefault(pair.OtherUID, new List<string>());
+            var tagsForPair = tagDictionary.GetValueOrDefault(pair.User.UID, new List<string>());
             tagsForPair.Add(tagName);
-            tagDictionary[pair.OtherUID] = tagsForPair;
+            tagDictionary[pair.User.UID] = tagsForPair;
             _configuration.Save();
         }
         
-        public void RemoveTagFromPairedUid(ClientPairDto pair, string tagName)
+        public void RemoveTagFromPairedUid(UserPairDto pair, string tagName)
         {
-            RemoveTagFromPairedUid(pair.OtherUID, tagName);
+            RemoveTagFromPairedUid(pair.User.UID, tagName);
             _configuration.Save();
         }
 
-        public bool HasTag(ClientPairDto pair, string tagName)
+        public bool HasTag(UserPairDto pair, string tagName)
         {
-            var tagsForPair = GetUidTagDictionaryForCurrentServer().GetValueOrDefault(pair.OtherUID, new List<string>());
+            var tagsForPair = GetUidTagDictionaryForCurrentServer().GetValueOrDefault(pair.User.UID, new List<string>());
             return tagsForPair.Contains(tagName, StringComparer.Ordinal);
         }
 
-        public bool HasAnyTag(ClientPairDto pair)
+        public bool HasAnyTag(UserPairDto pair)
         {
-            return GetUidTagDictionaryForCurrentServer().ContainsKey(pair.OtherUID);
+            return GetUidTagDictionaryForCurrentServer().ContainsKey(pair.User.UID);
         }
         
         private void RemoveTagFromPairedUid(string otherUid, string tagName)

@@ -325,7 +325,7 @@ public partial class ApiController
         CancelDownload(currentDownloadId);
     }
 
-    public async Task PushCharacterData(API.Data.CharacterData character, List<UserDto> visibleCharacters)
+    public async Task PushCharacterData(API.Data.CharacterData character, List<UserData> visibleCharacters)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", StringComparison.Ordinal)) return;
         Logger.Debug("Sending Character data to service " + ApiUri);
@@ -427,7 +427,7 @@ public partial class ApiController
 
         if (!uploadToken.IsCancellationRequested)
         {
-            Logger.Info("Pushing character data for " + character.GetHashCode() + " to " + string.Join(", ", visibleCharacters.Select(c => c.User.AliasOrUID)));
+            Logger.Info("Pushing character data for " + character.GetHashCode() + " to " + string.Join(", ", visibleCharacters.Select(c => c.AliasOrUID)));
             StringBuilder sb = new();
             foreach (var item in character.FileReplacements)
             {
@@ -438,7 +438,7 @@ public partial class ApiController
                 sb.AppendLine($"GlamourerData for {item.Key}: {!string.IsNullOrEmpty(item.Value)}");
             }
             Logger.Debug("Chara data contained: " + Environment.NewLine + sb.ToString());
-            await UserPushData(visibleCharacters, character).ConfigureAwait(false);
+            await UserPushData(new(visibleCharacters, character)).ConfigureAwait(false);
         }
         else
         {

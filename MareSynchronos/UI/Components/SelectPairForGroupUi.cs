@@ -1,6 +1,7 @@
-﻿using Dalamud.Interface;
-using FFXIVClientStructs.FFXIV.Common.Math;
+﻿using System.Numerics;
+using Dalamud.Interface;
 using ImGuiNET;
+using MareSynchronos.API.Dto.User;
 using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI.Components;
@@ -28,7 +29,7 @@ public class SelectPairForGroupUi
         _show = true;
     }
 
-    public void Draw(List<ClientPairDto> pairs, Dictionary<string, bool> showUidForEntry)
+    public void Draw(List<UserPairDto> pairs, Dictionary<string, bool> showUidForEntry)
     {
         var workHeight = ImGui.GetMainViewport().WorkSize.Y / ImGuiHelpers.GlobalScale;
         var minSize = new Vector2(300, workHeight < 400 ? workHeight : 400) * ImGuiHelpers.GlobalScale;
@@ -54,21 +55,21 @@ public class SelectPairForGroupUi
         {
             UiShared.FontText($"Select users for group {_tag}", UiBuilder.DefaultFont);
             ImGui.InputTextWithHint("##filter", "Filter", ref _filter, 255, ImGuiInputTextFlags.None);
-            foreach (var item in pairs.OrderBy(p => PairName(showUidForEntry, p.OtherUID, p.VanityUID), StringComparer.OrdinalIgnoreCase)
-                .Where(p => string.IsNullOrEmpty(_filter) || PairName(showUidForEntry, p.OtherUID, p.VanityUID).Contains(_filter, StringComparison.OrdinalIgnoreCase)).ToList())
+            foreach (var item in pairs.OrderBy(p => PairName(showUidForEntry, p), StringComparer.OrdinalIgnoreCase)
+                .Where(p => string.IsNullOrEmpty(_filter) || PairName(showUidForEntry, p).Contains(_filter, StringComparison.OrdinalIgnoreCase)).ToList())
             {
-                var isInGroup = _peopleInGroup.Contains(item.OtherUID);
-                if (ImGui.Checkbox(PairName(showUidForEntry, item.OtherUID, item.VanityUID), ref isInGroup))
+                var isInGroup = _peopleInGroup.Contains(item.User.UID);
+                if (ImGui.Checkbox(PairName(showUidForEntry, item), ref isInGroup))
                 {
                     if (isInGroup)
                     {
                         _tagHandler.AddTagToPairedUid(item, _tag);
-                        _peopleInGroup.Add(item.OtherUID);
+                        _peopleInGroup.Add(item.User.UID);
                     }
                     else
                     {
                         _tagHandler.RemoveTagFromPairedUid(item, _tag);
-                        _peopleInGroup.Remove(item.OtherUID);
+                        _peopleInGroup.Remove(item.User.UID);
                     }
                 }
             }
@@ -81,13 +82,13 @@ public class SelectPairForGroupUi
         }
     }
 
-    private string PairName(Dictionary<string, bool> showUidForEntry, string otherUid, string vanityUid)
+    private string PairName(Dictionary<string, bool> showUidForEntry, UserPairDto dto)
     {
-        showUidForEntry.TryGetValue(otherUid, out var showUidInsteadOfName);
-        _configuration.GetCurrentServerUidComments().TryGetValue(otherUid, out var playerText);
+        showUidForEntry.TryGetValue(dto.User.UID, out var showUidInsteadOfName);
+        _configuration.GetCurrentServerUidComments().TryGetValue(dto.User.UID, out var playerText);
         if (showUidInsteadOfName || string.IsNullOrEmpty(playerText))
         {
-            playerText = string.IsNullOrEmpty(vanityUid) ? otherUid : vanityUid;
+            playerText = dto.User.AliasOrUID;
         }
         return playerText;
     }

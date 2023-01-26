@@ -9,6 +9,7 @@ public partial class ApiController
 {
     public async Task UserDelete()
     {
+        CheckConnection();
         _pluginConfiguration.ClientSecret.Remove(ApiUri);
         _pluginConfiguration.Save();
         await FilesDeleteAll().ConfigureAwait(false);
@@ -16,11 +17,11 @@ public partial class ApiController
         await CreateConnections().ConfigureAwait(false);
     }
 
-    public async Task UserPushData(List<UserDto> recipients, CharacterData characterData)
+    public async Task UserPushData(UserCharaDataMessageDto dto)
     {
         try
         {
-            await _mareHub!.InvokeAsync(nameof(UserPushData), recipients, characterData).ConfigureAwait(false);
+            await _mareHub!.InvokeAsync(nameof(UserPushData), dto).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -33,9 +34,14 @@ public partial class ApiController
         return await _mareHub!.InvokeAsync<List<UserPairDto>>(nameof(UserGetPairedClients)).ConfigureAwait(false);
     }
 
-    public async Task<List<OnlineUserIdentDto>> UserGetOnlineCharacters()
+    public async Task<List<OnlineUserIdentDto>> UserGetOnlinePairs()
     {
-        return await _mareHub!.InvokeAsync<List<OnlineUserIdentDto>>(nameof(UserGetOnlineCharacters)).ConfigureAwait(false);
+        return await _mareHub!.InvokeAsync<List<OnlineUserIdentDto>>(nameof(UserGetOnlinePairs)).ConfigureAwait(false);
+    }
+
+    public async Task UserSetPairPermissions(UserPermissionsDto dto)
+    {
+        await _mareHub!.SendAsync(nameof(UserSetPairPermissions), dto).ConfigureAwait(false);
     }
 
     public async Task UserAddPair(UserDto dto)
@@ -44,17 +50,9 @@ public partial class ApiController
         await _mareHub!.SendAsync(nameof(UserAddPair), dto).ConfigureAwait(false);
     }
 
-    public async Task UserChangePairPauseStatus(string uid, bool paused)
-    {
-        if (!IsConnected || string.Equals(SecretKey, "-", StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(nameof(UserChangePairPauseStatus), uid, paused).ConfigureAwait(false);
-    }
-
     public async Task UserRemovePair(UserDto dto)
     {
         if (!IsConnected || string.Equals(SecretKey, "-", StringComparison.Ordinal)) return;
         await _mareHub!.SendAsync(nameof(UserRemovePair), dto).ConfigureAwait(false);
     }
 }
-
-

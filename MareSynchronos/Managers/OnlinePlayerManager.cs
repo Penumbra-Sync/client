@@ -18,7 +18,6 @@ public class OnlinePlayerManager : IDisposable
     private readonly Configuration _configuration;
     private readonly ConcurrentDictionary<UserDto, CachedPlayer> _onlineCachedPlayers = new(new UserDtoComparer());
     private readonly ConcurrentDictionary<UserDto, OnlineUserCharaDataDto> _temporaryStoredCharacterCache = new(new UserDtoComparer());
-    private readonly ConcurrentDictionary<CachedPlayer, CancellationTokenSource> _playerTokenDisposal = new();
     private readonly ConcurrentDictionary<UserDto, OptionalPluginWarning> _shownWarnings = new(new UserDtoComparer());
 
     private List<UserDto> OnlineVisiblePlayerHashes => _onlineCachedPlayers.Select(p => p.Value).Where(p => p.PlayerCharacter != IntPtr.Zero)
@@ -157,11 +156,9 @@ public class OnlinePlayerManager : IDisposable
     {
         Logger.Debug("Player online: " + dto);
 
-        if (_onlineCachedPlayers.TryGetValue(dto, out var cachedPlayer))
+        if (_onlineCachedPlayers.ContainsKey(dto))
         {
             PushCharacterData(new List<UserDto>() { new(dto.User) });
-            _playerTokenDisposal.TryGetValue(cachedPlayer, out var cancellationTokenSource);
-            cancellationTokenSource?.Cancel();
             return;
         }
 
@@ -210,7 +207,7 @@ public class OnlinePlayerManager : IDisposable
         {
             Task.Run(async () =>
             {
-                await _apiController.PushCharacterData(_playerManager.LastCreatedCharacterData, visiblePlayers).ConfigureAwait(false);
+                await _apiController.PushCharacterData(_playerManager.LastCreatedCharacterData, visiblePlayers.Select(c => c.User).ToList()).ConfigureAwait(false);
             });
         }
     }

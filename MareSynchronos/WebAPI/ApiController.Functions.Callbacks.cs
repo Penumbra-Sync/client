@@ -13,12 +13,6 @@ public partial class ApiController
 {
     public UserPairDto? LastAddedUser { get; set; }
 
-    public void OnUserUpdateClientPairs(Action<ClientPairDto> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_UserUpdateClientPairs), act);
-    }
-
     public void OnUpdateSystemInfo(Action<SystemInfoDto> act)
     {
         if (_initialized) return;
@@ -29,12 +23,6 @@ public partial class ApiController
     {
         if (_initialized) return;
         _mareHub!.On(nameof(Client_UserReceiveCharacterData), act);
-    }
-
-    public void OnUserChangePairedPlayer(Action<string, bool> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_UserChangePairedPlayer), act);
     }
 
     public void OnAdminForcedReconnect(Action act)
@@ -177,34 +165,6 @@ public partial class ApiController
         return Task.CompletedTask;
     }
 
-    public Task Client_UserUpdateClientPairs(ClientPairDto dto)
-    {
-        var entry = PairedClients.SingleOrDefault(e => string.Equals(e.OtherUID, dto.OtherUID, StringComparison.Ordinal));
-        if (dto.IsRemoved)
-        {
-            PairedClients.RemoveAll(p => string.Equals(p.OtherUID, dto.OtherUID, StringComparison.Ordinal));
-            return Task.CompletedTask;
-        }
-        if (entry == null)
-        {
-            LastAddedUser = dto;
-            PairedClients.Add(dto);
-            return Task.CompletedTask;
-        }
-
-        entry.IsPaused = dto.IsPaused;
-        entry.IsPausedFromOthers = dto.IsPausedFromOthers;
-        entry.IsSynced = dto.IsSynced;
-
-        return Task.CompletedTask;
-    }
-
-    public Task Client_UpdateSystemInfo(SystemInfoDto systemInfo)
-    {
-        SystemInfoDto = systemInfo;
-        return Task.CompletedTask;
-    }
-
     public Task Client_UserReceiveCharacterData(OnlineUserCharaDataDto dto)
     {
         Logger.Verbose("Received DTO for " + dto.User.AliasOrUID);
@@ -212,10 +172,81 @@ public partial class ApiController
         return Task.CompletedTask;
     }
 
-    public Task Client_UserChangePairedPlayer(string characterIdent, bool isOnline)
+    public void OnUserAddClientPair(Action<UserPairDto> act)
     {
-        if (isOnline) PairedClientOnline?.Invoke(characterIdent);
-        else PairedClientOffline?.Invoke(characterIdent);
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_UserAddClientPair), act);
+    }
+
+    public Task Client_UserAddClientPair(UserPairDto userPairDto)
+    {
+        this.PairedClients[userPairDto] = userPairDto;
+        return Task.CompletedTask;
+    }
+
+    public void OnUserRemoveClientPair(Action<UserDto> act)
+    {
+        if (!_initialized) return;
+        _mareHub!.On(nameof(Client_UserRemoveClientPair), act);
+    }
+
+    public Task Client_UserRemoveClientPair(UserDto dto)
+    {
+        PairedClients.TryRemove(dto, out _);
+        return Task.CompletedTask;
+    }
+
+    public void OnUserSendOffline(Action<UserDto> act)
+    {
+        if (!_initialized) return;
+        _mareHub!.On(nameof(OnUserSendOffline), act);
+    }
+
+    public Task Client_UserSendOffline(UserDto dto)
+    {
+        PairedClientOffline?.Invoke(dto);
+        return Task.CompletedTask;
+    }
+
+    public void OnUserSendOnline(Action<OnlineUserIdentDto> act)
+    {
+        if (!_initialized) return;
+        _mareHub!.On(nameof(Client_UserSendOnline), act);
+    }
+
+    public Task Client_UserSendOnline(OnlineUserIdentDto dto)
+    {
+        PairedClientOnline?.Invoke(dto);
+        return Task.CompletedTask;
+    }
+
+    public void OnUserUpdateOtherPairPermissions(Action<UserPermissionsDto> act)
+    {
+        if (!_initialized) return;
+        _mareHub!.On(nameof(Client_UserUpdateOtherPairPermissions), act);
+    }
+
+    public Task Client_UserUpdateOtherPairPermissions(UserPermissionsDto dto)
+    {
+        PairedClients[dto].OtherPermissions = dto.Permissions;
+        return Task.CompletedTask;
+    }
+
+    public void OnUserUpdateSelfPairPermissions(Action<UserPermissionsDto> act)
+    {
+        if (!_initialized) return;
+        _mareHub!.On(nameof(Client_UserUpdateSelfPairPermissions), act);
+    }
+
+    public Task Client_UserUpdateSelfPairPermissions(UserPermissionsDto dto)
+    {
+        PairedClients[dto].OwnPermissions = dto.Permissions;
+        return Task.CompletedTask;
+    }
+
+    public Task Client_UpdateSystemInfo(SystemInfoDto systemInfo)
+    {
+        SystemInfoDto = systemInfo;
         return Task.CompletedTask;
     }
 

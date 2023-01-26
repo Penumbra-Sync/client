@@ -3,6 +3,7 @@ using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Client.System.Resource;
+using MareSynchronos.API.Data.Enum;
 using MareSynchronos.Interop;
 using MareSynchronos.Managers;
 using MareSynchronos.Models;

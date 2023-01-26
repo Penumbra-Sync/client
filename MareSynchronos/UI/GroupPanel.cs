@@ -6,6 +6,7 @@ using ImGuiNET;
 using MareSynchronos.WebAPI;
 using System.Numerics;
 using System.Globalization;
+using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.API.Data.Enum;
@@ -177,7 +178,7 @@ namespace MareSynchronos.UI
             var ySize = _mainUi.TransferPartHeight == 0
                 ? 1
                 : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - _mainUi.TransferPartHeight - ImGui.GetCursorPosY();
-            ImGui.BeginChild("list", new Vector2(_mainUi._windowContentWidth, ySize), false);
+            ImGui.BeginChild("list", new Vector2(_mainUi.WindowContentWidth, ySize), false);
             foreach (var entry in _apiController.Groups.OrderBy(g => string.IsNullOrEmpty(g.Value.Group.Alias) ? g.Value.Group.GID : g.Value.Group.Alias).ToList())
             {
                 UiShared.DrawWithID(entry.Value.Group.GID, () => DrawSyncshell(entry.Value));
@@ -635,7 +636,7 @@ namespace MareSynchronos.UI
                 playerText = entryUID;
             }
 
-            bool plusButtonShown = !_apiController.PairedClients.Any(p => string.Equals(p.OtherUID, entry.UID, StringComparison.Ordinal));
+            bool plusButtonShown = !_apiController.PairedClients.Any(p => string.Equals(p.Key.User.UID, entry.UID, StringComparison.Ordinal));
 
             ImGui.SameLine();
             if (!string.Equals(_mainUi.EditNickEntry, entry.UID, StringComparison.Ordinal))

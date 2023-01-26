@@ -1,6 +1,8 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using ImGuiNET;
+using MareSynchronos.API.Data.Extensions;
+using MareSynchronos.API.Dto.User;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
 
@@ -8,12 +10,12 @@ namespace MareSynchronos.UI.Components
 {
     public class PairGroupsUi
     {
-        private readonly Action<ClientPairDto> _clientRenderFn;
+        private readonly Action<UserPairDto> _clientRenderFn;
         private readonly TagHandler _tagHandler;
         private readonly ApiController _apiController;
         private readonly SelectPairForGroupUi _selectGroupForPairUi;
 
-        public PairGroupsUi(TagHandler tagHandler, Action<ClientPairDto> clientRenderFn, ApiController apiController, SelectPairForGroupUi selectGroupForPairUi)
+        public PairGroupsUi(TagHandler tagHandler, Action<UserPairDto> clientRenderFn, ApiController apiController, SelectPairForGroupUi selectGroupForPairUi)
         {
             _clientRenderFn = clientRenderFn;
             _tagHandler = tagHandler;
@@ -21,7 +23,7 @@ namespace MareSynchronos.UI.Components
             _selectGroupForPairUi = selectGroupForPairUi;
         }
 
-        public void Draw(List<ClientPairDto> availablePairs)
+        public void Draw(List<UserPairDto> availablePairs)
         {
             // Only render those tags that actually have pairs in them, otherwise
             // we can end up with a bunch of useless pair groups
@@ -32,11 +34,11 @@ namespace MareSynchronos.UI.Components
             }
         }
 
-        public void DrawCategory(string tag, List<ClientPairDto> availablePairs)
+        public void DrawCategory(string tag, List<UserPairDto> availablePairs)
         {
             var otherUidsTaggedWithTag = _tagHandler.GetOtherUidsForTag(tag);
             var availablePairsInThisTag = availablePairs
-                .Where(pair => otherUidsTaggedWithTag.Contains(pair.OtherUID))
+                .Where(pair => otherUidsTaggedWithTag.Contains(pair.User.UID))
                 .ToList();
             if (availablePairsInThisTag.Any())
             {
@@ -68,9 +70,9 @@ namespace MareSynchronos.UI.Components
             }
         }
 
-        private void DrawButtons(string tag, List<ClientPairDto> availablePairsInThisTag)
+        private void DrawButtons(string tag, List<UserPairDto> availablePairsInThisTag)
         {
-            var allArePaused = availablePairsInThisTag.All(pair => pair.IsPaused);
+            var allArePaused = availablePairsInThisTag.All(pair => pair.OwnPermissions.IsPaused());
             var pauseButton = allArePaused ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
             var flyoutMenuX = UiShared.GetIconButtonSize(FontAwesomeIcon.Bars).X;
             var pauseButtonX = UiShared.GetIconButtonSize(pauseButton).X;
@@ -138,16 +140,16 @@ namespace MareSynchronos.UI.Components
             UiShared.AttachToolTip($"Delete Group {tag} (Will not delete the pairs)" + Environment.NewLine + "Hold CTRL to delete");
         }
 
-        private void DrawPairs(string tag, List<ClientPairDto> availablePairsInThisCategory)
+        private void DrawPairs(string tag, List<UserPairDto> availablePairsInThisCategory)
         {
             ImGui.Separator();
             // These are all the OtherUIDs that are tagged with this tag
             availablePairsInThisCategory
-                .ForEach(pair => UiShared.DrawWithID($"tag-{tag}-pair-${pair.OtherUID}", () => DrawPair(pair)));
+                .ForEach(pair => UiShared.DrawWithID($"tag-{tag}-pair-${pair.User.UID}", () => DrawPair(pair)));
             ImGui.Separator();
         }
 
-        private void DrawPair(ClientPairDto pair)
+        private void DrawPair(UserPairDto pair)
         {
             // This is probably just dumb. Somehow, just setting the cursor position to the icon lenght
             // does not really push the child rendering further. So we'll just add two whitespaces and call it a day?
@@ -162,19 +164,23 @@ namespace MareSynchronos.UI.Components
             _tagHandler.SetTagOpen(tag, open);
         }
 
-        private void PauseRemainingPairs(List<ClientPairDto> availablePairs)
+        private void PauseRemainingPairs(List<UserPairDto> availablePairs)
         {
-            foreach (var pairToPause in availablePairs.Where(pair => !pair.IsPaused))
+            foreach (var pairToPause in availablePairs.Where(pair => !pair.OwnPermissions.IsPaused()))
             {
-                _ = _apiController.UserChangePairPauseStatus(pairToPause.OtherUID, paused: true);
+                var perm = pairToPause.OwnPermissions;
+                perm.SetPaused(true);
+                _ = _apiController.UserSetPairPermissions(new(pairToPause.User, perm));
             }
         }
 
-        private void ResumeAllPairs(List<ClientPairDto> availablePairs)
+        private void ResumeAllPairs(List<UserPairDto> availablePairs)
         {
             foreach (var pairToPause in availablePairs)
             {
-                _ = _apiController.UserChangePairPauseStatus(pairToPause.OtherUID, paused: false);
+                var perm = pairToPause.OwnPermissions;
+                perm.SetPaused(false);
+                _ = _apiController.UserSetPairPermissions(new(pairToPause.User, perm));
             }
         }
     }
