@@ -1,4 +1,4 @@
-﻿using MareSynchronos.API;
+﻿using MareSynchronos.API.Data;
 using MareSynchronos.FileCache;
 
 namespace MareSynchronos.Export;
@@ -12,7 +12,7 @@ internal class MareCharaFileDataFactory
         _fileCacheManager = fileCacheManager;
     }
 
-    public MareCharaFileData Create(string description, CharacterCacheDto characterCacheDto)
+    public MareCharaFileData Create(string description, CharacterData characterCacheDto)
     {
         return new MareCharaFileData(_fileCacheManager, description, characterCacheDto);
     }

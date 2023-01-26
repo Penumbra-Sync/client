@@ -3,17 +3,15 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using MareSynchronos.WebAPI;
-using System;
-using System.IO;
-using System.Linq;
 using System.Numerics;
-using System.Threading.Tasks;
-using MareSynchronos.API;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
 using Dalamud.Utility;
 using Newtonsoft.Json;
 using MareSynchronos.Export;
+using MareSynchronos.API.Dto.Admin;
+using MareSynchronos.API.Dto.Files;
+using MareSynchronos.API.Data;
 
 namespace MareSynchronos.UI;
 
@@ -25,7 +23,7 @@ public class SettingsUi : Window, IDisposable
     private readonly ApiController _apiController;
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly UiShared _uiShared;
-    public CharacterCacheDto LastCreatedCharacterData { private get; set; }
+    public CharacterData LastCreatedCharacterData { private get; set; }
 
     public event SwitchUi? SwitchToIntroUi;
     private bool _overwriteExistingLabels = false;

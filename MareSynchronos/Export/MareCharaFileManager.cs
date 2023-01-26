@@ -1,15 +1,10 @@
-﻿using System.Linq;
-
-using Dalamud.Game.ClientState.Objects.Types;
+﻿using Dalamud.Game.ClientState.Objects.Types;
 using LZ4;
-using MareSynchronos.API;
 using MareSynchronos.FileCache;
 using MareSynchronos.Managers;
 using MareSynchronos.Utils;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading.Tasks;
+using MareSynchronos.API.Data;
+using MareSynchronos.API.Data.Enum;
 
 namespace MareSynchronos.Export;
 public class MareCharaFileManager
@@ -127,7 +122,7 @@ public class MareCharaFileManager
         return gamePathToFilePath;
     }
 
-    public void SaveMareCharaFile(CharacterCacheDto? dto, string description, string filePath)
+    public void SaveMareCharaFile(CharacterData? dto, string description, string filePath)
     {
         CurrentlyWorking = true;
         try

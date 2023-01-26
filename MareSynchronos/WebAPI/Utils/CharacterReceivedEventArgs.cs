@@ -1,7 +1,4 @@
-﻿using System;
-using MareSynchronos.API;
-
-namespace MareSynchronos.WebAPI.Utils;
+﻿namespace MareSynchronos.WebAPI.Utils;
 
 public class CharacterReceivedEventArgs : EventArgs
 {

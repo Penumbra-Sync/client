@@ -1,10 +1,8 @@
 ﻿using Newtonsoft.Json;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using MareSynchronos.API;
 using MareSynchronos.Utils;
-using Lumina.Excel.GeneratedSheets;
+using MareSynchronos.API.Data.Enum;
+using MareSynchronos.API.Data;
 
 namespace MareSynchronos.Models;
 
@@ -34,10 +32,10 @@ public class CharacterData
 
         if (!FileReplacements.ContainsKey(objectKind)) FileReplacements.Add(objectKind, new List<FileReplacement>());
 
-        var existingReplacement = FileReplacements[objectKind].SingleOrDefault(f => string.Equals(f.ResolvedPath, fileReplacement.ResolvedPath, System.StringComparison.OrdinalIgnoreCase));
+        var existingReplacement = FileReplacements[objectKind].SingleOrDefault(f => string.Equals(f.ResolvedPath, fileReplacement.ResolvedPath, StringComparison.OrdinalIgnoreCase));
         if (existingReplacement != null)
         {
-            existingReplacement.GamePaths.AddRange(fileReplacement.GamePaths.Where(e => !existingReplacement.GamePaths.Contains(e, System.StringComparer.OrdinalIgnoreCase)));
+            existingReplacement.GamePaths.AddRange(fileReplacement.GamePaths.Where(e => !existingReplacement.GamePaths.Contains(e, StringComparer.OrdinalIgnoreCase)));
         }
         else
         {
@@ -45,13 +43,13 @@ public class CharacterData
         }
     }
 
-    public CharacterCacheDto ToCharacterCacheDto()
+    public API.Data.CharacterData ToAPI()
     {
-        var fileReplacements = FileReplacements.ToDictionary(k => k.Key, k => k.Value.Where(f => f.HasFileReplacement && !f.IsFileSwap).GroupBy(f => f.Hash, System.StringComparer.OrdinalIgnoreCase).Select(g =>
+        var fileReplacements = FileReplacements.ToDictionary(k => k.Key, k => k.Value.Where(f => f.HasFileReplacement && !f.IsFileSwap).GroupBy(f => f.Hash, StringComparer.OrdinalIgnoreCase).Select(g =>
         {
-            return new FileReplacementDto()
+            return new FileReplacementData()
             {
-                GamePaths = g.SelectMany(f => f.GamePaths).Distinct(System.StringComparer.OrdinalIgnoreCase).ToArray(),
+                GamePaths = g.SelectMany(f => f.GamePaths).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
                 Hash = g.First().Hash,
             };
         }).ToList());
@@ -69,7 +67,7 @@ public class CharacterData
             fileReplacements[item.Key].AddRange(fileSwapsToAdd);
         }
 
-        return new CharacterCacheDto()
+        return new API.Data.CharacterData()
         {
             FileReplacements = fileReplacements,
             GlamourerData = GlamourerString.ToDictionary(d => d.Key, d => d.Value),

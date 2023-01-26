@@ -1,10 +1,8 @@
-﻿using System.Collections.Generic;
-using System.Numerics;
+﻿using System.Numerics;
 using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Utility;
 using ImGuiNET;
-using MareSynchronos.API;
 using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI.Components;

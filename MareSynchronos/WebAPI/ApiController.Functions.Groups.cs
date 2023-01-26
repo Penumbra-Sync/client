@@ -1,14 +1,12 @@
 ﻿using MareSynchronos.API.Dto.Group;
 using Microsoft.AspNetCore.SignalR.Client;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 
 namespace MareSynchronos.WebAPI;
 public partial class ApiController
 {
     private void CheckConnection()
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) throw new System.Exception("Not connected");
+        if (!IsConnected || string.Equals(SecretKey, "-", StringComparison.Ordinal)) throw new System.Exception("Not connected");
     }
 
     public async Task<List<BannedGroupUserDto>> GroupGetBannedUsers(GroupDto group)

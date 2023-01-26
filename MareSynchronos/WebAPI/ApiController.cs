@@ -1,14 +1,7 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
+﻿using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using MareSynchronos.API.Routes;
-using MareSynchronos.API;
 using MareSynchronos.FileCache;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
@@ -16,11 +9,19 @@ using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
 using MareSynchronos.API.Dto.Group;
+using MareSynchronos.API.Dto.Admin;
+using MareSynchronos.API.Dto;
+using MareSynchronos.API.SignalR;
+using MareSynchronos.API.Dto.Files;
+using MareSynchronos.API.Dto.User;
+using MareSynchronos.API.Data.Comparer;
 
 namespace MareSynchronos.WebAPI;
 
 public delegate void SimpleStringDelegate(string str);
-
+public delegate void PairedClientDelegate(OnlineUserIdentDto dto);
+public delegate void PairedClientDataDelegate(OnlineUserCharaDataDto dto);
+public delegate void UserDelegate(UserDto userDto);
 public record JwtCache(string ApiUrl, string CharaIdent, string SecretKey);
 
 public partial class ApiController : IDisposable, IMareHubClient
@@ -43,7 +44,7 @@ public partial class ApiController : IDisposable, IMareHubClient
     private CancellationTokenSource? _healthCheckTokenSource = new();
 
     private ConnectionDto? _connectionDto;
-    public ServerInfoDto ServerInfo => _connectionDto?.ServerInfo ?? new ServerInfoDto();
+    public ServerInfo ServerInfo => _connectionDto?.ServerInfo ?? new ServerInfo();
     public string AuthFailureMessage { get; private set; } = string.Empty;
 
     public SystemInfoDto SystemInfoDto { get; private set; } = new();
@@ -65,6 +66,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         _dalamudUtil.LogOut += DalamudUtilOnLogOut;
         ServerState = ServerState.Offline;
         _verifiedUploadedHashes = new(StringComparer.Ordinal);
+        _httpClient = new();
 
         if (_dalamudUtil.IsLoggedIn)
         {
@@ -84,15 +86,14 @@ public partial class ApiController : IDisposable, IMareHubClient
     }
 
 
-    public event EventHandler<CharacterReceivedEventArgs>? CharacterReceived;
 
     public event VoidDelegate? Connected;
-
     public event VoidDelegate? Disconnected;
 
-    public event SimpleStringDelegate? PairedClientOffline;
+    public event UserDelegate? PairedClientOffline;
+    public event PairedClientDelegate? PairedClientOnline;
+    public event PairedClientDataDelegate? CharacterReceived;
 
-    public event SimpleStringDelegate? PairedClientOnline;
     public event VoidDelegate? DownloadStarted;
     public event VoidDelegate? DownloadFinished;
 
@@ -112,7 +113,7 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     public bool IsUploading => CurrentUploads.Count > 0;
 
-    public List<ClientPairDto> PairedClients { get; set; } = new();
+    public ConcurrentDictionary<UserDto, UserPairDto> PairedClients { get; set; } = new();
     public ConcurrentDictionary<GroupPairDto, GroupPairFullInfoDto> GroupPairedClients { get; set; } = new(new GroupPairDtoComparer());
     public ConcurrentDictionary<GroupDto, GroupFullInfoDto> Groups { get; set; } = new(new GroupDtoComparer());
 
@@ -126,8 +127,8 @@ public partial class ApiController : IDisposable, IMareHubClient
         .Concat(_pluginConfiguration.CustomServerList)
         .ToDictionary(k => k.Key, k => k.Value, StringComparer.Ordinal);
 
-    public string UID => _connectionDto?.UID ?? string.Empty;
-    public string DisplayName => _connectionDto?.UID ?? string.Empty;
+    public string UID => _connectionDto?.User.UID ?? string.Empty;
+    public string DisplayName => _connectionDto?.User.UID ?? string.Empty;
     private string ApiUri => _pluginConfiguration.ApiUri;
     public int OnlineUsers => SystemInfoDto.OnlineUsers;
 
@@ -298,9 +299,10 @@ public partial class ApiController : IDisposable, IMareHubClient
         Logger.Debug("Initializing data");
         OnUserUpdateClientPairs((dto) => Client_UserUpdateClientPairs(dto));
         OnUserChangePairedPlayer((ident, online) => Client_UserChangePairedPlayer(ident, online));
-        OnUserReceiveCharacterData((dto, ident) => Client_UserReceiveCharacterData(dto, ident));
         OnDownloadReady((guid) => Client_DownloadReady(guid));
         OnAdminForcedReconnect(() => Client_AdminForcedReconnect());
+
+        OnUserReceiveCharacterData((dto) => Client_UserReceiveCharacterData(dto));
 
         OnGroupChangePermissions((dto) => Client_GroupChangePermissions(dto));
         OnGroupDelete((dto) => Client_GroupDelete(dto));
@@ -311,7 +313,11 @@ public partial class ApiController : IDisposable, IMareHubClient
         OnGroupSendFullInfo((dto) => Client_GroupSendFullInfo(dto));
         OnGroupSendInfo((dto) => Client_GroupSendInfo(dto));
 
-        PairedClients = await UserGetPairedClients().ConfigureAwait(false);
+        PairedClients.Clear();
+        foreach(var userPair in await UserGetPairedClients().ConfigureAwait(false))
+        {
+            PairedClients[userPair] = userPair;
+        }
         Groups.Clear();
         foreach (var entry in await GroupsGetAll().ConfigureAwait(false))
         {
@@ -325,6 +331,11 @@ public partial class ApiController : IDisposable, IMareHubClient
             {
                 GroupPairedClients[user] = user;
             }
+        }
+
+        foreach(var entry in await UserGetOnlineCharacters().ConfigureAwait(false))
+        {
+            PairedClientOnline?.Invoke(entry);
         }
 
         if (IsModerator)

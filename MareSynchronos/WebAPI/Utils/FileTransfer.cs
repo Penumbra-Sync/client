@@ -1,5 +1,4 @@
-﻿using MareSynchronos.API;
-using System;
+﻿using MareSynchronos.API.Dto.Files;
 
 namespace MareSynchronos.WebAPI.Utils;
 

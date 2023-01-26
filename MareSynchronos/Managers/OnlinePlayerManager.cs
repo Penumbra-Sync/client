@@ -1,15 +1,10 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using MareSynchronos.API;
+﻿using System.Collections.Concurrent;
+using MareSynchronos.API.Data.Comparer;
+using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using MareSynchronos.WebAPI.Utils;
 
 namespace MareSynchronos.Managers;
 
@@ -21,13 +16,13 @@ public class OnlinePlayerManager : IDisposable
     private readonly PlayerManager _playerManager;
     private readonly FileCacheManager _fileDbManager;
     private readonly Configuration _configuration;
-    private readonly ConcurrentDictionary<string, CachedPlayer> _onlineCachedPlayers = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, CharacterCacheDto> _temporaryStoredCharacterCache = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<UserDto, CachedPlayer> _onlineCachedPlayers = new(new UserDtoComparer());
+    private readonly ConcurrentDictionary<UserDto, OnlineUserCharaDataDto> _temporaryStoredCharacterCache = new(new UserDtoComparer());
     private readonly ConcurrentDictionary<CachedPlayer, CancellationTokenSource> _playerTokenDisposal = new();
-    private readonly ConcurrentDictionary<string, OptionalPluginWarning> _shownWarnings = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<UserDto, OptionalPluginWarning> _shownWarnings = new(new UserDtoComparer());
 
-    private List<string> OnlineVisiblePlayerHashes => _onlineCachedPlayers.Select(p => p.Value).Where(p => p.PlayerCharacter != IntPtr.Zero)
-        .Select(p => p.PlayerNameHash).ToList();
+    private List<UserDto> OnlineVisiblePlayerHashes => _onlineCachedPlayers.Select(p => p.Value).Where(p => p.PlayerCharacter != IntPtr.Zero)
+        .Select(p => (UserDto)p.OnlineUser).ToList();
 
     public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil, IpcManager ipcManager, PlayerManager playerManager, FileCacheManager fileDbManager, Configuration configuration)
     {
@@ -62,38 +57,32 @@ public class OnlinePlayerManager : IDisposable
         DisposePlayers();
     }
 
-    private void ApiControllerOnCharacterReceived(object? sender, CharacterReceivedEventArgs e)
+    private void ApiControllerOnCharacterReceived(OnlineUserCharaDataDto dto)
     {
-        if (!_shownWarnings.ContainsKey(e.CharacterNameHash)) _shownWarnings[e.CharacterNameHash] = new()
+        if (!_shownWarnings.ContainsKey(dto)) _shownWarnings[dto] = new()
         {
             ShownCustomizePlusWarning = _configuration.DisableOptionalPluginWarnings,
             ShownHeelsWarning = _configuration.DisableOptionalPluginWarnings,
         };
-        if (_onlineCachedPlayers.TryGetValue(e.CharacterNameHash, out var visiblePlayer) && visiblePlayer.IsVisible)
+        if (_onlineCachedPlayers.TryGetValue(dto, out var visiblePlayer) && visiblePlayer.IsVisible)
         {
-            Logger.Debug("Received data and applying to " + e.CharacterNameHash);
-            visiblePlayer.ApplyCharacterData(e.CharacterData, _shownWarnings[e.CharacterNameHash]);
+            Logger.Debug("Received data and applying to " + dto.User.AliasOrUID);
+            visiblePlayer.ApplyCharacterData(dto.CharaData, _shownWarnings[dto]);
         }
         else
         {
-            Logger.Debug("Received data but no fitting character visible for " + e.CharacterNameHash);
-            _temporaryStoredCharacterCache[e.CharacterNameHash] = e.CharacterData;
+            Logger.Debug("Received data but no fitting character visible for " + dto.User.AliasOrUID);
+            _temporaryStoredCharacterCache[dto] = dto;
         }
     }
 
-    private void PlayerManagerOnPlayerHasChanged(CharacterCacheDto characterCache)
+    private void PlayerManagerOnPlayerHasChanged(API.Data.CharacterData characterCache)
     {
         PushCharacterData(OnlineVisiblePlayerHashes);
     }
 
     private void ApiControllerOnConnected()
     {
-        var apiTask = _apiController.UserGetOnlineCharacters();
-
-        Task.WaitAll(apiTask);
-
-        AddInitialPairs(apiTask.Result);
-
         _playerManager.PlayerHasChanged += PlayerManagerOnPlayerHasChanged;
     }
 
@@ -126,16 +115,6 @@ public class OnlinePlayerManager : IDisposable
         _playerManager.PlayerHasChanged -= PlayerManagerOnPlayerHasChanged;
     }
 
-    public void AddInitialPairs(List<string> apiTaskResult)
-    {
-        _onlineCachedPlayers.Clear();
-        foreach (var hash in apiTaskResult)
-        {
-            _onlineCachedPlayers.TryAdd(hash, CreateCachedPlayer(hash));
-        }
-        Logger.Verbose("Online and paired users: " + string.Join(Environment.NewLine, _onlineCachedPlayers.Select(k => k.Key)));
-    }
-
     public void Dispose()
     {
         Logger.Verbose("Disposing " + nameof(OnlinePlayerManager));
@@ -161,40 +140,32 @@ public class OnlinePlayerManager : IDisposable
         _onlineCachedPlayers.Clear();
     }
 
-    private void ApiControllerOnPairedClientOffline(string charHash)
+    private void ApiControllerOnPairedClientOffline(UserDto dto)
     {
-        Logger.Debug("Player offline: " + charHash);
-        RemovePlayer(charHash);
-    }
+        Logger.Debug("Player offline: " + dto);
 
-    private void ApiControllerOnPairedClientOnline(string charHash)
-    {
-        Logger.Debug("Player online: " + charHash);
-        AddPlayer(charHash);
-        return;
-    }
-
-    private void AddPlayer(string characterNameHash)
-    {
-        if (_onlineCachedPlayers.TryGetValue(characterNameHash, out var cachedPlayer))
-        {
-            PushCharacterData(new List<string>() { characterNameHash });
-            _playerTokenDisposal.TryGetValue(cachedPlayer, out var cancellationTokenSource);
-            cancellationTokenSource?.Cancel();
-            return;
-        }
-        _onlineCachedPlayers.TryAdd(characterNameHash, CreateCachedPlayer(characterNameHash));
-    }
-
-    private void RemovePlayer(string characterHash)
-    {
-        if (!_onlineCachedPlayers.TryGetValue(characterHash, out var cachedPlayer))
+        if (!_onlineCachedPlayers.TryGetValue(dto, out var cachedPlayer))
         {
             return;
         }
 
         cachedPlayer.DisposePlayer();
-        _onlineCachedPlayers.TryRemove(characterHash, out _);
+        _onlineCachedPlayers.TryRemove(dto, out _);
+    }
+
+    private void ApiControllerOnPairedClientOnline(OnlineUserIdentDto dto)
+    {
+        Logger.Debug("Player online: " + dto);
+
+        if (_onlineCachedPlayers.TryGetValue(dto, out var cachedPlayer))
+        {
+            PushCharacterData(new List<UserDto>() { new(dto.User) });
+            _playerTokenDisposal.TryGetValue(cachedPlayer, out var cancellationTokenSource);
+            cancellationTokenSource?.Cancel();
+            return;
+        }
+
+        _onlineCachedPlayers.TryAdd(dto, CreateCachedPlayer(dto));
     }
 
     private void FrameworkOnUpdate()
@@ -205,26 +176,26 @@ public class OnlinePlayerManager : IDisposable
         foreach (var pChar in playerCharacters)
         {
             var hashedName = Crypto.GetHash256(pChar);
-            if (_onlineCachedPlayers.TryGetValue(hashedName, out var existingPlayer) && !string.IsNullOrEmpty(existingPlayer.PlayerName))
+            var existingPlayer = _onlineCachedPlayers.FirstOrDefault(c => string.Equals(c.Value.PlayerNameHash, hashedName, StringComparison.Ordinal)).Value;
+            if (existingPlayer == null) continue;
+
+            if (!string.IsNullOrEmpty(existingPlayer.PlayerName))
             {
                 existingPlayer.IsVisible = true;
                 continue;
             }
 
-            if (existingPlayer != null)
+            _temporaryStoredCharacterCache.TryRemove(existingPlayer.OnlineUser, out var cache);
+            if (!_shownWarnings.ContainsKey(existingPlayer.OnlineUser)) _shownWarnings[existingPlayer.OnlineUser] = new()
             {
-                _temporaryStoredCharacterCache.TryRemove(hashedName, out var cache);
-                if (!_shownWarnings.ContainsKey(hashedName)) _shownWarnings[hashedName] = new()
-                {
-                    ShownCustomizePlusWarning = _configuration.DisableOptionalPluginWarnings,
-                    ShownHeelsWarning = _configuration.DisableOptionalPluginWarnings,
-                };
-                existingPlayer.InitializePlayer(pChar.Address, pChar.Name.ToString(), cache, _shownWarnings[hashedName]);
-            }
+                ShownCustomizePlusWarning = _configuration.DisableOptionalPluginWarnings,
+                ShownHeelsWarning = _configuration.DisableOptionalPluginWarnings,
+            };
+            existingPlayer.InitializePlayer(pChar.Address, pChar.Name.ToString(), cache?.CharaData ?? null, _shownWarnings[existingPlayer.OnlineUser]);
         }
 
         var newlyVisiblePlayers = _onlineCachedPlayers.Select(v => v.Value)
-            .Where(p => p.PlayerCharacter != IntPtr.Zero && p.IsVisible && !p.WasVisible).Select(p => p.PlayerNameHash)
+            .Where(p => p.PlayerCharacter != IntPtr.Zero && p.IsVisible && !p.WasVisible).Select(p => (UserDto)p.OnlineUser)
             .ToList();
         if (newlyVisiblePlayers.Any())
         {
@@ -233,20 +204,19 @@ public class OnlinePlayerManager : IDisposable
         }
     }
 
-    private void PushCharacterData(List<string> visiblePlayers)
+    private void PushCharacterData(List<UserDto> visiblePlayers)
     {
         if (visiblePlayers.Any() && _playerManager.LastCreatedCharacterData != null)
         {
             Task.Run(async () =>
             {
-                await _apiController.PushCharacterData(_playerManager.LastCreatedCharacterData,
-                    visiblePlayers).ConfigureAwait(false);
+                await _apiController.PushCharacterData(_playerManager.LastCreatedCharacterData, visiblePlayers).ConfigureAwait(false);
             });
         }
     }
 
-    private CachedPlayer CreateCachedPlayer(string hashedName)
+    private CachedPlayer CreateCachedPlayer(OnlineUserIdentDto onlineUser)
     {
-        return new CachedPlayer(hashedName, _ipcManager, _apiController, _dalamudUtil, _fileDbManager);
+        return new CachedPlayer(onlineUser, _ipcManager, _apiController, _dalamudUtil, _fileDbManager);
     }
 }

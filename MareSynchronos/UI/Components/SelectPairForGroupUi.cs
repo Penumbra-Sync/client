@@ -1,9 +1,6 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using Dalamud.Interface;
+﻿using Dalamud.Interface;
 using FFXIVClientStructs.FFXIV.Common.Math;
 using ImGuiNET;
-using MareSynchronos.API;
 using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI.Components;
@@ -12,7 +9,7 @@ public class SelectPairForGroupUi
 {
     private bool _show = false;
     private bool _opened = false;
-    private HashSet<string> _peopleInGroup = new(System.StringComparer.Ordinal);
+    private HashSet<string> _peopleInGroup = new(StringComparer.Ordinal);
     private string _tag = string.Empty;
     private readonly TagHandler _tagHandler;
     private readonly Configuration _configuration;
@@ -57,8 +54,8 @@ public class SelectPairForGroupUi
         {
             UiShared.FontText($"Select users for group {_tag}", UiBuilder.DefaultFont);
             ImGui.InputTextWithHint("##filter", "Filter", ref _filter, 255, ImGuiInputTextFlags.None);
-            foreach (var item in pairs.OrderBy(p => PairName(showUidForEntry, p.OtherUID, p.VanityUID), System.StringComparer.OrdinalIgnoreCase)
-                .Where(p => string.IsNullOrEmpty(_filter) || PairName(showUidForEntry, p.OtherUID, p.VanityUID).Contains(_filter, System.StringComparison.OrdinalIgnoreCase)).ToList())
+            foreach (var item in pairs.OrderBy(p => PairName(showUidForEntry, p.OtherUID, p.VanityUID), StringComparer.OrdinalIgnoreCase)
+                .Where(p => string.IsNullOrEmpty(_filter) || PairName(showUidForEntry, p.OtherUID, p.VanityUID).Contains(_filter, StringComparison.OrdinalIgnoreCase)).ToList())
             {
                 var isInGroup = _peopleInGroup.Contains(item.OtherUID);
                 if (ImGui.Checkbox(PairName(showUidForEntry, item.OtherUID, item.VanityUID), ref isInGroup))

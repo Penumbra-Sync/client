@@ -1,13 +1,9 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using MareSynchronos.API;
+﻿using System.Text;
 using System.Text.RegularExpressions;
 using MareSynchronos.FileCache;
 using MareSynchronos.Managers;
 using MareSynchronos.Utils;
-using System;
+using MareSynchronos.API.Data;
 
 namespace MareSynchronos.Models;
 
@@ -26,9 +22,9 @@ public class FileReplacement
 
     public List<string> GamePaths { get; set; } = new();
 
-    public bool HasFileReplacement => GamePaths.Count >= 1 && GamePaths.Any(p => !string.Equals(p, ResolvedPath, System.StringComparison.Ordinal));
+    public bool HasFileReplacement => GamePaths.Count >= 1 && GamePaths.Any(p => !string.Equals(p, ResolvedPath, StringComparison.Ordinal));
 
-    public bool IsFileSwap => !Regex.IsMatch(ResolvedPath, @"^[a-zA-Z]:(/|\\)", RegexOptions.ECMAScript) && !string.Equals(GamePaths.First(), ResolvedPath, System.StringComparison.Ordinal);
+    public bool IsFileSwap => !Regex.IsMatch(ResolvedPath, @"^[a-zA-Z]:(/|\\)", RegexOptions.ECMAScript) && !string.Equals(GamePaths.First(), ResolvedPath, StringComparison.Ordinal);
 
     public string Hash { get; private set; } = string.Empty;
 
@@ -79,9 +75,9 @@ public class FileReplacement
         return success;
     }
 
-    public FileReplacementDto ToFileReplacementDto()
+    public FileReplacementData ToFileReplacementDto()
     {
-        return new FileReplacementDto
+        return new FileReplacementData
         {
             GamePaths = GamePaths.ToArray(),
             Hash = Hash,

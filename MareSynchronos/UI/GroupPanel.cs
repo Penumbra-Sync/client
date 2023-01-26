@@ -4,13 +4,11 @@ using Dalamud.Interface;
 using Dalamud.Utility;
 using ImGuiNET;
 using MareSynchronos.WebAPI;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Numerics;
 using System.Globalization;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
+using MareSynchronos.API.Data.Enum;
 
 namespace MareSynchronos.UI
 {
@@ -700,7 +698,7 @@ namespace MareSynchronos.UI
 
                 if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
                 {
-                    _ = _apiController.UserAddPair(entry.UID);
+                    _ = _apiController.UserAddPair(new UserDto(entry.User));
                 }
                 UiShared.AttachToolTip("Pair with " + entryUID + " individually");
             }

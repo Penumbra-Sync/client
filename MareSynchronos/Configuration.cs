@@ -1,13 +1,7 @@
 ﻿using Dalamud.Configuration;
 using Dalamud.Plugin;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using MareSynchronos.API;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using Microsoft.Extensions.Primitives;
 
 namespace MareSynchronos;
 

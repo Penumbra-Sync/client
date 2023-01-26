@@ -5,8 +5,6 @@ using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using MareSynchronos.Export;
 using MareSynchronos.Utils;
-using System;
-using System.Threading.Tasks;
 
 namespace MareSynchronos.UI;
 

@@ -1,9 +1,4 @@
-﻿using Lumina.Extensions;
-using System.Collections.Generic;
-using System.IO;
-using System.Runtime.CompilerServices;
-
-namespace MareSynchronos.Export;
+﻿namespace MareSynchronos.Export;
 
 public record MareCharaFileHeader(byte Version, MareCharaFileData CharaFileData)
 {
@@ -28,7 +23,7 @@ public record MareCharaFileHeader(byte Version, MareCharaFileData CharaFileData)
     public static MareCharaFileHeader? FromBinaryReader(string path, BinaryReader reader)
     {
         var chars = new string(reader.ReadChars(4));
-        if (!string.Equals(chars, "MCDF", System.StringComparison.Ordinal)) throw new System.Exception("Not a Mare Chara File");
+        if (!string.Equals(chars, "MCDF", StringComparison.Ordinal)) throw new System.Exception("Not a Mare Chara File");
 
         MareCharaFileHeader? decoded = null;
 

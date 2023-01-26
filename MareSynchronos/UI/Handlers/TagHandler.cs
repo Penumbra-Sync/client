@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using MareSynchronos.API;
-using MareSynchronos.WebAPI;
+﻿using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.UI.Handlers
 {

@@ -1,9 +1,8 @@
-﻿using System;
-using MareSynchronos.API;
-using FFXIVClientStructs.FFXIV.Client.Game.Character;
+﻿using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using System.Runtime.InteropServices;
 using MareSynchronos.Utils;
 using Penumbra.String;
+using MareSynchronos.API.Data.Enum;
 
 namespace MareSynchronos.Models;
 

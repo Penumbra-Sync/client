@@ -1,23 +1,18 @@
 ﻿using MareSynchronos.Factories;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-using MareSynchronos.API;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using System.Collections.Generic;
-using System.Linq;
 using MareSynchronos.Models;
 using MareSynchronos.FileCache;
 using MareSynchronos.UI;
+using MareSynchronos.API.Data.Enum;
 #if DEBUG
 using Newtonsoft.Json;
 #endif
 
 namespace MareSynchronos.Managers;
 
-public delegate void PlayerHasChanged(CharacterCacheDto characterCache);
+public delegate void PlayerHasChanged(API.Data.CharacterData characterCache);
 
 public class PlayerManager : IDisposable
 {
@@ -29,8 +24,8 @@ public class PlayerManager : IDisposable
     private readonly SettingsUi _settingsUi;
     private readonly IpcManager _ipcManager;
     public event PlayerHasChanged? PlayerHasChanged;
-    public CharacterCacheDto? LastCreatedCharacterData { get; private set; }
-    public CharacterData PermanentDataCache { get; private set; } = new();
+    public API.Data.CharacterData? LastCreatedCharacterData { get; private set; }
+    public Models.CharacterData PermanentDataCache { get; private set; } = new();
     private readonly Dictionary<ObjectKind, Func<bool>> objectKindsToUpdate = new();
 
     private CancellationTokenSource? _playerChangedCts = new();
@@ -167,7 +162,7 @@ public class PlayerManager : IDisposable
         _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
     }
 
-    private async Task<CharacterCacheDto?> CreateFullCharacterCacheDto(CancellationToken token)
+    private async Task<API.Data.CharacterData?> CreateFullCharacterCacheDto(CancellationToken token)
     {
         foreach (var unprocessedObject in playerRelatedObjects.Where(c => c.HasUnprocessedUpdate || c.HasTransientsUpdate).ToList())
         {
@@ -194,7 +189,7 @@ public class PlayerManager : IDisposable
 
         Logger.Verbose("Cache creation complete");
 
-        var cache = PermanentDataCache.ToCharacterCacheDto();
+        var cache = PermanentDataCache.ToAPI();
         //Logger.Verbose(JsonConvert.SerializeObject(cache, Formatting.Indented));
         return cache;
     }
@@ -253,7 +248,7 @@ public class PlayerManager : IDisposable
 
         Task.Run(async () =>
         {
-            CharacterCacheDto? cacheDto = null;
+            API.Data.CharacterData? cacheDto = null;
             try
             {
                 _periodicFileScanner.HaltScan("Character creation");

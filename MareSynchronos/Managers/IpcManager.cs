@@ -1,7 +1,5 @@
 ﻿using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
-using System;
-using System.Collections.Generic;
 using Dalamud.Game.ClientState.Objects.Types;
 using MareSynchronos.Utils;
 using Action = System.Action;
@@ -9,7 +7,6 @@ using System.Collections.Concurrent;
 using System.Text;
 using Penumbra.Api.Enums;
 using Penumbra.Api.Helpers;
-using System.Threading.Tasks;
 
 namespace MareSynchronos.Managers;
 
@@ -232,7 +229,7 @@ public class IpcManager : IDisposable
         {
             Logger.Verbose("Waiting for actionqueue to clear...");
             HandleActionQueue();
-            System.Threading.Thread.Sleep(16);
+            Thread.Sleep(16);
             totalSleepTime += 16;
         }
 

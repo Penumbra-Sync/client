@@ -1,11 +1,9 @@
 ﻿using Dalamud.Game.Command;
 using Dalamud.Plugin;
 using MareSynchronos.Factories;
-using System.Threading.Tasks;
 using Dalamud.Game;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState;
-using System;
 using Dalamud.Interface.ImGuiFileDialog;
 using MareSynchronos.Managers;
 using MareSynchronos.WebAPI;

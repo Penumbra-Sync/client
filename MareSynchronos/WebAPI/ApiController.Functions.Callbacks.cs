@@ -1,18 +1,17 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using MareSynchronos.API;
+﻿using MareSynchronos.API.Data.Enum;
+using MareSynchronos.API.Dto;
+using MareSynchronos.API.Dto.Admin;
+using MareSynchronos.API.Dto.Files;
 using MareSynchronos.API.Dto.Group;
-using MareSynchronos.API.Routes;
+using MareSynchronos.API.Dto.User;
 using MareSynchronos.Utils;
-using MareSynchronos.WebAPI.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
 
 namespace MareSynchronos.WebAPI;
 
 public partial class ApiController
 {
-    public ClientPairDto? LastAddedUser { get; set; }
+    public UserPairDto? LastAddedUser { get; set; }
 
     public void OnUserUpdateClientPairs(Action<ClientPairDto> act)
     {
@@ -26,7 +25,7 @@ public partial class ApiController
         _mareHub!.On(nameof(Client_UpdateSystemInfo), act);
     }
 
-    public void OnUserReceiveCharacterData(Action<CharacterCacheDto, string> act)
+    public void OnUserReceiveCharacterData(Action<OnlineUserCharaDataDto> act)
     {
         if (_initialized) return;
         _mareHub!.On(nameof(Client_UserReceiveCharacterData), act);
@@ -180,10 +179,10 @@ public partial class ApiController
 
     public Task Client_UserUpdateClientPairs(ClientPairDto dto)
     {
-        var entry = PairedClients.SingleOrDefault(e => string.Equals(e.OtherUID, dto.OtherUID, System.StringComparison.Ordinal));
+        var entry = PairedClients.SingleOrDefault(e => string.Equals(e.OtherUID, dto.OtherUID, StringComparison.Ordinal));
         if (dto.IsRemoved)
         {
-            PairedClients.RemoveAll(p => string.Equals(p.OtherUID, dto.OtherUID, System.StringComparison.Ordinal));
+            PairedClients.RemoveAll(p => string.Equals(p.OtherUID, dto.OtherUID, StringComparison.Ordinal));
             return Task.CompletedTask;
         }
         if (entry == null)
@@ -206,10 +205,10 @@ public partial class ApiController
         return Task.CompletedTask;
     }
 
-    public Task Client_UserReceiveCharacterData(CharacterCacheDto clientPairDto, string characterIdent)
+    public Task Client_UserReceiveCharacterData(OnlineUserCharaDataDto dto)
     {
-        Logger.Verbose("Received DTO for " + characterIdent);
-        CharacterReceived?.Invoke(null, new CharacterReceivedEventArgs(characterIdent, clientPairDto));
+        Logger.Verbose("Received DTO for " + dto.User.AliasOrUID);
+        CharacterReceived?.Invoke(dto);
         return Task.CompletedTask;
     }
 
@@ -228,19 +227,19 @@ public partial class ApiController
 
     public Task Client_AdminDeleteBannedUser(BannedUserDto dto)
     {
-        AdminBannedUsers.RemoveAll(a => string.Equals(a.CharacterHash, dto.CharacterHash, System.StringComparison.Ordinal));
+        AdminBannedUsers.RemoveAll(a => string.Equals(a.CharacterHash, dto.CharacterHash, StringComparison.Ordinal));
         return Task.CompletedTask;
     }
 
     public Task Client_AdminDeleteForbiddenFile(ForbiddenFileDto dto)
     {
-        AdminForbiddenFiles.RemoveAll(f => string.Equals(f.Hash, dto.Hash, System.StringComparison.Ordinal));
+        AdminForbiddenFiles.RemoveAll(f => string.Equals(f.Hash, dto.Hash, StringComparison.Ordinal));
         return Task.CompletedTask;
     }
 
     public Task Client_AdminUpdateOrAddBannedUser(BannedUserDto dto)
     {
-        var user = AdminBannedUsers.SingleOrDefault(b => string.Equals(b.CharacterHash, dto.CharacterHash, System.StringComparison.Ordinal));
+        var user = AdminBannedUsers.SingleOrDefault(b => string.Equals(b.CharacterHash, dto.CharacterHash, StringComparison.Ordinal));
         if (user == null)
         {
             AdminBannedUsers.Add(dto);
@@ -255,7 +254,7 @@ public partial class ApiController
 
     public Task Client_AdminUpdateOrAddForbiddenFile(ForbiddenFileDto dto)
     {
-        var user = AdminForbiddenFiles.SingleOrDefault(b => string.Equals(b.Hash, dto.Hash, System.StringComparison.Ordinal));
+        var user = AdminForbiddenFiles.SingleOrDefault(b => string.Equals(b.Hash, dto.Hash, StringComparison.Ordinal));
         if (user == null)
         {
             AdminForbiddenFiles.Add(dto);

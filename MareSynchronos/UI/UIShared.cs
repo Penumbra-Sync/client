@@ -1,11 +1,7 @@
-﻿using System;
-using System.IO;
-using System.Linq;
-using System.Numerics;
+﻿using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.ImGuiFileDialog;
@@ -472,18 +468,18 @@ public class UiShared : IDisposable
     public static void OutlineTextWrapped(string text, Vector4 textcolor, Vector4 outlineColor, float dist = 3)
     {
         var cursorPos = ImGui.GetCursorPos();
-        UiShared.ColorTextWrapped(text, outlineColor);
+        ColorTextWrapped(text, outlineColor);
         ImGui.SetCursorPos(new(cursorPos.X, cursorPos.Y + dist));
-        UiShared.ColorTextWrapped(text, outlineColor);
+        ColorTextWrapped(text, outlineColor);
         ImGui.SetCursorPos(new(cursorPos.X + dist, cursorPos.Y));
-        UiShared.ColorTextWrapped(text, outlineColor);
+        ColorTextWrapped(text, outlineColor);
         ImGui.SetCursorPos(new(cursorPos.X + dist, cursorPos.Y + dist));
-        UiShared.ColorTextWrapped(text, outlineColor);
+        ColorTextWrapped(text, outlineColor);
 
         ImGui.SetCursorPos(new(cursorPos.X + dist / 2, cursorPos.Y + dist / 2));
-        UiShared.ColorTextWrapped(text, textcolor);
+        ColorTextWrapped(text, textcolor);
         ImGui.SetCursorPos(new(cursorPos.X + dist / 2, cursorPos.Y + dist / 2));
-        UiShared.ColorTextWrapped(text, textcolor);
+        ColorTextWrapped(text, textcolor);
     }
 
     public static void DrawHelpText(string helpText)

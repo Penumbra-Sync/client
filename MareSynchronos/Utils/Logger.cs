@@ -1,8 +1,6 @@
-﻿using System;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Dalamud.Logging;
 using Dalamud.Utility;
-using Lumina.Excel.GeneratedSheets;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Utils;

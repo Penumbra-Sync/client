@@ -1,11 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Dalamud.Logging;
+﻿using Dalamud.Logging;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using MareSynchronos.API;
+using MareSynchronos.API.Data;
+using MareSynchronos.API.Data.Enum;
+using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
@@ -21,9 +18,9 @@ public class CachedPlayer
     private readonly ApiController _apiController;
     private bool _isVisible;
 
-    public CachedPlayer(string nameHash, IpcManager ipcManager, ApiController apiController, DalamudUtil dalamudUtil, FileCacheManager fileDbManager)
+    public CachedPlayer(OnlineUserIdentDto onlineUser, IpcManager ipcManager, ApiController apiController, DalamudUtil dalamudUtil, FileCacheManager fileDbManager)
     {
-        PlayerNameHash = nameHash;
+        OnlineUser = onlineUser;
         _ipcManager = ipcManager;
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
@@ -48,27 +45,28 @@ public class CachedPlayer
     private string _originalGlamourerData = string.Empty;
 
     public IntPtr PlayerCharacter { get; set; } = IntPtr.Zero;
+    public OnlineUserIdentDto OnlineUser { get; set; }
+    private API.Data.CharacterData _cachedData = new();
 
     public string? PlayerName { get; private set; }
 
-    public string PlayerNameHash { get; }
+    public string PlayerNameHash => OnlineUser.Ident;
 
     public bool RequestedPenumbraRedraw { get; set; }
 
     public bool WasVisible { get; private set; }
 
-    private CharacterCacheDto _cachedData = new();
 
     private PlayerRelatedObject? _currentCharacterEquipment;
 
-    public void ApplyCharacterData(CharacterCacheDto characterData, OptionalPluginWarning warning)
+    public void ApplyCharacterData(API.Data.CharacterData characterData, OptionalPluginWarning warning)
     {
         Logger.Debug("Received data for " + this);
 
         Logger.Debug("Checking for files to download for player " + PlayerName);
-        Logger.Debug("Hash for data is " + characterData.GetHashCode() + ", current cache hash is " + _cachedData.GetHashCode());
+        Logger.Debug("Hash for data is " + characterData.DataHash.Value + ", current cache hash is " + _cachedData.DataHash.Value);
 
-        if (characterData.GetHashCode() == _cachedData.GetHashCode()) return;
+        if (string.Equals(characterData.DataHash.Value, _cachedData.DataHash.Value, StringComparison.Ordinal)) return;
 
         bool updateModdedPaths = false;
         List<ObjectKind> charaDataToUpdate = new();
@@ -175,7 +173,7 @@ public class CachedPlayer
         var downloadId = _apiController.GetDownloadId();
         Task.Run(async () =>
         {
-            List<FileReplacementDto> toDownloadReplacements;
+            List<FileReplacementData> toDownloadReplacements;
 
             if (updateModdedPaths)
             {
@@ -225,9 +223,9 @@ public class CachedPlayer
         });
     }
 
-    private List<FileReplacementDto> TryCalculateModdedDictionary(out Dictionary<string, string> moddedDictionary)
+    private List<FileReplacementData> TryCalculateModdedDictionary(out Dictionary<string, string> moddedDictionary)
     {
-        List<FileReplacementDto> missingFiles = new();
+        List<FileReplacementData> missingFiles = new();
         moddedDictionary = new Dictionary<string, string>(StringComparer.Ordinal);
         try
         {
@@ -442,7 +440,7 @@ public class CachedPlayer
         }
     }
 
-    public void InitializePlayer(IntPtr character, string name, CharacterCacheDto? cache, OptionalPluginWarning displayedChatWarning)
+    public void InitializePlayer(IntPtr character, string name, API.Data.CharacterData? cache, OptionalPluginWarning displayedChatWarning)
     {
         if (!_isDisposed) return;
         IsVisible = true;
