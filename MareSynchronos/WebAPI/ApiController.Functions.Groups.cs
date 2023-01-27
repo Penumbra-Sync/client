@@ -6,7 +6,7 @@ public partial class ApiController
 {
     private void CheckConnection()
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", StringComparison.Ordinal)) throw new System.Exception("Not connected");
+        if (!IsConnected) throw new System.Exception("Not connected");
     }
 
     public async Task<List<BannedGroupUserDto>> GroupGetBannedUsers(GroupDto group)

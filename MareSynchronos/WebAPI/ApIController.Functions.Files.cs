@@ -209,7 +209,7 @@ public partial class ApiController
 
     private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage, CancellationToken? ct = null)
     {
-        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", this.Authorization);
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", this._serverManager.GetToken());
 
         if (requestMessage.Content != null)
         {
@@ -327,8 +327,8 @@ public partial class ApiController
 
     public async Task PushCharacterData(API.Data.CharacterData character, List<UserData> visibleCharacters)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", StringComparison.Ordinal)) return;
-        Logger.Debug("Sending Character data to service " + ApiUri);
+        if (!IsConnected) return;
+        Logger.Debug("Sending Character data to service " + _serverManager.CurrentApiUrl);
 
         CancelUpload();
         _uploadCancellationTokenSource = new CancellationTokenSource();

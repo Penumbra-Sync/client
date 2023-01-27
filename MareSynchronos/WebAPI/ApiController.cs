@@ -1,6 +1,4 @@
 ﻿using System.Collections.Concurrent;
-using System.Security.Cryptography;
-using System.Text;
 using MareSynchronos.API.Routes;
 using MareSynchronos.FileCache;
 using MareSynchronos.Utils;
@@ -12,6 +10,7 @@ using MareSynchronos.API.Dto;
 using MareSynchronos.API.SignalR;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.Managers;
+using Dalamud.Utility;
 
 namespace MareSynchronos.WebAPI;
 
@@ -19,7 +18,6 @@ public delegate void SimpleStringDelegate(string str);
 public delegate void PairedClientDelegate(OnlineUserIdentDto dto);
 public delegate void PairedClientDataDelegate(OnlineUserCharaDataDto dto);
 public delegate void UserDelegate(UserDto userDto);
-public record JwtCache(string ApiUrl, string CharaIdent, string SecretKey);
 
 public partial class ApiController : IDisposable, IMareHubClient
 {
@@ -32,10 +30,9 @@ public partial class ApiController : IDisposable, IMareHubClient
     private readonly DalamudUtil _dalamudUtil;
     private readonly FileCacheManager _fileDbManager;
     private readonly PairManager _pairManager;
+    private readonly ServerConfigurationManager _serverManager;
     private CancellationTokenSource _connectionCancellationTokenSource;
     private Dictionary<JwtCache, string> _jwtToken = new();
-    private string Authorization => _jwtToken.GetValueOrDefault(new JwtCache(ApiUri, _dalamudUtil.PlayerNameHashed, SecretKey), string.Empty);
-
     private HubConnection? _mareHub;
 
     private CancellationTokenSource? _uploadCancellationTokenSource = new();
@@ -52,7 +49,7 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     private HttpClient _httpClient;
 
-    public ApiController(Configuration pluginConfiguration, DalamudUtil dalamudUtil, FileCacheManager fileDbManager, PairManager pairManager)
+    public ApiController(Configuration pluginConfiguration, DalamudUtil dalamudUtil, FileCacheManager fileDbManager, PairManager pairManager, ServerConfigurationManager serverManager)
     {
         Logger.Verbose("Creating " + nameof(ApiController));
 
@@ -60,6 +57,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         _dalamudUtil = dalamudUtil;
         _fileDbManager = fileDbManager;
         _pairManager = pairManager;
+        _serverManager = serverManager;
         _connectionCancellationTokenSource = new CancellationTokenSource();
         _dalamudUtil.LogIn += DalamudUtilOnLogIn;
         _dalamudUtil.LogOut += DalamudUtilOnLogOut;
@@ -75,7 +73,7 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     private void DalamudUtilOnLogOut()
     {
-        Task.Run(async () => await StopConnection(_connectionCancellationTokenSource.Token).ConfigureAwait(false));
+        Task.Run(async () => await StopConnection(_connectionCancellationTokenSource.Token, ServerState.Disconnected).ConfigureAwait(false));
         ServerState = ServerState.Offline;
     }
 
@@ -84,11 +82,8 @@ public partial class ApiController : IDisposable, IMareHubClient
         Task.Run(() => CreateConnections(true));
     }
 
-
-
     public event VoidDelegate? Connected;
     public event VoidDelegate? Disconnected;
-
     public event VoidDelegate? DownloadStarted;
     public event VoidDelegate? DownloadFinished;
 
@@ -99,24 +94,13 @@ public partial class ApiController : IDisposable, IMareHubClient
     public List<FileTransfer> ForbiddenTransfers { get; } = new();
 
     public bool IsConnected => ServerState == ServerState.Connected;
-
     public bool IsDownloading => CurrentDownloads.Count > 0;
-
     public bool IsUploading => CurrentUploads.Count > 0;
-
-    public string SecretKey => _pluginConfiguration.ClientSecret.ContainsKey(ApiUri)
-        ? _pluginConfiguration.ClientSecret[ApiUri] : string.Empty;
 
     public bool ServerAlive => ServerState is ServerState.Connected or ServerState.RateLimited or ServerState.Unauthorized or ServerState.Disconnected;
 
-    public Dictionary<string, string> ServerDictionary => new Dictionary<string, string>(StringComparer.Ordinal)
-            { { MainServiceUri, MainServer } }
-        .Concat(_pluginConfiguration.CustomServerList)
-        .ToDictionary(k => k.Key, k => k.Value, StringComparer.Ordinal);
-
     public string UID => _connectionDto?.User.UID ?? string.Empty;
     public string DisplayName => _connectionDto?.User.UID ?? string.Empty;
-    private string ApiUri => _pluginConfiguration.ApiUri;
     public int OnlineUsers => SystemInfoDto.OnlineUsers;
 
     private ServerState _serverState;
@@ -142,13 +126,21 @@ public partial class ApiController : IDisposable, IMareHubClient
         if (_pluginConfiguration.FullPause)
         {
             Logger.Info("Not recreating Connection, paused");
-            ServerState = ServerState.Disconnected;
             _connectionDto = null;
-            await StopConnection(_connectionCancellationTokenSource.Token).ConfigureAwait(false);
+            await StopConnection(_connectionCancellationTokenSource.Token, ServerState.Disconnected).ConfigureAwait(false);
             return;
         }
 
-        await StopConnection(_connectionCancellationTokenSource.Token).ConfigureAwait(false);
+        var secretKey = _serverManager.GetSecretKey();
+        if (secretKey.IsNullOrEmpty())
+        {
+            Logger.Warn("No secret key set for current character");
+            _connectionDto = null;
+            await StopConnection(_connectionCancellationTokenSource.Token, ServerState.NoSecretKey).ConfigureAwait(false);
+            return;
+        }
+
+        await StopConnection(_connectionCancellationTokenSource.Token, ServerState.Disconnected).ConfigureAwait(false);
 
         Logger.Info("Recreating Connection");
 
@@ -158,29 +150,23 @@ public partial class ApiController : IDisposable, IMareHubClient
         _verifiedUploadedHashes.Clear();
         while (ServerState is not ServerState.Connected && !token.IsCancellationRequested)
         {
-            if (string.IsNullOrEmpty(SecretKey))
-            {
-                await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
-                continue;
-            }
-
             AuthFailureMessage = string.Empty;
 
-            await StopConnection(token).ConfigureAwait(false);
+            await StopConnection(token, ServerState.Disconnected).ConfigureAwait(false);
+            ServerState = ServerState.Connecting;
 
             try
             {
                 Logger.Debug("Building connection");
 
-                if (!_jwtToken.TryGetValue(new JwtCache(ApiUri, _dalamudUtil.PlayerNameHashed, SecretKey), out var jwtToken) || forceGetToken)
+                if (_serverManager.GetToken() == null || forceGetToken)
                 {
                     Logger.Debug("Requesting new JWT");
                     using HttpClient httpClient = new();
-                    var postUri = MareAuth.AuthFullPath(new Uri(ApiUri
+                    var postUri = MareAuth.AuthFullPath(new Uri(_serverManager.CurrentApiUrl
                         .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
                         .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)));
-                    using var sha256 = SHA256.Create();
-                    var auth = BitConverter.ToString(sha256.ComputeHash(Encoding.UTF8.GetBytes(SecretKey))).Replace("-", "", StringComparison.OrdinalIgnoreCase);
+                    var auth = secretKey.GetHash256();
                     var result = await httpClient.PostAsync(postUri, new FormUrlEncodedContent(new[]
                     {
                         new KeyValuePair<string, string>("auth", auth),
@@ -188,7 +174,7 @@ public partial class ApiController : IDisposable, IMareHubClient
                     })).ConfigureAwait(false);
                     AuthFailureMessage = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
                     result.EnsureSuccessStatusCode();
-                    _jwtToken[new JwtCache(ApiUri, _dalamudUtil.PlayerNameHashed, SecretKey)] = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    _serverManager.SaveToken(await result.Content.ReadAsStringAsync().ConfigureAwait(false));
                     Logger.Debug("JWT Success");
                 }
 
@@ -213,14 +199,13 @@ public partial class ApiController : IDisposable, IMareHubClient
 
                 if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
                 {
-                    ServerState = ServerState.VersionMisMatch;
-                    await StopConnection(token).ConfigureAwait(false);
+                    await StopConnection(token, ServerState.VersionMisMatch).ConfigureAwait(false);
                     return;
                 }
 
                 if (ServerState is ServerState.Connected) // user is authorized && server is legit
                 {
-                    await InitializeData(token).ConfigureAwait(false);
+                    await InitializeData().ConfigureAwait(false);
 
                     _mareHub.Closed += MareHubOnClosed;
                     _mareHub.Reconnecting += MareHubOnReconnecting;
@@ -235,13 +220,12 @@ public partial class ApiController : IDisposable, IMareHubClient
 
                 if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
-                    ServerState = ServerState.Unauthorized;
-                    await StopConnection(token).ConfigureAwait(false);
+                    await StopConnection(token, ServerState.Unauthorized).ConfigureAwait(false);
                     return;
                 }
                 else
                 {
-                    ServerState = ServerState.Offline;
+                    ServerState = ServerState.Reconnecting;
                     Logger.Info("Failed to establish connection, retrying");
                     await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token).ConfigureAwait(false);
                 }
@@ -257,10 +241,11 @@ public partial class ApiController : IDisposable, IMareHubClient
         }
     }
 
-    private Task MareHubOnReconnected(string? arg)
+    private async Task MareHubOnReconnected(string? arg)
     {
-        _ = Task.Run(() => CreateConnections(false));
-        return Task.CompletedTask;
+        ServerState = ServerState.Connected;
+        _connectionDto = await GetConnectionDto().ConfigureAwait(false);
+        await InitializeData().ConfigureAwait(false);
     }
 
     private async Task ClientHealthCheck(CancellationToken ct)
@@ -279,7 +264,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         }
     }
 
-    private async Task InitializeData(CancellationToken token)
+    private async Task InitializeData()
     {
         if (_mareHub == null) return;
 
@@ -345,7 +330,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
 
         ServerState = ServerState.Offline;
-        Task.Run(async () => await StopConnection(_connectionCancellationTokenSource.Token).ConfigureAwait(false));
+        Task.Run(async () => await StopConnection(_connectionCancellationTokenSource.Token, ServerState.Disconnected).ConfigureAwait(false));
         _connectionCancellationTokenSource?.Cancel();
         _healthCheckTokenSource?.Cancel();
         _uploadCancellationTokenSource?.Cancel();
@@ -354,9 +339,9 @@ public partial class ApiController : IDisposable, IMareHubClient
     private HubConnection BuildHubConnection(string hubName)
     {
         return new HubConnectionBuilder()
-            .WithUrl(ApiUri + hubName, options =>
+            .WithUrl(_serverManager.CurrentApiUrl + hubName, options =>
             {
-                options.Headers.Add("Authorization", "Bearer " + Authorization);
+                options.Headers.Add("Authorization", "Bearer " + _serverManager.GetToken());
                 options.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling;
             })
             .WithAutomaticReconnect(new ForeverRetryPolicy())
@@ -373,6 +358,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         CurrentUploads.Clear();
         CurrentDownloads.Clear();
         _uploadCancellationTokenSource?.Cancel();
+        _healthCheckTokenSource?.Cancel();
         Disconnected?.Invoke();
         _pairManager.ClearPairs();
         ServerState = ServerState.Offline;
@@ -384,17 +370,16 @@ public partial class ApiController : IDisposable, IMareHubClient
     {
         _connectionDto = null;
         _healthCheckTokenSource?.Cancel();
-        ServerState = ServerState.Disconnected;
+        ServerState = ServerState.Reconnecting;
         Logger.Warn("Connection closed... Reconnecting");
         Logger.Warn(arg?.Message ?? string.Empty);
         Logger.Warn(arg?.StackTrace ?? string.Empty);
         Disconnected?.Invoke();
         _pairManager.ClearPairs();
-        ServerState = ServerState.Offline;
         return Task.CompletedTask;
     }
 
-    private async Task StopConnection(CancellationToken token)
+    private async Task StopConnection(CancellationToken token, ServerState state)
     {
         if (_mareHub is not null)
         {
@@ -412,14 +397,7 @@ public partial class ApiController : IDisposable, IMareHubClient
             Disconnected?.Invoke();
             _pairManager.ClearPairs();
             _mareHub = null;
-        }
-
-        if (ServerState != ServerState.Disconnected)
-        {
-            while (ServerState != ServerState.Offline)
-            {
-                await Task.Delay(16).ConfigureAwait(false);
-            }
+            ServerState = state;
         }
     }
 

@@ -14,6 +14,7 @@ using Dalamud.Game.ClientState.Conditions;
 using MareSynchronos.FileCache;
 using Dalamud.Game.Gui;
 using MareSynchronos.Export;
+using Dalamud.Data;
 
 namespace MareSynchronos;
 
@@ -42,10 +43,11 @@ public sealed class Plugin : IDalamudPlugin
     private readonly Dalamud.Localization _localization;
     private readonly FileReplacementFactory _fileReplacementFactory;
     private readonly MareCharaFileManager _mareCharaFileManager;
+    private readonly ServerConfigurationManager _serverManager;
     private readonly GposeUi _gposeUi;
 
 
-    public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager,
+    public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager, DataManager gameData,
         Framework framework, ObjectTable objectTable, ClientState clientState, Condition condition, ChatGui chatGui)
     {
         Logger.Debug("Launching " + Name);
@@ -62,21 +64,22 @@ public sealed class Plugin : IDalamudPlugin
         _windowSystem = new WindowSystem("MareSynchronos");
 
         // those can be initialized outside of game login
-        _dalamudUtil = new DalamudUtil(clientState, objectTable, framework, condition, chatGui);
+        _dalamudUtil = new DalamudUtil(clientState, objectTable, framework, condition, chatGui, gameData);
 
         _ipcManager = new IpcManager(_pluginInterface, _dalamudUtil);
         _fileDialogManager = new FileDialogManager();
         _fileCacheManager = new FileCacheManager(_ipcManager, _configuration, _pluginInterface.ConfigDirectory.FullName);
         _pairManager = new PairManager(new CachedPlayerFactory(_ipcManager, _dalamudUtil, _fileCacheManager), _dalamudUtil, new PairFactory(_configuration));
-        _apiController = new ApiController(_configuration, _dalamudUtil, _fileCacheManager, _pairManager);
+        _serverManager = new ServerConfigurationManager(_configuration, _dalamudUtil);
+        _apiController = new ApiController(_configuration, _dalamudUtil, _fileCacheManager, _pairManager, _serverManager);
         _periodicFileScanner = new PeriodicFileScanner(_ipcManager, _configuration, _fileCacheManager, _apiController, _dalamudUtil);
         _fileReplacementFactory = new FileReplacementFactory(_fileCacheManager, _ipcManager);
         _mareCharaFileManager = new(_fileCacheManager, _ipcManager, _configuration, _dalamudUtil);
 
         _uiSharedComponent =
-            new UiShared(_ipcManager, _apiController, _periodicFileScanner, _fileDialogManager, _configuration, _dalamudUtil, _pluginInterface, _localization);
-        _settingsUi = new SettingsUi(_windowSystem, _uiSharedComponent, _configuration, _apiController, _mareCharaFileManager, _pairManager);
-        _compactUi = new CompactUi(_windowSystem, _uiSharedComponent, _configuration, _apiController, _pairManager);
+            new UiShared(_ipcManager, _apiController, _periodicFileScanner, _fileDialogManager, _configuration, _dalamudUtil, _pluginInterface, _localization, _serverManager);
+        _settingsUi = new SettingsUi(_windowSystem, _uiSharedComponent, _configuration, _apiController, _mareCharaFileManager, _pairManager, _serverManager);
+        _compactUi = new CompactUi(_windowSystem, _uiSharedComponent, _configuration, _apiController, _pairManager, _serverManager);
         _gposeUi = new GposeUi(_windowSystem, _mareCharaFileManager, _dalamudUtil, _fileDialogManager, _configuration);
 
         _introUi = new IntroUi(_windowSystem, _uiSharedComponent, _configuration, _periodicFileScanner);

@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using System.Globalization;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -30,8 +31,12 @@ public class UiShared : IDisposable
     private readonly DalamudUtil _dalamudUtil;
     private readonly DalamudPluginInterface _pluginInterface;
     private readonly Dalamud.Localization _localization;
+    private readonly ServerConfigurationManager _serverManager;
+
     public long FileCacheSize => _cacheScanner.FileCacheSize;
     public string PlayerName => _dalamudUtil.PlayerName;
+    public uint WorldId => _dalamudUtil.WorldId;
+    public Dictionary<ushort, string> WorldData => _dalamudUtil.WorldData.Value;
     public bool HasValidPenumbraModPath => !(_ipcManager.PenumbraModDirectory() ?? string.Empty).IsNullOrEmpty() && Directory.Exists(_ipcManager.PenumbraModDirectory());
     public bool EditTrackerPosition { get; set; }
     public ImFontPtr UidFont { get; private set; }
@@ -49,7 +54,8 @@ public class UiShared : IDisposable
     public ApiController ApiController => _apiController;
 
     public UiShared(IpcManager ipcManager, ApiController apiController, PeriodicFileScanner cacheScanner, FileDialogManager fileDialogManager,
-        Configuration pluginConfiguration, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization)
+        Configuration pluginConfiguration, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization,
+        ServerConfigurationManager serverManager)
     {
         _ipcManager = ipcManager;
         _apiController = apiController;
@@ -59,6 +65,7 @@ public class UiShared : IDisposable
         _dalamudUtil = dalamudUtil;
         _pluginInterface = pluginInterface;
         _localization = localization;
+        _serverManager = serverManager;
         _isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder);
 
         _pluginInterface.UiBuilder.BuildFonts += BuildFont;
@@ -242,18 +249,15 @@ public class UiShared : IDisposable
 
     public void PrintServerState()
     {
-        var serverName = _apiController.ServerDictionary.ContainsKey(_pluginConfiguration.ApiUri)
-            ? _apiController.ServerDictionary[_pluginConfiguration.ApiUri]
-            : _pluginConfiguration.ApiUri;
         if (_apiController.ServerState is ServerState.Connected)
         {
-            ImGui.TextUnformatted("Service " + serverName + ":");
+            ImGui.TextUnformatted("Service " + _serverManager.CurrentServer.ServerName + ":");
             ImGui.SameLine();
             ImGui.TextColored(ImGuiColors.ParsedGreen, "Available");
             ImGui.SameLine();
             ImGui.TextUnformatted("(");
             ImGui.SameLine();
-            ImGui.TextColored(ImGuiColors.ParsedGreen, _apiController.OnlineUsers.ToString());
+            ImGui.TextColored(ImGuiColors.ParsedGreen, _apiController.OnlineUsers.ToString(CultureInfo.InvariantCulture));
             ImGui.SameLine();
             ImGui.Text("Users Online");
             ImGui.SameLine();
@@ -348,7 +352,7 @@ public class UiShared : IDisposable
     private bool _enterSecretKey = false;
     private bool _cacheDirectoryHasOtherFilesThanCache = false;
     private bool _cacheDirectoryIsValidPath = true;
-
+    /*
     public void DrawServiceSelection(Action? callBackOnExit = null)
     {
         string[] comboEntries = _apiController.ServerDictionary.Values.ToArray();
@@ -463,7 +467,7 @@ public class UiShared : IDisposable
             }
         }
     }
-
+    */
     private string _secretKey = "";
 
     public static void OutlineTextWrapped(string text, Vector4 textcolor, Vector4 outlineColor, float dist = 3)

@@ -199,7 +199,7 @@ internal class IntroUi : Window, IDisposable
 
             UiShared.TextWrapped("Once you have received a secret key you can connect to the service using the tools provided below.");
 
-            _uiShared.DrawServiceSelection(() => { });
+            //_uiShared.DrawServiceSelection(() => { });
         }
         else
         {

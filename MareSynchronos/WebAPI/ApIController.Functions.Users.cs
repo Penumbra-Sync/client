@@ -10,8 +10,6 @@ public partial class ApiController
     public async Task UserDelete()
     {
         CheckConnection();
-        _pluginConfiguration.ClientSecret.Remove(ApiUri);
-        _pluginConfiguration.Save();
         await FilesDeleteAll().ConfigureAwait(false);
         await _mareHub!.SendAsync(nameof(UserDelete)).ConfigureAwait(false);
         await CreateConnections().ConfigureAwait(false);
@@ -47,13 +45,13 @@ public partial class ApiController
 
     public async Task UserAddPair(UserDto dto)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", StringComparison.Ordinal)) return;
+        if (!IsConnected) return;
         await _mareHub!.SendAsync(nameof(UserAddPair), dto).ConfigureAwait(false);
     }
 
     public async Task UserRemovePair(UserDto dto)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", StringComparison.Ordinal)) return;
+        if (!IsConnected) return;
         await _mareHub!.SendAsync(nameof(UserRemovePair), dto).ConfigureAwait(false);
     }
 }

@@ -82,9 +82,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="FileCache.db">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </None>
     <None Update="images\icon.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

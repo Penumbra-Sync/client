@@ -23,6 +23,7 @@ public class CompactUi : Window, IDisposable
 {
     private readonly ApiController _apiController;
     private readonly PairManager _pairManager;
+    private readonly ServerConfigurationManager _serverManager;
     private readonly Configuration _configuration;
     private readonly TagHandler _tagHandler;
     public readonly Dictionary<string, bool> ShowUidForEntry = new(StringComparer.Ordinal);
@@ -53,7 +54,8 @@ public class CompactUi : Window, IDisposable
     private readonly PairGroupsUi _pairGroupsUi;
 
     public CompactUi(WindowSystem windowSystem,
-        UiShared uiShared, Configuration configuration, ApiController apiController, PairManager pairManager) : base("###MareSynchronosMainUI")
+        UiShared uiShared, Configuration configuration, ApiController apiController, PairManager pairManager,
+        ServerConfigurationManager serverManager) : base("###MareSynchronosMainUI")
     {
 
 #if DEBUG
@@ -81,6 +83,7 @@ public class CompactUi : Window, IDisposable
         _configuration = configuration;
         _apiController = apiController;
         _pairManager = pairManager;
+        _serverManager = serverManager;
         _tagHandler = new(_configuration);
 
         _groupPanel = new(this, uiShared, configuration, apiController, _pairManager);
@@ -603,7 +606,7 @@ public class CompactUi : Window, IDisposable
             _ = _apiController.CreateConnections();
         }
         ImGui.PopStyleColor();
-        UiShared.AttachToolTip(!_configuration.FullPause ? "Disconnect from " + _apiController.ServerDictionary[_configuration.ApiUri] : "Connect to " + _apiController.ServerDictionary[_configuration.ApiUri]);
+        UiShared.AttachToolTip(!_configuration.FullPause ? "Disconnect from " + _serverManager.CurrentServer.ServerName : "Connect to " + _serverManager.CurrentServer.ServerName);
     }
 
     private void DrawTransfers()
@@ -715,6 +718,8 @@ public class CompactUi : Window, IDisposable
     {
         return _apiController.ServerState switch
         {
+            ServerState.Connecting => "Attempting to connect to the server.",
+            ServerState.Reconnecting => "Connection to server interrupted, attempting to reconnect to the server.",
             ServerState.Disconnected => "You are currently disconnected from the Mare Synchronos server.",
             ServerState.Unauthorized => "Server Response: " + _apiController.AuthFailureMessage,
             ServerState.Offline => "Your selected Mare Synchronos server is currently offline.",
@@ -722,6 +727,7 @@ public class CompactUi : Window, IDisposable
                 "Your plugin or the server you are connecting to is out of date. Please update your plugin now. If you already did so, contact the server provider to update their server to the latest version.",
             ServerState.RateLimited => "You are rate limited for (re)connecting too often. Disconnect, wait 10 minutes and try again.",
             ServerState.Connected => string.Empty,
+            ServerState.NoSecretKey => "You have no secret key set for this current character. Open the settings and set a secret key. You can reuse one secret key for different characters.",
             _ => string.Empty
         };
     }
@@ -730,12 +736,15 @@ public class CompactUi : Window, IDisposable
     {
         return _apiController.ServerState switch
         {
+            ServerState.Connecting => ImGuiColors.DalamudYellow,
+            ServerState.Reconnecting => ImGuiColors.DalamudRed,
             ServerState.Connected => ImGuiColors.ParsedGreen,
             ServerState.Disconnected => ImGuiColors.DalamudYellow,
             ServerState.Unauthorized => ImGuiColors.DalamudRed,
             ServerState.VersionMisMatch => ImGuiColors.DalamudRed,
             ServerState.Offline => ImGuiColors.DalamudRed,
             ServerState.RateLimited => ImGuiColors.DalamudYellow,
+            ServerState.NoSecretKey => ImGuiColors.DalamudYellow,
             _ => ImGuiColors.DalamudRed
         };
     }
@@ -744,11 +753,14 @@ public class CompactUi : Window, IDisposable
     {
         return _apiController.ServerState switch
         {
+            ServerState.Reconnecting => "Reconnecting",
+            ServerState.Connecting => "Connecting",
             ServerState.Disconnected => "Disconnected",
             ServerState.Unauthorized => "Unauthorized",
             ServerState.VersionMisMatch => "Version mismatch",
             ServerState.Offline => "Unavailable",
             ServerState.RateLimited => "Rate Limited",
+            ServerState.NoSecretKey => "No Secret Key",
             ServerState.Connected => _apiController.UID,
             _ => string.Empty
         };

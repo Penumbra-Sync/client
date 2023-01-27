@@ -11,26 +11,31 @@ public static class ConfigurationExtensions
     {
         return configuration.AcceptedAgreement && configuration.InitialScanComplete
                     && !string.IsNullOrEmpty(configuration.CacheFolder)
-                    && Directory.Exists(configuration.CacheFolder)
-                    && configuration.ClientSecret.ContainsKey(configuration.ApiUri);
+                    && Directory.Exists(configuration.CacheFolder);
     }
 
+    [Obsolete]
     public static Dictionary<string, string> GetCurrentServerUidComments(this Configuration configuration)
     {
+        // todo: remove usages
         return configuration.UidServerComments.ContainsKey(configuration.ApiUri)
             ? configuration.UidServerComments[configuration.ApiUri]
             : new Dictionary<string, string>(StringComparer.Ordinal);
     }
 
+    [Obsolete]
     public static Dictionary<string, string> GetCurrentServerGidComments(this Configuration configuration)
     {
+        // todo: remove usages
         return configuration.GidServerComments.ContainsKey(configuration.ApiUri)
             ? configuration.GidServerComments[configuration.ApiUri]
             : new Dictionary<string, string>(StringComparer.Ordinal);
     }
 
+    [Obsolete]
     public static void SetCurrentServerGidComment(this Configuration configuration, string gid, string comment)
     {
+        // todo: remove usages
         if (!configuration.GidServerComments.ContainsKey(configuration.ApiUri))
         {
             configuration.GidServerComments[configuration.ApiUri] = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -39,8 +44,10 @@ public static class ConfigurationExtensions
         configuration.GidServerComments[configuration.ApiUri][gid] = comment;
     }
 
+    [Obsolete]
     public static void SetCurrentServerUidComment(this Configuration configuration, string uid, string comment)
     {
+        // todo: remove usages
         if (!configuration.UidServerComments.ContainsKey(configuration.ApiUri))
         {
             configuration.UidServerComments[configuration.ApiUri] = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -51,55 +58,92 @@ public static class ConfigurationExtensions
 }
 
 [Serializable]
+public class SecretKey
+{
+    public string Key { get; set; } = string.Empty;
+    public string FriendlyName { get; set; } = string.Empty;
+}
+
+[Serializable]
+public class Authentication
+{
+    public string CharacterName { get; set; } = string.Empty;
+    public uint WorldId { get; set; } = 0;
+    public int SecretKeyIdx { get; set; } = -1;
+}
+
+[Serializable]
+public class ServerStorage
+{
+    public string ServerUri { get; set; } = string.Empty;
+    public string ServerName { get; set; } = string.Empty;
+    public List<Authentication> Authentications { get; set; } = new();
+    public Dictionary<string, string> UidServerComments { get; set; } = new(StringComparer.Ordinal);
+    public Dictionary<string, string> GidServerComments { get; set; } = new(StringComparer.Ordinal);
+    public Dictionary<string, List<string>> UidServerPairedUserTags = new(StringComparer.Ordinal);
+    public HashSet<string> ServerAvailablePairTags { get; set; } = new(StringComparer.Ordinal);
+    public HashSet<string> OpenPairTags { get; set; } = new(StringComparer.Ordinal);
+    [Newtonsoft.Json.JsonIgnore]
+    public Dictionary<int, SecretKey> SecretKeys { get; set; } = new();
+}
+
+[Serializable]
 public class Configuration : IPluginConfiguration
 {
-    private string _apiUri = string.Empty;
+    public int Version { get; set; } = 6;
     [NonSerialized]
     private DalamudPluginInterface? _pluginInterface;
+    public Dictionary<string, ServerStorage> ServerStorage { get; set; } = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { ApiController.MainServiceUri, new ServerStorage() { ServerName = ApiController.MainServer, ServerUri = ApiController.MainServiceUri } }
+    };
     public bool AcceptedAgreement { get; set; } = false;
+    public string CacheFolder { get; set; } = string.Empty;
+    public double MaxLocalCacheInGiB { get; set; } = 20;
+    public bool ReverseUserSort { get; set; } = false;
+    public int TimeSpanBetweenScansInSeconds { get; set; } = 30;
+    public bool FileScanPaused { get; set; } = false;
+    public bool InitialScanComplete { get; set; } = false;
+    public bool FullPause { get; set; } = false;
+    public bool HideInfoMessages { get; set; } = false;
+    public bool DisableOptionalPluginWarnings { get; set; } = false;
+    public bool OpenGposeImportOnGposeStart { get; set; } = false;
+    public bool ShowTransferWindow { get; set; } = true;
+    public bool OpenPopupOnAdd { get; set; } = true;
+    public string CurrentServer { get; set; } = string.Empty;
+
+    [Obsolete]
+    private string _apiUri = string.Empty;
+    [Obsolete]
     public string ApiUri
     {
         get => string.IsNullOrEmpty(_apiUri) ? ApiController.MainServiceUri : _apiUri;
         set => _apiUri = value;
     }
-
-    public string CacheFolder { get; set; } = string.Empty;
+    [Obsolete]
     public Dictionary<string, string> ClientSecret { get; set; } = new(StringComparer.Ordinal);
+    [Obsolete]
     public Dictionary<string, string> CustomServerList { get; set; } = new(StringComparer.Ordinal);
-    public double MaxLocalCacheInGiB { get; set; } = 20;
-    public bool ReverseUserSort { get; set; } = false;
-
-    public int TimeSpanBetweenScansInSeconds { get; set; } = 30;
-    public bool FileScanPaused { get; set; } = false;
-
-    public bool InitialScanComplete { get; set; } = false;
-
-    public bool FullPause { get; set; } = false;
-    public bool HideInfoMessages { get; set; } = false;
-    public bool DisableOptionalPluginWarnings { get; set; } = false;
-    public bool OpenGposeImportOnGposeStart { get; set; } = false;
+    [Obsolete]
     public Dictionary<string, Dictionary<string, string>> UidServerComments { get; set; } = new(StringComparer.Ordinal);
+    [Obsolete]
     public Dictionary<string, Dictionary<string, string>> GidServerComments { get; set; } = new(StringComparer.Ordinal);
-
-    public Dictionary<string, string> UidComments { get; set; } = new(StringComparer.Ordinal);
-
     /// <summary>
     /// Each paired user can have multiple tags. Each tag will create a category, and the user will
     /// be displayed into that category.
     /// The dictionary first maps a server URL to a dictionary, and that
     /// dictionary maps the OtherUID of the <see cref="ClientPairDto"/> to a list of tags.
     /// </summary>
+    [Obsolete]
     public Dictionary<string, Dictionary<string, List<string>>> UidServerPairedUserTags = new(StringComparer.Ordinal);
     /// <summary>
     /// A dictionary that maps a server URL to the tags the user has added for that server.
     /// </summary>
+    [Obsolete]
     public Dictionary<string, HashSet<string>> ServerAvailablePairTags = new(StringComparer.Ordinal);
-
+    [Obsolete]
     public HashSet<string> OpenPairTags = new(StringComparer.Ordinal);
-    public int Version { get; set; } = 5;
 
-    public bool ShowTransferWindow { get; set; } = true;
-    public bool OpenPopupOnAdd { get; set; } = true;
 
     // the below exist just to make saving less cumbersome
     public void Initialize(DalamudPluginInterface pluginInterface)
@@ -121,109 +165,58 @@ public class Configuration : IPluginConfiguration
 
     public void Migrate()
     {
-        if (Version == 0)
+        if (Version == 5)
         {
-            Logger.Debug("Migrating Configuration from V0 to V1");
-            Version = 1;
-            ApiUri = ApiUri.Replace("https", "wss", StringComparison.Ordinal);
-            foreach (var kvp in ClientSecret.ToList())
+            Logger.Info("Migrating Config to v6");
+            // create all server storage based on current clientsecret
+            foreach (var secret in ClientSecret)
             {
-                var newKey = kvp.Key.Replace("https", "wss", StringComparison.Ordinal);
-                ClientSecret.Remove(kvp.Key);
-                if (ClientSecret.ContainsKey(newKey))
+                Logger.Debug("Migrating " + secret.Key);
+                var apiuri = secret.Key;
+                var secretkey = secret.Value;
+                ServerStorage toAdd = new();
+                if (apiuri == ApiController.MainServiceUri)
                 {
-                    ClientSecret[newKey] = kvp.Value;
+                    toAdd.ServerUri = ApiController.MainServiceUri;
+                    toAdd.ServerName = ApiController.MainServer;
                 }
                 else
                 {
-                    ClientSecret.Add(newKey, kvp.Value);
+                    toAdd.ServerUri = apiuri;
+                    toAdd.ServerName = CustomServerList[apiuri];
                 }
-            }
-            UidServerComments.Add(ApiUri, UidComments.ToDictionary(k => k.Key, k => k.Value, StringComparer.Ordinal));
-            UidComments.Clear();
-            Save();
-        }
 
-        if (Version == 1)
-        {
-            Logger.Debug("Migrating Configuration from V1 to V2");
-            ApiUri = ApiUri.Replace("5001", "5000", StringComparison.Ordinal);
-            foreach (var kvp in ClientSecret.ToList())
-            {
-                var newKey = kvp.Key.Replace("5001", "5000", StringComparison.Ordinal);
-                ClientSecret.Remove(kvp.Key);
-                if (ClientSecret.ContainsKey(newKey))
+                toAdd.SecretKeys[0] = new SecretKey()
                 {
-                    ClientSecret[newKey] = kvp.Value;
-                }
-                else
+                    FriendlyName = "Auto Migrated Secret Key (" + DateTime.Now.ToString("yyyy-MM-dd") + ")",
+                    Key = secretkey
+                };
+
+                if (GidServerComments.TryGetValue(apiuri, out var gids))
                 {
-                    ClientSecret.Add(newKey, kvp.Value);
+                    toAdd.GidServerComments = gids;
                 }
-            }
-
-            foreach (var kvp in UidServerComments.ToList())
-            {
-                var newKey = kvp.Key.Replace("5001", "5000", StringComparison.Ordinal);
-                UidServerComments.Remove(kvp.Key);
-                UidServerComments.Add(newKey, kvp.Value);
-            }
-
-            Version = 2;
-            Save();
-        }
-
-        if (Version == 2)
-        {
-            Logger.Debug("Migrating Configuration from V2 to V3");
-            ApiUri = "wss://v2202207178628194299.powersrv.de:6871";
-            ClientSecret.Clear();
-            UidServerComments.Clear();
-
-            Version = 3;
-            Save();
-        }
-
-        if (Version == 3)
-        {
-            Logger.Debug("Migrating Configuration from V3 to V4");
-
-            ApiUri = ApiUri.Replace("wss://v2202207178628194299.powersrv.de:6871", "wss://v2202207178628194299.powersrv.de:6872", StringComparison.Ordinal);
-            foreach (var kvp in ClientSecret.ToList())
-            {
-                var newKey = kvp.Key.Replace("wss://v2202207178628194299.powersrv.de:6871", "wss://v2202207178628194299.powersrv.de:6872", StringComparison.Ordinal);
-                ClientSecret.Remove(kvp.Key);
-                if (ClientSecret.ContainsKey(newKey))
+                if (UidServerComments.TryGetValue(apiuri, out var uids))
                 {
-                    ClientSecret[newKey] = kvp.Value;
+                    toAdd.UidServerComments = uids;
                 }
-                else
+                if (UidServerPairedUserTags.TryGetValue(apiuri, out var uidtag))
                 {
-                    ClientSecret.Add(newKey, kvp.Value);
+                    toAdd.UidServerPairedUserTags = uidtag;
                 }
+                if (ServerAvailablePairTags.TryGetValue(apiuri, out var servertag))
+                {
+                    toAdd.ServerAvailablePairTags = servertag;
+                }
+                toAdd.OpenPairTags = OpenPairTags;
+
+                ServerStorage[apiuri] = toAdd;
             }
 
-            foreach (var kvp in UidServerComments.ToList())
-            {
-                var newKey = kvp.Key.Replace("wss://v2202207178628194299.powersrv.de:6871", "wss://v2202207178628194299.powersrv.de:6872", StringComparison.Ordinal);
-                UidServerComments.Remove(kvp.Key);
-                UidServerComments.Add(newKey, kvp.Value);
-            }
-
-            Version = 4;
-            Save();
+            CurrentServer = ApiUri;
+            Version = 6;
         }
 
-        if (Version == 4)
-        {
-            Logger.Debug("Migrating Configuration from V4 to V5");
-
-            ApiUri = ApiUri.Replace("wss://v2202207178628194299.powersrv.de:6872", "wss://maresynchronos.com", StringComparison.Ordinal);
-            ClientSecret.Remove("wss://v2202207178628194299.powersrv.de:6872");
-            UidServerComments.Remove("wss://v2202207178628194299.powersrv.de:6872");
-
-            Version = 5;
-            Save();
-        }
+        Save();
     }
 }

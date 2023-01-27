@@ -9,7 +9,6 @@ using MareSynchronos.WebAPI.Utils;
 using Dalamud.Utility;
 using Newtonsoft.Json;
 using MareSynchronos.Export;
-using MareSynchronos.API.Dto.Files;
 using MareSynchronos.API.Data;
 using MareSynchronos.Managers;
 using MareSynchronos.API.Data.Comparer;
@@ -24,6 +23,7 @@ public class SettingsUi : Window, IDisposable
     private readonly ApiController _apiController;
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly PairManager _pairManager;
+    private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly UiShared _uiShared;
     public CharacterData LastCreatedCharacterData { private get; set; }
 
@@ -38,7 +38,7 @@ public class SettingsUi : Window, IDisposable
 
     public SettingsUi(WindowSystem windowSystem,
         UiShared uiShared, Configuration configuration, ApiController apiController,
-        MareCharaFileManager mareCharaFileManager, PairManager pairManager) : base("Mare Synchronos Settings")
+        MareCharaFileManager mareCharaFileManager, PairManager pairManager, ServerConfigurationManager serverConfigurationManager) : base("Mare Synchronos Settings")
     {
         Logger.Verbose("Creating " + nameof(SettingsUi));
 
@@ -53,6 +53,7 @@ public class SettingsUi : Window, IDisposable
         _apiController = apiController;
         _mareCharaFileManager = mareCharaFileManager;
         _pairManager = pairManager;
+        _serverConfigurationManager = serverConfigurationManager;
         _uiShared = uiShared;
         _openPopupOnAddition = _configuration.OpenPopupOnAdd;
         _hideInfoMessages = _configuration.HideInfoMessages;
@@ -132,15 +133,316 @@ public class SettingsUi : Window, IDisposable
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("User Administration"))
+            if (ImGui.BeginTabItem("Service Settings"))
             {
-                DrawUserAdministration(_apiController.IsConnected);
+                DrawServerConfiguration();
+                ImGui.EndTabItem();
+            }
+
+            if (ImGui.BeginTabItem("Debug"))
+            {
+                DrawDebug();
                 ImGui.EndTabItem();
             }
 
             ImGui.EndTabBar();
         }
     }
+
+    private void DrawServerConfiguration()
+    {
+        _lastTab = "Service Settings";
+        if (_apiController.ServerAlive)
+        {
+            UiShared.FontText("Service Actions", _uiShared.UidFont);
+            ImGui.Separator();
+
+            if (ImGui.Button("Delete all my files"))
+            {
+                _deleteFilesPopupModalShown = true;
+                ImGui.OpenPopup("Delete all your files?");
+            }
+
+            UiShared.DrawHelpText("Completely deletes all your uploaded files on the service.");
+
+            if (ImGui.BeginPopupModal("Delete all your files?", ref _deleteFilesPopupModalShown, UiShared.PopupWindowFlags))
+            {
+                UiShared.TextWrapped(
+                    "All your own uploaded files on the service will be deleted.\nThis operation cannot be undone.");
+                ImGui.Text("Are you sure you want to continue?");
+                ImGui.Separator();
+                ImGui.Spacing();
+
+                var buttonSize = (ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X -
+                                 ImGui.GetStyle().ItemSpacing.X) / 2;
+
+                if (ImGui.Button("Delete everything", new Vector2(buttonSize, 0)))
+                {
+                    Task.Run(() => _apiController.FilesDeleteAll());
+                    _deleteFilesPopupModalShown = false;
+                }
+
+                ImGui.SameLine();
+
+                if (ImGui.Button("Cancel##cancelDelete", new Vector2(buttonSize, 0)))
+                {
+                    _deleteFilesPopupModalShown = false;
+                }
+
+                UiShared.SetScaledWindowSize(325);
+                ImGui.EndPopup();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Delete account"))
+            {
+                _deleteAccountPopupModalShown = true;
+                ImGui.OpenPopup("Delete your account?");
+            }
+
+            UiShared.DrawHelpText("Completely deletes your account and all uploaded files to the service.");
+
+            if (ImGui.BeginPopupModal("Delete your account?", ref _deleteAccountPopupModalShown, UiShared.PopupWindowFlags))
+            {
+                UiShared.TextWrapped(
+                    "Your account and all associated files and data on the service will be deleted.");
+                UiShared.TextWrapped("Your UID will be removed from all pairing lists.");
+                ImGui.Text("Are you sure you want to continue?");
+                ImGui.Separator();
+                ImGui.Spacing();
+
+                var buttonSize = (ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X -
+                                  ImGui.GetStyle().ItemSpacing.X) / 2;
+
+                if (ImGui.Button("Delete account", new Vector2(buttonSize, 0)))
+                {
+                    Task.Run(() => _apiController.UserDelete());
+                    _deleteAccountPopupModalShown = false;
+                    SwitchToIntroUi?.Invoke();
+                }
+
+                ImGui.SameLine();
+
+                if (ImGui.Button("Cancel##cancelDelete", new Vector2(buttonSize, 0)))
+                {
+                    _deleteAccountPopupModalShown = false;
+                }
+
+                UiShared.SetScaledWindowSize(325);
+                ImGui.EndPopup();
+            }
+            ImGui.Separator();
+
+        }
+
+        UiShared.FontText("Service & Character Settings", _uiShared.UidFont);
+        ImGui.Separator();
+
+        string[] comboEntries = _serverConfigurationManager.GetServerNames();
+
+        if (_serverSelectionIndex == -1)
+            _serverSelectionIndex = Array.IndexOf(_serverConfigurationManager.GetServerApiUrls(), _serverConfigurationManager.CurrentApiUrl);
+        for (int i = 0; i < comboEntries.Length; i++)
+        {
+            if (string.Equals(_serverConfigurationManager.CurrentServer.ServerName, comboEntries[i], StringComparison.OrdinalIgnoreCase))
+                comboEntries[i] += " [Current]";
+        }
+        if (ImGui.BeginCombo("Select Service", comboEntries[_serverSelectionIndex]))
+        {
+            for (int i = 0; i < comboEntries.Length; i++)
+            {
+                bool isSelected = _serverSelectionIndex == i;
+                if (ImGui.Selectable(comboEntries[i], isSelected))
+                {
+                    _serverSelectionIndex = i;
+                }
+
+                if (isSelected)
+                {
+                    ImGui.SetItemDefaultFocus();
+                }
+            }
+
+            ImGui.EndCombo();
+        }
+
+        if (!string.Equals(_serverConfigurationManager.GetServerApiUrls()[_serverSelectionIndex], _serverConfigurationManager.CurrentApiUrl, StringComparison.Ordinal))
+        {
+            ImGui.SameLine();
+            if (UiShared.IconTextButton(FontAwesomeIcon.Link, "Connect"))
+            {
+                _serverConfigurationManager.SelectServer(_serverSelectionIndex);
+                _ = _apiController.CreateConnections();
+            }
+        }
+
+        ImGui.Dummy(new Vector2(10, 10));
+
+        var selectedServer = _serverConfigurationManager.GetServerByIndex(_serverSelectionIndex);
+        if (selectedServer == _serverConfigurationManager.CurrentServer)
+        {
+            UiShared.ColorTextWrapped("For any changes to be applied you need to reconnect to the service.", ImGuiColors.DalamudYellow);
+        }
+
+
+        if (ImGui.BeginTabBar("serverTabBar"))
+        {
+            if (ImGui.BeginTabItem("Character Management"))
+            {
+                int i = 0;
+                foreach (var item in selectedServer.Authentications.ToList())
+                {
+                    UiShared.DrawWithID("selectedChara" + i, () =>
+                    {
+                        var charaName = item.CharacterName;
+                        if (ImGui.InputText("Character Name", ref charaName, 64))
+                        {
+                            item.CharacterName = charaName;
+                            _serverConfigurationManager.Save();
+                        }
+                        var worldIdx = (ushort)item.WorldId;
+                        var data = _uiShared.WorldData;
+                        if (!data.TryGetValue(worldIdx, out string worldPreview))
+                        {
+                            worldPreview = data.First().Value;
+                        }
+                        if (ImGui.BeginCombo("World", worldPreview))
+                        {
+                            foreach (var world in data)
+                            {
+                                bool isSelected = worldIdx == world.Key;
+                                if (ImGui.Selectable(world.Value, isSelected))
+                                {
+                                    item.WorldId = world.Key;
+                                    _serverConfigurationManager.Save();
+                                }
+                            }
+                            ImGui.EndCombo();
+                        }
+                        var secretKeyIdx = item.SecretKeyIdx;
+                        var keys = selectedServer.SecretKeys;
+                        if (!keys.TryGetValue(secretKeyIdx, out var secretKey))
+                        {
+                            secretKey = new();
+                        }
+                        var friendlyName = secretKey.FriendlyName;
+                        if (ImGui.BeginCombo("Secret Key", friendlyName))
+                        {
+                            foreach (var kvp in keys)
+                            {
+                                bool isSelected = kvp.Key == secretKeyIdx;
+                                if (ImGui.Selectable(kvp.Value.FriendlyName, isSelected))
+                                {
+                                    item.SecretKeyIdx = kvp.Key;
+                                    _serverConfigurationManager.Save();
+                                }
+                            }
+                            ImGui.EndCombo();
+                        }
+
+                        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete entry"))
+                        {
+                            if (UiShared.CtrlPressed())
+                                _serverConfigurationManager.RemoveCharacterFromServer(_serverSelectionIndex, item);
+                        }
+                        UiShared.AttachToolTip("Hold CTRL to delete this entry.");
+
+                        if (item != selectedServer.Authentications.LastOrDefault())
+                            ImGui.Separator();
+                    });
+
+                    i++;
+
+                }
+
+                ImGui.Separator();
+                if (!selectedServer.Authentications.Any(c => string.Equals(c.CharacterName, _uiShared.PlayerName, StringComparison.Ordinal)
+                    && c.WorldId == _uiShared.WorldId))
+                {
+                    if (UiShared.IconTextButton(FontAwesomeIcon.User, "Add current character"))
+                    {
+                        _serverConfigurationManager.AddCurrentCharacterToServer(_serverSelectionIndex);
+                    }
+                    ImGui.SameLine();
+                }
+
+                if (UiShared.IconTextButton(FontAwesomeIcon.Plus, "Add new character"))
+                {
+                    _serverConfigurationManager.AddEmptyCharacterToServer(_serverSelectionIndex);
+                }
+
+                ImGui.EndTabItem();
+            }
+
+            if (ImGui.BeginTabItem("Secret Key Management"))
+            {
+                foreach (var item in selectedServer.SecretKeys.ToList())
+                {
+                    UiShared.DrawWithID("key" + item.Key, () =>
+                    {
+                        var friendlyName = item.Value.FriendlyName;
+                        if (ImGui.InputText("Secret Key Display Name", ref friendlyName, 255))
+                        {
+                            item.Value.FriendlyName = friendlyName;
+                            _serverConfigurationManager.Save();
+                        }
+                        var key = item.Value.Key;
+                        if (ImGui.InputText("Secret Key", ref key, 64))
+                        {
+                            item.Value.Key = key;
+                            _serverConfigurationManager.Save();
+                        }
+                        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Secret Key"))
+                        {
+                            if (UiShared.CtrlPressed())
+                            {
+                                selectedServer.SecretKeys.Remove(item.Key);
+                                _serverConfigurationManager.Save();
+                            }
+                        }
+                        UiShared.AttachToolTip("Hold CTRL to delete this secret key entry");
+                    });
+
+                    if (item.Key != selectedServer.SecretKeys.Keys.LastOrDefault())
+                        ImGui.Separator();
+                }
+
+                ImGui.Separator();
+                if (UiShared.IconTextButton(FontAwesomeIcon.Plus, "Add new Secret Key"))
+                {
+                    selectedServer.SecretKeys.Add(selectedServer.SecretKeys.Last().Key + 1, new SecretKey()
+                    {
+                        FriendlyName = "New Secret Key"
+                    });
+                    _serverConfigurationManager.Save();
+                }
+
+                ImGui.EndTabItem();
+            }
+
+            if (ImGui.BeginTabItem("Service Settings"))
+            {
+                var serverUri = selectedServer.ServerUri;
+                ImGui.InputText("Server URI", ref serverUri, 255, ImGuiInputTextFlags.ReadOnly);
+                UiShared.DrawHelpText("You cannot edit the server URI. Add a new server if you need to edit the URI.");
+                var serverName = selectedServer.ServerName;
+                var isMain = string.Equals(serverName, ApiController.MainServer, StringComparison.OrdinalIgnoreCase);
+                var flags = isMain ? ImGuiInputTextFlags.ReadOnly : ImGuiInputTextFlags.None;
+                if (ImGui.InputText("Server Name", ref serverName, 255, flags))
+                {
+                    selectedServer.ServerName = serverName;
+                    _serverConfigurationManager.Save();
+                }
+                if (isMain)
+                {
+                    UiShared.DrawHelpText("You cannot edit the name of the main server.");
+                }
+                ImGui.EndTabItem();
+            }
+            ImGui.EndTabBar();
+        }
+    }
+
+    private int _serverSelectionIndex = -1;
 
     private string _forbiddenFileHashEntry = string.Empty;
     private string _forbiddenFileHashForbiddenBy = string.Empty;
@@ -205,115 +507,9 @@ public class SettingsUi : Window, IDisposable
     private bool _deleteFilesPopupModalShown = false;
     private bool _deleteAccountPopupModalShown = false;
 
-    private void DrawUserAdministration(bool serverAlive)
+    private void DrawDebug()
     {
-        _lastTab = "UserAdministration";
-        if (serverAlive)
-        {
-            if (ImGui.Button("Delete all my files"))
-            {
-                _deleteFilesPopupModalShown = true;
-                ImGui.OpenPopup("Delete all your files?");
-            }
-
-            UiShared.DrawHelpText("Completely deletes all your uploaded files on the service.");
-
-            if (ImGui.BeginPopupModal("Delete all your files?", ref _deleteFilesPopupModalShown, UiShared.PopupWindowFlags))
-            {
-                UiShared.TextWrapped(
-                    "All your own uploaded files on the service will be deleted.\nThis operation cannot be undone.");
-                ImGui.Text("Are you sure you want to continue?");
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                var buttonSize = (ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X -
-                                 ImGui.GetStyle().ItemSpacing.X) / 2;
-
-                if (ImGui.Button("Delete everything", new Vector2(buttonSize, 0)))
-                {
-                    Task.Run(() => _apiController.FilesDeleteAll());
-                    _deleteFilesPopupModalShown = false;
-                }
-
-                ImGui.SameLine();
-
-                if (ImGui.Button("Cancel##cancelDelete", new Vector2(buttonSize, 0)))
-                {
-                    _deleteFilesPopupModalShown = false;
-                }
-
-                UiShared.SetScaledWindowSize(325);
-                ImGui.EndPopup();
-            }
-
-            if (ImGui.Button("Delete account"))
-            {
-                _deleteAccountPopupModalShown = true;
-                ImGui.OpenPopup("Delete your account?");
-            }
-
-            UiShared.DrawHelpText("Completely deletes your account and all uploaded files to the service.");
-
-            if (ImGui.BeginPopupModal("Delete your account?", ref _deleteAccountPopupModalShown, UiShared.PopupWindowFlags))
-            {
-                UiShared.TextWrapped(
-                    "Your account and all associated files and data on the service will be deleted.");
-                UiShared.TextWrapped("Your UID will be removed from all pairing lists.");
-                ImGui.Text("Are you sure you want to continue?");
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                var buttonSize = (ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X -
-                                  ImGui.GetStyle().ItemSpacing.X) / 2;
-
-                if (ImGui.Button("Delete account", new Vector2(buttonSize, 0)))
-                {
-                    Task.Run(() => _apiController.UserDelete());
-                    _deleteAccountPopupModalShown = false;
-                    SwitchToIntroUi?.Invoke();
-                }
-
-                ImGui.SameLine();
-
-                if (ImGui.Button("Cancel##cancelDelete", new Vector2(buttonSize, 0)))
-                {
-                    _deleteAccountPopupModalShown = false;
-                }
-
-                UiShared.SetScaledWindowSize(325);
-                ImGui.EndPopup();
-            }
-        }
-
-        if (!_configuration.FullPause)
-        {
-            UiShared.ColorTextWrapped("Note: to change servers or your secret key you need to disconnect from your current Mare Synchronos server.", ImGuiColors.DalamudYellow);
-        }
-
-        var marePaused = _configuration.FullPause;
-
-        if (_configuration.HasValidSetup())
-        {
-            if (ImGui.Checkbox("Disconnect Mare Synchronos", ref marePaused))
-            {
-                _configuration.FullPause = marePaused;
-                _configuration.Save();
-                Task.Run(() => _apiController.CreateConnections(false));
-            }
-
-            UiShared.DrawHelpText("Completely pauses the sync and clears your current data (not uploaded files) on the service.");
-        }
-        else
-        {
-            UiShared.ColorText("You cannot reconnect without a valid account on the service.", ImGuiColors.DalamudYellow);
-        }
-
-        if (marePaused)
-        {
-            _uiShared.DrawServiceSelection(() => { });
-        }
-
-        ImGui.Separator();
+        _lastTab = "Debug";
 
         UiShared.FontText("Debug", _uiShared.UidFont);
 

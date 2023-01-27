@@ -7,6 +7,7 @@ using Dalamud.Game.Gui;
 using Dalamud.Game.Text.SeStringHandling;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
+using Lumina.Excel.GeneratedSheets;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 
@@ -21,8 +22,9 @@ public class DalamudUtil : IDisposable
     private readonly ClientState _clientState;
     private readonly ObjectTable _objectTable;
     private readonly Framework _framework;
-    private readonly Condition _condition;
+    private readonly Dalamud.Game.ClientState.Conditions.Condition _condition;
     private readonly ChatGui _chatGui;
+    private readonly Dalamud.Data.DataManager _gameData;
 
     public event VoidDelegate? LogIn;
     public event VoidDelegate? LogOut;
@@ -52,20 +54,30 @@ public class DalamudUtil : IDisposable
         return false;
     }
 
-    public DalamudUtil(ClientState clientState, ObjectTable objectTable, Framework framework, Condition condition, ChatGui chatGui)
+    public DalamudUtil(ClientState clientState, ObjectTable objectTable, Framework framework, Dalamud.Game.ClientState.Conditions.Condition condition, ChatGui chatGui,
+        Dalamud.Data.DataManager gameData)
     {
         _clientState = clientState;
         _objectTable = objectTable;
         _framework = framework;
         _condition = condition;
         _chatGui = chatGui;
+        _gameData = gameData;
         _framework.Update += FrameworkOnUpdate;
         if (IsLoggedIn)
         {
             classJobId = _clientState.LocalPlayer!.ClassJob.Id;
             ClientStateOnLogin(null, EventArgs.Empty);
         }
+        WorldData = new(() =>
+        {
+            return gameData.GetExcelSheet<World>(Dalamud.ClientLanguage.English)!
+                .Where(w => w.IsPublic && !w.Name.RawData.IsEmpty)
+                .ToDictionary(w => (ushort)w.RowId, w => w.Name.ToString());
+        });
     }
+
+    public Lazy<Dictionary<ushort, string>> WorldData { get; private set; }
 
     public void PrintInfoChat(string message)
     {
@@ -224,6 +236,7 @@ public class DalamudUtil : IDisposable
     }
 
     public string PlayerName => _clientState.LocalPlayer?.Name.ToString() ?? "--";
+    public uint WorldId => _clientState.LocalPlayer!.HomeWorld.Id;
 
     public IntPtr PlayerPointer => _clientState.LocalPlayer?.Address ?? IntPtr.Zero;
 
