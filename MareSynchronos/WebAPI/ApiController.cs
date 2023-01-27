@@ -112,10 +112,6 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     public bool IsUploading => CurrentUploads.Count > 0;
 
-    public ConcurrentDictionary<UserDto, UserPairDto> PairedClients { get; set; } = new(new UserDtoComparer());
-    public ConcurrentDictionary<GroupPairDto, GroupPairFullInfoDto> GroupPairedClients { get; set; } = new(new GroupPairDtoComparer());
-    public ConcurrentDictionary<GroupDto, GroupFullInfoDto> Groups { get; set; } = new(new GroupDtoComparer());
-
     public string SecretKey => _pluginConfiguration.ClientSecret.ContainsKey(ApiUri)
         ? _pluginConfiguration.ClientSecret[ApiUri] : string.Empty;
 
@@ -316,29 +312,23 @@ public partial class ApiController : IDisposable, IMareHubClient
         OnGroupSendFullInfo((dto) => Client_GroupSendFullInfo(dto));
         OnGroupSendInfo((dto) => Client_GroupSendInfo(dto));
 
-        PairedClients.Clear();
         foreach (var userPair in await UserGetPairedClients().ConfigureAwait(false))
         {
             Logger.Debug($"Pair: {userPair}");
             _pairManager.AddUserPair(userPair);
-            PairedClients[userPair] = userPair;
         }
-        Groups.Clear();
         foreach (var entry in await GroupsGetAll().ConfigureAwait(false))
         {
             Logger.Debug($"Group: {entry}");
-            Groups[entry] = entry;
+            _pairManager.AddGroup(entry);
         }
-        GroupPairedClients.Clear();
-        foreach (var group in Groups)
+        foreach (var group in _pairManager.GroupPairs.Keys)
         {
-            var users = await GroupsGetUsersInGroup(group.Value).ConfigureAwait(false);
+            var users = await GroupsGetUsersInGroup(group).ConfigureAwait(false);
             foreach (var user in users)
             {
                 Logger.Debug($"GroupPair: {user}");
-                GroupPairedClients[user] = user;
                 _pairManager.AddGroupPair(user);
-                _pairManager.AddAssociatedGroup(user.User, group.Value);
             }
         }
 

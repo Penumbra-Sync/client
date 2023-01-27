@@ -12,6 +12,8 @@ using MareSynchronos.Export;
 using MareSynchronos.API.Dto.Admin;
 using MareSynchronos.API.Dto.Files;
 using MareSynchronos.API.Data;
+using MareSynchronos.Managers;
+using MareSynchronos.API.Data.Comparer;
 
 namespace MareSynchronos.UI;
 
@@ -22,6 +24,7 @@ public class SettingsUi : Window, IDisposable
     private readonly WindowSystem _windowSystem;
     private readonly ApiController _apiController;
     private readonly MareCharaFileManager _mareCharaFileManager;
+    private readonly PairManager _pairManager;
     private readonly UiShared _uiShared;
     public CharacterData LastCreatedCharacterData { private get; set; }
 
@@ -36,7 +39,7 @@ public class SettingsUi : Window, IDisposable
 
     public SettingsUi(WindowSystem windowSystem,
         UiShared uiShared, Configuration configuration, ApiController apiController,
-        MareCharaFileManager mareCharaFileManager) : base("Mare Synchronos Settings")
+        MareCharaFileManager mareCharaFileManager, PairManager pairManager) : base("Mare Synchronos Settings")
     {
         Logger.Verbose("Creating " + nameof(SettingsUi));
 
@@ -50,6 +53,7 @@ public class SettingsUi : Window, IDisposable
         _windowSystem = windowSystem;
         _apiController = apiController;
         _mareCharaFileManager = mareCharaFileManager;
+        _pairManager = pairManager;
         _uiShared = uiShared;
         _openPopupOnAddition = _configuration.OpenPopupOnAdd;
         _hideInfoMessages = _configuration.HideInfoMessages;
@@ -164,7 +168,7 @@ public class SettingsUi : Window, IDisposable
         UiShared.FontText("Notes", _uiShared.UidFont);
         if (UiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Export all your user notes to clipboard"))
         {
-            ImGui.SetClipboardText(_uiShared.GetNotes());
+            ImGui.SetClipboardText(_uiShared.GetNotes(_pairManager.DirectPairs.UnionBy(_pairManager.GroupPairs.SelectMany(p => p.Value), p => p.UserData, UserDataComparer.Instance).ToList()));
         }
         if (UiShared.IconTextButton(FontAwesomeIcon.FileImport, "Import notes from clipboard"))
         {

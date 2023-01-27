@@ -75,7 +75,8 @@ public partial class ApiController
 
     public Task Client_GroupSendFullInfo(GroupFullInfoDto dto)
     {
-        Groups[dto] = dto;
+        Logger.Verbose("Client_GroupSendFullInfo: " + dto);
+        _pairManager.AddGroup(dto);
         return Task.CompletedTask;
     }
 
@@ -87,9 +88,8 @@ public partial class ApiController
 
     public Task Client_GroupSendInfo(GroupInfoDto dto)
     {
-        Groups[dto].Group = dto.Group;
-        Groups[dto].Owner = dto.Owner;
-        Groups[dto].GroupPermissions = dto.GroupPermissions;
+        Logger.Verbose("Client_GroupSendInfo: " + dto);
+        _pairManager.SetGroupInfo(dto);
         return Task.CompletedTask;
     }
 
@@ -101,7 +101,8 @@ public partial class ApiController
 
     public Task Client_GroupDelete(GroupDto dto)
     {
-        Groups.TryRemove(dto, out _);
+        Logger.Verbose("Client_GroupDelete: " + dto);
+        _pairManager.RemoveGroup(dto.Group);
         return Task.CompletedTask;
     }
 
@@ -113,7 +114,8 @@ public partial class ApiController
 
     public Task Client_GroupPairJoined(GroupPairFullInfoDto dto)
     {
-        GroupPairedClients[dto] = dto;
+        Logger.Verbose("Client_GroupPairJoined: " + dto);
+        _pairManager.AddGroupPair(dto);
         return Task.CompletedTask;
     }
 
@@ -125,7 +127,8 @@ public partial class ApiController
 
     public Task Client_GroupPairLeft(GroupPairDto dto)
     {
-        GroupPairedClients.TryRemove(dto, out _);
+        Logger.Verbose("Client_GroupPairLeft: " + dto);
+        _pairManager.RemoveGroupPair(dto);
         return Task.CompletedTask;
     }
 
@@ -137,7 +140,8 @@ public partial class ApiController
 
     public Task Client_GroupChangePermissions(GroupPermissionDto dto)
     {
-        Groups[dto].GroupPermissions = dto.Permissions;
+        Logger.Verbose("Client_GroupChangePermissions: " + dto);
+        _pairManager.SetGroupPermissions(dto);
         return Task.CompletedTask;
     }
 
@@ -149,9 +153,9 @@ public partial class ApiController
 
     public Task Client_GroupPairChangePermissions(GroupPairUserPermissionDto dto)
     {
-        Logger.Debug("GroupPairChangePermissions: " + dto);
-        if (dto.UID == UID) Groups[dto].GroupUserPermissions = dto.GroupPairPermissions;
-        else GroupPairedClients[dto].GroupUserPermissions = dto.GroupPairPermissions;
+        Logger.Verbose("Client_GroupPairChangePermissions: " + dto);
+        if (string.Equals(dto.UID, UID, StringComparison.Ordinal)) _pairManager.SetGroupUserPermissions(dto);
+        else _pairManager.SetGroupPairUserPermissions(dto);
         return Task.CompletedTask;
     }
 
@@ -163,13 +167,14 @@ public partial class ApiController
 
     public Task Client_GroupPairChangeUserInfo(GroupPairUserInfoDto dto)
     {
-        GroupPairedClients[dto].GroupPairStatusInfo = dto.GroupUserInfo;
+        Logger.Verbose("Client_GroupPairChangeUserInfo: " + dto);
+        _pairManager.SetGroupPairStatusInfo(dto);
         return Task.CompletedTask;
     }
 
     public Task Client_UserReceiveCharacterData(OnlineUserCharaDataDto dto)
     {
-        Logger.Verbose("Data: " + dto.User);
+        Logger.Verbose("Client_UserReceiveCharacterData: " + dto.User);
         _pairManager.ReceiveCharaData(dto);
         return Task.CompletedTask;
     }
@@ -180,11 +185,10 @@ public partial class ApiController
         _mareHub!.On(nameof(Client_UserAddClientPair), act);
     }
 
-    public Task Client_UserAddClientPair(UserPairDto userPairDto)
+    public Task Client_UserAddClientPair(UserPairDto dto)
     {
-        Logger.Debug($"Added: {userPairDto}");
-        PairedClients[userPairDto] = userPairDto;
-        _pairManager.AddUserPair(userPairDto);
+        Logger.Debug($"Client_UserAddClientPair: " + dto);
+        _pairManager.AddUserPair(dto);
         return Task.CompletedTask;
     }
 
@@ -196,8 +200,7 @@ public partial class ApiController
 
     public Task Client_UserRemoveClientPair(UserDto dto)
     {
-        Logger.Debug($"Removing {dto}");
-        PairedClients.TryRemove(dto, out _);
+        Logger.Debug($"Client_UserRemoveClientPair: " + dto);
         _pairManager.RemoveUserPair(dto);
         return Task.CompletedTask;
     }
@@ -210,7 +213,7 @@ public partial class ApiController
 
     public Task Client_UserSendOffline(UserDto dto)
     {
-        Logger.Debug($"Offline: {dto}");
+        Logger.Debug($"Client_UserSendOffline: {dto}");
         _pairManager.MarkPairOffline(dto.User);
         return Task.CompletedTask;
     }
@@ -223,15 +226,8 @@ public partial class ApiController
 
     public Task Client_UserSendOnline(OnlineUserIdentDto dto)
     {
-        Logger.Debug($"Online: {dto}");
-        try
-        {
-            _pairManager.MarkPairOnline(dto, this);
-        }
-        catch (Exception ex)
-        {
-            Logger.Error("Error UserSendOnline", ex);
-        }
+        Logger.Debug($"Client_UserSendOnline: {dto}");
+        _pairManager.MarkPairOnline(dto, this);
         return Task.CompletedTask;
     }
 
@@ -243,7 +239,6 @@ public partial class ApiController
 
     public Task Client_UserUpdateOtherPairPermissions(UserPermissionsDto dto)
     {
-        PairedClients[dto].OtherPermissions = dto.Permissions;
         _pairManager.UpdatePairPermissions(dto);
         return Task.CompletedTask;
     }
@@ -256,7 +251,6 @@ public partial class ApiController
 
     public Task Client_UserUpdateSelfPairPermissions(UserPermissionsDto dto)
     {
-        PairedClients[dto].OwnPermissions = dto.Permissions;
         _pairManager.UpdateSelfPairPermissions(dto);
         return Task.CompletedTask;
     }

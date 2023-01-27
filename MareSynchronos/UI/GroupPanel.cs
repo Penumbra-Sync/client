@@ -11,6 +11,9 @@ using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Data.Extensions;
+using MareSynchronos.Managers;
+using MareSynchronos.Models;
+using MareSynchronos.API.Data.Comparer;
 
 namespace MareSynchronos.UI
 {
@@ -20,7 +23,7 @@ namespace MareSynchronos.UI
         private UiShared _uiShared;
         private Configuration _configuration;
         private ApiController _apiController;
-
+        private readonly PairManager _pairManager;
         private readonly Dictionary<string, bool> _showGidForEntry = new(StringComparer.Ordinal);
         private string _editGroupEntry = string.Empty;
         private string _editGroupComment = string.Empty;
@@ -48,12 +51,13 @@ namespace MareSynchronos.UI
         private bool _modalChangePwOpened;
         private int _bulkInviteCount = 10;
 
-        public GroupPanel(CompactUi mainUi, UiShared uiShared, Configuration configuration, ApiController apiController)
+        public GroupPanel(CompactUi mainUi, UiShared uiShared, Configuration configuration, ApiController apiController, PairManager pairManager)
         {
             _mainUi = mainUi;
             _uiShared = uiShared;
             _configuration = configuration;
             _apiController = apiController;
+            _pairManager = pairManager;
         }
 
         public void DrawSyncshells()
@@ -70,12 +74,12 @@ namespace MareSynchronos.UI
             ImGui.InputTextWithHint("##syncshellid", "Syncshell GID/Alias (leave empty to create)", ref _syncShellToJoin, 20);
             ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
 
-            bool userCanJoinMoreGroups = _apiController.Groups.Count < _apiController.ServerInfo.MaxGroupsJoinedByUser;
-            bool userCanCreateMoreGroups = _apiController.Groups.Count(u => string.Equals(u.Value.Owner.UID, _apiController.UID, StringComparison.Ordinal)) < _apiController.ServerInfo.MaxGroupsCreatedByUser;
+            bool userCanJoinMoreGroups = _pairManager.GroupPairs.Count < _apiController.ServerInfo.MaxGroupsJoinedByUser;
+            bool userCanCreateMoreGroups = _pairManager.GroupPairs.Count(u => string.Equals(u.Key.Owner.UID, _apiController.UID, StringComparison.Ordinal)) < _apiController.ServerInfo.MaxGroupsCreatedByUser;
 
             if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
             {
-                if (_apiController.Groups.All(w => !string.Equals(w.Value.Group.GID, _syncShellToJoin, StringComparison.Ordinal) && !string.Equals(w.Value.Group.Alias, _syncShellToJoin, StringComparison.Ordinal))
+                if (_pairManager.GroupPairs.All(w => !string.Equals(w.Key.Group.GID, _syncShellToJoin, StringComparison.Ordinal) && !string.Equals(w.Key.Group.Alias, _syncShellToJoin, StringComparison.Ordinal))
                     && !string.IsNullOrEmpty(_syncShellToJoin))
                 {
                     if (userCanJoinMoreGroups)
@@ -180,17 +184,16 @@ namespace MareSynchronos.UI
                 ? 1
                 : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - _mainUi.TransferPartHeight - ImGui.GetCursorPosY();
             ImGui.BeginChild("list", new Vector2(_mainUi.WindowContentWidth, ySize), false);
-            foreach (var entry in _apiController.Groups.OrderBy(g => string.IsNullOrEmpty(g.Value.Group.Alias) ? g.Value.Group.GID : g.Value.Group.Alias).ToList())
+            foreach (var entry in _pairManager.GroupPairs.OrderBy(g => g.Key.Group.AliasOrGID, StringComparer.OrdinalIgnoreCase).ToList())
             {
-                UiShared.DrawWithID(entry.Value.Group.GID, () => DrawSyncshell(entry.Value));
+                UiShared.DrawWithID(entry.Key.Group.GID, () => DrawSyncshell(entry.Key, entry.Value));
             }
             ImGui.EndChild();
         }
 
-        private void DrawSyncshell(GroupFullInfoDto groupDto)
+        private void DrawSyncshell(GroupFullInfoDto groupDto, List<Pair> pairsInGroup)
         {
             var name = groupDto.Group.Alias ?? groupDto.GID;
-            var pairsInGroup = _apiController.GroupPairedClients.Where(p => string.Equals(p.Value.GID, groupDto.GID, StringComparison.Ordinal)).ToList();
             if (!ExpandedGroupState.TryGetValue(groupDto.GID, out bool isExpanded))
             {
                 isExpanded = false;
@@ -292,7 +295,7 @@ namespace MareSynchronos.UI
                 UiShared.AttachToolTip("Hit ENTER to save\nRight click to cancel");
             }
 
-            UiShared.DrawWithID(groupDto.GID + "settings", () => DrawSyncShellButtons(groupDto, name));
+            UiShared.DrawWithID(groupDto.GID + "settings", () => DrawSyncShellButtons(groupDto, pairsInGroup));
 
             if (_showModalBanList && !_modalBanListOpened)
             {
@@ -416,15 +419,16 @@ namespace MareSynchronos.UI
             ImGui.Indent(collapseButton.X);
             if (ExpandedGroupState[groupDto.GID])
             {
-                pairsInGroup = pairsInGroup.OrderBy(p => string.Equals(p.Value.User.UID, groupDto.OwnerUID, StringComparison.Ordinal) ? 0 : 1)
-                    .ThenBy(p => p.Value.GroupPairStatusInfo.IsModerator() ? 0 : 1)
-                    .ThenBy(p => p.Value.GroupPairStatusInfo.IsPinned() ? 0 : 1)
-                    .ThenBy(p => p.Value.UserAliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
+                pairsInGroup = pairsInGroup.OrderBy(p => string.Equals(p.UserData.UID, groupDto.OwnerUID, StringComparison.Ordinal) ? 0 : 1)
+                    .ThenBy(p => p.GroupPair.Single(p => GroupDataComparer.Instance.Equals(p.Key.Group, groupDto.Group)).Value.GroupPairStatusInfo.IsModerator() ? 0 : 1)
+                    .ThenBy(p => p.GroupPair.Single(p => GroupDataComparer.Instance.Equals(p.Key.Group, groupDto.Group)).Value.GroupPairStatusInfo.IsPinned() ? 0 : 1)
+                    .ThenBy(p => p.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
                 ImGui.Indent(ImGui.GetStyle().ItemSpacing.X / 2);
                 ImGui.Separator();
                 foreach (var pair in pairsInGroup)
                 {
-                    UiShared.DrawWithID(groupDto.GID + pair.Value.User.UID, () => DrawSyncshellPairedClient(pair.Value,
+                    UiShared.DrawWithID(groupDto.GID + pair.UserData.UID, () => DrawSyncshellPairedClient(
+                        pair.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
                         groupDto.OwnerUID,
                         string.Equals(groupDto.OwnerUID, _apiController.UID, StringComparison.Ordinal),
                         groupDto.GroupUserInfo.IsModerator(),
@@ -438,7 +442,7 @@ namespace MareSynchronos.UI
             ImGui.Unindent(collapseButton.X);
         }
 
-        private void DrawSyncShellButtons(GroupFullInfoDto groupDto, string name)
+        private void DrawSyncShellButtons(GroupFullInfoDto groupDto, List<Pair> groupPairs)
         {
             bool invitesEnabled = !groupDto.GroupPermissions.IsDisableInvites();
             var lockedIcon = invitesEnabled ? FontAwesomeIcon.LockOpen : FontAwesomeIcon.Lock;
@@ -481,7 +485,7 @@ namespace MareSynchronos.UI
                 if (UiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Copy Notes"))
                 {
                     ImGui.CloseCurrentPopup();
-                    ImGui.SetClipboardText(_uiShared.GetNotes(groupDto.GID));
+                    ImGui.SetClipboardText(_uiShared.GetNotes(groupPairs));
                 }
                 UiShared.AttachToolTip("Copies all your notes for all users in this Syncshell to the clipboard." + Environment.NewLine + "They can be imported via Settings -> Privacy -> Import Notes from Clipboard");
 
@@ -638,7 +642,7 @@ namespace MareSynchronos.UI
                 playerText = entryUID;
             }
 
-            bool plusButtonShown = !_apiController.PairedClients.Any(p => string.Equals(p.Key.User.UID, entry.UID, StringComparison.Ordinal));
+            bool plusButtonShown = !_pairManager.DirectPairs.Any(p => string.Equals(p.UserData.UID, entry.UID, StringComparison.Ordinal));
 
             ImGui.SameLine();
             if (!string.Equals(_mainUi.EditNickEntry, entry.UID, StringComparison.Ordinal))

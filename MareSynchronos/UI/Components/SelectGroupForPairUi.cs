@@ -3,7 +3,7 @@ using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Utility;
 using ImGuiNET;
-using MareSynchronos.API.Dto.User;
+using MareSynchronos.Models;
 using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI.Components;
@@ -19,7 +19,7 @@ public class SelectGroupForPairUi
     /// The group UI is always open for a specific pair. This defines which pair the UI is open for.
     /// </summary>
     /// <returns></returns>
-    private UserPairDto? _pair;
+    private Pair? _pair;
 
     /// <summary>
     /// For the add category option, this stores the currently typed in tag name
@@ -37,7 +37,7 @@ public class SelectGroupForPairUi
         _configuration = configuration;
     }
 
-    public void Open(UserPairDto pair)
+    public void Open(Pair pair)
     {
         _pair = pair;
         // Using "_show" here to de-couple the opening of the popup
@@ -75,7 +75,7 @@ public class SelectGroupForPairUi
             {
                 foreach (var tag in tags)
                 {
-                    UiShared.DrawWithID($"groups-pair-{_pair.User.UID}-{tag}", () => DrawGroupName(_pair, tag));
+                    UiShared.DrawWithID($"groups-pair-{_pair.UserData.UID}-{tag}", () => DrawGroupName(_pair, tag));
                 }
                 ImGui.EndChild();
             }
@@ -98,19 +98,19 @@ public class SelectGroupForPairUi
         }
     }
 
-    private void DrawGroupName(UserPairDto pair, string name)
+    private void DrawGroupName(Pair pair, string name)
     {
-        var hasTagBefore = _tagHandler.HasTag(pair, name);
+        var hasTagBefore = _tagHandler.HasTag(pair.UserPair, name);
         var hasTag = hasTagBefore;
         if (ImGui.Checkbox(name, ref hasTag))
         {
             if (hasTag)
             {
-                _tagHandler.AddTagToPairedUid(pair, name);
+                _tagHandler.AddTagToPairedUid(pair.UserPair, name);
             }
             else
             {
-                _tagHandler.RemoveTagFromPairedUid(pair, name);
+                _tagHandler.RemoveTagFromPairedUid(pair.UserPair, name);
             }
         }
     }
@@ -122,19 +122,19 @@ public class SelectGroupForPairUi
             _tagHandler.AddTag(_tagNameToAdd);
             if (_pair != null)
             {
-                _tagHandler.AddTagToPairedUid(_pair, _tagNameToAdd);
+                _tagHandler.AddTagToPairedUid(_pair.UserPair, _tagNameToAdd);
             }
             _tagNameToAdd = string.Empty;
         }
     }
 
-    private string PairName(Dictionary<string, bool> showUidForEntry, UserPairDto dto)
+    private string PairName(Dictionary<string, bool> showUidForEntry, Pair pair)
     {
-        showUidForEntry.TryGetValue(dto.User.UID, out var showUidInsteadOfName);
-        _configuration.GetCurrentServerUidComments().TryGetValue(dto.User.UID, out var playerText);
+        showUidForEntry.TryGetValue(pair.UserData.UID, out var showUidInsteadOfName);
+        var playerText = pair.GetNote();
         if (showUidInsteadOfName || string.IsNullOrEmpty(playerText))
         {
-            playerText = dto.User.AliasOrUID;
+            playerText = pair.UserData.AliasOrUID;
         }
         return playerText;
     }

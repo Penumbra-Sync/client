@@ -22,11 +22,33 @@ public class Pair
     public UserPairDto? UserPair { get; set; }
     public CachedPlayer? CachedPlayer { get; set; }
     public API.Data.CharacterData? LastReceivedCharacterData { get; set; }
-    public Dictionary<GroupPairDto, GroupPairFullInfoDto> GroupPair { get; set; } = new(new GroupPairDtoComparer());
-    public Dictionary<GroupDto, GroupFullInfoDto> AssociatedGroups { get; set; } = new(new GroupDtoComparer());
+    public Dictionary<GroupFullInfoDto, GroupPairFullInfoDto> GroupPair { get; set; } = new(GroupDtoComparer.Instance);
     public string PlayerNameHash => CachedPlayer?.PlayerNameHash ?? string.Empty;
     public string? PlayerName => CachedPlayer?.PlayerName ?? string.Empty;
-    private UserData UserData => UserPair?.User ?? GroupPair.First().Value.User;
+    public UserData UserData => UserPair?.User ?? GroupPair.First().Value.User;
+    public bool IsOnline => CachedPlayer != null;
+    public bool IsVisible => CachedPlayer != null && CachedPlayer.IsVisible;
+
+    public string? GetNote()
+    {
+        if (_configuration.GetCurrentServerUidComments().TryGetValue(UserData.UID, out string? note))
+        {
+            return note;
+        }
+
+        return null;
+    }
+
+    public void SetNote(string note)
+    {
+        _configuration.SetCurrentServerUidComment(UserData.UID, note);
+        _configuration.Save();
+    }
+
+    public bool HasAnyConnection()
+    {
+        return UserPair != null || GroupPair.Any();
+    }
 
     public void InitializePair(nint address, string name)
     {
@@ -59,18 +81,13 @@ public class Pair
     {
         if (data == null || UserPair != null) return data;
 
-        var userDataComparer = new UserDataComparer();
-        var groupComparer = new GroupDataComparer();
-        var userGroupPairs = GroupPair.Select(p => p.Value).Where(p => userDataComparer.Equals(p.User, UserData)).ToList();
-        bool disableAnimations = userGroupPairs.All(u =>
+        bool disableAnimations = GroupPair.All(u =>
         {
-            var group = AssociatedGroups.Select(g => g.Value).Single(p => groupComparer.Equals(p.Group, u.Group));
-            return u.GroupUserPermissions.IsDisableAnimations() || group.GroupPermissions.IsDisableAnimations() || group.GroupUserPermissions.IsDisableAnimations();
+            return u.Value.GroupUserPermissions.IsDisableAnimations() || u.Key.GroupPermissions.IsDisableAnimations() || u.Key.GroupUserPermissions.IsDisableAnimations();
         });
-        bool disableSounds = userGroupPairs.All(pair =>
+        bool disableSounds = GroupPair.All(pair =>
         {
-            var group = AssociatedGroups.Select(g => g.Value).Single(p => groupComparer.Equals(p.Group, pair.Group));
-            return pair.GroupUserPermissions.IsDisableSounds() || group.GroupPermissions.IsDisableSounds() || group.GroupUserPermissions.IsDisableSounds();
+            return pair.Value.GroupUserPermissions.IsDisableSounds() || pair.Key.GroupPermissions.IsDisableSounds() || pair.Key.GroupUserPermissions.IsDisableSounds();
         });
 
         if (disableAnimations || disableSounds)

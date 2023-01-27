@@ -11,6 +11,7 @@ using ImGuiNET;
 using MareSynchronos.FileCache;
 using MareSynchronos.Localization;
 using MareSynchronos.Managers;
+using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 
@@ -137,13 +138,13 @@ public class UiShared : IDisposable
 
         ImGui.SetWindowSize(new Vector2(x, y));
     }
-    
+
     private static void CenterWindow(float width, float height, ImGuiCond cond = ImGuiCond.None)
     {
         var center = ImGui.GetMainViewport().GetCenter();
         ImGui.SetWindowPos(new Vector2(center.X - width / 2, center.Y - height / 2), cond);
     }
-    
+
     public static void CenterNextWindow(float width, float height, ImGuiCond cond = ImGuiCond.None)
     {
         var center = ImGui.GetMainViewport().GetCenter();
@@ -652,19 +653,17 @@ public class UiShared : IDisposable
     private const string NotesStart = "##MARE_SYNCHRONOS_USER_NOTES_START##";
     private const string NotesEnd = "##MARE_SYNCHRONOS_USER_NOTES_END##";
 
-    public string GetNotes(string? gid = null)
+    public string GetNotes(List<Pair> pairs)
     {
         var comments = _pluginConfiguration.GetCurrentServerUidComments();
         StringBuilder sb = new();
         sb.AppendLine(NotesStart);
-        foreach (var userEntry in comments.Where(c => !string.IsNullOrEmpty(c.Key)))
+        foreach (var entry in pairs)
         {
-            if (gid != null)
-            {
-                if (!ApiController.GroupPairedClients.Any(p => string.Equals(p.Key.Group.GID, gid, StringComparison.Ordinal) && string.Equals(p.Key.User.UID, userEntry.Key, StringComparison.Ordinal))) continue;
-            }
+            var note = entry.GetNote();
+            if (note.IsNullOrEmpty()) continue;
 
-            sb.AppendLine(userEntry.Key + ":\"" + userEntry.Value + "\"");
+            sb.AppendLine(entry.UserData.UID + ":\"" + entry.GetNote() + "\"");
         }
         sb.AppendLine(NotesEnd);
 
