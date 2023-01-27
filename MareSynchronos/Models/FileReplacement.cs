@@ -44,7 +44,7 @@ public class FileReplacement
             }
             catch (Exception ex)
             {
-                Logger.Warn("Could not set Hash for " + ResolvedPath + ", resetting to original");
+                Logger.Warn("Could not set Hash for " + ResolvedPath + ", resetting to original", ex);
                 ResolvedPath = GamePaths.First();
             }
         });

@@ -31,7 +31,7 @@ public class UiShared : IDisposable
     private readonly DalamudUtil _dalamudUtil;
     private readonly DalamudPluginInterface _pluginInterface;
     private readonly Dalamud.Localization _localization;
-    private readonly ServerConfigurationManager _serverManager;
+    private readonly ServerConfigurationManager _serverConfigurationManager;
 
     public long FileCacheSize => _cacheScanner.FileCacheSize;
     public string PlayerName => _dalamudUtil.PlayerName;
@@ -65,7 +65,7 @@ public class UiShared : IDisposable
         _dalamudUtil = dalamudUtil;
         _pluginInterface = pluginInterface;
         _localization = localization;
-        _serverManager = serverManager;
+        _serverConfigurationManager = serverManager;
         _isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder);
 
         _pluginInterface.UiBuilder.BuildFonts += BuildFont;
@@ -251,7 +251,7 @@ public class UiShared : IDisposable
     {
         if (_apiController.ServerState is ServerState.Connected)
         {
-            ImGui.TextUnformatted("Service " + _serverManager.CurrentServer.ServerName + ":");
+            ImGui.TextUnformatted("Service " + _serverConfigurationManager.CurrentServer.ServerName + ":");
             ImGui.SameLine();
             ImGui.TextColored(ImGuiColors.ParsedGreen, "Available");
             ImGui.SameLine();
@@ -346,17 +346,23 @@ public class UiShared : IDisposable
         return $"{dblSByte:0.00} {suffix[i]}";
     }
 
-    private int _serverSelectionIndex = 0;
+    private int _serverSelectionIndex = -1;
     private string _customServerName = "";
     private string _customServerUri = "";
-    private bool _enterSecretKey = false;
     private bool _cacheDirectoryHasOtherFilesThanCache = false;
     private bool _cacheDirectoryIsValidPath = true;
-    /*
-    public void DrawServiceSelection(Action? callBackOnExit = null)
+
+    public int DrawServiceSelection()
     {
-        string[] comboEntries = _apiController.ServerDictionary.Values.ToArray();
-        _serverSelectionIndex = Array.IndexOf(_apiController.ServerDictionary.Keys.ToArray(), _pluginConfiguration.ApiUri);
+        string[] comboEntries = _serverConfigurationManager.GetServerNames();
+
+        if (_serverSelectionIndex == -1)
+            _serverSelectionIndex = Array.IndexOf(_serverConfigurationManager.GetServerApiUrls(), _serverConfigurationManager.CurrentApiUrl);
+        for (int i = 0; i < comboEntries.Length; i++)
+        {
+            if (string.Equals(_serverConfigurationManager.CurrentServer.ServerName, comboEntries[i], StringComparison.OrdinalIgnoreCase))
+                comboEntries[i] += " [Current]";
+        }
         if (ImGui.BeginCombo("Select Service", comboEntries[_serverSelectionIndex]))
         {
             for (int i = 0; i < comboEntries.Length; i++)
@@ -364,9 +370,7 @@ public class UiShared : IDisposable
                 bool isSelected = _serverSelectionIndex == i;
                 if (ImGui.Selectable(comboEntries[i], isSelected))
                 {
-                    _pluginConfiguration.ApiUri = _apiController.ServerDictionary.Single(k => string.Equals(k.Value, comboEntries[i], StringComparison.Ordinal)).Key;
-                    _pluginConfiguration.Save();
-                    _ = _apiController.CreateConnections();
+                    _serverSelectionIndex = i;
                 }
 
                 if (isSelected)
@@ -378,97 +382,45 @@ public class UiShared : IDisposable
             ImGui.EndCombo();
         }
 
-        if (_serverSelectionIndex != 0)
+        if (_serverConfigurationManager.GetSecretKey(_serverSelectionIndex) != null)
         {
             ImGui.SameLine();
-            ImGui.PushFont(UiBuilder.IconFont);
-            if (ImGui.Button(FontAwesomeIcon.Trash.ToIconString() + "##deleteService"))
+            var text = "Connect";
+            if (_serverSelectionIndex == _serverConfigurationManager.GetCurrentServerIndex()) text = "Reconnect";
+            if (IconTextButton(FontAwesomeIcon.Link, text))
             {
-                _pluginConfiguration.CustomServerList.Remove(_pluginConfiguration.ApiUri);
-                _pluginConfiguration.ApiUri = _apiController.ServerDictionary.First().Key;
-                _pluginConfiguration.Save();
+                _serverConfigurationManager.SelectServer(_serverSelectionIndex);
+                _ = _apiController.CreateConnections();
             }
-            ImGui.PopFont();
         }
 
         if (ImGui.TreeNode("Add Custom Service"))
         {
             ImGui.SetNextItemWidth(250);
-            ImGui.InputText("Custom Service Name", ref _customServerName, 255);
+            ImGui.InputText("Custom Service URI", ref _customServerUri, 255);
             ImGui.SetNextItemWidth(250);
-            ImGui.InputText("Custom Service Address", ref _customServerUri, 255);
-            if (ImGui.Button("Add Custom Service"))
+            ImGui.InputText("Custom Service Name", ref _customServerName, 255);
+            if (UiShared.IconTextButton(FontAwesomeIcon.Plus, "Add Custom Service"))
             {
                 if (!string.IsNullOrEmpty(_customServerUri)
-                    && !string.IsNullOrEmpty(_customServerName)
-                    && !_pluginConfiguration.CustomServerList.ContainsValue(_customServerName)
-                    && !_pluginConfiguration.CustomServerList.ContainsKey(_customServerUri))
+                    && !string.IsNullOrEmpty(_customServerName))
                 {
-                    _pluginConfiguration.CustomServerList[_customServerUri] = _customServerName;
-                    _customServerUri = string.Empty;
+                    _serverConfigurationManager.AddServer(new ServerStorage()
+                    {
+                        ServerName = _customServerName,
+                        ServerUri = _customServerUri
+                    });
                     _customServerName = string.Empty;
+                    _customServerUri = string.Empty;
                     _pluginConfiguration.Save();
                 }
             }
             ImGui.TreePop();
         }
 
-        PrintServerState();
-
-        if (!_apiController.ServerAlive && (_pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri) && !_pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri].IsNullOrEmpty()))
-        {
-            ColorTextWrapped("You already have an account on this server.", ImGuiColors.DalamudYellow);
-            ImGui.SameLine();
-            if (ImGui.Button("Connect##connectToService"))
-            {
-                _pluginConfiguration.FullPause = false;
-                _pluginConfiguration.Save();
-                Task.Run(() => _apiController.CreateConnections(true));
-            }
-        }
-
-        string checkboxText = _pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri)
-            ? "I want to switch accounts"
-            : "I have an account";
-        ImGui.Checkbox(checkboxText, ref _enterSecretKey);
-
-        if (_enterSecretKey)
-        {
-            if (_pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri))
-            {
-                ColorTextWrapped("A secret key was previously set for this service. Entering a new secret key will overwrite the one set prior.", ImGuiColors.DalamudYellow);
-            }
-
-            var text = "Enter Secret Key";
-            var buttonText = "Save";
-            var buttonWidth = _secretKey.Length != 64 ? 0 : ImGuiHelpers.GetButtonSize(buttonText).X + ImGui.GetStyle().ItemSpacing.X;
-            var textSize = ImGui.CalcTextSize(text);
-            ImGui.AlignTextToFramePadding();
-            ImGui.Text(text);
-            ImGui.SameLine();
-            ImGui.SetNextItemWidth(GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonWidth - textSize.X);
-            ImGui.InputText("", ref _secretKey, 64);
-            if (_secretKey.Length > 0 && _secretKey.Length != 64)
-            {
-                ColorTextWrapped("Your secret key must be exactly 64 characters long. Don't enter your Lodestone auth here.", ImGuiColors.DalamudRed);
-            }
-            else if (_secretKey.Length == 64)
-            {
-                ImGui.SameLine();
-                if (ImGui.Button(buttonText))
-                {
-                    _pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri] = _secretKey;
-                    _pluginConfiguration.Save();
-                    _secretKey = string.Empty;
-                    Task.Run(() => _apiController.CreateConnections(true));
-                    _enterSecretKey = false;
-                    callBackOnExit?.Invoke();
-                }
-            }
-        }
+        return _serverSelectionIndex;
     }
-    */
-    private string _secretKey = "";
+
 
     public static void OutlineTextWrapped(string text, Vector4 textcolor, Vector4 outlineColor, float dist = 3)
     {

@@ -40,7 +40,7 @@ public class CharacterDataFactory
     {
         if (!_ipcManager.Initialized)
         {
-            throw new ArgumentException("Penumbra is not connected");
+            throw new InvalidOperationException("Penumbra is not connected");
         }
 
         bool pointerIsZero = true;

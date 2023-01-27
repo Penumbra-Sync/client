@@ -48,13 +48,13 @@ public class MareCharaFileManager
         finally { CurrentlyWorking = false; }
     }
 
-    public async Task ApplyMareCharaFile(GameObject charaTarget)
+    public Task ApplyMareCharaFile(GameObject? charaTarget)
     {
         Dictionary<string, string> extractedFiles = new();
         CurrentlyWorking = true;
         try
         {
-            if (LoadedCharaFile == null || charaTarget == null || !File.Exists(LoadedCharaFile.FilePath)) return;
+            if (LoadedCharaFile == null || charaTarget == null || !File.Exists(LoadedCharaFile.FilePath)) return Task.CompletedTask;
 
             using var unwrapped = File.OpenRead(LoadedCharaFile.FilePath);
             using var lz4Stream = new LZ4Stream(unwrapped, LZ4StreamMode.Decompress, LZ4StreamFlags.HighCompression);
@@ -79,6 +79,7 @@ public class MareCharaFileManager
             _dalamudUtil.WaitWhileGposeCharacterIsDrawing(charaTarget.Address);
             _ipcManager.PenumbraRemoveTemporaryCollection(charaTarget.Name.TextValue);
             _ipcManager.ToggleGposeQueueMode(false);
+            return Task.CompletedTask;
         }
         catch { throw; }
         finally

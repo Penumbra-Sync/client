@@ -9,13 +9,13 @@ internal class Logger : ILogger
 {
     private readonly string name;
 
-    public static void Info(string info)
+    public static void Info(string? info)
     {
         var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
         PluginLog.Information($"[{caller}] {info}");
     }
 
-    public static void Debug(string debug, string stringToHighlight = "")
+    public static void Debug(string? debug, string stringToHighlight = "")
     {
         var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
         // todo: remove this again
@@ -30,31 +30,31 @@ internal class Logger : ILogger
         }
     }
 
-    public static void Error(string msg, Exception ex)
+    public static void Error(string? msg, Exception ex)
     {
         var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
         PluginLog.Error($"[{caller}] {msg} {Environment.NewLine} Exception: {ex.Message} {Environment.NewLine} {ex.StackTrace}");
     }
 
-    public static void Warn(string msg, Exception ex)
+    public static void Warn(string? msg, Exception ex)
     {
         var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
         PluginLog.Warning($"[{caller}] {msg} {Environment.NewLine} Exception: {ex.Message} {Environment.NewLine} {ex.StackTrace}");
     }
 
-    public static void Error(string msg)
+    public static void Error(string? msg)
     {
         var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
         PluginLog.Error($"[{caller}] {msg}");
     }
 
-    public static void Warn(string warn)
+    public static void Warn(string? warn)
     {
         var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
         PluginLog.Warning($"[{caller}] {warn}");
     }
 
-    public static void Verbose(string verbose)
+    public static void Verbose(string? verbose)
     {
         var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
         // todo: remove this again

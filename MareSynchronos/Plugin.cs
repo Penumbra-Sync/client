@@ -78,11 +78,11 @@ public sealed class Plugin : IDalamudPlugin
 
         _uiSharedComponent =
             new UiShared(_ipcManager, _apiController, _periodicFileScanner, _fileDialogManager, _configuration, _dalamudUtil, _pluginInterface, _localization, _serverManager);
-        _settingsUi = new SettingsUi(_windowSystem, _uiSharedComponent, _configuration, _apiController, _mareCharaFileManager, _pairManager, _serverManager);
+        _settingsUi = new SettingsUi(_windowSystem, _uiSharedComponent, _configuration, _mareCharaFileManager, _pairManager, _serverManager);
         _compactUi = new CompactUi(_windowSystem, _uiSharedComponent, _configuration, _apiController, _pairManager, _serverManager);
         _gposeUi = new GposeUi(_windowSystem, _mareCharaFileManager, _dalamudUtil, _fileDialogManager, _configuration);
 
-        _introUi = new IntroUi(_windowSystem, _uiSharedComponent, _configuration, _periodicFileScanner);
+        _introUi = new IntroUi(_windowSystem, _uiSharedComponent, _configuration, _periodicFileScanner, _serverManager);
         _settingsUi.SwitchToIntroUi += () =>
         {
             _introUi.IsOpen = true;

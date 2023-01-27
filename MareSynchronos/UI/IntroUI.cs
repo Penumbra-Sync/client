@@ -6,6 +6,9 @@ using MareSynchronos.Utils;
 using MareSynchronos.Localization;
 using Dalamud.Utility;
 using MareSynchronos.FileCache;
+using Dalamud.Interface;
+using MareSynchronos.Managers;
+using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.UI;
 
@@ -14,6 +17,7 @@ internal class IntroUi : Window, IDisposable
     private readonly UiShared _uiShared;
     private readonly Configuration _pluginConfiguration;
     private readonly PeriodicFileScanner _fileCacheManager;
+    private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly WindowSystem _windowSystem;
     private bool _readFirstPage;
 
@@ -35,13 +39,14 @@ internal class IntroUi : Window, IDisposable
     }
 
     public IntroUi(WindowSystem windowSystem, UiShared uiShared, Configuration pluginConfiguration,
-        PeriodicFileScanner fileCacheManager) : base("Mare Synchronos Setup")
+        PeriodicFileScanner fileCacheManager, ServerConfigurationManager serverConfigurationManager) : base("Mare Synchronos Setup")
     {
         Logger.Verbose("Creating " + nameof(IntroUi));
 
         _uiShared = uiShared;
         _pluginConfiguration = pluginConfiguration;
         _fileCacheManager = fileCacheManager;
+        _serverConfigurationManager = serverConfigurationManager;
         _windowSystem = windowSystem;
 
         SizeConstraints = new WindowSizeConstraints()
@@ -199,7 +204,36 @@ internal class IntroUi : Window, IDisposable
 
             UiShared.TextWrapped("Once you have received a secret key you can connect to the service using the tools provided below.");
 
-            //_uiShared.DrawServiceSelection(() => { });
+            _uiShared.DrawServiceSelection();
+
+            var text = "Enter Secret Key";
+            var buttonText = "Save";
+            var buttonWidth = _secretKey.Length != 64 ? 0 : ImGuiHelpers.GetButtonSize(buttonText).X + ImGui.GetStyle().ItemSpacing.X;
+            var textSize = ImGui.CalcTextSize(text);
+            ImGui.AlignTextToFramePadding();
+            ImGui.Text(text);
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonWidth - textSize.X);
+            ImGui.InputText("", ref _secretKey, 64);
+            if (_secretKey.Length > 0 && _secretKey.Length != 64)
+            {
+                UiShared.ColorTextWrapped("Your secret key must be exactly 64 characters long. Don't enter your Lodestone auth here.", ImGuiColors.DalamudRed);
+            }
+            else if (_secretKey.Length == 64)
+            {
+                ImGui.SameLine();
+                if (ImGui.Button(buttonText))
+                {
+                    _serverConfigurationManager.CurrentServer.SecretKeys.Add(_serverConfigurationManager.CurrentServer.SecretKeys.Select(k => k.Key).FirstOrDefault(), new SecretKey()
+                    {
+                        FriendlyName = $"Secret Key added on Setup ({DateTime.Now:yyyy-MM-dd})",
+                        Key = _secretKey
+                    });
+                    _serverConfigurationManager.AddCurrentCharacterToServer(addFirstSecretKey: true);
+                    _secretKey = string.Empty;
+                    Task.Run(() => _uiShared.ApiController.CreateConnections(true));
+                }
+            }
         }
         else
         {

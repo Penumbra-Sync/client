@@ -20,12 +20,12 @@ public class SettingsUi : Window, IDisposable
 {
     private readonly Configuration _configuration;
     private readonly WindowSystem _windowSystem;
-    private readonly ApiController _apiController;
+    private ApiController _apiController => _uiShared.ApiController;
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly UiShared _uiShared;
-    public CharacterData LastCreatedCharacterData { private get; set; }
+    public CharacterData? LastCreatedCharacterData { private get; set; }
 
     public event SwitchUi? SwitchToIntroUi;
     private bool _overwriteExistingLabels = false;
@@ -37,7 +37,7 @@ public class SettingsUi : Window, IDisposable
     private bool _wasOpen = false;
 
     public SettingsUi(WindowSystem windowSystem,
-        UiShared uiShared, Configuration configuration, ApiController apiController,
+        UiShared uiShared, Configuration configuration, 
         MareCharaFileManager mareCharaFileManager, PairManager pairManager, ServerConfigurationManager serverConfigurationManager) : base("Mare Synchronos Settings")
     {
         Logger.Verbose("Creating " + nameof(SettingsUi));
@@ -50,7 +50,6 @@ public class SettingsUi : Window, IDisposable
 
         _configuration = configuration;
         _windowSystem = windowSystem;
-        _apiController = apiController;
         _mareCharaFileManager = mareCharaFileManager;
         _pairManager = pairManager;
         _serverConfigurationManager = serverConfigurationManager;
@@ -155,7 +154,6 @@ public class SettingsUi : Window, IDisposable
         if (_apiController.ServerAlive)
         {
             UiShared.FontText("Service Actions", _uiShared.UidFont);
-            ImGui.Separator();
 
             if (ImGui.Button("Delete all my files"))
             {
@@ -235,52 +233,15 @@ public class SettingsUi : Window, IDisposable
         }
 
         UiShared.FontText("Service & Character Settings", _uiShared.UidFont);
-        ImGui.Separator();
 
-        string[] comboEntries = _serverConfigurationManager.GetServerNames();
-
-        if (_serverSelectionIndex == -1)
-            _serverSelectionIndex = Array.IndexOf(_serverConfigurationManager.GetServerApiUrls(), _serverConfigurationManager.CurrentApiUrl);
-        for (int i = 0; i < comboEntries.Length; i++)
-        {
-            if (string.Equals(_serverConfigurationManager.CurrentServer.ServerName, comboEntries[i], StringComparison.OrdinalIgnoreCase))
-                comboEntries[i] += " [Current]";
-        }
-        if (ImGui.BeginCombo("Select Service", comboEntries[_serverSelectionIndex]))
-        {
-            for (int i = 0; i < comboEntries.Length; i++)
-            {
-                bool isSelected = _serverSelectionIndex == i;
-                if (ImGui.Selectable(comboEntries[i], isSelected))
-                {
-                    _serverSelectionIndex = i;
-                }
-
-                if (isSelected)
-                {
-                    ImGui.SetItemDefaultFocus();
-                }
-            }
-
-            ImGui.EndCombo();
-        }
-
-        if (!string.Equals(_serverConfigurationManager.GetServerApiUrls()[_serverSelectionIndex], _serverConfigurationManager.CurrentApiUrl, StringComparison.Ordinal))
-        {
-            ImGui.SameLine();
-            if (UiShared.IconTextButton(FontAwesomeIcon.Link, "Connect"))
-            {
-                _serverConfigurationManager.SelectServer(_serverSelectionIndex);
-                _ = _apiController.CreateConnections();
-            }
-        }
+        var idx = _uiShared.DrawServiceSelection();
 
         ImGui.Dummy(new Vector2(10, 10));
 
-        var selectedServer = _serverConfigurationManager.GetServerByIndex(_serverSelectionIndex);
+        var selectedServer = _serverConfigurationManager.GetServerByIndex(idx);
         if (selectedServer == _serverConfigurationManager.CurrentServer)
         {
-            UiShared.ColorTextWrapped("For any changes to be applied you need to reconnect to the service.", ImGuiColors.DalamudYellow);
+            UiShared.ColorTextWrapped("For any changes to be applied to the current service you need to reconnect to the service.", ImGuiColors.DalamudYellow);
         }
 
 
@@ -288,6 +249,8 @@ public class SettingsUi : Window, IDisposable
         {
             if (ImGui.BeginTabItem("Character Management"))
             {
+                UiShared.ColorTextWrapped("Characters listed here will automatically connect to the selected Mare service with the settings as provided below." +
+                    " Make sure to enter the character names correctly or use the 'Add current character' button at the bottom.", ImGuiColors.DalamudYellow);
                 int i = 0;
                 foreach (var item in selectedServer.Authentications.ToList())
                 {
@@ -339,10 +302,10 @@ public class SettingsUi : Window, IDisposable
                             ImGui.EndCombo();
                         }
 
-                        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete entry"))
+                        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Character"))
                         {
                             if (UiShared.CtrlPressed())
-                                _serverConfigurationManager.RemoveCharacterFromServer(_serverSelectionIndex, item);
+                                _serverConfigurationManager.RemoveCharacterFromServer(idx, item);
                         }
                         UiShared.AttachToolTip("Hold CTRL to delete this entry.");
 
@@ -360,14 +323,14 @@ public class SettingsUi : Window, IDisposable
                 {
                     if (UiShared.IconTextButton(FontAwesomeIcon.User, "Add current character"))
                     {
-                        _serverConfigurationManager.AddCurrentCharacterToServer(_serverSelectionIndex);
+                        _serverConfigurationManager.AddCurrentCharacterToServer(idx);
                     }
                     ImGui.SameLine();
                 }
 
                 if (UiShared.IconTextButton(FontAwesomeIcon.Plus, "Add new character"))
                 {
-                    _serverConfigurationManager.AddEmptyCharacterToServer(_serverSelectionIndex);
+                    _serverConfigurationManager.AddEmptyCharacterToServer(idx);
                 }
 
                 ImGui.EndTabItem();
@@ -422,27 +385,25 @@ public class SettingsUi : Window, IDisposable
             if (ImGui.BeginTabItem("Service Settings"))
             {
                 var serverUri = selectedServer.ServerUri;
-                ImGui.InputText("Server URI", ref serverUri, 255, ImGuiInputTextFlags.ReadOnly);
-                UiShared.DrawHelpText("You cannot edit the server URI. Add a new server if you need to edit the URI.");
+                ImGui.InputText("Service URI", ref serverUri, 255, ImGuiInputTextFlags.ReadOnly);
+                UiShared.DrawHelpText("You cannot edit the service URI. Add a new service if you need to edit the URI.");
                 var serverName = selectedServer.ServerName;
                 var isMain = string.Equals(serverName, ApiController.MainServer, StringComparison.OrdinalIgnoreCase);
                 var flags = isMain ? ImGuiInputTextFlags.ReadOnly : ImGuiInputTextFlags.None;
-                if (ImGui.InputText("Server Name", ref serverName, 255, flags))
+                if (ImGui.InputText("Service Name", ref serverName, 255, flags))
                 {
                     selectedServer.ServerName = serverName;
                     _serverConfigurationManager.Save();
                 }
                 if (isMain)
                 {
-                    UiShared.DrawHelpText("You cannot edit the name of the main server.");
+                    UiShared.DrawHelpText("You cannot edit the name of the main service.");
                 }
                 ImGui.EndTabItem();
             }
             ImGui.EndTabBar();
         }
     }
-
-    private int _serverSelectionIndex = -1;
 
     private string _forbiddenFileHashEntry = string.Empty;
     private string _forbiddenFileHashForbiddenBy = string.Empty;

@@ -49,26 +49,27 @@ public class ServerConfigurationManager
         Save();
     }
 
-    public string? GetSecretKey()
+    public string? GetSecretKey(int serverIdx = -1)
     {
+        var currentServer = serverIdx == -1 ? CurrentServer : GetServerByIndex(serverIdx);
         var charaName = _dalamudUtil.PlayerName;
         var worldId = _dalamudUtil.WorldId;
-        if (!CurrentServer.Authentications.Any())
+        if (!currentServer.Authentications.Any())
         {
-            CurrentServer.Authentications.Add(new Authentication()
+            currentServer.Authentications.Add(new Authentication()
             {
                 CharacterName = charaName,
                 WorldId = worldId,
-                SecretKeyIdx = CurrentServer.SecretKeys.Last().Key
+                SecretKeyIdx = currentServer.SecretKeys.Last().Key
             });
 
             Save();
         }
 
-        var auth = CurrentServer.Authentications.FirstOrDefault(f => string.Equals(f.CharacterName, charaName, StringComparison.Ordinal) && f.WorldId == worldId);
+        var auth = currentServer.Authentications.FirstOrDefault(f => string.Equals(f.CharacterName, charaName, StringComparison.Ordinal) && f.WorldId == worldId);
         if (auth == null) return null;
 
-        if (CurrentServer.SecretKeys.TryGetValue(auth.SecretKeyIdx, out var secretKey))
+        if (currentServer.SecretKeys.TryGetValue(auth.SecretKeyIdx, out var secretKey))
         {
             return secretKey.Key;
         }
@@ -99,13 +100,15 @@ public class ServerConfigurationManager
         _tokenDictionary[new JwtCache(CurrentApiUrl, charaName, worldId, secretKey)] = token;
     }
 
-    internal void AddCurrentCharacterToServer(int serverSelectionIndex)
+    internal void AddCurrentCharacterToServer(int serverSelectionIndex = -1, bool addFirstSecretKey = false)
     {
+        if (serverSelectionIndex == -1) serverSelectionIndex = GetCurrentServerIndex();
         var server = GetServerByIndex(serverSelectionIndex);
         server.Authentications.Add(new Authentication()
         {
             CharacterName = _dalamudUtil.PlayerName,
-            WorldId = _dalamudUtil.WorldId
+            WorldId = _dalamudUtil.WorldId,
+            SecretKeyIdx = addFirstSecretKey ? server.SecretKeys.First().Key : -1
         });
         _configuration.Save();
     }
@@ -121,5 +124,11 @@ public class ServerConfigurationManager
     {
         var server = GetServerByIndex(serverSelectionIndex);
         server.Authentications.Remove(item);
+    }
+
+    internal void AddServer(ServerStorage serverStorage)
+    {
+        _configuration.ServerStorage[serverStorage.ServerUri] = serverStorage;
+        _configuration.Save();
     }
 }

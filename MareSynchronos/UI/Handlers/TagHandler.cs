@@ -6,7 +6,6 @@ namespace MareSynchronos.UI.Handlers
     public class TagHandler
     {
         private readonly Configuration _configuration;
-        private readonly ApiController _apiController;
 
         public TagHandler(Configuration configuration)
         {

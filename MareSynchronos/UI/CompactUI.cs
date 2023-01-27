@@ -531,8 +531,8 @@ public class CompactUi : Window, IDisposable
             : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - TransferPartHeight - ImGui.GetCursorPosY();
         var users = GetFilteredUsers();
 
-        if (!_configuration.ReverseUserSort) users.OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ThenByDescending(u => u.IsOnline).ThenByDescending(u => u.IsVisible).ToList();
-        else users = users.OrderByDescending(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ThenByDescending(u => u.IsOnline).ThenByDescending(u => u.IsVisible).ToList();
+        if (!_configuration.ReverseUserSort) users.OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ThenByDescending(u => u.IsOnline ? 1 : 0).ThenByDescending(u => u.IsVisible ? 1 : 0).ToList();
+        else users = users.OrderByDescending(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ThenByDescending(u => u.IsOnline ? 1 : 0).ThenByDescending(u => u.IsVisible ? 1 : 0).ToList();
 
         ImGui.BeginChild("list", new Vector2(WindowContentWidth, ySize), false);
         var pairsWithoutTags = users.Where(pair => !_tagHandler.HasAnyTag(pair.UserPair!)).ToList();
