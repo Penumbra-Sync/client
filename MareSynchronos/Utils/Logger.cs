@@ -18,6 +18,8 @@ internal class Logger : ILogger
     public static void Debug(string debug, string stringToHighlight = "")
     {
         var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
+        // todo: remove this again
+        if (caller == "CharacterDataFactory") return;
         if (debug.Contains(stringToHighlight, StringComparison.Ordinal) && !stringToHighlight.IsNullOrEmpty())
         {
             PluginLog.Warning($"[{caller}] {debug}");
@@ -55,6 +57,8 @@ internal class Logger : ILogger
     public static void Verbose(string verbose)
     {
         var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
+        // todo: remove this again
+        if (caller == "CharacterDataFactory") return;
 #if DEBUG
         PluginLog.Debug($"[{caller}] {verbose}");
 #else

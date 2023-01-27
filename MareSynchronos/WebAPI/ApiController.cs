@@ -15,6 +15,7 @@ using MareSynchronos.API.SignalR;
 using MareSynchronos.API.Dto.Files;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.API.Data.Comparer;
+using MareSynchronos.Managers;
 
 namespace MareSynchronos.WebAPI;
 
@@ -34,6 +35,7 @@ public partial class ApiController : IDisposable, IMareHubClient
     private readonly Configuration _pluginConfiguration;
     private readonly DalamudUtil _dalamudUtil;
     private readonly FileCacheManager _fileDbManager;
+    private readonly PairManager _pairManager;
     private CancellationTokenSource _connectionCancellationTokenSource;
     private Dictionary<JwtCache, string> _jwtToken = new();
     private string Authorization => _jwtToken.GetValueOrDefault(new JwtCache(ApiUri, _dalamudUtil.PlayerNameHashed, SecretKey), string.Empty);
@@ -54,13 +56,14 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     private HttpClient _httpClient;
 
-    public ApiController(Configuration pluginConfiguration, DalamudUtil dalamudUtil, FileCacheManager fileDbManager)
+    public ApiController(Configuration pluginConfiguration, DalamudUtil dalamudUtil, FileCacheManager fileDbManager, PairManager pairManager)
     {
         Logger.Verbose("Creating " + nameof(ApiController));
 
         _pluginConfiguration = pluginConfiguration;
         _dalamudUtil = dalamudUtil;
         _fileDbManager = fileDbManager;
+        _pairManager = pairManager;
         _connectionCancellationTokenSource = new CancellationTokenSource();
         _dalamudUtil.LogIn += DalamudUtilOnLogIn;
         _dalamudUtil.LogOut += DalamudUtilOnLogOut;
@@ -90,10 +93,6 @@ public partial class ApiController : IDisposable, IMareHubClient
     public event VoidDelegate? Connected;
     public event VoidDelegate? Disconnected;
 
-    public event UserDelegate? PairedClientOffline;
-    public event PairedClientDelegate? PairedClientOnline;
-    public event PairedClientDataDelegate? CharacterReceived;
-
     public event VoidDelegate? DownloadStarted;
     public event VoidDelegate? DownloadFinished;
 
@@ -113,7 +112,7 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     public bool IsUploading => CurrentUploads.Count > 0;
 
-    public ConcurrentDictionary<UserDto, UserPairDto> PairedClients { get; set; } = new();
+    public ConcurrentDictionary<UserDto, UserPairDto> PairedClients { get; set; } = new(new UserDtoComparer());
     public ConcurrentDictionary<GroupPairDto, GroupPairFullInfoDto> GroupPairedClients { get; set; } = new(new GroupPairDtoComparer());
     public ConcurrentDictionary<GroupDto, GroupFullInfoDto> Groups { get; set; } = new(new GroupDtoComparer());
 
@@ -320,11 +319,14 @@ public partial class ApiController : IDisposable, IMareHubClient
         PairedClients.Clear();
         foreach (var userPair in await UserGetPairedClients().ConfigureAwait(false))
         {
+            Logger.Debug($"Pair: {userPair}");
+            _pairManager.AddUserPair(userPair);
             PairedClients[userPair] = userPair;
         }
         Groups.Clear();
         foreach (var entry in await GroupsGetAll().ConfigureAwait(false))
         {
+            Logger.Debug($"Group: {entry}");
             Groups[entry] = entry;
         }
         GroupPairedClients.Clear();
@@ -333,13 +335,16 @@ public partial class ApiController : IDisposable, IMareHubClient
             var users = await GroupsGetUsersInGroup(group.Value).ConfigureAwait(false);
             foreach (var user in users)
             {
+                Logger.Debug($"GroupPair: {user}");
                 GroupPairedClients[user] = user;
+                _pairManager.AddGroupPair(user);
+                _pairManager.AddAssociatedGroup(user.User, group.Value);
             }
         }
 
         foreach (var entry in await UserGetOnlinePairs().ConfigureAwait(false))
         {
-            PairedClientOnline?.Invoke(entry);
+            _pairManager.MarkPairOnline(entry, this);
         }
 
         if (IsModerator)
@@ -398,6 +403,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         CurrentDownloads.Clear();
         _uploadCancellationTokenSource?.Cancel();
         Disconnected?.Invoke();
+        _pairManager.ClearPairs();
         ServerState = ServerState.Offline;
         Logger.Info("Connection closed");
         return Task.CompletedTask;
@@ -412,6 +418,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         Logger.Warn(arg?.Message ?? string.Empty);
         Logger.Warn(arg?.StackTrace ?? string.Empty);
         Disconnected?.Invoke();
+        _pairManager.ClearPairs();
         ServerState = ServerState.Offline;
         return Task.CompletedTask;
     }
@@ -432,6 +439,7 @@ public partial class ApiController : IDisposable, IMareHubClient
             CurrentUploads.Clear();
             CurrentDownloads.Clear();
             Disconnected?.Invoke();
+            _pairManager.ClearPairs();
             _mareHub = null;
         }
 

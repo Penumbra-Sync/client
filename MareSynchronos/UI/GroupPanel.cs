@@ -10,6 +10,7 @@ using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.API.Data.Enum;
+using MareSynchronos.API.Data.Extensions;
 
 namespace MareSynchronos.UI
 {
@@ -205,13 +206,13 @@ namespace MareSynchronos.UI
             }
             ImGui.PopStyleColor(2);
             ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + collapseButton.X);
-            var pauseIcon = groupDto.GroupUserPermissions.HasFlag(GroupUserPermissions.Paused) ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
+            var pauseIcon = groupDto.GroupUserPermissions.IsPaused() ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
             if (ImGuiComponents.IconButton(pauseIcon))
             {
                 var userPerm = groupDto.GroupUserPermissions ^ GroupUserPermissions.Paused;
                 _ = _apiController.GroupChangeIndividualPermissionState(new GroupPairUserPermissionDto(groupDto.Group, new UserData(_apiController.UID), userPerm));
             }
-            UiShared.AttachToolTip((groupDto.GroupUserPermissions.HasFlag(GroupUserPermissions.Paused) ? "Resume" : "Pause") + " pairing with all users in this Syncshell");
+            UiShared.AttachToolTip((groupDto.GroupUserPermissions.IsPaused() ? "Resume" : "Pause") + " pairing with all users in this Syncshell");
             ImGui.SameLine();
 
             var textIsGid = true;
@@ -225,7 +226,7 @@ namespace MareSynchronos.UI
                 UiShared.AttachToolTip("You are the owner of Syncshell " + groupName);
                 ImGui.SameLine();
             }
-            else if (groupDto.GroupUserInfo.HasFlag(GroupUserInfo.IsModerator))
+            else if (groupDto.GroupUserInfo.IsModerator())
             {
                 ImGui.PushFont(UiBuilder.IconFont);
                 ImGui.Text(FontAwesomeIcon.UserShield.ToIconString());
@@ -416,8 +417,8 @@ namespace MareSynchronos.UI
             if (ExpandedGroupState[groupDto.GID])
             {
                 pairsInGroup = pairsInGroup.OrderBy(p => string.Equals(p.Value.User.UID, groupDto.OwnerUID, StringComparison.Ordinal) ? 0 : 1)
-                    .ThenBy(p => p.Value.GroupPairStatusInfo.HasFlag(GroupUserInfo.IsModerator) ? 0 : 1)
-                    .ThenBy(p => p.Value.GroupPairStatusInfo.HasFlag(GroupUserInfo.IsPinned) ? 0 : 1)
+                    .ThenBy(p => p.Value.GroupPairStatusInfo.IsModerator() ? 0 : 1)
+                    .ThenBy(p => p.Value.GroupPairStatusInfo.IsPinned() ? 0 : 1)
                     .ThenBy(p => p.Value.UserAliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
                 ImGui.Indent(ImGui.GetStyle().ItemSpacing.X / 2);
                 ImGui.Separator();
@@ -426,8 +427,8 @@ namespace MareSynchronos.UI
                     UiShared.DrawWithID(groupDto.GID + pair.Value.User.UID, () => DrawSyncshellPairedClient(pair.Value,
                         groupDto.OwnerUID,
                         string.Equals(groupDto.OwnerUID, _apiController.UID, StringComparison.Ordinal),
-                        groupDto.GroupUserInfo.HasFlag(GroupUserInfo.IsModerator),
-                        groupDto.GroupUserInfo.HasFlag(GroupUserInfo.IsPinned)));
+                        groupDto.GroupUserInfo.IsModerator(),
+                        groupDto.GroupUserPermissions.IsPaused()));
 
                 }
 
@@ -439,7 +440,7 @@ namespace MareSynchronos.UI
 
         private void DrawSyncShellButtons(GroupFullInfoDto groupDto, string name)
         {
-            bool invitesEnabled = !groupDto.GroupPermissions.HasFlag(GroupPermissions.DisableInvites);
+            bool invitesEnabled = !groupDto.GroupPermissions.IsDisableInvites();
             var lockedIcon = invitesEnabled ? FontAwesomeIcon.LockOpen : FontAwesomeIcon.Lock;
             var iconSize = UiShared.GetIconSize(lockedIcon);
             var diffLockUnlockIcons = invitesEnabled ? 0 : (UiShared.GetIconSize(FontAwesomeIcon.LockOpen).X - iconSize.X) / 2;
@@ -484,7 +485,7 @@ namespace MareSynchronos.UI
                 }
                 UiShared.AttachToolTip("Copies all your notes for all users in this Syncshell to the clipboard." + Environment.NewLine + "They can be imported via Settings -> Privacy -> Import Notes from Clipboard");
 
-                if (isOwner || groupDto.GroupUserInfo.HasFlag(GroupUserInfo.IsModerator))
+                if (isOwner || groupDto.GroupUserInfo.IsModerator())
                 {
                     ImGui.Separator();
 
@@ -492,8 +493,9 @@ namespace MareSynchronos.UI
                     if (UiShared.IconTextButton(changedToIcon, invitesEnabled ? "Lock Syncshell" : "Unlock Syncshell"))
                     {
                         ImGui.CloseCurrentPopup();
-                        var groupPerm = groupDto.GroupPermissions ^ GroupPermissions.DisableInvites;
-                        _apiController.GroupChangeGroupPermissionState(new GroupPermissionDto(groupDto.Group, groupPerm));
+                        var groupPerm = groupDto.GroupPermissions;
+                        groupPerm.SetDisableInvites(!invitesEnabled);
+                        _ = _apiController.GroupChangeGroupPermissionState(new GroupPermissionDto(groupDto.Group, groupPerm));
                     }
                     UiShared.AttachToolTip("Change Syncshell joining permissions" + Environment.NewLine + "Syncshell is currently " + (invitesEnabled ? "open" : "closed") + " for people to join");
 
@@ -566,10 +568,10 @@ namespace MareSynchronos.UI
             var entryUID = entry.UserAliasOrUID;
             var textSize = ImGui.CalcTextSize(entryUID);
             var originalY = ImGui.GetCursorPosY();
-            var userIsMod = entry.GroupPairStatusInfo.HasFlag(GroupUserInfo.IsModerator);
+            var userIsMod = entry.GroupPairStatusInfo.IsModerator();
             var userIsOwner = string.Equals(entryUID, ownerUid, StringComparison.Ordinal);
-            var isPinned = entry.GroupPairStatusInfo.HasFlag(GroupUserInfo.IsPinned);
-            var isPaused = entry.GroupUserPermissions.HasFlag(GroupUserPermissions.Paused);
+            var isPinned = entry.GroupPairStatusInfo.IsPinned();
+            var isPaused = entry.GroupUserPermissions.IsPaused();
 
             var textPos = originalY + barButtonSize.Y / 2 - textSize.Y / 2;
             ImGui.SetCursorPosY(textPos);

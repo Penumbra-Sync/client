@@ -273,7 +273,7 @@ public class PlayerManager : IDisposable
             //Logger.Verbose(json);
 #endif
 
-            if ((LastCreatedCharacterData?.GetHashCode() ?? 0) == cacheDto.GetHashCode())
+            if ((LastCreatedCharacterData?.DataHash.Value ?? string.Empty) == cacheDto.DataHash.Value)
             {
                 Logger.Debug("Not sending data, already sent");
                 return;

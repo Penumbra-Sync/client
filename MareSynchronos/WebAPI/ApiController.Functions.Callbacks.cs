@@ -149,7 +149,9 @@ public partial class ApiController
 
     public Task Client_GroupPairChangePermissions(GroupPairUserPermissionDto dto)
     {
-        GroupPairedClients[dto].GroupUserPermissions = dto.GroupPairPermissions;
+        Logger.Debug("GroupPairChangePermissions: " + dto);
+        if (dto.UID == UID) Groups[dto].GroupUserPermissions = dto.GroupPairPermissions;
+        else GroupPairedClients[dto].GroupUserPermissions = dto.GroupPairPermissions;
         return Task.CompletedTask;
     }
 
@@ -167,8 +169,8 @@ public partial class ApiController
 
     public Task Client_UserReceiveCharacterData(OnlineUserCharaDataDto dto)
     {
-        Logger.Verbose("Received DTO for " + dto.User.AliasOrUID);
-        CharacterReceived?.Invoke(dto);
+        Logger.Verbose("Data: " + dto.User);
+        _pairManager.ReceiveCharaData(dto);
         return Task.CompletedTask;
     }
 
@@ -180,67 +182,82 @@ public partial class ApiController
 
     public Task Client_UserAddClientPair(UserPairDto userPairDto)
     {
-        this.PairedClients[userPairDto] = userPairDto;
+        Logger.Debug($"Added: {userPairDto}");
+        PairedClients[userPairDto] = userPairDto;
+        _pairManager.AddUserPair(userPairDto);
         return Task.CompletedTask;
     }
 
     public void OnUserRemoveClientPair(Action<UserDto> act)
     {
-        if (!_initialized) return;
+        if (_initialized) return;
         _mareHub!.On(nameof(Client_UserRemoveClientPair), act);
     }
 
     public Task Client_UserRemoveClientPair(UserDto dto)
     {
+        Logger.Debug($"Removing {dto}");
         PairedClients.TryRemove(dto, out _);
+        _pairManager.RemoveUserPair(dto);
         return Task.CompletedTask;
     }
 
     public void OnUserSendOffline(Action<UserDto> act)
     {
-        if (!_initialized) return;
-        _mareHub!.On(nameof(OnUserSendOffline), act);
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_UserSendOffline), act);
     }
 
     public Task Client_UserSendOffline(UserDto dto)
     {
-        PairedClientOffline?.Invoke(dto);
+        Logger.Debug($"Offline: {dto}");
+        _pairManager.MarkPairOffline(dto.User);
         return Task.CompletedTask;
     }
 
     public void OnUserSendOnline(Action<OnlineUserIdentDto> act)
     {
-        if (!_initialized) return;
+        if (_initialized) return;
         _mareHub!.On(nameof(Client_UserSendOnline), act);
     }
 
     public Task Client_UserSendOnline(OnlineUserIdentDto dto)
     {
-        PairedClientOnline?.Invoke(dto);
+        Logger.Debug($"Online: {dto}");
+        try
+        {
+            _pairManager.MarkPairOnline(dto, this);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Error UserSendOnline", ex);
+        }
         return Task.CompletedTask;
     }
 
     public void OnUserUpdateOtherPairPermissions(Action<UserPermissionsDto> act)
     {
-        if (!_initialized) return;
+        if (_initialized) return;
         _mareHub!.On(nameof(Client_UserUpdateOtherPairPermissions), act);
     }
 
     public Task Client_UserUpdateOtherPairPermissions(UserPermissionsDto dto)
     {
         PairedClients[dto].OtherPermissions = dto.Permissions;
+        _pairManager.UpdatePairPermissions(dto);
         return Task.CompletedTask;
     }
 
     public void OnUserUpdateSelfPairPermissions(Action<UserPermissionsDto> act)
     {
-        if (!_initialized) return;
+        if (_initialized) return;
         _mareHub!.On(nameof(Client_UserUpdateSelfPairPermissions), act);
     }
 
     public Task Client_UserUpdateSelfPairPermissions(UserPermissionsDto dto)
     {
         PairedClients[dto].OwnPermissions = dto.Permissions;
+        _pairManager.UpdateSelfPairPermissions(dto);
         return Task.CompletedTask;
     }
 
@@ -312,7 +329,7 @@ public partial class ApiController
                 break;
             case MessageSeverity.Information:
                 Logger.Info(message);
-                if (!_pluginConfiguration.HideInfoMessages)
+                if (_pluginConfiguration.HideInfoMessages)
                 {
                     _dalamudUtil.PrintInfoChat(message);
                 }

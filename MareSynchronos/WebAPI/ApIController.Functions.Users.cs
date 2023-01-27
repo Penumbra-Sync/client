@@ -41,6 +41,7 @@ public partial class ApiController
 
     public async Task UserSetPairPermissions(UserPermissionsDto dto)
     {
+        Logger.Verbose("Sending UserSetPairPermissions: " + dto);
         await _mareHub!.SendAsync(nameof(UserSetPairPermissions), dto).ConfigureAwait(false);
     }
 

@@ -4,29 +4,25 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 
 namespace MareSynchronos.Utils;
 
-public class Crypto
+public static class Crypto
 {
     public static string GetFileHash(string filePath)
     {
-        using SHA1CryptoServiceProvider cryptoProvider = new();
-        return BitConverter.ToString(cryptoProvider.ComputeHash(File.ReadAllBytes(filePath))).Replace("-", "", StringComparison.Ordinal);
+        return BitConverter.ToString(SHA1.HashData(File.ReadAllBytes(filePath))).Replace("-", "", StringComparison.Ordinal);
     }
 
-    public static string GetHash(string stringToHash)
+    public static string GetHash(this string stringToHash)
     {
-        using SHA1CryptoServiceProvider cryptoProvider = new();
-        return BitConverter.ToString(cryptoProvider.ComputeHash(Encoding.UTF8.GetBytes(stringToHash))).Replace("-", "", StringComparison.Ordinal);
+        return BitConverter.ToString(SHA1.HashData(Encoding.UTF8.GetBytes(stringToHash))).Replace("-", "", StringComparison.Ordinal);
     }
 
-    public static string GetHash256(string stringToHash)
+    public static string GetHash256(this string stringToHash)
     {
-        using SHA256CryptoServiceProvider cryptoProvider = new();
-        return BitConverter.ToString(cryptoProvider.ComputeHash(Encoding.UTF8.GetBytes(stringToHash))).Replace("-", "", StringComparison.Ordinal);
+        return BitConverter.ToString(SHA256.HashData(Encoding.UTF8.GetBytes(stringToHash))).Replace("-", "", StringComparison.Ordinal);
     }
 
-    public static string GetHash256(PlayerCharacter character)
+    public static string GetHash256(this PlayerCharacter character)
     {
-        using SHA256CryptoServiceProvider cryptoProvider = new();
-        return BitConverter.ToString(cryptoProvider.ComputeHash(Encoding.UTF8.GetBytes(character.Name + character.HomeWorld.Id.ToString()))).Replace("-", "", StringComparison.Ordinal);
+        return BitConverter.ToString(SHA256.HashData(Encoding.UTF8.GetBytes(character.Name + character.HomeWorld.Id.ToString()))).Replace("-", "", StringComparison.Ordinal);
     }
 }

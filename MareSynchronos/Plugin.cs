@@ -22,7 +22,6 @@ public sealed class Plugin : IDalamudPlugin
     private const string CommandName = "/mare";
     private readonly ApiController _apiController;
     private readonly CommandManager _commandManager;
-    private readonly ChatGui _chatGui;
     private readonly Configuration _configuration;
     private readonly PeriodicFileScanner _periodicFileScanner;
     private readonly IntroUi _introUi;
@@ -37,6 +36,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly DownloadUi _downloadUi;
     private readonly FileDialogManager _fileDialogManager;
     private readonly FileCacheManager _fileCacheManager;
+    private readonly PairManager _pairManager;
     private readonly CompactUi _compactUi;
     private readonly UiShared _uiSharedComponent;
     private readonly Dalamud.Localization _localization;
@@ -46,8 +46,7 @@ public sealed class Plugin : IDalamudPlugin
 
 
     public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager,
-        Framework framework, ObjectTable objectTable, ClientState clientState, Condition condition,
-        ChatGui chatGui)
+        Framework framework, ObjectTable objectTable, ClientState clientState, Condition condition, ChatGui chatGui)
     {
         Logger.Debug("Launching " + Name);
         _pluginInterface = pluginInterface;
@@ -68,7 +67,8 @@ public sealed class Plugin : IDalamudPlugin
         _ipcManager = new IpcManager(_pluginInterface, _dalamudUtil);
         _fileDialogManager = new FileDialogManager();
         _fileCacheManager = new FileCacheManager(_ipcManager, _configuration, _pluginInterface.ConfigDirectory.FullName);
-        _apiController = new ApiController(_configuration, _dalamudUtil, _fileCacheManager);
+        _pairManager = new PairManager(new CachedPlayerFactory(_ipcManager, _dalamudUtil, _fileCacheManager), _dalamudUtil, new PairFactory(_configuration));
+        _apiController = new ApiController(_configuration, _dalamudUtil, _fileCacheManager, _pairManager);
         _periodicFileScanner = new PeriodicFileScanner(_ipcManager, _configuration, _fileCacheManager, _apiController, _dalamudUtil);
         _fileReplacementFactory = new FileReplacementFactory(_fileCacheManager, _ipcManager);
         _mareCharaFileManager = new(_fileCacheManager, _ipcManager, _configuration, _dalamudUtil);
@@ -110,6 +110,7 @@ public sealed class Plugin : IDalamudPlugin
     }
 
     public string Name => "Mare Synchronos";
+
     public void Dispose()
     {
         Logger.Verbose("Disposing " + Name);
@@ -126,6 +127,7 @@ public sealed class Plugin : IDalamudPlugin
         _compactUi?.Dispose();
         _gposeUi?.Dispose();
 
+        _pairManager.Dispose();
         _periodicFileScanner?.Dispose();
         _fileCacheManager?.Dispose();
         _playerManager?.Dispose();
@@ -195,7 +197,7 @@ public sealed class Plugin : IDalamudPlugin
             _playerManager = new PlayerManager(_apiController, _ipcManager,
                 characterCacheFactory, _dalamudUtil, _transientResourceManager, _periodicFileScanner, _settingsUi);
             _characterCacheManager = new OnlinePlayerManager(_apiController,
-                _dalamudUtil, _ipcManager, _playerManager, _fileCacheManager, _configuration);
+                _dalamudUtil, _playerManager, _fileCacheManager, _pairManager);
         }
         catch (Exception ex)
         {
