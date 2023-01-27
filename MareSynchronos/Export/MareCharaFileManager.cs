@@ -5,6 +5,7 @@ using MareSynchronos.Managers;
 using MareSynchronos.Utils;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Enum;
+using MareSynchronos.MareConfiguration;
 
 namespace MareSynchronos.Export;
 public class MareCharaFileManager

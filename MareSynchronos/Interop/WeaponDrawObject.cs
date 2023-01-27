@@ -1,5 +1,4 @@
 ﻿using System.Runtime.InteropServices;
-using Penumbra.Interop.Structs;
 
 namespace MareSynchronos.Interop;
 

@@ -8,7 +8,6 @@ using MareSynchronos.Interop;
 using MareSynchronos.Managers;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
-using Penumbra.Interop.Structs;
 using Object = FFXIVClientStructs.FFXIV.Client.Graphics.Scene.Object;
 using Penumbra.String;
 using Weapon = MareSynchronos.Interop.Weapon;

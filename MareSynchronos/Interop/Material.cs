@@ -1,17 +1,17 @@
 using System.Runtime.InteropServices;
 
-namespace Penumbra.Interop.Structs;
+namespace MareSynchronos.Interop;
 
-[StructLayout( LayoutKind.Explicit )]
+[StructLayout(LayoutKind.Explicit)]
 public unsafe struct Material
 {
-    [FieldOffset( 0x10 )]
+    [FieldOffset(0x10)]
     public ResourceHandle* ResourceHandle;
 }
 
-[StructLayout( LayoutKind.Explicit )]
+[StructLayout(LayoutKind.Explicit)]
 public unsafe struct MaterialData
 {
-    [FieldOffset( 0x0 )]
+    [FieldOffset(0x0)]
     public byte* Data;
 }

@@ -5,6 +5,7 @@ using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.Managers;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.Utils;
 
 namespace MareSynchronos.Models;

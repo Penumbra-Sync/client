@@ -11,6 +11,7 @@ using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.Managers;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.Models;
 using MareSynchronos.UI.Components;
 using MareSynchronos.UI.Handlers;
@@ -87,8 +88,8 @@ public class CompactUi : Window, IDisposable
         _tagHandler = new(_serverManager);
 
         _groupPanel = new(this, uiShared, _pairManager, _serverManager);
-        _selectGroupForPairUi = new(_tagHandler, configuration);
-        _selectPairsForGroupUi = new(_tagHandler, configuration);
+        _selectGroupForPairUi = new(_tagHandler);
+        _selectPairsForGroupUi = new(_tagHandler);
         _pairGroupsUi = new(_tagHandler, DrawPairedClient, apiController, _selectPairsForGroupUi);
 
         _uiShared.GposeStart += UiShared_GposeStart;

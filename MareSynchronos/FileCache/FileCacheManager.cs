@@ -1,4 +1,5 @@
 ﻿using MareSynchronos.Managers;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.Utils;
 using System.Collections.Concurrent;
 using System.Globalization;

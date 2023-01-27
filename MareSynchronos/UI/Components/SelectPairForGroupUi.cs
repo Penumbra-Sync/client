@@ -13,13 +13,11 @@ public class SelectPairForGroupUi
     private HashSet<string> _peopleInGroup = new(StringComparer.Ordinal);
     private string _tag = string.Empty;
     private readonly TagHandler _tagHandler;
-    private readonly Configuration _configuration;
     private string _filter = string.Empty;
 
-    public SelectPairForGroupUi(TagHandler tagHandler, Configuration configuration)
+    public SelectPairForGroupUi(TagHandler tagHandler)
     {
         _tagHandler = tagHandler;
-        _configuration = configuration;
     }
 
     public void Open(string tag)

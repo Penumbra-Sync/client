@@ -1,9 +1,10 @@
 ﻿using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
+using MareSynchronos.Managers;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 
-namespace MareSynchronos.Managers;
+namespace MareSynchronos.Factories;
 
 public class CachedPlayerFactory
 {

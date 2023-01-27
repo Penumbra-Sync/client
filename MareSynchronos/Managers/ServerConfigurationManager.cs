@@ -1,4 +1,5 @@
-﻿using MareSynchronos.Utils;
+﻿using MareSynchronos.MareConfiguration;
+using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.Managers;

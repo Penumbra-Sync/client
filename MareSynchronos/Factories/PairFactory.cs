@@ -1,6 +1,8 @@
-﻿using MareSynchronos.Models;
+﻿using MareSynchronos.Managers;
+using MareSynchronos.MareConfiguration;
+using MareSynchronos.Models;
 
-namespace MareSynchronos.Managers;
+namespace MareSynchronos.Factories;
 
 public class PairFactory
 {

@@ -3,89 +3,7 @@ using Dalamud.Plugin;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 
-namespace MareSynchronos;
-
-public static class ConfigurationExtensions
-{
-    public static bool HasValidSetup(this Configuration configuration)
-    {
-        return configuration.AcceptedAgreement && configuration.InitialScanComplete
-                    && !string.IsNullOrEmpty(configuration.CacheFolder)
-                    && Directory.Exists(configuration.CacheFolder);
-    }
-
-    [Obsolete]
-    public static Dictionary<string, string> GetCurrentServerUidComments(this Configuration configuration)
-    {
-        // todo: remove usages
-        return configuration.UidServerComments.ContainsKey(configuration.ApiUri)
-            ? configuration.UidServerComments[configuration.ApiUri]
-            : new Dictionary<string, string>(StringComparer.Ordinal);
-    }
-
-    [Obsolete]
-    public static Dictionary<string, string> GetCurrentServerGidComments(this Configuration configuration)
-    {
-        // todo: remove usages
-        return configuration.GidServerComments.ContainsKey(configuration.ApiUri)
-            ? configuration.GidServerComments[configuration.ApiUri]
-            : new Dictionary<string, string>(StringComparer.Ordinal);
-    }
-
-    [Obsolete]
-    public static void SetCurrentServerGidComment(this Configuration configuration, string gid, string comment)
-    {
-        // todo: remove usages
-        if (!configuration.GidServerComments.ContainsKey(configuration.ApiUri))
-        {
-            configuration.GidServerComments[configuration.ApiUri] = new Dictionary<string, string>(StringComparer.Ordinal);
-        }
-
-        configuration.GidServerComments[configuration.ApiUri][gid] = comment;
-    }
-
-    [Obsolete]
-    public static void SetCurrentServerUidComment(this Configuration configuration, string uid, string comment)
-    {
-        // todo: remove usages
-        if (!configuration.UidServerComments.ContainsKey(configuration.ApiUri))
-        {
-            configuration.UidServerComments[configuration.ApiUri] = new Dictionary<string, string>(StringComparer.Ordinal);
-        }
-
-        configuration.UidServerComments[configuration.ApiUri][uid] = comment;
-    }
-}
-
-[Serializable]
-public class SecretKey
-{
-    public string Key { get; set; } = string.Empty;
-    public string FriendlyName { get; set; } = string.Empty;
-}
-
-[Serializable]
-public class Authentication
-{
-    public string CharacterName { get; set; } = string.Empty;
-    public uint WorldId { get; set; } = 0;
-    public int SecretKeyIdx { get; set; } = -1;
-}
-
-[Serializable]
-public class ServerStorage
-{
-    public string ServerUri { get; set; } = string.Empty;
-    public string ServerName { get; set; } = string.Empty;
-    public List<Authentication> Authentications { get; set; } = new();
-    public Dictionary<string, string> UidServerComments { get; set; } = new(StringComparer.Ordinal);
-    public Dictionary<string, string> GidServerComments { get; set; } = new(StringComparer.Ordinal);
-    public Dictionary<string, List<string>> UidServerPairedUserTags = new(StringComparer.Ordinal);
-    public HashSet<string> ServerAvailablePairTags { get; set; } = new(StringComparer.Ordinal);
-    public HashSet<string> OpenPairTags { get; set; } = new(StringComparer.Ordinal);
-    [Newtonsoft.Json.JsonIgnore]
-    public Dictionary<int, SecretKey> SecretKeys { get; set; } = new();
-}
+namespace MareSynchronos.MareConfiguration;
 
 [Serializable]
 public class Configuration : IPluginConfiguration
@@ -212,6 +130,14 @@ public class Configuration : IPluginConfiguration
 
                 ServerStorage[apiuri] = toAdd;
             }
+
+            OpenPairTags.Clear();
+            GidServerComments.Clear();
+            UidServerComments.Clear();
+            UidServerPairedUserTags.Clear();
+            ServerAvailablePairTags.Clear();
+            ClientSecret.Clear();
+            CustomServerList.Clear();
 
             CurrentServer = ApiUri;
             Version = 6;

@@ -9,6 +9,7 @@ using MareSynchronos.FileCache;
 using Dalamud.Interface;
 using MareSynchronos.Managers;
 using MareSynchronos.WebAPI;
+using MareSynchronos.MareConfiguration;
 
 namespace MareSynchronos.UI;
 

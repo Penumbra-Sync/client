@@ -3,6 +3,7 @@ using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Utility;
 using ImGuiNET;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.Models;
 using MareSynchronos.UI.Handlers;
 
@@ -27,14 +28,12 @@ public class SelectGroupForPairUi
     private string _tagNameToAdd = "";
 
     private readonly TagHandler _tagHandler;
-    private readonly Configuration _configuration;
 
-    public SelectGroupForPairUi(TagHandler tagHandler, Configuration configuration)
+    public SelectGroupForPairUi(TagHandler tagHandler)
     {
         _show = false;
         _pair = null;
         _tagHandler = tagHandler;
-        _configuration = configuration;
     }
 
     public void Open(Pair pair)

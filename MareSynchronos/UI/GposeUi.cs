@@ -4,6 +4,7 @@ using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using MareSynchronos.Export;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.Utils;
 
 namespace MareSynchronos.UI;

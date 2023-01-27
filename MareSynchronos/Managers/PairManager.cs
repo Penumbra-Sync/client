@@ -4,6 +4,7 @@ using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
+using MareSynchronos.Factories;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;

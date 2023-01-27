@@ -15,6 +15,7 @@ using MareSynchronos.FileCache;
 using Dalamud.Game.Gui;
 using MareSynchronos.Export;
 using Dalamud.Data;
+using MareSynchronos.MareConfiguration;
 
 namespace MareSynchronos;
 

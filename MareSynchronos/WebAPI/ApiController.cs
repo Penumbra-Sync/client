@@ -26,7 +26,7 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     public readonly int[] SupportedServerVersions = { IMareHub.ApiVersion };
 
-    private readonly Configuration _pluginConfiguration;
+    private readonly MareConfiguration.Configuration _pluginConfiguration;
     private readonly DalamudUtil _dalamudUtil;
     private readonly FileCacheManager _fileDbManager;
     private readonly PairManager _pairManager;
@@ -49,7 +49,7 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     private HttpClient _httpClient;
 
-    public ApiController(Configuration pluginConfiguration, DalamudUtil dalamudUtil, FileCacheManager fileDbManager, PairManager pairManager, ServerConfigurationManager serverManager)
+    public ApiController(MareConfiguration.Configuration pluginConfiguration, DalamudUtil dalamudUtil, FileCacheManager fileDbManager, PairManager pairManager, ServerConfigurationManager serverManager)
     {
         Logger.Verbose("Creating " + nameof(ApiController));
 
