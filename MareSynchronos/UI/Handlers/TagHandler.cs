@@ -1,21 +1,22 @@
 ﻿using MareSynchronos.API.Dto.User;
+using MareSynchronos.Managers;
 using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.UI.Handlers
 {
     public class TagHandler
     {
-        private readonly Configuration _configuration;
+        private readonly ServerConfigurationManager _serverConfigurationManager;
 
-        public TagHandler(Configuration configuration)
+        public TagHandler(ServerConfigurationManager serverConfigurationManager)
         {
-            _configuration = configuration;
+            _serverConfigurationManager = serverConfigurationManager;
         }
 
         public void AddTag(string tag)
         {
             GetAvailableTagsForCurrentServer().Add(tag);
-            _configuration.Save();
+            _serverConfigurationManager.Save();
         }
 
         public void RemoveTag(string tag)
@@ -26,20 +27,20 @@ namespace MareSynchronos.UI.Handlers
             GetUidTagDictionaryForCurrentServer().Keys
                 .ToList()
                 .ForEach(otherUid => RemoveTagFromPairedUid(otherUid, tag));
-            _configuration.Save();
+            _serverConfigurationManager.Save();
         }
 
         public void SetTagOpen(string tag, bool open)
         {
             if (open)
             {
-                _configuration.OpenPairTags.Add(tag);
+                _serverConfigurationManager.CurrentServer.OpenPairTags.Add(tag);
             }
             else
             {
-                _configuration.OpenPairTags.Remove(tag);
+                _serverConfigurationManager.CurrentServer.OpenPairTags.Remove(tag);
             }
-            _configuration.Save();
+            _serverConfigurationManager.Save();
         }
         
         /// <summary>
@@ -49,7 +50,7 @@ namespace MareSynchronos.UI.Handlers
         /// <returns>open true/false</returns>
         public bool IsTagOpen(string tag)
         {
-            return _configuration.OpenPairTags.Contains(tag);
+            return _serverConfigurationManager.CurrentServer.OpenPairTags.Contains(tag);
         }
 
         public List<string> GetAllTagsSorted()
@@ -73,13 +74,13 @@ namespace MareSynchronos.UI.Handlers
             var tagsForPair = tagDictionary.GetValueOrDefault(pair.User.UID, new List<string>());
             tagsForPair.Add(tagName);
             tagDictionary[pair.User.UID] = tagsForPair;
-            _configuration.Save();
+            _serverConfigurationManager.Save();
         }
         
         public void RemoveTagFromPairedUid(UserPairDto pair, string tagName)
         {
             RemoveTagFromPairedUid(pair.User.UID, tagName);
-            _configuration.Save();
+            _serverConfigurationManager.Save();
         }
 
         public bool HasTag(UserPairDto pair, string tagName)
@@ -110,22 +111,12 @@ namespace MareSynchronos.UI.Handlers
 
         private Dictionary<string, List<string>> GetUidTagDictionaryForCurrentServer()
         {
-            if (!_configuration.UidServerPairedUserTags.ContainsKey(_configuration.ApiUri))
-            {
-                _configuration.UidServerPairedUserTags.Add(_configuration.ApiUri, new(StringComparer.Ordinal));
-            }
-
-            return _configuration.UidServerPairedUserTags[_configuration.ApiUri];
+            return _serverConfigurationManager.CurrentServer.UidServerPairedUserTags;
         }
         
         private HashSet<string> GetAvailableTagsForCurrentServer()
         {
-            if (!_configuration.ServerAvailablePairTags.ContainsKey(_configuration.ApiUri))
-            {
-                _configuration.ServerAvailablePairTags.Add(_configuration.ApiUri, new(StringComparer.Ordinal));
-            }
-
-            return _configuration.ServerAvailablePairTags[_configuration.ApiUri];
+            return _serverConfigurationManager.CurrentServer.ServerAvailablePairTags;
         }
     }
 }

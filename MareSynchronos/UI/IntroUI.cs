@@ -21,7 +21,7 @@ internal class IntroUi : Window, IDisposable
     private readonly WindowSystem _windowSystem;
     private bool _readFirstPage;
 
-    public event SwitchUi? SwitchToMainUi;
+    public event VoidDelegate? SwitchToMainUi;
 
     private string[] TosParagraphs;
 

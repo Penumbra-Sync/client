@@ -84,9 +84,9 @@ public class CompactUi : Window, IDisposable
         _apiController = apiController;
         _pairManager = pairManager;
         _serverManager = serverManager;
-        _tagHandler = new(_configuration);
+        _tagHandler = new(_serverManager);
 
-        _groupPanel = new(this, uiShared, configuration, apiController, _pairManager);
+        _groupPanel = new(this, uiShared, _pairManager, _serverManager);
         _selectGroupForPairUi = new(_tagHandler, configuration);
         _selectPairsForGroupUi = new(_tagHandler, configuration);
         _pairGroupsUi = new(_tagHandler, DrawPairedClient, apiController, _selectPairsForGroupUi);
@@ -114,7 +114,7 @@ public class CompactUi : Window, IDisposable
         IsOpen = false;
     }
 
-    public event SwitchUi? OpenSettingsUi;
+    public event VoidDelegate? OpenSettingsUi;
     public void Dispose()
     {
         Logger.Verbose("Disposing " + nameof(CompactUi));
@@ -207,10 +207,10 @@ public class CompactUi : Window, IDisposable
                 ImGui.InputTextWithHint("##noteforuser", $"Note for {_lastAddedUser.User.AliasOrUID}", ref _lastAddedUserComment, 100);
                 if (UiShared.IconTextButton(FontAwesomeIcon.Save, "Save Note"))
                 {
-                    _configuration.SetCurrentServerUidComment(_lastAddedUser.User.UID, _lastAddedUserComment);
+                    _serverManager.CurrentServer.UidServerComments[_lastAddedUser.User.UID] = _lastAddedUserComment;
+                    _serverManager.Save();
                     _lastAddedUser = null;
                     _lastAddedUserComment = string.Empty;
-                    _configuration.Save();
                     _showModalForUserAddition = false;
                 }
             }
@@ -403,7 +403,7 @@ public class CompactUi : Window, IDisposable
 
         var textIsUid = true;
         ShowUidForEntry.TryGetValue(entry.UserPair!.User.UID, out var showUidInsteadOfName);
-        if (!showUidInsteadOfName && _configuration.GetCurrentServerUidComments().TryGetValue(entry.UserPair!.User.UID, out var playerText))
+        if (!showUidInsteadOfName && _serverManager.CurrentServer.UidServerComments.TryGetValue(entry.UserPair!.User.UID, out var playerText))
         {
             if (string.IsNullOrEmpty(playerText))
             {
@@ -454,8 +454,8 @@ public class CompactUi : Window, IDisposable
             ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * 2);
             if (ImGui.InputTextWithHint("", "Nick/Notes", ref EditUserComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
             {
-                _configuration.SetCurrentServerUidComment(entry.UserPair!.User.UID, EditUserComment);
-                _configuration.Save();
+                _serverManager.CurrentServer.UidServerComments[entry.UserPair!.User.UID] = EditUserComment;
+                _serverManager.Save();
                 EditNickEntry = string.Empty;
             }
 

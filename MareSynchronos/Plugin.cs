@@ -43,7 +43,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly Dalamud.Localization _localization;
     private readonly FileReplacementFactory _fileReplacementFactory;
     private readonly MareCharaFileManager _mareCharaFileManager;
-    private readonly ServerConfigurationManager _serverManager;
+    private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly GposeUi _gposeUi;
 
 
@@ -69,20 +69,20 @@ public sealed class Plugin : IDalamudPlugin
         _ipcManager = new IpcManager(_pluginInterface, _dalamudUtil);
         _fileDialogManager = new FileDialogManager();
         _fileCacheManager = new FileCacheManager(_ipcManager, _configuration, _pluginInterface.ConfigDirectory.FullName);
-        _pairManager = new PairManager(new CachedPlayerFactory(_ipcManager, _dalamudUtil, _fileCacheManager), _dalamudUtil, new PairFactory(_configuration));
-        _serverManager = new ServerConfigurationManager(_configuration, _dalamudUtil);
-        _apiController = new ApiController(_configuration, _dalamudUtil, _fileCacheManager, _pairManager, _serverManager);
+        _serverConfigurationManager = new ServerConfigurationManager(_configuration, _dalamudUtil);
+        _pairManager = new PairManager(new CachedPlayerFactory(_ipcManager, _dalamudUtil, _fileCacheManager), _dalamudUtil, new PairFactory(_configuration, _serverConfigurationManager));
+        _apiController = new ApiController(_configuration, _dalamudUtil, _fileCacheManager, _pairManager, _serverConfigurationManager);
         _periodicFileScanner = new PeriodicFileScanner(_ipcManager, _configuration, _fileCacheManager, _apiController, _dalamudUtil);
         _fileReplacementFactory = new FileReplacementFactory(_fileCacheManager, _ipcManager);
         _mareCharaFileManager = new(_fileCacheManager, _ipcManager, _configuration, _dalamudUtil);
 
         _uiSharedComponent =
-            new UiShared(_ipcManager, _apiController, _periodicFileScanner, _fileDialogManager, _configuration, _dalamudUtil, _pluginInterface, _localization, _serverManager);
-        _settingsUi = new SettingsUi(_windowSystem, _uiSharedComponent, _configuration, _mareCharaFileManager, _pairManager, _serverManager);
-        _compactUi = new CompactUi(_windowSystem, _uiSharedComponent, _configuration, _apiController, _pairManager, _serverManager);
+            new UiShared(_ipcManager, _apiController, _periodicFileScanner, _fileDialogManager, _configuration, _dalamudUtil, _pluginInterface, _localization, _serverConfigurationManager);
+        _settingsUi = new SettingsUi(_windowSystem, _uiSharedComponent, _configuration, _mareCharaFileManager, _pairManager, _serverConfigurationManager);
+        _compactUi = new CompactUi(_windowSystem, _uiSharedComponent, _configuration, _apiController, _pairManager, _serverConfigurationManager);
         _gposeUi = new GposeUi(_windowSystem, _mareCharaFileManager, _dalamudUtil, _fileDialogManager, _configuration);
 
-        _introUi = new IntroUi(_windowSystem, _uiSharedComponent, _configuration, _periodicFileScanner, _serverManager);
+        _introUi = new IntroUi(_windowSystem, _uiSharedComponent, _configuration, _periodicFileScanner, _serverConfigurationManager);
         _settingsUi.SwitchToIntroUi += () =>
         {
             _introUi.IsOpen = true;

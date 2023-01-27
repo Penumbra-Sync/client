@@ -15,7 +15,6 @@ using MareSynchronos.API.Data.Comparer;
 
 namespace MareSynchronos.UI;
 
-public delegate void SwitchUi();
 public class SettingsUi : Window, IDisposable
 {
     private readonly Configuration _configuration;
@@ -27,7 +26,7 @@ public class SettingsUi : Window, IDisposable
     private readonly UiShared _uiShared;
     public CharacterData? LastCreatedCharacterData { private get; set; }
 
-    public event SwitchUi? SwitchToIntroUi;
+    public event VoidDelegate? SwitchToIntroUi;
     private bool _overwriteExistingLabels = false;
     private bool? _notesSuccessfullyApplied = null;
     private string _lastTab = string.Empty;
@@ -264,7 +263,7 @@ public class SettingsUi : Window, IDisposable
                         }
                         var worldIdx = (ushort)item.WorldId;
                         var data = _uiShared.WorldData;
-                        if (!data.TryGetValue(worldIdx, out string worldPreview))
+                        if (!data.TryGetValue(worldIdx, out string? worldPreview))
                         {
                             worldPreview = data.First().Value;
                         }

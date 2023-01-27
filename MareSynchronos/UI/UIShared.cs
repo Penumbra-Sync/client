@@ -611,7 +611,6 @@ public class UiShared : IDisposable
 
     public string GetNotes(List<Pair> pairs)
     {
-        var comments = _pluginConfiguration.GetCurrentServerUidComments();
         StringBuilder sb = new();
         sb.AppendLine(NotesStart);
         foreach (var entry in pairs)
@@ -638,7 +637,7 @@ public class UiShared : IDisposable
 
         splitNotes.RemoveAll(n => string.Equals(n, NotesStart) || string.Equals(n, NotesEnd));
 
-        var comments = _pluginConfiguration.GetCurrentServerUidComments();
+        var comments = _serverConfigurationManager.CurrentServer.UidServerComments;
 
         foreach (var note in splitNotes)
         {
@@ -648,7 +647,7 @@ public class UiShared : IDisposable
                 var uid = splittedEntry[0];
                 var comment = splittedEntry[1].Trim('"');
                 if (comments.ContainsKey(uid) && !overwrite) continue;
-                _pluginConfiguration.SetCurrentServerUidComment(uid, comment);
+                _serverConfigurationManager.CurrentServer.UidServerComments[uid] = comment;
             }
             catch
             {
@@ -656,7 +655,7 @@ public class UiShared : IDisposable
             }
         }
 
-        _pluginConfiguration.Save();
+        _serverConfigurationManager.Save();
 
         return true;
     }
