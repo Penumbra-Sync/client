@@ -1,7 +1,5 @@
 ﻿using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Dto;
-using MareSynchronos.API.Dto.Admin;
-using MareSynchronos.API.Dto.Files;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.Utils;
@@ -23,36 +21,6 @@ public partial class ApiController
     {
         if (_initialized) return;
         _mareHub!.On(nameof(Client_UserReceiveCharacterData), act);
-    }
-
-    public void OnAdminForcedReconnect(Action act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_AdminForcedReconnect), act);
-    }
-
-    public void OnAdminDeleteBannedUser(Action<BannedUserDto> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_AdminDeleteBannedUser), act);
-    }
-
-    public void OnAdminDeleteForbiddenFile(Action<ForbiddenFileDto> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_AdminDeleteForbiddenFile), act);
-    }
-
-    public void OnAdminUpdateOrAddBannedUser(Action<BannedUserDto> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_AdminUpdateOrAddBannedUser), act);
-    }
-
-    public void OnAdminUpdateOrAddForbiddenFile(Action<ForbiddenFileDto> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_AdminUpdateOrAddForbiddenFile), act);
     }
 
     public void OnReceiveServerMessage(Action<MessageSeverity, string> act)
@@ -239,6 +207,7 @@ public partial class ApiController
 
     public Task Client_UserUpdateOtherPairPermissions(UserPermissionsDto dto)
     {
+        Logger.Debug($"Client_UserUpdateOtherPairPermissions: {dto}");
         _pairManager.UpdatePairPermissions(dto);
         return Task.CompletedTask;
     }
@@ -251,6 +220,7 @@ public partial class ApiController
 
     public Task Client_UserUpdateSelfPairPermissions(UserPermissionsDto dto)
     {
+        Logger.Debug($"Client_UserUpdateSelfPairPermissions: {dto}");
         _pairManager.UpdateSelfPairPermissions(dto);
         return Task.CompletedTask;
     }
@@ -264,48 +234,6 @@ public partial class ApiController
     public Task Client_AdminForcedReconnect()
     {
         _ = CreateConnections();
-        return Task.CompletedTask;
-    }
-
-    public Task Client_AdminDeleteBannedUser(BannedUserDto dto)
-    {
-        AdminBannedUsers.RemoveAll(a => string.Equals(a.CharacterHash, dto.CharacterHash, StringComparison.Ordinal));
-        return Task.CompletedTask;
-    }
-
-    public Task Client_AdminDeleteForbiddenFile(ForbiddenFileDto dto)
-    {
-        AdminForbiddenFiles.RemoveAll(f => string.Equals(f.Hash, dto.Hash, StringComparison.Ordinal));
-        return Task.CompletedTask;
-    }
-
-    public Task Client_AdminUpdateOrAddBannedUser(BannedUserDto dto)
-    {
-        var user = AdminBannedUsers.SingleOrDefault(b => string.Equals(b.CharacterHash, dto.CharacterHash, StringComparison.Ordinal));
-        if (user == null)
-        {
-            AdminBannedUsers.Add(dto);
-        }
-        else
-        {
-            user.Reason = dto.Reason;
-        }
-
-        return Task.CompletedTask;
-    }
-
-    public Task Client_AdminUpdateOrAddForbiddenFile(ForbiddenFileDto dto)
-    {
-        var user = AdminForbiddenFiles.SingleOrDefault(b => string.Equals(b.Hash, dto.Hash, StringComparison.Ordinal));
-        if (user == null)
-        {
-            AdminForbiddenFiles.Add(dto);
-        }
-        else
-        {
-            user.ForbiddenBy = dto.ForbiddenBy;
-        }
-
         return Task.CompletedTask;
     }
 

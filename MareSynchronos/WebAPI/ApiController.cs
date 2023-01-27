@@ -8,13 +8,9 @@ using MareSynchronos.WebAPI.Utils;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
-using MareSynchronos.API.Dto.Group;
-using MareSynchronos.API.Dto.Admin;
 using MareSynchronos.API.Dto;
 using MareSynchronos.API.SignalR;
-using MareSynchronos.API.Dto.Files;
 using MareSynchronos.API.Dto.User;
-using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.Managers;
 
 namespace MareSynchronos.WebAPI;
@@ -101,10 +97,6 @@ public partial class ApiController : IDisposable, IMareHubClient
     public List<FileTransfer> CurrentUploads { get; } = new();
 
     public List<FileTransfer> ForbiddenTransfers { get; } = new();
-
-    public List<BannedUserDto> AdminBannedUsers { get; private set; } = new();
-
-    public List<ForbiddenFileDto> AdminForbiddenFiles { get; private set; } = new();
 
     public bool IsConnected => ServerState == ServerState.Connected;
 
@@ -293,7 +285,6 @@ public partial class ApiController : IDisposable, IMareHubClient
 
         Logger.Debug("Initializing data");
         OnDownloadReady((guid) => Client_DownloadReady(guid));
-        OnAdminForcedReconnect(() => Client_AdminForcedReconnect());
 
         OnUserSendOffline((dto) => Client_UserSendOffline(dto));
         OnUserAddClientPair((dto) => Client_UserAddClientPair(dto));
@@ -335,16 +326,6 @@ public partial class ApiController : IDisposable, IMareHubClient
         foreach (var entry in await UserGetOnlinePairs().ConfigureAwait(false))
         {
             _pairManager.MarkPairOnline(entry, this);
-        }
-
-        if (IsModerator)
-        {
-            AdminForbiddenFiles = await AdminGetForbiddenFiles().ConfigureAwait(false);
-            AdminBannedUsers = await AdminGetBannedUsers().ConfigureAwait(false);
-            OnAdminUpdateOrAddBannedUser((dto) => Client_AdminUpdateOrAddBannedUser(dto));
-            OnAdminDeleteBannedUser((dto) => Client_AdminDeleteBannedUser(dto));
-            OnAdminUpdateOrAddForbiddenFile(dto => Client_AdminUpdateOrAddForbiddenFile(dto));
-            OnAdminDeleteForbiddenFile(dto => Client_AdminDeleteForbiddenFile(dto));
         }
 
         _healthCheckTokenSource?.Cancel();
