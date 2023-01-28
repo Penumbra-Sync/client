@@ -215,9 +215,9 @@ public class TransientResourceManager : IDisposable
 
             try
             {
-                var fileReplacement = createFileReplacement(gamePath.ToLowerInvariant(), true);
+                var fileReplacement = createFileReplacement(gamePath.ToLowerInvariant(), arg2: true);
                 if (!fileReplacement.HasFileReplacement)
-                    fileReplacement = createFileReplacement(gamePath.ToLowerInvariant(), false);
+                    fileReplacement = createFileReplacement(gamePath.ToLowerInvariant(), arg2: false);
                 if (fileReplacement.HasFileReplacement)
                 {
                     Logger.Debug("Persisting " + gamePath.ToLowerInvariant());

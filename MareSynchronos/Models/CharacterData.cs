@@ -73,7 +73,7 @@ public class CharacterData
             GlamourerData = GlamourerString.ToDictionary(d => d.Key, d => d.Value),
             ManipulationData = ManipulationString,
             HeelsOffset = HeelsOffset,
-            CustomizePlusData = CustomizePlusScale
+            CustomizePlusData = CustomizePlusScale,
         };
     }
 

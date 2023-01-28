@@ -73,7 +73,7 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     private void DalamudUtilOnLogIn()
     {
-        Task.Run(() => CreateConnections(true));
+        Task.Run(() => CreateConnections(forceGetToken: true));
     }
 
     public event VoidDelegate? Connected;
@@ -164,7 +164,7 @@ public partial class ApiController : IDisposable, IMareHubClient
                     var result = await httpClient.PostAsync(postUri, new FormUrlEncodedContent(new[]
                     {
                         new KeyValuePair<string, string>("auth", auth),
-                        new KeyValuePair<string, string>("charaIdent", _dalamudUtil.PlayerNameHashed)
+                        new KeyValuePair<string, string>("charaIdent", _dalamudUtil.PlayerNameHashed),
                     })).ConfigureAwait(false);
                     AuthFailureMessage = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
                     result.EnsureSuccessStatusCode();

@@ -24,7 +24,7 @@ internal class IntroUi : Window, IDisposable
 
     public event VoidDelegate? SwitchToMainUi;
 
-    private string[] _tosParagraphs;
+    private string[]? _tosParagraphs;
 
     private Task? _timeoutTask;
     private string _timeoutLabel = string.Empty;
@@ -53,7 +53,7 @@ internal class IntroUi : Window, IDisposable
         SizeConstraints = new WindowSizeConstraints()
         {
             MinimumSize = new Vector2(600, 400),
-            MaximumSize = new Vector2(600, 2000)
+            MaximumSize = new Vector2(600, 2000),
         };
 
         GetToSLocalization();
@@ -176,7 +176,7 @@ internal class IntroUi : Window, IDisposable
             {
                 if (ImGui.Button("Start Scan##startScan"))
                 {
-                    _fileCacheManager.InvokeScan(true);
+                    _fileCacheManager.InvokeScan(forced: true);
                 }
             }
             else
@@ -228,11 +228,11 @@ internal class IntroUi : Window, IDisposable
                     _serverConfigurationManager.CurrentServer.SecretKeys.Add(_serverConfigurationManager.CurrentServer.SecretKeys.Select(k => k.Key).FirstOrDefault(), new SecretKey()
                     {
                         FriendlyName = $"Secret Key added on Setup ({DateTime.Now:yyyy-MM-dd})",
-                        Key = _secretKey
+                        Key = _secretKey,
                     });
                     _serverConfigurationManager.AddCurrentCharacterToServer(addFirstSecretKey: true);
                     _secretKey = string.Empty;
-                    Task.Run(() => _uiShared.ApiController.CreateConnections(true));
+                    Task.Run(() => _uiShared.ApiController.CreateConnections(forceGetToken: true));
                 }
             }
         }

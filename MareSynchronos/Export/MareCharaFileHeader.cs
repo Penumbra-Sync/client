@@ -34,7 +34,7 @@ public record MareCharaFileHeader(byte Version, MareCharaFileData CharaFileData)
 
             decoded = new(version, MareCharaFileData.FromByteArray(reader.ReadBytes(dataLength)))
             {
-                FilePath = path
+                FilePath = path,
             };
         }
 

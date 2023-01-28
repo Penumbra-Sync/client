@@ -186,7 +186,7 @@ namespace MareSynchronos.UI.Components
             foreach (var pairToPause in availablePairs.Where(pair => !pair.UserPair!.OwnPermissions.IsPaused()))
             {
                 var perm = pairToPause.UserPair!.OwnPermissions;
-                perm.SetPaused(true);
+                perm.SetPaused(paused: true);
                 _ = _apiController.UserSetPairPermissions(new(pairToPause.UserData, perm));
             }
         }
@@ -196,7 +196,7 @@ namespace MareSynchronos.UI.Components
             foreach (var pairToPause in availablePairs)
             {
                 var perm = pairToPause.UserPair!.OwnPermissions;
-                perm.SetPaused(false);
+                perm.SetPaused(paused: false);
                 _ = _apiController.UserSetPairPermissions(new(pairToPause.UserData, perm));
             }
         }

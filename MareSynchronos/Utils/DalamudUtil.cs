@@ -28,7 +28,7 @@ public class DalamudUtil : IDisposable
     public event VoidDelegate? LogOut;
     public event VoidDelegate? FrameworkUpdate;
     public event VoidDelegate? ClassJobChanged;
-    private uint? classJobId = 0;
+    private uint? _classJobId = 0;
     public event VoidDelegate? DelayedFrameworkUpdate;
     public event VoidDelegate? ZoneSwitchStart;
     public event VoidDelegate? ZoneSwitchEnd;
@@ -64,8 +64,8 @@ public class DalamudUtil : IDisposable
         _framework.Update += FrameworkOnUpdate;
         if (IsLoggedIn)
         {
-            classJobId = _clientState.LocalPlayer!.ClassJob.Id;
-            ClientStateOnLogin(null, EventArgs.Empty);
+            _classJobId = _clientState.LocalPlayer!.ClassJob.Id;
+            ClientStateOnLogin(sender: null, EventArgs.Empty);
         }
         WorldData = new(() =>
         {
@@ -123,7 +123,8 @@ public class DalamudUtil : IDisposable
 
             return;
         }
-        else if (_sentBetweenAreas)
+
+        if (_sentBetweenAreas)
         {
             Logger.Debug("Zone switch/Gpose end");
             _sentBetweenAreas = false;
@@ -164,9 +165,9 @@ public class DalamudUtil : IDisposable
         {
             var newclassJobId = _clientState.LocalPlayer.ClassJob.Id;
 
-            if (classJobId != newclassJobId)
+            if (_classJobId != newclassJobId)
             {
-                classJobId = newclassJobId;
+                _classJobId = newclassJobId;
                 ClassJobChanged?.Invoke();
             }
         }
@@ -209,7 +210,7 @@ public class DalamudUtil : IDisposable
 
     public bool IsPlayerPresent => _clientState.LocalPlayer != null && _clientState.LocalPlayer.IsValid();
 
-    public bool IsObjectPresent(Dalamud.Game.ClientState.Objects.Types.GameObject? obj)
+    public static bool IsObjectPresent(Dalamud.Game.ClientState.Objects.Types.GameObject? obj)
     {
         return obj != null && obj.IsValid();
     }
@@ -222,15 +223,15 @@ public class DalamudUtil : IDisposable
     public unsafe IntPtr GetPet(IntPtr? playerPointer = null)
     {
         var mgr = CharacterManager.Instance();
-        if (playerPointer == null) playerPointer = PlayerPointer;
-        return (IntPtr)mgr->LookupPetByOwnerObject((FFXIVClientStructs.FFXIV.Client.Game.Character.BattleChara*)playerPointer);
+        playerPointer ??= PlayerPointer;
+        return (IntPtr)mgr->LookupPetByOwnerObject((BattleChara*)playerPointer);
     }
 
     public unsafe IntPtr GetCompanion(IntPtr? playerPointer = null)
     {
         var mgr = CharacterManager.Instance();
-        if (playerPointer == null) playerPointer = PlayerPointer;
-        return (IntPtr)mgr->LookupBuddyByOwnerObject((FFXIVClientStructs.FFXIV.Client.Game.Character.BattleChara*)playerPointer);
+        playerPointer ??= PlayerPointer;
+        return (IntPtr)mgr->LookupBuddyByOwnerObject((BattleChara*)playerPointer);
     }
 
     public string PlayerName => _clientState.LocalPlayer?.Name.ToString() ?? "--";
@@ -246,7 +247,7 @@ public class DalamudUtil : IDisposable
     {
         return _objectTable.Where(obj =>
             obj.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player &&
-            !string.Equals(obj.Name.ToString(), PlayerName, StringComparison.Ordinal)).Select(p => (PlayerCharacter)p).ToList();
+            !string.Equals(obj.Name.ToString(), PlayerName, StringComparison.Ordinal)).Cast<PlayerCharacter>().ToList();
     }
 
     public Dalamud.Game.ClientState.Objects.Types.Character? GetCharacterFromObjectTableByIndex(int index)

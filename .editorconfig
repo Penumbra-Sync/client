@@ -243,6 +243,7 @@ dotnet_diagnostic.MA0016.severity = suggestion
 dotnet_diagnostic.MA0026.severity = warning
 dotnet_diagnostic.MA0046.severity = suggestion
 dotnet_diagnostic.MA0051.severity = suggestion
+dotnet_diagnostic.MA0011.severity = suggestion
 
 [*.{cs,vb}]
 dotnet_style_operator_placement_when_wrapping = beginning_of_line

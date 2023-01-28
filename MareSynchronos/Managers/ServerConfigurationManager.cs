@@ -72,7 +72,7 @@ public class ServerConfigurationManager
             {
                 CharacterName = charaName,
                 WorldId = worldId,
-                SecretKeyIdx = currentServer.SecretKeys.Last().Key
+                SecretKeyIdx = currentServer.SecretKeys.Last().Key,
             });
 
             Save();
@@ -120,7 +120,7 @@ public class ServerConfigurationManager
         {
             CharacterName = _dalamudUtil.PlayerName,
             WorldId = _dalamudUtil.WorldId,
-            SecretKeyIdx = addFirstSecretKey ? server.SecretKeys.First().Key : -1
+            SecretKeyIdx = addFirstSecretKey ? server.SecretKeys.First().Key : -1,
         });
         _configService.Save();
     }

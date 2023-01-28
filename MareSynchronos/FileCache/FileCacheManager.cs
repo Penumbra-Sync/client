@@ -29,7 +29,7 @@ public class FileCacheManager : IDisposable
         {
             if (File.Exists(CsvBakPath))
             {
-                File.Move(CsvBakPath, _csvPath, true);
+                File.Move(CsvBakPath, _csvPath, overwrite: true);
             }
         }
 
@@ -63,7 +63,7 @@ public class FileCacheManager : IDisposable
         }
         if (File.Exists(_csvPath))
         {
-            File.Copy(_csvPath, CsvBakPath, true);
+            File.Copy(_csvPath, CsvBakPath, overwrite: true);
         }
         lock (_fileWriteLock)
         {
@@ -147,10 +147,7 @@ public class FileCacheManager : IDisposable
 
     private FileCacheEntity? CreateFileCacheEntity(FileInfo fileInfo, string prefixedPath, string? hash = null)
     {
-        if (hash == null)
-        {
-            hash = Crypto.GetFileHash(fileInfo.FullName);
-        }
+        hash ??= Crypto.GetFileHash(fileInfo.FullName);
         var entity = new FileCacheEntity(hash, prefixedPath, fileInfo.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture));
         entity = ReplacePathPrefixes(entity);
         _fileCaches[prefixedPath] = entity;

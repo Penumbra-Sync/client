@@ -81,7 +81,7 @@ public class FileReplacement
         {
             GamePaths = GamePaths.ToArray(),
             Hash = Hash,
-            FileSwapPath = IsFileSwap ? ResolvedPath : string.Empty
+            FileSwapPath = IsFileSwap ? ResolvedPath : string.Empty,
         };
     }
 

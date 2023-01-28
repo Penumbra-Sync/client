@@ -57,7 +57,7 @@ public sealed class Plugin : IDalamudPlugin
         _commandManager = commandManager;
         _configurationService = new(_pluginInterface);
 
-        _localization = new Dalamud.Localization("MareSynchronos.Localization.", "", true);
+        _localization = new Dalamud.Localization("MareSynchronos.Localization.", "", useEmbedded: true);
         _localization.SetupWithLangCode("en");
 
         _windowSystem = new WindowSystem("MareSynchronos");
@@ -150,7 +150,7 @@ public sealed class Plugin : IDalamudPlugin
         _pluginInterface.UiBuilder.OpenConfigUi += OpenUi;
         _commandManager.AddHandler(_commandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Opens the Mare Synchronos UI"
+            HelpMessage = "Opens the Mare Synchronos UI",
         });
 
         if (!_configurationService.Current.HasValidSetup())

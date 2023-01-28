@@ -42,7 +42,7 @@ public class PairManager : IDisposable
     public Dictionary<GroupFullInfoDto, List<Pair>> GroupPairs => _groupPairsInternal.Value;
     public List<Pair> DirectPairs => _directPairsInternal.Value;
 
-    private Lazy<List<Pair>> DirectPairsLazy() => new Lazy<List<Pair>>(() => _allClientPairs.Select(k => k.Value).Where(k => k.UserPair != null).ToList());
+    private Lazy<List<Pair>> DirectPairsLazy() => new(() => _allClientPairs.Select(k => k.Value).Where(k => k.UserPair != null).ToList());
     private Lazy<Dictionary<GroupFullInfoDto, List<Pair>>> GroupPairsLazy()
     {
         return new Lazy<Dictionary<GroupFullInfoDto, List<Pair>>>(() =>

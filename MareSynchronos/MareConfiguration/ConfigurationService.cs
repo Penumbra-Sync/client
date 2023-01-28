@@ -22,7 +22,7 @@ public class ConfigurationService : IDisposable
         if (pluginInterface.GetPluginConfig() is Configuration oldConfig)
         {
             Current = oldConfig.ToMareConfig();
-            File.Move(pluginInterface.ConfigFile.FullName, pluginInterface.ConfigFile.FullName + ".old", true);
+            File.Move(pluginInterface.ConfigFile.FullName, pluginInterface.ConfigFile.FullName + ".old", overwrite: true);
         }
         else
         {

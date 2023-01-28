@@ -256,7 +256,7 @@ public partial class ApiController
         await Parallel.ForEachAsync(downloadGroups, new ParallelOptions()
         {
             MaxDegreeOfParallelism = downloadGroups.Count(),
-            CancellationToken = ct
+            CancellationToken = ct,
         },
         async (fileGroup, token) =>
         {
@@ -362,7 +362,7 @@ public partial class ApiController
                 {
                     CurrentUploads.Add(new UploadFileTransfer(file)
                     {
-                        Total = new FileInfo(_fileDbManager.GetFileCacheByHash(file.Hash)!.ResolvedFilepath).Length
+                        Total = new FileInfo(_fileDbManager.GetFileCacheByHash(file.Hash)!.ResolvedFilepath).Length,
                     });
                 }
                 catch (Exception ex)
@@ -378,7 +378,7 @@ public partial class ApiController
                 {
                     ForbiddenTransfers.Add(new UploadFileTransfer(file)
                     {
-                        LocalFile = _fileDbManager.GetFileCacheByHash(file.Hash)?.ResolvedFilepath ?? string.Empty
+                        LocalFile = _fileDbManager.GetFileCacheByHash(file.Hash)?.ResolvedFilepath ?? string.Empty,
                     });
                 }
             }

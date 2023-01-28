@@ -6,7 +6,7 @@ using MareSynchronos.WebAPI;
 namespace MareSynchronos.MareConfiguration;
 
 [Serializable]
-[Obsolete]
+[Obsolete("Migrated to MareConfig")]
 public class Configuration : IPluginConfiguration
 {
     public int Version { get; set; } = 6;
@@ -14,7 +14,7 @@ public class Configuration : IPluginConfiguration
     private DalamudPluginInterface? _pluginInterface;
     public Dictionary<string, ServerStorage> ServerStorage { get; set; } = new(StringComparer.OrdinalIgnoreCase)
     {
-        { ApiController.MainServiceUri, new ServerStorage() { ServerName = ApiController.MainServer, ServerUri = ApiController.MainServiceUri } }
+        { ApiController.MainServiceUri, new ServerStorage() { ServerName = ApiController.MainServer, ServerUri = ApiController.MainServiceUri } },
     };
     public bool AcceptedAgreement { get; set; } = false;
     public string CacheFolder { get; set; } = string.Empty;
@@ -31,21 +31,15 @@ public class Configuration : IPluginConfiguration
     public bool OpenPopupOnAdd { get; set; } = true;
     public string CurrentServer { get; set; } = string.Empty;
 
-    [Obsolete]
     private string _apiUri = string.Empty;
-    [Obsolete]
     public string ApiUri
     {
         get => string.IsNullOrEmpty(_apiUri) ? ApiController.MainServiceUri : _apiUri;
         set => _apiUri = value;
     }
-    [Obsolete]
     public Dictionary<string, string> ClientSecret { get; set; } = new(StringComparer.Ordinal);
-    [Obsolete]
     public Dictionary<string, string> CustomServerList { get; set; } = new(StringComparer.Ordinal);
-    [Obsolete]
     public Dictionary<string, Dictionary<string, string>> UidServerComments { get; set; } = new(StringComparer.Ordinal);
-    [Obsolete]
     public Dictionary<string, Dictionary<string, string>> GidServerComments { get; set; } = new(StringComparer.Ordinal);
     /// <summary>
     /// Each paired user can have multiple tags. Each tag will create a category, and the user will
@@ -53,14 +47,11 @@ public class Configuration : IPluginConfiguration
     /// The dictionary first maps a server URL to a dictionary, and that
     /// dictionary maps the OtherUID of the <see cref="ClientPairDto"/> to a list of tags.
     /// </summary>
-    [Obsolete]
     public Dictionary<string, Dictionary<string, List<string>>> UidServerPairedUserTags = new(StringComparer.Ordinal);
     /// <summary>
     /// A dictionary that maps a server URL to the tags the user has added for that server.
     /// </summary>
-    [Obsolete]
     public Dictionary<string, HashSet<string>> ServerAvailablePairTags = new(StringComparer.Ordinal);
-    [Obsolete]
     public HashSet<string> OpenPairTags = new(StringComparer.Ordinal);
 
 
@@ -123,7 +114,7 @@ public class Configuration : IPluginConfiguration
             toAdd.SecretKeys[0] = new SecretKey()
             {
                 FriendlyName = "Auto Migrated Secret Key (" + DateTime.Now.ToString("yyyy-MM-dd") + ")",
-                Key = secretkey
+                Key = secretkey,
             };
 
             if (GidServerComments.TryGetValue(apiuri, out var gids))
@@ -151,7 +142,6 @@ public class Configuration : IPluginConfiguration
         return newConfig;
     }
 
-    [Obsolete]
     public void Migrate()
     {
 

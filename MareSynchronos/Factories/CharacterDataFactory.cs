@@ -226,7 +226,7 @@ public class CharacterDataFactory
             }
         }
 
-        var shpkFileReplacement = CreateFileReplacement(shpkPath, true);
+        var shpkFileReplacement = CreateFileReplacement(shpkPath, doNotReverseResolve: true);
         DebugPrint(shpkFileReplacement, objectKind, "Shader", inheritanceLevel);
         cache.AddFileReplacement(objectKind, shpkFileReplacement);
     }
@@ -279,7 +279,7 @@ public class CharacterDataFactory
             }
 
             var chara = _dalamudUtil.CreateGameObject(charaPointer)!;
-            while (!_dalamudUtil.IsObjectPresent(chara))
+            while (!DalamudUtil.IsObjectPresent(chara))
             {
                 Logger.Verbose("Character is null but it shouldn't be, waiting");
                 Thread.Sleep(50);
@@ -391,7 +391,7 @@ public class CharacterDataFactory
             foreach (var item in _transientResourceManager.GetTransientResources((IntPtr)weaponObject))
             {
                 Logger.Verbose("Found transient weapon resource: " + item);
-                AddReplacement(item, objectKind, previousData, 1, true);
+                AddReplacement(item, objectKind, previousData, 1, doNotReverseResolve: true);
             }
 
             if (weaponObject->NextSibling != (IntPtr)weaponObject)
@@ -408,7 +408,7 @@ public class CharacterDataFactory
                 foreach (var item in _transientResourceManager.GetTransientResources((IntPtr)offHandWeapon))
                 {
                     Logger.Verbose("Found transient offhand weapon resource: " + item);
-                    AddReplacement(item, objectKind, previousData, 1, true);
+                    AddReplacement(item, objectKind, previousData, 1, doNotReverseResolve: true);
                 }
             }
         }
@@ -416,7 +416,7 @@ public class CharacterDataFactory
         AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId, objectKind, previousData);
         try
         {
-            AddReplacementsFromTexture(new ByteString(((HumanExt*)human)->Decal->FileName()).ToString(), objectKind, previousData, 0, false);
+            AddReplacementsFromTexture(new ByteString(((HumanExt*)human)->Decal->FileName()).ToString(), objectKind, previousData, 0, doNotReverseResolve: false);
         }
         catch
         {
@@ -424,7 +424,7 @@ public class CharacterDataFactory
         }
         try
         {
-            AddReplacementsFromTexture(new ByteString(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), objectKind, previousData, 0, false);
+            AddReplacementsFromTexture(new ByteString(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), objectKind, previousData, 0, doNotReverseResolve: false);
         }
         catch
         {
@@ -443,7 +443,7 @@ public class CharacterDataFactory
 
         string skeletonPath = $"chara/human/c{raceSexIdString}/skeleton/base/b0001/skl_c{raceSexIdString}b0001.sklb";
 
-        var replacement = CreateFileReplacement(skeletonPath, true);
+        var replacement = CreateFileReplacement(skeletonPath, doNotReverseResolve: true);
         cache.AddFileReplacement(objectKind, replacement);
 
         DebugPrint(replacement, objectKind, "SKLB", 0);

@@ -25,12 +25,12 @@ public class PlayerManager : IDisposable
     public event CharacterDataDelegate? PlayerHasChanged;
     public API.Data.CharacterData? LastCreatedCharacterData { get; private set; }
     public Models.CharacterData PermanentDataCache { get; private set; } = new();
-    private readonly Dictionary<ObjectKind, Func<bool>> objectKindsToUpdate = new();
+    private readonly Dictionary<ObjectKind, Func<bool>> _objectKindsToUpdate = new();
 
     private CancellationTokenSource? _playerChangedCts = new();
     private CancellationTokenSource _transientUpdateCts = new();
 
-    private List<PlayerRelatedObject> playerRelatedObjects = new();
+    private readonly List<PlayerRelatedObject> _playerRelatedObjects = new();
 
     public unsafe PlayerManager(ApiController apiController, IpcManager ipcManager,
         CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil, TransientResourceManager transientResourceManager,
@@ -60,7 +60,7 @@ public class PlayerManager : IDisposable
             ApiControllerOnConnected();
         }
 
-        playerRelatedObjects = new List<PlayerRelatedObject>()
+        _playerRelatedObjects = new List<PlayerRelatedObject>()
         {
             new PlayerRelatedObject(ObjectKind.Player, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.PlayerPointer),
             new PlayerRelatedObject(ObjectKind.MinionOrMount, IntPtr.Zero, IntPtr.Zero, () => (IntPtr)((Character*)_dalamudUtil.PlayerPointer)->CompanionObject),
@@ -71,12 +71,12 @@ public class PlayerManager : IDisposable
 
     private void DalamudUtilOnFrameworkUpdate()
     {
-        _transientResourceManager.PlayerRelatedPointers = playerRelatedObjects.Select(f => f.CurrentAddress).ToArray();
+        _transientResourceManager.PlayerRelatedPointers = _playerRelatedObjects.Select(f => f.CurrentAddress).ToArray();
     }
 
     public void HandleTransientResourceLoad(IntPtr gameObj, int idx)
     {
-        foreach (var obj in playerRelatedObjects)
+        foreach (var obj in _playerRelatedObjects)
         {
             if (obj.Address == gameObj && !obj.HasUnprocessedUpdate)
             {
@@ -99,7 +99,7 @@ public class PlayerManager : IDisposable
 
     private void HeelsOffsetChanged(float change)
     {
-        var player = playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player);
+        var player = _playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player);
         if (LastCreatedCharacterData != null && LastCreatedCharacterData.HeelsOffset != change && !player.IsProcessing)
         {
             Logger.Debug("Heels offset changed to " + change);
@@ -110,7 +110,7 @@ public class PlayerManager : IDisposable
     private void CustomizePlusChanged(string? change)
     {
         change ??= string.Empty;
-        var player = playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player);
+        var player = _playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player);
         if (LastCreatedCharacterData != null && !string.Equals(LastCreatedCharacterData.CustomizePlusData, change, StringComparison.Ordinal) && !player.IsProcessing)
         {
             Logger.Debug("CustomizePlus data changed to " + change);
@@ -140,8 +140,8 @@ public class PlayerManager : IDisposable
     {
         if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized) return;
 
-        playerRelatedObjects.ForEach(k => k.CheckAndUpdateObject());
-        if (playerRelatedObjects.Any(c => (c.HasUnprocessedUpdate || c.HasTransientsUpdate) && !c.IsProcessing))
+        _playerRelatedObjects.ForEach(k => k.CheckAndUpdateObject());
+        if (_playerRelatedObjects.Any(c => (c.HasUnprocessedUpdate || c.HasTransientsUpdate) && !c.IsProcessing))
         {
             OnPlayerOrAttachedObjectsChanged();
         }
@@ -163,7 +163,7 @@ public class PlayerManager : IDisposable
 
     private async Task<API.Data.CharacterData?> CreateFullCharacterCacheDto(CancellationToken token)
     {
-        foreach (var unprocessedObject in playerRelatedObjects.Where(c => c.HasUnprocessedUpdate || c.HasTransientsUpdate).ToList())
+        foreach (var unprocessedObject in _playerRelatedObjects.Where(c => c.HasUnprocessedUpdate || c.HasTransientsUpdate).ToList())
         {
             Logger.Verbose("Building Cache for " + unprocessedObject.ObjectKind);
             PermanentDataCache = _characterDataFactory.BuildCharacterData(PermanentDataCache, unprocessedObject, token);
@@ -197,7 +197,7 @@ public class PlayerManager : IDisposable
     {
         Logger.Verbose("RedrawEvent for addr " + address);
 
-        foreach (var item in playerRelatedObjects)
+        foreach (var item in _playerRelatedObjects)
         {
             if (address == item.Address)
             {
@@ -206,7 +206,7 @@ public class PlayerManager : IDisposable
             }
         }
 
-        if (playerRelatedObjects.Any(c => (c.HasUnprocessedUpdate || c.HasTransientsUpdate) && (!c.IsProcessing || (c.IsProcessing && c.DoNotSendUpdate))))
+        if (_playerRelatedObjects.Any(c => (c.HasUnprocessedUpdate || c.HasTransientsUpdate) && (!c.IsProcessing || (c.IsProcessing && c.DoNotSendUpdate))))
         {
             OnPlayerOrAttachedObjectsChanged();
         }
@@ -214,7 +214,7 @@ public class PlayerManager : IDisposable
 
     private void OnPlayerOrAttachedObjectsChanged()
     {
-        var unprocessedObjects = playerRelatedObjects.Where(c => c.HasUnprocessedUpdate || c.HasTransientsUpdate).ToList();
+        var unprocessedObjects = _playerRelatedObjects.Where(c => c.HasUnprocessedUpdate || c.HasTransientsUpdate).ToList();
         foreach (var unprocessedObject in unprocessedObjects)
         {
             unprocessedObject.IsProcessing = true;
@@ -277,10 +277,8 @@ public class PlayerManager : IDisposable
                 Logger.Debug("Not sending data, already sent");
                 return;
             }
-            else
-            {
-                LastCreatedCharacterData = cacheDto;
-            }
+
+            LastCreatedCharacterData = cacheDto;
 
             if (_apiController.IsConnected && !token.IsCancellationRequested && !doNotSendUpdate)
             {

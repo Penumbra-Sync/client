@@ -49,38 +49,39 @@ public class MareCharaFileManager
         finally { CurrentlyWorking = false; }
     }
 
-    public Task ApplyMareCharaFile(GameObject? charaTarget)
+    public async Task ApplyMareCharaFile(GameObject? charaTarget)
     {
         Dictionary<string, string> extractedFiles = new(StringComparer.Ordinal);
         CurrentlyWorking = true;
         try
         {
-            if (LoadedCharaFile == null || charaTarget == null || !File.Exists(LoadedCharaFile.FilePath)) return Task.CompletedTask;
-
-            using var unwrapped = File.OpenRead(LoadedCharaFile.FilePath);
-            using var lz4Stream = new LZ4Stream(unwrapped, LZ4StreamMode.Decompress, LZ4StreamFlags.HighCompression);
-            using var reader = new BinaryReader(lz4Stream);
-            LoadedCharaFile.AdvanceReaderToData(reader);
-            Logger.Debug("Applying to " + charaTarget.Name.TextValue);
-            extractedFiles = ExtractFilesFromCharaFile(LoadedCharaFile, reader);
-            Dictionary<string, string> fileSwaps = new(StringComparer.Ordinal);
-            foreach (var fileSwap in LoadedCharaFile.CharaFileData.FileSwaps)
+            if (LoadedCharaFile == null || charaTarget == null || !File.Exists(LoadedCharaFile.FilePath)) return;
+            var unwrapped = File.OpenRead(LoadedCharaFile.FilePath);
+            await using (unwrapped.ConfigureAwait(false))
             {
-                foreach (var path in fileSwap.GamePaths)
+                using var lz4Stream = new LZ4Stream(unwrapped, LZ4StreamMode.Decompress, LZ4StreamFlags.HighCompression);
+                using var reader = new BinaryReader(lz4Stream);
+                LoadedCharaFile.AdvanceReaderToData(reader);
+                Logger.Debug("Applying to " + charaTarget.Name.TextValue);
+                extractedFiles = ExtractFilesFromCharaFile(LoadedCharaFile, reader);
+                Dictionary<string, string> fileSwaps = new(StringComparer.Ordinal);
+                foreach (var fileSwap in LoadedCharaFile.CharaFileData.FileSwaps)
                 {
-                    fileSwaps.Add(path, fileSwap.FileSwapPath);
+                    foreach (var path in fileSwap.GamePaths)
+                    {
+                        fileSwaps.Add(path, fileSwap.FileSwapPath);
+                    }
                 }
+                _ipcManager.ToggleGposeQueueMode(on: true);
+                _ipcManager.PenumbraRemoveTemporaryCollection(charaTarget.Name.TextValue);
+                _ipcManager.PenumbraSetTemporaryMods(charaTarget.Name.TextValue,
+                    extractedFiles.Union(fileSwaps).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal),
+                    LoadedCharaFile.CharaFileData.ManipulationData);
+                _ipcManager.GlamourerApplyAll(LoadedCharaFile.CharaFileData.GlamourerData, charaTarget.Address);
+                _dalamudUtil.WaitWhileGposeCharacterIsDrawing(charaTarget.Address);
+                _ipcManager.PenumbraRemoveTemporaryCollection(charaTarget.Name.TextValue);
+                _ipcManager.ToggleGposeQueueMode(on: false);
             }
-            _ipcManager.ToggleGposeQueueMode(true);
-            _ipcManager.PenumbraRemoveTemporaryCollection(charaTarget.Name.TextValue);
-            _ipcManager.PenumbraSetTemporaryMods(charaTarget.Name.TextValue,
-                extractedFiles.Union(fileSwaps).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal),
-                LoadedCharaFile.CharaFileData.ManipulationData);
-            _ipcManager.GlamourerApplyAll(LoadedCharaFile.CharaFileData.GlamourerData, charaTarget.Address);
-            _dalamudUtil.WaitWhileGposeCharacterIsDrawing(charaTarget.Address);
-            _ipcManager.PenumbraRemoveTemporaryCollection(charaTarget.Name.TextValue);
-            _ipcManager.ToggleGposeQueueMode(false);
-            return Task.CompletedTask;
         }
         catch { throw; }
         finally
@@ -145,7 +146,7 @@ public class MareCharaFileManager
             {
                 foreach (var file in replacement.Select(item => _manager.GetFileCacheByHash(item.Hash)).Where(file => file != null))
                 {
-                    var length = new FileInfo(file.ResolvedFilepath).Length;
+                    var length = new FileInfo(file!.ResolvedFilepath).Length;
                     using var fsRead = File.OpenRead(file.ResolvedFilepath);
                     using var br = new BinaryReader(fsRead);
                     int readBytes = 0;

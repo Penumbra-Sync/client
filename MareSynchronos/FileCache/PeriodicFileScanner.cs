@@ -67,7 +67,7 @@ public class PeriodicFileScanner : IDisposable
         if (_fileScanWasRunning && haltScanLocks.All(f => f.Value == 0))
         {
             _fileScanWasRunning = false;
-            InvokeScan(true);
+            InvokeScan(forced: true);
         }
     }
 
@@ -208,7 +208,7 @@ public class PeriodicFileScanner : IDisposable
                             .Concat(Directory.EnumerateFiles(_configService.Current.CacheFolder, "*.*", SearchOption.TopDirectoryOnly)
                                 .Where(f => new FileInfo(f).Name.Length == 40)
                                 .Select(s => s.ToLowerInvariant()).ToList())
-                            .Select(c => new KeyValuePair<string, bool>(c, false)), StringComparer.OrdinalIgnoreCase);
+                            .Select(c => new KeyValuePair<string, bool>(c, value: false)), StringComparer.OrdinalIgnoreCase);
 
         TotalFiles = scannedFiles.Count;
 
@@ -332,6 +332,6 @@ public class PeriodicFileScanner : IDisposable
     {
         if (!_ipcManager.Initialized || !_configService.Current.HasValidSetup()) return;
         Logger.Verbose("Penumbra is active, configuration is valid, scan");
-        InvokeScan(true);
+        InvokeScan(forced: true);
     }
 }

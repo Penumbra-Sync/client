@@ -370,7 +370,7 @@ public class SettingsUi : Window, IDisposable
                 {
                     selectedServer.SecretKeys.Add(selectedServer.SecretKeys.Last().Key + 1, new SecretKey()
                     {
-                        FriendlyName = "New Secret Key"
+                        FriendlyName = "New Secret Key",
                     });
                     _serverConfigurationManager.Save();
                 }
@@ -423,7 +423,7 @@ public class SettingsUi : Window, IDisposable
         UiShared.FontText("Notes", _uiShared.UidFont);
         if (UiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Export all your user notes to clipboard"))
         {
-            ImGui.SetClipboardText(_uiShared.GetNotes(_pairManager.DirectPairs.UnionBy(_pairManager.GroupPairs.SelectMany(p => p.Value), p => p.UserData, UserDataComparer.Instance).ToList()));
+            ImGui.SetClipboardText(UiShared.GetNotes(_pairManager.DirectPairs.UnionBy(_pairManager.GroupPairs.SelectMany(p => p.Value), p => p.UserData, UserDataComparer.Instance).ToList()));
         }
         if (UiShared.IconTextButton(FontAwesomeIcon.FileImport, "Import notes from clipboard"))
         {

@@ -182,7 +182,7 @@ namespace MareSynchronos.UI
             var ySize = _mainUi.TransferPartHeight == 0
                 ? 1
                 : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - _mainUi.TransferPartHeight - ImGui.GetCursorPosY();
-            ImGui.BeginChild("list", new Vector2(_mainUi.WindowContentWidth, ySize), false);
+            ImGui.BeginChild("list", new Vector2(_mainUi.WindowContentWidth, ySize), border: false);
             foreach (var entry in _pairManager.GroupPairs.OrderBy(g => g.Key.Group.AliasOrGID, StringComparer.OrdinalIgnoreCase).ToList())
             {
                 UiShared.DrawWithID(entry.Key.Group.GID, () => DrawSyncshell(entry.Key, entry.Value));
@@ -560,7 +560,7 @@ namespace MareSynchronos.UI
                 if (UiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Copy Notes"))
                 {
                     ImGui.CloseCurrentPopup();
-                    ImGui.SetClipboardText(_uiShared.GetNotes(groupPairs));
+                    ImGui.SetClipboardText(UiShared.GetNotes(groupPairs));
                 }
                 UiShared.AttachToolTip("Copies all your notes for all users in this Syncshell to the clipboard." + Environment.NewLine + "They can be imported via Settings -> Privacy -> Import Notes from Clipboard");
 

@@ -5,5 +5,5 @@ public enum FileState
 {
     Valid,
     RequireUpdate,
-    RequireDeletion
+    RequireDeletion,
 }

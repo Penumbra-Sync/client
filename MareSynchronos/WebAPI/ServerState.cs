@@ -10,5 +10,5 @@ public enum ServerState
     Unauthorized,
     VersionMisMatch,
     RateLimited,
-    NoSecretKey
+    NoSecretKey,
 }

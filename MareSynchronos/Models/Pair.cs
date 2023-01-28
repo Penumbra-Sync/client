@@ -63,7 +63,7 @@ public class Pair
         _pluginWarnings ??= new()
         {
             ShownCustomizePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
-            ShownHeelsWarning = _configService.Current.DisableOptionalPluginWarnings
+            ShownHeelsWarning = _configService.Current.DisableOptionalPluginWarnings,
         };
 
         CachedPlayer.Initialize(address, name, RemoveNotSyncedFiles(LastReceivedCharacterData), _pluginWarnings);
@@ -76,7 +76,7 @@ public class Pair
         _pluginWarnings ??= new()
         {
             ShownCustomizePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
-            ShownHeelsWarning = _configService.Current.DisableOptionalPluginWarnings
+            ShownHeelsWarning = _configService.Current.DisableOptionalPluginWarnings,
         };
 
         CachedPlayer.ApplyCharacterData(RemoveNotSyncedFiles(data.CharaData)!, _pluginWarnings);

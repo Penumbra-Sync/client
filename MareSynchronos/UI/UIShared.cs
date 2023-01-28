@@ -231,7 +231,7 @@ public partial class UiShared : IDisposable
             ImGui.SameLine();
             if (ImGui.Button("Force Rescan##forcedrescan"))
             {
-                _cacheScanner.InvokeScan(true);
+                _cacheScanner.InvokeScan(forced: true);
             }
         }
         else if (_cacheScanner.haltScanLocks.Any(f => f.Value > 0))
@@ -410,7 +410,7 @@ public partial class UiShared : IDisposable
                     _serverConfigurationManager.AddServer(new ServerStorage()
                     {
                         ServerName = _customServerName,
-                        ServerUri = _customServerUri
+                        ServerUri = _customServerUri,
                     });
                     _customServerName = string.Empty;
                     _customServerUri = string.Empty;
@@ -524,19 +524,17 @@ public partial class UiShared : IDisposable
     private bool _isDirectoryWritable = false;
     private bool _isPenumbraDirectory = false;
 
-    public bool IsDirectoryWritable(string dirPath, bool throwIfFails = false)
+    public static bool IsDirectoryWritable(string dirPath, bool throwIfFails = false)
     {
         try
         {
-            using (FileStream fs = File.Create(
+            using FileStream fs = File.Create(
                        Path.Combine(
                            dirPath,
                            Path.GetRandomFileName()
                        ),
                        1,
-                       FileOptions.DeleteOnClose)
-                  )
-            { }
+                       FileOptions.DeleteOnClose);
             return true;
         }
         catch
@@ -550,7 +548,7 @@ public partial class UiShared : IDisposable
 
     public void RecalculateFileCacheSize()
     {
-        _cacheScanner.InvokeScan(true);
+        _cacheScanner.InvokeScan(forced: true);
     }
 
     public void DrawTimeSpanBetweenScansSetting()
@@ -611,7 +609,7 @@ public partial class UiShared : IDisposable
     private const string _notesStart = "##MARE_SYNCHRONOS_USER_NOTES_START##";
     private const string _notesEnd = "##MARE_SYNCHRONOS_USER_NOTES_END##";
 
-    public string GetNotes(List<Pair> pairs)
+    public static string GetNotes(List<Pair> pairs)
     {
         StringBuilder sb = new();
         sb.AppendLine(_notesStart);

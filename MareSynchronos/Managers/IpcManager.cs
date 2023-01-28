@@ -144,7 +144,7 @@ public class IpcManager : IDisposable
     {
         Task.Run(() =>
         {
-            if (ptr != IntPtr.Zero && string.Compare(arg1, arg2, true, System.Globalization.CultureInfo.InvariantCulture) != 0)
+            if (ptr != IntPtr.Zero && string.Compare(arg1, arg2, ignoreCase: true, System.Globalization.CultureInfo.InvariantCulture) != 0)
             {
                 PenumbraResourceLoadEvent?.Invoke(ptr, arg1, arg2);
             }
@@ -469,7 +469,7 @@ public class IpcManager : IDisposable
             var collName = "Mare_" + characterName;
             var ret = _penumbraCreateNamedTemporaryCollection.Invoke(collName);
             Logger.Verbose("Creating Temp Collection " + collName + ", Success: " + ret);
-            var retAssign = _penumbraAssignTemporaryCollection.Invoke(collName, idx.Value, true);
+            var retAssign = _penumbraAssignTemporaryCollection.Invoke(collName, idx.Value, c: true);
             Logger.Verbose("Assigning Temp Collection " + collName + " to index " + idx.Value);
             foreach (var mod in modPaths)
             {
