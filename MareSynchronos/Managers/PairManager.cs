@@ -252,7 +252,8 @@ public class PairManager : IDisposable
 
     internal void SetGroupPairUserPermissions(GroupPairUserPermissionDto dto)
     {
-        _allGroups[dto.Group].GroupUserPermissions = dto.GroupPairPermissions;
+        var group = _allGroups[dto.Group];
+        _allClientPairs[dto.User].GroupPair[group].GroupUserPermissions = dto.GroupPairPermissions;
         RecreateLazy();
     }
 

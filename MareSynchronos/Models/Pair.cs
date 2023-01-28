@@ -82,11 +82,16 @@ public class Pair
 
     private API.Data.CharacterData? RemoveNotSyncedFiles(API.Data.CharacterData? data)
     {
-        if (data == null || UserPair != null) return data;
-
-        bool disableAnimations = GroupPair.All(u =>
+        Logger.Verbose("Removing not synced files");
+        if (data == null || (UserPair != null && UserPair.OtherPermissions.IsPaired()))
         {
-            return u.Value.GroupUserPermissions.IsDisableAnimations() || u.Key.GroupPermissions.IsDisableAnimations() || u.Key.GroupUserPermissions.IsDisableAnimations();
+            Logger.Verbose("Nothing to remove or user is paired directly");
+            return data;
+        }
+
+        bool disableAnimations = GroupPair.All(pair =>
+        {
+            return pair.Value.GroupUserPermissions.IsDisableAnimations() || pair.Key.GroupPermissions.IsDisableAnimations() || pair.Key.GroupUserPermissions.IsDisableAnimations();
         });
         bool disableSounds = GroupPair.All(pair =>
         {
