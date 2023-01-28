@@ -12,6 +12,7 @@ public class MareConfig : IPluginConfiguration
     {
         { ApiController.MainServiceUri, new ServerStorage() { ServerName = ApiController.MainServer, ServerUri = ApiController.MainServiceUri } }
     };
+    public Dictionary<string, HashSet<string>> PlayerPersistentTransientCache { get; set; } = new();
     public bool AcceptedAgreement { get; set; } = false;
     public string CacheFolder { get; set; } = string.Empty;
     public double MaxLocalCacheInGiB { get; set; } = 20;

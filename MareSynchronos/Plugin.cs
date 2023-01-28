@@ -194,7 +194,7 @@ public sealed class Plugin : IDalamudPlugin
 
         try
         {
-            _transientResourceManager = new TransientResourceManager(_ipcManager, _dalamudUtil, _fileReplacementFactory, _pluginInterface.ConfigDirectory.FullName);
+            _transientResourceManager = new TransientResourceManager(_ipcManager, _configurationService, _dalamudUtil, _fileReplacementFactory);
             var characterCacheFactory =
                 new CharacterDataFactory(_dalamudUtil, _ipcManager, _transientResourceManager, _fileReplacementFactory);
             _playerManager = new PlayerManager(_apiController, _ipcManager,
