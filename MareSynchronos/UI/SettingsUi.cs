@@ -13,6 +13,7 @@ using MareSynchronos.API.Data;
 using MareSynchronos.Managers;
 using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.Delegates;
 
 namespace MareSynchronos.UI;
 
@@ -20,7 +21,7 @@ public class SettingsUi : Window, IDisposable
 {
     private readonly ConfigurationService _configService;
     private readonly WindowSystem _windowSystem;
-    private ApiController _apiController => _uiShared.ApiController;
+    private ApiController ApiController => _uiShared.ApiController;
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
@@ -53,18 +54,18 @@ public class SettingsUi : Window, IDisposable
         _uiShared = uiShared;
 
 
-        _uiShared.GposeStart += _uiShared_GposeStart;
-        _uiShared.GposeEnd += _uiShared_GposeEnd;
+        _uiShared.GposeStart += UiShared_GposeStart;
+        _uiShared.GposeEnd += UiShared_GposeEnd;
 
         windowSystem.AddWindow(this);
     }
 
-    private void _uiShared_GposeEnd()
+    private void UiShared_GposeEnd()
     {
         IsOpen = _wasOpen;
     }
 
-    private void _uiShared_GposeStart()
+    private void UiShared_GposeStart()
     {
         _wasOpen = IsOpen;
         IsOpen = false;
@@ -74,15 +75,15 @@ public class SettingsUi : Window, IDisposable
     {
         Logger.Verbose("Disposing " + nameof(SettingsUi));
 
-        _uiShared.GposeStart -= _uiShared_GposeStart;
-        _uiShared.GposeEnd -= _uiShared_GposeEnd;
+        _uiShared.GposeStart -= UiShared_GposeStart;
+        _uiShared.GposeEnd -= UiShared_GposeEnd;
 
         _windowSystem.RemoveWindow(this);
     }
 
     public override void Draw()
     {
-        var pluginState = _uiShared.DrawOtherPluginState();
+        _ = _uiShared.DrawOtherPluginState();
 
         DrawSettingsContent();
     }
@@ -112,7 +113,7 @@ public class SettingsUi : Window, IDisposable
                 ImGui.EndTabItem();
             }
 
-            if (_apiController.ServerState is ServerState.Connected)
+            if (ApiController.ServerState is ServerState.Connected)
             {
                 if (ImGui.BeginTabItem("Transfers"))
                 {
@@ -146,7 +147,7 @@ public class SettingsUi : Window, IDisposable
     private void DrawServerConfiguration()
     {
         _lastTab = "Service Settings";
-        if (_apiController.ServerAlive)
+        if (ApiController.ServerAlive)
         {
             UiShared.FontText("Service Actions", _uiShared.UidFont);
 
@@ -171,7 +172,7 @@ public class SettingsUi : Window, IDisposable
 
                 if (ImGui.Button("Delete everything", new Vector2(buttonSize, 0)))
                 {
-                    Task.Run(() => _apiController.FilesDeleteAll());
+                    Task.Run(() => ApiController.FilesDeleteAll());
                     _deleteFilesPopupModalShown = false;
                 }
 
@@ -208,7 +209,7 @@ public class SettingsUi : Window, IDisposable
 
                 if (ImGui.Button("Delete account", new Vector2(buttonSize, 0)))
                 {
-                    Task.Run(() => _apiController.UserDelete());
+                    Task.Run(() => ApiController.UserDelete());
                     _deleteAccountPopupModalShown = false;
                     SwitchToIntroUi?.Invoke();
                 }
@@ -411,11 +412,6 @@ public class SettingsUi : Window, IDisposable
         }
     }
 
-    private string _forbiddenFileHashEntry = string.Empty;
-    private string _forbiddenFileHashForbiddenBy = string.Empty;
-    private string _bannedUserHashEntry = string.Empty;
-    private string _bannedUserReasonEntry = string.Empty;
-
     private void DrawGeneral()
     {
         if (!string.Equals(_lastTab, "General", StringComparison.OrdinalIgnoreCase))
@@ -454,7 +450,7 @@ public class SettingsUi : Window, IDisposable
 
         if (ImGui.Checkbox("Open Notes Popup on user addition", ref openPopupOnAddition))
         {
-            _apiController.LastAddedUser = null;
+            ApiController.LastAddedUser = null;
             _configService.Current.OpenPopupOnAdd = openPopupOnAddition;
             _configService.Save();
         }
@@ -499,9 +495,6 @@ public class SettingsUi : Window, IDisposable
         UiShared.AttachToolTip("Use this when reporting mods being rejected from the server.");
     }
 
-    private string _charaFileSavePath = string.Empty;
-    private string _charaFileLoadPath = string.Empty;
-
     private void DrawBlockedTransfers()
     {
         _lastTab = "BlockedTransfers";
@@ -518,7 +511,7 @@ public class SettingsUi : Window, IDisposable
 
             ImGui.TableHeadersRow();
 
-            foreach (var item in _apiController.ForbiddenTransfers)
+            foreach (var item in ApiController.ForbiddenTransfers)
             {
                 ImGui.TableNextColumn();
                 if (item is UploadFileTransfer transfer)
@@ -560,8 +553,8 @@ public class SettingsUi : Window, IDisposable
         if (ImGui.BeginTable("TransfersTable", 2))
         {
             ImGui.TableSetupColumn(
-                $"Uploads ({UiShared.ByteToString(_apiController.CurrentUploads.Sum(a => a.Transferred))} / {UiShared.ByteToString(_apiController.CurrentUploads.Sum(a => a.Total))})");
-            ImGui.TableSetupColumn($"Downloads ({UiShared.ByteToString(_apiController.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Transferred))} / {UiShared.ByteToString(_apiController.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Total))})");
+                $"Uploads ({UiShared.ByteToString(ApiController.CurrentUploads.Sum(a => a.Transferred))} / {UiShared.ByteToString(ApiController.CurrentUploads.Sum(a => a.Total))})");
+            ImGui.TableSetupColumn($"Downloads ({UiShared.ByteToString(ApiController.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Transferred))} / {UiShared.ByteToString(ApiController.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Total))})");
 
             ImGui.TableHeadersRow();
 
@@ -572,7 +565,7 @@ public class SettingsUi : Window, IDisposable
                 ImGui.TableSetupColumn("Uploaded");
                 ImGui.TableSetupColumn("Size");
                 ImGui.TableHeadersRow();
-                foreach (var transfer in _apiController.CurrentUploads.ToArray())
+                foreach (var transfer in ApiController.CurrentUploads.ToArray())
                 {
                     var color = UiShared.UploadColor((transfer.Transferred, transfer.Total));
                     ImGui.PushStyleColor(ImGuiCol.Text, color);
@@ -596,7 +589,7 @@ public class SettingsUi : Window, IDisposable
                 ImGui.TableSetupColumn("Downloaded");
                 ImGui.TableSetupColumn("Size");
                 ImGui.TableHeadersRow();
-                foreach (var transfer in _apiController.CurrentDownloads.SelectMany(k => k.Value).ToArray())
+                foreach (var transfer in ApiController.CurrentDownloads.SelectMany(k => k.Value).ToArray())
                 {
                     var color = UiShared.UploadColor((transfer.Transferred, transfer.Total));
                     ImGui.PushStyleColor(ImGuiCol.Text, color);

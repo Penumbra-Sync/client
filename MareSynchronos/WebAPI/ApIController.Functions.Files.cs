@@ -8,7 +8,6 @@ using Dalamud.Utility;
 using LZ4;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.Files;
-using MareSynchronos.API.Dto.User;
 using MareSynchronos.API.Routes;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;

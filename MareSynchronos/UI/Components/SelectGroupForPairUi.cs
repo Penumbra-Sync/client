@@ -3,7 +3,6 @@ using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Utility;
 using ImGuiNET;
-using MareSynchronos.MareConfiguration;
 using MareSynchronos.Models;
 using MareSynchronos.UI.Handlers;
 
@@ -99,17 +98,17 @@ public class SelectGroupForPairUi
 
     private void DrawGroupName(Pair pair, string name)
     {
-        var hasTagBefore = _tagHandler.HasTag(pair.UserPair, name);
+        var hasTagBefore = _tagHandler.HasTag(pair.UserPair!, name);
         var hasTag = hasTagBefore;
         if (ImGui.Checkbox(name, ref hasTag))
         {
             if (hasTag)
             {
-                _tagHandler.AddTagToPairedUid(pair.UserPair, name);
+                _tagHandler.AddTagToPairedUid(pair.UserPair!, name);
             }
             else
             {
-                _tagHandler.RemoveTagFromPairedUid(pair.UserPair, name);
+                _tagHandler.RemoveTagFromPairedUid(pair.UserPair!, name);
             }
         }
     }
@@ -121,7 +120,7 @@ public class SelectGroupForPairUi
             _tagHandler.AddTag(_tagNameToAdd);
             if (_pair != null)
             {
-                _tagHandler.AddTagToPairedUid(_pair.UserPair, _tagNameToAdd);
+                _tagHandler.AddTagToPairedUid(_pair.UserPair!, _tagNameToAdd);
             }
             _tagNameToAdd = string.Empty;
         }

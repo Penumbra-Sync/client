@@ -7,7 +7,7 @@ namespace MareSynchronos.Managers;
 
 public class ServerConfigurationManager
 {
-    private Dictionary<JwtCache, string> _tokenDictionary = new();
+    private readonly Dictionary<JwtCache, string> _tokenDictionary = new();
     private readonly ConfigurationService _configService;
     private readonly DalamudUtil _dalamudUtil;
 
@@ -78,7 +78,7 @@ public class ServerConfigurationManager
             Save();
         }
 
-        var auth = currentServer.Authentications.FirstOrDefault(f => string.Equals(f.CharacterName, charaName, StringComparison.Ordinal) && f.WorldId == worldId);
+        var auth = currentServer.Authentications.Find(f => string.Equals(f.CharacterName, charaName, StringComparison.Ordinal) && f.WorldId == worldId);
         if (auth == null) return null;
 
         if (currentServer.SecretKeys.TryGetValue(auth.SecretKeyIdx, out var secretKey))

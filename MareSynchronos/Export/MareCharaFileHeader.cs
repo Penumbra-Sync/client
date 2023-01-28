@@ -6,7 +6,7 @@ public record MareCharaFileHeader(byte Version, MareCharaFileData CharaFileData)
 
     public byte Version { get; set; } = Version;
     public MareCharaFileData CharaFileData { get; set; } = CharaFileData;
-    public string FilePath { get; private set; }
+    public string FilePath { get; private set; } = string.Empty;
 
     public void WriteToStream(BinaryWriter writer)
     {
@@ -32,8 +32,10 @@ public record MareCharaFileHeader(byte Version, MareCharaFileData CharaFileData)
         {
             var dataLength = reader.ReadInt32();
 
-            decoded = new(version, MareCharaFileData.FromByteArray(reader.ReadBytes(dataLength)));
-            decoded.FilePath = path;
+            decoded = new(version, MareCharaFileData.FromByteArray(reader.ReadBytes(dataLength)))
+            {
+                FilePath = path
+            };
         }
 
         return decoded;

@@ -15,7 +15,7 @@ public class CachedPlayer : IDisposable
     private readonly ApiController _apiController;
     private readonly DalamudUtil _dalamudUtil;
     private readonly IpcManager _ipcManager;
-    private readonly FileCacheManager fileDbManager;
+    private readonly FileCacheManager _fileDbManager;
     private API.Data.CharacterData _cachedData = new();
     private PlayerRelatedObject? _currentCharacterEquipment;
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
@@ -33,7 +33,7 @@ public class CachedPlayer : IDisposable
         _ipcManager = ipcManager;
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
-        this.fileDbManager = fileDbManager;
+        _fileDbManager = fileDbManager;
     }
 
     public bool IsVisible
@@ -122,7 +122,7 @@ public class CachedPlayer : IDisposable
                     continue;
                 }
 
-                bool customizeDataDifferent = _cachedData.CustomizePlusData != characterData.CustomizePlusData;
+                bool customizeDataDifferent = !string.Equals(_cachedData.CustomizePlusData, characterData.CustomizePlusData, StringComparison.Ordinal);
                 if (customizeDataDifferent)
                 {
                     Logger.Debug("Updating " + objectKind);
@@ -495,7 +495,7 @@ public class CachedPlayer : IDisposable
             {
                 foreach (var gamePath in item.GamePaths)
                 {
-                    var fileCache = fileDbManager.GetFileCacheByHash(item.Hash);
+                    var fileCache = _fileDbManager.GetFileCacheByHash(item.Hash);
                     if (fileCache != null)
                     {
                         moddedDictionary[gamePath] = fileCache.ResolvedFilepath;

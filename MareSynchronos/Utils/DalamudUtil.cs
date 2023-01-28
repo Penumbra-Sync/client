@@ -8,14 +8,12 @@ using Dalamud.Game.Text.SeStringHandling;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using Lumina.Excel.GeneratedSheets;
+using MareSynchronos.Delegates;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 
 namespace MareSynchronos.Utils;
 
-public delegate void PlayerChange(Dalamud.Game.ClientState.Objects.Types.Character actor);
-
-public delegate void VoidDelegate();
 
 public class DalamudUtil : IDisposable
 {

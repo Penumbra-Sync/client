@@ -7,7 +7,7 @@ namespace MareSynchronos.Utils;
 
 internal class Logger : ILogger
 {
-    private readonly string name;
+    private readonly string _name;
 
     public static void Info(string? info)
     {
@@ -68,7 +68,7 @@ internal class Logger : ILogger
 
     public Logger(string name)
     {
-        this.name = name;
+        this._name = name;
     }
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
@@ -78,22 +78,22 @@ internal class Logger : ILogger
         switch (logLevel)
         {
             case LogLevel.Debug:
-                PluginLog.Debug($"[{name}] [{eventId}] {formatter(state, exception)}");
+                PluginLog.Debug($"[{_name}] [{eventId}] {formatter(state, exception)}");
                 break;
             case LogLevel.Error:
             case LogLevel.Critical:
-                PluginLog.Error($"[{name}] [{eventId}] {formatter(state, exception)}");
+                PluginLog.Error($"[{_name}] [{eventId}] {formatter(state, exception)}");
                 break;
             case LogLevel.Information:
-                PluginLog.Information($"[{name}] [{eventId}] {formatter(state, exception)}");
+                PluginLog.Information($"[{_name}] [{eventId}] {formatter(state, exception)}");
                 break;
             case LogLevel.Warning:
-                PluginLog.Warning($"[{name}] [{eventId}] {formatter(state, exception)}");
+                PluginLog.Warning($"[{_name}] [{eventId}] {formatter(state, exception)}");
                 break;
             case LogLevel.Trace:
             default:
 #if DEBUG
-                PluginLog.Verbose($"[{name}] [{eventId}] {formatter(state, exception)}");
+                PluginLog.Verbose($"[{_name}] [{eventId}] {formatter(state, exception)}");
 #else
                 PluginLog.Verbose($"[{name}] {eventId} {state} {formatter(state, exception)}");
 #endif

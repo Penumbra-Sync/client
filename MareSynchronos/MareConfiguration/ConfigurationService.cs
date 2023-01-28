@@ -6,11 +6,11 @@ namespace MareSynchronos.MareConfiguration;
 
 public class ConfigurationService : IDisposable
 {
-    private const string ConfigurationName = "Config.json";
-    private string ConfigurationPath => Path.Combine(_pluginInterface.ConfigDirectory.FullName, ConfigurationName);
+    private const string _configurationName = "Config.json";
+    private string ConfigurationPath => Path.Combine(_pluginInterface.ConfigDirectory.FullName, _configurationName);
     public string ConfigurationDirectory => _pluginInterface.ConfigDirectory.FullName;
     private readonly DalamudPluginInterface _pluginInterface;
-    private CancellationTokenSource _periodicCheckCts = new();
+    private readonly CancellationTokenSource _periodicCheckCts = new();
     private DateTime _configLastWriteTime;
 
     public MareConfig Current { get; private set; }
@@ -19,8 +19,7 @@ public class ConfigurationService : IDisposable
     {
         _pluginInterface = pluginInterface;
 
-        var oldConfig = pluginInterface.GetPluginConfig() as Configuration;
-        if (oldConfig != null)
+        if (pluginInterface.GetPluginConfig() is Configuration oldConfig)
         {
             Current = oldConfig.ToMareConfig();
             File.Move(pluginInterface.ConfigFile.FullName, pluginInterface.ConfigFile.FullName + ".old", true);

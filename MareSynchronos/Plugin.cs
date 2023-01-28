@@ -21,7 +21,7 @@ namespace MareSynchronos;
 
 public sealed class Plugin : IDalamudPlugin
 {
-    private const string CommandName = "/mare";
+    private const string _commandName = "/mare";
     private readonly ApiController _apiController;
     private readonly CommandManager _commandManager;
     private readonly PeriodicFileScanner _periodicFileScanner;
@@ -118,7 +118,7 @@ public sealed class Plugin : IDalamudPlugin
         Logger.Verbose("Disposing " + Name);
         _apiController?.Dispose();
 
-        _commandManager.RemoveHandler(CommandName);
+        _commandManager.RemoveHandler(_commandName);
         _dalamudUtil.LogIn -= DalamudUtilOnLogIn;
         _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
 
@@ -148,7 +148,7 @@ public sealed class Plugin : IDalamudPlugin
 
         _pluginInterface.UiBuilder.Draw += Draw;
         _pluginInterface.UiBuilder.OpenConfigUi += OpenUi;
-        _commandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
+        _commandManager.AddHandler(_commandName, new CommandInfo(OnCommand)
         {
             HelpMessage = "Opens the Mare Synchronos UI"
         });
@@ -173,7 +173,7 @@ public sealed class Plugin : IDalamudPlugin
         _transientResourceManager?.Dispose();
         _pluginInterface.UiBuilder.Draw -= Draw;
         _pluginInterface.UiBuilder.OpenConfigUi -= OpenUi;
-        _commandManager.RemoveHandler(CommandName);
+        _commandManager.RemoveHandler(_commandName);
     }
 
     public void ReLaunchCharacterManager()

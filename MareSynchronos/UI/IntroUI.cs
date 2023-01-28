@@ -8,8 +8,8 @@ using Dalamud.Utility;
 using MareSynchronos.FileCache;
 using Dalamud.Interface;
 using MareSynchronos.Managers;
-using MareSynchronos.WebAPI;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.Delegates;
 
 namespace MareSynchronos.UI;
 
@@ -24,12 +24,12 @@ internal class IntroUi : Window, IDisposable
 
     public event VoidDelegate? SwitchToMainUi;
 
-    private string[] TosParagraphs;
+    private string[] _tosParagraphs;
 
-    private Task _timeoutTask;
-    private string _timeoutLabel;
+    private Task? _timeoutTask;
+    private string _timeoutLabel = string.Empty;
 
-    private Dictionary<string, string> _languages = new(StringComparer.Ordinal) { { "English", "en" }, { "Deutsch", "de" }, { "Français", "fr" } };
+    private readonly Dictionary<string, string> _languages = new(StringComparer.Ordinal) { { "English", "en" }, { "Deutsch", "de" }, { "Français", "fr" } };
     private int _currentLanguage;
 
     public void Dispose()
@@ -125,12 +125,12 @@ internal class IntroUi : Window, IDisposable
             ImGui.Separator();
 
 
-            UiShared.TextWrapped(TosParagraphs[0]);
-            UiShared.TextWrapped(TosParagraphs[1]);
-            UiShared.TextWrapped(TosParagraphs[2]);
-            UiShared.TextWrapped(TosParagraphs[3]);
-            UiShared.TextWrapped(TosParagraphs[4]);
-            UiShared.TextWrapped(TosParagraphs[5]);
+            UiShared.TextWrapped(_tosParagraphs[0]);
+            UiShared.TextWrapped(_tosParagraphs[1]);
+            UiShared.TextWrapped(_tosParagraphs[2]);
+            UiShared.TextWrapped(_tosParagraphs[3]);
+            UiShared.TextWrapped(_tosParagraphs[4]);
+            UiShared.TextWrapped(_tosParagraphs[5]);
 
             ImGui.Separator();
             if (_timeoutTask?.IsCompleted ?? true)
@@ -252,6 +252,6 @@ internal class IntroUi : Window, IDisposable
             _uiShared.LoadLocalization(_languages.ElementAt(changeLanguageTo).Value);
         }
 
-        TosParagraphs = new[] { Strings.ToS.Paragraph1, Strings.ToS.Paragraph2, Strings.ToS.Paragraph3, Strings.ToS.Paragraph4, Strings.ToS.Paragraph5, Strings.ToS.Paragraph6 };
+        _tosParagraphs = new[] { Strings.ToS.Paragraph1, Strings.ToS.Paragraph2, Strings.ToS.Paragraph3, Strings.ToS.Paragraph4, Strings.ToS.Paragraph5, Strings.ToS.Paragraph6 };
     }
 }

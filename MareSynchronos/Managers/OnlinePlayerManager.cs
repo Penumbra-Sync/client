@@ -3,7 +3,6 @@ using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using System;
 
 namespace MareSynchronos.Managers;
 
@@ -76,7 +75,7 @@ public class OnlinePlayerManager : IDisposable
         }
 
         var newlyVisiblePlayers = onlinePairs.Select(v => v.CachedPlayer)
-            .Where(p => p.PlayerCharacter != IntPtr.Zero && p.IsVisible && !p.WasVisible).Select(p => (UserDto)p.OnlineUser)
+            .Where(p => p != null && p.PlayerCharacter != IntPtr.Zero && p.IsVisible && !p.WasVisible).Select(p => (UserDto)p!.OnlineUser)
             .ToList();
         if (newlyVisiblePlayers.Any())
         {

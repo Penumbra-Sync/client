@@ -7,13 +7,11 @@ using System.Collections.Concurrent;
 using System.Text;
 using Penumbra.Api.Enums;
 using Penumbra.Api.Helpers;
+using MareSynchronos.Delegates;
 
 namespace MareSynchronos.Managers;
 
-public delegate void PenumbraRedrawEvent(IntPtr address, int objTblIdx);
-public delegate void HeelsOffsetChange(float change);
-public delegate void PenumbraResourceLoadEvent(IntPtr drawObject, string gamePath, string filePath);
-public delegate void CustomizePlusScaleChange(string? scale);
+
 public class IpcManager : IDisposable
 {
     private readonly ICallGateSubscriber<int> _glamourerApiVersion;
@@ -54,10 +52,10 @@ public class IpcManager : IDisposable
     private readonly ICallGateSubscriber<string?, object> _customizePlusOnScaleUpdate;
 
     private readonly DalamudUtil _dalamudUtil;
-    private bool inGposeQueueMode = false;
-    private ConcurrentQueue<Action> actionQueue => inGposeQueueMode ? gposeActionQueue : normalQueue;
-    private readonly ConcurrentQueue<Action> normalQueue = new();
-    private readonly ConcurrentQueue<Action> gposeActionQueue = new();
+    private bool _inGposeQueueMode = false;
+    private ConcurrentQueue<Action> ActionQueue => _inGposeQueueMode ? _gposeActionQueue : _normalQueue;
+    private readonly ConcurrentQueue<Action> _normalQueue = new();
+    private readonly ConcurrentQueue<Action> _gposeActionQueue = new();
 
     public IpcManager(DalamudPluginInterface pi, DalamudUtil dalamudUtil)
     {
@@ -118,7 +116,7 @@ public class IpcManager : IDisposable
 
     private void HandleGposeActionQueue()
     {
-        if (gposeActionQueue.TryDequeue(out var action))
+        if (_gposeActionQueue.TryDequeue(out var action))
         {
             if (action == null) return;
             Logger.Debug("Execution action in gpose queue: " + action.Method);
@@ -128,7 +126,7 @@ public class IpcManager : IDisposable
 
     public void ToggleGposeQueueMode(bool on)
     {
-        inGposeQueueMode = on;
+        _inGposeQueueMode = on;
     }
 
     private void PenumbraModSettingChangedHandler()
@@ -138,8 +136,8 @@ public class IpcManager : IDisposable
 
     private void ClearActionQueue()
     {
-        actionQueue.Clear();
-        gposeActionQueue.Clear();
+        ActionQueue.Clear();
+        _gposeActionQueue.Clear();
     }
 
     private void ResourceLoaded(IntPtr ptr, string arg1, string arg2)
@@ -155,7 +153,7 @@ public class IpcManager : IDisposable
 
     private void HandleActionQueue()
     {
-        if (actionQueue.TryDequeue(out var action))
+        if (ActionQueue.TryDequeue(out var action))
         {
             if (action == null) return;
             Logger.Debug("Execution action in queue: " + action.Method);
@@ -166,10 +164,10 @@ public class IpcManager : IDisposable
     public event VoidDelegate? PenumbraModSettingChanged;
     public event VoidDelegate? PenumbraInitialized;
     public event VoidDelegate? PenumbraDisposed;
-    public event PenumbraRedrawEvent? PenumbraRedrawEvent;
-    public event HeelsOffsetChange? HeelsOffsetChangeEvent;
-    public event PenumbraResourceLoadEvent? PenumbraResourceLoadEvent;
-    public event CustomizePlusScaleChange? CustomizePlusScaleChange;
+    public event DrawObjectDelegate? PenumbraRedrawEvent;
+    public event FloatDelegate? HeelsOffsetChangeEvent;
+    public event PenumbraFileResourceDelegate? PenumbraResourceLoadEvent;
+    public event StringDelegate? CustomizePlusScaleChange;
 
     public bool Initialized => CheckPenumbraApi();
     public bool CheckGlamourerApi()
@@ -225,7 +223,7 @@ public class IpcManager : IDisposable
         Logger.Verbose("Disposing " + nameof(IpcManager));
 
         int totalSleepTime = 0;
-        while (actionQueue.Count > 0 && totalSleepTime < 2000)
+        while (!ActionQueue.IsEmpty && totalSleepTime < 2000)
         {
             Logger.Verbose("Waiting for actionqueue to clear...");
             HandleActionQueue();
@@ -241,7 +239,7 @@ public class IpcManager : IDisposable
         _dalamudUtil.FrameworkUpdate -= HandleActionQueue;
         _dalamudUtil.ZoneSwitchEnd -= ClearActionQueue;
         _dalamudUtil.GposeFrameworkUpdate -= HandleGposeActionQueue;
-        actionQueue.Clear();
+        ActionQueue.Clear();
 
         _penumbraGameObjectResourcePathResolved.Dispose();
         _penumbraDispose.Dispose();
@@ -260,7 +258,7 @@ public class IpcManager : IDisposable
     public void HeelsSetOffsetForPlayer(float offset, IntPtr character)
     {
         if (!CheckHeelsApi()) return;
-        actionQueue.Enqueue(() =>
+        ActionQueue.Enqueue(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj != null)
@@ -274,7 +272,7 @@ public class IpcManager : IDisposable
     public void HeelsRestoreOffsetForPlayer(IntPtr character)
     {
         if (!CheckHeelsApi()) return;
-        actionQueue.Enqueue(() =>
+        ActionQueue.Enqueue(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj != null)
@@ -296,7 +294,7 @@ public class IpcManager : IDisposable
     public void CustomizePlusSetBodyScale(IntPtr character, string scale)
     {
         if (!CheckCustomizePlusApi() || string.IsNullOrEmpty(scale)) return;
-        actionQueue.Enqueue(() =>
+        ActionQueue.Enqueue(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj is Character c)
@@ -311,7 +309,7 @@ public class IpcManager : IDisposable
     public void CustomizePlusRevert(IntPtr character)
     {
         if (!CheckCustomizePlusApi()) return;
-        actionQueue.Enqueue(() =>
+        ActionQueue.Enqueue(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj is Character c)
@@ -325,7 +323,7 @@ public class IpcManager : IDisposable
     public void GlamourerApplyAll(string? customization, IntPtr obj)
     {
         if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
-        actionQueue.Enqueue(() =>
+        ActionQueue.Enqueue(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(obj);
             if (gameObj is Character c)
@@ -339,7 +337,7 @@ public class IpcManager : IDisposable
     public void GlamourerApplyOnlyEquipment(string customization, IntPtr character)
     {
         if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
-        actionQueue.Enqueue(() =>
+        ActionQueue.Enqueue(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj is Character c)
@@ -353,7 +351,7 @@ public class IpcManager : IDisposable
     public void GlamourerApplyOnlyCustomization(string customization, IntPtr character)
     {
         if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
-        actionQueue.Enqueue(() =>
+        ActionQueue.Enqueue(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj is Character c)
@@ -390,7 +388,7 @@ public class IpcManager : IDisposable
     public void GlamourerRevertCharacterCustomization(GameObject character)
     {
         if (!CheckGlamourerApi()) return;
-        actionQueue.Enqueue(() => _glamourerRevertCustomization!.InvokeAction(character));
+        ActionQueue.Enqueue(() => _glamourerRevertCustomization!.InvokeAction(character));
     }
 
     public string PenumbraGetMetaManipulations()
@@ -408,7 +406,7 @@ public class IpcManager : IDisposable
     public void PenumbraRedraw(IntPtr obj)
     {
         if (!CheckPenumbraApi()) return;
-        actionQueue.Enqueue(() =>
+        ActionQueue.Enqueue(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(obj);
             if (gameObj != null)
@@ -422,13 +420,13 @@ public class IpcManager : IDisposable
     public void PenumbraRedraw(string actorName)
     {
         if (!CheckPenumbraApi()) return;
-        actionQueue.Enqueue(() => _penumbraRedraw!.Invoke(actorName, RedrawType.Redraw));
+        ActionQueue.Enqueue(() => _penumbraRedraw!.Invoke(actorName, RedrawType.Redraw));
     }
 
     public void PenumbraRemoveTemporaryCollection(string characterName)
     {
         if (!CheckPenumbraApi()) return;
-        actionQueue.Enqueue(() =>
+        ActionQueue.Enqueue(() =>
         {
             var collName = "Mare_" + characterName;
             Logger.Verbose("Removing temp collection for " + collName);
@@ -461,7 +459,7 @@ public class IpcManager : IDisposable
     {
         if (!CheckPenumbraApi()) return;
 
-        actionQueue.Enqueue(() =>
+        ActionQueue.Enqueue(() =>
         {
             var idx = _dalamudUtil.GetIndexFromObjectTableByName(characterName);
             if (idx == null)
@@ -508,6 +506,6 @@ public class IpcManager : IDisposable
     private void PenumbraDispose()
     {
         PenumbraDisposed?.Invoke();
-        actionQueue.Clear();
+        ActionQueue.Clear();
     }
 }

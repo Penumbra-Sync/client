@@ -42,7 +42,7 @@ public class MareCharaFileManager
             using var reader = new BinaryReader(lz4Stream);
             LoadedCharaFile = MareCharaFileHeader.FromBinaryReader(filePath, reader);
             Logger.Debug("Read Mare Chara File");
-            Logger.Debug("Version: " + LoadedCharaFile.Version);
+            Logger.Debug("Version: " + (LoadedCharaFile?.Version ?? -1));
 
         }
         catch { throw; }
@@ -51,7 +51,7 @@ public class MareCharaFileManager
 
     public Task ApplyMareCharaFile(GameObject? charaTarget)
     {
-        Dictionary<string, string> extractedFiles = new();
+        Dictionary<string, string> extractedFiles = new(StringComparer.Ordinal);
         CurrentlyWorking = true;
         try
         {

@@ -9,6 +9,7 @@ using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Plugin;
 using Dalamud.Utility;
 using ImGuiNET;
+using MareSynchronos.Delegates;
 using MareSynchronos.FileCache;
 using MareSynchronos.Localization;
 using MareSynchronos.Managers;
@@ -19,10 +20,10 @@ using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.UI;
 
-public class UiShared : IDisposable
+public partial class UiShared : IDisposable
 {
-    [DllImport("user32")]
-    public static extern short GetKeyState(int nVirtKey);
+    [LibraryImport("user32")]
+    internal static partial short GetKeyState(int nVirtKey);
 
     private readonly IpcManager _ipcManager;
     private readonly ApiController _apiController;
@@ -48,7 +49,7 @@ public class UiShared : IDisposable
     public static bool CtrlPressed() => (GetKeyState(0xA2) & 0x8000) != 0 || (GetKeyState(0xA3) & 0x8000) != 0;
     public static bool ShiftPressed() => (GetKeyState(0xA1) & 0x8000) != 0 || (GetKeyState(0xA0) & 0x8000) != 0;
 
-    public static ImGuiWindowFlags PopupWindowFlags = ImGuiWindowFlags.NoResize |
+    public static readonly ImGuiWindowFlags PopupWindowFlags = ImGuiWindowFlags.NoResize |
                                            ImGuiWindowFlags.NoScrollbar |
                                            ImGuiWindowFlags.NoScrollWithMouse;
 
@@ -72,16 +73,16 @@ public class UiShared : IDisposable
         _pluginInterface.UiBuilder.BuildFonts += BuildFont;
         _pluginInterface.UiBuilder.RebuildFonts();
 
-        _dalamudUtil.GposeStart += _dalamudUtil_GposeStart;
-        _dalamudUtil.GposeEnd += _dalamudUtil_GposeEnd;
+        _dalamudUtil.GposeStart += DalamudUtil_GposeStart;
+        _dalamudUtil.GposeEnd += DalamudUtil_GposeEnd;
     }
 
-    private void _dalamudUtil_GposeEnd()
+    private void DalamudUtil_GposeEnd()
     {
         GposeEnd?.Invoke();
     }
 
-    private void _dalamudUtil_GposeStart()
+    private void DalamudUtil_GposeStart()
     {
         GposeStart?.Invoke();
     }
@@ -607,13 +608,13 @@ public class UiShared : IDisposable
         return buttonClicked;
     }
 
-    private const string NotesStart = "##MARE_SYNCHRONOS_USER_NOTES_START##";
-    private const string NotesEnd = "##MARE_SYNCHRONOS_USER_NOTES_END##";
+    private const string _notesStart = "##MARE_SYNCHRONOS_USER_NOTES_START##";
+    private const string _notesEnd = "##MARE_SYNCHRONOS_USER_NOTES_END##";
 
     public string GetNotes(List<Pair> pairs)
     {
         StringBuilder sb = new();
-        sb.AppendLine(NotesStart);
+        sb.AppendLine(_notesStart);
         foreach (var entry in pairs)
         {
             var note = entry.GetNote();
@@ -621,7 +622,7 @@ public class UiShared : IDisposable
 
             sb.AppendLine(entry.UserData.UID + ":\"" + entry.GetNote() + "\"");
         }
-        sb.AppendLine(NotesEnd);
+        sb.AppendLine(_notesEnd);
 
         return sb.ToString();
     }
@@ -631,12 +632,12 @@ public class UiShared : IDisposable
         var splitNotes = notes.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).ToList();
         var splitNotesStart = splitNotes.FirstOrDefault();
         var splitNotesEnd = splitNotes.LastOrDefault();
-        if (!string.Equals(splitNotesStart, NotesStart) || !string.Equals(splitNotesEnd, NotesEnd))
+        if (!string.Equals(splitNotesStart, _notesStart) || !string.Equals(splitNotesEnd, _notesEnd))
         {
             return false;
         }
 
-        splitNotes.RemoveAll(n => string.Equals(n, NotesStart) || string.Equals(n, NotesEnd));
+        splitNotes.RemoveAll(n => string.Equals(n, _notesStart) || string.Equals(n, _notesEnd));
 
         var comments = _serverConfigurationManager.CurrentServer.UidServerComments;
 
@@ -664,7 +665,7 @@ public class UiShared : IDisposable
     public void Dispose()
     {
         _pluginInterface.UiBuilder.BuildFonts -= BuildFont;
-        _dalamudUtil.GposeStart -= _dalamudUtil_GposeStart;
-        _dalamudUtil.GposeEnd -= _dalamudUtil_GposeEnd;
+        _dalamudUtil.GposeStart -= DalamudUtil_GposeStart;
+        _dalamudUtil.GposeEnd -= DalamudUtil_GposeEnd;
     }
 }

@@ -7,7 +7,7 @@ public partial class ApiController
 {
     private void CheckConnection()
     {
-        if (!IsConnected) throw new System.Exception("Not connected");
+        if (ServerState is not (ServerState.Connected or ServerState.Connecting or ServerState.Reconnecting)) throw new System.Exception("Not connected");
     }
 
     public async Task<List<BannedGroupUserDto>> GroupGetBannedUsers(GroupDto group)

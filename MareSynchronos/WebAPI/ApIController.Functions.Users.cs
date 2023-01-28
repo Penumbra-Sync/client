@@ -1,5 +1,4 @@
-﻿using MareSynchronos.API.Data;
-using MareSynchronos.API.Dto.User;
+﻿using MareSynchronos.API.Dto.User;
 using MareSynchronos.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
 

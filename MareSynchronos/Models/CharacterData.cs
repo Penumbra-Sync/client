@@ -80,7 +80,7 @@ public class CharacterData
     public override string ToString()
     {
         StringBuilder stringBuilder = new();
-        foreach (var fileReplacement in FileReplacements.SelectMany(k => k.Value).OrderBy(a => a.GamePaths[0]))
+        foreach (var fileReplacement in FileReplacements.SelectMany(k => k.Value).OrderBy(a => a.GamePaths[0], StringComparer.Ordinal))
         {
             stringBuilder.AppendLine(fileReplacement.ToString());
         }

@@ -37,7 +37,7 @@ public class PairManager : IDisposable
         _groupPairsInternal = GroupPairsLazy();
     }
 
-    public Lazy<List<Pair>> _directPairsInternal { get; private set; }
+    private Lazy<List<Pair>> _directPairsInternal;
     private Lazy<Dictionary<GroupFullInfoDto, List<Pair>>> _groupPairsInternal;
     public Dictionary<GroupFullInfoDto, List<Pair>> GroupPairs => _groupPairsInternal.Value;
     public List<Pair> DirectPairs => _directPairsInternal.Value;
@@ -132,7 +132,7 @@ public class PairManager : IDisposable
     {
         if (pChar == null) return null;
         var hash = pChar.GetHash256();
-        return OnlineUserPairs.FirstOrDefault(p => string.Equals(p.PlayerNameHash, hash, StringComparison.Ordinal));
+        return OnlineUserPairs.Find(p => string.Equals(p.PlayerNameHash, hash, StringComparison.Ordinal));
     }
 
     public void MarkPairOffline(UserData user)

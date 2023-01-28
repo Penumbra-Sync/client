@@ -1,4 +1,5 @@
 ﻿using MareSynchronos.API.Data.Enum;
+using MareSynchronos.Delegates;
 using MareSynchronos.Factories;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Models;
@@ -7,16 +8,15 @@ using System.Collections.Concurrent;
 
 namespace MareSynchronos.Managers;
 
-public delegate void TransientResourceLoadedEvent(IntPtr drawObject);
 
 public class TransientResourceManager : IDisposable
 {
     private readonly IpcManager _ipcManager;
     private readonly ConfigurationService _configurationService;
     private readonly DalamudUtil _dalamudUtil;
-    public event TransientResourceLoadedEvent? TransientResourceLoaded;
+    public event DrawObjectDelegate? TransientResourceLoaded;
     public IntPtr[] PlayerRelatedPointers = Array.Empty<IntPtr>();
-    private readonly string[] FileTypesToHandle = new[] { "tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk" };
+    private readonly string[] _fileTypesToHandle = new[] { "tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk" };
     [Obsolete]
     private string PersistentDataCache => Path.Combine(_configurationService.ConfigurationDirectory, "PersistentTransientData.lst");
     private string PlayerPersistentDataKey => _dalamudUtil.PlayerName + "_" + _dalamudUtil.WorldId;
@@ -83,7 +83,7 @@ public class TransientResourceManager : IDisposable
                     return !verified;
                 });
                 if (!successfulValidation)
-                    TransientResourceLoaded?.Invoke(_dalamudUtil.PlayerPointer);
+                    TransientResourceLoaded?.Invoke(_dalamudUtil.PlayerPointer, -1);
             }
         });
     }
@@ -138,7 +138,7 @@ public class TransientResourceManager : IDisposable
 
     private void Manager_PenumbraResourceLoadEvent(IntPtr gameObject, string gamePath, string filePath)
     {
-        if (!FileTypesToHandle.Any(type => gamePath.EndsWith(type, StringComparison.OrdinalIgnoreCase)))
+        if (!_fileTypesToHandle.Any(type => gamePath.EndsWith(type, StringComparison.OrdinalIgnoreCase)))
         {
             return;
         }
@@ -176,7 +176,7 @@ public class TransientResourceManager : IDisposable
         {
             TransientResources[gameObject].Add(replacedGamePath);
             Logger.Debug($"Adding {replacedGamePath} for {gameObject} ({filePath})");
-            TransientResourceLoaded?.Invoke(gameObject);
+            TransientResourceLoaded?.Invoke(gameObject, -1);
         }
     }
 

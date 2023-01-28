@@ -8,19 +8,12 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
 using MareSynchronos.API.Dto;
 using MareSynchronos.API.SignalR;
-using MareSynchronos.API.Dto.User;
 using MareSynchronos.Managers;
 using Dalamud.Utility;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.Models;
+using MareSynchronos.Delegates;
 
 namespace MareSynchronos.WebAPI;
-
-public delegate void SimpleStringDelegate(string str);
-public delegate void PairedClientDelegate(OnlineUserIdentDto dto);
-public delegate void PairedClientDataDelegate(OnlineUserCharaDataDto dto);
-public delegate void UserDelegate(UserDto userDto);
-
 public partial class ApiController : IDisposable, IMareHubClient
 {
     public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
@@ -34,7 +27,6 @@ public partial class ApiController : IDisposable, IMareHubClient
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
     private CancellationTokenSource _connectionCancellationTokenSource;
-    private Dictionary<JwtCache, string> _jwtToken = new();
     private HubConnection? _mareHub;
 
     private CancellationTokenSource? _uploadCancellationTokenSource = new();
@@ -96,7 +88,7 @@ public partial class ApiController : IDisposable, IMareHubClient
     public List<FileTransfer> ForbiddenTransfers { get; } = new();
 
     public bool IsConnected => ServerState == ServerState.Connected;
-    public bool IsDownloading => CurrentDownloads.Count > 0;
+    public bool IsDownloading => !CurrentDownloads.IsEmpty;
     public bool IsUploading => CurrentUploads.Count > 0;
 
     public bool ServerAlive => ServerState is ServerState.Connected or ServerState.RateLimited or ServerState.Unauthorized or ServerState.Disconnected;
@@ -195,6 +187,8 @@ public partial class ApiController : IDisposable, IMareHubClient
                 OnReceiveServerMessage((sev, msg) => Client_ReceiveServerMessage(sev, msg));
                 OnUpdateSystemInfo((dto) => Client_UpdateSystemInfo(dto));
 
+                await InitializeData().ConfigureAwait(false);
+
                 _connectionDto = await GetConnectionDto().ConfigureAwait(false);
 
                 ServerState = ServerState.Connected;
@@ -207,8 +201,6 @@ public partial class ApiController : IDisposable, IMareHubClient
 
                 if (ServerState is ServerState.Connected) // user is authorized && server is legit
                 {
-                    await InitializeData().ConfigureAwait(false);
-
                     _mareHub.Closed += MareHubOnClosed;
                     _mareHub.Reconnecting += MareHubOnReconnecting;
                     _mareHub.Reconnected += MareHubOnReconnected;
@@ -241,13 +233,6 @@ public partial class ApiController : IDisposable, IMareHubClient
                 await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token).ConfigureAwait(false);
             }
         }
-    }
-
-    private async Task MareHubOnReconnected(string? arg)
-    {
-        ServerState = ServerState.Connected;
-        _connectionDto = await GetConnectionDto().ConfigureAwait(false);
-        await InitializeData().ConfigureAwait(false);
     }
 
     private async Task ClientHealthCheck(CancellationToken ct)
@@ -379,6 +364,14 @@ public partial class ApiController : IDisposable, IMareHubClient
         Disconnected?.Invoke();
         _pairManager.ClearPairs();
         return Task.CompletedTask;
+    }
+
+    private async Task MareHubOnReconnected(string? arg)
+    {
+        ServerState = ServerState.Connecting;
+        _connectionDto = await GetConnectionDto().ConfigureAwait(false);
+        await InitializeData().ConfigureAwait(false);
+        ServerState = ServerState.Connected;
     }
 
     private async Task StopConnection(CancellationToken token, ServerState state)

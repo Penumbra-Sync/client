@@ -6,13 +6,12 @@ using MareSynchronos.Models;
 using MareSynchronos.FileCache;
 using MareSynchronos.UI;
 using MareSynchronos.API.Data.Enum;
+using MareSynchronos.Delegates;
 #if DEBUG
-using Newtonsoft.Json;
 #endif
 
 namespace MareSynchronos.Managers;
 
-public delegate void PlayerHasChanged(API.Data.CharacterData characterCache);
 
 public class PlayerManager : IDisposable
 {
@@ -23,7 +22,7 @@ public class PlayerManager : IDisposable
     private readonly PeriodicFileScanner _periodicFileScanner;
     private readonly SettingsUi _settingsUi;
     private readonly IpcManager _ipcManager;
-    public event PlayerHasChanged? PlayerHasChanged;
+    public event CharacterDataDelegate? PlayerHasChanged;
     public API.Data.CharacterData? LastCreatedCharacterData { get; private set; }
     public Models.CharacterData PermanentDataCache { get; private set; } = new();
     private readonly Dictionary<ObjectKind, Func<bool>> objectKindsToUpdate = new();
@@ -75,7 +74,7 @@ public class PlayerManager : IDisposable
         _transientResourceManager.PlayerRelatedPointers = playerRelatedObjects.Select(f => f.CurrentAddress).ToArray();
     }
 
-    public void HandleTransientResourceLoad(IntPtr gameObj)
+    public void HandleTransientResourceLoad(IntPtr gameObj, int idx)
     {
         foreach (var obj in playerRelatedObjects)
         {
@@ -112,7 +111,7 @@ public class PlayerManager : IDisposable
     {
         change ??= string.Empty;
         var player = playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player);
-        if (LastCreatedCharacterData != null && LastCreatedCharacterData.CustomizePlusData != change && !player.IsProcessing)
+        if (LastCreatedCharacterData != null && !string.Equals(LastCreatedCharacterData.CustomizePlusData, change, StringComparison.Ordinal) && !player.IsProcessing)
         {
             Logger.Debug("CustomizePlus data changed to " + change);
             player.HasTransientsUpdate = true;
@@ -273,7 +272,7 @@ public class PlayerManager : IDisposable
             //Logger.Verbose(json);
 #endif
 
-            if ((LastCreatedCharacterData?.DataHash.Value ?? string.Empty) == cacheDto.DataHash.Value)
+            if (string.Equals(LastCreatedCharacterData?.DataHash.Value ?? string.Empty, cacheDto.DataHash.Value, StringComparison.Ordinal))
             {
                 Logger.Debug("Not sending data, already sent");
                 return;

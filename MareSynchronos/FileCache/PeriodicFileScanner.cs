@@ -64,9 +64,9 @@ public class PeriodicFileScanner : IDisposable
         haltScanLocks[source]--;
         if (haltScanLocks[source] < 0) haltScanLocks[source] = 0;
 
-        if (fileScanWasRunning && haltScanLocks.All(f => f.Value == 0))
+        if (_fileScanWasRunning && haltScanLocks.All(f => f.Value == 0))
         {
-            fileScanWasRunning = false;
+            _fileScanWasRunning = false;
             InvokeScan(true);
         }
     }
@@ -79,13 +79,13 @@ public class PeriodicFileScanner : IDisposable
         if (IsScanRunning && haltScanLocks.Any(f => f.Value > 0))
         {
             _scanCancellationTokenSource?.Cancel();
-            fileScanWasRunning = true;
+            _fileScanWasRunning = true;
         }
     }
 
-    private bool fileScanWasRunning = false;
-    private long currentFileProgress = 0;
-    public long CurrentFileProgress => currentFileProgress;
+    private bool _fileScanWasRunning = false;
+    private long _currentFileProgress = 0;
+    public long CurrentFileProgress => _currentFileProgress;
 
     public long FileCacheSize { get; set; }
 
@@ -95,7 +95,7 @@ public class PeriodicFileScanner : IDisposable
 
     public string TimeUntilNextScan => _timeUntilNextScan.ToString(@"mm\:ss");
     private TimeSpan _timeUntilNextScan = TimeSpan.Zero;
-    private int timeBetweenScans => _configService.Current.TimeSpanBetweenScansInSeconds;
+    private int TimeBetweenScans => _configService.Current.TimeSpanBetweenScansInSeconds;
 
     public void Dispose()
     {
@@ -113,7 +113,7 @@ public class PeriodicFileScanner : IDisposable
     {
         bool isForced = forced;
         TotalFiles = 0;
-        currentFileProgress = 0;
+        _currentFileProgress = 0;
         _scanCancellationTokenSource?.Cancel();
         _scanCancellationTokenSource = new CancellationTokenSource();
         var token = _scanCancellationTokenSource.Token;
@@ -131,12 +131,12 @@ public class PeriodicFileScanner : IDisposable
                 {
                     isForced = false;
                     TotalFiles = 0;
-                    currentFileProgress = 0;
+                    _currentFileProgress = 0;
                     PeriodicFileScan(token);
                     TotalFiles = 0;
-                    currentFileProgress = 0;
+                    _currentFileProgress = 0;
                 }
-                _timeUntilNextScan = TimeSpan.FromSeconds(timeBetweenScans);
+                _timeUntilNextScan = TimeSpan.FromSeconds(TimeBetweenScans);
                 while (_timeUntilNextScan.TotalSeconds >= 0)
                 {
                     await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
@@ -166,7 +166,7 @@ public class PeriodicFileScanner : IDisposable
             .Select(f => new FileInfo(f)).OrderBy(f => f.LastAccessTime).ToList();
         while (FileCacheSize > (long)_configService.Current.MaxLocalCacheInGiB * 1024 * 1024 * 1024)
         {
-            var oldestFile = allFiles.First();
+            var oldestFile = allFiles[0];
             FileCacheSize -= oldestFile.Length;
             File.Delete(oldestFile.FullName);
             allFiles.Remove(oldestFile);
@@ -199,7 +199,7 @@ public class PeriodicFileScanner : IDisposable
         Logger.Debug("Getting files from " + penumbraDir + " and " + _configService.Current.CacheFolder);
         string[] ext = { ".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk" };
 
-        var scannedFiles = new ConcurrentDictionary<string, bool>(Directory.EnumerateFiles(penumbraDir, "*.*", SearchOption.AllDirectories)
+        var scannedFiles = new ConcurrentDictionary<string, bool>(Directory.EnumerateFiles(penumbraDir!, "*.*", SearchOption.AllDirectories)
                             .Select(s => s.ToLowerInvariant())
                             .Where(f => ext.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase)) 
                                 && !f.Contains(@"\bg\", StringComparison.OrdinalIgnoreCase) 
@@ -248,7 +248,7 @@ public class PeriodicFileScanner : IDisposable
                         Logger.Warn(ex.StackTrace);
                     }
 
-                    Interlocked.Increment(ref currentFileProgress);
+                    Interlocked.Increment(ref _currentFileProgress);
                     Thread.Sleep(1);
                 }, ct);
 
@@ -303,7 +303,7 @@ public class PeriodicFileScanner : IDisposable
                     Logger.Warn(ex.StackTrace);
                 }
 
-                Interlocked.Increment(ref currentFileProgress);
+                Interlocked.Increment(ref _currentFileProgress);
                 Thread.Sleep(1);
             }, ct);
 
@@ -316,7 +316,7 @@ public class PeriodicFileScanner : IDisposable
 
         Logger.Debug("Scan complete");
         TotalFiles = 0;
-        currentFileProgress = 0;
+        _currentFileProgress = 0;
         entitiesToRemove.Clear();
         scannedFiles.Clear();
         dbTasks = Array.Empty<Task>();
