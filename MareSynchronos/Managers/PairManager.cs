@@ -47,6 +47,7 @@ public class PairManager : IDisposable
     {
         return new Lazy<Dictionary<GroupFullInfoDto, List<Pair>>>(() =>
         {
+            Logger.Debug("Creating new GroupPairsLazy");
             Dictionary<GroupFullInfoDto, List<Pair>> outDict = new();
             foreach (var group in _allGroups)
             {
@@ -74,11 +75,11 @@ public class PairManager : IDisposable
             {
                 if (GroupDataComparer.Instance.Equals(grpPair.Group, data))
                 {
-                    item.Value.GroupPair.Remove(grpPair);
+                    _allClientPairs[item.Key].GroupPair.Remove(grpPair);
                 }
             }
 
-            if (!item.Value.HasAnyConnection())
+            if (!_allClientPairs[item.Key].HasAnyConnection())
             {
                 _allClientPairs.TryRemove(item.Key, out _);
             }
@@ -177,8 +178,9 @@ public class PairManager : IDisposable
             if (!pair.HasAnyConnection())
             {
                 _allClientPairs.TryRemove(dto.User, out _);
-                RecreateLazy();
             }
+
+            RecreateLazy();
         }
     }
 
@@ -263,6 +265,11 @@ public class PairManager : IDisposable
         var group = _allGroups[dto.Group];
         group.GroupUserPermissions = dto.GroupPairPermissions;
         RecreateLazy();
+    }
+
+    internal void SetGroupStatusInfo(GroupPairUserInfoDto dto)
+    {
+        _allGroups[dto.Group].GroupUserInfo = dto.GroupUserInfo;
     }
 
     internal void SetGroupPairStatusInfo(GroupPairUserInfoDto dto)

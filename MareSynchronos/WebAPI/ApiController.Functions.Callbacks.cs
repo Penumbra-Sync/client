@@ -136,7 +136,8 @@ public partial class ApiController
     public Task Client_GroupPairChangeUserInfo(GroupPairUserInfoDto dto)
     {
         Logger.Verbose("Client_GroupPairChangeUserInfo: " + dto);
-        _pairManager.SetGroupPairStatusInfo(dto);
+        if (string.Equals(dto.UID, UID, StringComparison.Ordinal)) _pairManager.SetGroupStatusInfo(dto);
+        else _pairManager.SetGroupPairStatusInfo(dto);
         return Task.CompletedTask;
     }
 

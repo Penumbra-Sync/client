@@ -23,30 +23,57 @@ namespace MareSynchronos.UI.Components
             _selectGroupForPairUi = selectGroupForPairUi;
         }
 
-        public void Draw(List<Pair> availablePairs)
+        public void Draw(List<Pair> visibleUsers, List<Pair> onlineUsers, List<Pair> offlineUsers)
         {
             // Only render those tags that actually have pairs in them, otherwise
             // we can end up with a bunch of useless pair groups
             var tagsWithPairsInThem = _tagHandler.GetAllTagsSorted();
             foreach (var tag in tagsWithPairsInThem)
             {
-                UiShared.DrawWithID($"group-{tag}", () => DrawCategory(tag, availablePairs));
+                UiShared.DrawWithID($"group-{tag}", () => DrawCategory(tag, visibleUsers, onlineUsers, offlineUsers));
             }
         }
 
-        public void DrawCategory(string tag, List<Pair> availablePairs)
+        public void DrawCategory(string tag, List<Pair> visibleUsers, List<Pair> onlineUsers, List<Pair> offlineUsers)
         {
             var otherUidsTaggedWithTag = _tagHandler.GetOtherUidsForTag(tag);
-            var availablePairsInThisTag = availablePairs
+            var visiblePairsInThisTag = visibleUsers
                 .Where(pair => otherUidsTaggedWithTag.Contains(pair.UserData.UID))
                 .ToList();
-            if (availablePairsInThisTag.Any())
+            var onlinePairsInThisTag = onlineUsers
+                .Where(pair => otherUidsTaggedWithTag.Contains(pair.UserData.UID))
+                .ToList();
+            var offlinePairsInThisTag = offlineUsers
+                .Where(pair => otherUidsTaggedWithTag.Contains(pair.UserData.UID))
+                .ToList();
+            if (visiblePairsInThisTag.Any() || onlinePairsInThisTag.Any() || offlinePairsInThisTag.Any())
             {
                 DrawName(tag);
-                UiShared.DrawWithID($"group-{tag}-buttons", () => DrawButtons(tag, availablePairsInThisTag));
+                UiShared.DrawWithID($"group-{tag}-buttons", () => DrawButtons(tag, visiblePairsInThisTag));
                 if (_tagHandler.IsTagOpen(tag))
                 {
-                    DrawPairs(tag, availablePairsInThisTag);
+                    ImGui.Indent(20);
+                    if (visiblePairsInThisTag.Any())
+                    {
+                        ImGui.Text("Visible");
+                        ImGui.Separator();
+                        DrawPairs(tag, visiblePairsInThisTag);
+                    }
+
+                    if (onlinePairsInThisTag.Any())
+                    {
+                        ImGui.Text("Online");
+                        ImGui.Separator();
+                        DrawPairs(tag, onlinePairsInThisTag);
+                    }
+
+                    if (offlinePairsInThisTag.Any())
+                    {
+                        ImGui.Text("Offline/Unknown");
+                        ImGui.Separator();
+                        DrawPairs(tag, offlinePairsInThisTag);
+                    }
+                    ImGui.Unindent(20);
                 }
             }
         }
@@ -142,20 +169,10 @@ namespace MareSynchronos.UI.Components
 
         private void DrawPairs(string tag, List<Pair> availablePairsInThisCategory)
         {
-            ImGui.Separator();
             // These are all the OtherUIDs that are tagged with this tag
             availablePairsInThisCategory
-                .ForEach(pair => UiShared.DrawWithID($"tag-{tag}-pair-${pair.UserData.UID}", () => DrawPair(pair)));
+                .ForEach(pair => UiShared.DrawWithID($"tag-{tag}-pair-${pair.UserData.UID}", () => _clientRenderFn(pair)));
             ImGui.Separator();
-        }
-
-        private void DrawPair(Pair pair)
-        {
-            // This is probably just dumb. Somehow, just setting the cursor position to the icon lenght
-            // does not really push the child rendering further. So we'll just add two whitespaces and call it a day?
-            UiShared.FontText("    ", UiBuilder.DefaultFont);
-            ImGui.SameLine();
-            _clientRenderFn(pair);
         }
 
         private void ToggleTagOpen(string tag)

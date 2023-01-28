@@ -388,7 +388,7 @@ public class CompactUi : Window, IDisposable
             presenceColor = (entry.IsOnline || entry.IsVisible) ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
             presenceText = entryUID + " is offline";
             if (entry.IsOnline && !entry.IsVisible) presenceText = entryUID + " is online";
-            else if (entry.IsOnline && entry.IsVisible) presenceText = entryUID + " is present: " + entry.PlayerName;
+            else if (entry.IsOnline && entry.IsVisible) presenceText = entryUID + " is visible: " + entry.PlayerName;
         }
 
         ImGui.PushFont(UiBuilder.IconFont);
@@ -420,7 +420,7 @@ public class CompactUi : Window, IDisposable
             playerText = entryUID;
         }
 
-        ImGui.SameLine(50 * ImGuiHelpers.GlobalScale);
+        ImGui.SameLine();
         if (!string.Equals(EditNickEntry, entry.UserData.UID, StringComparison.Ordinal))
         {
             ImGui.SetCursorPosY(textPos);
@@ -532,16 +532,57 @@ public class CompactUi : Window, IDisposable
             : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - TransferPartHeight - ImGui.GetCursorPosY();
         var users = GetFilteredUsers();
 
-        if (!_configService.Current.ReverseUserSort) users.OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ThenByDescending(u => u.IsOnline ? 1 : 0).ThenByDescending(u => u.IsVisible ? 1 : 0).ToList();
-        else users = users.OrderByDescending(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ThenByDescending(u => u.IsOnline ? 1 : 0).ThenByDescending(u => u.IsVisible ? 1 : 0).ToList();
+        //if (!_configService.Current.ReverseUserSort) users.OrderByDescending(u => u.IsVisible ? 1 : 0).ThenByDescending(u => u.IsOnline ? 1 : 0).ThenBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
+        //else users = users.OrderByDescending(u => u.IsVisible ? 1 : 0).ThenByDescending(u => u.IsOnline ? 1 : 0).ThenByDescending(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
 
         ImGui.BeginChild("list", new Vector2(WindowContentWidth, ySize), false);
-        var pairsWithoutTags = users.Where(pair => !_tagHandler.HasAnyTag(pair.UserPair!)).ToList();
-        _pairGroupsUi.Draw(users);
-        foreach (var entry in pairsWithoutTags)
+        var visibleUsers = users.Where(u => u.IsVisible).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
+        var onlineUsers = users.Where(u => u.IsOnline && !u.IsVisible).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
+        var offlineUsers = users.Where(u => !u.IsOnline && !u.IsVisible).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
+
+        if (_configService.Current.ReverseUserSort)
         {
-            UiShared.DrawWithID(entry.UserData.UID, () => DrawPairedClient(entry));
+            visibleUsers.Reverse();
+            onlineUsers.Reverse();
+            offlineUsers.Reverse();
         }
+
+        _pairGroupsUi.Draw(visibleUsers, onlineUsers, offlineUsers);
+
+        visibleUsers = visibleUsers.Where(pair => !_tagHandler.HasAnyTag(pair.UserPair!)).ToList();
+        onlineUsers = onlineUsers.Where(pair => !_tagHandler.HasAnyTag(pair.UserPair!)).ToList();
+        offlineUsers = offlineUsers.Where(pair => !_tagHandler.HasAnyTag(pair.UserPair!)).ToList();
+
+        if (visibleUsers.Any())
+        {
+            ImGui.Text("Visible");
+            ImGui.Separator();
+            foreach (var entry in visibleUsers)
+            {
+                UiShared.DrawWithID(entry.UserData.UID, () => DrawPairedClient(entry));
+            }
+        }
+
+        if (onlineUsers.Any())
+        {
+            ImGui.Text("Online");
+            ImGui.Separator();
+            foreach (var entry in onlineUsers)
+            {
+                UiShared.DrawWithID(entry.UserData.UID, () => DrawPairedClient(entry));
+            }
+        }
+
+        if (offlineUsers.Any())
+        {
+            ImGui.Text("Offline/Unknown");
+            ImGui.Separator();
+            foreach (var entry in offlineUsers)
+            {
+                UiShared.DrawWithID(entry.UserData.UID, () => DrawPairedClient(entry));
+            }
+        }
+
         ImGui.EndChild();
     }
 

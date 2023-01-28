@@ -121,7 +121,7 @@ public class PeriodicFileScanner : IDisposable
         {
             while (!token.IsCancellationRequested)
             {
-                while (haltScanLocks.Any(f => f.Value > 0))
+                while (haltScanLocks.Any(f => f.Value > 0) || !_ipcManager.CheckPenumbraApi())
                 {
                     await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                 }
