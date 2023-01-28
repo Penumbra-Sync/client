@@ -11,6 +11,7 @@ using MareSynchronos.API.SignalR;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.Managers;
 using Dalamud.Utility;
+using MareSynchronos.MareConfiguration;
 
 namespace MareSynchronos.WebAPI;
 
@@ -26,7 +27,7 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     public readonly int[] SupportedServerVersions = { IMareHub.ApiVersion };
 
-    private readonly MareConfiguration.Configuration _pluginConfiguration;
+    private readonly ConfigurationService _configService;
     private readonly DalamudUtil _dalamudUtil;
     private readonly FileCacheManager _fileDbManager;
     private readonly PairManager _pairManager;
@@ -49,11 +50,11 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     private HttpClient _httpClient;
 
-    public ApiController(MareConfiguration.Configuration pluginConfiguration, DalamudUtil dalamudUtil, FileCacheManager fileDbManager, PairManager pairManager, ServerConfigurationManager serverManager)
+    public ApiController(ConfigurationService configService, DalamudUtil dalamudUtil, FileCacheManager fileDbManager, PairManager pairManager, ServerConfigurationManager serverManager)
     {
         Logger.Verbose("Creating " + nameof(ApiController));
 
-        _pluginConfiguration = pluginConfiguration;
+        _configService = configService;
         _dalamudUtil = dalamudUtil;
         _fileDbManager = fileDbManager;
         _pairManager = pairManager;
@@ -123,7 +124,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         _httpClient?.Dispose();
         _httpClient = new();
 
-        if (_pluginConfiguration.FullPause)
+        if (_configService.Current.FullPause)
         {
             Logger.Info("Not recreating Connection, paused");
             _connectionDto = null;

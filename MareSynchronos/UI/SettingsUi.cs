@@ -18,7 +18,7 @@ namespace MareSynchronos.UI;
 
 public class SettingsUi : Window, IDisposable
 {
-    private readonly Configuration _configuration;
+    private readonly ConfigurationService _configService;
     private readonly WindowSystem _windowSystem;
     private ApiController _apiController => _uiShared.ApiController;
     private readonly MareCharaFileManager _mareCharaFileManager;
@@ -31,13 +31,10 @@ public class SettingsUi : Window, IDisposable
     private bool _overwriteExistingLabels = false;
     private bool? _notesSuccessfullyApplied = null;
     private string _lastTab = string.Empty;
-    private bool _openPopupOnAddition;
-    private bool _hideInfoMessages;
-    private bool _disableOptionalPluginsWarnings;
     private bool _wasOpen = false;
 
     public SettingsUi(WindowSystem windowSystem,
-        UiShared uiShared, Configuration configuration, 
+        UiShared uiShared, ConfigurationService configService, 
         MareCharaFileManager mareCharaFileManager, PairManager pairManager, ServerConfigurationManager serverConfigurationManager) : base("Mare Synchronos Settings")
     {
         Logger.Verbose("Creating " + nameof(SettingsUi));
@@ -48,15 +45,13 @@ public class SettingsUi : Window, IDisposable
             MaximumSize = new Vector2(800, 2000),
         };
 
-        _configuration = configuration;
+        _configService = configService;
         _windowSystem = windowSystem;
         _mareCharaFileManager = mareCharaFileManager;
         _pairManager = pairManager;
         _serverConfigurationManager = serverConfigurationManager;
         _uiShared = uiShared;
-        _openPopupOnAddition = _configuration.OpenPopupOnAdd;
-        _hideInfoMessages = _configuration.HideInfoMessages;
-        _disableOptionalPluginsWarnings = _configuration.DisableOptionalPluginWarnings;
+
 
         _uiShared.GposeStart += _uiShared_GposeStart;
         _uiShared.GposeEnd += _uiShared_GposeEnd;
@@ -441,26 +436,31 @@ public class SettingsUi : Window, IDisposable
         {
             UiShared.ColorTextWrapped("Attempt to import notes from clipboard failed. Check formatting and try again", ImGuiColors.DalamudRed);
         }
-        if (ImGui.Checkbox("Open Notes Popup on user addition", ref _openPopupOnAddition))
+
+        var openPopupOnAddition = _configService.Current.OpenPopupOnAdd;
+        var hideInfoMessages = _configService.Current.HideInfoMessages;
+        var disableOptionalPluginWarnings = _configService.Current.DisableOptionalPluginWarnings;
+
+        if (ImGui.Checkbox("Open Notes Popup on user addition", ref openPopupOnAddition))
         {
             _apiController.LastAddedUser = null;
-            _configuration.OpenPopupOnAdd = _openPopupOnAddition;
-            _configuration.Save();
+            _configService.Current.OpenPopupOnAdd = openPopupOnAddition;
+            _configService.Save();
         }
         UiShared.DrawHelpText("This will open a popup that allows you to set the notes for a user after successfully adding them to your individual pairs.");
 
         ImGui.Separator();
         UiShared.FontText("Server Messages", _uiShared.UidFont);
-        if (ImGui.Checkbox("Hide Server Info Messages", ref _hideInfoMessages))
+        if (ImGui.Checkbox("Hide Server Info Messages", ref hideInfoMessages))
         {
-            _configuration.HideInfoMessages = _hideInfoMessages;
-            _configuration.Save();
+            _configService.Current.HideInfoMessages = hideInfoMessages;
+            _configService.Save();
         }
         UiShared.DrawHelpText("Enabling this will not print any \"Info\" labeled messages into the game chat.");
-        if (ImGui.Checkbox("Disable optional plugin warnings", ref _disableOptionalPluginsWarnings))
+        if (ImGui.Checkbox("Disable optional plugin warnings", ref disableOptionalPluginWarnings))
         {
-            _configuration.DisableOptionalPluginWarnings = _disableOptionalPluginsWarnings;
-            _configuration.Save();
+            _configService.Current.DisableOptionalPluginWarnings = disableOptionalPluginWarnings;
+            _configService.Save();
         }
         UiShared.DrawHelpText("Enabling this will not print any \"Warning\" labeled messages for missing optional plugins Heels or Customize+ in the game chat.");
     }
@@ -528,14 +528,14 @@ public class SettingsUi : Window, IDisposable
     private void DrawCurrentTransfers()
     {
         _lastTab = "Transfers";
-        bool showTransferWindow = _configuration.ShowTransferWindow;
+        bool showTransferWindow = _configService.Current.ShowTransferWindow;
         if (ImGui.Checkbox("Show separate Transfer window while transfers are active", ref showTransferWindow))
         {
-            _configuration.ShowTransferWindow = showTransferWindow;
-            _configuration.Save();
+            _configService.Current.ShowTransferWindow = showTransferWindow;
+            _configService.Save();
         }
 
-        if (_configuration.ShowTransferWindow)
+        if (_configService.Current.ShowTransferWindow)
         {
             ImGui.Indent();
             bool editTransferWindowPosition = _uiShared.EditTrackerPosition;
@@ -659,11 +659,11 @@ public class SettingsUi : Window, IDisposable
 
             ImGui.Unindent();
         }
-        bool openInGpose = _configuration.OpenGposeImportOnGposeStart;
+        bool openInGpose = _configService.Current.OpenGposeImportOnGposeStart;
         if (ImGui.Checkbox("Open MCDF import window when GPose loads", ref openInGpose))
         {
-            _configuration.OpenGposeImportOnGposeStart = openInGpose;
-            _configuration.Save();
+            _configService.Current.OpenGposeImportOnGposeStart = openInGpose;
+            _configService.Save();
         }
         UiShared.DrawHelpText("This will automatically open the import menu when loading into Gpose. If unchecked you can open the menu manually with /mare gpose");
 
@@ -686,7 +686,7 @@ public class SettingsUi : Window, IDisposable
             {
                 Task.Run(() =>
                 {
-                    foreach (var file in Directory.GetFiles(_configuration.CacheFolder))
+                    foreach (var file in Directory.GetFiles(_configService.Current.CacheFolder))
                     {
                         File.Delete(file);
                     }

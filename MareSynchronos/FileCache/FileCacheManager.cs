@@ -12,18 +12,18 @@ public class FileCacheManager : IDisposable
     private const string PenumbraPrefix = "{penumbra}";
     private const string CachePrefix = "{cache}";
     private readonly IpcManager _ipcManager;
-    private readonly Configuration _configuration;
+    private readonly ConfigurationService _configService;
     private readonly string CsvPath;
     private string CsvBakPath => CsvPath + ".bak";
     private readonly ConcurrentDictionary<string, FileCacheEntity> FileCaches = new(StringComparer.Ordinal);
     public const string CsvSplit = "|";
     private object _fileWriteLock = new();
 
-    public FileCacheManager(IpcManager ipcManager, Configuration configuration, string configDirectoryName)
+    public FileCacheManager(IpcManager ipcManager, ConfigurationService configService)
     {
         _ipcManager = ipcManager;
-        _configuration = configuration;
-        CsvPath = Path.Combine(configDirectoryName, "FileCache.csv");
+        _configService = configService;
+        CsvPath = Path.Combine(configService.ConfigurationDirectory, "FileCache.csv");
 
         lock (_fileWriteLock)
         {
@@ -129,8 +129,8 @@ public class FileCacheManager : IDisposable
         FileInfo fi = new(path);
         if (!fi.Exists) return null;
         var fullName = fi.FullName.ToLowerInvariant();
-        if (!fullName.Contains(_configuration.CacheFolder.ToLowerInvariant(), StringComparison.Ordinal)) return null;
-        string prefixedPath = fullName.Replace(_configuration.CacheFolder.ToLowerInvariant(), CachePrefix + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
+        if (!fullName.Contains(_configService.Current.CacheFolder.ToLowerInvariant(), StringComparison.Ordinal)) return null;
+        string prefixedPath = fullName.Replace(_configService.Current.CacheFolder.ToLowerInvariant(), CachePrefix + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
         return CreateFileCacheEntity(fi, prefixedPath, fi.Name.ToUpper(CultureInfo.InvariantCulture));
     }
 
@@ -210,7 +210,7 @@ public class FileCacheManager : IDisposable
         }
         else if (fileCache.PrefixedFilePath.StartsWith(CachePrefix, StringComparison.OrdinalIgnoreCase))
         {
-            fileCache.SetResolvedFilePath(fileCache.PrefixedFilePath.Replace(CachePrefix, _configuration.CacheFolder, StringComparison.Ordinal));
+            fileCache.SetResolvedFilePath(fileCache.PrefixedFilePath.Replace(CachePrefix, _configService.Current.CacheFolder, StringComparison.Ordinal));
         }
 
         return fileCache;

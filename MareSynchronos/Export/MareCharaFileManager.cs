@@ -12,18 +12,18 @@ public class MareCharaFileManager
 {
     private readonly FileCacheManager _manager;
     private readonly IpcManager _ipcManager;
-    private readonly Configuration _configuration;
+    private readonly ConfigurationService _configService;
     private readonly DalamudUtil _dalamudUtil;
     private readonly MareCharaFileDataFactory _factory;
     public MareCharaFileHeader? LoadedCharaFile { get; private set; }
     public bool CurrentlyWorking { get; private set; } = false;
 
-    public MareCharaFileManager(FileCacheManager manager, IpcManager ipcManager, Configuration configuration, DalamudUtil dalamudUtil)
+    public MareCharaFileManager(FileCacheManager manager, IpcManager ipcManager, ConfigurationService configService, DalamudUtil dalamudUtil)
     {
         _factory = new(manager);
         _manager = manager;
         _ipcManager = ipcManager;
-        _configuration = configuration;
+        _configService = configService;
         _dalamudUtil = dalamudUtil;
     }
 
@@ -101,7 +101,7 @@ public class MareCharaFileManager
         int i = 0;
         foreach (var fileData in charaFileHeader.CharaFileData.Files)
         {
-            var fileName = Path.Combine(_configuration.CacheFolder, "mare_" + (i++) + ".tmp");
+            var fileName = Path.Combine(_configService.Current.CacheFolder, "mare_" + (i++) + ".tmp");
             var length = fileData.Length;
             var bufferSize = 4 * 1024 * 1024;
             var buffer = new byte[bufferSize];

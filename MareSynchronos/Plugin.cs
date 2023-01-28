@@ -24,7 +24,6 @@ public sealed class Plugin : IDalamudPlugin
     private const string CommandName = "/mare";
     private readonly ApiController _apiController;
     private readonly CommandManager _commandManager;
-    private readonly Configuration _configuration;
     private readonly PeriodicFileScanner _periodicFileScanner;
     private readonly IntroUi _introUi;
     private readonly IpcManager _ipcManager;
@@ -46,6 +45,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly GposeUi _gposeUi;
+    private readonly ConfigurationService _configurationService;
 
 
     public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager, DataManager gameData,
@@ -55,9 +55,7 @@ public sealed class Plugin : IDalamudPlugin
         _pluginInterface = pluginInterface;
         _pluginInterface.UiBuilder.DisableGposeUiHide = true;
         _commandManager = commandManager;
-        _configuration = _pluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-        _configuration.Initialize(_pluginInterface);
-        _configuration.Migrate();
+        _configurationService = new(_pluginInterface);
 
         _localization = new Dalamud.Localization("MareSynchronos.Localization.", "", true);
         _localization.SetupWithLangCode("en");
@@ -69,21 +67,21 @@ public sealed class Plugin : IDalamudPlugin
 
         _ipcManager = new IpcManager(_pluginInterface, _dalamudUtil);
         _fileDialogManager = new FileDialogManager();
-        _fileCacheManager = new FileCacheManager(_ipcManager, _configuration, _pluginInterface.ConfigDirectory.FullName);
-        _serverConfigurationManager = new ServerConfigurationManager(_configuration, _dalamudUtil);
-        _pairManager = new PairManager(new CachedPlayerFactory(_ipcManager, _dalamudUtil, _fileCacheManager), _dalamudUtil, new PairFactory(_configuration, _serverConfigurationManager));
-        _apiController = new ApiController(_configuration, _dalamudUtil, _fileCacheManager, _pairManager, _serverConfigurationManager);
-        _periodicFileScanner = new PeriodicFileScanner(_ipcManager, _configuration, _fileCacheManager, _apiController, _dalamudUtil);
+        _fileCacheManager = new FileCacheManager(_ipcManager, _configurationService);
+        _serverConfigurationManager = new ServerConfigurationManager(_configurationService, _dalamudUtil);
+        _pairManager = new PairManager(new CachedPlayerFactory(_ipcManager, _dalamudUtil, _fileCacheManager), _dalamudUtil, new PairFactory(_configurationService, _serverConfigurationManager));
+        _apiController = new ApiController(_configurationService, _dalamudUtil, _fileCacheManager, _pairManager, _serverConfigurationManager);
+        _periodicFileScanner = new PeriodicFileScanner(_ipcManager, _configurationService, _fileCacheManager, _apiController, _dalamudUtil);
         _fileReplacementFactory = new FileReplacementFactory(_fileCacheManager, _ipcManager);
-        _mareCharaFileManager = new(_fileCacheManager, _ipcManager, _configuration, _dalamudUtil);
+        _mareCharaFileManager = new(_fileCacheManager, _ipcManager, _configurationService, _dalamudUtil);
 
         _uiSharedComponent =
-            new UiShared(_ipcManager, _apiController, _periodicFileScanner, _fileDialogManager, _configuration, _dalamudUtil, _pluginInterface, _localization, _serverConfigurationManager);
-        _settingsUi = new SettingsUi(_windowSystem, _uiSharedComponent, _configuration, _mareCharaFileManager, _pairManager, _serverConfigurationManager);
-        _compactUi = new CompactUi(_windowSystem, _uiSharedComponent, _configuration, _apiController, _pairManager, _serverConfigurationManager);
-        _gposeUi = new GposeUi(_windowSystem, _mareCharaFileManager, _dalamudUtil, _fileDialogManager, _configuration);
+            new UiShared(_ipcManager, _apiController, _periodicFileScanner, _fileDialogManager, _configurationService, _dalamudUtil, _pluginInterface, _localization, _serverConfigurationManager);
+        _settingsUi = new SettingsUi(_windowSystem, _uiSharedComponent, _configurationService, _mareCharaFileManager, _pairManager, _serverConfigurationManager);
+        _compactUi = new CompactUi(_windowSystem, _uiSharedComponent, _configurationService, _apiController, _pairManager, _serverConfigurationManager);
+        _gposeUi = new GposeUi(_windowSystem, _mareCharaFileManager, _dalamudUtil, _fileDialogManager, _configurationService);
 
-        _introUi = new IntroUi(_windowSystem, _uiSharedComponent, _configuration, _periodicFileScanner, _serverConfigurationManager);
+        _introUi = new IntroUi(_windowSystem, _uiSharedComponent, _configurationService, _periodicFileScanner, _serverConfigurationManager);
         _settingsUi.SwitchToIntroUi += () =>
         {
             _introUi.IsOpen = true;
@@ -101,7 +99,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             _settingsUi.Toggle();
         };
-        _downloadUi = new DownloadUi(_windowSystem, _configuration, _apiController, _uiSharedComponent);
+        _downloadUi = new DownloadUi(_windowSystem, _configurationService, _apiController, _uiSharedComponent);
 
 
         _dalamudUtil.LogIn += DalamudUtilOnLogIn;
@@ -139,6 +137,7 @@ public sealed class Plugin : IDalamudPlugin
         _ipcManager?.Dispose();
         _transientResourceManager?.Dispose();
         _dalamudUtil.Dispose();
+        _configurationService?.Dispose();
         Logger.Debug("Shut down");
     }
 
@@ -154,11 +153,11 @@ public sealed class Plugin : IDalamudPlugin
             HelpMessage = "Opens the Mare Synchronos UI"
         });
 
-        if (!_configuration.HasValidSetup())
+        if (!_configurationService.Current.HasValidSetup())
         {
             _introUi.IsOpen = true;
-            _configuration.FullPause = false;
-            _configuration.Save();
+            _configurationService.Current.FullPause = false;
+            _configurationService.Save();
             return;
         }
 
@@ -232,13 +231,13 @@ public sealed class Plugin : IDalamudPlugin
             {
                 "on" => false,
                 "off" => true,
-                _ => !_configuration.FullPause,
-            } : !_configuration.FullPause;
+                _ => !_configurationService.Current.FullPause,
+            } : !_configurationService.Current.FullPause;
 
-            if (fullPause != _configuration.FullPause)
+            if (fullPause != _configurationService.Current.FullPause)
             {
-                _configuration.FullPause = fullPause;
-                _configuration.Save();
+                _configurationService.Current.FullPause = fullPause;
+                _configurationService.Save();
                 _ = _apiController.CreateConnections();
             }
         }
@@ -250,7 +249,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OpenUi()
     {
-        if (_configuration.HasValidSetup())
+        if (_configurationService.Current.HasValidSetup())
             _compactUi.Toggle();
         else
             _introUi.Toggle();

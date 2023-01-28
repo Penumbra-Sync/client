@@ -10,7 +10,7 @@ namespace MareSynchronos.UI;
 public class DownloadUi : Window, IDisposable
 {
     private readonly WindowSystem _windowSystem;
-    private readonly Configuration _pluginConfiguration;
+    private readonly ConfigurationService _configService;
     private readonly ApiController _apiController;
     private readonly UiShared _uiShared;
     private bool _wasOpen = false;
@@ -21,11 +21,11 @@ public class DownloadUi : Window, IDisposable
         _windowSystem.RemoveWindow(this);
     }
 
-    public DownloadUi(WindowSystem windowSystem, Configuration pluginConfiguration, ApiController apiController, UiShared uiShared) : base("Mare Synchronos Downloads")
+    public DownloadUi(WindowSystem windowSystem, ConfigurationService configService, ApiController apiController, UiShared uiShared) : base("Mare Synchronos Downloads")
     {
         Logger.Verbose("Creating " + nameof(DownloadUi));
         _windowSystem = windowSystem;
-        _pluginConfiguration = pluginConfiguration;
+        _configService = configService;
         _apiController = apiController;
         _uiShared = uiShared;
 
@@ -78,7 +78,7 @@ public class DownloadUi : Window, IDisposable
 
     public override void Draw()
     {
-        if (!_pluginConfiguration.ShowTransferWindow) return;
+        if (!_configService.Current.ShowTransferWindow) return;
         if (!_apiController.IsDownloading && !_apiController.IsUploading) return;
 
         var drawList = ImGui.GetWindowDrawList();

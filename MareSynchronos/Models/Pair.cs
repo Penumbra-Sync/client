@@ -12,13 +12,13 @@ namespace MareSynchronos.Models;
 
 public class Pair
 {
-    private readonly Configuration _configuration;
+    private readonly ConfigurationService _configService;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private OptionalPluginWarning? _pluginWarnings;
 
-    public Pair(Configuration configuration, ServerConfigurationManager serverConfigurationManager)
+    public Pair(ConfigurationService configService, ServerConfigurationManager serverConfigurationManager)
     {
-        _configuration = configuration;
+        _configService = configService;
         _serverConfigurationManager = serverConfigurationManager;
     }
 
@@ -60,8 +60,8 @@ public class Pair
         if (CachedPlayer == null) throw new InvalidOperationException("CachedPlayer not initialized");
         _pluginWarnings ??= new()
         {
-            ShownCustomizePlusWarning = _configuration.DisableOptionalPluginWarnings,
-            ShownHeelsWarning = _configuration.DisableOptionalPluginWarnings
+            ShownCustomizePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
+            ShownHeelsWarning = _configService.Current.DisableOptionalPluginWarnings
         };
 
         CachedPlayer.Initialize(address, name, RemoveNotSyncedFiles(LastReceivedCharacterData), _pluginWarnings);
@@ -73,8 +73,8 @@ public class Pair
         if (CachedPlayer == null) throw new InvalidOperationException("CachedPlayer not initialized");
         _pluginWarnings ??= new()
         {
-            ShownCustomizePlusWarning = _configuration.DisableOptionalPluginWarnings,
-            ShownHeelsWarning = _configuration.DisableOptionalPluginWarnings
+            ShownCustomizePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
+            ShownHeelsWarning = _configService.Current.DisableOptionalPluginWarnings
         };
 
         CachedPlayer.ApplyCharacterData(RemoveNotSyncedFiles(data.CharaData)!, _pluginWarnings);

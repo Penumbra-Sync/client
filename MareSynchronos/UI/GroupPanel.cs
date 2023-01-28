@@ -519,7 +519,7 @@ namespace MareSynchronos.UI
                     }
                 }
                 UiShared.AttachToolTip("Hold CTRL and click to leave this Syncshell" + (!string.Equals(groupDto.OwnerUID, _apiController.UID, StringComparison.Ordinal) ? string.Empty : Environment.NewLine
-                    + "WARNING: This action is irreverisble" + Environment.NewLine + "Leaving an owned Syncshell will transfer the ownership to a random person in the Syncshell."));
+                    + "WARNING: This action is irreversible" + Environment.NewLine + "Leaving an owned Syncshell will transfer the ownership to a random person in the Syncshell."));
 
                 if (UiShared.IconTextButton(FontAwesomeIcon.Copy, "Copy ID"))
                 {

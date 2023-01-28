@@ -28,7 +28,7 @@ public class UiShared : IDisposable
     private readonly ApiController _apiController;
     private readonly PeriodicFileScanner _cacheScanner;
     public readonly FileDialogManager FileDialogManager;
-    private readonly Configuration _pluginConfiguration;
+    private readonly ConfigurationService _configService;
     private readonly DalamudUtil _dalamudUtil;
     private readonly DalamudPluginInterface _pluginInterface;
     private readonly Dalamud.Localization _localization;
@@ -55,19 +55,19 @@ public class UiShared : IDisposable
     public ApiController ApiController => _apiController;
 
     public UiShared(IpcManager ipcManager, ApiController apiController, PeriodicFileScanner cacheScanner, FileDialogManager fileDialogManager,
-        Configuration pluginConfiguration, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization,
+        ConfigurationService configService, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization,
         ServerConfigurationManager serverManager)
     {
         _ipcManager = ipcManager;
         _apiController = apiController;
         _cacheScanner = cacheScanner;
         FileDialogManager = fileDialogManager;
-        _pluginConfiguration = pluginConfiguration;
+        _configService = configService;
         _dalamudUtil = dalamudUtil;
         _pluginInterface = pluginInterface;
         _localization = localization;
         _serverConfigurationManager = serverManager;
-        _isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder);
+        _isDirectoryWritable = IsDirectoryWritable(_configService.Current.CacheFolder);
 
         _pluginInterface.UiBuilder.BuildFonts += BuildFont;
         _pluginInterface.UiBuilder.RebuildFonts();
@@ -224,7 +224,7 @@ public class UiShared : IDisposable
                 ? "Collecting files"
                 : $"Processing {_cacheScanner.CurrentFileProgress} / {_cacheScanner.TotalFiles} files");
         }
-        else if (_pluginConfiguration.FileScanPaused)
+        else if (_configService.Current.FileScanPaused)
         {
             ImGui.Text("File scanner is paused");
             ImGui.SameLine();
@@ -413,7 +413,7 @@ public class UiShared : IDisposable
                     });
                     _customServerName = string.Empty;
                     _customServerUri = string.Empty;
-                    _pluginConfiguration.Save();
+                    _configService.Save();
                 }
             }
             ImGui.TreePop();
@@ -461,7 +461,7 @@ public class UiShared : IDisposable
     public void DrawCacheDirectorySetting()
     {
         ColorTextWrapped("Note: The storage folder should be somewhere close to root (i.e. C:\\MareStorage) in a new empty folder. DO NOT point this to your game folder. DO NOT point this to your Penumbra folder.", ImGuiColors.DalamudYellow);
-        var cacheDirectory = _pluginConfiguration.CacheFolder;
+        var cacheDirectory = _configService.Current.CacheFolder;
         ImGui.InputText("Storage Folder##cache", ref cacheDirectory, 255, ImGuiInputTextFlags.ReadOnly);
 
         ImGui.SameLine();
@@ -485,8 +485,8 @@ public class UiShared : IDisposable
                     && !_cacheDirectoryHasOtherFilesThanCache
                     && _cacheDirectoryIsValidPath)
                 {
-                    _pluginConfiguration.CacheFolder = path;
-                    _pluginConfiguration.Save();
+                    _configService.Current.CacheFolder = path;
+                    _configService.Save();
                     _cacheScanner.StartScan();
                 }
             });
@@ -511,11 +511,11 @@ public class UiShared : IDisposable
                              "Restrict yourself to latin letters (A-Z), underscores (_), dashes (-) and arabic numbers (0-9).", ImGuiColors.DalamudRed);
         }
 
-        float maxCacheSize = (float)_pluginConfiguration.MaxLocalCacheInGiB;
+        float maxCacheSize = (float)_configService.Current.MaxLocalCacheInGiB;
         if (ImGui.SliderFloat("Maximum Storage Size in GiB", ref maxCacheSize, 1f, 200f, "%.2f GiB"))
         {
-            _pluginConfiguration.MaxLocalCacheInGiB = maxCacheSize;
-            _pluginConfiguration.Save();
+            _configService.Current.MaxLocalCacheInGiB = maxCacheSize;
+            _configService.Save();
         }
         DrawHelpText("The storage is automatically governed by Mare. It will clear itself automatically once it reaches the set capacity by removing the oldest unused files. You typically do not need to clear it yourself.");
     }
@@ -554,18 +554,18 @@ public class UiShared : IDisposable
 
     public void DrawTimeSpanBetweenScansSetting()
     {
-        var timeSpan = _pluginConfiguration.TimeSpanBetweenScansInSeconds;
+        var timeSpan = _configService.Current.TimeSpanBetweenScansInSeconds;
         if (ImGui.SliderInt("Seconds between scans##timespan", ref timeSpan, 20, 60))
         {
-            _pluginConfiguration.TimeSpanBetweenScansInSeconds = timeSpan;
-            _pluginConfiguration.Save();
+            _configService.Current.TimeSpanBetweenScansInSeconds = timeSpan;
+            _configService.Save();
         }
         DrawHelpText("This is the time in seconds between file scans. Increase it to reduce system load. A too high setting can cause issues when manually fumbling about in the cache or Penumbra mods folders.");
-        var isPaused = _pluginConfiguration.FileScanPaused;
+        var isPaused = _configService.Current.FileScanPaused;
         if (ImGui.Checkbox("Pause periodic file scan##filescanpause", ref isPaused))
         {
-            _pluginConfiguration.FileScanPaused = isPaused;
-            _pluginConfiguration.Save();
+            _configService.Current.FileScanPaused = isPaused;
+            _configService.Save();
         }
         DrawHelpText("This allows you to stop the periodic scans of your Penumbra and Mare cache directories. Use this to move the Mare cache and Penumbra mod folders around. If you enable this permanently, run a Force rescan after adding mods to Penumbra.");
     }

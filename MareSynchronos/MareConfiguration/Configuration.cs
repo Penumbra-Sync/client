@@ -6,6 +6,7 @@ using MareSynchronos.WebAPI;
 namespace MareSynchronos.MareConfiguration;
 
 [Serializable]
+[Obsolete]
 public class Configuration : IPluginConfiguration
 {
     public int Version { get; set; } = 6;
@@ -81,68 +82,78 @@ public class Configuration : IPluginConfiguration
         _pluginInterface!.SavePluginConfig(this);
     }
 
-    public void Migrate()
+    public MareConfig ToMareConfig()
     {
-        if (Version == 5)
+        MareConfig newConfig = new();
+        Logger.Info("Migrating Config to MareConfig");
+
+        newConfig.AcceptedAgreement = AcceptedAgreement;
+        newConfig.CacheFolder = CacheFolder;
+        newConfig.MaxLocalCacheInGiB = MaxLocalCacheInGiB;
+        newConfig.ReverseUserSort = ReverseUserSort;
+        newConfig.TimeSpanBetweenScansInSeconds = TimeSpanBetweenScansInSeconds;
+        newConfig.FileScanPaused = FileScanPaused;
+        newConfig.InitialScanComplete = InitialScanComplete;
+        newConfig.FullPause = FullPause;
+        newConfig.HideInfoMessages = HideInfoMessages;
+        newConfig.DisableOptionalPluginWarnings = DisableOptionalPluginWarnings;
+        newConfig.OpenGposeImportOnGposeStart = OpenGposeImportOnGposeStart;
+        newConfig.ShowTransferWindow = ShowTransferWindow;
+        newConfig.OpenPopupOnAdd = OpenPopupOnAdd;
+        newConfig.CurrentServer = ApiUri;
+
+        // create all server storage based on current clientsecret
+        foreach (var secret in ClientSecret)
         {
-            Logger.Info("Migrating Config to v6");
-            // create all server storage based on current clientsecret
-            foreach (var secret in ClientSecret)
+            Logger.Debug("Migrating " + secret.Key);
+            var apiuri = secret.Key;
+            var secretkey = secret.Value;
+            ServerStorage toAdd = new();
+            if (apiuri == ApiController.MainServiceUri)
             {
-                Logger.Debug("Migrating " + secret.Key);
-                var apiuri = secret.Key;
-                var secretkey = secret.Value;
-                ServerStorage toAdd = new();
-                if (apiuri == ApiController.MainServiceUri)
-                {
-                    toAdd.ServerUri = ApiController.MainServiceUri;
-                    toAdd.ServerName = ApiController.MainServer;
-                }
-                else
-                {
-                    toAdd.ServerUri = apiuri;
-                    toAdd.ServerName = CustomServerList[apiuri];
-                }
-
-                toAdd.SecretKeys[0] = new SecretKey()
-                {
-                    FriendlyName = "Auto Migrated Secret Key (" + DateTime.Now.ToString("yyyy-MM-dd") + ")",
-                    Key = secretkey
-                };
-
-                if (GidServerComments.TryGetValue(apiuri, out var gids))
-                {
-                    toAdd.GidServerComments = gids;
-                }
-                if (UidServerComments.TryGetValue(apiuri, out var uids))
-                {
-                    toAdd.UidServerComments = uids;
-                }
-                if (UidServerPairedUserTags.TryGetValue(apiuri, out var uidtag))
-                {
-                    toAdd.UidServerPairedUserTags = uidtag;
-                }
-                if (ServerAvailablePairTags.TryGetValue(apiuri, out var servertag))
-                {
-                    toAdd.ServerAvailablePairTags = servertag;
-                }
-                toAdd.OpenPairTags = OpenPairTags;
-
-                ServerStorage[apiuri] = toAdd;
+                toAdd.ServerUri = ApiController.MainServiceUri;
+                toAdd.ServerName = ApiController.MainServer;
+            }
+            else
+            {
+                toAdd.ServerUri = apiuri;
+                if (!CustomServerList.TryGetValue(apiuri, out var serverName)) serverName = apiuri;
+                toAdd.ServerName = serverName;
             }
 
-            OpenPairTags.Clear();
-            GidServerComments.Clear();
-            UidServerComments.Clear();
-            UidServerPairedUserTags.Clear();
-            ServerAvailablePairTags.Clear();
-            ClientSecret.Clear();
-            CustomServerList.Clear();
+            toAdd.SecretKeys[0] = new SecretKey()
+            {
+                FriendlyName = "Auto Migrated Secret Key (" + DateTime.Now.ToString("yyyy-MM-dd") + ")",
+                Key = secretkey
+            };
 
-            CurrentServer = ApiUri;
-            Version = 6;
+            if (GidServerComments.TryGetValue(apiuri, out var gids))
+            {
+                toAdd.GidServerComments = gids;
+            }
+            if (UidServerComments.TryGetValue(apiuri, out var uids))
+            {
+                toAdd.UidServerComments = uids;
+            }
+            if (UidServerPairedUserTags.TryGetValue(apiuri, out var uidtag))
+            {
+                toAdd.UidServerPairedUserTags = uidtag;
+            }
+            if (ServerAvailablePairTags.TryGetValue(apiuri, out var servertag))
+            {
+                toAdd.ServerAvailablePairTags = servertag;
+            }
+            toAdd.OpenPairTags = OpenPairTags;
+
+            newConfig.ServerStorage[apiuri] = toAdd;
         }
 
-        Save();
+        return newConfig;
+    }
+
+    [Obsolete]
+    public void Migrate()
+    {
+
     }
 }

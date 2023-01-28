@@ -7,46 +7,46 @@ namespace MareSynchronos.Managers;
 public class ServerConfigurationManager
 {
     private Dictionary<JwtCache, string> _tokenDictionary = new();
-    private readonly Configuration _configuration;
+    private readonly ConfigurationService _configService;
     private readonly DalamudUtil _dalamudUtil;
 
-    public string CurrentApiUrl => _configuration.CurrentServer;
-    public ServerStorage CurrentServer => _configuration.ServerStorage[CurrentApiUrl];
+    public string CurrentApiUrl => _configService.Current.CurrentServer;
+    public ServerStorage CurrentServer => _configService.Current.ServerStorage[CurrentApiUrl];
 
-    public ServerConfigurationManager(Configuration configuration, DalamudUtil dalamudUtil)
+    public ServerConfigurationManager(ConfigurationService configService, DalamudUtil dalamudUtil)
     {
-        _configuration = configuration;
+        _configService = configService;
         _dalamudUtil = dalamudUtil;
     }
 
     public string[] GetServerApiUrls()
     {
-        return _configuration.ServerStorage.Keys.ToArray();
+        return _configService.Current.ServerStorage.Keys.ToArray();
     }
 
     public string[] GetServerNames()
     {
-        return _configuration.ServerStorage.Values.Select(v => v.ServerName).ToArray();
+        return _configService.Current.ServerStorage.Values.Select(v => v.ServerName).ToArray();
     }
 
     public ServerStorage GetServerByIndex(int idx)
     {
-        return _configuration.ServerStorage.ElementAt(idx).Value;
+        return _configService.Current.ServerStorage.ElementAt(idx).Value;
     }
 
     public int GetCurrentServerIndex()
     {
-        return Array.IndexOf(_configuration.ServerStorage.Keys.ToArray(), CurrentApiUrl);
+        return Array.IndexOf(_configService.Current.ServerStorage.Keys.ToArray(), CurrentApiUrl);
     }
 
     public void Save()
     {
-        _configuration.Save();
+        _configService.Save();
     }
 
     public void SelectServer(int idx)
     {
-        _configuration.CurrentServer = GetServerByIndex(idx).ServerUri;
+        _configService.Current.CurrentServer = GetServerByIndex(idx).ServerUri;
         Save();
     }
 
@@ -111,14 +111,14 @@ public class ServerConfigurationManager
             WorldId = _dalamudUtil.WorldId,
             SecretKeyIdx = addFirstSecretKey ? server.SecretKeys.First().Key : -1
         });
-        _configuration.Save();
+        _configService.Save();
     }
 
     internal void AddEmptyCharacterToServer(int serverSelectionIndex)
     {
         var server = GetServerByIndex(serverSelectionIndex);
         server.Authentications.Add(new Authentication());
-        _configuration.Save();
+        _configService.Save();
     }
 
     internal void RemoveCharacterFromServer(int serverSelectionIndex, Authentication item)
@@ -129,7 +129,7 @@ public class ServerConfigurationManager
 
     internal void AddServer(ServerStorage serverStorage)
     {
-        _configuration.ServerStorage[serverStorage.ServerUri] = serverStorage;
-        _configuration.Save();
+        _configService.Current.ServerStorage[serverStorage.ServerUri] = serverStorage;
+        _configService.Save();
     }
 }

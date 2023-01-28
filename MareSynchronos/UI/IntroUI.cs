@@ -16,7 +16,7 @@ namespace MareSynchronos.UI;
 internal class IntroUi : Window, IDisposable
 {
     private readonly UiShared _uiShared;
-    private readonly Configuration _pluginConfiguration;
+    private readonly ConfigurationService _configService;
     private readonly PeriodicFileScanner _fileCacheManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly WindowSystem _windowSystem;
@@ -39,13 +39,13 @@ internal class IntroUi : Window, IDisposable
         _windowSystem.RemoveWindow(this);
     }
 
-    public IntroUi(WindowSystem windowSystem, UiShared uiShared, Configuration pluginConfiguration,
+    public IntroUi(WindowSystem windowSystem, UiShared uiShared, ConfigurationService configService,
         PeriodicFileScanner fileCacheManager, ServerConfigurationManager serverConfigurationManager) : base("Mare Synchronos Setup")
     {
         Logger.Verbose("Creating " + nameof(IntroUi));
 
         _uiShared = uiShared;
-        _pluginConfiguration = pluginConfiguration;
+        _configService = configService;
         _fileCacheManager = fileCacheManager;
         _serverConfigurationManager = serverConfigurationManager;
         _windowSystem = windowSystem;
@@ -65,7 +65,7 @@ internal class IntroUi : Window, IDisposable
     {
         if (_uiShared.IsInGpose) return;
 
-        if (!_pluginConfiguration.AcceptedAgreement && !_readFirstPage)
+        if (!_configService.Current.AcceptedAgreement && !_readFirstPage)
         {
             if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
             ImGui.TextUnformatted("Welcome to Mare Synchronos");
@@ -94,7 +94,7 @@ internal class IntroUi : Window, IDisposable
                 });
             }
         }
-        else if (!_pluginConfiguration.AcceptedAgreement && _readFirstPage)
+        else if (!_configService.Current.AcceptedAgreement && _readFirstPage)
         {
             if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
             var textSize = ImGui.CalcTextSize(Strings.ToS.LanguageLabel);
@@ -137,8 +137,8 @@ internal class IntroUi : Window, IDisposable
             {
                 if (ImGui.Button(Strings.ToS.AgreeLabel + "##toSetup"))
                 {
-                    _pluginConfiguration.AcceptedAgreement = true;
-                    _pluginConfiguration.Save();
+                    _configService.Current.AcceptedAgreement = true;
+                    _configService.Save();
                 }
             }
             else
@@ -146,10 +146,10 @@ internal class IntroUi : Window, IDisposable
                 UiShared.TextWrapped(_timeoutLabel);
             }
         }
-        else if (_pluginConfiguration.AcceptedAgreement
-                 && (string.IsNullOrEmpty(_pluginConfiguration.CacheFolder)
-                     || _pluginConfiguration.InitialScanComplete == false
-                     || !Directory.Exists(_pluginConfiguration.CacheFolder)))
+        else if (_configService.Current.AcceptedAgreement
+                 && (string.IsNullOrEmpty(_configService.Current.CacheFolder)
+                     || _configService.Current.InitialScanComplete == false
+                     || !Directory.Exists(_configService.Current.CacheFolder)))
         {
             if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
             ImGui.TextUnformatted("File Storage Setup");
@@ -172,7 +172,7 @@ internal class IntroUi : Window, IDisposable
                 _uiShared.DrawCacheDirectorySetting();
             }
 
-            if (!_fileCacheManager.IsScanRunning && !string.IsNullOrEmpty(_pluginConfiguration.CacheFolder) && _uiShared.HasValidPenumbraModPath && Directory.Exists(_pluginConfiguration.CacheFolder))
+            if (!_fileCacheManager.IsScanRunning && !string.IsNullOrEmpty(_configService.Current.CacheFolder) && _uiShared.HasValidPenumbraModPath && Directory.Exists(_configService.Current.CacheFolder))
             {
                 if (ImGui.Button("Start Scan##startScan"))
                 {

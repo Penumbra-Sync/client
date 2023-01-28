@@ -25,7 +25,7 @@ public class CompactUi : Window, IDisposable
     private readonly ApiController _apiController;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
-    private readonly Configuration _configuration;
+    private readonly ConfigurationService _configService;
     private readonly TagHandler _tagHandler;
     public readonly Dictionary<string, bool> ShowUidForEntry = new(StringComparer.Ordinal);
     private readonly UiShared _uiShared;
@@ -55,7 +55,7 @@ public class CompactUi : Window, IDisposable
     private readonly PairGroupsUi _pairGroupsUi;
 
     public CompactUi(WindowSystem windowSystem,
-        UiShared uiShared, Configuration configuration, ApiController apiController, PairManager pairManager,
+        UiShared uiShared, ConfigurationService configService, ApiController apiController, PairManager pairManager,
         ServerConfigurationManager serverManager) : base("###MareSynchronosMainUI")
     {
 
@@ -81,7 +81,7 @@ public class CompactUi : Window, IDisposable
 
         _windowSystem = windowSystem;
         _uiShared = uiShared;
-        _configuration = configuration;
+        _configService = configService;
         _apiController = apiController;
         _pairManager = pairManager;
         _serverManager = serverManager;
@@ -187,7 +187,7 @@ public class CompactUi : Window, IDisposable
             UiShared.DrawWithID("grouping-popup", () => _selectGroupForPairUi.Draw(ShowUidForEntry));
         }
 
-        if (_configuration.OpenPopupOnAdd && _apiController.LastAddedUser != null)
+        if (_configService.Current.OpenPopupOnAdd && _apiController.LastAddedUser != null)
         {
             _lastAddedUser = _apiController.LastAddedUser;
             _apiController.LastAddedUser = null;
@@ -255,12 +255,12 @@ public class CompactUi : Window, IDisposable
     {
         var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.ArrowUp);
         var playButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Play);
-        if (!_configuration.ReverseUserSort)
+        if (!_configService.Current.ReverseUserSort)
         {
             if (ImGuiComponents.IconButton(FontAwesomeIcon.ArrowDown))
             {
-                _configuration.ReverseUserSort = true;
-                _configuration.Save();
+                _configService.Current.ReverseUserSort = true;
+                _configService.Save();
             }
             UiShared.AttachToolTip("Sort by name descending");
         }
@@ -268,8 +268,8 @@ public class CompactUi : Window, IDisposable
         {
             if (ImGuiComponents.IconButton(FontAwesomeIcon.ArrowUp))
             {
-                _configuration.ReverseUserSort = false;
-                _configuration.Save();
+                _configService.Current.ReverseUserSort = false;
+                _configService.Save();
             }
             UiShared.AttachToolTip("Sort by name ascending");
         }
@@ -443,7 +443,7 @@ public class CompactUi : Window, IDisposable
             if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
             {
                 entry.SetNote(EditUserComment);
-                _configuration.Save();
+                _configService.Save();
                 EditUserComment = entry.GetNote() ?? string.Empty;
                 EditNickEntry = entry.UserPair!.User.UID;
             }
@@ -532,7 +532,7 @@ public class CompactUi : Window, IDisposable
             : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - TransferPartHeight - ImGui.GetCursorPosY();
         var users = GetFilteredUsers();
 
-        if (!_configuration.ReverseUserSort) users.OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ThenByDescending(u => u.IsOnline ? 1 : 0).ThenByDescending(u => u.IsVisible ? 1 : 0).ToList();
+        if (!_configService.Current.ReverseUserSort) users.OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ThenByDescending(u => u.IsOnline ? 1 : 0).ThenByDescending(u => u.IsVisible ? 1 : 0).ToList();
         else users = users.OrderByDescending(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ThenByDescending(u => u.IsOnline ? 1 : 0).ThenByDescending(u => u.IsVisible ? 1 : 0).ToList();
 
         ImGui.BeginChild("list", new Vector2(WindowContentWidth, ySize), false);
@@ -596,18 +596,18 @@ public class CompactUi : Window, IDisposable
         {
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ((userSize.Y + textSize.Y) / 2 + shardTextSize.Y) / 2 - ImGui.GetStyle().ItemSpacing.Y + buttonSize.Y / 2);
         }
-        var color = UiShared.GetBoolColor(!_configuration.FullPause);
-        var connectedIcon = !_configuration.FullPause ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
+        var color = UiShared.GetBoolColor(!_configService.Current.FullPause);
+        var connectedIcon = !_configService.Current.FullPause ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
 
         ImGui.PushStyleColor(ImGuiCol.Text, color);
         if (ImGuiComponents.IconButton(connectedIcon))
         {
-            _configuration.FullPause = !_configuration.FullPause;
-            _configuration.Save();
+            _configService.Current.FullPause = !_configService.Current.FullPause;
+            _configService.Save();
             _ = _apiController.CreateConnections();
         }
         ImGui.PopStyleColor();
-        UiShared.AttachToolTip(!_configuration.FullPause ? "Disconnect from " + _serverManager.CurrentServer.ServerName : "Connect to " + _serverManager.CurrentServer.ServerName);
+        UiShared.AttachToolTip(!_configService.Current.FullPause ? "Disconnect from " + _serverManager.CurrentServer.ServerName : "Connect to " + _serverManager.CurrentServer.ServerName);
     }
 
     private void DrawTransfers()

@@ -273,7 +273,7 @@ public partial class ApiController
                     file.Transferred += bytesDownloaded;
                 });
 
-                var tempPath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash + ".tmp");
+                var tempPath = Path.Combine(_configService.Current.CacheFolder, file.Hash + ".tmp");
                 try
                 {
                     await DownloadFileHttpClient(file, tempPath, progress, token).ConfigureAwait(false);
@@ -294,7 +294,7 @@ public partial class ApiController
                 var tempFileData = await File.ReadAllBytesAsync(tempPath, token).ConfigureAwait(false);
                 var extratokenedFile = LZ4Codec.Unwrap(tempFileData);
                 File.Delete(tempPath);
-                var filePath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash);
+                var filePath = Path.Combine(_configService.Current.CacheFolder, file.Hash);
                 await File.WriteAllBytesAsync(filePath, extratokenedFile, token).ConfigureAwait(false);
                 var fi = new FileInfo(filePath);
                 Func<DateTime> RandomDayInThePast()

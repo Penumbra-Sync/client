@@ -6,17 +6,17 @@ namespace MareSynchronos.Factories;
 
 public class PairFactory
 {
-    private readonly Configuration _configuration;
+    private readonly ConfigurationService _configService;
     private readonly ServerConfigurationManager _serverConfigurationManager;
 
-    public PairFactory(Configuration configuration, ServerConfigurationManager serverConfigurationManager)
+    public PairFactory(ConfigurationService configService, ServerConfigurationManager serverConfigurationManager)
     {
-        _configuration = configuration;
+        _configService = configService;
         _serverConfigurationManager = serverConfigurationManager;
     }
 
     public Pair Create()
     {
-        return new Pair(_configuration, _serverConfigurationManager);
+        return new Pair(_configService, _serverConfigurationManager);
     }
 }
