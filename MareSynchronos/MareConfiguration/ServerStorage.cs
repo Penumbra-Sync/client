@@ -12,4 +12,5 @@ public class ServerStorage
     public HashSet<string> ServerAvailablePairTags { get; set; } = new(StringComparer.Ordinal);
     public HashSet<string> OpenPairTags { get; set; } = new(StringComparer.Ordinal);
     public Dictionary<int, SecretKey> SecretKeys { get; set; } = new();
+    public bool FullPause { get; set; } = false;
 }

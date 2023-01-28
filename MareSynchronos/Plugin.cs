@@ -156,8 +156,8 @@ public sealed class Plugin : IDalamudPlugin
         if (!_configurationService.Current.HasValidSetup())
         {
             _introUi.IsOpen = true;
-            _configurationService.Current.FullPause = false;
-            _configurationService.Save();
+            _serverConfigurationManager.CurrentServer.FullPause = false;
+            _serverConfigurationManager.Save();
             return;
         }
 
@@ -226,23 +226,23 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
-        if (splitArgs[0] == "toggle")
+        if (string.Equals(splitArgs[0], "toggle", StringComparison.OrdinalIgnoreCase))
         {
             var fullPause = splitArgs.Length > 1 ? splitArgs[1] switch
             {
                 "on" => false,
                 "off" => true,
-                _ => !_configurationService.Current.FullPause,
-            } : !_configurationService.Current.FullPause;
+                _ => !_serverConfigurationManager.CurrentServer.FullPause,
+            } : !_serverConfigurationManager.CurrentServer.FullPause;
 
-            if (fullPause != _configurationService.Current.FullPause)
+            if (fullPause != _serverConfigurationManager.CurrentServer.FullPause)
             {
-                _configurationService.Current.FullPause = fullPause;
-                _configurationService.Save();
+                _serverConfigurationManager.CurrentServer.FullPause = fullPause;
+                _serverConfigurationManager.Save();
                 _ = _apiController.CreateConnections();
             }
         }
-        else if (splitArgs[0] == "gpose")
+        else if (string.Equals(splitArgs[0], "gpose", StringComparison.OrdinalIgnoreCase))
         {
             _gposeUi.Toggle();
         }

@@ -40,7 +40,7 @@ public class ServerConfigurationManager
         {
             _configService.Current.CurrentServer = ApiController.MainServiceUri;
             _configService.Save();
-            return _configService.Current.ServerStorage.First().Value;
+            return CurrentServer;
         }
     }
 
@@ -57,6 +57,7 @@ public class ServerConfigurationManager
     public void SelectServer(int idx)
     {
         _configService.Current.CurrentServer = GetServerByIndex(idx).ServerUri;
+        CurrentServer.FullPause = false;
         Save();
     }
 

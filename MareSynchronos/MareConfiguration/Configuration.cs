@@ -94,7 +94,6 @@ public class Configuration : IPluginConfiguration
         newConfig.TimeSpanBetweenScansInSeconds = TimeSpanBetweenScansInSeconds;
         newConfig.FileScanPaused = FileScanPaused;
         newConfig.InitialScanComplete = InitialScanComplete;
-        newConfig.FullPause = FullPause;
         newConfig.HideInfoMessages = HideInfoMessages;
         newConfig.DisableOptionalPluginWarnings = DisableOptionalPluginWarnings;
         newConfig.OpenGposeImportOnGposeStart = OpenGposeImportOnGposeStart;
@@ -109,7 +108,7 @@ public class Configuration : IPluginConfiguration
             var apiuri = secret.Key;
             var secretkey = secret.Value;
             ServerStorage toAdd = new();
-            if (apiuri == ApiController.MainServiceUri)
+            if (string.Equals(apiuri, ApiController.MainServiceUri, StringComparison.OrdinalIgnoreCase))
             {
                 toAdd.ServerUri = ApiController.MainServiceUri;
                 toAdd.ServerName = ApiController.MainServer;
@@ -144,6 +143,7 @@ public class Configuration : IPluginConfiguration
                 toAdd.ServerAvailablePairTags = servertag;
             }
             toAdd.OpenPairTags = OpenPairTags;
+            toAdd.FullPause = FullPause;
 
             newConfig.ServerStorage[apiuri] = toAdd;
         }

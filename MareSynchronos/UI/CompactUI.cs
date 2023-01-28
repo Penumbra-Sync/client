@@ -634,18 +634,18 @@ public class CompactUi : Window, IDisposable
         {
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ((userSize.Y + textSize.Y) / 2 + shardTextSize.Y) / 2 - ImGui.GetStyle().ItemSpacing.Y + buttonSize.Y / 2);
         }
-        var color = UiShared.GetBoolColor(!_configService.Current.FullPause);
-        var connectedIcon = !_configService.Current.FullPause ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
+        var color = UiShared.GetBoolColor(!_serverManager.CurrentServer.FullPause);
+        var connectedIcon = !_serverManager.CurrentServer.FullPause ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
 
         ImGui.PushStyleColor(ImGuiCol.Text, color);
         if (ImGuiComponents.IconButton(connectedIcon))
         {
-            _configService.Current.FullPause = !_configService.Current.FullPause;
-            _configService.Save();
+            _serverManager.CurrentServer.FullPause = !_serverManager.CurrentServer.FullPause;
+            _serverManager.Save();
             _ = _apiController.CreateConnections();
         }
         ImGui.PopStyleColor();
-        UiShared.AttachToolTip(!_configService.Current.FullPause ? "Disconnect from " + _serverManager.CurrentServer.ServerName : "Connect to " + _serverManager.CurrentServer.ServerName);
+        UiShared.AttachToolTip(!_serverManager.CurrentServer.FullPause ? "Disconnect from " + _serverManager.CurrentServer.ServerName : "Connect to " + _serverManager.CurrentServer.ServerName);
     }
 
     private void DrawTransfers()

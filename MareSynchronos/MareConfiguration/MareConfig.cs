@@ -20,7 +20,6 @@ public class MareConfig : IPluginConfiguration
     public int TimeSpanBetweenScansInSeconds { get; set; } = 30;
     public bool FileScanPaused { get; set; } = false;
     public bool InitialScanComplete { get; set; } = false;
-    public bool FullPause { get; set; } = false;
     public bool HideInfoMessages { get; set; } = false;
     public bool DisableOptionalPluginWarnings { get; set; } = false;
     public bool OpenGposeImportOnGposeStart { get; set; } = false;

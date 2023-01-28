@@ -125,7 +125,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         _httpClient?.Dispose();
         _httpClient = new();
 
-        if (_configService.Current.FullPause)
+        if (_serverManager.CurrentServer.FullPause)
         {
             Logger.Info("Not recreating Connection, paused");
             _connectionDto = null;
