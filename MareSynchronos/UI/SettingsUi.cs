@@ -34,7 +34,7 @@ public class SettingsUi : Window, IDisposable
     private bool _wasOpen = false;
 
     public SettingsUi(WindowSystem windowSystem,
-        UiShared uiShared, ConfigurationService configService, 
+        UiShared uiShared, ConfigurationService configService,
         MareCharaFileManager mareCharaFileManager, PairManager pairManager, ServerConfigurationManager serverConfigurationManager) : base("Mare Synchronos Settings")
     {
         Logger.Verbose("Creating " + nameof(SettingsUi));
@@ -393,6 +393,17 @@ public class SettingsUi : Window, IDisposable
                 if (isMain)
                 {
                     UiShared.DrawHelpText("You cannot edit the name of the main service.");
+                }
+                if (!isMain)
+                {
+                    if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Service"))
+                    {
+                        if (UiShared.CtrlPressed())
+                        {
+                            _serverConfigurationManager.DeleteServer(selectedServer);
+                        }
+                    }
+                    UiShared.DrawHelpText("Hold CTRL to delete this service");
                 }
                 ImGui.EndTabItem();
             }

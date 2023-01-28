@@ -31,7 +31,16 @@ public class ServerConfigurationManager
 
     public ServerStorage GetServerByIndex(int idx)
     {
-        return _configService.Current.ServerStorage.ElementAt(idx).Value;
+        try
+        {
+            return _configService.Current.ServerStorage.ElementAt(idx).Value;
+        }
+        catch
+        {
+            _configService.Current.CurrentServer = ApiController.MainServiceUri;
+            _configService.Save();
+            return _configService.Current.ServerStorage.First().Value;
+        }
     }
 
     public int GetCurrentServerIndex()
@@ -131,5 +140,10 @@ public class ServerConfigurationManager
     {
         _configService.Current.ServerStorage[serverStorage.ServerUri] = serverStorage;
         _configService.Save();
+    }
+
+    internal void DeleteServer(ServerStorage selectedServer)
+    {
+        _configService.Current.ServerStorage.Remove(selectedServer.ServerUri);
     }
 }

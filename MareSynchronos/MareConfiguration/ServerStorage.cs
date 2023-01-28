@@ -11,6 +11,5 @@ public class ServerStorage
     public Dictionary<string, List<string>> UidServerPairedUserTags = new(StringComparer.Ordinal);
     public HashSet<string> ServerAvailablePairTags { get; set; } = new(StringComparer.Ordinal);
     public HashSet<string> OpenPairTags { get; set; } = new(StringComparer.Ordinal);
-    [Newtonsoft.Json.JsonIgnore]
     public Dictionary<int, SecretKey> SecretKeys { get; set; } = new();
 }
