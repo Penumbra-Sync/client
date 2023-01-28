@@ -138,6 +138,7 @@ public class PairManager : IDisposable
     {
         _allClientPairs[user].CachedPlayer?.Dispose();
         _allClientPairs[user].CachedPlayer = null;
+        RecreateLazy();
     }
 
     public void MarkPairOnline(OnlineUserIdentDto dto, ApiController controller)
@@ -148,6 +149,7 @@ public class PairManager : IDisposable
 
         _allClientPairs[dto.User].CachedPlayer?.Dispose();
         _allClientPairs[dto.User].CachedPlayer = _cachedPlayerFactory.Create(dto, controller);
+        RecreateLazy();
     }
 
     public void ReceiveCharaData(OnlineUserCharaDataDto dto)

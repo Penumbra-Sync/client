@@ -194,6 +194,7 @@ public sealed class Plugin : IDalamudPlugin
 
         try
         {
+            Logger.Debug("Launching Managers");
             _transientResourceManager = new TransientResourceManager(_ipcManager, _configurationService, _dalamudUtil, _fileReplacementFactory);
             var characterCacheFactory =
                 new CharacterDataFactory(_dalamudUtil, _ipcManager, _transientResourceManager, _fileReplacementFactory);
@@ -204,7 +205,7 @@ public sealed class Plugin : IDalamudPlugin
         }
         catch (Exception ex)
         {
-            Logger.Debug(ex.Message);
+            Logger.Warn(ex.Message);
         }
     }
 

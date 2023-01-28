@@ -42,28 +42,30 @@ public class TransientResourceManager : IDisposable
         }
 
         SemiTransientResources.TryAdd(ObjectKind.Player, new HashSet<FileReplacement>());
-        var linesInConfig = _configurationService.Current.PlayerPersistentTransientCache[PlayerPersistentDataKey];
-        int restored = 0;
-        foreach (var file in linesInConfig)
+        if (_configurationService.Current.PlayerPersistentTransientCache.TryGetValue(PlayerPersistentDataKey, out var linesInConfig))
         {
-            try
+            int restored = 0;
+            foreach (var file in linesInConfig)
             {
-                var fileReplacement = fileReplacementFactory.Create();
-                fileReplacement.ResolvePath(file);
-                if (fileReplacement.HasFileReplacement)
+                try
                 {
-                    Logger.Debug("Loaded persistent transient resource " + file);
-                    SemiTransientResources[ObjectKind.Player].Add(fileReplacement);
-                    restored++;
+                    var fileReplacement = fileReplacementFactory.Create();
+                    fileReplacement.ResolvePath(file);
+                    if (fileReplacement.HasFileReplacement)
+                    {
+                        Logger.Debug("Loaded persistent transient resource " + file);
+                        SemiTransientResources[ObjectKind.Player].Add(fileReplacement);
+                        restored++;
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn("Error during loading persistent transient resource " + file, ex);
-            }
+                catch (Exception ex)
+                {
+                    Logger.Warn("Error during loading persistent transient resource " + file, ex);
+                }
 
+            }
+            Logger.Debug($"Restored {restored}/{linesInConfig.Count()} semi persistent resources");
         }
-        Logger.Debug($"Restored {restored}/{linesInConfig.Count()} semi persistent resources");
     }
 
     private void Manager_PenumbraModSettingChanged()
@@ -237,8 +239,9 @@ public class TransientResourceManager : IDisposable
 
         if (objectKind == ObjectKind.Player && SemiTransientResources.TryGetValue(ObjectKind.Player, out var fileReplacements))
         {
-            _configurationService.Current.PlayerPersistentTransientCache[PlayerPersistentDataKey] 
+            _configurationService.Current.PlayerPersistentTransientCache[PlayerPersistentDataKey]
                 = fileReplacements.SelectMany(p => p.GamePaths).Distinct(StringComparer.OrdinalIgnoreCase).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            _configurationService.Save();
         }
         TransientResources[gameObject].Clear();
     }
@@ -253,7 +256,7 @@ public class TransientResourceManager : IDisposable
         SemiTransientResources.Clear();
         if (SemiTransientResources.ContainsKey(ObjectKind.Player))
         {
-            _configurationService.Current.PlayerPersistentTransientCache[PlayerPersistentDataKey] 
+            _configurationService.Current.PlayerPersistentTransientCache[PlayerPersistentDataKey]
                 = SemiTransientResources[ObjectKind.Player].SelectMany(p => p.GamePaths).Distinct(StringComparer.OrdinalIgnoreCase).ToHashSet(StringComparer.OrdinalIgnoreCase);
             _configurationService.Save();
         }
