@@ -100,7 +100,7 @@ public partial class ApiController : IDisposable, IMareHubClient
     public bool ServerAlive => ServerState is ServerState.Connected or ServerState.RateLimited or ServerState.Unauthorized or ServerState.Disconnected;
 
     public string UID => _connectionDto?.User.UID ?? string.Empty;
-    public string DisplayName => _connectionDto?.User.UID ?? string.Empty;
+    public string DisplayName => _connectionDto?.User.AliasOrUID ?? string.Empty;
     public int OnlineUsers => SystemInfoDto.OnlineUsers;
 
     private ServerState _serverState;

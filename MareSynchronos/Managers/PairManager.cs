@@ -239,27 +239,33 @@ public class PairManager : IDisposable
         _allGroups[dto.Group].Group = dto.Group;
         _allGroups[dto.Group].Owner = dto.Owner;
         _allGroups[dto.Group].GroupPermissions = dto.GroupPermissions;
+        RecreateLazy();
     }
 
     internal void SetGroupPermissions(GroupPermissionDto dto)
     {
         _allGroups[dto.Group].GroupPermissions = dto.Permissions;
+        RecreateLazy();
     }
 
     internal void SetGroupPairUserPermissions(GroupPairUserPermissionDto dto)
     {
         _allGroups[dto.Group].GroupUserPermissions = dto.GroupPairPermissions;
+        RecreateLazy();
     }
 
     internal void SetGroupUserPermissions(GroupPairUserPermissionDto dto)
     {
+        Logger.Debug("Setting Group User Permissions for " + dto);
         var group = _allGroups[dto.Group];
-        _allClientPairs[dto.User].GroupPair[group].GroupUserPermissions = dto.GroupPairPermissions;
+        group.GroupUserPermissions = dto.GroupPairPermissions;
+        RecreateLazy();
     }
 
     internal void SetGroupPairStatusInfo(GroupPairUserInfoDto dto)
     {
         var group = _allGroups[dto.Group];
         _allClientPairs[dto.User].GroupPair[group].GroupPairStatusInfo = dto.GroupUserInfo;
+        RecreateLazy();
     }
 }

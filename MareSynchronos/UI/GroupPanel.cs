@@ -14,6 +14,7 @@ using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.Managers;
 using MareSynchronos.Models;
 using MareSynchronos.API.Data.Comparer;
+using MareSynchronos.Utils;
 
 namespace MareSynchronos.UI
 {
@@ -356,7 +357,6 @@ namespace MareSynchronos.UI
 
             if (!_showModalChangePassword) _modalChangePwOpened = false;
 
-
             if (ImGui.BeginPopupModal("Change Syncshell Password", ref _showModalChangePassword, UiShared.PopupWindowFlags))
             {
                 UiShared.TextWrapped("Enter the new Syncshell password for Syncshell " + name + " here.");
@@ -443,18 +443,65 @@ namespace MareSynchronos.UI
 
         private void DrawSyncShellButtons(GroupFullInfoDto groupDto, List<Pair> groupPairs)
         {
+            var infoIcon = FontAwesomeIcon.InfoCircle;
+
             bool invitesEnabled = !groupDto.GroupPermissions.IsDisableInvites();
+            var soundsDisabled = groupDto.GroupPermissions.IsDisableSounds();
+            var animDisabled = groupDto.GroupPermissions.IsDisableAnimations();
+
+            var userSoundsDisabled = groupDto.GroupUserPermissions.IsDisableSounds();
+            var userAnimDisabled = groupDto.GroupUserPermissions.IsDisableAnimations();
+
             var lockedIcon = invitesEnabled ? FontAwesomeIcon.LockOpen : FontAwesomeIcon.Lock;
-            var iconSize = UiShared.GetIconSize(lockedIcon);
-            var diffLockUnlockIcons = invitesEnabled ? 0 : (UiShared.GetIconSize(FontAwesomeIcon.LockOpen).X - iconSize.X) / 2;
+            var animIcon = animDisabled ? FontAwesomeIcon.Stop : FontAwesomeIcon.Running;
+            var soundsIcon = soundsDisabled ? FontAwesomeIcon.VolumeOff : FontAwesomeIcon.VolumeUp;
+            var userAnimIcon = userAnimDisabled ? FontAwesomeIcon.Stop : FontAwesomeIcon.Running;
+            var userSoundsIcon = userSoundsDisabled ? FontAwesomeIcon.VolumeOff : FontAwesomeIcon.VolumeUp;
+
+            var iconSize = UiShared.GetIconSize(infoIcon);
+            var diffLockUnlockIcons = (UiShared.GetIconSize(infoIcon).X - iconSize.X) / 2;
             var barbuttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Bars);
             var isOwner = string.Equals(groupDto.OwnerUID, _apiController.UID, StringComparison.Ordinal);
 
+
+
             ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - barbuttonSize.X - iconSize.X - diffLockUnlockIcons - ImGui.GetStyle().ItemSpacing.X);
             ImGui.PushFont(UiBuilder.IconFont);
-            ImGui.Text(lockedIcon.ToIconString());
+            ImGui.Text(infoIcon.ToIconString());
             ImGui.PopFont();
-            UiShared.AttachToolTip(invitesEnabled ? "Syncshell is open for new joiners" : "Syncshell is closed for new joiners");
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.BeginTooltip();
+                ImGui.Text("Syncshell permissions");
+                var lockedText = invitesEnabled ? "Syncshell is opened for joining" : "Syncshell is closed for joining";
+                UiShared.FontText(lockedIcon.ToIconString(), UiBuilder.IconFont);
+                ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                ImGui.Text(lockedText);
+
+                var soundsText = soundsDisabled ? "Sound sync disabled through owner" : "Sound sync enabled";
+                UiShared.FontText(soundsIcon.ToIconString(), UiBuilder.IconFont);
+                ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                ImGui.Text(soundsText);
+
+                var animText = animDisabled ? "Animation sync disabled through owner" : "Animation sync enabled";
+                UiShared.FontText(animIcon.ToIconString(), UiBuilder.IconFont);
+                ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                ImGui.Text(animText);
+                ImGui.Separator();
+                ImGui.Text("Your permissions");
+
+                var userSoundsText = userSoundsDisabled ? "Sound sync disabled through you" : "Sound sync enabled";
+                UiShared.FontText(userSoundsIcon.ToIconString(), UiBuilder.IconFont);
+                ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                ImGui.Text(userSoundsText);
+
+                var userAnimText = userAnimDisabled ? "Animation sync disabled through you" : "Animation sync enabled";
+                UiShared.FontText(userAnimIcon.ToIconString(), UiBuilder.IconFont);
+                ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                ImGui.Text(userAnimText);
+                UiShared.TextWrapped("Note that syncshell permissions for disabling take precedence over your own set permissions");
+                ImGui.EndTooltip();
+            }
             ImGui.SameLine();
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + diffLockUnlockIcons);
             if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
@@ -488,16 +535,44 @@ namespace MareSynchronos.UI
                 }
                 UiShared.AttachToolTip("Copies all your notes for all users in this Syncshell to the clipboard." + Environment.NewLine + "They can be imported via Settings -> Privacy -> Import Notes from Clipboard");
 
+
+                var soundsText = userSoundsDisabled ? "Enable sound sync" : "Disable sound sync";
+                if (UiShared.IconTextButton(userSoundsIcon, soundsText))
+                {
+                    ImGui.CloseCurrentPopup();
+                    var perm = groupDto.GroupUserPermissions;
+                    perm.SetDisableSounds(!perm.IsDisableSounds());
+                    _ = _apiController.GroupChangeIndividualPermissionState(new(groupDto.Group, new UserData(_apiController.UID), perm));
+                }
+                UiShared.AttachToolTip("Sets your allowance for sound synchronization for users of this syncshell."
+                    + Environment.NewLine + "Disabling the synchronization will stop applying sound modifications for users of this syncshell."
+                    + Environment.NewLine + "Note: this setting can be forcefully overridden to 'disabled' through the syncshell owner."
+                    + Environment.NewLine + "Note: this setting does not apply to individual pairs that are also in the syncshell.");
+
+                var animText = userAnimDisabled ? "Enable animations sync" : "Disable animations sync";
+                if (UiShared.IconTextButton(userAnimIcon, animText))
+                {
+                    ImGui.CloseCurrentPopup();
+                    var perm = groupDto.GroupUserPermissions;
+                    perm.SetDisableAnimations(!perm.IsDisableAnimations());
+                    _ = _apiController.GroupChangeIndividualPermissionState(new(groupDto.Group, new UserData(_apiController.UID), perm));
+                }
+                UiShared.AttachToolTip("Sets your allowance for animations synchronization for users of this syncshell."
+                    + Environment.NewLine + "Disabling the synchronization will stop applying animations modifications for users of this syncshell."
+                    + Environment.NewLine + "Note: this setting might also affect sound synchronization"
+                    + Environment.NewLine + "Note: this setting can be forcefully overridden to 'disabled' through the syncshell owner."
+                    + Environment.NewLine + "Note: this setting does not apply to individual pairs that are also in the syncshell.");
+
                 if (isOwner || groupDto.GroupUserInfo.IsModerator())
                 {
                     ImGui.Separator();
 
-                    var changedToIcon = !invitesEnabled ? FontAwesomeIcon.LockOpen : FontAwesomeIcon.Lock;
+                    var changedToIcon = invitesEnabled ? FontAwesomeIcon.LockOpen : FontAwesomeIcon.Lock;
                     if (UiShared.IconTextButton(changedToIcon, invitesEnabled ? "Lock Syncshell" : "Unlock Syncshell"))
                     {
                         ImGui.CloseCurrentPopup();
                         var groupPerm = groupDto.GroupPermissions;
-                        groupPerm.SetDisableInvites(!invitesEnabled);
+                        groupPerm.SetDisableInvites(invitesEnabled);
                         _ = _apiController.GroupChangeGroupPermissionState(new GroupPermissionDto(groupDto.Group, groupPerm));
                     }
                     UiShared.AttachToolTip("Change Syncshell joining permissions" + Environment.NewLine + "Syncshell is currently " + (invitesEnabled ? "open" : "closed") + " for people to join");
@@ -523,6 +598,30 @@ namespace MareSynchronos.UI
                     }
                     UiShared.AttachToolTip("Hold CTRL and click to clear this Syncshell." + Environment.NewLine + "WARNING: this action is irreversible." + Environment.NewLine
                         + "Clearing the Syncshell will remove all not pinned users from it.");
+
+                    var groupSoundsText = soundsDisabled ? "Enable syncshell sound sync" : "Disable syncshell sound sync";
+                    if (UiShared.IconTextButton(soundsIcon, groupSoundsText))
+                    {
+                        ImGui.CloseCurrentPopup();
+                        var perm = groupDto.GroupPermissions;
+                        perm.SetDisableSounds(!perm.IsDisableSounds());
+                        _ = _apiController.GroupChangeGroupPermissionState(new(groupDto.Group, perm));
+                    }
+                    UiShared.AttachToolTip("Sets syncshell-wide allowance for sound synchronization for all users." + Environment.NewLine
+                        + "Note: users that are individually paired with others in the syncshell will ignore this setting." + Environment.NewLine
+                        + "Note: if the synchronization is enabled, users can individually override this setting to disabled.");
+
+                    var groupAnimText = animDisabled ? "Enable syncshell animations sync" : "Disable syncshell animations sync";
+                    if (UiShared.IconTextButton(animIcon, groupAnimText))
+                    {
+                        ImGui.CloseCurrentPopup();
+                        var perm = groupDto.GroupPermissions;
+                        perm.SetDisableAnimations(!perm.IsDisableAnimations());
+                        _ = _apiController.GroupChangeGroupPermissionState(new(groupDto.Group, perm));
+                    }
+                    UiShared.AttachToolTip("Sets syncshell-wide allowance for animations synchronization for all users." + Environment.NewLine
+                        + "Note: users that are individually paired with others in the syncshell will ignore this setting." + Environment.NewLine
+                        + "Note: if the synchronization is enabled, users can individually override this setting to disabled.");
 
                     if (UiShared.IconTextButton(FontAwesomeIcon.Envelope, "Single one-time invite"))
                     {
