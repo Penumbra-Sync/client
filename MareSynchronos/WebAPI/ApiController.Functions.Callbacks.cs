@@ -232,12 +232,6 @@ public partial class ApiController
         return Task.CompletedTask;
     }
 
-    public Task Client_AdminForcedReconnect()
-    {
-        _ = CreateConnections();
-        return Task.CompletedTask;
-    }
-
     public Task Client_ReceiveServerMessage(MessageSeverity severity, string message)
     {
         switch (severity)

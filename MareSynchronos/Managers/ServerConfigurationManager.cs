@@ -1,4 +1,5 @@
 ﻿using MareSynchronos.MareConfiguration;
+using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 

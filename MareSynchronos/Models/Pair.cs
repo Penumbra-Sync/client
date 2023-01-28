@@ -31,6 +31,8 @@ public class Pair
     public UserData UserData => UserPair?.User ?? GroupPair.First().Value.User;
     public bool IsOnline => CachedPlayer != null;
     public bool IsVisible => CachedPlayer != null && CachedPlayer.IsVisible;
+    public bool IsPaused => UserPair != null ? (UserPair.OtherPermissions.IsPaused() || UserPair.OwnPermissions.IsPaused())
+            : GroupPair.All(p => p.Key.GroupUserPermissions.IsPaused() || p.Value.GroupUserPermissions.IsPaused());
 
     public string? GetNote()
     {

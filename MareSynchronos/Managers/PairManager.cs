@@ -137,9 +137,12 @@ public class PairManager : IDisposable
 
     public void MarkPairOffline(UserData user)
     {
-        _allClientPairs[user].CachedPlayer?.Dispose();
-        _allClientPairs[user].CachedPlayer = null;
-        RecreateLazy();
+        if (_allClientPairs.TryGetValue(user, out var pair))
+        {
+            pair.CachedPlayer?.Dispose();
+            pair.CachedPlayer = null;
+            RecreateLazy();
+        }
     }
 
     public void MarkPairOnline(OnlineUserIdentDto dto, ApiController controller)

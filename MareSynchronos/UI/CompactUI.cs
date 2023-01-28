@@ -532,9 +532,6 @@ public class CompactUi : Window, IDisposable
             : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - TransferPartHeight - ImGui.GetCursorPosY();
         var users = GetFilteredUsers();
 
-        //if (!_configService.Current.ReverseUserSort) users.OrderByDescending(u => u.IsVisible ? 1 : 0).ThenByDescending(u => u.IsOnline ? 1 : 0).ThenBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
-        //else users = users.OrderByDescending(u => u.IsVisible ? 1 : 0).ThenByDescending(u => u.IsOnline ? 1 : 0).ThenByDescending(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
-
         ImGui.BeginChild("list", new Vector2(WindowContentWidth, ySize), false);
         var visibleUsers = users.Where(u => u.IsVisible).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
         var onlineUsers = users.Where(u => u.IsOnline && !u.IsVisible).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();

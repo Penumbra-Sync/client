@@ -12,6 +12,7 @@ using MareSynchronos.API.Dto.User;
 using MareSynchronos.Managers;
 using Dalamud.Utility;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.Models;
 
 namespace MareSynchronos.WebAPI;
 

@@ -15,6 +15,8 @@ using MareSynchronos.Managers;
 using MareSynchronos.Models;
 using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.Utils;
+using MareSynchronos.UI.Components;
+using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI
 {
@@ -418,21 +420,53 @@ namespace MareSynchronos.UI
             ImGui.Indent(collapseButton.X);
             if (ExpandedGroupState[groupDto.GID])
             {
-                pairsInGroup = pairsInGroup.OrderBy(p => string.Equals(p.UserData.UID, groupDto.OwnerUID, StringComparison.Ordinal) ? 0 : 1)
-                    .ThenBy(p => p.GroupPair.Single(p => GroupDataComparer.Instance.Equals(p.Key.Group, groupDto.Group)).Value.GroupPairStatusInfo.IsModerator() ? 0 : 1)
-                    .ThenBy(p => p.GroupPair.Single(p => GroupDataComparer.Instance.Equals(p.Key.Group, groupDto.Group)).Value.GroupPairStatusInfo.IsPinned() ? 0 : 1)
-                    .ThenBy(p => p.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
-                ImGui.Indent(ImGui.GetStyle().ItemSpacing.X / 2);
-                ImGui.Separator();
-                foreach (var pair in pairsInGroup)
-                {
-                    UiShared.DrawWithID(groupDto.GID + pair.UserData.UID, () => DrawSyncshellPairedClient(
-                        pair.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
-                        groupDto.OwnerUID,
-                        string.Equals(groupDto.OwnerUID, _apiController.UID, StringComparison.Ordinal),
-                        groupDto.GroupUserInfo.IsModerator(),
-                        groupDto.GroupUserPermissions.IsPaused()));
+                var visibleUsers = pairsInGroup.Where(u => u.IsVisible).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
+                var onlineUsers = pairsInGroup.Where(u => u.IsOnline && !u.IsVisible).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
+                var offlineUsers = pairsInGroup.Where(u => !u.IsOnline && !u.IsVisible).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
 
+                if (visibleUsers.Any())
+                {
+                    ImGui.Text("Visible");
+                    ImGui.Separator();
+                    foreach (var entry in visibleUsers)
+                    {
+                        UiShared.DrawWithID(groupDto.GID + entry.UserData.UID, () => DrawSyncshellPairedClient(
+                                                entry,
+                                                entry.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
+                                                groupDto.OwnerUID,
+                                                string.Equals(groupDto.OwnerUID, _apiController.UID, StringComparison.Ordinal),
+                                                groupDto.GroupUserInfo.IsModerator()));
+                    }
+                }
+
+                if (onlineUsers.Any())
+                {
+                    ImGui.Text("Online");
+                    ImGui.Separator();
+                    foreach (var entry in onlineUsers)
+                    {
+                        UiShared.DrawWithID(groupDto.GID + entry.UserData.UID, () => DrawSyncshellPairedClient(
+                            entry,
+                                                entry.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
+                                                groupDto.OwnerUID,
+                                                string.Equals(groupDto.OwnerUID, _apiController.UID, StringComparison.Ordinal),
+                                                groupDto.GroupUserInfo.IsModerator()));
+                    }
+                }
+
+                if (offlineUsers.Any())
+                {
+                    ImGui.Text("Offline/Unknown");
+                    ImGui.Separator();
+                    foreach (var entry in offlineUsers)
+                    {
+                        UiShared.DrawWithID(groupDto.GID + entry.UserData.UID, () => DrawSyncshellPairedClient(
+                                                entry,
+                                                entry.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
+                                                groupDto.OwnerUID,
+                                                string.Equals(groupDto.OwnerUID, _apiController.UID, StringComparison.Ordinal),
+                                                groupDto.GroupUserInfo.IsModerator()));
+                    }
                 }
 
                 ImGui.Separator();
@@ -663,7 +697,7 @@ namespace MareSynchronos.UI
             }
         }
 
-        private void DrawSyncshellPairedClient(GroupPairFullInfoDto entry, string ownerUid, bool isOwner, bool isModerator, bool isPausedByYou)
+        private void DrawSyncshellPairedClient(Pair pair, GroupPairFullInfoDto entry, string ownerUid, bool isOwner, bool isModerator)
         {
             var plusButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Plus);
             var barButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Bars);
@@ -673,12 +707,19 @@ namespace MareSynchronos.UI
             var userIsMod = entry.GroupPairStatusInfo.IsModerator();
             var userIsOwner = string.Equals(entryUID, ownerUid, StringComparison.Ordinal);
             var isPinned = entry.GroupPairStatusInfo.IsPinned();
-            var isPaused = entry.GroupUserPermissions.IsPaused();
+            var isPaused = pair.IsPaused;
+            var presenceIcon = pair.IsVisible ? FontAwesomeIcon.Eye : (pair.IsOnline ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink);
+            var presenceColor = (pair.IsOnline || pair.IsVisible) ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
+            var presenceText = entryUID + " is offline";
 
             var textPos = originalY + barButtonSize.Y / 2 - textSize.Y / 2;
             ImGui.SetCursorPosY(textPos);
-            if (isPausedByYou || isPaused)
+            if (pair.IsPaused)
             {
+                presenceIcon = FontAwesomeIcon.Question;
+                presenceColor = ImGuiColors.DalamudGrey;
+                presenceText = entryUID + " online status is unknown (paused)";
+
                 ImGui.PushFont(UiBuilder.IconFont);
                 UiShared.ColorText(FontAwesomeIcon.PauseCircle.ToIconString(), ImGuiColors.DalamudYellow);
                 ImGui.PopFont();
@@ -693,6 +734,16 @@ namespace MareSynchronos.UI
 
                 UiShared.AttachToolTip("You are paired with " + entryUID);
             }
+
+            if (pair.IsOnline && !pair.IsVisible) presenceText = entryUID + " is online";
+            else if (pair.IsOnline && pair.IsVisible) presenceText = entryUID + " is visible: " + pair.PlayerName;
+
+            ImGui.SameLine();
+            ImGui.SetCursorPosY(textPos);
+            ImGui.PushFont(UiBuilder.IconFont);
+            UiShared.ColorText(presenceIcon.ToIconString(), presenceColor);
+            ImGui.PopFont();
+            UiShared.AttachToolTip(presenceText);
 
             if (userIsOwner)
             {
