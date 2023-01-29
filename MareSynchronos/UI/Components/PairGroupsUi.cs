@@ -49,7 +49,7 @@ namespace MareSynchronos.UI.Components
             if (visiblePairsInThisTag.Any() || onlinePairsInThisTag.Any() || offlinePairsInThisTag.Any())
             {
                 DrawName(tag);
-                UiShared.DrawWithID($"group-{tag}-buttons", () => DrawButtons(tag, visiblePairsInThisTag));
+                UiShared.DrawWithID($"group-{tag}-buttons", () => DrawButtons(tag, visiblePairsInThisTag.Concat(onlinePairsInThisTag).Concat(offlinePairsInThisTag).ToList()));
                 if (_tagHandler.IsTagOpen(tag))
                 {
                     ImGui.Indent(20);

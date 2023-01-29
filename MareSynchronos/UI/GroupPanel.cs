@@ -736,16 +736,16 @@ namespace MareSynchronos.UI
             }
         }
 
-        private void DrawSyncshellPairedClient(Pair pair, GroupPairFullInfoDto entry, string ownerUid, bool isOwner, bool isModerator)
+        private void DrawSyncshellPairedClient(Pair pair, GroupPairFullInfoDto entry, string ownerUid, bool userIsOwner, bool userIsModerator)
         {
             var plusButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Plus);
             var barButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Bars);
             var entryUID = entry.UserAliasOrUID;
             var textSize = ImGui.CalcTextSize(entryUID);
             var originalY = ImGui.GetCursorPosY();
-            var userIsMod = entry.GroupPairStatusInfo.IsModerator();
-            var userIsOwner = string.Equals(pair.UserData.UID, ownerUid, StringComparison.Ordinal);
-            var isPinned = entry.GroupPairStatusInfo.IsPinned();
+            var entryIsMod = entry.GroupPairStatusInfo.IsModerator();
+            var entryIsOwner = string.Equals(pair.UserData.UID, ownerUid, StringComparison.Ordinal);
+            var entryIsPinned = entry.GroupPairStatusInfo.IsPinned();
             var isPaused = pair.IsPaused;
             var presenceIcon = pair.IsVisible ? FontAwesomeIcon.Eye : (pair.IsOnline ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink);
             var presenceColor = (pair.IsOnline || pair.IsVisible) ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
@@ -787,7 +787,7 @@ namespace MareSynchronos.UI
             ImGui.PopFont();
             UiShared.AttachToolTip(presenceText);
 
-            if (userIsOwner)
+            if (entryIsOwner)
             {
                 ImGui.SameLine();
                 ImGui.SetCursorPosY(textPos);
@@ -796,7 +796,7 @@ namespace MareSynchronos.UI
                 ImGui.PopFont();
                 UiShared.AttachToolTip("User is owner of this Syncshell");
             }
-            else if (userIsMod)
+            else if (entryIsMod)
             {
                 ImGui.SameLine();
                 ImGui.SetCursorPosY(textPos);
@@ -805,7 +805,7 @@ namespace MareSynchronos.UI
                 ImGui.PopFont();
                 UiShared.AttachToolTip("User is moderator of this Syncshell");
             }
-            else if (isPinned)
+            else if (entryIsPinned)
             {
                 ImGui.SameLine();
                 ImGui.SetCursorPosY(textPos);
@@ -886,7 +886,7 @@ namespace MareSynchronos.UI
 
             if (plusButtonShown)
             {
-                var barWidth = isOwner || (isModerator && !userIsMod && !userIsOwner)
+                var barWidth = userIsOwner || (userIsModerator && !entryIsMod && !entryIsOwner)
                     ? barButtonSize.X + ImGui.GetStyle().ItemSpacing.X
                     : 0;
                 ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - plusButtonSize.X - barWidth);
@@ -899,7 +899,7 @@ namespace MareSynchronos.UI
                 UiShared.AttachToolTip("Pair with " + entryUID + " individually");
             }
 
-            if (isOwner || (isModerator && !userIsMod && !userIsOwner))
+            if (userIsOwner || (userIsModerator && !entryIsMod && !entryIsOwner))
             {
                 ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - barButtonSize.X);
                 ImGui.SetCursorPosY(originalY);
@@ -914,7 +914,7 @@ namespace MareSynchronos.UI
             if ((animDisabled || soundsDisabled) && pair.UserPair == null)
             {
                 var infoIconPosDist = (plusButtonShown ? plusButtonSize.X + ImGui.GetStyle().ItemSpacing.X : 0)
-                    + ((isOwner || (isModerator && !userIsMod && !userIsOwner)) ? barButtonSize.X + ImGui.GetStyle().ItemSpacing.X : 0);
+                    + ((userIsOwner || (userIsModerator && !entryIsMod && !entryIsOwner)) ? barButtonSize.X + ImGui.GetStyle().ItemSpacing.X : 0);
                 var icon = FontAwesomeIcon.InfoCircle;
                 var iconwidth = UiShared.GetIconSize(icon);
 
@@ -949,7 +949,7 @@ namespace MareSynchronos.UI
                 }
             }
 
-            if (!plusButtonShown && !(isOwner || (isModerator && !userIsMod && !userIsOwner)))
+            if (!plusButtonShown && !(userIsOwner || (userIsModerator && !entryIsMod && !entryIsOwner)))
             {
                 ImGui.SameLine();
                 ImGui.Dummy(barButtonSize with { X = 0 });
@@ -957,9 +957,9 @@ namespace MareSynchronos.UI
 
             if (ImGui.BeginPopup("Popup"))
             {
-                if ((isModerator) && !(userIsMod || userIsOwner))
+                if ((userIsModerator || userIsOwner) && !(entryIsMod || entryIsOwner))
                 {
-                    var pinText = isPinned ? "Unpin user" : "Pin user";
+                    var pinText = entryIsPinned ? "Unpin user" : "Pin user";
                     if (UiShared.IconTextButton(FontAwesomeIcon.Thumbtack, pinText))
                     {
                         ImGui.CloseCurrentPopup();
@@ -986,9 +986,9 @@ namespace MareSynchronos.UI
                     UiShared.AttachToolTip("Ban user from this Syncshell");
                 }
 
-                if (isOwner)
+                if (userIsOwner)
                 {
-                    string modText = userIsMod ? "Demod user" : "Mod user";
+                    string modText = entryIsMod ? "Demod user" : "Mod user";
                     if (UiShared.IconTextButton(FontAwesomeIcon.UserShield, modText))
                     {
                         if (UiShared.CtrlPressed())
