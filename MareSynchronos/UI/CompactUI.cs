@@ -774,7 +774,7 @@ public class CompactUi : Window, IDisposable
                 "Your plugin or the server you are connecting to is out of date. Please update your plugin now. If you already did so, contact the server provider to update their server to the latest version.",
             ServerState.RateLimited => "You are rate limited for (re)connecting too often. Disconnect, wait 10 minutes and try again.",
             ServerState.Connected => string.Empty,
-            ServerState.NoSecretKey => "You have no secret key set for this current character. Open the settings and set a secret key. You can reuse one secret key for different characters.",
+            ServerState.NoSecretKey => "You have no secret key set for this current character. Open the settings and set a secret key for this current character. If this character does not exist in Mare, it needs to be added. You can reuse one secret key for different characters.",
             _ => string.Empty
         };
     }
