@@ -259,7 +259,7 @@ public class SettingsUi : Window, IDisposable
                             _serverConfigurationManager.Save();
                         }
                         var worldIdx = (ushort)item.WorldId;
-                        var data = _uiShared.WorldData;
+                        var data = _uiShared.WorldData.OrderBy(u => u.Value, StringComparer.Ordinal).ToDictionary(k => k.Key, k => k.Value);
                         if (!data.TryGetValue(worldIdx, out string? worldPreview))
                         {
                             worldPreview = data.First().Value;

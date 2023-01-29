@@ -62,6 +62,8 @@ public class CompactUi : Window, IDisposable
 
 #if DEBUG
         string dateTime = "DEV VERSION";
+        var ver = Assembly.GetExecutingAssembly().GetName().Version;
+        this.WindowName = "Mare Synchronos " + ver.Major + "." + ver.Minor + "." + ver.Build + "###MareSynchronosMainUI";
         try
         {
             dateTime = VariousExtensions.GetLinkerTime(Assembly.GetCallingAssembly()).ToString("yyyyMMddHHmmss");
@@ -72,7 +74,7 @@ public class CompactUi : Window, IDisposable
             Logger.Warn(ex.Message);
             Logger.Warn(ex.StackTrace);
         }
-        this.WindowName = "Mare Synchronos " + dateTime + "###MareSynchronosMainUI";
+        this.WindowName = $"Mare Synchronos {dateTime} ({ver.Major}.{ver.Minor}.{ver.Build})###MareSynchronosMainUI";
         Toggle();
 #else
         var ver = Assembly.GetExecutingAssembly().GetName().Version;

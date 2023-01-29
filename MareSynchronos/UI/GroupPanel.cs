@@ -415,10 +415,25 @@ namespace MareSynchronos.UI
             ImGui.Indent(collapseButton.X);
             if (_expandedGroupState[groupDto.GID])
             {
-                var visibleUsers = pairsInGroup.Where(u => u.IsVisible).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
-                var onlineUsers = pairsInGroup.Where(u => u.IsOnline && !u.IsVisible).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
-                var offlineUsers = pairsInGroup.Where(u => !u.IsOnline && !u.IsVisible).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
-
+                var visibleUsers = pairsInGroup.Where(u => u.IsVisible)
+                    .OrderByDescending(u => string.Equals(u.UserData.UID, groupDto.OwnerUID, StringComparison.Ordinal))
+                    .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsModerator())
+                    .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsPinned())
+                    .ThenBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                var onlineUsers = pairsInGroup.Where(u => u.IsOnline && !u.IsVisible)
+                    .OrderByDescending(u => string.Equals(u.UserData.UID, groupDto.OwnerUID, StringComparison.Ordinal))
+                    .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsModerator())
+                    .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsPinned())
+                    .ThenBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                var offlineUsers = pairsInGroup.Where(u => !u.IsOnline && !u.IsVisible)
+                    .OrderByDescending(u => string.Equals(u.UserData.UID, groupDto.OwnerUID, StringComparison.Ordinal))
+                    .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsModerator())
+                    .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsPinned())
+                    .ThenBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+                    
                 if (visibleUsers.Any())
                 {
                     ImGui.Text("Visible");
@@ -426,11 +441,11 @@ namespace MareSynchronos.UI
                     foreach (var entry in visibleUsers)
                     {
                         UiShared.DrawWithID(groupDto.GID + entry.UserData.UID, () => DrawSyncshellPairedClient(
-                                                entry,
-                                                entry.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
-                                                groupDto.OwnerUID,
-                                                string.Equals(groupDto.OwnerUID, ApiController.UID, StringComparison.Ordinal),
-                                                groupDto.GroupUserInfo.IsModerator()));
+                            entry,
+                            entry.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
+                            groupDto.OwnerUID,
+                            string.Equals(groupDto.OwnerUID, ApiController.UID, StringComparison.Ordinal),
+                            groupDto.GroupUserInfo.IsModerator()));
                     }
                 }
 
@@ -442,10 +457,10 @@ namespace MareSynchronos.UI
                     {
                         UiShared.DrawWithID(groupDto.GID + entry.UserData.UID, () => DrawSyncshellPairedClient(
                             entry,
-                                                entry.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
-                                                groupDto.OwnerUID,
-                                                string.Equals(groupDto.OwnerUID, ApiController.UID, StringComparison.Ordinal),
-                                                groupDto.GroupUserInfo.IsModerator()));
+                            entry.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
+                            groupDto.OwnerUID,
+                            string.Equals(groupDto.OwnerUID, ApiController.UID, StringComparison.Ordinal),
+                            groupDto.GroupUserInfo.IsModerator()));
                     }
                 }
 
@@ -456,11 +471,11 @@ namespace MareSynchronos.UI
                     foreach (var entry in offlineUsers)
                     {
                         UiShared.DrawWithID(groupDto.GID + entry.UserData.UID, () => DrawSyncshellPairedClient(
-                                                entry,
-                                                entry.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
-                                                groupDto.OwnerUID,
-                                                string.Equals(groupDto.OwnerUID, ApiController.UID, StringComparison.Ordinal),
-                                                groupDto.GroupUserInfo.IsModerator()));
+                            entry,
+                            entry.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
+                            groupDto.OwnerUID,
+                            string.Equals(groupDto.OwnerUID, ApiController.UID, StringComparison.Ordinal),
+                            groupDto.GroupUserInfo.IsModerator()));
                     }
                 }
 
@@ -729,7 +744,7 @@ namespace MareSynchronos.UI
             var textSize = ImGui.CalcTextSize(entryUID);
             var originalY = ImGui.GetCursorPosY();
             var userIsMod = entry.GroupPairStatusInfo.IsModerator();
-            var userIsOwner = string.Equals(entryUID, ownerUid, StringComparison.Ordinal);
+            var userIsOwner = string.Equals(pair.UserData.UID, ownerUid, StringComparison.Ordinal);
             var isPinned = entry.GroupPairStatusInfo.IsPinned();
             var isPaused = pair.IsPaused;
             var presenceIcon = pair.IsVisible ? FontAwesomeIcon.Eye : (pair.IsOnline ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink);
@@ -942,7 +957,7 @@ namespace MareSynchronos.UI
 
             if (ImGui.BeginPopup("Popup"))
             {
-                if ((!isModerator) && !(userIsMod || userIsOwner))
+                if ((isModerator) && !(userIsMod || userIsOwner))
                 {
                     var pinText = isPinned ? "Unpin user" : "Pin user";
                     if (UiShared.IconTextButton(FontAwesomeIcon.Thumbtack, pinText))
