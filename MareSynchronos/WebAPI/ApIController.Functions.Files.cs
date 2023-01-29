@@ -219,9 +219,17 @@ public partial class ApiController
             Logger.Debug("Sending " + requestMessage.Method + " to " + requestMessage.RequestUri);
         }
 
-        if (ct != null)
-            return await _httpClient.SendAsync(requestMessage, ct.Value).ConfigureAwait(false);
-        return await _httpClient.SendAsync(requestMessage).ConfigureAwait(false);
+        try
+        {
+            if (ct != null)
+                return await _httpClient.SendAsync(requestMessage, ct.Value).ConfigureAwait(false);
+            return await _httpClient.SendAsync(requestMessage).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Error during SendRequestInternal for " + requestMessage.RequestUri, ex);
+            throw;
+        }
     }
 
     private async Task<HttpResponseMessage> SendRequestAsync<T>(HttpMethod method, Uri uri, T content, CancellationToken ct) where T : class

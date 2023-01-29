@@ -87,7 +87,11 @@ public class PairManager : IDisposable
 
             if (!_allClientPairs[item.Key].HasAnyConnection())
             {
-                _allClientPairs.TryRemove(item.Key, out _);
+                if (_allClientPairs.TryRemove(item.Key, out var pair))
+                {
+                    pair.CachedPlayer?.Dispose();
+                    pair.CachedPlayer = null;
+                }
             }
         }
         RecreateLazy();
@@ -197,6 +201,8 @@ public class PairManager : IDisposable
 
             if (!pair.HasAnyConnection())
             {
+                pair.CachedPlayer?.Dispose();
+                pair.CachedPlayer = null;
                 _allClientPairs.TryRemove(dto.User, out _);
             }
 
@@ -211,6 +217,8 @@ public class PairManager : IDisposable
             pair.UserPair = null;
             if (!pair.HasAnyConnection())
             {
+                pair.CachedPlayer?.Dispose();
+                pair.CachedPlayer = null;
                 _allClientPairs.TryRemove(dto.User, out _);
             }
             else
