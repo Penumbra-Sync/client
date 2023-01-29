@@ -447,6 +447,8 @@ public class SettingsUi : Window, IDisposable
         var openPopupOnAddition = _configService.Current.OpenPopupOnAdd;
         var hideInfoMessages = _configService.Current.HideInfoMessages;
         var disableOptionalPluginWarnings = _configService.Current.DisableOptionalPluginWarnings;
+        var onlineNotifs = _configService.Current.ShowOnlineNotifications;
+        var onlineNotifsPairsOnly = _configService.Current.ShowOnlineNotificationsOnlyForIndividualPairs;
 
         if (ImGui.Checkbox("Open Notes Popup on user addition", ref openPopupOnAddition))
         {
@@ -470,6 +472,21 @@ public class SettingsUi : Window, IDisposable
             _configService.Save();
         }
         UiShared.DrawHelpText("Enabling this will not print any \"Warning\" labeled messages for missing optional plugins Heels or Customize+ in the game chat.");
+        if (ImGui.Checkbox("Enable online notifications", ref onlineNotifs))
+        {
+            _configService.Current.ShowOnlineNotifications = onlineNotifs;
+            _configService.Save();
+        }
+        UiShared.DrawHelpText("Enabling this will show a small notification in the bottom right corner when pairs go online.");
+
+        if (!onlineNotifs) ImGui.BeginDisabled();
+        if (ImGui.Checkbox("Notify only for individual pairs", ref onlineNotifsPairsOnly))
+        {
+            _configService.Current.ShowOnlineNotificationsOnlyForIndividualPairs = onlineNotifsPairsOnly;
+            _configService.Save();
+        }
+        UiShared.DrawHelpText("Enabling this will only show online notifications for individual pairs.");
+        if (!onlineNotifs) ImGui.EndDisabled();
     }
 
     private bool _deleteFilesPopupModalShown = false;

@@ -184,9 +184,6 @@ public partial class ApiController : IDisposable, IMareHubClient
 
                 await _mareHub.StartAsync(token).ConfigureAwait(false);
 
-                OnReceiveServerMessage((sev, msg) => Client_ReceiveServerMessage(sev, msg));
-                OnUpdateSystemInfo((dto) => Client_UpdateSystemInfo(dto));
-
                 await InitializeData().ConfigureAwait(false);
 
                 _connectionDto = await GetConnectionDto().ConfigureAwait(false);
@@ -257,6 +254,8 @@ public partial class ApiController : IDisposable, IMareHubClient
 
         Logger.Debug("Initializing data");
         OnDownloadReady((guid) => Client_DownloadReady(guid));
+        OnReceiveServerMessage((sev, msg) => Client_ReceiveServerMessage(sev, msg));
+        OnUpdateSystemInfo((dto) => Client_UpdateSystemInfo(dto));
 
         OnUserSendOffline((dto) => Client_UserSendOffline(dto));
         OnUserAddClientPair((dto) => Client_UserAddClientPair(dto));
@@ -369,8 +368,8 @@ public partial class ApiController : IDisposable, IMareHubClient
     private async Task MareHubOnReconnected(string? arg)
     {
         ServerState = ServerState.Connecting;
-        _connectionDto = await GetConnectionDto().ConfigureAwait(false);
         await InitializeData().ConfigureAwait(false);
+        _connectionDto = await GetConnectionDto().ConfigureAwait(false);
         ServerState = ServerState.Connected;
     }
 

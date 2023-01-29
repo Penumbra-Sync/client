@@ -25,4 +25,6 @@ public class MareConfig : IPluginConfiguration
     public bool ShowTransferWindow { get; set; } = true;
     public bool OpenPopupOnAdd { get; set; } = true;
     public string CurrentServer { get; set; } = string.Empty;
+    public bool ShowOnlineNotifications { get; set; } = false;
+    public bool ShowOnlineNotificationsOnlyForIndividualPairs { get; set; } = true;
 }

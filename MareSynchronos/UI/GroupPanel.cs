@@ -481,6 +481,8 @@ namespace MareSynchronos.UI
             var userSoundsDisabled = groupDto.GroupUserPermissions.IsDisableSounds();
             var userAnimDisabled = groupDto.GroupUserPermissions.IsDisableAnimations();
 
+            bool showInfoIcon = !invitesEnabled || soundsDisabled || animDisabled || userSoundsDisabled || userAnimDisabled;
+
             var lockedIcon = invitesEnabled ? FontAwesomeIcon.LockOpen : FontAwesomeIcon.Lock;
             var animIcon = animDisabled ? FontAwesomeIcon.Stop : FontAwesomeIcon.Running;
             var soundsIcon = soundsDisabled ? FontAwesomeIcon.VolumeOff : FontAwesomeIcon.VolumeUp;
@@ -488,50 +490,77 @@ namespace MareSynchronos.UI
             var userSoundsIcon = userSoundsDisabled ? FontAwesomeIcon.VolumeOff : FontAwesomeIcon.VolumeUp;
 
             var iconSize = UiShared.GetIconSize(infoIcon);
-            var diffLockUnlockIcons = (UiShared.GetIconSize(infoIcon).X - iconSize.X) / 2;
+            var diffLockUnlockIcons = showInfoIcon ? (UiShared.GetIconSize(infoIcon).X - iconSize.X) / 2 : 0;
             var barbuttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Bars);
             var isOwner = string.Equals(groupDto.OwnerUID, ApiController.UID, StringComparison.Ordinal);
 
-
-
-            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - barbuttonSize.X - iconSize.X - diffLockUnlockIcons - ImGui.GetStyle().ItemSpacing.X);
-            ImGui.PushFont(UiBuilder.IconFont);
-            ImGui.Text(infoIcon.ToIconString());
-            ImGui.PopFont();
-            if (ImGui.IsItemHovered())
+            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - barbuttonSize.X - (showInfoIcon ? iconSize.X : 0) - diffLockUnlockIcons - (showInfoIcon ? ImGui.GetStyle().ItemSpacing.X : 0));
+            if (showInfoIcon)
             {
-                ImGui.BeginTooltip();
-                ImGui.Text("Syncshell permissions");
-                var lockedText = invitesEnabled ? "Syncshell is opened for joining" : "Syncshell is closed for joining";
-                UiShared.FontText(lockedIcon.ToIconString(), UiBuilder.IconFont);
-                ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                ImGui.Text(lockedText);
+                UiShared.FontText(infoIcon.ToIconString(), UiBuilder.IconFont);
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.BeginTooltip();
+                    if (!invitesEnabled || soundsDisabled || animDisabled)
+                    {
+                        ImGui.Text("Syncshell permissions");
 
-                var soundsText = soundsDisabled ? "Sound sync disabled through owner" : "Sound sync enabled";
-                UiShared.FontText(soundsIcon.ToIconString(), UiBuilder.IconFont);
-                ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                ImGui.Text(soundsText);
+                        if (!invitesEnabled)
+                        {
+                            var lockedText = "Syncshell is closed for joining";
+                            UiShared.FontText(lockedIcon.ToIconString(), UiBuilder.IconFont);
+                            ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                            ImGui.Text(lockedText);
+                        }
 
-                var animText = animDisabled ? "Animation sync disabled through owner" : "Animation sync enabled";
-                UiShared.FontText(animIcon.ToIconString(), UiBuilder.IconFont);
-                ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                ImGui.Text(animText);
-                ImGui.Separator();
-                ImGui.Text("Your permissions");
+                        if (soundsDisabled)
+                        {
+                            var soundsText = "Sound sync disabled through owner";
+                            UiShared.FontText(soundsIcon.ToIconString(), UiBuilder.IconFont);
+                            ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                            ImGui.Text(soundsText);
+                        }
 
-                var userSoundsText = userSoundsDisabled ? "Sound sync disabled through you" : "Sound sync enabled";
-                UiShared.FontText(userSoundsIcon.ToIconString(), UiBuilder.IconFont);
-                ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                ImGui.Text(userSoundsText);
+                        if (animDisabled)
+                        {
+                            var animText = "Animation sync disabled through owner";
+                            UiShared.FontText(animIcon.ToIconString(), UiBuilder.IconFont);
+                            ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                            ImGui.Text(animText);
+                        }
+                    }
 
-                var userAnimText = userAnimDisabled ? "Animation sync disabled through you" : "Animation sync enabled";
-                UiShared.FontText(userAnimIcon.ToIconString(), UiBuilder.IconFont);
-                ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                ImGui.Text(userAnimText);
-                UiShared.TextWrapped("Note that syncshell permissions for disabling take precedence over your own set permissions");
-                ImGui.EndTooltip();
+                    if (userSoundsDisabled || userAnimDisabled)
+                    {
+                        if (!invitesEnabled || soundsDisabled || animDisabled)
+                            ImGui.Separator();
+
+                        ImGui.Text("Your permissions");
+
+                        if (userSoundsDisabled)
+                        {
+                            var userSoundsText = "Sound sync disabled through you";
+                            UiShared.FontText(userSoundsIcon.ToIconString(), UiBuilder.IconFont);
+                            ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                            ImGui.Text(userSoundsText);
+                        }
+
+                        if (userAnimDisabled)
+                        {
+                            var userAnimText = "Animation sync disabled through you";
+                            UiShared.FontText(userAnimIcon.ToIconString(), UiBuilder.IconFont);
+                            ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                            ImGui.Text(userAnimText);
+                        }
+
+                        if (!invitesEnabled || soundsDisabled || animDisabled)
+                            UiShared.TextWrapped("Note that syncshell permissions for disabling take precedence over your own set permissions");
+                    }
+                    ImGui.EndTooltip();
+                }
+                ImGui.SameLine();
             }
-            ImGui.SameLine();
+
             ImGui.SetCursorPosX(ImGui.GetCursorPosX() + diffLockUnlockIcons);
             if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
             {
@@ -707,6 +736,9 @@ namespace MareSynchronos.UI
             var presenceColor = (pair.IsOnline || pair.IsVisible) ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
             var presenceText = entryUID + " is offline";
 
+            var soundsDisabled = entry.GroupUserPermissions.IsDisableSounds();
+            var animDisabled = entry.GroupUserPermissions.IsDisableAnimations();
+
             var textPos = originalY + barButtonSize.Y / 2 - textSize.Y / 2;
             ImGui.SetCursorPosY(textPos);
             if (pair.IsPaused)
@@ -860,7 +892,52 @@ namespace MareSynchronos.UI
                 if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
                 {
                     ImGui.OpenPopup("Popup");
+
                 }
+            }
+
+            if ((animDisabled || soundsDisabled) && pair.UserPair == null)
+            {
+                var infoIconPosDist = (plusButtonShown ? plusButtonSize.X + ImGui.GetStyle().ItemSpacing.X : 0)
+                    + ((isOwner || (isModerator && !userIsMod && !userIsOwner)) ? barButtonSize.X + ImGui.GetStyle().ItemSpacing.X : 0);
+                var icon = FontAwesomeIcon.InfoCircle;
+                var iconwidth = UiShared.GetIconSize(icon);
+
+                ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - infoIconPosDist - iconwidth.X);
+                ImGui.SetCursorPosY(originalY);
+
+                UiShared.FontText(icon.ToIconString(), UiBuilder.IconFont);
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.BeginTooltip();
+
+
+                    ImGui.Text("User permissions");
+
+                    if (soundsDisabled)
+                    {
+                        var userSoundsText = "Sound sync disabled by " + pair.UserData.AliasOrUID;
+                        UiShared.FontText(FontAwesomeIcon.VolumeOff.ToIconString(), UiBuilder.IconFont);
+                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                        ImGui.Text(userSoundsText);
+                    }
+
+                    if (animDisabled)
+                    {
+                        var userAnimText = "Animation sync disabled by " + pair.UserData.AliasOrUID;
+                        UiShared.FontText(FontAwesomeIcon.Stop.ToIconString(), UiBuilder.IconFont);
+                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                        ImGui.Text(userAnimText);
+                    }
+
+                    ImGui.EndTooltip();
+                }
+            }
+
+            if (!plusButtonShown && !(isOwner || (isModerator && !userIsMod && !userIsOwner)))
+            {
+                ImGui.SameLine();
+                ImGui.Dummy(barButtonSize with { X = 0 });
             }
 
             if (ImGui.BeginPopup("Popup"))
@@ -919,12 +996,6 @@ namespace MareSynchronos.UI
                     UiShared.AttachToolTip("Hold CTRL and SHIFT and click to transfer ownership of this Syncshell to " + (entry.UserAliasOrUID) + Environment.NewLine + "WARNING: This action is irreversible.");
                 }
                 ImGui.EndPopup();
-            }
-
-            if (!plusButtonShown && !(isOwner || (isModerator && !userIsMod && !userIsOwner)))
-            {
-                ImGui.SameLine();
-                ImGui.Dummy(barButtonSize with { X = 0 });
             }
 
             if (_showModalBanUser && !_banUserPopupOpen)

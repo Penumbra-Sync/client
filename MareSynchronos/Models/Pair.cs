@@ -7,6 +7,7 @@ using MareSynchronos.API.Dto.User;
 using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Utils;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace MareSynchronos.Models;
 
@@ -38,7 +39,7 @@ public class Pair
     {
         if (_serverConfigurationManager.CurrentServer.UidServerComments.TryGetValue(UserData.UID, out string? note))
         {
-            return note;
+            return string.IsNullOrEmpty(note) ? null : note;
         }
 
         return null;
@@ -66,20 +67,34 @@ public class Pair
             ShownHeelsWarning = _configService.Current.DisableOptionalPluginWarnings,
         };
 
-        CachedPlayer.Initialize(address, name, RemoveNotSyncedFiles(LastReceivedCharacterData), _pluginWarnings);
-        LastReceivedCharacterData = null;
+        CachedPlayer.Initialize(address, name);
+
+        ApplyLastReceivedData();
     }
 
     public void ApplyData(OnlineUserCharaDataDto data)
     {
         if (CachedPlayer == null) throw new InvalidOperationException("CachedPlayer not initialized");
+
+        if (string.Equals(LastReceivedCharacterData?.DataHash.Value, data.CharaData.DataHash.Value, StringComparison.Ordinal)) return;
+
+        LastReceivedCharacterData = data.CharaData;
+
+        ApplyLastReceivedData();
+    }
+
+    public void ApplyLastReceivedData()
+    {
+        if (CachedPlayer == null) return;
+        if (LastReceivedCharacterData == null) return;
+
         _pluginWarnings ??= new()
         {
             ShownCustomizePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
             ShownHeelsWarning = _configService.Current.DisableOptionalPluginWarnings,
         };
 
-        CachedPlayer.ApplyCharacterData(RemoveNotSyncedFiles(data.CharaData)!, _pluginWarnings);
+        CachedPlayer.ApplyCharacterData(RemoveNotSyncedFiles(LastReceivedCharacterData.DeepClone())!, _pluginWarnings);
     }
 
     private API.Data.CharacterData? RemoveNotSyncedFiles(API.Data.CharacterData? data)

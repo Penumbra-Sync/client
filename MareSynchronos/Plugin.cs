@@ -69,7 +69,8 @@ public sealed class Plugin : IDalamudPlugin
         _fileDialogManager = new FileDialogManager();
         _fileCacheManager = new FileCacheManager(_ipcManager, _configurationService);
         _serverConfigurationManager = new ServerConfigurationManager(_configurationService, _dalamudUtil);
-        _pairManager = new PairManager(new CachedPlayerFactory(_ipcManager, _dalamudUtil, _fileCacheManager), _dalamudUtil, new PairFactory(_configurationService, _serverConfigurationManager));
+        _pairManager = new PairManager(new CachedPlayerFactory(_ipcManager, _dalamudUtil, _fileCacheManager), _dalamudUtil,
+            new PairFactory(_configurationService, _serverConfigurationManager), _pluginInterface.UiBuilder, _configurationService);
         _apiController = new ApiController(_configurationService, _dalamudUtil, _fileCacheManager, _pairManager, _serverConfigurationManager);
         _periodicFileScanner = new PeriodicFileScanner(_ipcManager, _configurationService, _fileCacheManager, _apiController, _dalamudUtil);
         _fileReplacementFactory = new FileReplacementFactory(_fileCacheManager, _ipcManager);

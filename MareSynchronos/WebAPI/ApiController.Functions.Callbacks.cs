@@ -10,6 +10,17 @@ namespace MareSynchronos.WebAPI;
 public partial class ApiController
 {
     public UserPairDto? LastAddedUser { get; set; }
+    private void ExecuteSafely(Action act)
+    {
+        try
+        {
+            act();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Error on executing safely", ex);
+        }
+    }
 
     public void OnUpdateSystemInfo(Action<SystemInfoDto> act)
     {
@@ -44,7 +55,7 @@ public partial class ApiController
     public Task Client_GroupSendFullInfo(GroupFullInfoDto dto)
     {
         Logger.Verbose("Client_GroupSendFullInfo: " + dto);
-        _pairManager.AddGroup(dto);
+        ExecuteSafely(() => _pairManager.AddGroup(dto));
         return Task.CompletedTask;
     }
 
@@ -57,7 +68,7 @@ public partial class ApiController
     public Task Client_GroupSendInfo(GroupInfoDto dto)
     {
         Logger.Verbose("Client_GroupSendInfo: " + dto);
-        _pairManager.SetGroupInfo(dto);
+        ExecuteSafely(() => _pairManager.SetGroupInfo(dto));
         return Task.CompletedTask;
     }
 
@@ -70,7 +81,7 @@ public partial class ApiController
     public Task Client_GroupDelete(GroupDto dto)
     {
         Logger.Verbose("Client_GroupDelete: " + dto);
-        _pairManager.RemoveGroup(dto.Group);
+        ExecuteSafely(() => _pairManager.RemoveGroup(dto.Group));
         return Task.CompletedTask;
     }
 
@@ -83,7 +94,7 @@ public partial class ApiController
     public Task Client_GroupPairJoined(GroupPairFullInfoDto dto)
     {
         Logger.Verbose("Client_GroupPairJoined: " + dto);
-        _pairManager.AddGroupPair(dto);
+        ExecuteSafely(() => _pairManager.AddGroupPair(dto));
         return Task.CompletedTask;
     }
 
@@ -96,7 +107,7 @@ public partial class ApiController
     public Task Client_GroupPairLeft(GroupPairDto dto)
     {
         Logger.Verbose("Client_GroupPairLeft: " + dto);
-        _pairManager.RemoveGroupPair(dto);
+        ExecuteSafely(() => _pairManager.RemoveGroupPair(dto));
         return Task.CompletedTask;
     }
 
@@ -109,7 +120,7 @@ public partial class ApiController
     public Task Client_GroupChangePermissions(GroupPermissionDto dto)
     {
         Logger.Verbose("Client_GroupChangePermissions: " + dto);
-        _pairManager.SetGroupPermissions(dto);
+        ExecuteSafely(() => _pairManager.SetGroupPermissions(dto));
         return Task.CompletedTask;
     }
 
@@ -122,8 +133,11 @@ public partial class ApiController
     public Task Client_GroupPairChangePermissions(GroupPairUserPermissionDto dto)
     {
         Logger.Verbose("Client_GroupPairChangePermissions: " + dto);
-        if (string.Equals(dto.UID, UID, StringComparison.Ordinal)) _pairManager.SetGroupUserPermissions(dto);
-        else _pairManager.SetGroupPairUserPermissions(dto);
+        ExecuteSafely(() =>
+        {
+            if (string.Equals(dto.UID, UID, StringComparison.Ordinal)) _pairManager.SetGroupUserPermissions(dto);
+            else _pairManager.SetGroupPairUserPermissions(dto);
+        });
         return Task.CompletedTask;
     }
 
@@ -136,15 +150,18 @@ public partial class ApiController
     public Task Client_GroupPairChangeUserInfo(GroupPairUserInfoDto dto)
     {
         Logger.Verbose("Client_GroupPairChangeUserInfo: " + dto);
-        if (string.Equals(dto.UID, UID, StringComparison.Ordinal)) _pairManager.SetGroupStatusInfo(dto);
-        else _pairManager.SetGroupPairStatusInfo(dto);
+        ExecuteSafely(() =>
+        {
+            if (string.Equals(dto.UID, UID, StringComparison.Ordinal)) _pairManager.SetGroupStatusInfo(dto);
+            else _pairManager.SetGroupPairStatusInfo(dto);
+        });
         return Task.CompletedTask;
     }
 
     public Task Client_UserReceiveCharacterData(OnlineUserCharaDataDto dto)
     {
         Logger.Verbose("Client_UserReceiveCharacterData: " + dto.User);
-        _pairManager.ReceiveCharaData(dto);
+        ExecuteSafely(() => _pairManager.ReceiveCharaData(dto));
         return Task.CompletedTask;
     }
 
@@ -157,7 +174,7 @@ public partial class ApiController
     public Task Client_UserAddClientPair(UserPairDto dto)
     {
         Logger.Debug($"Client_UserAddClientPair: " + dto);
-        _pairManager.AddUserPair(dto);
+        ExecuteSafely(() => _pairManager.AddUserPair(dto));
         return Task.CompletedTask;
     }
 
@@ -170,7 +187,7 @@ public partial class ApiController
     public Task Client_UserRemoveClientPair(UserDto dto)
     {
         Logger.Debug($"Client_UserRemoveClientPair: " + dto);
-        _pairManager.RemoveUserPair(dto);
+        ExecuteSafely(() => _pairManager.RemoveUserPair(dto));
         return Task.CompletedTask;
     }
 
@@ -183,7 +200,7 @@ public partial class ApiController
     public Task Client_UserSendOffline(UserDto dto)
     {
         Logger.Debug($"Client_UserSendOffline: {dto}");
-        _pairManager.MarkPairOffline(dto.User);
+        ExecuteSafely(() => _pairManager.MarkPairOffline(dto.User));
         return Task.CompletedTask;
     }
 
@@ -196,7 +213,7 @@ public partial class ApiController
     public Task Client_UserSendOnline(OnlineUserIdentDto dto)
     {
         Logger.Debug($"Client_UserSendOnline: {dto}");
-        _pairManager.MarkPairOnline(dto, this);
+        ExecuteSafely(() => _pairManager.MarkPairOnline(dto, this));
         return Task.CompletedTask;
     }
 
@@ -209,7 +226,7 @@ public partial class ApiController
     public Task Client_UserUpdateOtherPairPermissions(UserPermissionsDto dto)
     {
         Logger.Debug($"Client_UserUpdateOtherPairPermissions: {dto}");
-        _pairManager.UpdatePairPermissions(dto);
+        ExecuteSafely(() => _pairManager.UpdatePairPermissions(dto));
         return Task.CompletedTask;
     }
 
@@ -222,7 +239,7 @@ public partial class ApiController
     public Task Client_UserUpdateSelfPairPermissions(UserPermissionsDto dto)
     {
         Logger.Debug($"Client_UserUpdateSelfPairPermissions: {dto}");
-        _pairManager.UpdateSelfPairPermissions(dto);
+        ExecuteSafely(() => _pairManager.UpdateSelfPairPermissions(dto));
         return Task.CompletedTask;
     }
 

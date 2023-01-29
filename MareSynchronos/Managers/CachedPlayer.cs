@@ -208,21 +208,17 @@ public class CachedPlayer : IDisposable
         }
     }
 
-    public void Initialize(IntPtr character, string name, API.Data.CharacterData? cache, OptionalPluginWarning displayedChatWarning)
+    public void Initialize(IntPtr character, string name)
     {
         IsVisible = true;
         PlayerName = name;
         PlayerCharacter = character;
-        Logger.Debug("Initializing Player " + this + " has cache: " + (cache != null));
+        Logger.Debug("Initializing Player " + this);
 
         _ipcManager.PenumbraRedrawEvent += IpcManagerOnPenumbraRedrawEvent;
         _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
         _currentCharacterEquipment = new PlayerRelatedObject(ObjectKind.Player, IntPtr.Zero, IntPtr.Zero,
             () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName)?.Address ?? IntPtr.Zero);
-        if (cache != null)
-        {
-            ApplyCharacterData(cache, displayedChatWarning);
-        }
     }
 
     public override string ToString()

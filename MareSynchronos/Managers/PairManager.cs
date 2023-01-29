@@ -1,10 +1,13 @@
 ﻿using Dalamud.Game.ClientState.Objects.SubKinds;
+using Dalamud.Interface;
 using Dalamud.Utility;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Comparer;
+using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.Factories;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
@@ -19,12 +22,16 @@ public class PairManager : IDisposable
     private readonly CachedPlayerFactory _cachedPlayerFactory;
     private readonly DalamudUtil _dalamudUtil;
     private readonly PairFactory _pairFactory;
+    private readonly UiBuilder _uiBuilder;
+    private readonly ConfigurationService _configurationService;
 
-    public PairManager(CachedPlayerFactory cachedPlayerFactory, DalamudUtil dalamudUtil, PairFactory pairFactory)
+    public PairManager(CachedPlayerFactory cachedPlayerFactory, DalamudUtil dalamudUtil, PairFactory pairFactory, UiBuilder uiBuilder, ConfigurationService configurationService)
     {
         _cachedPlayerFactory = cachedPlayerFactory;
         _dalamudUtil = dalamudUtil;
         _pairFactory = pairFactory;
+        _uiBuilder = uiBuilder;
+        _configurationService = configurationService;
         _dalamudUtil.ZoneSwitchStart += DalamudUtilOnZoneSwitched;
         _dalamudUtil.DelayedFrameworkUpdate += DalamudUtilOnDelayedFrameworkUpdate;
         _directPairsInternal = DirectPairsLazy();
@@ -47,7 +54,6 @@ public class PairManager : IDisposable
     {
         return new Lazy<Dictionary<GroupFullInfoDto, List<Pair>>>(() =>
         {
-            Logger.Debug("Creating new GroupPairsLazy");
             Dictionary<GroupFullInfoDto, List<Pair>> outDict = new();
             foreach (var group in _allGroups)
             {
@@ -109,6 +115,7 @@ public class PairManager : IDisposable
         Logger.Debug("Clearing all Pairs");
         DisposePairs();
         _allClientPairs.Clear();
+        _allGroups.Clear();
         RecreateLazy();
     }
 
@@ -150,6 +157,15 @@ public class PairManager : IDisposable
         if (!_allClientPairs.ContainsKey(dto.User)) throw new InvalidOperationException("No user found for " + dto);
 
         if (_allClientPairs[dto.User].CachedPlayer != null) return;
+
+        if (_configurationService.Current.ShowOnlineNotifications)
+        {
+            var pair = _allClientPairs[dto.User];
+            if (_configurationService.Current.ShowOnlineNotificationsOnlyForIndividualPairs && pair.UserPair != null || !_configurationService.Current.ShowOnlineNotificationsOnlyForIndividualPairs)
+            {
+                _uiBuilder.AddNotification(string.Empty, "[Mare Synchronos] " + (pair.GetNote() ?? pair.UserData.AliasOrUID) + " online", Dalamud.Interface.Internal.Notifications.NotificationType.Info, 5000);
+            }
+        }
 
         _allClientPairs[dto.User].CachedPlayer?.Dispose();
         _allClientPairs[dto.User].CachedPlayer = _cachedPlayerFactory.Create(dto, controller);
@@ -251,22 +267,42 @@ public class PairManager : IDisposable
 
     internal void SetGroupPermissions(GroupPermissionDto dto)
     {
+        var prevPermissions = _allGroups[dto.Group].GroupPermissions;
         _allGroups[dto.Group].GroupPermissions = dto.Permissions;
+        if (prevPermissions.IsDisableAnimations() != dto.Permissions.IsDisableAnimations()
+            || prevPermissions.IsDisableSounds() != dto.Permissions.IsDisableSounds())
+        {
+            RecreateLazy();
+            var group = _allGroups[dto.Group];
+            GroupPairs[group].ForEach(p => p.ApplyLastReceivedData());
+        }
         RecreateLazy();
     }
 
     internal void SetGroupPairUserPermissions(GroupPairUserPermissionDto dto)
     {
         var group = _allGroups[dto.Group];
+        var prevPermissions = _allClientPairs[dto.User].GroupPair[group].GroupUserPermissions;
         _allClientPairs[dto.User].GroupPair[group].GroupUserPermissions = dto.GroupPairPermissions;
+        if (prevPermissions.IsDisableAnimations() != dto.GroupPairPermissions.IsDisableAnimations()
+            || prevPermissions.IsDisableSounds() != dto.GroupPairPermissions.IsDisableSounds())
+        {
+            _allClientPairs[dto.User].ApplyLastReceivedData();
+        }
         RecreateLazy();
     }
 
     internal void SetGroupUserPermissions(GroupPairUserPermissionDto dto)
     {
-        Logger.Debug("Setting Group User Permissions for " + dto);
-        var group = _allGroups[dto.Group];
-        group.GroupUserPermissions = dto.GroupPairPermissions;
+        var prevPermissions = _allGroups[dto.Group].GroupUserPermissions;
+        _allGroups[dto.Group].GroupUserPermissions = dto.GroupPairPermissions;
+        if (prevPermissions.IsDisableAnimations() != dto.GroupPairPermissions.IsDisableAnimations()
+            || prevPermissions.IsDisableSounds() != dto.GroupPairPermissions.IsDisableSounds())
+        {
+            RecreateLazy();
+            var group = _allGroups[dto.Group];
+            GroupPairs[group].ForEach(p => p.ApplyLastReceivedData());
+        }
         RecreateLazy();
     }
 
