@@ -91,7 +91,7 @@ internal class Logger : ILogger
 #if DEBUG
                 PluginLog.Verbose($"[{_name}] [{eventId}] {formatter(state, exception)}");
 #else
-                PluginLog.Verbose($"[{name}] {eventId} {state} {formatter(state, exception)}");
+                PluginLog.Verbose($"[{_name}] {eventId} {state} {formatter(state, exception)}");
 #endif
                 break;
         }
