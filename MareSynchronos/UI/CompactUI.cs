@@ -802,7 +802,7 @@ public class CompactUi : Window, IDisposable
             ServerState.Offline => "Unavailable",
             ServerState.RateLimited => "Rate Limited",
             ServerState.NoSecretKey => "No Secret Key",
-            ServerState.Connected => _apiController.UID,
+            ServerState.Connected => _apiController.DisplayName,
             _ => string.Empty
         };
     }

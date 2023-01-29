@@ -22,7 +22,7 @@ public class ServerConfigurationManager
 
     public bool HasValidConfig()
     {
-        return CurrentServer != null && (CurrentServer?.Authentications.Any() ?? false);
+        return CurrentServer != null;
     }
 
     public string[] GetServerApiUrls()

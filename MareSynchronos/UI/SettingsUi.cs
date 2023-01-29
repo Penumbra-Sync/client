@@ -368,7 +368,7 @@ public class SettingsUi : Window, IDisposable
                 ImGui.Separator();
                 if (UiShared.IconTextButton(FontAwesomeIcon.Plus, "Add new Secret Key"))
                 {
-                    selectedServer.SecretKeys.Add(selectedServer.SecretKeys.Last().Key + 1, new SecretKey()
+                    selectedServer.SecretKeys.Add(selectedServer.SecretKeys.LastOrDefault().Key + 1, new SecretKey()
                     {
                         FriendlyName = "New Secret Key",
                     });
