@@ -277,7 +277,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         foreach (var userPair in await UserGetPairedClients().ConfigureAwait(false))
         {
             Logger.Debug($"Pair: {userPair}");
-            _pairManager.AddUserPair(userPair);
+            _pairManager.AddUserPair(userPair, addToLastAddedUser: false);
         }
         foreach (var entry in await GroupsGetAll().ConfigureAwait(false))
         {

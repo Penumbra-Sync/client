@@ -108,11 +108,12 @@ public class PairManager : IDisposable
         RecreateLazy();
     }
 
-    public void AddUserPair(UserPairDto dto)
+    public void AddUserPair(UserPairDto dto, bool addToLastAddedUser = true)
     {
         if (!_allClientPairs.ContainsKey(dto.User)) _allClientPairs[dto.User] = _pairFactory.Create();
         _allClientPairs[dto.User].UserPair = dto;
-        LastAddedUser = _allClientPairs[dto.User];
+        if (addToLastAddedUser)
+            LastAddedUser = _allClientPairs[dto.User];
         _allClientPairs[dto.User].ApplyLastReceivedData();
         RecreateLazy();
     }
