@@ -107,6 +107,7 @@ public class PairManager : IDisposable
         if (!_allClientPairs.ContainsKey(dto.User)) _allClientPairs[dto.User] = _pairFactory.Create();
 
         _allClientPairs[dto.User].UserPair = dto;
+        _allClientPairs[dto.User].ApplyLastReceivedData();
         RecreateLazy();
     }
 
@@ -163,7 +164,7 @@ public class PairManager : IDisposable
             var pair = _allClientPairs[dto.User];
             if (_configurationService.Current.ShowOnlineNotificationsOnlyForIndividualPairs && pair.UserPair != null || !_configurationService.Current.ShowOnlineNotificationsOnlyForIndividualPairs)
             {
-                _uiBuilder.AddNotification(string.Empty, "[Mare Synchronos] " + (pair.GetNote() ?? pair.UserData.AliasOrUID) + " online", Dalamud.Interface.Internal.Notifications.NotificationType.Info, 5000);
+                _uiBuilder.AddNotification(string.Empty, "[Mare Synchronos] " + (pair.GetNote() ?? pair.UserData.AliasOrUID) + " is now online", Dalamud.Interface.Internal.Notifications.NotificationType.Info, 5000);
             }
         }
 
@@ -212,6 +213,10 @@ public class PairManager : IDisposable
             {
                 _allClientPairs.TryRemove(dto.User, out _);
             }
+            else
+            {
+                pair.ApplyLastReceivedData();
+            }
 
             RecreateLazy();
         }
@@ -227,6 +232,10 @@ public class PairManager : IDisposable
         if (pair.UserPair == null) throw new InvalidOperationException("No direct pair for " + dto);
 
         pair.UserPair.OtherPermissions = dto.Permissions;
+        if (!pair.UserPair.OtherPermissions.IsPaired())
+        {
+            pair.ApplyLastReceivedData();
+        }
     }
 
     public void UpdateSelfPairPermissions(UserPermissionsDto dto)

@@ -7,7 +7,6 @@ using MareSynchronos.API.Dto.User;
 using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Utils;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace MareSynchronos.Models;
 
@@ -32,12 +31,12 @@ public class Pair
     public UserData UserData => UserPair?.User ?? GroupPair.First().Value.User;
     public bool IsOnline => CachedPlayer != null;
     public bool IsVisible => CachedPlayer != null && CachedPlayer.IsVisible;
-    public bool IsPaused => UserPair != null ? (UserPair.OtherPermissions.IsPaused() || UserPair.OwnPermissions.IsPaused())
+    public bool IsPaused => UserPair != null && UserPair.OtherPermissions.IsPaired() ? (UserPair.OtherPermissions.IsPaused() || UserPair.OwnPermissions.IsPaused())
             : GroupPair.All(p => p.Key.GroupUserPermissions.IsPaused() || p.Value.GroupUserPermissions.IsPaused());
 
     public string? GetNote()
     {
-        if (_serverConfigurationManager.CurrentServer.UidServerComments.TryGetValue(UserData.UID, out string? note))
+        if (_serverConfigurationManager.CurrentServer!.UidServerComments.TryGetValue(UserData.UID, out string? note))
         {
             return string.IsNullOrEmpty(note) ? null : note;
         }
@@ -47,7 +46,7 @@ public class Pair
 
     public void SetNote(string note)
     {
-        _serverConfigurationManager.CurrentServer.UidServerComments[UserData.UID] = note;
+        _serverConfigurationManager.CurrentServer!.UidServerComments[UserData.UID] = note;
         _serverConfigurationManager.Save();
     }
 

@@ -238,7 +238,7 @@ namespace MareSynchronos.UI
             }
 
             _showGidForEntry.TryGetValue(groupDto.GID, out var showGidInsteadOfName);
-            if (!showGidInsteadOfName && _serverConfigurationManager.CurrentServer.GidServerComments.TryGetValue(groupDto.GID, out var groupComment))
+            if (!showGidInsteadOfName && _serverConfigurationManager.CurrentServer!.GidServerComments.TryGetValue(groupDto.GID, out var groupComment))
             {
                 if (!string.IsNullOrEmpty(groupComment))
                 {
@@ -268,9 +268,9 @@ namespace MareSynchronos.UI
 
                 if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
                 {
-                    _serverConfigurationManager.CurrentServer.GidServerComments[_editGroupEntry] = _editGroupComment;
+                    _serverConfigurationManager.CurrentServer!.GidServerComments[_editGroupEntry] = _editGroupComment;
                     _serverConfigurationManager.Save();
-                    _editGroupComment = _serverConfigurationManager.CurrentServer.GidServerComments.TryGetValue(groupDto.GID, out string? value) ? value : string.Empty;
+                    _editGroupComment = _serverConfigurationManager.CurrentServer!.GidServerComments.TryGetValue(groupDto.GID, out string? value) ? value : string.Empty;
                     _editGroupEntry = groupDto.GID;
                 }
             }
@@ -280,7 +280,7 @@ namespace MareSynchronos.UI
                 ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * 2);
                 if (ImGui.InputTextWithHint("", "Comment/Notes", ref _editGroupComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
                 {
-                    _serverConfigurationManager.CurrentServer.GidServerComments[groupDto.GID] = _editGroupComment;
+                    _serverConfigurationManager.CurrentServer!.GidServerComments[groupDto.GID] = _editGroupComment;
                     _serverConfigurationManager.Save();
                     _editGroupEntry = string.Empty;
                 }
@@ -802,7 +802,7 @@ namespace MareSynchronos.UI
 
             var textIsUid = true;
             _mainUi.ShowUidForEntry.TryGetValue(entry.UID, out var showUidInsteadOfName);
-            if (!showUidInsteadOfName && _serverConfigurationManager.CurrentServer.UidServerComments.TryGetValue(entry.UID, out var playerText))
+            if (!showUidInsteadOfName && _serverConfigurationManager.CurrentServer!.UidServerComments.TryGetValue(entry.UID, out var playerText))
             {
                 if (string.IsNullOrEmpty(playerText))
                 {
@@ -842,7 +842,7 @@ namespace MareSynchronos.UI
 
                 if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
                 {
-                    _serverConfigurationManager.CurrentServer.UidServerComments[_mainUi.EditNickEntry] = _mainUi.EditUserComment;
+                    _serverConfigurationManager.CurrentServer!.UidServerComments[_mainUi.EditNickEntry] = _mainUi.EditUserComment;
                     _serverConfigurationManager.Save();
                     _mainUi.EditUserComment = _serverConfigurationManager.CurrentServer.UidServerComments.TryGetValue(entry.UID, out string? value) ? value : string.Empty;
                     _mainUi.EditNickEntry = entry.UID;
@@ -857,7 +857,7 @@ namespace MareSynchronos.UI
                 ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * buttons);
                 if (ImGui.InputTextWithHint("", "Nick/Notes", ref _mainUi.EditUserComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
                 {
-                    _serverConfigurationManager.CurrentServer.UidServerComments[entry.UID] = _mainUi.EditUserComment;
+                    _serverConfigurationManager.CurrentServer!.UidServerComments[entry.UID] = _mainUi.EditUserComment;
                     _serverConfigurationManager.Save();
                     _mainUi.EditNickEntry = string.Empty;
                 }

@@ -33,11 +33,11 @@ namespace MareSynchronos.UI.Handlers
         {
             if (open)
             {
-                _serverConfigurationManager.CurrentServer.OpenPairTags.Add(tag);
+                _serverConfigurationManager.CurrentServer!.OpenPairTags.Add(tag);
             }
             else
             {
-                _serverConfigurationManager.CurrentServer.OpenPairTags.Remove(tag);
+                _serverConfigurationManager.CurrentServer!.OpenPairTags.Remove(tag);
             }
             _serverConfigurationManager.Save();
         }
@@ -49,7 +49,7 @@ namespace MareSynchronos.UI.Handlers
         /// <returns>open true/false</returns>
         public bool IsTagOpen(string tag)
         {
-            return _serverConfigurationManager.CurrentServer.OpenPairTags.Contains(tag);
+            return _serverConfigurationManager.CurrentServer!.OpenPairTags.Contains(tag);
         }
 
         public List<string> GetAllTagsSorted()
@@ -110,12 +110,12 @@ namespace MareSynchronos.UI.Handlers
 
         private Dictionary<string, List<string>> GetUidTagDictionaryForCurrentServer()
         {
-            return _serverConfigurationManager.CurrentServer.UidServerPairedUserTags;
+            return _serverConfigurationManager.CurrentServer!.UidServerPairedUserTags;
         }
         
         private HashSet<string> GetAvailableTagsForCurrentServer()
         {
-            return _serverConfigurationManager.CurrentServer.ServerAvailablePairTags;
+            return _serverConfigurationManager.CurrentServer!.ServerAvailablePairTags;
         }
     }
 }

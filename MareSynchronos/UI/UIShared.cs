@@ -253,7 +253,7 @@ public partial class UiShared : IDisposable
     {
         if (_apiController.ServerState is ServerState.Connected)
         {
-            ImGui.TextUnformatted("Service " + _serverConfigurationManager.CurrentServer.ServerName + ":");
+            ImGui.TextUnformatted("Service " + _serverConfigurationManager.CurrentServer!.ServerName + ":");
             ImGui.SameLine();
             ImGui.TextColored(ImGuiColors.ParsedGreen, "Available");
             ImGui.SameLine();
@@ -354,7 +354,7 @@ public partial class UiShared : IDisposable
     private bool _cacheDirectoryHasOtherFilesThanCache = false;
     private bool _cacheDirectoryIsValidPath = true;
 
-    public int DrawServiceSelection()
+    public int DrawServiceSelection(bool selectOnChange = false)
     {
         string[] comboEntries = _serverConfigurationManager.GetServerNames();
 
@@ -362,7 +362,7 @@ public partial class UiShared : IDisposable
             _serverSelectionIndex = Array.IndexOf(_serverConfigurationManager.GetServerApiUrls(), _serverConfigurationManager.CurrentApiUrl);
         for (int i = 0; i < comboEntries.Length; i++)
         {
-            if (string.Equals(_serverConfigurationManager.CurrentServer.ServerName, comboEntries[i], StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(_serverConfigurationManager.CurrentServer?.ServerName, comboEntries[i], StringComparison.OrdinalIgnoreCase))
                 comboEntries[i] += " [Current]";
         }
         if (ImGui.BeginCombo("Select Service", comboEntries[_serverSelectionIndex]))
@@ -373,6 +373,10 @@ public partial class UiShared : IDisposable
                 if (ImGui.Selectable(comboEntries[i], isSelected))
                 {
                     _serverSelectionIndex = i;
+                    if (selectOnChange)
+                    {
+                        _serverConfigurationManager.SelectServer(i);
+                    }
                 }
 
                 if (isSelected)
@@ -637,7 +641,7 @@ public partial class UiShared : IDisposable
 
         splitNotes.RemoveAll(n => string.Equals(n, _notesStart) || string.Equals(n, _notesEnd));
 
-        var comments = _serverConfigurationManager.CurrentServer.UidServerComments;
+        var comments = _serverConfigurationManager.CurrentServer!.UidServerComments;
 
         foreach (var note in splitNotes)
         {

@@ -49,6 +49,7 @@ internal class IntroUi : Window, IDisposable
         _fileCacheManager = fileCacheManager;
         _serverConfigurationManager = serverConfigurationManager;
         _windowSystem = windowSystem;
+        IsOpen = false;
 
         SizeConstraints = new WindowSizeConstraints()
         {
@@ -88,7 +89,6 @@ internal class IntroUi : Window, IDisposable
                     for (int i = 60; i > 0; i--)
                     {
                         _timeoutLabel = $"{Strings.ToS.ButtonWillBeAvailableIn} {i}s";
-                        Logger.Debug(_timeoutLabel);
                         await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                     }
                 });
@@ -125,12 +125,12 @@ internal class IntroUi : Window, IDisposable
             ImGui.Separator();
 
 
-            UiShared.TextWrapped(_tosParagraphs[0]);
-            UiShared.TextWrapped(_tosParagraphs[1]);
-            UiShared.TextWrapped(_tosParagraphs[2]);
-            UiShared.TextWrapped(_tosParagraphs[3]);
-            UiShared.TextWrapped(_tosParagraphs[4]);
-            UiShared.TextWrapped(_tosParagraphs[5]);
+            UiShared.TextWrapped(_tosParagraphs![0]);
+            UiShared.TextWrapped(_tosParagraphs![1]);
+            UiShared.TextWrapped(_tosParagraphs![2]);
+            UiShared.TextWrapped(_tosParagraphs![3]);
+            UiShared.TextWrapped(_tosParagraphs![4]);
+            UiShared.TextWrapped(_tosParagraphs![5]);
 
             ImGui.Separator();
             if (_timeoutTask?.IsCompleted ?? true)
@@ -205,7 +205,7 @@ internal class IntroUi : Window, IDisposable
 
             UiShared.TextWrapped("Once you have received a secret key you can connect to the service using the tools provided below.");
 
-            _uiShared.DrawServiceSelection();
+            var idx = _uiShared.DrawServiceSelection(selectOnChange: true);
 
             var text = "Enter Secret Key";
             var buttonText = "Save";
@@ -225,12 +225,13 @@ internal class IntroUi : Window, IDisposable
                 ImGui.SameLine();
                 if (ImGui.Button(buttonText))
                 {
-                    _serverConfigurationManager.CurrentServer.SecretKeys.Add(_serverConfigurationManager.CurrentServer.SecretKeys.Select(k => k.Key).FirstOrDefault(), new SecretKey()
+                    if (_serverConfigurationManager.CurrentServer == null) _serverConfigurationManager.SelectServer(0);
+                    _serverConfigurationManager.CurrentServer!.SecretKeys.Add(_serverConfigurationManager.CurrentServer.SecretKeys.Select(k => k.Key).LastOrDefault() + 1, new SecretKey()
                     {
                         FriendlyName = $"Secret Key added on Setup ({DateTime.Now:yyyy-MM-dd})",
                         Key = _secretKey,
                     });
-                    _serverConfigurationManager.AddCurrentCharacterToServer(addFirstSecretKey: true);
+                    _serverConfigurationManager.AddCurrentCharacterToServer(addLastSecretKey: true);
                     _secretKey = string.Empty;
                     Task.Run(() => _uiShared.ApiController.CreateConnections(forceGetToken: true));
                 }

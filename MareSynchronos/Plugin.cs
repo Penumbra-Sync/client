@@ -102,7 +102,6 @@ public sealed class Plugin : IDalamudPlugin
         };
         _downloadUi = new DownloadUi(_windowSystem, _configurationService, _apiController, _uiSharedComponent);
 
-
         _dalamudUtil.LogIn += DalamudUtilOnLogIn;
         _dalamudUtil.LogOut += DalamudUtilOnLogOut;
 
@@ -154,11 +153,10 @@ public sealed class Plugin : IDalamudPlugin
             HelpMessage = "Opens the Mare Synchronos UI",
         });
 
-        if (!_configurationService.Current.HasValidSetup())
+        if (!_configurationService.Current.HasValidSetup() || !_serverConfigurationManager.HasValidConfig())
         {
             _introUi.IsOpen = true;
-            _serverConfigurationManager.CurrentServer.FullPause = false;
-            _serverConfigurationManager.Save();
+            _compactUi.IsOpen = false;
             return;
         }
 
@@ -229,6 +227,7 @@ public sealed class Plugin : IDalamudPlugin
 
         if (string.Equals(splitArgs[0], "toggle", StringComparison.OrdinalIgnoreCase))
         {
+            if (_serverConfigurationManager.CurrentServer == null) return;
             var fullPause = splitArgs.Length > 1 ? splitArgs[1] switch
             {
                 "on" => false,

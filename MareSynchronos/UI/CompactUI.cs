@@ -209,7 +209,7 @@ public class CompactUi : Window, IDisposable
                 ImGui.InputTextWithHint("##noteforuser", $"Note for {_lastAddedUser.User.AliasOrUID}", ref _lastAddedUserComment, 100);
                 if (UiShared.IconTextButton(FontAwesomeIcon.Save, "Save Note"))
                 {
-                    _serverManager.CurrentServer.UidServerComments[_lastAddedUser.User.UID] = _lastAddedUserComment;
+                    _serverManager.CurrentServer!.UidServerComments[_lastAddedUser.User.UID] = _lastAddedUserComment;
                     _serverManager.Save();
                     _lastAddedUser = null;
                     _lastAddedUserComment = string.Empty;
@@ -276,7 +276,7 @@ public class CompactUi : Window, IDisposable
         }
         ImGui.SameLine();
 
-        var users = GetFilteredUsers().ToList();
+        var users = GetFilteredUsers();
         var userCount = users.Count;
 
         var spacing = userCount > 0
@@ -287,10 +287,12 @@ public class CompactUi : Window, IDisposable
         ImGui.InputTextWithHint("##filter", "Filter for UID/notes", ref _characterOrCommentFilter, 255);
 
         if (userCount == 0) return;
-        ImGui.SameLine();
 
-        var pausedUsers = users.Where(u => u.UserPair!.OwnPermissions.IsPaused()).ToList();
-        var resumedUsers = users.Where(u => !u.UserPair!.OwnPermissions.IsPaused()).ToList();
+        var pausedUsers = users.Where(u => u.UserPair!.OwnPermissions.IsPaused() && u.UserPair.OtherPermissions.IsPaired()).ToList();
+        var resumedUsers = users.Where(u => !u.UserPair!.OwnPermissions.IsPaused() && u.UserPair.OtherPermissions.IsPaired()).ToList();
+
+        if (!pausedUsers.Any() && !resumedUsers.Any()) return;
+        ImGui.SameLine();
 
         switch (_buttonState)
         {
@@ -318,7 +320,6 @@ public class CompactUi : Window, IDisposable
             {
                 if (UiShared.CtrlPressed())
                 {
-                    Logger.Debug(users.Count.ToString());
                     foreach (var entry in users)
                     {
                         var perm = entry.UserPair!.OwnPermissions;
@@ -405,7 +406,7 @@ public class CompactUi : Window, IDisposable
 
         var textIsUid = true;
         ShowUidForEntry.TryGetValue(entry.UserPair!.User.UID, out var showUidInsteadOfName);
-        if (!showUidInsteadOfName && _serverManager.CurrentServer.UidServerComments.TryGetValue(entry.UserPair!.User.UID, out var playerText))
+        if (!showUidInsteadOfName && _serverManager.CurrentServer!.UidServerComments.TryGetValue(entry.UserPair!.User.UID, out var playerText))
         {
             if (string.IsNullOrEmpty(playerText))
             {
@@ -456,7 +457,7 @@ public class CompactUi : Window, IDisposable
             ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * 2);
             if (ImGui.InputTextWithHint("", "Nick/Notes", ref EditUserComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
             {
-                _serverManager.CurrentServer.UidServerComments[entry.UserPair!.User.UID] = EditUserComment;
+                _serverManager.CurrentServer!.UidServerComments[entry.UserPair!.User.UID] = EditUserComment;
                 _serverManager.Save();
                 EditNickEntry = string.Empty;
             }
@@ -534,9 +535,9 @@ public class CompactUi : Window, IDisposable
         var users = GetFilteredUsers();
 
         ImGui.BeginChild("list", new Vector2(WindowContentWidth, ySize), border: false);
-        var visibleUsers = users.Where(u => u.IsVisible).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
-        var onlineUsers = users.Where(u => u.IsOnline && !u.IsVisible).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
-        var offlineUsers = users.Where(u => !u.IsOnline && !u.IsVisible).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
+        var visibleUsers = users.Where(u => u.IsVisible && u.UserPair!.OtherPermissions.IsPaired()).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
+        var onlineUsers = users.Where(u => u.IsOnline && !u.IsVisible && u.UserPair!.OtherPermissions.IsPaired()).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
+        var offlineUsers = users.Where(u => !u.IsOnline && !u.IsVisible || !u.UserPair!.OtherPermissions.IsPaired()).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
 
         if (_configService.Current.ReverseUserSort)
         {
@@ -635,7 +636,7 @@ public class CompactUi : Window, IDisposable
         {
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ((userSize.Y + textSize.Y) / 2 + shardTextSize.Y) / 2 - ImGui.GetStyle().ItemSpacing.Y + buttonSize.Y / 2);
         }
-        var color = UiShared.GetBoolColor(!_serverManager.CurrentServer.FullPause);
+        var color = UiShared.GetBoolColor(!_serverManager.CurrentServer!.FullPause);
         var connectedIcon = !_serverManager.CurrentServer.FullPause ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
 
         ImGui.PushStyleColor(ImGuiCol.Text, color);

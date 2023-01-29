@@ -11,13 +11,18 @@ public class ServerConfigurationManager
     private readonly ConfigurationService _configService;
     private readonly DalamudUtil _dalamudUtil;
 
-    public string CurrentApiUrl => _configService.Current.CurrentServer;
-    public ServerStorage CurrentServer => _configService.Current.ServerStorage[CurrentApiUrl];
+    public string CurrentApiUrl => string.IsNullOrEmpty(_configService.Current.CurrentServer) ? ApiController.MainServiceUri : _configService.Current.CurrentServer;
+    public ServerStorage? CurrentServer => (_configService.Current.ServerStorage.ContainsKey(CurrentApiUrl) ? _configService.Current.ServerStorage[CurrentApiUrl] : null);
 
     public ServerConfigurationManager(ConfigurationService configService, DalamudUtil dalamudUtil)
     {
         _configService = configService;
         _dalamudUtil = dalamudUtil;
+    }
+
+    public bool HasValidConfig()
+    {
+        return CurrentServer != null && (CurrentServer?.Authentications.Any() ?? false);
     }
 
     public string[] GetServerApiUrls()
@@ -39,8 +44,12 @@ public class ServerConfigurationManager
         catch
         {
             _configService.Current.CurrentServer = ApiController.MainServiceUri;
+            if (!_configService.Current.ServerStorage.ContainsKey(ApiController.MainServer))
+            {
+                _configService.Current.ServerStorage.Add(_configService.Current.CurrentServer, new ServerStorage() { ServerUri = ApiController.MainServiceUri, ServerName = ApiController.MainServer });
+            }
             _configService.Save();
-            return CurrentServer;
+            return CurrentServer!;
         }
     }
 
@@ -57,16 +66,24 @@ public class ServerConfigurationManager
     public void SelectServer(int idx)
     {
         _configService.Current.CurrentServer = GetServerByIndex(idx).ServerUri;
-        CurrentServer.FullPause = false;
+        CurrentServer!.FullPause = false;
         Save();
     }
 
     public string? GetSecretKey(int serverIdx = -1)
     {
-        var currentServer = serverIdx == -1 ? CurrentServer : GetServerByIndex(serverIdx);
+        ServerStorage? currentServer;
+        currentServer = serverIdx == -1 ? CurrentServer : GetServerByIndex(serverIdx);
+        Save();
+        if (currentServer == null)
+        {
+            currentServer = new();
+            Save();
+        }
+
         var charaName = _dalamudUtil.PlayerName;
         var worldId = _dalamudUtil.WorldId;
-        if (!currentServer.Authentications.Any())
+        if (!currentServer.Authentications.Any() && currentServer.SecretKeys.Any())
         {
             currentServer.Authentications.Add(new Authentication()
             {
@@ -112,7 +129,7 @@ public class ServerConfigurationManager
         _tokenDictionary[new JwtCache(CurrentApiUrl, charaName, worldId, secretKey)] = token;
     }
 
-    internal void AddCurrentCharacterToServer(int serverSelectionIndex = -1, bool addFirstSecretKey = false)
+    internal void AddCurrentCharacterToServer(int serverSelectionIndex = -1, bool addLastSecretKey = false)
     {
         if (serverSelectionIndex == -1) serverSelectionIndex = GetCurrentServerIndex();
         var server = GetServerByIndex(serverSelectionIndex);
@@ -120,7 +137,7 @@ public class ServerConfigurationManager
         {
             CharacterName = _dalamudUtil.PlayerName,
             WorldId = _dalamudUtil.WorldId,
-            SecretKeyIdx = addFirstSecretKey ? server.SecretKeys.First().Key : -1,
+            SecretKeyIdx = addLastSecretKey ? server.SecretKeys.Last().Key : -1,
         });
         _configService.Save();
     }
