@@ -444,8 +444,12 @@ public class CompactUi : Window, IDisposable
 
             if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
             {
-                entry.SetNote(EditUserComment);
-                _configService.Save();
+                var pair = _pairManager.DirectPairs.Find(p => p.UserData.UID == EditNickEntry);
+                if (pair != null)
+                {
+                    pair.SetNote(EditUserComment);
+                    _configService.Save();
+                }
                 EditUserComment = entry.GetNote() ?? string.Empty;
                 EditNickEntry = entry.UserPair!.User.UID;
             }

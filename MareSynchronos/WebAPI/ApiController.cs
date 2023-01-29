@@ -375,6 +375,8 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     private async Task StopConnection(CancellationToken token, ServerState state)
     {
+        ServerState = state;
+
         if (_mareHub is not null)
         {
             _initialized = false;
@@ -391,7 +393,6 @@ public partial class ApiController : IDisposable, IMareHubClient
             Disconnected?.Invoke();
             _pairManager.ClearPairs();
             _mareHub = null;
-            ServerState = state;
         }
     }
 
