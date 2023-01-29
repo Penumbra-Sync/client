@@ -74,7 +74,6 @@ public class ServerConfigurationManager
     {
         ServerStorage? currentServer;
         currentServer = serverIdx == -1 ? CurrentServer : GetServerByIndex(serverIdx);
-        Save();
         if (currentServer == null)
         {
             currentServer = new();

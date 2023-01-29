@@ -452,7 +452,6 @@ public class SettingsUi : Window, IDisposable
 
         if (ImGui.Checkbox("Open Notes Popup on user addition", ref openPopupOnAddition))
         {
-            ApiController.LastAddedUser = null;
             _configService.Current.OpenPopupOnAdd = openPopupOnAddition;
             _configService.Save();
         }

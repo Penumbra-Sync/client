@@ -66,6 +66,8 @@ public class PairManager : IDisposable
     public List<Pair> OnlineUserPairs => _allClientPairs.Where(p => !string.IsNullOrEmpty(p.Value.PlayerNameHash)).Select(p => p.Value).ToList();
     public List<UserData> VisibleUsers => _allClientPairs.Where(p => p.Value.CachedPlayer != null && p.Value.CachedPlayer.IsVisible).Select(p => p.Key).ToList();
 
+    public Pair? LastAddedUser { get; internal set; }
+
     public void AddGroup(GroupFullInfoDto dto)
     {
         _allGroups[dto.Group] = dto;
@@ -109,8 +111,8 @@ public class PairManager : IDisposable
     public void AddUserPair(UserPairDto dto)
     {
         if (!_allClientPairs.ContainsKey(dto.User)) _allClientPairs[dto.User] = _pairFactory.Create();
-
         _allClientPairs[dto.User].UserPair = dto;
+        LastAddedUser = _allClientPairs[dto.User];
         _allClientPairs[dto.User].ApplyLastReceivedData();
         RecreateLazy();
     }

@@ -9,7 +9,6 @@ namespace MareSynchronos.WebAPI;
 
 public partial class ApiController
 {
-    public UserPairDto? LastAddedUser { get; set; }
     private void ExecuteSafely(Action act)
     {
         try

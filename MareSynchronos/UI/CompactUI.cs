@@ -48,7 +48,7 @@ public class CompactUi : Window, IDisposable
 
     private bool _showSyncShells;
     private readonly GroupPanel _groupPanel;
-    private UserPairDto? _lastAddedUser;
+    private Pair? _lastAddedUser;
     private string _lastAddedUserComment = string.Empty;
 
     private readonly SelectGroupForPairUi _selectGroupForPairUi;
@@ -190,10 +190,10 @@ public class CompactUi : Window, IDisposable
             UiShared.DrawWithID("grouping-popup", () => _selectGroupForPairUi.Draw(ShowUidForEntry));
         }
 
-        if (_configService.Current.OpenPopupOnAdd && _apiController.LastAddedUser != null)
+        if (_configService.Current.OpenPopupOnAdd && _pairManager.LastAddedUser != null)
         {
-            _lastAddedUser = _apiController.LastAddedUser;
-            _apiController.LastAddedUser = null;
+            _lastAddedUser = _pairManager.LastAddedUser;
+            _pairManager.LastAddedUser = null;
             ImGui.OpenPopup("Set Notes for New User");
             _showModalForUserAddition = true;
             _lastAddedUserComment = string.Empty;
@@ -207,11 +207,11 @@ public class CompactUi : Window, IDisposable
             }
             else
             {
-                UiShared.TextWrapped($"You have successfully added {_lastAddedUser.User.AliasOrUID}. Set a local note for the user in the field below:");
-                ImGui.InputTextWithHint("##noteforuser", $"Note for {_lastAddedUser.User.AliasOrUID}", ref _lastAddedUserComment, 100);
+                UiShared.TextWrapped($"You have successfully added {_lastAddedUser.UserData.AliasOrUID}. Set a local note for the user in the field below:");
+                ImGui.InputTextWithHint("##noteforuser", $"Note for {_lastAddedUser.UserData.AliasOrUID}", ref _lastAddedUserComment, 100);
                 if (UiShared.IconTextButton(FontAwesomeIcon.Save, "Save Note"))
                 {
-                    _serverManager.CurrentServer!.UidServerComments[_lastAddedUser.User.UID] = _lastAddedUserComment;
+                    _serverManager.CurrentServer!.UidServerComments[_lastAddedUser.UserData.UID] = _lastAddedUserComment;
                     _serverManager.Save();
                     _lastAddedUser = null;
                     _lastAddedUserComment = string.Empty;
