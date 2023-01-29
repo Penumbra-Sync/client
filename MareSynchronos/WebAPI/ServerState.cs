@@ -3,9 +3,12 @@
 public enum ServerState
 {
     Offline,
+    Connecting,
+    Reconnecting,
     Disconnected,
     Connected,
     Unauthorized,
     VersionMisMatch,
-    RateLimited
+    RateLimited,
+    NoSecretKey,
 }

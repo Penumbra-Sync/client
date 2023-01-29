@@ -1,11 +1,6 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Collections.Concurrent;
 using MareSynchronos.Managers;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 
@@ -14,19 +9,19 @@ namespace MareSynchronos.FileCache;
 public class PeriodicFileScanner : IDisposable
 {
     private readonly IpcManager _ipcManager;
-    private readonly Configuration _pluginConfiguration;
+    private readonly ConfigurationService _configService;
     private readonly FileCacheManager _fileDbManager;
     private readonly ApiController _apiController;
     private readonly DalamudUtil _dalamudUtil;
     private CancellationTokenSource? _scanCancellationTokenSource;
     private Task? _fileScannerTask = null;
     public ConcurrentDictionary<string, int> haltScanLocks = new(StringComparer.Ordinal);
-    public PeriodicFileScanner(IpcManager ipcManager, Configuration pluginConfiguration, FileCacheManager fileDbManager, ApiController apiController, DalamudUtil dalamudUtil)
+    public PeriodicFileScanner(IpcManager ipcManager, ConfigurationService configService, FileCacheManager fileDbManager, ApiController apiController, DalamudUtil dalamudUtil)
     {
         Logger.Verbose("Creating " + nameof(PeriodicFileScanner));
 
         _ipcManager = ipcManager;
-        _pluginConfiguration = pluginConfiguration;
+        _configService = configService;
         _fileDbManager = fileDbManager;
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
@@ -69,10 +64,10 @@ public class PeriodicFileScanner : IDisposable
         haltScanLocks[source]--;
         if (haltScanLocks[source] < 0) haltScanLocks[source] = 0;
 
-        if (fileScanWasRunning && haltScanLocks.All(f => f.Value == 0))
+        if (_fileScanWasRunning && haltScanLocks.All(f => f.Value == 0))
         {
-            fileScanWasRunning = false;
-            InvokeScan(true);
+            _fileScanWasRunning = false;
+            InvokeScan(forced: true);
         }
     }
 
@@ -84,13 +79,13 @@ public class PeriodicFileScanner : IDisposable
         if (IsScanRunning && haltScanLocks.Any(f => f.Value > 0))
         {
             _scanCancellationTokenSource?.Cancel();
-            fileScanWasRunning = true;
+            _fileScanWasRunning = true;
         }
     }
 
-    private bool fileScanWasRunning = false;
-    private long currentFileProgress = 0;
-    public long CurrentFileProgress => currentFileProgress;
+    private bool _fileScanWasRunning = false;
+    private long _currentFileProgress = 0;
+    public long CurrentFileProgress => _currentFileProgress;
 
     public long FileCacheSize { get; set; }
 
@@ -100,7 +95,7 @@ public class PeriodicFileScanner : IDisposable
 
     public string TimeUntilNextScan => _timeUntilNextScan.ToString(@"mm\:ss");
     private TimeSpan _timeUntilNextScan = TimeSpan.Zero;
-    private int timeBetweenScans => _pluginConfiguration.TimeSpanBetweenScansInSeconds;
+    private int TimeBetweenScans => _configService.Current.TimeSpanBetweenScansInSeconds;
 
     public void Dispose()
     {
@@ -118,7 +113,7 @@ public class PeriodicFileScanner : IDisposable
     {
         bool isForced = forced;
         TotalFiles = 0;
-        currentFileProgress = 0;
+        _currentFileProgress = 0;
         _scanCancellationTokenSource?.Cancel();
         _scanCancellationTokenSource = new CancellationTokenSource();
         var token = _scanCancellationTokenSource.Token;
@@ -126,22 +121,22 @@ public class PeriodicFileScanner : IDisposable
         {
             while (!token.IsCancellationRequested)
             {
-                while (haltScanLocks.Any(f => f.Value > 0))
+                while (haltScanLocks.Any(f => f.Value > 0) || !_ipcManager.CheckPenumbraApi())
                 {
                     await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                 }
 
                 isForced |= RecalculateFileCacheSize();
-                if (!_pluginConfiguration.FileScanPaused || isForced)
+                if (!_configService.Current.FileScanPaused || isForced)
                 {
                     isForced = false;
                     TotalFiles = 0;
-                    currentFileProgress = 0;
+                    _currentFileProgress = 0;
                     PeriodicFileScan(token);
                     TotalFiles = 0;
-                    currentFileProgress = 0;
+                    _currentFileProgress = 0;
                 }
-                _timeUntilNextScan = TimeSpan.FromSeconds(timeBetweenScans);
+                _timeUntilNextScan = TimeSpan.FromSeconds(TimeBetweenScans);
                 while (_timeUntilNextScan.TotalSeconds >= 0)
                 {
                     await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
@@ -153,7 +148,7 @@ public class PeriodicFileScanner : IDisposable
 
     public bool RecalculateFileCacheSize()
     {
-        FileCacheSize = Directory.EnumerateFiles(_pluginConfiguration.CacheFolder).Sum(f =>
+        FileCacheSize = Directory.EnumerateFiles(_configService.Current.CacheFolder).Sum(f =>
         {
             try
             {
@@ -165,13 +160,13 @@ public class PeriodicFileScanner : IDisposable
             }
         });
 
-        if (FileCacheSize < (long)_pluginConfiguration.MaxLocalCacheInGiB * 1024 * 1024 * 1024) return false;
+        if (FileCacheSize < (long)_configService.Current.MaxLocalCacheInGiB * 1024 * 1024 * 1024) return false;
 
-        var allFiles = Directory.EnumerateFiles(_pluginConfiguration.CacheFolder)
+        var allFiles = Directory.EnumerateFiles(_configService.Current.CacheFolder)
             .Select(f => new FileInfo(f)).OrderBy(f => f.LastAccessTime).ToList();
-        while (FileCacheSize > (long)_pluginConfiguration.MaxLocalCacheInGiB * 1024 * 1024 * 1024)
+        while (FileCacheSize > (long)_configService.Current.MaxLocalCacheInGiB * 1024 * 1024 * 1024)
         {
-            var oldestFile = allFiles.First();
+            var oldestFile = allFiles[0];
             FileCacheSize -= oldestFile.Length;
             File.Delete(oldestFile.FullName);
             allFiles.Remove(oldestFile);
@@ -191,7 +186,7 @@ public class PeriodicFileScanner : IDisposable
             penDirExists = false;
             Logger.Warn("Penumbra directory is not set or does not exist.");
         }
-        if (string.IsNullOrEmpty(_pluginConfiguration.CacheFolder) || !Directory.Exists(_pluginConfiguration.CacheFolder))
+        if (string.IsNullOrEmpty(_configService.Current.CacheFolder) || !Directory.Exists(_configService.Current.CacheFolder))
         {
             cacheDirExists = false;
             Logger.Warn("Mare Cache directory is not set or does not exist.");
@@ -201,19 +196,19 @@ public class PeriodicFileScanner : IDisposable
             return;
         }
 
-        Logger.Debug("Getting files from " + penumbraDir + " and " + _pluginConfiguration.CacheFolder);
+        Logger.Debug("Getting files from " + penumbraDir + " and " + _configService.Current.CacheFolder);
         string[] ext = { ".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk" };
 
-        var scannedFiles = new ConcurrentDictionary<string, bool>(Directory.EnumerateFiles(penumbraDir, "*.*", SearchOption.AllDirectories)
+        var scannedFiles = new ConcurrentDictionary<string, bool>(Directory.EnumerateFiles(penumbraDir!, "*.*", SearchOption.AllDirectories)
                             .Select(s => s.ToLowerInvariant())
                             .Where(f => ext.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase)) 
                                 && !f.Contains(@"\bg\", StringComparison.OrdinalIgnoreCase) 
                                 && !f.Contains(@"\bgcommon\", StringComparison.OrdinalIgnoreCase) 
                                 && !f.Contains(@"\ui\", StringComparison.OrdinalIgnoreCase))
-                            .Concat(Directory.EnumerateFiles(_pluginConfiguration.CacheFolder, "*.*", SearchOption.TopDirectoryOnly)
+                            .Concat(Directory.EnumerateFiles(_configService.Current.CacheFolder, "*.*", SearchOption.TopDirectoryOnly)
                                 .Where(f => new FileInfo(f).Name.Length == 40)
                                 .Select(s => s.ToLowerInvariant()).ToList())
-                            .Select(c => new KeyValuePair<string, bool>(c, false)), StringComparer.OrdinalIgnoreCase);
+                            .Select(c => new KeyValuePair<string, bool>(c, value: false)), StringComparer.OrdinalIgnoreCase);
 
         TotalFiles = scannedFiles.Count;
 
@@ -253,7 +248,7 @@ public class PeriodicFileScanner : IDisposable
                         Logger.Warn(ex.StackTrace);
                     }
 
-                    Interlocked.Increment(ref currentFileProgress);
+                    Interlocked.Increment(ref _currentFileProgress);
                     Thread.Sleep(1);
                 }, ct);
 
@@ -308,7 +303,7 @@ public class PeriodicFileScanner : IDisposable
                     Logger.Warn(ex.StackTrace);
                 }
 
-                Interlocked.Increment(ref currentFileProgress);
+                Interlocked.Increment(ref _currentFileProgress);
                 Thread.Sleep(1);
             }, ct);
 
@@ -321,22 +316,22 @@ public class PeriodicFileScanner : IDisposable
 
         Logger.Debug("Scan complete");
         TotalFiles = 0;
-        currentFileProgress = 0;
+        _currentFileProgress = 0;
         entitiesToRemove.Clear();
         scannedFiles.Clear();
         dbTasks = Array.Empty<Task>();
 
-        if (!_pluginConfiguration.InitialScanComplete)
+        if (!_configService.Current.InitialScanComplete)
         {
-            _pluginConfiguration.InitialScanComplete = true;
-            _pluginConfiguration.Save();
+            _configService.Current.InitialScanComplete = true;
+            _configService.Save();
         }
     }
 
     public void StartScan()
     {
-        if (!_ipcManager.Initialized || !_pluginConfiguration.HasValidSetup()) return;
+        if (!_ipcManager.Initialized || !_configService.Current.HasValidSetup()) return;
         Logger.Verbose("Penumbra is active, configuration is valid, scan");
-        InvokeScan(true);
+        InvokeScan(forced: true);
     }
 }

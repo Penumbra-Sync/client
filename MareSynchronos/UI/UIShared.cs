@@ -1,40 +1,44 @@
-﻿using System;
-using System.IO;
-using System.Linq;
+﻿using System.Globalization;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Plugin;
 using Dalamud.Utility;
 using ImGuiNET;
+using MareSynchronos.Delegates;
 using MareSynchronos.FileCache;
 using MareSynchronos.Localization;
 using MareSynchronos.Managers;
+using MareSynchronos.MareConfiguration;
+using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.UI;
 
-public class UiShared : IDisposable
+public partial class UiShared : IDisposable
 {
-    [DllImport("user32")]
-    public static extern short GetKeyState(int nVirtKey);
+    [LibraryImport("user32")]
+    internal static partial short GetKeyState(int nVirtKey);
 
     private readonly IpcManager _ipcManager;
     private readonly ApiController _apiController;
     private readonly PeriodicFileScanner _cacheScanner;
     public readonly FileDialogManager FileDialogManager;
-    private readonly Configuration _pluginConfiguration;
+    private readonly ConfigurationService _configService;
     private readonly DalamudUtil _dalamudUtil;
     private readonly DalamudPluginInterface _pluginInterface;
     private readonly Dalamud.Localization _localization;
+    private readonly ServerConfigurationManager _serverConfigurationManager;
+
     public long FileCacheSize => _cacheScanner.FileCacheSize;
     public string PlayerName => _dalamudUtil.PlayerName;
+    public uint WorldId => _dalamudUtil.WorldId;
+    public Dictionary<ushort, string> WorldData => _dalamudUtil.WorldData.Value;
     public bool HasValidPenumbraModPath => !(_ipcManager.PenumbraModDirectory() ?? string.Empty).IsNullOrEmpty() && Directory.Exists(_ipcManager.PenumbraModDirectory());
     public bool EditTrackerPosition { get; set; }
     public ImFontPtr UidFont { get; private set; }
@@ -45,38 +49,40 @@ public class UiShared : IDisposable
     public static bool CtrlPressed() => (GetKeyState(0xA2) & 0x8000) != 0 || (GetKeyState(0xA3) & 0x8000) != 0;
     public static bool ShiftPressed() => (GetKeyState(0xA1) & 0x8000) != 0 || (GetKeyState(0xA0) & 0x8000) != 0;
 
-    public static ImGuiWindowFlags PopupWindowFlags = ImGuiWindowFlags.NoResize |
+    public static readonly ImGuiWindowFlags PopupWindowFlags = ImGuiWindowFlags.NoResize |
                                            ImGuiWindowFlags.NoScrollbar |
                                            ImGuiWindowFlags.NoScrollWithMouse;
 
     public ApiController ApiController => _apiController;
 
     public UiShared(IpcManager ipcManager, ApiController apiController, PeriodicFileScanner cacheScanner, FileDialogManager fileDialogManager,
-        Configuration pluginConfiguration, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization)
+        ConfigurationService configService, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization,
+        ServerConfigurationManager serverManager)
     {
         _ipcManager = ipcManager;
         _apiController = apiController;
         _cacheScanner = cacheScanner;
         FileDialogManager = fileDialogManager;
-        _pluginConfiguration = pluginConfiguration;
+        _configService = configService;
         _dalamudUtil = dalamudUtil;
         _pluginInterface = pluginInterface;
         _localization = localization;
-        _isDirectoryWritable = IsDirectoryWritable(_pluginConfiguration.CacheFolder);
+        _serverConfigurationManager = serverManager;
+        _isDirectoryWritable = IsDirectoryWritable(_configService.Current.CacheFolder);
 
         _pluginInterface.UiBuilder.BuildFonts += BuildFont;
         _pluginInterface.UiBuilder.RebuildFonts();
 
-        _dalamudUtil.GposeStart += _dalamudUtil_GposeStart;
-        _dalamudUtil.GposeEnd += _dalamudUtil_GposeEnd;
+        _dalamudUtil.GposeStart += DalamudUtil_GposeStart;
+        _dalamudUtil.GposeEnd += DalamudUtil_GposeEnd;
     }
 
-    private void _dalamudUtil_GposeEnd()
+    private void DalamudUtil_GposeEnd()
     {
         GposeEnd?.Invoke();
     }
 
-    private void _dalamudUtil_GposeStart()
+    private void DalamudUtil_GposeStart()
     {
         GposeStart?.Invoke();
     }
@@ -141,13 +147,13 @@ public class UiShared : IDisposable
 
         ImGui.SetWindowSize(new Vector2(x, y));
     }
-    
+
     private static void CenterWindow(float width, float height, ImGuiCond cond = ImGuiCond.None)
     {
         var center = ImGui.GetMainViewport().GetCenter();
         ImGui.SetWindowPos(new Vector2(center.X - width / 2, center.Y - height / 2), cond);
     }
-    
+
     public static void CenterNextWindow(float width, float height, ImGuiCond cond = ImGuiCond.None)
     {
         var center = ImGui.GetMainViewport().GetCenter();
@@ -219,13 +225,13 @@ public class UiShared : IDisposable
                 ? "Collecting files"
                 : $"Processing {_cacheScanner.CurrentFileProgress} / {_cacheScanner.TotalFiles} files");
         }
-        else if (_pluginConfiguration.FileScanPaused)
+        else if (_configService.Current.FileScanPaused)
         {
             ImGui.Text("File scanner is paused");
             ImGui.SameLine();
             if (ImGui.Button("Force Rescan##forcedrescan"))
             {
-                _cacheScanner.InvokeScan(true);
+                _cacheScanner.InvokeScan(forced: true);
             }
         }
         else if (_cacheScanner.haltScanLocks.Any(f => f.Value > 0))
@@ -245,18 +251,15 @@ public class UiShared : IDisposable
 
     public void PrintServerState()
     {
-        var serverName = _apiController.ServerDictionary.ContainsKey(_pluginConfiguration.ApiUri)
-            ? _apiController.ServerDictionary[_pluginConfiguration.ApiUri]
-            : _pluginConfiguration.ApiUri;
         if (_apiController.ServerState is ServerState.Connected)
         {
-            ImGui.TextUnformatted("Service " + serverName + ":");
+            ImGui.TextUnformatted("Service " + _serverConfigurationManager.CurrentServer!.ServerName + ":");
             ImGui.SameLine();
             ImGui.TextColored(ImGuiColors.ParsedGreen, "Available");
             ImGui.SameLine();
             ImGui.TextUnformatted("(");
             ImGui.SameLine();
-            ImGui.TextColored(ImGuiColors.ParsedGreen, _apiController.OnlineUsers.ToString());
+            ImGui.TextColored(ImGuiColors.ParsedGreen, _apiController.OnlineUsers.ToString(CultureInfo.InvariantCulture));
             ImGui.SameLine();
             ImGui.Text("Users Online");
             ImGui.SameLine();
@@ -345,17 +348,23 @@ public class UiShared : IDisposable
         return $"{dblSByte:0.00} {suffix[i]}";
     }
 
-    private int _serverSelectionIndex = 0;
+    private int _serverSelectionIndex = -1;
     private string _customServerName = "";
     private string _customServerUri = "";
-    private bool _enterSecretKey = false;
     private bool _cacheDirectoryHasOtherFilesThanCache = false;
     private bool _cacheDirectoryIsValidPath = true;
 
-    public void DrawServiceSelection(Action? callBackOnExit = null)
+    public int DrawServiceSelection(bool selectOnChange = false)
     {
-        string[] comboEntries = _apiController.ServerDictionary.Values.ToArray();
-        _serverSelectionIndex = Array.IndexOf(_apiController.ServerDictionary.Keys.ToArray(), _pluginConfiguration.ApiUri);
+        string[] comboEntries = _serverConfigurationManager.GetServerNames();
+
+        if (_serverSelectionIndex == -1)
+            _serverSelectionIndex = Array.IndexOf(_serverConfigurationManager.GetServerApiUrls(), _serverConfigurationManager.CurrentApiUrl);
+        for (int i = 0; i < comboEntries.Length; i++)
+        {
+            if (string.Equals(_serverConfigurationManager.CurrentServer?.ServerName, comboEntries[i], StringComparison.OrdinalIgnoreCase))
+                comboEntries[i] += " [Current]";
+        }
         if (ImGui.BeginCombo("Select Service", comboEntries[_serverSelectionIndex]))
         {
             for (int i = 0; i < comboEntries.Length; i++)
@@ -363,9 +372,11 @@ public class UiShared : IDisposable
                 bool isSelected = _serverSelectionIndex == i;
                 if (ImGui.Selectable(comboEntries[i], isSelected))
                 {
-                    _pluginConfiguration.ApiUri = _apiController.ServerDictionary.Single(k => string.Equals(k.Value, comboEntries[i], StringComparison.Ordinal)).Key;
-                    _pluginConfiguration.Save();
-                    _ = _apiController.CreateConnections();
+                    _serverSelectionIndex = i;
+                    if (selectOnChange)
+                    {
+                        _serverConfigurationManager.SelectServer(i);
+                    }
                 }
 
                 if (isSelected)
@@ -377,113 +388,61 @@ public class UiShared : IDisposable
             ImGui.EndCombo();
         }
 
-        if (_serverSelectionIndex != 0)
+        if (_serverConfigurationManager.GetSecretKey(_serverSelectionIndex) != null)
         {
             ImGui.SameLine();
-            ImGui.PushFont(UiBuilder.IconFont);
-            if (ImGui.Button(FontAwesomeIcon.Trash.ToIconString() + "##deleteService"))
+            var text = "Connect";
+            if (_serverSelectionIndex == _serverConfigurationManager.GetCurrentServerIndex()) text = "Reconnect";
+            if (IconTextButton(FontAwesomeIcon.Link, text))
             {
-                _pluginConfiguration.CustomServerList.Remove(_pluginConfiguration.ApiUri);
-                _pluginConfiguration.ApiUri = _apiController.ServerDictionary.First().Key;
-                _pluginConfiguration.Save();
+                _serverConfigurationManager.SelectServer(_serverSelectionIndex);
+                _ = _apiController.CreateConnections();
             }
-            ImGui.PopFont();
         }
 
         if (ImGui.TreeNode("Add Custom Service"))
         {
             ImGui.SetNextItemWidth(250);
-            ImGui.InputText("Custom Service Name", ref _customServerName, 255);
+            ImGui.InputText("Custom Service URI", ref _customServerUri, 255);
             ImGui.SetNextItemWidth(250);
-            ImGui.InputText("Custom Service Address", ref _customServerUri, 255);
-            if (ImGui.Button("Add Custom Service"))
+            ImGui.InputText("Custom Service Name", ref _customServerName, 255);
+            if (UiShared.IconTextButton(FontAwesomeIcon.Plus, "Add Custom Service"))
             {
                 if (!string.IsNullOrEmpty(_customServerUri)
-                    && !string.IsNullOrEmpty(_customServerName)
-                    && !_pluginConfiguration.CustomServerList.ContainsValue(_customServerName)
-                    && !_pluginConfiguration.CustomServerList.ContainsKey(_customServerUri))
+                    && !string.IsNullOrEmpty(_customServerName))
                 {
-                    _pluginConfiguration.CustomServerList[_customServerUri] = _customServerName;
-                    _customServerUri = string.Empty;
+                    _serverConfigurationManager.AddServer(new ServerStorage()
+                    {
+                        ServerName = _customServerName,
+                        ServerUri = _customServerUri,
+                    });
                     _customServerName = string.Empty;
-                    _pluginConfiguration.Save();
+                    _customServerUri = string.Empty;
+                    _configService.Save();
                 }
             }
             ImGui.TreePop();
         }
 
-        PrintServerState();
-
-        if (!_apiController.ServerAlive && (_pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri) && !_pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri].IsNullOrEmpty()))
-        {
-            ColorTextWrapped("You already have an account on this server.", ImGuiColors.DalamudYellow);
-            ImGui.SameLine();
-            if (ImGui.Button("Connect##connectToService"))
-            {
-                _pluginConfiguration.FullPause = false;
-                _pluginConfiguration.Save();
-                Task.Run(() => _apiController.CreateConnections(true));
-            }
-        }
-
-        string checkboxText = _pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri)
-            ? "I want to switch accounts"
-            : "I have an account";
-        ImGui.Checkbox(checkboxText, ref _enterSecretKey);
-
-        if (_enterSecretKey)
-        {
-            if (_pluginConfiguration.ClientSecret.ContainsKey(_pluginConfiguration.ApiUri))
-            {
-                ColorTextWrapped("A secret key was previously set for this service. Entering a new secret key will overwrite the one set prior.", ImGuiColors.DalamudYellow);
-            }
-
-            var text = "Enter Secret Key";
-            var buttonText = "Save";
-            var buttonWidth = _secretKey.Length != 64 ? 0 : ImGuiHelpers.GetButtonSize(buttonText).X + ImGui.GetStyle().ItemSpacing.X;
-            var textSize = ImGui.CalcTextSize(text);
-            ImGui.AlignTextToFramePadding();
-            ImGui.Text(text);
-            ImGui.SameLine();
-            ImGui.SetNextItemWidth(GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonWidth - textSize.X);
-            ImGui.InputText("", ref _secretKey, 64);
-            if (_secretKey.Length > 0 && _secretKey.Length != 64)
-            {
-                ColorTextWrapped("Your secret key must be exactly 64 characters long. Don't enter your Lodestone auth here.", ImGuiColors.DalamudRed);
-            }
-            else if (_secretKey.Length == 64)
-            {
-                ImGui.SameLine();
-                if (ImGui.Button(buttonText))
-                {
-                    _pluginConfiguration.ClientSecret[_pluginConfiguration.ApiUri] = _secretKey;
-                    _pluginConfiguration.Save();
-                    _secretKey = string.Empty;
-                    Task.Run(() => _apiController.CreateConnections(true));
-                    _enterSecretKey = false;
-                    callBackOnExit?.Invoke();
-                }
-            }
-        }
+        return _serverSelectionIndex;
     }
 
-    private string _secretKey = "";
 
     public static void OutlineTextWrapped(string text, Vector4 textcolor, Vector4 outlineColor, float dist = 3)
     {
         var cursorPos = ImGui.GetCursorPos();
-        UiShared.ColorTextWrapped(text, outlineColor);
+        ColorTextWrapped(text, outlineColor);
         ImGui.SetCursorPos(new(cursorPos.X, cursorPos.Y + dist));
-        UiShared.ColorTextWrapped(text, outlineColor);
+        ColorTextWrapped(text, outlineColor);
         ImGui.SetCursorPos(new(cursorPos.X + dist, cursorPos.Y));
-        UiShared.ColorTextWrapped(text, outlineColor);
+        ColorTextWrapped(text, outlineColor);
         ImGui.SetCursorPos(new(cursorPos.X + dist, cursorPos.Y + dist));
-        UiShared.ColorTextWrapped(text, outlineColor);
+        ColorTextWrapped(text, outlineColor);
 
         ImGui.SetCursorPos(new(cursorPos.X + dist / 2, cursorPos.Y + dist / 2));
-        UiShared.ColorTextWrapped(text, textcolor);
+        ColorTextWrapped(text, textcolor);
         ImGui.SetCursorPos(new(cursorPos.X + dist / 2, cursorPos.Y + dist / 2));
-        UiShared.ColorTextWrapped(text, textcolor);
+        ColorTextWrapped(text, textcolor);
     }
 
     public static void DrawHelpText(string helpText)
@@ -507,7 +466,7 @@ public class UiShared : IDisposable
     public void DrawCacheDirectorySetting()
     {
         ColorTextWrapped("Note: The storage folder should be somewhere close to root (i.e. C:\\MareStorage) in a new empty folder. DO NOT point this to your game folder. DO NOT point this to your Penumbra folder.", ImGuiColors.DalamudYellow);
-        var cacheDirectory = _pluginConfiguration.CacheFolder;
+        var cacheDirectory = _configService.Current.CacheFolder;
         ImGui.InputText("Storage Folder##cache", ref cacheDirectory, 255, ImGuiInputTextFlags.ReadOnly);
 
         ImGui.SameLine();
@@ -531,8 +490,8 @@ public class UiShared : IDisposable
                     && !_cacheDirectoryHasOtherFilesThanCache
                     && _cacheDirectoryIsValidPath)
                 {
-                    _pluginConfiguration.CacheFolder = path;
-                    _pluginConfiguration.Save();
+                    _configService.Current.CacheFolder = path;
+                    _configService.Save();
                     _cacheScanner.StartScan();
                 }
             });
@@ -557,11 +516,11 @@ public class UiShared : IDisposable
                              "Restrict yourself to latin letters (A-Z), underscores (_), dashes (-) and arabic numbers (0-9).", ImGuiColors.DalamudRed);
         }
 
-        float maxCacheSize = (float)_pluginConfiguration.MaxLocalCacheInGiB;
+        float maxCacheSize = (float)_configService.Current.MaxLocalCacheInGiB;
         if (ImGui.SliderFloat("Maximum Storage Size in GiB", ref maxCacheSize, 1f, 200f, "%.2f GiB"))
         {
-            _pluginConfiguration.MaxLocalCacheInGiB = maxCacheSize;
-            _pluginConfiguration.Save();
+            _configService.Current.MaxLocalCacheInGiB = maxCacheSize;
+            _configService.Save();
         }
         DrawHelpText("The storage is automatically governed by Mare. It will clear itself automatically once it reaches the set capacity by removing the oldest unused files. You typically do not need to clear it yourself.");
     }
@@ -569,19 +528,17 @@ public class UiShared : IDisposable
     private bool _isDirectoryWritable = false;
     private bool _isPenumbraDirectory = false;
 
-    public bool IsDirectoryWritable(string dirPath, bool throwIfFails = false)
+    public static bool IsDirectoryWritable(string dirPath, bool throwIfFails = false)
     {
         try
         {
-            using (FileStream fs = File.Create(
+            using FileStream fs = File.Create(
                        Path.Combine(
                            dirPath,
                            Path.GetRandomFileName()
                        ),
                        1,
-                       FileOptions.DeleteOnClose)
-                  )
-            { }
+                       FileOptions.DeleteOnClose);
             return true;
         }
         catch
@@ -595,23 +552,23 @@ public class UiShared : IDisposable
 
     public void RecalculateFileCacheSize()
     {
-        _cacheScanner.InvokeScan(true);
+        _cacheScanner.InvokeScan(forced: true);
     }
 
     public void DrawTimeSpanBetweenScansSetting()
     {
-        var timeSpan = _pluginConfiguration.TimeSpanBetweenScansInSeconds;
+        var timeSpan = _configService.Current.TimeSpanBetweenScansInSeconds;
         if (ImGui.SliderInt("Seconds between scans##timespan", ref timeSpan, 20, 60))
         {
-            _pluginConfiguration.TimeSpanBetweenScansInSeconds = timeSpan;
-            _pluginConfiguration.Save();
+            _configService.Current.TimeSpanBetweenScansInSeconds = timeSpan;
+            _configService.Save();
         }
         DrawHelpText("This is the time in seconds between file scans. Increase it to reduce system load. A too high setting can cause issues when manually fumbling about in the cache or Penumbra mods folders.");
-        var isPaused = _pluginConfiguration.FileScanPaused;
+        var isPaused = _configService.Current.FileScanPaused;
         if (ImGui.Checkbox("Pause periodic file scan##filescanpause", ref isPaused))
         {
-            _pluginConfiguration.FileScanPaused = isPaused;
-            _pluginConfiguration.Save();
+            _configService.Current.FileScanPaused = isPaused;
+            _configService.Save();
         }
         DrawHelpText("This allows you to stop the periodic scans of your Penumbra and Mare cache directories. Use this to move the Mare cache and Penumbra mod folders around. If you enable this permanently, run a Force rescan after adding mods to Penumbra.");
     }
@@ -653,24 +610,21 @@ public class UiShared : IDisposable
         return buttonClicked;
     }
 
-    private const string NotesStart = "##MARE_SYNCHRONOS_USER_NOTES_START##";
-    private const string NotesEnd = "##MARE_SYNCHRONOS_USER_NOTES_END##";
+    private const string _notesStart = "##MARE_SYNCHRONOS_USER_NOTES_START##";
+    private const string _notesEnd = "##MARE_SYNCHRONOS_USER_NOTES_END##";
 
-    public string GetNotes(string? gid = null)
+    public static string GetNotes(List<Pair> pairs)
     {
-        var comments = _pluginConfiguration.GetCurrentServerUidComments();
         StringBuilder sb = new();
-        sb.AppendLine(NotesStart);
-        foreach (var userEntry in comments.Where(c => !string.IsNullOrEmpty(c.Key)))
+        sb.AppendLine(_notesStart);
+        foreach (var entry in pairs)
         {
-            if (gid != null)
-            {
-                if (!ApiController.GroupPairedClients.Any(p => string.Equals(p.GroupGID, gid, StringComparison.Ordinal) && string.Equals(p.UserUID, userEntry.Key, StringComparison.Ordinal))) continue;
-            }
+            var note = entry.GetNote();
+            if (note.IsNullOrEmpty()) continue;
 
-            sb.AppendLine(userEntry.Key + ":\"" + userEntry.Value + "\"");
+            sb.AppendLine(entry.UserData.UID + ":\"" + entry.GetNote() + "\"");
         }
-        sb.AppendLine(NotesEnd);
+        sb.AppendLine(_notesEnd);
 
         return sb.ToString();
     }
@@ -680,14 +634,14 @@ public class UiShared : IDisposable
         var splitNotes = notes.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).ToList();
         var splitNotesStart = splitNotes.FirstOrDefault();
         var splitNotesEnd = splitNotes.LastOrDefault();
-        if (!string.Equals(splitNotesStart, NotesStart) || !string.Equals(splitNotesEnd, NotesEnd))
+        if (!string.Equals(splitNotesStart, _notesStart) || !string.Equals(splitNotesEnd, _notesEnd))
         {
             return false;
         }
 
-        splitNotes.RemoveAll(n => string.Equals(n, NotesStart) || string.Equals(n, NotesEnd));
+        splitNotes.RemoveAll(n => string.Equals(n, _notesStart) || string.Equals(n, _notesEnd));
 
-        var comments = _pluginConfiguration.GetCurrentServerUidComments();
+        var comments = _serverConfigurationManager.CurrentServer!.UidServerComments;
 
         foreach (var note in splitNotes)
         {
@@ -697,7 +651,7 @@ public class UiShared : IDisposable
                 var uid = splittedEntry[0];
                 var comment = splittedEntry[1].Trim('"');
                 if (comments.ContainsKey(uid) && !overwrite) continue;
-                _pluginConfiguration.SetCurrentServerUidComment(uid, comment);
+                _serverConfigurationManager.CurrentServer.UidServerComments[uid] = comment;
             }
             catch
             {
@@ -705,7 +659,7 @@ public class UiShared : IDisposable
             }
         }
 
-        _pluginConfiguration.Save();
+        _serverConfigurationManager.Save();
 
         return true;
     }
@@ -713,7 +667,7 @@ public class UiShared : IDisposable
     public void Dispose()
     {
         _pluginInterface.UiBuilder.BuildFonts -= BuildFont;
-        _dalamudUtil.GposeStart -= _dalamudUtil_GposeStart;
-        _dalamudUtil.GposeEnd -= _dalamudUtil_GposeEnd;
+        _dalamudUtil.GposeStart -= DalamudUtil_GposeStart;
+        _dalamudUtil.GposeEnd -= DalamudUtil_GposeEnd;
     }
 }

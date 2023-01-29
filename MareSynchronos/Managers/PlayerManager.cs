@@ -1,23 +1,17 @@
 ﻿using MareSynchronos.Factories;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-using MareSynchronos.API;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using System.Collections.Generic;
-using System.Linq;
 using MareSynchronos.Models;
 using MareSynchronos.FileCache;
 using MareSynchronos.UI;
+using MareSynchronos.API.Data.Enum;
+using MareSynchronos.Delegates;
 #if DEBUG
-using Newtonsoft.Json;
 #endif
 
 namespace MareSynchronos.Managers;
 
-public delegate void PlayerHasChanged(CharacterCacheDto characterCache);
 
 public class PlayerManager : IDisposable
 {
@@ -28,15 +22,15 @@ public class PlayerManager : IDisposable
     private readonly PeriodicFileScanner _periodicFileScanner;
     private readonly SettingsUi _settingsUi;
     private readonly IpcManager _ipcManager;
-    public event PlayerHasChanged? PlayerHasChanged;
-    public CharacterCacheDto? LastCreatedCharacterData { get; private set; }
-    public CharacterData PermanentDataCache { get; private set; } = new();
-    private readonly Dictionary<ObjectKind, Func<bool>> objectKindsToUpdate = new();
+    public event CharacterDataDelegate? PlayerHasChanged;
+    public API.Data.CharacterData? LastCreatedCharacterData { get; private set; }
+    public Models.CharacterData PermanentDataCache { get; private set; } = new();
+    private readonly Dictionary<ObjectKind, Func<bool>> _objectKindsToUpdate = new();
 
     private CancellationTokenSource? _playerChangedCts = new();
     private CancellationTokenSource _transientUpdateCts = new();
 
-    private List<PlayerRelatedObject> playerRelatedObjects = new();
+    private readonly List<PlayerRelatedObject> _playerRelatedObjects = new();
 
     public unsafe PlayerManager(ApiController apiController, IpcManager ipcManager,
         CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil, TransientResourceManager transientResourceManager,
@@ -66,7 +60,7 @@ public class PlayerManager : IDisposable
             ApiControllerOnConnected();
         }
 
-        playerRelatedObjects = new List<PlayerRelatedObject>()
+        _playerRelatedObjects = new List<PlayerRelatedObject>()
         {
             new PlayerRelatedObject(ObjectKind.Player, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.PlayerPointer),
             new PlayerRelatedObject(ObjectKind.MinionOrMount, IntPtr.Zero, IntPtr.Zero, () => (IntPtr)((Character*)_dalamudUtil.PlayerPointer)->CompanionObject),
@@ -77,12 +71,12 @@ public class PlayerManager : IDisposable
 
     private void DalamudUtilOnFrameworkUpdate()
     {
-        _transientResourceManager.PlayerRelatedPointers = playerRelatedObjects.Select(f => f.CurrentAddress).ToArray();
+        _transientResourceManager.PlayerRelatedPointers = _playerRelatedObjects.Select(f => f.CurrentAddress).ToArray();
     }
 
-    public void HandleTransientResourceLoad(IntPtr gameObj)
+    public void HandleTransientResourceLoad(IntPtr gameObj, int idx)
     {
-        foreach (var obj in playerRelatedObjects)
+        foreach (var obj in _playerRelatedObjects)
         {
             if (obj.Address == gameObj && !obj.HasUnprocessedUpdate)
             {
@@ -105,7 +99,7 @@ public class PlayerManager : IDisposable
 
     private void HeelsOffsetChanged(float change)
     {
-        var player = playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player);
+        var player = _playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player);
         if (LastCreatedCharacterData != null && LastCreatedCharacterData.HeelsOffset != change && !player.IsProcessing)
         {
             Logger.Debug("Heels offset changed to " + change);
@@ -116,8 +110,8 @@ public class PlayerManager : IDisposable
     private void CustomizePlusChanged(string? change)
     {
         change ??= string.Empty;
-        var player = playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player);
-        if (LastCreatedCharacterData != null && LastCreatedCharacterData.CustomizePlusData != change && !player.IsProcessing)
+        var player = _playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player);
+        if (LastCreatedCharacterData != null && !string.Equals(LastCreatedCharacterData.CustomizePlusData, change, StringComparison.Ordinal) && !player.IsProcessing)
         {
             Logger.Debug("CustomizePlus data changed to " + change);
             player.HasTransientsUpdate = true;
@@ -146,8 +140,8 @@ public class PlayerManager : IDisposable
     {
         if (!_dalamudUtil.IsPlayerPresent || !_ipcManager.Initialized) return;
 
-        playerRelatedObjects.ForEach(k => k.CheckAndUpdateObject());
-        if (playerRelatedObjects.Any(c => (c.HasUnprocessedUpdate || c.HasTransientsUpdate) && !c.IsProcessing))
+        _playerRelatedObjects.ForEach(k => k.CheckAndUpdateObject());
+        if (_playerRelatedObjects.Any(c => (c.HasUnprocessedUpdate || c.HasTransientsUpdate) && !c.IsProcessing))
         {
             OnPlayerOrAttachedObjectsChanged();
         }
@@ -167,9 +161,9 @@ public class PlayerManager : IDisposable
         _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
     }
 
-    private async Task<CharacterCacheDto?> CreateFullCharacterCacheDto(CancellationToken token)
+    private async Task<API.Data.CharacterData?> CreateFullCharacterCacheDto(CancellationToken token)
     {
-        foreach (var unprocessedObject in playerRelatedObjects.Where(c => c.HasUnprocessedUpdate || c.HasTransientsUpdate).ToList())
+        foreach (var unprocessedObject in _playerRelatedObjects.Where(c => c.HasUnprocessedUpdate || c.HasTransientsUpdate).ToList())
         {
             Logger.Verbose("Building Cache for " + unprocessedObject.ObjectKind);
             PermanentDataCache = _characterDataFactory.BuildCharacterData(PermanentDataCache, unprocessedObject, token);
@@ -194,7 +188,7 @@ public class PlayerManager : IDisposable
 
         Logger.Verbose("Cache creation complete");
 
-        var cache = PermanentDataCache.ToCharacterCacheDto();
+        var cache = PermanentDataCache.ToAPI();
         //Logger.Verbose(JsonConvert.SerializeObject(cache, Formatting.Indented));
         return cache;
     }
@@ -203,7 +197,7 @@ public class PlayerManager : IDisposable
     {
         Logger.Verbose("RedrawEvent for addr " + address);
 
-        foreach (var item in playerRelatedObjects)
+        foreach (var item in _playerRelatedObjects)
         {
             if (address == item.Address)
             {
@@ -212,7 +206,7 @@ public class PlayerManager : IDisposable
             }
         }
 
-        if (playerRelatedObjects.Any(c => (c.HasUnprocessedUpdate || c.HasTransientsUpdate) && (!c.IsProcessing || (c.IsProcessing && c.DoNotSendUpdate))))
+        if (_playerRelatedObjects.Any(c => (c.HasUnprocessedUpdate || c.HasTransientsUpdate) && (!c.IsProcessing || (c.IsProcessing && c.DoNotSendUpdate))))
         {
             OnPlayerOrAttachedObjectsChanged();
         }
@@ -220,7 +214,7 @@ public class PlayerManager : IDisposable
 
     private void OnPlayerOrAttachedObjectsChanged()
     {
-        var unprocessedObjects = playerRelatedObjects.Where(c => c.HasUnprocessedUpdate || c.HasTransientsUpdate).ToList();
+        var unprocessedObjects = _playerRelatedObjects.Where(c => c.HasUnprocessedUpdate || c.HasTransientsUpdate).ToList();
         foreach (var unprocessedObject in unprocessedObjects)
         {
             unprocessedObject.IsProcessing = true;
@@ -253,7 +247,7 @@ public class PlayerManager : IDisposable
 
         Task.Run(async () =>
         {
-            CharacterCacheDto? cacheDto = null;
+            API.Data.CharacterData? cacheDto = null;
             try
             {
                 _periodicFileScanner.HaltScan("Character creation");
@@ -278,15 +272,13 @@ public class PlayerManager : IDisposable
             //Logger.Verbose(json);
 #endif
 
-            if ((LastCreatedCharacterData?.GetHashCode() ?? 0) == cacheDto.GetHashCode())
+            if (string.Equals(LastCreatedCharacterData?.DataHash.Value ?? string.Empty, cacheDto.DataHash.Value, StringComparison.Ordinal))
             {
                 Logger.Debug("Not sending data, already sent");
                 return;
             }
-            else
-            {
-                LastCreatedCharacterData = cacheDto;
-            }
+
+            LastCreatedCharacterData = cacheDto;
 
             if (_apiController.IsConnected && !token.IsCancellationRequested && !doNotSendUpdate)
             {

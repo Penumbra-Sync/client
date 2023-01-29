@@ -1,34 +1,30 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using MareSynchronos.API;
+﻿using System.Text;
 using System.Text.RegularExpressions;
 using MareSynchronos.FileCache;
 using MareSynchronos.Managers;
 using MareSynchronos.Utils;
-using System;
+using MareSynchronos.API.Data;
 
 namespace MareSynchronos.Models;
 
 public class FileReplacement
 {
-    private readonly FileCacheManager fileDbManager;
-    private readonly IpcManager ipcManager;
+    private readonly FileCacheManager _fileDbManager;
+    private readonly IpcManager _ipcManager;
 
     public FileReplacement(FileCacheManager fileDbManager, IpcManager ipcManager)
     {
-        this.fileDbManager = fileDbManager;
-        this.ipcManager = ipcManager;
+        _fileDbManager = fileDbManager;
+        _ipcManager = ipcManager;
     }
 
     public bool Computed => IsFileSwap || !HasFileReplacement || !string.IsNullOrEmpty(Hash);
 
     public List<string> GamePaths { get; set; } = new();
 
-    public bool HasFileReplacement => GamePaths.Count >= 1 && GamePaths.Any(p => !string.Equals(p, ResolvedPath, System.StringComparison.Ordinal));
+    public bool HasFileReplacement => GamePaths.Count >= 1 && GamePaths.Any(p => !string.Equals(p, ResolvedPath, StringComparison.Ordinal));
 
-    public bool IsFileSwap => !Regex.IsMatch(ResolvedPath, @"^[a-zA-Z]:(/|\\)", RegexOptions.ECMAScript) && !string.Equals(GamePaths.First(), ResolvedPath, System.StringComparison.Ordinal);
+    public bool IsFileSwap => !Regex.IsMatch(ResolvedPath, @"^[a-zA-Z]:(/|\\)", RegexOptions.ECMAScript) && !string.Equals(GamePaths[0], ResolvedPath, StringComparison.Ordinal);
 
     public string Hash { get; private set; } = string.Empty;
 
@@ -43,13 +39,13 @@ public class FileReplacement
         {
             try
             {
-                var cache = fileDbManager.GetFileCacheByPath(ResolvedPath)!;
+                var cache = _fileDbManager.GetFileCacheByPath(ResolvedPath)!;
                 Hash = cache.Hash;
             }
             catch (Exception ex)
             {
-                Logger.Warn("Could not set Hash for " + ResolvedPath + ", resetting to original");
-                ResolvedPath = GamePaths.First();
+                Logger.Warn("Could not set Hash for " + ResolvedPath + ", resetting to original", ex);
+                ResolvedPath = GamePaths[0];
             }
         });
     }
@@ -58,34 +54,34 @@ public class FileReplacement
     {
         if (!IsFileSwap)
         {
-            var cache = fileDbManager.GetFileCacheByPath(ResolvedPath);
+            var cache = _fileDbManager.GetFileCacheByPath(ResolvedPath);
             if (cache == null)
             {
-                Logger.Warn("Replacement Failed verification: " + GamePaths.First());
+                Logger.Warn("Replacement Failed verification: " + GamePaths[0]);
                 return false;
             }
             Hash = cache.Hash;
             return true;
         }
 
-        ResolvePath(GamePaths.First());
+        ResolvePath(GamePaths[0]);
 
         var success = IsFileSwap;
         if (!success)
         {
-            Logger.Warn("FileSwap Failed verification: " + GamePaths.First());
+            Logger.Warn("FileSwap Failed verification: " + GamePaths[0]);
         }
 
         return success;
     }
 
-    public FileReplacementDto ToFileReplacementDto()
+    public FileReplacementData ToFileReplacementDto()
     {
-        return new FileReplacementDto
+        return new FileReplacementData
         {
             GamePaths = GamePaths.ToArray(),
             Hash = Hash,
-            FileSwapPath = IsFileSwap ? ResolvedPath : string.Empty
+            FileSwapPath = IsFileSwap ? ResolvedPath : string.Empty,
         };
     }
 
@@ -98,13 +94,13 @@ public class FileReplacement
 
     internal void ReverseResolvePath(string path)
     {
-        GamePaths = ipcManager.PenumbraReverseResolvePlayer(path).ToList();
+        GamePaths = _ipcManager.PenumbraReverseResolvePlayer(path).ToList();
         SetResolvedPath(path);
     }
 
     internal void ResolvePath(string path)
     {
         GamePaths = new List<string> { path };
-        SetResolvedPath(ipcManager.PenumbraResolvePath(path));
+        SetResolvedPath(_ipcManager.PenumbraResolvePath(path));
     }
 }

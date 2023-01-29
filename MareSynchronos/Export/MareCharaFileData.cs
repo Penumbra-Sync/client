@@ -1,8 +1,7 @@
-﻿using MareSynchronos.API;
+﻿using MareSynchronos.API.Data;
+using MareSynchronos.API.Data.Enum;
 using MareSynchronos.FileCache;
 using Newtonsoft.Json;
-using System.Collections.Generic;
-using System.IO;
 using System.Text;
 
 namespace MareSynchronos.Export;
@@ -17,7 +16,7 @@ public record MareCharaFileData
     public List<FileSwap> FileSwaps { get; set; } = new();
 
     public MareCharaFileData() { }
-    public MareCharaFileData(FileCacheManager manager, string description, CharacterCacheDto dto)
+    public MareCharaFileData(FileCacheManager manager, string description, CharacterData dto)
     {
         Description = description;
 

@@ -1,9 +1,4 @@
-﻿using Lumina.Extensions;
-using System.Collections.Generic;
-using System.IO;
-using System.Runtime.CompilerServices;
-
-namespace MareSynchronos.Export;
+﻿namespace MareSynchronos.Export;
 
 public record MareCharaFileHeader(byte Version, MareCharaFileData CharaFileData)
 {
@@ -11,7 +6,7 @@ public record MareCharaFileHeader(byte Version, MareCharaFileData CharaFileData)
 
     public byte Version { get; set; } = Version;
     public MareCharaFileData CharaFileData { get; set; } = CharaFileData;
-    public string FilePath { get; private set; }
+    public string FilePath { get; private set; } = string.Empty;
 
     public void WriteToStream(BinaryWriter writer)
     {
@@ -28,7 +23,7 @@ public record MareCharaFileHeader(byte Version, MareCharaFileData CharaFileData)
     public static MareCharaFileHeader? FromBinaryReader(string path, BinaryReader reader)
     {
         var chars = new string(reader.ReadChars(4));
-        if (!string.Equals(chars, "MCDF", System.StringComparison.Ordinal)) throw new System.Exception("Not a Mare Chara File");
+        if (!string.Equals(chars, "MCDF", StringComparison.Ordinal)) throw new System.Exception("Not a Mare Chara File");
 
         MareCharaFileHeader? decoded = null;
 
@@ -37,8 +32,10 @@ public record MareCharaFileHeader(byte Version, MareCharaFileData CharaFileData)
         {
             var dataLength = reader.ReadInt32();
 
-            decoded = new(version, MareCharaFileData.FromByteArray(reader.ReadBytes(dataLength)));
-            decoded.FilePath = path;
+            decoded = new(version, MareCharaFileData.FromByteArray(reader.ReadBytes(dataLength)))
+            {
+                FilePath = path,
+            };
         }
 
         return decoded;

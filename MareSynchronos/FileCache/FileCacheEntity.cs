@@ -1,7 +1,6 @@
 ﻿#nullable disable
 
 
-using MareSynchronos;
 using System.Globalization;
 
 namespace MareSynchronos.FileCache;
@@ -22,7 +21,7 @@ public class FileCacheEntity
 
     public void SetResolvedFilePath(string filePath)
     {
-        ResolvedFilepath = filePath.ToLowerInvariant().Replace("\\\\", "\\", System.StringComparison.Ordinal);
+        ResolvedFilepath = filePath.ToLowerInvariant().Replace("\\\\", "\\", StringComparison.Ordinal);
     }
 
     public string CsvEntry => $"{Hash}{FileCacheManager.CsvSplit}{PrefixedFilePath}{FileCacheManager.CsvSplit}{LastModifiedDateTicks.ToString(CultureInfo.InvariantCulture)}";

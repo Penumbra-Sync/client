@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Numerics;
-using System.Threading.Tasks;
+﻿using System.Numerics;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
@@ -11,25 +6,30 @@ using MareSynchronos.Utils;
 using MareSynchronos.Localization;
 using Dalamud.Utility;
 using MareSynchronos.FileCache;
+using Dalamud.Interface;
+using MareSynchronos.Managers;
+using MareSynchronos.MareConfiguration;
+using MareSynchronos.Delegates;
 
 namespace MareSynchronos.UI;
 
 internal class IntroUi : Window, IDisposable
 {
     private readonly UiShared _uiShared;
-    private readonly Configuration _pluginConfiguration;
+    private readonly ConfigurationService _configService;
     private readonly PeriodicFileScanner _fileCacheManager;
+    private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly WindowSystem _windowSystem;
     private bool _readFirstPage;
 
-    public event SwitchUi? SwitchToMainUi;
+    public event VoidDelegate? SwitchToMainUi;
 
-    private string[] TosParagraphs;
+    private string[]? _tosParagraphs;
 
-    private Task _timeoutTask;
-    private string _timeoutLabel;
+    private Task? _timeoutTask;
+    private string _timeoutLabel = string.Empty;
 
-    private Dictionary<string, string> _languages = new(StringComparer.Ordinal) { { "English", "en" }, { "Deutsch", "de" }, { "Français", "fr" } };
+    private readonly Dictionary<string, string> _languages = new(StringComparer.Ordinal) { { "English", "en" }, { "Deutsch", "de" }, { "Français", "fr" } };
     private int _currentLanguage;
 
     public void Dispose()
@@ -39,20 +39,22 @@ internal class IntroUi : Window, IDisposable
         _windowSystem.RemoveWindow(this);
     }
 
-    public IntroUi(WindowSystem windowSystem, UiShared uiShared, Configuration pluginConfiguration,
-        PeriodicFileScanner fileCacheManager) : base("Mare Synchronos Setup")
+    public IntroUi(WindowSystem windowSystem, UiShared uiShared, ConfigurationService configService,
+        PeriodicFileScanner fileCacheManager, ServerConfigurationManager serverConfigurationManager) : base("Mare Synchronos Setup")
     {
         Logger.Verbose("Creating " + nameof(IntroUi));
 
         _uiShared = uiShared;
-        _pluginConfiguration = pluginConfiguration;
+        _configService = configService;
         _fileCacheManager = fileCacheManager;
+        _serverConfigurationManager = serverConfigurationManager;
         _windowSystem = windowSystem;
+        IsOpen = false;
 
         SizeConstraints = new WindowSizeConstraints()
         {
             MinimumSize = new Vector2(600, 400),
-            MaximumSize = new Vector2(600, 2000)
+            MaximumSize = new Vector2(600, 2000),
         };
 
         GetToSLocalization();
@@ -64,7 +66,7 @@ internal class IntroUi : Window, IDisposable
     {
         if (_uiShared.IsInGpose) return;
 
-        if (!_pluginConfiguration.AcceptedAgreement && !_readFirstPage)
+        if (!_configService.Current.AcceptedAgreement && !_readFirstPage)
         {
             if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
             ImGui.TextUnformatted("Welcome to Mare Synchronos");
@@ -87,13 +89,12 @@ internal class IntroUi : Window, IDisposable
                     for (int i = 60; i > 0; i--)
                     {
                         _timeoutLabel = $"{Strings.ToS.ButtonWillBeAvailableIn} {i}s";
-                        Logger.Debug(_timeoutLabel);
                         await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                     }
                 });
             }
         }
-        else if (!_pluginConfiguration.AcceptedAgreement && _readFirstPage)
+        else if (!_configService.Current.AcceptedAgreement && _readFirstPage)
         {
             if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
             var textSize = ImGui.CalcTextSize(Strings.ToS.LanguageLabel);
@@ -124,20 +125,20 @@ internal class IntroUi : Window, IDisposable
             ImGui.Separator();
 
 
-            UiShared.TextWrapped(TosParagraphs[0]);
-            UiShared.TextWrapped(TosParagraphs[1]);
-            UiShared.TextWrapped(TosParagraphs[2]);
-            UiShared.TextWrapped(TosParagraphs[3]);
-            UiShared.TextWrapped(TosParagraphs[4]);
-            UiShared.TextWrapped(TosParagraphs[5]);
+            UiShared.TextWrapped(_tosParagraphs![0]);
+            UiShared.TextWrapped(_tosParagraphs![1]);
+            UiShared.TextWrapped(_tosParagraphs![2]);
+            UiShared.TextWrapped(_tosParagraphs![3]);
+            UiShared.TextWrapped(_tosParagraphs![4]);
+            UiShared.TextWrapped(_tosParagraphs![5]);
 
             ImGui.Separator();
             if (_timeoutTask?.IsCompleted ?? true)
             {
                 if (ImGui.Button(Strings.ToS.AgreeLabel + "##toSetup"))
                 {
-                    _pluginConfiguration.AcceptedAgreement = true;
-                    _pluginConfiguration.Save();
+                    _configService.Current.AcceptedAgreement = true;
+                    _configService.Save();
                 }
             }
             else
@@ -145,10 +146,10 @@ internal class IntroUi : Window, IDisposable
                 UiShared.TextWrapped(_timeoutLabel);
             }
         }
-        else if (_pluginConfiguration.AcceptedAgreement
-                 && (string.IsNullOrEmpty(_pluginConfiguration.CacheFolder)
-                     || _pluginConfiguration.InitialScanComplete == false
-                     || !Directory.Exists(_pluginConfiguration.CacheFolder)))
+        else if (_configService.Current.AcceptedAgreement
+                 && (string.IsNullOrEmpty(_configService.Current.CacheFolder)
+                     || _configService.Current.InitialScanComplete == false
+                     || !Directory.Exists(_configService.Current.CacheFolder)))
         {
             if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
             ImGui.TextUnformatted("File Storage Setup");
@@ -171,11 +172,11 @@ internal class IntroUi : Window, IDisposable
                 _uiShared.DrawCacheDirectorySetting();
             }
 
-            if (!_fileCacheManager.IsScanRunning && !string.IsNullOrEmpty(_pluginConfiguration.CacheFolder) && _uiShared.HasValidPenumbraModPath && Directory.Exists(_pluginConfiguration.CacheFolder))
+            if (!_fileCacheManager.IsScanRunning && !string.IsNullOrEmpty(_configService.Current.CacheFolder) && _uiShared.HasValidPenumbraModPath && Directory.Exists(_configService.Current.CacheFolder))
             {
                 if (ImGui.Button("Start Scan##startScan"))
                 {
-                    _fileCacheManager.InvokeScan(true);
+                    _fileCacheManager.InvokeScan(forced: true);
                 }
             }
             else
@@ -204,7 +205,37 @@ internal class IntroUi : Window, IDisposable
 
             UiShared.TextWrapped("Once you have received a secret key you can connect to the service using the tools provided below.");
 
-            _uiShared.DrawServiceSelection(() => { });
+            var idx = _uiShared.DrawServiceSelection(selectOnChange: true);
+
+            var text = "Enter Secret Key";
+            var buttonText = "Save";
+            var buttonWidth = _secretKey.Length != 64 ? 0 : ImGuiHelpers.GetButtonSize(buttonText).X + ImGui.GetStyle().ItemSpacing.X;
+            var textSize = ImGui.CalcTextSize(text);
+            ImGui.AlignTextToFramePadding();
+            ImGui.Text(text);
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonWidth - textSize.X);
+            ImGui.InputText("", ref _secretKey, 64);
+            if (_secretKey.Length > 0 && _secretKey.Length != 64)
+            {
+                UiShared.ColorTextWrapped("Your secret key must be exactly 64 characters long. Don't enter your Lodestone auth here.", ImGuiColors.DalamudRed);
+            }
+            else if (_secretKey.Length == 64)
+            {
+                ImGui.SameLine();
+                if (ImGui.Button(buttonText))
+                {
+                    if (_serverConfigurationManager.CurrentServer == null) _serverConfigurationManager.SelectServer(0);
+                    _serverConfigurationManager.CurrentServer!.SecretKeys.Add(_serverConfigurationManager.CurrentServer.SecretKeys.Select(k => k.Key).LastOrDefault() + 1, new SecretKey()
+                    {
+                        FriendlyName = $"Secret Key added on Setup ({DateTime.Now:yyyy-MM-dd})",
+                        Key = _secretKey,
+                    });
+                    _serverConfigurationManager.AddCurrentCharacterToServer(addLastSecretKey: true);
+                    _secretKey = string.Empty;
+                    Task.Run(() => _uiShared.ApiController.CreateConnections(forceGetToken: true));
+                }
+            }
         }
         else
         {
@@ -222,6 +253,6 @@ internal class IntroUi : Window, IDisposable
             _uiShared.LoadLocalization(_languages.ElementAt(changeLanguageTo).Value);
         }
 
-        TosParagraphs = new[] { Strings.ToS.Paragraph1, Strings.ToS.Paragraph2, Strings.ToS.Paragraph3, Strings.ToS.Paragraph4, Strings.ToS.Paragraph5, Strings.ToS.Paragraph6 };
+        _tosParagraphs = new[] { Strings.ToS.Paragraph1, Strings.ToS.Paragraph2, Strings.ToS.Paragraph3, Strings.ToS.Paragraph4, Strings.ToS.Paragraph5, Strings.ToS.Paragraph6 };
     }
 }

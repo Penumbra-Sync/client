@@ -3,42 +3,40 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using MareSynchronos.WebAPI;
-using System;
-using System.IO;
-using System.Linq;
 using System.Numerics;
-using System.Threading.Tasks;
-using MareSynchronos.API;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
 using Dalamud.Utility;
 using Newtonsoft.Json;
 using MareSynchronos.Export;
+using MareSynchronos.API.Data;
+using MareSynchronos.Managers;
+using MareSynchronos.API.Data.Comparer;
+using MareSynchronos.MareConfiguration;
+using MareSynchronos.Delegates;
 
 namespace MareSynchronos.UI;
 
-public delegate void SwitchUi();
 public class SettingsUi : Window, IDisposable
 {
-    private readonly Configuration _configuration;
+    private readonly ConfigurationService _configService;
     private readonly WindowSystem _windowSystem;
-    private readonly ApiController _apiController;
+    private ApiController ApiController => _uiShared.ApiController;
     private readonly MareCharaFileManager _mareCharaFileManager;
+    private readonly PairManager _pairManager;
+    private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly UiShared _uiShared;
-    public CharacterCacheDto LastCreatedCharacterData { private get; set; }
+    public CharacterData? LastCreatedCharacterData { private get; set; }
 
-    public event SwitchUi? SwitchToIntroUi;
+    public event VoidDelegate? SwitchToIntroUi;
     private bool _overwriteExistingLabels = false;
     private bool? _notesSuccessfullyApplied = null;
     private string _lastTab = string.Empty;
-    private bool _openPopupOnAddition;
-    private bool _hideInfoMessages;
-    private bool _disableOptionalPluginsWarnings;
     private bool _wasOpen = false;
 
     public SettingsUi(WindowSystem windowSystem,
-        UiShared uiShared, Configuration configuration, ApiController apiController,
-        MareCharaFileManager mareCharaFileManager) : base("Mare Synchronos Settings")
+        UiShared uiShared, ConfigurationService configService,
+        MareCharaFileManager mareCharaFileManager, PairManager pairManager, ServerConfigurationManager serverConfigurationManager) : base("Mare Synchronos Settings")
     {
         Logger.Verbose("Creating " + nameof(SettingsUi));
 
@@ -48,27 +46,26 @@ public class SettingsUi : Window, IDisposable
             MaximumSize = new Vector2(800, 2000),
         };
 
-        _configuration = configuration;
+        _configService = configService;
         _windowSystem = windowSystem;
-        _apiController = apiController;
         _mareCharaFileManager = mareCharaFileManager;
+        _pairManager = pairManager;
+        _serverConfigurationManager = serverConfigurationManager;
         _uiShared = uiShared;
-        _openPopupOnAddition = _configuration.OpenPopupOnAdd;
-        _hideInfoMessages = _configuration.HideInfoMessages;
-        _disableOptionalPluginsWarnings = _configuration.DisableOptionalPluginWarnings;
 
-        _uiShared.GposeStart += _uiShared_GposeStart;
-        _uiShared.GposeEnd += _uiShared_GposeEnd;
+
+        _uiShared.GposeStart += UiShared_GposeStart;
+        _uiShared.GposeEnd += UiShared_GposeEnd;
 
         windowSystem.AddWindow(this);
     }
 
-    private void _uiShared_GposeEnd()
+    private void UiShared_GposeEnd()
     {
         IsOpen = _wasOpen;
     }
 
-    private void _uiShared_GposeStart()
+    private void UiShared_GposeStart()
     {
         _wasOpen = IsOpen;
         IsOpen = false;
@@ -78,15 +75,15 @@ public class SettingsUi : Window, IDisposable
     {
         Logger.Verbose("Disposing " + nameof(SettingsUi));
 
-        _uiShared.GposeStart -= _uiShared_GposeStart;
-        _uiShared.GposeEnd -= _uiShared_GposeEnd;
+        _uiShared.GposeStart -= UiShared_GposeStart;
+        _uiShared.GposeEnd -= UiShared_GposeEnd;
 
         _windowSystem.RemoveWindow(this);
     }
 
     public override void Draw()
     {
-        var pluginState = _uiShared.DrawOtherPluginState();
+        _ = _uiShared.DrawOtherPluginState();
 
         DrawSettingsContent();
     }
@@ -116,7 +113,7 @@ public class SettingsUi : Window, IDisposable
                 ImGui.EndTabItem();
             }
 
-            if (_apiController.ServerState is ServerState.Connected)
+            if (ApiController.ServerState is ServerState.Connected)
             {
                 if (ImGui.BeginTabItem("Transfers"))
                 {
@@ -131,344 +128,29 @@ public class SettingsUi : Window, IDisposable
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("User Administration"))
+            if (ImGui.BeginTabItem("Service Settings"))
             {
-                DrawUserAdministration(_apiController.IsConnected);
+                DrawServerConfiguration();
                 ImGui.EndTabItem();
             }
 
-            if (_apiController.IsConnected && _apiController.IsModerator)
+            if (ImGui.BeginTabItem("Debug"))
             {
-                if (ImGui.BeginTabItem("Administration"))
-                {
-                    DrawAdministration();
-                    ImGui.EndTabItem();
-                }
+                DrawDebug();
+                ImGui.EndTabItem();
             }
 
             ImGui.EndTabBar();
         }
     }
 
-    private string _forbiddenFileHashEntry = string.Empty;
-    private string _forbiddenFileHashForbiddenBy = string.Empty;
-    private string _bannedUserHashEntry = string.Empty;
-    private string _bannedUserReasonEntry = string.Empty;
-
-    private void DrawGeneral()
+    private void DrawServerConfiguration()
     {
-        if (!string.Equals(_lastTab, "General", StringComparison.OrdinalIgnoreCase))
+        _lastTab = "Service Settings";
+        if (ApiController.ServerAlive)
         {
-            _notesSuccessfullyApplied = null;
-        }
+            UiShared.FontText("Service Actions", _uiShared.UidFont);
 
-        _lastTab = "General";
-        UiShared.FontText("Notes", _uiShared.UidFont);
-        if (UiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Export all your user notes to clipboard"))
-        {
-            ImGui.SetClipboardText(_uiShared.GetNotes());
-        }
-        if (UiShared.IconTextButton(FontAwesomeIcon.FileImport, "Import notes from clipboard"))
-        {
-            _notesSuccessfullyApplied = null;
-            var notes = ImGui.GetClipboardText();
-            _notesSuccessfullyApplied = _uiShared.ApplyNotesFromClipboard(notes, _overwriteExistingLabels);
-        }
-
-        ImGui.SameLine();
-        ImGui.Checkbox("Overwrite existing notes", ref _overwriteExistingLabels);
-        UiShared.DrawHelpText("If this option is selected all already existing notes for UIDs will be overwritten by the imported notes.");
-        if (_notesSuccessfullyApplied.HasValue && _notesSuccessfullyApplied.Value)
-        {
-            UiShared.ColorTextWrapped("User Notes successfully imported", ImGuiColors.HealerGreen);
-        }
-        else if (_notesSuccessfullyApplied.HasValue && !_notesSuccessfullyApplied.Value)
-        {
-            UiShared.ColorTextWrapped("Attempt to import notes from clipboard failed. Check formatting and try again", ImGuiColors.DalamudRed);
-        }
-        if (ImGui.Checkbox("Open Notes Popup on user addition", ref _openPopupOnAddition))
-        {
-            _apiController.LastAddedUser = null;
-            _configuration.OpenPopupOnAdd = _openPopupOnAddition;
-            _configuration.Save();
-        }
-        UiShared.DrawHelpText("This will open a popup that allows you to set the notes for a user after successfully adding them to your individual pairs.");
-
-        ImGui.Separator();
-        UiShared.FontText("Server Messages", _uiShared.UidFont);
-        if (ImGui.Checkbox("Hide Server Info Messages", ref _hideInfoMessages))
-        {
-            _configuration.HideInfoMessages = _hideInfoMessages;
-            _configuration.Save();
-        }
-        UiShared.DrawHelpText("Enabling this will not print any \"Info\" labeled messages into the game chat.");
-        if (ImGui.Checkbox("Disable optional plugin warnings", ref _disableOptionalPluginsWarnings))
-        {
-            _configuration.DisableOptionalPluginWarnings = _disableOptionalPluginsWarnings;
-            _configuration.Save();
-        }
-        UiShared.DrawHelpText("Enabling this will not print any \"Warning\" labeled messages for missing optional plugins Heels or Customize+ in the game chat.");
-    }
-
-    private void DrawAdministration()
-    {
-        _lastTab = "Administration";
-        if (ImGui.TreeNode("Forbidden Files Changes"))
-        {
-            if (ImGui.BeginTable("ForbiddenFilesTable", 3, ImGuiTableFlags.RowBg))
-            {
-                ImGui.TableSetupColumn("File Hash", ImGuiTableColumnFlags.None, 290);
-                ImGui.TableSetupColumn("Forbidden By", ImGuiTableColumnFlags.None, 290);
-                ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.None, 70);
-
-                ImGui.TableHeadersRow();
-
-                foreach (var forbiddenFile in _apiController.AdminForbiddenFiles)
-                {
-                    ImGui.TableNextColumn();
-
-                    ImGui.Text(forbiddenFile.Hash);
-                    ImGui.TableNextColumn();
-                    string by = forbiddenFile.ForbiddenBy;
-                    if (ImGui.InputText("##forbiddenBy" + forbiddenFile.Hash, ref by, 255))
-                    {
-                        forbiddenFile.ForbiddenBy = by;
-                    }
-
-                    ImGui.TableNextColumn();
-                    if (_apiController.IsAdmin)
-                    {
-                        ImGui.PushFont(UiBuilder.IconFont);
-                        if (ImGui.Button(
-                                FontAwesomeIcon.Upload.ToIconString() + "##updateFile" + forbiddenFile.Hash))
-                        {
-                            _ = _apiController.AdminUpdateOrAddForbiddenFile(forbiddenFile);
-                        }
-
-                        ImGui.SameLine();
-                        if (ImGui.Button(FontAwesomeIcon.Trash.ToIconString() + "##deleteFile" +
-                                         forbiddenFile.Hash))
-                        {
-                            _ = _apiController.AdminDeleteForbiddenFile(forbiddenFile);
-                        }
-
-                        ImGui.PopFont();
-                    }
-
-                }
-
-                if (_apiController.IsAdmin)
-                {
-                    ImGui.TableNextColumn();
-                    ImGui.InputText("##addFileHash", ref _forbiddenFileHashEntry, 255);
-                    ImGui.TableNextColumn();
-                    ImGui.InputText("##addForbiddenBy", ref _forbiddenFileHashForbiddenBy, 255);
-                    ImGui.TableNextColumn();
-                    ImGui.PushFont(UiBuilder.IconFont);
-                    if (ImGui.Button(FontAwesomeIcon.Plus.ToIconString() + "##addForbiddenFile"))
-                    {
-                        _ = _apiController.AdminUpdateOrAddForbiddenFile(new ForbiddenFileDto()
-                        {
-                            ForbiddenBy = _forbiddenFileHashForbiddenBy,
-                            Hash = _forbiddenFileHashEntry
-                        });
-                    }
-
-                    ImGui.PopFont();
-                    ImGui.NextColumn();
-                }
-
-                ImGui.EndTable();
-            }
-
-            ImGui.TreePop();
-        }
-
-        if (ImGui.TreeNode("Banned Users"))
-        {
-            if (ImGui.BeginTable("BannedUsersTable", 3, ImGuiTableFlags.RowBg))
-            {
-                ImGui.TableSetupColumn("Character Hash", ImGuiTableColumnFlags.None, 290);
-                ImGui.TableSetupColumn("Reason", ImGuiTableColumnFlags.None, 290);
-                ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.None, 70);
-
-                ImGui.TableHeadersRow();
-
-                foreach (var bannedUser in _apiController.AdminBannedUsers)
-                {
-                    ImGui.TableNextColumn();
-                    ImGui.Text(bannedUser.CharacterHash);
-
-                    ImGui.TableNextColumn();
-                    string reason = bannedUser.Reason;
-                    ImGuiInputTextFlags moderatorFlags = _apiController.IsModerator
-                        ? ImGuiInputTextFlags.ReadOnly
-                        : ImGuiInputTextFlags.None;
-                    if (ImGui.InputText("##bannedReason" + bannedUser.CharacterHash, ref reason, 255,
-                            moderatorFlags))
-                    {
-                        bannedUser.Reason = reason;
-                    }
-
-                    ImGui.TableNextColumn();
-                    ImGui.PushFont(UiBuilder.IconFont);
-                    if (_apiController.IsAdmin)
-                    {
-                        if (ImGui.Button(FontAwesomeIcon.Upload.ToIconString() + "##updateUser" +
-                                         bannedUser.CharacterHash))
-                        {
-                            _ = _apiController.AdminUpdateOrAddBannedUser(bannedUser);
-                        }
-
-                        ImGui.SameLine();
-                    }
-
-                    if (ImGui.Button(FontAwesomeIcon.Trash.ToIconString() + "##deleteUser" +
-                                     bannedUser.CharacterHash))
-                    {
-                        _ = _apiController.AdminDeleteBannedUser(bannedUser);
-                    }
-
-                    ImGui.PopFont();
-                }
-
-                ImGui.TableNextColumn();
-                ImGui.InputText("##addUserHash", ref _bannedUserHashEntry, 255);
-
-                ImGui.TableNextColumn();
-                if (_apiController.IsAdmin)
-                {
-                    ImGui.InputText("##addUserReason", ref _bannedUserReasonEntry, 255);
-                }
-                else
-                {
-                    _bannedUserReasonEntry = "Banned by " + _uiShared.PlayerName;
-                    ImGui.InputText("##addUserReason", ref _bannedUserReasonEntry, 255,
-                        ImGuiInputTextFlags.ReadOnly);
-                }
-
-                ImGui.TableNextColumn();
-                ImGui.PushFont(UiBuilder.IconFont);
-                if (ImGui.Button(FontAwesomeIcon.Plus.ToIconString() + "##addForbiddenFile"))
-                {
-                    _ = _apiController.AdminUpdateOrAddBannedUser(new BannedUserDto()
-                    {
-                        CharacterHash = _forbiddenFileHashForbiddenBy,
-                        Reason = _forbiddenFileHashEntry
-                    });
-                }
-
-                ImGui.PopFont();
-
-                ImGui.EndTable();
-            }
-
-            ImGui.TreePop();
-        }
-
-        if (ImGui.TreeNode("Online Users"))
-        {
-            if (ImGui.Button("Refresh Online Users"))
-            {
-                _ = _apiController.RefreshOnlineUsers();
-            }
-
-            if (ImGui.BeginTable("OnlineUsersTable", 3, ImGuiTableFlags.RowBg))
-            {
-                ImGui.TableSetupColumn("UID", ImGuiTableColumnFlags.None, 100);
-                ImGui.TableSetupColumn("Character Hash", ImGuiTableColumnFlags.None, 300);
-                ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.None, 70);
-
-                ImGui.TableHeadersRow();
-
-                foreach (var onlineUser in _apiController.AdminOnlineUsers)
-                {
-                    ImGui.TableNextColumn();
-                    ImGui.PushFont(UiBuilder.IconFont);
-                    string icon = onlineUser.IsModerator
-                        ? FontAwesomeIcon.ChessKing.ToIconString()
-                        : onlineUser.IsAdmin
-                            ? FontAwesomeIcon.Crown.ToIconString()
-                            : FontAwesomeIcon.User.ToIconString();
-                    ImGui.Text(icon);
-                    ImGui.PopFont();
-                    ImGui.SameLine();
-
-                    ImGui.Text(onlineUser.UID);
-                    ImGui.SameLine();
-                    ImGui.PushFont(UiBuilder.IconFont);
-                    if (ImGui.Button(FontAwesomeIcon.Copy.ToIconString() + "##onlineUserCopyUID" +
-                                     onlineUser.CharacterNameHash))
-                    {
-                        ImGui.SetClipboardText(onlineUser.UID);
-                    }
-
-                    ImGui.PopFont();
-
-                    ImGui.TableNextColumn();
-                    string charNameHash = onlineUser.CharacterNameHash;
-                    ImGui.InputText("##onlineUserHash" + onlineUser.CharacterNameHash, ref charNameHash, 255,
-                        ImGuiInputTextFlags.ReadOnly);
-                    ImGui.SameLine();
-                    ImGui.PushFont(UiBuilder.IconFont);
-                    if (ImGui.Button(FontAwesomeIcon.Copy.ToIconString() + "##onlineUserCopyHash" +
-                                     onlineUser.CharacterNameHash))
-                    {
-                        ImGui.SetClipboardText(onlineUser.UID);
-                    }
-
-                    ImGui.PopFont();
-
-                    ImGui.TableNextColumn();
-                    ImGui.PushFont(UiBuilder.IconFont);
-                    if (ImGui.Button(FontAwesomeIcon.SkullCrossbones.ToIconString() + "##onlineUserBan" +
-                                     onlineUser.CharacterNameHash))
-                    {
-                        _ = _apiController.AdminUpdateOrAddBannedUser(new BannedUserDto
-                        {
-                            CharacterHash = onlineUser.CharacterNameHash,
-                            Reason = "Banned by " + _uiShared.PlayerName
-                        });
-                    }
-                    ImGui.SameLine();
-                    if (!string.Equals(onlineUser.UID, _apiController.UID, StringComparison.Ordinal) && _apiController.IsAdmin)
-                    {
-                        if (!onlineUser.IsModerator)
-                        {
-                            if (ImGui.Button(FontAwesomeIcon.ChessKing.ToIconString() +
-                                             "##onlineUserModerator" +
-                                             onlineUser.CharacterNameHash))
-                            {
-                                _apiController.AdminChangeModeratorStatus(onlineUser.UID, true);
-                            }
-                        }
-                        else
-                        {
-                            if (ImGui.Button(FontAwesomeIcon.User.ToIconString() +
-                                             "##onlineUserNonModerator" +
-                                             onlineUser.CharacterNameHash))
-                            {
-                                _apiController.AdminChangeModeratorStatus(onlineUser.UID, false);
-                            }
-                        }
-                    }
-
-                    ImGui.PopFont();
-                }
-                ImGui.EndTable();
-            }
-            ImGui.TreePop();
-        }
-    }
-
-    private bool _deleteFilesPopupModalShown = false;
-    private bool _deleteAccountPopupModalShown = false;
-
-    private void DrawUserAdministration(bool serverAlive)
-    {
-        _lastTab = "UserAdministration";
-        if (serverAlive)
-        {
             if (ImGui.Button("Delete all my files"))
             {
                 _deleteFilesPopupModalShown = true;
@@ -490,7 +172,7 @@ public class SettingsUi : Window, IDisposable
 
                 if (ImGui.Button("Delete everything", new Vector2(buttonSize, 0)))
                 {
-                    Task.Run(() => _apiController.FilesDeleteAll());
+                    Task.Run(() => ApiController.FilesDeleteAll());
                     _deleteFilesPopupModalShown = false;
                 }
 
@@ -504,7 +186,7 @@ public class SettingsUi : Window, IDisposable
                 UiShared.SetScaledWindowSize(325);
                 ImGui.EndPopup();
             }
-
+            ImGui.SameLine();
             if (ImGui.Button("Delete account"))
             {
                 _deleteAccountPopupModalShown = true;
@@ -527,7 +209,7 @@ public class SettingsUi : Window, IDisposable
 
                 if (ImGui.Button("Delete account", new Vector2(buttonSize, 0)))
                 {
-                    Task.Run(() => _apiController.UserDelete());
+                    Task.Run(() => ApiController.UserDelete());
                     _deleteAccountPopupModalShown = false;
                     SwitchToIntroUi?.Invoke();
                 }
@@ -542,37 +224,277 @@ public class SettingsUi : Window, IDisposable
                 UiShared.SetScaledWindowSize(325);
                 ImGui.EndPopup();
             }
+            ImGui.Separator();
+
         }
 
-        if (!_configuration.FullPause)
+        UiShared.FontText("Service & Character Settings", _uiShared.UidFont);
+
+        var idx = _uiShared.DrawServiceSelection();
+
+        ImGui.Dummy(new Vector2(10, 10));
+
+        var selectedServer = _serverConfigurationManager.GetServerByIndex(idx);
+        if (selectedServer == _serverConfigurationManager.CurrentServer)
         {
-            UiShared.ColorTextWrapped("Note: to change servers or your secret key you need to disconnect from your current Mare Synchronos server.", ImGuiColors.DalamudYellow);
+            UiShared.ColorTextWrapped("For any changes to be applied to the current service you need to reconnect to the service.", ImGuiColors.DalamudYellow);
         }
 
-        var marePaused = _configuration.FullPause;
 
-        if (_configuration.HasValidSetup())
+        if (ImGui.BeginTabBar("serverTabBar"))
         {
-            if (ImGui.Checkbox("Disconnect Mare Synchronos", ref marePaused))
+            if (ImGui.BeginTabItem("Character Management"))
             {
-                _configuration.FullPause = marePaused;
-                _configuration.Save();
-                Task.Run(() => _apiController.CreateConnections(false));
+                UiShared.ColorTextWrapped("Characters listed here will automatically connect to the selected Mare service with the settings as provided below." +
+                    " Make sure to enter the character names correctly or use the 'Add current character' button at the bottom.", ImGuiColors.DalamudYellow);
+                int i = 0;
+                foreach (var item in selectedServer.Authentications.ToList())
+                {
+                    UiShared.DrawWithID("selectedChara" + i, () =>
+                    {
+                        var charaName = item.CharacterName;
+                        if (ImGui.InputText("Character Name", ref charaName, 64))
+                        {
+                            item.CharacterName = charaName;
+                            _serverConfigurationManager.Save();
+                        }
+                        var worldIdx = (ushort)item.WorldId;
+                        var data = _uiShared.WorldData;
+                        if (!data.TryGetValue(worldIdx, out string? worldPreview))
+                        {
+                            worldPreview = data.First().Value;
+                        }
+                        if (ImGui.BeginCombo("World", worldPreview))
+                        {
+                            foreach (var world in data)
+                            {
+                                bool isSelected = worldIdx == world.Key;
+                                if (ImGui.Selectable(world.Value, isSelected))
+                                {
+                                    item.WorldId = world.Key;
+                                    _serverConfigurationManager.Save();
+                                }
+                            }
+                            ImGui.EndCombo();
+                        }
+                        var secretKeyIdx = item.SecretKeyIdx;
+                        var keys = selectedServer.SecretKeys;
+                        if (!keys.TryGetValue(secretKeyIdx, out var secretKey))
+                        {
+                            secretKey = new();
+                        }
+                        var friendlyName = secretKey.FriendlyName;
+                        if (ImGui.BeginCombo("Secret Key", friendlyName))
+                        {
+                            foreach (var kvp in keys)
+                            {
+                                bool isSelected = kvp.Key == secretKeyIdx;
+                                if (ImGui.Selectable(kvp.Value.FriendlyName, isSelected))
+                                {
+                                    item.SecretKeyIdx = kvp.Key;
+                                    _serverConfigurationManager.Save();
+                                }
+                            }
+                            ImGui.EndCombo();
+                        }
+
+                        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Character"))
+                        {
+                            if (UiShared.CtrlPressed())
+                                _serverConfigurationManager.RemoveCharacterFromServer(idx, item);
+                        }
+                        UiShared.AttachToolTip("Hold CTRL to delete this entry.");
+
+                        if (item != selectedServer.Authentications.LastOrDefault())
+                            ImGui.Separator();
+                    });
+
+                    i++;
+
+                }
+
+                ImGui.Separator();
+                if (!selectedServer.Authentications.Any(c => string.Equals(c.CharacterName, _uiShared.PlayerName, StringComparison.Ordinal)
+                    && c.WorldId == _uiShared.WorldId))
+                {
+                    if (UiShared.IconTextButton(FontAwesomeIcon.User, "Add current character"))
+                    {
+                        _serverConfigurationManager.AddCurrentCharacterToServer(idx);
+                    }
+                    ImGui.SameLine();
+                }
+
+                if (UiShared.IconTextButton(FontAwesomeIcon.Plus, "Add new character"))
+                {
+                    _serverConfigurationManager.AddEmptyCharacterToServer(idx);
+                }
+
+                ImGui.EndTabItem();
             }
 
-            UiShared.DrawHelpText("Completely pauses the sync and clears your current data (not uploaded files) on the service.");
+            if (ImGui.BeginTabItem("Secret Key Management"))
+            {
+                foreach (var item in selectedServer.SecretKeys.ToList())
+                {
+                    UiShared.DrawWithID("key" + item.Key, () =>
+                    {
+                        var friendlyName = item.Value.FriendlyName;
+                        if (ImGui.InputText("Secret Key Display Name", ref friendlyName, 255))
+                        {
+                            item.Value.FriendlyName = friendlyName;
+                            _serverConfigurationManager.Save();
+                        }
+                        var key = item.Value.Key;
+                        if (ImGui.InputText("Secret Key", ref key, 64))
+                        {
+                            item.Value.Key = key;
+                            _serverConfigurationManager.Save();
+                        }
+                        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Secret Key"))
+                        {
+                            if (UiShared.CtrlPressed())
+                            {
+                                selectedServer.SecretKeys.Remove(item.Key);
+                                _serverConfigurationManager.Save();
+                            }
+                        }
+                        UiShared.AttachToolTip("Hold CTRL to delete this secret key entry");
+                    });
+
+                    if (item.Key != selectedServer.SecretKeys.Keys.LastOrDefault())
+                        ImGui.Separator();
+                }
+
+                ImGui.Separator();
+                if (UiShared.IconTextButton(FontAwesomeIcon.Plus, "Add new Secret Key"))
+                {
+                    selectedServer.SecretKeys.Add(selectedServer.SecretKeys.Last().Key + 1, new SecretKey()
+                    {
+                        FriendlyName = "New Secret Key",
+                    });
+                    _serverConfigurationManager.Save();
+                }
+
+                ImGui.EndTabItem();
+            }
+
+            if (ImGui.BeginTabItem("Service Settings"))
+            {
+                var serverUri = selectedServer.ServerUri;
+                ImGui.InputText("Service URI", ref serverUri, 255, ImGuiInputTextFlags.ReadOnly);
+                UiShared.DrawHelpText("You cannot edit the service URI. Add a new service if you need to edit the URI.");
+                var serverName = selectedServer.ServerName;
+                var isMain = string.Equals(serverName, ApiController.MainServer, StringComparison.OrdinalIgnoreCase);
+                var flags = isMain ? ImGuiInputTextFlags.ReadOnly : ImGuiInputTextFlags.None;
+                if (ImGui.InputText("Service Name", ref serverName, 255, flags))
+                {
+                    selectedServer.ServerName = serverName;
+                    _serverConfigurationManager.Save();
+                }
+                if (isMain)
+                {
+                    UiShared.DrawHelpText("You cannot edit the name of the main service.");
+                }
+                if (!isMain)
+                {
+                    if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Service"))
+                    {
+                        if (UiShared.CtrlPressed())
+                        {
+                            _serverConfigurationManager.DeleteServer(selectedServer);
+                        }
+                    }
+                    UiShared.DrawHelpText("Hold CTRL to delete this service");
+                }
+                ImGui.EndTabItem();
+            }
+            ImGui.EndTabBar();
         }
-        else
+    }
+
+    private void DrawGeneral()
+    {
+        if (!string.Equals(_lastTab, "General", StringComparison.OrdinalIgnoreCase))
         {
-            UiShared.ColorText("You cannot reconnect without a valid account on the service.", ImGuiColors.DalamudYellow);
+            _notesSuccessfullyApplied = null;
         }
 
-        if (marePaused)
+        _lastTab = "General";
+        UiShared.FontText("Notes", _uiShared.UidFont);
+        if (UiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Export all your user notes to clipboard"))
         {
-            _uiShared.DrawServiceSelection(() => { });
+            ImGui.SetClipboardText(UiShared.GetNotes(_pairManager.DirectPairs.UnionBy(_pairManager.GroupPairs.SelectMany(p => p.Value), p => p.UserData, UserDataComparer.Instance).ToList()));
         }
+        if (UiShared.IconTextButton(FontAwesomeIcon.FileImport, "Import notes from clipboard"))
+        {
+            _notesSuccessfullyApplied = null;
+            var notes = ImGui.GetClipboardText();
+            _notesSuccessfullyApplied = _uiShared.ApplyNotesFromClipboard(notes, _overwriteExistingLabels);
+        }
+
+        ImGui.SameLine();
+        ImGui.Checkbox("Overwrite existing notes", ref _overwriteExistingLabels);
+        UiShared.DrawHelpText("If this option is selected all already existing notes for UIDs will be overwritten by the imported notes.");
+        if (_notesSuccessfullyApplied.HasValue && _notesSuccessfullyApplied.Value)
+        {
+            UiShared.ColorTextWrapped("User Notes successfully imported", ImGuiColors.HealerGreen);
+        }
+        else if (_notesSuccessfullyApplied.HasValue && !_notesSuccessfullyApplied.Value)
+        {
+            UiShared.ColorTextWrapped("Attempt to import notes from clipboard failed. Check formatting and try again", ImGuiColors.DalamudRed);
+        }
+
+        var openPopupOnAddition = _configService.Current.OpenPopupOnAdd;
+        var hideInfoMessages = _configService.Current.HideInfoMessages;
+        var disableOptionalPluginWarnings = _configService.Current.DisableOptionalPluginWarnings;
+        var onlineNotifs = _configService.Current.ShowOnlineNotifications;
+        var onlineNotifsPairsOnly = _configService.Current.ShowOnlineNotificationsOnlyForIndividualPairs;
+
+        if (ImGui.Checkbox("Open Notes Popup on user addition", ref openPopupOnAddition))
+        {
+            ApiController.LastAddedUser = null;
+            _configService.Current.OpenPopupOnAdd = openPopupOnAddition;
+            _configService.Save();
+        }
+        UiShared.DrawHelpText("This will open a popup that allows you to set the notes for a user after successfully adding them to your individual pairs.");
 
         ImGui.Separator();
+        UiShared.FontText("Server Messages", _uiShared.UidFont);
+        if (ImGui.Checkbox("Hide Server Info Messages", ref hideInfoMessages))
+        {
+            _configService.Current.HideInfoMessages = hideInfoMessages;
+            _configService.Save();
+        }
+        UiShared.DrawHelpText("Enabling this will not print any \"Info\" labeled messages into the game chat.");
+        if (ImGui.Checkbox("Disable optional plugin warnings", ref disableOptionalPluginWarnings))
+        {
+            _configService.Current.DisableOptionalPluginWarnings = disableOptionalPluginWarnings;
+            _configService.Save();
+        }
+        UiShared.DrawHelpText("Enabling this will not print any \"Warning\" labeled messages for missing optional plugins Heels or Customize+ in the game chat.");
+        if (ImGui.Checkbox("Enable online notifications", ref onlineNotifs))
+        {
+            _configService.Current.ShowOnlineNotifications = onlineNotifs;
+            _configService.Save();
+        }
+        UiShared.DrawHelpText("Enabling this will show a small notification in the bottom right corner when pairs go online.");
+
+        if (!onlineNotifs) ImGui.BeginDisabled();
+        if (ImGui.Checkbox("Notify only for individual pairs", ref onlineNotifsPairsOnly))
+        {
+            _configService.Current.ShowOnlineNotificationsOnlyForIndividualPairs = onlineNotifsPairsOnly;
+            _configService.Save();
+        }
+        UiShared.DrawHelpText("Enabling this will only show online notifications for individual pairs.");
+        if (!onlineNotifs) ImGui.EndDisabled();
+    }
+
+    private bool _deleteFilesPopupModalShown = false;
+    private bool _deleteAccountPopupModalShown = false;
+
+    private void DrawDebug()
+    {
+        _lastTab = "Debug";
 
         UiShared.FontText("Debug", _uiShared.UidFont);
 
@@ -590,9 +512,6 @@ public class SettingsUi : Window, IDisposable
         UiShared.AttachToolTip("Use this when reporting mods being rejected from the server.");
     }
 
-    private string _charaFileSavePath = string.Empty;
-    private string _charaFileLoadPath = string.Empty;
-
     private void DrawBlockedTransfers()
     {
         _lastTab = "BlockedTransfers";
@@ -609,7 +528,7 @@ public class SettingsUi : Window, IDisposable
 
             ImGui.TableHeadersRow();
 
-            foreach (var item in _apiController.ForbiddenTransfers)
+            foreach (var item in ApiController.ForbiddenTransfers)
             {
                 ImGui.TableNextColumn();
                 if (item is UploadFileTransfer transfer)
@@ -630,14 +549,14 @@ public class SettingsUi : Window, IDisposable
     private void DrawCurrentTransfers()
     {
         _lastTab = "Transfers";
-        bool showTransferWindow = _configuration.ShowTransferWindow;
+        bool showTransferWindow = _configService.Current.ShowTransferWindow;
         if (ImGui.Checkbox("Show separate Transfer window while transfers are active", ref showTransferWindow))
         {
-            _configuration.ShowTransferWindow = showTransferWindow;
-            _configuration.Save();
+            _configService.Current.ShowTransferWindow = showTransferWindow;
+            _configService.Save();
         }
 
-        if (_configuration.ShowTransferWindow)
+        if (_configService.Current.ShowTransferWindow)
         {
             ImGui.Indent();
             bool editTransferWindowPosition = _uiShared.EditTrackerPosition;
@@ -651,8 +570,8 @@ public class SettingsUi : Window, IDisposable
         if (ImGui.BeginTable("TransfersTable", 2))
         {
             ImGui.TableSetupColumn(
-                $"Uploads ({UiShared.ByteToString(_apiController.CurrentUploads.Sum(a => a.Transferred))} / {UiShared.ByteToString(_apiController.CurrentUploads.Sum(a => a.Total))})");
-            ImGui.TableSetupColumn($"Downloads ({UiShared.ByteToString(_apiController.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Transferred))} / {UiShared.ByteToString(_apiController.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Total))})");
+                $"Uploads ({UiShared.ByteToString(ApiController.CurrentUploads.Sum(a => a.Transferred))} / {UiShared.ByteToString(ApiController.CurrentUploads.Sum(a => a.Total))})");
+            ImGui.TableSetupColumn($"Downloads ({UiShared.ByteToString(ApiController.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Transferred))} / {UiShared.ByteToString(ApiController.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Total))})");
 
             ImGui.TableHeadersRow();
 
@@ -663,7 +582,7 @@ public class SettingsUi : Window, IDisposable
                 ImGui.TableSetupColumn("Uploaded");
                 ImGui.TableSetupColumn("Size");
                 ImGui.TableHeadersRow();
-                foreach (var transfer in _apiController.CurrentUploads.ToArray())
+                foreach (var transfer in ApiController.CurrentUploads.ToArray())
                 {
                     var color = UiShared.UploadColor((transfer.Transferred, transfer.Total));
                     ImGui.PushStyleColor(ImGuiCol.Text, color);
@@ -687,7 +606,7 @@ public class SettingsUi : Window, IDisposable
                 ImGui.TableSetupColumn("Downloaded");
                 ImGui.TableSetupColumn("Size");
                 ImGui.TableHeadersRow();
-                foreach (var transfer in _apiController.CurrentDownloads.SelectMany(k => k.Value).ToArray())
+                foreach (var transfer in ApiController.CurrentDownloads.SelectMany(k => k.Value).ToArray())
                 {
                     var color = UiShared.UploadColor((transfer.Transferred, transfer.Total));
                     ImGui.PushStyleColor(ImGuiCol.Text, color);
@@ -761,11 +680,11 @@ public class SettingsUi : Window, IDisposable
 
             ImGui.Unindent();
         }
-        bool openInGpose = _configuration.OpenGposeImportOnGposeStart;
+        bool openInGpose = _configService.Current.OpenGposeImportOnGposeStart;
         if (ImGui.Checkbox("Open MCDF import window when GPose loads", ref openInGpose))
         {
-            _configuration.OpenGposeImportOnGposeStart = openInGpose;
-            _configuration.Save();
+            _configService.Current.OpenGposeImportOnGposeStart = openInGpose;
+            _configService.Save();
         }
         UiShared.DrawHelpText("This will automatically open the import menu when loading into Gpose. If unchecked you can open the menu manually with /mare gpose");
 
@@ -788,7 +707,7 @@ public class SettingsUi : Window, IDisposable
             {
                 Task.Run(() =>
                 {
-                    foreach (var file in Directory.GetFiles(_configuration.CacheFolder))
+                    foreach (var file in Directory.GetFiles(_configService.Current.CacheFolder))
                     {
                         File.Delete(file);
                     }

@@ -1,5 +1,4 @@
-﻿using System;
-using Microsoft.AspNetCore.SignalR.Client;
+﻿using Microsoft.AspNetCore.SignalR.Client;
 
 namespace MareSynchronos.WebAPI.Utils;
 

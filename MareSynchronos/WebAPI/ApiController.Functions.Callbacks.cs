@@ -1,21 +1,25 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using MareSynchronos.API;
+﻿using MareSynchronos.API.Data.Enum;
+using MareSynchronos.API.Dto;
+using MareSynchronos.API.Dto.Group;
+using MareSynchronos.API.Dto.User;
 using MareSynchronos.Utils;
-using MareSynchronos.WebAPI.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
 
 namespace MareSynchronos.WebAPI;
 
 public partial class ApiController
 {
-    public ClientPairDto? LastAddedUser { get; set; }
-
-    public void OnUserUpdateClientPairs(Action<ClientPairDto> act)
+    public UserPairDto? LastAddedUser { get; set; }
+    private void ExecuteSafely(Action act)
     {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_UserUpdateClientPairs), act);
+        try
+        {
+            act();
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("Error on executing safely", ex);
+        }
     }
 
     public void OnUpdateSystemInfo(Action<SystemInfoDto> act)
@@ -24,58 +28,10 @@ public partial class ApiController
         _mareHub!.On(nameof(Client_UpdateSystemInfo), act);
     }
 
-    public void OnUserReceiveCharacterData(Action<CharacterCacheDto, string> act)
+    public void OnUserReceiveCharacterData(Action<OnlineUserCharaDataDto> act)
     {
         if (_initialized) return;
         _mareHub!.On(nameof(Client_UserReceiveCharacterData), act);
-    }
-
-    public void OnUserChangePairedPlayer(Action<string, bool> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_UserChangePairedPlayer), act);
-    }
-
-    public void OnGroupChange(Action<GroupDto> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_GroupChange), act);
-    }
-
-    public void OnGroupUserChange(Action<GroupPairDto> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_GroupUserChange), act);
-    }
-
-    public void OnAdminForcedReconnect(Action act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_AdminForcedReconnect), act);
-    }
-
-    public void OnAdminDeleteBannedUser(Action<BannedUserDto> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_AdminDeleteBannedUser), act);
-    }
-
-    public void OnAdminDeleteForbiddenFile(Action<ForbiddenFileDto> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_AdminDeleteForbiddenFile), act);
-    }
-
-    public void OnAdminUpdateOrAddBannedUser(Action<BannedUserDto> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_AdminUpdateOrAddBannedUser), act);
-    }
-
-    public void OnAdminUpdateOrAddForbiddenFile(Action<ForbiddenFileDto> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_AdminUpdateOrAddForbiddenFile), act);
     }
 
     public void OnReceiveServerMessage(Action<MessageSeverity, string> act)
@@ -90,139 +46,206 @@ public partial class ApiController
         _mareHub!.On(nameof(Client_DownloadReady), act);
     }
 
-    public Task Client_UserUpdateClientPairs(ClientPairDto dto)
+    public void OnGroupSendFullInfo(Action<GroupFullInfoDto> act)
     {
-        var entry = PairedClients.SingleOrDefault(e => string.Equals(e.OtherUID, dto.OtherUID, System.StringComparison.Ordinal));
-        if (dto.IsRemoved)
-        {
-            PairedClients.RemoveAll(p => string.Equals(p.OtherUID, dto.OtherUID, System.StringComparison.Ordinal));
-            return Task.CompletedTask;
-        }
-        if (entry == null)
-        {
-            LastAddedUser = dto;
-            PairedClients.Add(dto);
-            return Task.CompletedTask;
-        }
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupSendFullInfo), act);
+    }
 
-        entry.IsPaused = dto.IsPaused;
-        entry.IsPausedFromOthers = dto.IsPausedFromOthers;
-        entry.IsSynced = dto.IsSynced;
+    public Task Client_GroupSendFullInfo(GroupFullInfoDto dto)
+    {
+        Logger.Verbose("Client_GroupSendFullInfo: " + dto);
+        ExecuteSafely(() => _pairManager.AddGroup(dto));
+        return Task.CompletedTask;
+    }
 
+    public void OnGroupSendInfo(Action<GroupInfoDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupSendInfo), act);
+    }
+
+    public Task Client_GroupSendInfo(GroupInfoDto dto)
+    {
+        Logger.Verbose("Client_GroupSendInfo: " + dto);
+        ExecuteSafely(() => _pairManager.SetGroupInfo(dto));
+        return Task.CompletedTask;
+    }
+
+    public void OnGroupDelete(Action<GroupDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupDelete), act);
+    }
+
+    public Task Client_GroupDelete(GroupDto dto)
+    {
+        Logger.Verbose("Client_GroupDelete: " + dto);
+        ExecuteSafely(() => _pairManager.RemoveGroup(dto.Group));
+        return Task.CompletedTask;
+    }
+
+    public void OnGroupPairJoined(Action<GroupPairFullInfoDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupPairJoined), act);
+    }
+
+    public Task Client_GroupPairJoined(GroupPairFullInfoDto dto)
+    {
+        Logger.Verbose("Client_GroupPairJoined: " + dto);
+        ExecuteSafely(() => _pairManager.AddGroupPair(dto));
+        return Task.CompletedTask;
+    }
+
+    public void OnGroupPairLeft(Action<GroupPairDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupPairLeft), act);
+    }
+
+    public Task Client_GroupPairLeft(GroupPairDto dto)
+    {
+        Logger.Verbose("Client_GroupPairLeft: " + dto);
+        ExecuteSafely(() => _pairManager.RemoveGroupPair(dto));
+        return Task.CompletedTask;
+    }
+
+    public void OnGroupChangePermissions(Action<GroupPermissionDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupChangePermissions), act);
+    }
+
+    public Task Client_GroupChangePermissions(GroupPermissionDto dto)
+    {
+        Logger.Verbose("Client_GroupChangePermissions: " + dto);
+        ExecuteSafely(() => _pairManager.SetGroupPermissions(dto));
+        return Task.CompletedTask;
+    }
+
+    public void OnGroupPairChangePermissions(Action<GroupPairUserPermissionDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupPairChangePermissions), act);
+    }
+
+    public Task Client_GroupPairChangePermissions(GroupPairUserPermissionDto dto)
+    {
+        Logger.Verbose("Client_GroupPairChangePermissions: " + dto);
+        ExecuteSafely(() =>
+        {
+            if (string.Equals(dto.UID, UID, StringComparison.Ordinal)) _pairManager.SetGroupUserPermissions(dto);
+            else _pairManager.SetGroupPairUserPermissions(dto);
+        });
+        return Task.CompletedTask;
+    }
+
+    public void OnGroupPairChangeUserInfo(Action<GroupPairUserInfoDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupPairChangeUserInfo), act);
+    }
+
+    public Task Client_GroupPairChangeUserInfo(GroupPairUserInfoDto dto)
+    {
+        Logger.Verbose("Client_GroupPairChangeUserInfo: " + dto);
+        ExecuteSafely(() =>
+        {
+            if (string.Equals(dto.UID, UID, StringComparison.Ordinal)) _pairManager.SetGroupStatusInfo(dto);
+            else _pairManager.SetGroupPairStatusInfo(dto);
+        });
+        return Task.CompletedTask;
+    }
+
+    public Task Client_UserReceiveCharacterData(OnlineUserCharaDataDto dto)
+    {
+        Logger.Verbose("Client_UserReceiveCharacterData: " + dto.User);
+        ExecuteSafely(() => _pairManager.ReceiveCharaData(dto));
+        return Task.CompletedTask;
+    }
+
+    public void OnUserAddClientPair(Action<UserPairDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_UserAddClientPair), act);
+    }
+
+    public Task Client_UserAddClientPair(UserPairDto dto)
+    {
+        Logger.Debug($"Client_UserAddClientPair: " + dto);
+        ExecuteSafely(() => _pairManager.AddUserPair(dto));
+        return Task.CompletedTask;
+    }
+
+    public void OnUserRemoveClientPair(Action<UserDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_UserRemoveClientPair), act);
+    }
+
+    public Task Client_UserRemoveClientPair(UserDto dto)
+    {
+        Logger.Debug($"Client_UserRemoveClientPair: " + dto);
+        ExecuteSafely(() => _pairManager.RemoveUserPair(dto));
+        return Task.CompletedTask;
+    }
+
+    public void OnUserSendOffline(Action<UserDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_UserSendOffline), act);
+    }
+
+    public Task Client_UserSendOffline(UserDto dto)
+    {
+        Logger.Debug($"Client_UserSendOffline: {dto}");
+        ExecuteSafely(() => _pairManager.MarkPairOffline(dto.User));
+        return Task.CompletedTask;
+    }
+
+    public void OnUserSendOnline(Action<OnlineUserIdentDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_UserSendOnline), act);
+    }
+
+    public Task Client_UserSendOnline(OnlineUserIdentDto dto)
+    {
+        Logger.Debug($"Client_UserSendOnline: {dto}");
+        ExecuteSafely(() => _pairManager.MarkPairOnline(dto, this));
+        return Task.CompletedTask;
+    }
+
+    public void OnUserUpdateOtherPairPermissions(Action<UserPermissionsDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_UserUpdateOtherPairPermissions), act);
+    }
+
+    public Task Client_UserUpdateOtherPairPermissions(UserPermissionsDto dto)
+    {
+        Logger.Debug($"Client_UserUpdateOtherPairPermissions: {dto}");
+        ExecuteSafely(() => _pairManager.UpdatePairPermissions(dto));
+        return Task.CompletedTask;
+    }
+
+    public void OnUserUpdateSelfPairPermissions(Action<UserPermissionsDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_UserUpdateSelfPairPermissions), act);
+    }
+
+    public Task Client_UserUpdateSelfPairPermissions(UserPermissionsDto dto)
+    {
+        Logger.Debug($"Client_UserUpdateSelfPairPermissions: {dto}");
+        ExecuteSafely(() => _pairManager.UpdateSelfPairPermissions(dto));
         return Task.CompletedTask;
     }
 
     public Task Client_UpdateSystemInfo(SystemInfoDto systemInfo)
     {
         SystemInfoDto = systemInfo;
-        return Task.CompletedTask;
-    }
-
-    public Task Client_UserReceiveCharacterData(CharacterCacheDto clientPairDto, string characterIdent)
-    {
-        Logger.Verbose("Received DTO for " + characterIdent);
-        CharacterReceived?.Invoke(null, new CharacterReceivedEventArgs(characterIdent, clientPairDto));
-        return Task.CompletedTask;
-    }
-
-    public Task Client_UserChangePairedPlayer(string characterIdent, bool isOnline)
-    {
-        if (isOnline) PairedClientOnline?.Invoke(characterIdent);
-        else PairedClientOffline?.Invoke(characterIdent);
-        return Task.CompletedTask;
-    }
-
-    public async Task Client_GroupChange(GroupDto dto)
-    {
-        if (dto.IsDeleted.GetValueOrDefault(false))
-        {
-            Groups.RemoveAll(g => string.Equals(g.GID, dto.GID, System.StringComparison.Ordinal));
-            GroupPairedClients.RemoveAll(g => string.Equals(g.GroupGID, dto.GID, System.StringComparison.Ordinal));
-            return;
-        }
-
-        var existingGroup = Groups.FirstOrDefault(g => string.Equals(g.GID, dto.GID, System.StringComparison.Ordinal));
-        if (existingGroup == null)
-        {
-            Groups.Add(dto);
-            GroupPairedClients.AddRange(await GroupsGetUsersInGroup(dto.GID).ConfigureAwait(false));
-            return;
-        }
-
-        existingGroup.OwnedBy = dto.OwnedBy ?? existingGroup.OwnedBy;
-        existingGroup.InvitesEnabled = dto.InvitesEnabled ?? existingGroup.InvitesEnabled;
-        existingGroup.IsPaused = dto.IsPaused ?? existingGroup.IsPaused;
-        existingGroup.IsModerator = dto.IsModerator ?? existingGroup.IsModerator;
-    }
-
-    public Task Client_GroupUserChange(GroupPairDto dto)
-    {
-        if (dto.IsRemoved.GetValueOrDefault(false))
-        {
-            GroupPairedClients.RemoveAll(g => string.Equals(g.GroupGID, dto.GroupGID, System.StringComparison.Ordinal) && string.Equals(g.UserUID, dto.UserUID, System.StringComparison.Ordinal));
-            return Task.CompletedTask;
-        }
-
-        var existingUser = GroupPairedClients.FirstOrDefault(f => string.Equals(f.GroupGID, dto.GroupGID, System.StringComparison.Ordinal) && string.Equals(f.UserUID, dto.UserUID, System.StringComparison.Ordinal));
-        if (existingUser == null)
-        {
-            GroupPairedClients.Add(dto);
-            return Task.CompletedTask;
-        }
-
-        existingUser.IsPaused = dto.IsPaused ?? existingUser.IsPaused;
-        existingUser.UserAlias = dto.UserAlias ?? existingUser.UserAlias;
-        existingUser.IsPinned = dto.IsPinned ?? existingUser.IsPinned;
-        existingUser.IsModerator = dto.IsModerator ?? existingUser.IsModerator;
-
-        return Task.CompletedTask;
-    }
-
-    public Task Client_AdminForcedReconnect()
-    {
-        _ = CreateConnections();
-        return Task.CompletedTask;
-    }
-
-    public Task Client_AdminDeleteBannedUser(BannedUserDto dto)
-    {
-        AdminBannedUsers.RemoveAll(a => string.Equals(a.CharacterHash, dto.CharacterHash, System.StringComparison.Ordinal));
-        return Task.CompletedTask;
-    }
-
-    public Task Client_AdminDeleteForbiddenFile(ForbiddenFileDto dto)
-    {
-        AdminForbiddenFiles.RemoveAll(f => string.Equals(f.Hash, dto.Hash, System.StringComparison.Ordinal));
-        return Task.CompletedTask;
-    }
-
-    public Task Client_AdminUpdateOrAddBannedUser(BannedUserDto dto)
-    {
-        var user = AdminBannedUsers.SingleOrDefault(b => string.Equals(b.CharacterHash, dto.CharacterHash, System.StringComparison.Ordinal));
-        if (user == null)
-        {
-            AdminBannedUsers.Add(dto);
-        }
-        else
-        {
-            user.Reason = dto.Reason;
-        }
-
-        return Task.CompletedTask;
-    }
-
-    public Task Client_AdminUpdateOrAddForbiddenFile(ForbiddenFileDto dto)
-    {
-        var user = AdminForbiddenFiles.SingleOrDefault(b => string.Equals(b.Hash, dto.Hash, System.StringComparison.Ordinal));
-        if (user == null)
-        {
-            AdminForbiddenFiles.Add(dto);
-        }
-        else
-        {
-            user.ForbiddenBy = dto.ForbiddenBy;
-        }
-
         return Task.CompletedTask;
     }
 
@@ -240,7 +263,7 @@ public partial class ApiController
                 break;
             case MessageSeverity.Information:
                 Logger.Info(message);
-                if (!_pluginConfiguration.HideInfoMessages)
+                if (_configService.Current.HideInfoMessages)
                 {
                     _dalamudUtil.PrintInfoChat(message);
                 }

@@ -1,9 +1,7 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System.Numerics;
 using Dalamud.Interface;
-using FFXIVClientStructs.FFXIV.Common.Math;
 using ImGuiNET;
-using MareSynchronos.API;
+using MareSynchronos.Models;
 using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI.Components;
@@ -12,16 +10,14 @@ public class SelectPairForGroupUi
 {
     private bool _show = false;
     private bool _opened = false;
-    private HashSet<string> _peopleInGroup = new(System.StringComparer.Ordinal);
+    private HashSet<string> _peopleInGroup = new(StringComparer.Ordinal);
     private string _tag = string.Empty;
     private readonly TagHandler _tagHandler;
-    private readonly Configuration _configuration;
     private string _filter = string.Empty;
 
-    public SelectPairForGroupUi(TagHandler tagHandler, Configuration configuration)
+    public SelectPairForGroupUi(TagHandler tagHandler)
     {
         _tagHandler = tagHandler;
-        _configuration = configuration;
     }
 
     public void Open(string tag)
@@ -31,7 +27,7 @@ public class SelectPairForGroupUi
         _show = true;
     }
 
-    public void Draw(List<ClientPairDto> pairs, Dictionary<string, bool> showUidForEntry)
+    public void Draw(List<Pair> pairs, Dictionary<string, bool> showUidForEntry)
     {
         var workHeight = ImGui.GetMainViewport().WorkSize.Y / ImGuiHelpers.GlobalScale;
         var minSize = new Vector2(300, workHeight < 400 ? workHeight : 400) * ImGuiHelpers.GlobalScale;
@@ -57,21 +53,21 @@ public class SelectPairForGroupUi
         {
             UiShared.FontText($"Select users for group {_tag}", UiBuilder.DefaultFont);
             ImGui.InputTextWithHint("##filter", "Filter", ref _filter, 255, ImGuiInputTextFlags.None);
-            foreach (var item in pairs.OrderBy(p => PairName(showUidForEntry, p.OtherUID, p.VanityUID), System.StringComparer.OrdinalIgnoreCase)
-                .Where(p => string.IsNullOrEmpty(_filter) || PairName(showUidForEntry, p.OtherUID, p.VanityUID).Contains(_filter, System.StringComparison.OrdinalIgnoreCase)).ToList())
+            foreach (var item in pairs.OrderBy(p => PairName(showUidForEntry, p), StringComparer.OrdinalIgnoreCase)
+                .Where(p => string.IsNullOrEmpty(_filter) || PairName(showUidForEntry, p).Contains(_filter, StringComparison.OrdinalIgnoreCase)).ToList())
             {
-                var isInGroup = _peopleInGroup.Contains(item.OtherUID);
-                if (ImGui.Checkbox(PairName(showUidForEntry, item.OtherUID, item.VanityUID), ref isInGroup))
+                var isInGroup = _peopleInGroup.Contains(item.UserData.UID);
+                if (ImGui.Checkbox(PairName(showUidForEntry, item), ref isInGroup))
                 {
                     if (isInGroup)
                     {
-                        _tagHandler.AddTagToPairedUid(item, _tag);
-                        _peopleInGroup.Add(item.OtherUID);
+                        _tagHandler.AddTagToPairedUid(item.UserPair!, _tag);
+                        _peopleInGroup.Add(item.UserData.UID);
                     }
                     else
                     {
-                        _tagHandler.RemoveTagFromPairedUid(item, _tag);
-                        _peopleInGroup.Remove(item.OtherUID);
+                        _tagHandler.RemoveTagFromPairedUid(item.UserPair!, _tag);
+                        _peopleInGroup.Remove(item.UserData.UID);
                     }
                 }
             }
@@ -84,13 +80,13 @@ public class SelectPairForGroupUi
         }
     }
 
-    private string PairName(Dictionary<string, bool> showUidForEntry, string otherUid, string vanityUid)
+    private string PairName(Dictionary<string, bool> showUidForEntry, Pair pair)
     {
-        showUidForEntry.TryGetValue(otherUid, out var showUidInsteadOfName);
-        _configuration.GetCurrentServerUidComments().TryGetValue(otherUid, out var playerText);
+        showUidForEntry.TryGetValue(pair.UserData.UID, out var showUidInsteadOfName);
+        var playerText = pair.GetNote();
         if (showUidInsteadOfName || string.IsNullOrEmpty(playerText))
         {
-            playerText = string.IsNullOrEmpty(vanityUid) ? otherUid : vanityUid;
+            playerText = pair.UserData.AliasOrUID;
         }
         return playerText;
     }

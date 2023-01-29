@@ -1,19 +1,14 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
+﻿using System.Collections.Concurrent;
 using System.Net;
-using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 using Dalamud.Utility;
 using LZ4;
-using MareSynchronos.API;
+using MareSynchronos.API.Data;
+using MareSynchronos.API.Dto.Files;
+using MareSynchronos.API.Routes;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -188,7 +183,7 @@ public partial class ApiController
 
     public int GetDownloadId() => _downloadId++;
 
-    public async Task DownloadFiles(int currentDownloadId, List<FileReplacementDto> fileReplacementDto, CancellationToken ct)
+    public async Task DownloadFiles(int currentDownloadId, List<FileReplacementData> fileReplacementDto, CancellationToken ct)
     {
         DownloadStarted?.Invoke();
         try
@@ -213,7 +208,7 @@ public partial class ApiController
 
     private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage, CancellationToken? ct = null)
     {
-        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", this.Authorization);
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", this._serverManager.GetToken());
 
         if (requestMessage.Content != null)
         {
@@ -224,7 +219,7 @@ public partial class ApiController
             Logger.Debug("Sending " + requestMessage.Method + " to " + requestMessage.RequestUri);
         }
 
-        if(ct != null)
+        if (ct != null)
             return await _httpClient.SendAsync(requestMessage, ct.Value).ConfigureAwait(false);
         return await _httpClient.SendAsync(requestMessage).ConfigureAwait(false);
     }
@@ -236,12 +231,12 @@ public partial class ApiController
         return await SendRequestInternalAsync(requestMessage, ct).ConfigureAwait(false);
     }
 
-    private async Task DownloadFilesInternal(int currentDownloadId, List<FileReplacementDto> fileReplacementDto, CancellationToken ct)
+    private async Task DownloadFilesInternal(int currentDownloadId, List<FileReplacementData> fileReplacement, CancellationToken ct)
     {
         Logger.Debug("Downloading files (Download ID " + currentDownloadId + ")");
 
         List<DownloadFileDto> downloadFileInfoFromService = new();
-        downloadFileInfoFromService.AddRange(await FilesGetSizes(fileReplacementDto.Select(f => f.Hash).ToList()).ConfigureAwait(false));
+        downloadFileInfoFromService.AddRange(await FilesGetSizes(fileReplacement.Select(f => f.Hash).ToList()).ConfigureAwait(false));
 
         Logger.Debug("Files with size 0 or less: " + string.Join(", ", downloadFileInfoFromService.Where(f => f.Size <= 0).Select(f => f.Hash)));
 
@@ -261,7 +256,7 @@ public partial class ApiController
         await Parallel.ForEachAsync(downloadGroups, new ParallelOptions()
         {
             MaxDegreeOfParallelism = downloadGroups.Count(),
-            CancellationToken = ct
+            CancellationToken = ct,
         },
         async (fileGroup, token) =>
         {
@@ -277,7 +272,7 @@ public partial class ApiController
                     file.Transferred += bytesDownloaded;
                 });
 
-                var tempPath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash + ".tmp");
+                var tempPath = Path.Combine(_configService.Current.CacheFolder, file.Hash + ".tmp");
                 try
                 {
                     await DownloadFileHttpClient(file, tempPath, progress, token).ConfigureAwait(false);
@@ -298,7 +293,7 @@ public partial class ApiController
                 var tempFileData = await File.ReadAllBytesAsync(tempPath, token).ConfigureAwait(false);
                 var extratokenedFile = LZ4Codec.Unwrap(tempFileData);
                 File.Delete(tempPath);
-                var filePath = Path.Combine(_pluginConfiguration.CacheFolder, file.Hash);
+                var filePath = Path.Combine(_configService.Current.CacheFolder, file.Hash);
                 await File.WriteAllBytesAsync(filePath, extratokenedFile, token).ConfigureAwait(false);
                 var fi = new FileInfo(filePath);
                 Func<DateTime> RandomDayInThePast()
@@ -329,10 +324,10 @@ public partial class ApiController
         CancelDownload(currentDownloadId);
     }
 
-    public async Task PushCharacterData(CharacterCacheDto character, List<string> visibleCharacterIds)
+    public async Task PushCharacterData(API.Data.CharacterData character, List<UserData> visibleCharacters)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", StringComparison.Ordinal)) return;
-        Logger.Debug("Sending Character data to service " + ApiUri);
+        if (!IsConnected) return;
+        Logger.Debug("Sending Character data to service " + _serverManager.CurrentApiUrl);
 
         CancelUpload();
         _uploadCancellationTokenSource = new CancellationTokenSource();
@@ -367,7 +362,7 @@ public partial class ApiController
                 {
                     CurrentUploads.Add(new UploadFileTransfer(file)
                     {
-                        Total = new FileInfo(_fileDbManager.GetFileCacheByHash(file.Hash)!.ResolvedFilepath).Length
+                        Total = new FileInfo(_fileDbManager.GetFileCacheByHash(file.Hash)!.ResolvedFilepath).Length,
                     });
                 }
                 catch (Exception ex)
@@ -383,7 +378,7 @@ public partial class ApiController
                 {
                     ForbiddenTransfers.Add(new UploadFileTransfer(file)
                     {
-                        LocalFile = _fileDbManager.GetFileCacheByHash(file.Hash)?.ResolvedFilepath ?? string.Empty
+                        LocalFile = _fileDbManager.GetFileCacheByHash(file.Hash)?.ResolvedFilepath ?? string.Empty,
                     });
                 }
             }
@@ -431,7 +426,7 @@ public partial class ApiController
 
         if (!uploadToken.IsCancellationRequested)
         {
-            Logger.Info("Pushing character data for " + character.GetHashCode() + " to " + string.Join(", ", visibleCharacterIds));
+            Logger.Info("Pushing character data for " + character.GetHashCode() + " to " + string.Join(", ", visibleCharacters.Select(c => c.AliasOrUID)));
             StringBuilder sb = new();
             foreach (var item in character.FileReplacements)
             {
@@ -442,14 +437,14 @@ public partial class ApiController
                 sb.AppendLine($"GlamourerData for {item.Key}: {!string.IsNullOrEmpty(item.Value)}");
             }
             Logger.Debug("Chara data contained: " + Environment.NewLine + sb.ToString());
-            await UserPushData(character, visibleCharacterIds).ConfigureAwait(false);
+            await UserPushData(new(visibleCharacters, character)).ConfigureAwait(false);
         }
         else
         {
             Logger.Warn("=== Upload operation was cancelled ===");
         }
 
-        Logger.Verbose("Upload complete for " + character.GetHashCode());
+        Logger.Verbose("Upload complete for " + character.DataHash);
         _uploadCancellationTokenSource = null;
     }
 

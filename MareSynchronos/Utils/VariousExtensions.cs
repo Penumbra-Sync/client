@@ -1,10 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
+﻿using System.Globalization;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
+using System.Runtime.Serialization.Formatters.Binary;
+using System.Runtime.Serialization;
+using Newtonsoft.Json;
 
 namespace MareSynchronos.Utils;
 
@@ -27,5 +25,10 @@ public static class VariousExtensions
         }
 
         return default;
+    }
+
+    public static T DeepClone<T>(this T obj)
+    {
+        return JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(obj))!;
     }
 }

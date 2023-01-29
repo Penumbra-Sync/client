@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using MareSynchronos.API;
+﻿using MareSynchronos.API.Dto.User;
 using MareSynchronos.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
 
@@ -11,18 +8,17 @@ public partial class ApiController
 {
     public async Task UserDelete()
     {
-        _pluginConfiguration.ClientSecret.Remove(ApiUri);
-        _pluginConfiguration.Save();
+        CheckConnection();
         await FilesDeleteAll().ConfigureAwait(false);
         await _mareHub!.SendAsync(nameof(UserDelete)).ConfigureAwait(false);
         await CreateConnections().ConfigureAwait(false);
     }
 
-    public async Task UserPushData(CharacterCacheDto characterCache, List<string> visibleCharacterIds)
+    public async Task UserPushData(UserCharaDataMessageDto dto)
     {
         try
         {
-            await _mareHub!.InvokeAsync(nameof(UserPushData), characterCache, visibleCharacterIds).ConfigureAwait(false);
+            await _mareHub!.InvokeAsync(nameof(UserPushData), dto).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -30,33 +26,31 @@ public partial class ApiController
         }
     }
 
-    public async Task<List<ClientPairDto>> UserGetPairedClients()
+    public async Task<List<UserPairDto>> UserGetPairedClients()
     {
-        return await _mareHub!.InvokeAsync<List<ClientPairDto>>(nameof(UserGetPairedClients)).ConfigureAwait(false);
+        return await _mareHub!.InvokeAsync<List<UserPairDto>>(nameof(UserGetPairedClients)).ConfigureAwait(false);
     }
 
-    public async Task<List<string>> UserGetOnlineCharacters()
+    public async Task<List<OnlineUserIdentDto>> UserGetOnlinePairs()
     {
-        return await _mareHub!.InvokeAsync<List<string>>(nameof(UserGetOnlineCharacters)).ConfigureAwait(false);
+        return await _mareHub!.InvokeAsync<List<OnlineUserIdentDto>>(nameof(UserGetOnlinePairs)).ConfigureAwait(false);
     }
 
-    public async Task UserAddPair(string uid)
+    public async Task UserSetPairPermissions(UserPermissionsDto dto)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(nameof(UserAddPair), uid.Trim()).ConfigureAwait(false);
+        Logger.Verbose("Sending UserSetPairPermissions: " + dto);
+        await _mareHub!.SendAsync(nameof(UserSetPairPermissions), dto).ConfigureAwait(false);
     }
 
-    public async Task UserChangePairPauseStatus(string uid, bool paused)
+    public async Task UserAddPair(UserDto dto)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(nameof(UserChangePairPauseStatus), uid, paused).ConfigureAwait(false);
+        if (!IsConnected) return;
+        await _mareHub!.SendAsync(nameof(UserAddPair), dto).ConfigureAwait(false);
     }
 
-    public async Task UserRemovePair(string uid)
+    public async Task UserRemovePair(UserDto dto)
     {
-        if (!IsConnected || string.Equals(SecretKey, "-", System.StringComparison.Ordinal)) return;
-        await _mareHub!.SendAsync(nameof(UserRemovePair), uid).ConfigureAwait(false);
+        if (!IsConnected) return;
+        await _mareHub!.SendAsync(nameof(UserRemovePair), dto).ConfigureAwait(false);
     }
 }
-
-

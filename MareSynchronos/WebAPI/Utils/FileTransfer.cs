@@ -1,5 +1,4 @@
-﻿using MareSynchronos.API;
-using System;
+﻿using MareSynchronos.API.Dto.Files;
 
 namespace MareSynchronos.WebAPI.Utils;
 
@@ -25,25 +24,4 @@ public abstract class FileTransfer
     {
         return Hash;
     }
-}
-
-public class UploadFileTransfer : FileTransfer
-{
-    public UploadFileTransfer(UploadFileDto dto) : base(dto) { }
-    public override long Total { get; set; }
-    public string LocalFile { get; set; } = string.Empty;
-}
-
-public class DownloadFileTransfer : FileTransfer
-{
-    private DownloadFileDto Dto => (DownloadFileDto)TransferDto;
-    public DownloadFileTransfer(DownloadFileDto dto) : base(dto) { }
-    public Uri DownloadUri => new(Dto.Url);
-    public override long Total
-    {
-        set { }
-        get => Dto.Size;
-    }
-
-    public override bool CanBeTransferred => Dto.FileExists && !Dto.IsForbidden && Dto.Size > 0;
 }

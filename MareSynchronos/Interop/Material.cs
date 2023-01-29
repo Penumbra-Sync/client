@@ -1,18 +1,10 @@
 using System.Runtime.InteropServices;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 
-namespace Penumbra.Interop.Structs;
+namespace MareSynchronos.Interop;
 
-[StructLayout( LayoutKind.Explicit )]
+[StructLayout(LayoutKind.Explicit)]
 public unsafe struct Material
 {
-    [FieldOffset( 0x10 )]
+    [FieldOffset(0x10)]
     public ResourceHandle* ResourceHandle;
-}
-
-[StructLayout( LayoutKind.Explicit )]
-public unsafe struct MaterialData
-{
-    [FieldOffset( 0x0 )]
-    public byte* Data;
 }
