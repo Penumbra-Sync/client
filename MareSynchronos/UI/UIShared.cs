@@ -205,7 +205,7 @@ public partial class UiShared : IDisposable
         ImGui.SameLine();
         ImGui.TextColored(customizeColor, customizeExists ? "Available" : "Unavailable");
         ImGui.SameLine();
-        ImGui.Text("PalettePlus+:");
+        ImGui.Text("Palette+:");
         ImGui.SameLine();
         ImGui.TextColored(paletteColor, paletteExists ? "Available" : "Unavailable");
 

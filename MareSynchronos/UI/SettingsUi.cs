@@ -252,31 +252,13 @@ public class SettingsUi : Window, IDisposable
                 {
                     UiShared.DrawWithID("selectedChara" + i, () =>
                     {
-                        var charaName = item.CharacterName;
-                        if (ImGui.InputText("Character Name", ref charaName, 64))
-                        {
-                            item.CharacterName = charaName;
-                            _serverConfigurationManager.Save();
-                        }
                         var worldIdx = (ushort)item.WorldId;
                         var data = _uiShared.WorldData.OrderBy(u => u.Value, StringComparer.Ordinal).ToDictionary(k => k.Key, k => k.Value);
                         if (!data.TryGetValue(worldIdx, out string? worldPreview))
                         {
                             worldPreview = data.First().Value;
                         }
-                        if (ImGui.BeginCombo("World", worldPreview))
-                        {
-                            foreach (var world in data)
-                            {
-                                bool isSelected = worldIdx == world.Key;
-                                if (ImGui.Selectable(world.Value, isSelected))
-                                {
-                                    item.WorldId = world.Key;
-                                    _serverConfigurationManager.Save();
-                                }
-                            }
-                            ImGui.EndCombo();
-                        }
+
                         var secretKeyIdx = item.SecretKeyIdx;
                         var keys = selectedServer.SecretKeys;
                         if (!keys.TryGetValue(secretKeyIdx, out var secretKey))
@@ -284,29 +266,53 @@ public class SettingsUi : Window, IDisposable
                             secretKey = new();
                         }
                         var friendlyName = secretKey.FriendlyName;
-                        if (ImGui.BeginCombo("Secret Key", friendlyName))
+
+                        if (ImGui.TreeNode($"chara", $"Character: {item.CharacterName}, World: {worldPreview}, Secret Key: {friendlyName}"))
                         {
-                            foreach (var kvp in keys)
+                            var charaName = item.CharacterName;
+                            if (ImGui.InputText("Character Name", ref charaName, 64))
                             {
-                                bool isSelected = kvp.Key == secretKeyIdx;
-                                if (ImGui.Selectable(kvp.Value.FriendlyName, isSelected))
-                                {
-                                    item.SecretKeyIdx = kvp.Key;
-                                    _serverConfigurationManager.Save();
-                                }
+                                item.CharacterName = charaName;
+                                _serverConfigurationManager.Save();
                             }
-                            ImGui.EndCombo();
-                        }
 
-                        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Character"))
-                        {
-                            if (UiShared.CtrlPressed())
-                                _serverConfigurationManager.RemoveCharacterFromServer(idx, item);
-                        }
-                        UiShared.AttachToolTip("Hold CTRL to delete this entry.");
+                            if (ImGui.BeginCombo("World", worldPreview))
+                            {
+                                foreach (var world in data)
+                                {
+                                    bool isSelected = worldIdx == world.Key;
+                                    if (ImGui.Selectable(world.Value, isSelected))
+                                    {
+                                        item.WorldId = world.Key;
+                                        _serverConfigurationManager.Save();
+                                    }
+                                }
+                                ImGui.EndCombo();
+                            }
 
-                        if (item != selectedServer.Authentications.LastOrDefault())
-                            ImGui.Separator();
+                            if (ImGui.BeginCombo("Secret Key", friendlyName))
+                            {
+                                foreach (var kvp in keys)
+                                {
+                                    bool isSelected = kvp.Key == secretKeyIdx;
+                                    if (ImGui.Selectable(kvp.Value.FriendlyName, isSelected))
+                                    {
+                                        item.SecretKeyIdx = kvp.Key;
+                                        _serverConfigurationManager.Save();
+                                    }
+                                }
+                                ImGui.EndCombo();
+                            }
+
+                            if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Character"))
+                            {
+                                if (UiShared.CtrlPressed())
+                                    _serverConfigurationManager.RemoveCharacterFromServer(idx, item);
+                            }
+                            UiShared.AttachToolTip("Hold CTRL to delete this entry.");
+
+                            ImGui.TreePop();
+                        }
                     });
 
                     i++;
