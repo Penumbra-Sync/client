@@ -14,6 +14,7 @@ using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.Managers;
 using MareSynchronos.Models;
 using MareSynchronos.API.Data.Comparer;
+using MareSynchronos.MareConfiguration;
 
 namespace MareSynchronos.UI
 {
@@ -24,6 +25,7 @@ namespace MareSynchronos.UI
         private ApiController ApiController => _uiShared.ApiController;
         private readonly PairManager _pairManager;
         private readonly ServerConfigurationManager _serverConfigurationManager;
+        private readonly ConfigurationService _configService;
         private readonly Dictionary<string, bool> _showGidForEntry = new(StringComparer.Ordinal);
         private string _editGroupEntry = string.Empty;
         private string _editGroupComment = string.Empty;
@@ -51,12 +53,13 @@ namespace MareSynchronos.UI
         private bool _modalChangePwOpened;
         private int _bulkInviteCount = 10;
 
-        public GroupPanel(CompactUi mainUi, UiShared uiShared, PairManager pairManager, ServerConfigurationManager serverConfigurationManager)
+        public GroupPanel(CompactUi mainUi, UiShared uiShared, PairManager pairManager, ServerConfigurationManager serverConfigurationManager, ConfigurationService configurationService)
         {
             _mainUi = mainUi;
             _uiShared = uiShared;
             _pairManager = pairManager;
             _serverConfigurationManager = serverConfigurationManager;
+            _configService = configurationService;
         }
 
         public void DrawSyncshells()
@@ -831,6 +834,12 @@ namespace MareSynchronos.UI
             else
             {
                 playerText = entryUID;
+            }
+
+            if (_configService.Current.ShowCharacterNameInsteadOfNotesForVisible && pair.IsVisible && !showUidInsteadOfName)
+            {
+                playerText = pair.PlayerName;
+                textIsUid = false;
             }
 
             bool plusButtonShown = !_pairManager.DirectPairs.Any(p => string.Equals(p.UserData.UID, entry.UID, StringComparison.Ordinal));

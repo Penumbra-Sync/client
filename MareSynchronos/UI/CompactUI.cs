@@ -90,7 +90,7 @@ public class CompactUi : Window, IDisposable
         _serverManager = serverManager;
         _tagHandler = new(_serverManager);
 
-        _groupPanel = new(this, uiShared, _pairManager, _serverManager);
+        _groupPanel = new(this, uiShared, _pairManager, _serverManager, _configService);
         _selectGroupForPairUi = new(_tagHandler);
         _selectPairsForGroupUi = new(_tagHandler);
         _pairGroupsUi = new(_tagHandler, DrawPairedClient, apiController, _selectPairsForGroupUi);
