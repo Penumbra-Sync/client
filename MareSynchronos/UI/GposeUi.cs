@@ -5,6 +5,7 @@ using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using MareSynchronos.Export;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.Mediator;
 using MareSynchronos.Utils;
 
 namespace MareSynchronos.UI;
@@ -16,17 +17,20 @@ public class GposeUi : Window, IDisposable
     private readonly DalamudUtil _dalamudUtil;
     private readonly FileDialogManager _fileDialogManager;
     private readonly ConfigurationService _configService;
+    private readonly MareMediator _mediator;
 
     public GposeUi(WindowSystem windowSystem, MareCharaFileManager mareCharaFileManager,
-        DalamudUtil dalamudUtil, FileDialogManager fileDialogManager, ConfigurationService configService) : base("Mare Synchronos Gpose Import UI###MareSynchronosGposeUI")
+        DalamudUtil dalamudUtil, FileDialogManager fileDialogManager, ConfigurationService configService,
+        MareMediator mediator) : base("Mare Synchronos Gpose Import UI###MareSynchronosGposeUI")
     {
         _windowSystem = windowSystem;
         _mareCharaFileManager = mareCharaFileManager;
         _dalamudUtil = dalamudUtil;
         _fileDialogManager = fileDialogManager;
         _configService = configService;
-        _dalamudUtil.GposeStart += StartGpose;
-        _dalamudUtil.GposeEnd += EndGpose;
+        _mediator = mediator;
+        _mediator.Subscribe<GposeStartMessage>(this, (_) => StartGpose());
+        _mediator.Subscribe<GposeEndMessage>(this, (_) => EndGpose());
         IsOpen = _dalamudUtil.IsInGpose;
         Flags = ImGuiWindowFlags.AlwaysAutoResize;
         _windowSystem.AddWindow(this);
@@ -45,8 +49,6 @@ public class GposeUi : Window, IDisposable
 
     public void Dispose()
     {
-        _dalamudUtil.GposeStart -= StartGpose;
-        _dalamudUtil.GposeEnd -= EndGpose;
         _windowSystem.RemoveWindow(this);
     }
 

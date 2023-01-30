@@ -9,7 +9,7 @@ using MareSynchronos.FileCache;
 using Dalamud.Interface;
 using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.Delegates;
+using MareSynchronos.Mediator;
 
 namespace MareSynchronos.UI;
 
@@ -19,10 +19,9 @@ internal class IntroUi : Window, IDisposable
     private readonly ConfigurationService _configService;
     private readonly PeriodicFileScanner _fileCacheManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
+    private readonly MareMediator _mareMediator;
     private readonly WindowSystem _windowSystem;
     private bool _readFirstPage;
-
-    public event VoidDelegate? SwitchToMainUi;
 
     private string[]? _tosParagraphs;
 
@@ -40,7 +39,7 @@ internal class IntroUi : Window, IDisposable
     }
 
     public IntroUi(WindowSystem windowSystem, UiShared uiShared, ConfigurationService configService,
-        PeriodicFileScanner fileCacheManager, ServerConfigurationManager serverConfigurationManager) : base("Mare Synchronos Setup")
+        PeriodicFileScanner fileCacheManager, ServerConfigurationManager serverConfigurationManager, MareMediator mareMediator) : base("Mare Synchronos Setup")
     {
         Logger.Verbose("Creating " + nameof(IntroUi));
 
@@ -48,6 +47,7 @@ internal class IntroUi : Window, IDisposable
         _configService = configService;
         _fileCacheManager = fileCacheManager;
         _serverConfigurationManager = serverConfigurationManager;
+        _mareMediator = mareMediator;
         _windowSystem = windowSystem;
         IsOpen = false;
 
@@ -58,6 +58,9 @@ internal class IntroUi : Window, IDisposable
         };
 
         GetToSLocalization();
+
+        _mareMediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = false);
+        _mareMediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = true);
 
         _windowSystem.AddWindow(this);
     }
@@ -239,7 +242,7 @@ internal class IntroUi : Window, IDisposable
         }
         else
         {
-            SwitchToMainUi?.Invoke();
+            _mareMediator.Publish(new SwitchToMainUiMessage());
             IsOpen = false;
         }
     }

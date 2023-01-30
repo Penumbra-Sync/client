@@ -8,12 +8,10 @@ using Dalamud.Game.Text.SeStringHandling;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using Lumina.Excel.GeneratedSheets;
-using MareSynchronos.Delegates;
+using MareSynchronos.Mediator;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
-
 namespace MareSynchronos.Utils;
-
 
 public class DalamudUtil : IDisposable
 {
@@ -23,18 +21,9 @@ public class DalamudUtil : IDisposable
     private readonly Dalamud.Game.ClientState.Conditions.Condition _condition;
     private readonly ChatGui _chatGui;
     private readonly Dalamud.Data.DataManager _gameData;
+    private readonly MareMediator _mediator;
 
-    public event VoidDelegate? LogIn;
-    public event VoidDelegate? LogOut;
-    public event VoidDelegate? FrameworkUpdate;
-    public event VoidDelegate? ClassJobChanged;
     private uint? _classJobId = 0;
-    public event VoidDelegate? DelayedFrameworkUpdate;
-    public event VoidDelegate? ZoneSwitchStart;
-    public event VoidDelegate? ZoneSwitchEnd;
-    public event VoidDelegate? GposeStart;
-    public event VoidDelegate? GposeEnd;
-    public event VoidDelegate? GposeFrameworkUpdate;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
     private bool _sentBetweenAreas = false;
     public bool IsInGpose { get; private set; } = false;
@@ -52,8 +41,9 @@ public class DalamudUtil : IDisposable
         return false;
     }
 
-    public DalamudUtil(ClientState clientState, ObjectTable objectTable, Framework framework, Dalamud.Game.ClientState.Conditions.Condition condition, ChatGui chatGui,
-        Dalamud.Data.DataManager gameData)
+    public DalamudUtil(ClientState clientState, ObjectTable objectTable, Framework framework,
+        Dalamud.Game.ClientState.Conditions.Condition condition, ChatGui chatGui,
+        Dalamud.Data.DataManager gameData, MareMediator mediator)
     {
         _clientState = clientState;
         _objectTable = objectTable;
@@ -61,11 +51,11 @@ public class DalamudUtil : IDisposable
         _condition = condition;
         _chatGui = chatGui;
         _gameData = gameData;
+        _mediator = mediator;
         _framework.Update += FrameworkOnUpdate;
         if (IsLoggedIn)
         {
             _classJobId = _clientState.LocalPlayer!.ClassJob.Id;
-            ClientStateOnLogin(sender: null, EventArgs.Empty);
         }
         WorldData = new(() =>
         {
@@ -101,13 +91,13 @@ public class DalamudUtil : IDisposable
         {
             Logger.Debug("Gpose start");
             IsInGpose = true;
-            GposeStart?.Invoke();
+            _mediator.Publish(new GposeStartMessage());
         }
         else if (GposeTarget == null && IsInGpose)
         {
             Logger.Debug("Gpose end");
             IsInGpose = false;
-            GposeEnd?.Invoke();
+            _mediator.Publish(new GposeEndMessage());
         }
 
         if (_condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51] || IsInGpose)
@@ -116,10 +106,10 @@ public class DalamudUtil : IDisposable
             {
                 Logger.Debug("Zone switch/Gpose start");
                 _sentBetweenAreas = true;
-                ZoneSwitchStart?.Invoke();
+                _mediator.Publish(new ZoneSwitchStartMessage());
             }
 
-            if (IsInGpose) GposeFrameworkUpdate?.Invoke();
+            if (IsInGpose) _mediator.Publish(new GposeFrameworkUpdateMessage());
 
             return;
         }
@@ -128,21 +118,10 @@ public class DalamudUtil : IDisposable
         {
             Logger.Debug("Zone switch/Gpose end");
             _sentBetweenAreas = false;
-            ZoneSwitchEnd?.Invoke();
+            _mediator.Publish(new ZoneSwitchEndMessage());
         }
 
-        foreach (VoidDelegate? frameworkInvocation in (FrameworkUpdate?.GetInvocationList() ?? Array.Empty<VoidDelegate>()).Cast<VoidDelegate>())
-        {
-            try
-            {
-                frameworkInvocation?.Invoke();
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn(ex.Message);
-                Logger.Warn(ex.StackTrace ?? string.Empty);
-            }
-        }
+        _mediator.Publish(new FrameworkUpdateMessage());
 
         if (DateTime.Now < _delayedFrameworkUpdateCheck.AddSeconds(1)) return;
 
@@ -152,13 +131,13 @@ public class DalamudUtil : IDisposable
         {
             Logger.Debug("Logged in");
             IsLoggedIn = true;
-            LogIn?.Invoke();
+            _mediator.Publish(new DalamudLoginMessage());
         }
         else if (localPlayer == null && IsLoggedIn)
         {
             Logger.Debug("Logged out");
             IsLoggedIn = false;
-            LogOut?.Invoke();
+            _mediator.Publish(new DalamudLogoutMessage());
         }
 
         if (_clientState.LocalPlayer != null && _clientState.LocalPlayer.IsValid())
@@ -168,33 +147,13 @@ public class DalamudUtil : IDisposable
             if (_classJobId != newclassJobId)
             {
                 _classJobId = newclassJobId;
-                ClassJobChanged?.Invoke();
+                _mediator.Publish(new ClassJobChangedMessage());
             }
         }
 
-        foreach (VoidDelegate? frameworkInvocation in (DelayedFrameworkUpdate?.GetInvocationList() ?? Array.Empty<VoidDelegate>()).Cast<VoidDelegate>())
-        {
-            try
-            {
-                frameworkInvocation?.Invoke();
-            }
-            catch (Exception ex)
-            {
-                Logger.Warn(ex.Message);
-                Logger.Warn(ex.StackTrace ?? string.Empty);
-            }
-        }
+        _mediator.Publish(new DelayedFrameworkUpdateMessage());
+
         _delayedFrameworkUpdateCheck = DateTime.Now;
-    }
-
-    private void ClientStateOnLogout(object? sender, EventArgs e)
-    {
-        LogOut?.Invoke();
-    }
-
-    private void ClientStateOnLogin(object? sender, EventArgs e)
-    {
-        LogIn?.Invoke();
     }
 
     public Dalamud.Game.ClientState.Objects.Types.GameObject? CreateGameObject(IntPtr reference)
@@ -331,8 +290,6 @@ public class DalamudUtil : IDisposable
 
     public void Dispose()
     {
-        _clientState.Login -= ClientStateOnLogin;
-        _clientState.Logout -= ClientStateOnLogout;
         _framework.Update -= FrameworkOnUpdate;
     }
 }

@@ -8,9 +8,9 @@ using System.Text;
 using Penumbra.Api.Enums;
 using Penumbra.Api.Helpers;
 using MareSynchronos.Delegates;
+using MareSynchronos.Mediator;
 
 namespace MareSynchronos.Managers;
-
 
 public class IpcManager : IDisposable
 {
@@ -58,12 +58,13 @@ public class IpcManager : IDisposable
     private readonly ICallGateSubscriber<Character, string, object> _palettePlusPaletteChanged;
 
     private readonly DalamudUtil _dalamudUtil;
+    private readonly MareMediator _mediator;
     private bool _inGposeQueueMode = false;
     private ConcurrentQueue<Action> ActionQueue => _inGposeQueueMode ? _gposeActionQueue : _normalQueue;
     private readonly ConcurrentQueue<Action> _normalQueue = new();
     private readonly ConcurrentQueue<Action> _gposeActionQueue = new();
 
-    public IpcManager(DalamudPluginInterface pi, DalamudUtil dalamudUtil)
+    public IpcManager(DalamudPluginInterface pi, DalamudUtil dalamudUtil, MareMediator mediator)
     {
         Logger.Verbose("Creating " + nameof(IpcManager));
 
@@ -123,9 +124,10 @@ public class IpcManager : IDisposable
         }
 
         _dalamudUtil = dalamudUtil;
-        _dalamudUtil.FrameworkUpdate += HandleActionQueue;
-        _dalamudUtil.GposeFrameworkUpdate += HandleGposeActionQueue;
-        _dalamudUtil.ZoneSwitchEnd += ClearActionQueue;
+        _mediator = mediator;
+        _mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => HandleActionQueue());
+        _mediator.Subscribe<GposeFrameworkUpdateMessage>(this, (_) => HandleGposeActionQueue());
+        _mediator.Subscribe<ZoneSwitchEndMessage>(this, (_) => ClearActionQueue());
     }
 
     private void HandleGposeActionQueue()
@@ -263,9 +265,6 @@ public class IpcManager : IDisposable
             Logger.Verbose("Action queue clear or not, disposing");
         }
 
-        _dalamudUtil.FrameworkUpdate -= HandleActionQueue;
-        _dalamudUtil.ZoneSwitchEnd -= ClearActionQueue;
-        _dalamudUtil.GposeFrameworkUpdate -= HandleGposeActionQueue;
         ActionQueue.Clear();
 
         _penumbraGameObjectResourcePathResolved.Dispose();

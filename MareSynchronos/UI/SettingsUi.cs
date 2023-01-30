@@ -13,7 +13,7 @@ using MareSynchronos.API.Data;
 using MareSynchronos.Managers;
 using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.Delegates;
+using MareSynchronos.Mediator;
 
 namespace MareSynchronos.UI;
 
@@ -25,10 +25,10 @@ public class SettingsUi : Window, IDisposable
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
+    private readonly MareMediator _mediator;
     private readonly UiShared _uiShared;
     public CharacterData? LastCreatedCharacterData { private get; set; }
 
-    public event VoidDelegate? SwitchToIntroUi;
     private bool _overwriteExistingLabels = false;
     private bool? _notesSuccessfullyApplied = null;
     private string _lastTab = string.Empty;
@@ -36,7 +36,8 @@ public class SettingsUi : Window, IDisposable
 
     public SettingsUi(WindowSystem windowSystem,
         UiShared uiShared, ConfigurationService configService,
-        MareCharaFileManager mareCharaFileManager, PairManager pairManager, ServerConfigurationManager serverConfigurationManager) : base("Mare Synchronos Settings")
+        MareCharaFileManager mareCharaFileManager, PairManager pairManager,
+        ServerConfigurationManager serverConfigurationManager, MareMediator mediator) : base("Mare Synchronos Settings")
     {
         Logger.Verbose("Creating " + nameof(SettingsUi));
 
@@ -51,9 +52,12 @@ public class SettingsUi : Window, IDisposable
         _mareCharaFileManager = mareCharaFileManager;
         _pairManager = pairManager;
         _serverConfigurationManager = serverConfigurationManager;
+        _mediator = mediator;
         _uiShared = uiShared;
 
 
+        _mediator.Subscribe<OpenSettingsUiMessage>(this, (_) => Toggle());
+        _mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
         _uiShared.GposeStart += UiShared_GposeStart;
         _uiShared.GposeEnd += UiShared_GposeEnd;
 
@@ -211,7 +215,7 @@ public class SettingsUi : Window, IDisposable
                 {
                     Task.Run(() => ApiController.UserDelete());
                     _deleteAccountPopupModalShown = false;
-                    SwitchToIntroUi?.Invoke();
+                    _mediator.Publish(new SwitchToIntroUiMessage());
                 }
 
                 ImGui.SameLine();

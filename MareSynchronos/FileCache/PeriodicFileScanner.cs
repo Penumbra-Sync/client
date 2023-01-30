@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.Mediator;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 
@@ -13,10 +14,11 @@ public class PeriodicFileScanner : IDisposable
     private readonly FileCacheManager _fileDbManager;
     private readonly ApiController _apiController;
     private readonly DalamudUtil _dalamudUtil;
+    private readonly MareMediator _mediator;
     private CancellationTokenSource? _scanCancellationTokenSource;
     private Task? _fileScannerTask = null;
     public ConcurrentDictionary<string, int> haltScanLocks = new(StringComparer.Ordinal);
-    public PeriodicFileScanner(IpcManager ipcManager, ConfigurationService configService, FileCacheManager fileDbManager, ApiController apiController, DalamudUtil dalamudUtil)
+    public PeriodicFileScanner(IpcManager ipcManager, ConfigurationService configService, FileCacheManager fileDbManager, ApiController apiController, DalamudUtil dalamudUtil, MareMediator mediator)
     {
         Logger.Verbose("Creating " + nameof(PeriodicFileScanner));
 
@@ -25,11 +27,14 @@ public class PeriodicFileScanner : IDisposable
         _fileDbManager = fileDbManager;
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
+        _mediator = mediator;
         _ipcManager.PenumbraInitialized += StartScan;
         _apiController.DownloadStarted += ApiHaltScan;
         _apiController.DownloadFinished += ApiResumeScan;
-        _dalamudUtil.ZoneSwitchStart += ZoneSwitchHaltScan;
-        _dalamudUtil.ZoneSwitchEnd += ZoneSwitchResumeScan;
+
+        _mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) => ZoneSwitchHaltScan());
+        _mediator.Subscribe<ZoneSwitchEndMessage>(this, (_) => ZoneSwitchResumeScan());
+        _mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => StartScan());
     }
 
     private void ApiHaltScan()
@@ -104,8 +109,6 @@ public class PeriodicFileScanner : IDisposable
         _ipcManager.PenumbraInitialized -= StartScan;
         _apiController.DownloadStarted -= ApiHaltScan;
         _apiController.DownloadFinished -= ApiResumeScan;
-        _dalamudUtil.ZoneSwitchStart -= ZoneSwitchHaltScan;
-        _dalamudUtil.ZoneSwitchEnd -= ZoneSwitchResumeScan;
         _scanCancellationTokenSource?.Cancel();
     }
 
@@ -201,9 +204,9 @@ public class PeriodicFileScanner : IDisposable
 
         var scannedFiles = new ConcurrentDictionary<string, bool>(Directory.EnumerateFiles(penumbraDir!, "*.*", SearchOption.AllDirectories)
                             .Select(s => s.ToLowerInvariant())
-                            .Where(f => ext.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase)) 
-                                && !f.Contains(@"\bg\", StringComparison.OrdinalIgnoreCase) 
-                                && !f.Contains(@"\bgcommon\", StringComparison.OrdinalIgnoreCase) 
+                            .Where(f => ext.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase))
+                                && !f.Contains(@"\bg\", StringComparison.OrdinalIgnoreCase)
+                                && !f.Contains(@"\bgcommon\", StringComparison.OrdinalIgnoreCase)
                                 && !f.Contains(@"\ui\", StringComparison.OrdinalIgnoreCase))
                             .Concat(Directory.EnumerateFiles(_configService.Current.CacheFolder, "*.*", SearchOption.TopDirectoryOnly)
                                 .Where(f => new FileInfo(f).Name.Length == 40)

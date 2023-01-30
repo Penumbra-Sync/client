@@ -14,6 +14,7 @@ using MareSynchronos.FileCache;
 using MareSynchronos.Localization;
 using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
@@ -34,6 +35,7 @@ public partial class UiShared : IDisposable
     private readonly DalamudPluginInterface _pluginInterface;
     private readonly Dalamud.Localization _localization;
     private readonly ServerConfigurationManager _serverConfigurationManager;
+    private readonly MareMediator _mediator;
 
     public long FileCacheSize => _cacheScanner.FileCacheSize;
     public string PlayerName => _dalamudUtil.PlayerName;
@@ -57,7 +59,7 @@ public partial class UiShared : IDisposable
 
     public UiShared(IpcManager ipcManager, ApiController apiController, PeriodicFileScanner cacheScanner, FileDialogManager fileDialogManager,
         ConfigurationService configService, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization,
-        ServerConfigurationManager serverManager)
+        ServerConfigurationManager serverManager, MareMediator mediator)
     {
         _ipcManager = ipcManager;
         _apiController = apiController;
@@ -68,13 +70,14 @@ public partial class UiShared : IDisposable
         _pluginInterface = pluginInterface;
         _localization = localization;
         _serverConfigurationManager = serverManager;
+        _mediator = mediator;
         _isDirectoryWritable = IsDirectoryWritable(_configService.Current.CacheFolder);
 
         _pluginInterface.UiBuilder.BuildFonts += BuildFont;
         _pluginInterface.UiBuilder.RebuildFonts();
 
-        _dalamudUtil.GposeStart += DalamudUtil_GposeStart;
-        _dalamudUtil.GposeEnd += DalamudUtil_GposeEnd;
+        _mediator.Subscribe<GposeStartMessage>(this, (_) => DalamudUtil_GposeStart());
+        _mediator.Subscribe<GposeEndMessage>(this, (_) => DalamudUtil_GposeEnd());
     }
 
     private void DalamudUtil_GposeEnd()
@@ -673,7 +676,5 @@ public partial class UiShared : IDisposable
     public void Dispose()
     {
         _pluginInterface.UiBuilder.BuildFonts -= BuildFont;
-        _dalamudUtil.GposeStart -= DalamudUtil_GposeStart;
-        _dalamudUtil.GposeEnd -= DalamudUtil_GposeEnd;
     }
 }

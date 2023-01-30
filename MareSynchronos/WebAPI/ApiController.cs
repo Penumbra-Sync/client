@@ -12,6 +12,7 @@ using MareSynchronos.Managers;
 using Dalamud.Utility;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Delegates;
+using MareSynchronos.Mediator;
 
 namespace MareSynchronos.WebAPI;
 public partial class ApiController : IDisposable, IMareHubClient
@@ -26,6 +27,7 @@ public partial class ApiController : IDisposable, IMareHubClient
     private readonly FileCacheManager _fileDbManager;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
+    private readonly MareMediator _mediator;
     private CancellationTokenSource _connectionCancellationTokenSource;
     private HubConnection? _mareHub;
 
@@ -43,7 +45,7 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     private HttpClient _httpClient;
 
-    public ApiController(ConfigurationService configService, DalamudUtil dalamudUtil, FileCacheManager fileDbManager, PairManager pairManager, ServerConfigurationManager serverManager)
+    public ApiController(ConfigurationService configService, DalamudUtil dalamudUtil, FileCacheManager fileDbManager, PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator)
     {
         Logger.Verbose("Creating " + nameof(ApiController));
 
@@ -52,9 +54,11 @@ public partial class ApiController : IDisposable, IMareHubClient
         _fileDbManager = fileDbManager;
         _pairManager = pairManager;
         _serverManager = serverManager;
+        _mediator = mediator;
         _connectionCancellationTokenSource = new CancellationTokenSource();
-        _dalamudUtil.LogIn += DalamudUtilOnLogIn;
-        _dalamudUtil.LogOut += DalamudUtilOnLogOut;
+
+        _mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
+        _mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
         ServerState = ServerState.Offline;
         _verifiedUploadedHashes = new(StringComparer.Ordinal);
         _httpClient = new();
@@ -311,9 +315,6 @@ public partial class ApiController : IDisposable, IMareHubClient
     public void Dispose()
     {
         Logger.Verbose("Disposing " + nameof(ApiController));
-
-        _dalamudUtil.LogIn -= DalamudUtilOnLogIn;
-        _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
 
         ServerState = ServerState.Offline;
         Task.Run(async () => await StopConnection(_connectionCancellationTokenSource.Token, ServerState.Disconnected).ConfigureAwait(false));

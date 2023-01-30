@@ -18,38 +18,13 @@ using Dalamud.Data;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace MareSynchronos;
 
 public sealed class Plugin : IDalamudPlugin
 {
     private const string _commandName = "/mare";
-    private readonly ApiController _apiController;
-    private readonly CommandManager _commandManager;
-    private readonly PeriodicFileScanner _periodicFileScanner;
-    private readonly IntroUi _introUi;
-    private readonly IpcManager _ipcManager;
-    private readonly DalamudPluginInterface _pluginInterface;
-    private readonly SettingsUi _settingsUi;
-    private readonly WindowSystem _windowSystem;
-    private PlayerManager? _playerManager;
-    private TransientResourceManager? _transientResourceManager;
-    private readonly DalamudUtil _dalamudUtil;
-    private OnlinePlayerManager? _characterCacheManager;
-    private readonly DownloadUi _downloadUi;
-    private readonly FileDialogManager _fileDialogManager;
-    private readonly FileCacheManager _fileCacheManager;
-    private readonly PairManager _pairManager;
-    private readonly CompactUi _compactUi;
-    private readonly UiShared _uiSharedComponent;
-    private readonly Dalamud.Localization _localization;
-    private readonly FileReplacementFactory _fileReplacementFactory;
-    private readonly MareCharaFileManager _mareCharaFileManager;
-    private readonly ServerConfigurationManager _serverConfigurationManager;
-    private readonly GposeUi _gposeUi;
-    private readonly ConfigurationService _configurationService;
-    private readonly MareMediator _mediator;
+    private IServiceScope? _runtimeServiceServiceScope;
     private readonly ServiceProvider _serviceProvider;
 
 
@@ -57,9 +32,6 @@ public sealed class Plugin : IDalamudPlugin
         Framework framework, ObjectTable objectTable, ClientState clientState, Condition condition, ChatGui chatGui)
     {
         Logger.Debug("Launching " + Name);
-        _pluginInterface = pluginInterface;
-        _pluginInterface.UiBuilder.DisableGposeUiHide = true;
-        _commandManager = commandManager;
 
         IServiceCollection collection = new ServiceCollection();
         // inject dalamud stuff
@@ -71,6 +43,7 @@ public sealed class Plugin : IDalamudPlugin
         collection.AddSingleton(clientState);
         collection.AddSingleton(condition);
         collection.AddSingleton(chatGui);
+        collection.AddSingleton(pluginInterface.UiBuilder);
         collection.AddSingleton(new WindowSystem("MareSynchronos"));
         collection.AddSingleton<FileDialogManager>();
 
@@ -82,6 +55,8 @@ public sealed class Plugin : IDalamudPlugin
         collection.AddSingleton<DalamudUtil>();
         collection.AddSingleton<IpcManager>();
         collection.AddSingleton<FileCacheManager>();
+        collection.AddSingleton<CachedPlayerFactory>();
+        collection.AddSingleton<PairFactory>();
         collection.AddSingleton<ServerConfigurationManager>();
         collection.AddSingleton<PairManager>();
         collection.AddSingleton<ApiController>();
@@ -94,44 +69,30 @@ public sealed class Plugin : IDalamudPlugin
         collection.AddSingleton<CompactUi>();
         collection.AddSingleton<GposeUi>();
         collection.AddSingleton<IntroUi>();
+        collection.AddSingleton<DownloadUi>();
 
-        collection.AddTransient<TransientResourceManager>();
-        collection.AddTransient<CharacterDataFactory>();
-        collection.AddTransient<PlayerManager>();
-        collection.AddTransient<OnlinePlayerManager>();
+        collection.AddScoped<TransientResourceManager>();
+        collection.AddScoped<CharacterDataFactory>();
+        collection.AddScoped<PlayerManager>();
+        collection.AddScoped<OnlinePlayerManager>();
 
         _serviceProvider = collection.BuildServiceProvider(new ServiceProviderOptions() { ValidateOnBuild = true, ValidateScopes = true });
 
-        _serviceProvider.GetRequiredService<Dalamud.Localization>().SetupWithLangCode("en");
-
         // those can be initialized outside of game login
 
-        _settingsUi.SwitchToIntroUi += () =>
-        {
-            _introUi.IsOpen = true;
-            _settingsUi.IsOpen = false;
-            _compactUi.IsOpen = false;
-        };
-        _introUi.SwitchToMainUi += () =>
-        {
-            _introUi.IsOpen = false;
-            _compactUi.IsOpen = true;
-            _periodicFileScanner.StartScan();
-            ReLaunchCharacterManager();
-        };
-        _compactUi.OpenSettingsUi += () =>
-        {
-            _settingsUi.Toggle();
-        };
-        _downloadUi = new DownloadUi(_windowSystem, _configurationService, _apiController, _uiSharedComponent);
+        _serviceProvider.GetRequiredService<Dalamud.Localization>().SetupWithLangCode("en");
+        _serviceProvider.GetRequiredService<DalamudPluginInterface>().UiBuilder.DisableGposeUiHide = true;
 
-        _dalamudUtil.LogIn += DalamudUtilOnLogIn;
-        _dalamudUtil.LogOut += DalamudUtilOnLogOut;
+        var mediator = _serviceProvider.GetRequiredService<MareMediator>();
+        mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => ReLaunchCharacterManager());
+        mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
+        mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
 
-        if (_dalamudUtil.IsLoggedIn)
-        {
-            DalamudUtilOnLogIn();
-        }
+        _serviceProvider.GetRequiredService<SettingsUi>();
+        _serviceProvider.GetRequiredService<CompactUi>();
+        _serviceProvider.GetRequiredService<GposeUi>();
+        _serviceProvider.GetRequiredService<IntroUi>();
+        _serviceProvider.GetRequiredService<DownloadUi>();
     }
 
     public string Name => "Mare Synchronos";
@@ -140,33 +101,10 @@ public sealed class Plugin : IDalamudPlugin
     {
         Logger.Verbose("Disposing " + Name);
 
-        var services = _serviceProvider.GetServices<IDisposable>().ToList();
-        services.ForEach(c => c.Dispose());
+        _serviceProvider.GetRequiredService<CommandManager>().RemoveHandler(_commandName);
 
-        _apiController?.Dispose();
-
-        _commandManager.RemoveHandler(_commandName);
-        _dalamudUtil.LogIn -= DalamudUtilOnLogIn;
-        _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
-
-        _uiSharedComponent.Dispose();
-        _settingsUi?.Dispose();
-        _introUi?.Dispose();
-        _downloadUi?.Dispose();
-        _compactUi?.Dispose();
-        _gposeUi?.Dispose();
-
-        _pairManager.Dispose();
-        _periodicFileScanner?.Dispose();
-        _fileCacheManager?.Dispose();
-        _playerManager?.Dispose();
-        _characterCacheManager?.Dispose();
-        _ipcManager?.Dispose();
-        _transientResourceManager?.Dispose();
-        _dalamudUtil.Dispose();
-        _configurationService?.Dispose();
-
-        _mediator.Dispose();
+        _runtimeServiceServiceScope?.Dispose();
+        _serviceProvider.Dispose();
 
         Logger.Debug("Shut down");
     }
@@ -176,47 +114,46 @@ public sealed class Plugin : IDalamudPlugin
     {
         Logger.Debug("Client login");
 
-        _pluginInterface.UiBuilder.Draw += Draw;
-        _pluginInterface.UiBuilder.OpenConfigUi += OpenUi;
-        _commandManager.AddHandler(_commandName, new CommandInfo(OnCommand)
+        var pi = _serviceProvider.GetRequiredService<DalamudPluginInterface>();
+        pi.UiBuilder.Draw += Draw;
+        pi.UiBuilder.OpenConfigUi += OpenUi;
+        _serviceProvider.GetRequiredService<CommandManager>().AddHandler(_commandName, new CommandInfo(OnCommand)
         {
             HelpMessage = "Opens the Mare Synchronos UI",
         });
 
-        if (!_configurationService.Current.HasValidSetup() || !_serverConfigurationManager.HasValidConfig())
+        if (!_serviceProvider.GetRequiredService<ConfigurationService>().Current.HasValidSetup()
+            || !_serviceProvider.GetRequiredService<ServerConfigurationManager>().HasValidConfig())
         {
-            _introUi.IsOpen = true;
-            _compactUi.IsOpen = false;
+            _serviceProvider.GetRequiredService<MareMediator>().Publish(new SwitchToIntroUiMessage());
             return;
         }
 
-        _periodicFileScanner.StartScan();
+        _serviceProvider.GetRequiredService<PeriodicFileScanner>().StartScan();
         ReLaunchCharacterManager();
     }
 
     private void DalamudUtilOnLogOut()
     {
         Logger.Debug("Client logout");
-        _characterCacheManager?.Dispose();
-        _playerManager?.Dispose();
-        _transientResourceManager?.Dispose();
-        _pluginInterface.UiBuilder.Draw -= Draw;
-        _pluginInterface.UiBuilder.OpenConfigUi -= OpenUi;
-        _commandManager.RemoveHandler(_commandName);
+        _runtimeServiceServiceScope?.Dispose();
+        var pi = _serviceProvider.GetRequiredService<DalamudPluginInterface>();
+        pi.UiBuilder.Draw -= Draw;
+        pi.UiBuilder.OpenConfigUi -= OpenUi;
+        _serviceProvider.GetRequiredService<CommandManager>().RemoveHandler(_commandName);
     }
 
     public void ReLaunchCharacterManager()
     {
-        _characterCacheManager?.Dispose();
-        _playerManager?.Dispose();
-        _transientResourceManager?.Dispose();
+        _runtimeServiceServiceScope?.Dispose();
 
         Task.Run(WaitForPlayerAndLaunchCharacterManager);
     }
 
     private async Task WaitForPlayerAndLaunchCharacterManager()
     {
-        while (!_dalamudUtil.IsPlayerPresent)
+        var dalamudUtil = _serviceProvider.GetRequiredService<DalamudUtil>();
+        while (!dalamudUtil.IsPlayerPresent)
         {
             await Task.Delay(100).ConfigureAwait(false);
         }
@@ -225,9 +162,10 @@ public sealed class Plugin : IDalamudPlugin
         {
             Logger.Debug("Launching Managers");
 
-            _transientResourceManager = _serviceProvider.GetRequiredService<TransientResourceManager>();
-            _playerManager = _serviceProvider.GetRequiredService<PlayerManager>();
-            _characterCacheManager = _serviceProvider.GetRequiredService<OnlinePlayerManager>();
+            _runtimeServiceServiceScope = _serviceProvider.CreateScope();
+            _runtimeServiceServiceScope.ServiceProvider.GetRequiredService<TransientResourceManager>();
+            _runtimeServiceServiceScope.ServiceProvider.GetRequiredService<PlayerManager>();
+            _runtimeServiceServiceScope.ServiceProvider.GetRequiredService<OnlinePlayerManager>();
         }
         catch (Exception ex)
         {
@@ -237,8 +175,8 @@ public sealed class Plugin : IDalamudPlugin
 
     private void Draw()
     {
-        _windowSystem.Draw();
-        _fileDialogManager.Draw();
+        _serviceProvider.GetRequiredService<WindowSystem>().Draw();
+        _serviceProvider.GetRequiredService<FileDialogManager>().Draw();
     }
 
     private void OnCommand(string command, string args)
@@ -254,6 +192,8 @@ public sealed class Plugin : IDalamudPlugin
 
         if (string.Equals(splitArgs[0], "toggle", StringComparison.OrdinalIgnoreCase))
         {
+            var _serverConfigurationManager = _serviceProvider.GetRequiredService<ServerConfigurationManager>();
+            var _apiController = _serviceProvider.GetRequiredService<ApiController>();
             if (_serverConfigurationManager.CurrentServer == null) return;
             var fullPause = splitArgs.Length > 1 ? splitArgs[1] switch
             {
@@ -266,20 +206,21 @@ public sealed class Plugin : IDalamudPlugin
             {
                 _serverConfigurationManager.CurrentServer.FullPause = fullPause;
                 _serverConfigurationManager.Save();
-                _ = _apiController.CreateConnections();
+                _ = _serviceProvider.GetRequiredService<ApiController>().CreateConnections();
             }
         }
         else if (string.Equals(splitArgs[0], "gpose", StringComparison.OrdinalIgnoreCase))
         {
-            _gposeUi.Toggle();
+            _serviceProvider.GetRequiredService<GposeUi>().Toggle();
         }
     }
 
     private void OpenUi()
     {
-        if (_configurationService.Current.HasValidSetup())
-            _compactUi.Toggle();
+        
+        if (_serviceProvider.GetRequiredService<ConfigurationService>().Current.HasValidSetup())
+            _serviceProvider.GetRequiredService<CompactUi>().Toggle();
         else
-            _introUi.Toggle();
+            _serviceProvider.GetRequiredService<IntroUi>().Toggle();
     }
 }

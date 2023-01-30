@@ -2,6 +2,7 @@
 using MareSynchronos.Delegates;
 using MareSynchronos.Factories;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using System.Collections.Concurrent;
@@ -14,6 +15,8 @@ public class TransientResourceManager : IDisposable
     private readonly IpcManager _ipcManager;
     private readonly ConfigurationService _configurationService;
     private readonly DalamudUtil _dalamudUtil;
+    private readonly MareMediator _mediator;
+
     public event DrawObjectDelegate? TransientResourceLoaded;
     public IntPtr[] PlayerRelatedPointers = Array.Empty<IntPtr>();
     private readonly string[] _fileTypesToHandle = new[] { "tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk" };
@@ -23,15 +26,16 @@ public class TransientResourceManager : IDisposable
 
     private ConcurrentDictionary<IntPtr, HashSet<string>> TransientResources { get; } = new();
     private ConcurrentDictionary<ObjectKind, HashSet<FileReplacement>> SemiTransientResources { get; } = new();
-    public TransientResourceManager(IpcManager manager, ConfigurationService configurationService, DalamudUtil dalamudUtil, FileReplacementFactory fileReplacementFactory)
+    public TransientResourceManager(IpcManager manager, ConfigurationService configurationService, DalamudUtil dalamudUtil, FileReplacementFactory fileReplacementFactory, MareMediator mediator)
     {
         manager.PenumbraResourceLoadEvent += Manager_PenumbraResourceLoadEvent;
         manager.PenumbraModSettingChanged += Manager_PenumbraModSettingChanged;
         _ipcManager = manager;
         _configurationService = configurationService;
         _dalamudUtil = dalamudUtil;
-        dalamudUtil.FrameworkUpdate += DalamudUtil_FrameworkUpdate;
-        dalamudUtil.ClassJobChanged += DalamudUtil_ClassJobChanged;
+        _mediator = mediator;
+        _mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => DalamudUtil_FrameworkUpdate());
+        _mediator.Subscribe<ClassJobChangedMessage>(this, (_) => DalamudUtil_ClassJobChanged());
         // migrate obsolete data to new format
         if (File.Exists(PersistentDataCache))
         {
@@ -248,9 +252,9 @@ public class TransientResourceManager : IDisposable
 
     public void Dispose()
     {
-        _dalamudUtil.FrameworkUpdate -= DalamudUtil_FrameworkUpdate;
+        _mediator.Unsubscribe<FrameworkUpdateMessage>(this);
+        _mediator.Unsubscribe<ClassJobChangedMessage>(this);
         _ipcManager.PenumbraResourceLoadEvent -= Manager_PenumbraResourceLoadEvent;
-        _dalamudUtil.ClassJobChanged -= DalamudUtil_ClassJobChanged;
         _ipcManager.PenumbraModSettingChanged -= Manager_PenumbraModSettingChanged;
         TransientResources.Clear();
         SemiTransientResources.Clear();

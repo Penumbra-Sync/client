@@ -1,6 +1,7 @@
 ﻿using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
+using MareSynchronos.Mediator;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 
@@ -13,8 +14,9 @@ public class OnlinePlayerManager : IDisposable
     private readonly PlayerManager _playerManager;
     private readonly FileCacheManager _fileDbManager;
     private readonly PairManager _pairManager;
+    private readonly MareMediator _mediator;
 
-    public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil, PlayerManager playerManager, FileCacheManager fileDbManager, PairManager pairManager)
+    public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil, PlayerManager playerManager, FileCacheManager fileDbManager, PairManager pairManager, MareMediator mediator)
     {
         Logger.Verbose("Creating " + nameof(OnlinePlayerManager));
 
@@ -23,11 +25,11 @@ public class OnlinePlayerManager : IDisposable
         _playerManager = playerManager;
         _fileDbManager = fileDbManager;
         _pairManager = pairManager;
-
+        _mediator = mediator;
         _playerManager.PlayerHasChanged += PlayerManagerOnPlayerHasChanged;
 
-        _dalamudUtil.LogIn += DalamudUtilOnLogIn;
-        _dalamudUtil.LogOut += DalamudUtilOnLogOut;
+        _mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
+        _mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
 
         if (_dalamudUtil.IsLoggedIn)
         {
@@ -42,12 +44,12 @@ public class OnlinePlayerManager : IDisposable
 
     private void DalamudUtilOnLogIn()
     {
-        _dalamudUtil.DelayedFrameworkUpdate += FrameworkOnUpdate;
+        _mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => FrameworkOnUpdate());
     }
 
     private void DalamudUtilOnLogOut()
     {
-        _dalamudUtil.DelayedFrameworkUpdate -= FrameworkOnUpdate;
+        _mediator.Unsubscribe<DelayedFrameworkUpdateMessage>(this);
     }
 
     public void Dispose()
@@ -55,9 +57,9 @@ public class OnlinePlayerManager : IDisposable
         Logger.Verbose("Disposing " + nameof(OnlinePlayerManager));
 
         _playerManager.PlayerHasChanged -= PlayerManagerOnPlayerHasChanged;
-        _dalamudUtil.LogIn -= DalamudUtilOnLogIn;
-        _dalamudUtil.LogOut -= DalamudUtilOnLogOut;
-        _dalamudUtil.DelayedFrameworkUpdate -= FrameworkOnUpdate;
+        _mediator.Unsubscribe<DalamudLoginMessage>(this);
+        _mediator.Unsubscribe<DalamudLogoutMessage>(this);
+        _mediator.Unsubscribe<DelayedFrameworkUpdateMessage>(this);
     }
 
     private void FrameworkOnUpdate()

@@ -7,6 +7,7 @@ using MareSynchronos.FileCache;
 using MareSynchronos.UI;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.Delegates;
+using MareSynchronos.Mediator;
 #if DEBUG
 #endif
 
@@ -21,6 +22,7 @@ public class PlayerManager : IDisposable
     private readonly TransientResourceManager _transientResourceManager;
     private readonly PeriodicFileScanner _periodicFileScanner;
     private readonly SettingsUi _settingsUi;
+    private readonly MareMediator _mediator;
     private readonly IpcManager _ipcManager;
     public event CharacterDataDelegate? PlayerHasChanged;
     public API.Data.CharacterData? LastCreatedCharacterData { get; private set; }
@@ -34,7 +36,7 @@ public class PlayerManager : IDisposable
 
     public unsafe PlayerManager(ApiController apiController, IpcManager ipcManager,
         CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil, TransientResourceManager transientResourceManager,
-        PeriodicFileScanner periodicFileScanner, SettingsUi settingsUi)
+        PeriodicFileScanner periodicFileScanner, SettingsUi settingsUi, MareMediator mediator)
     {
         Logger.Verbose("Creating " + nameof(PlayerManager));
 
@@ -45,15 +47,16 @@ public class PlayerManager : IDisposable
         _transientResourceManager = transientResourceManager;
         _periodicFileScanner = periodicFileScanner;
         _settingsUi = settingsUi;
+        _mediator = mediator;
         _apiController.Connected += ApiControllerOnConnected;
         _apiController.Disconnected += ApiController_Disconnected;
         _transientResourceManager.TransientResourceLoaded += HandleTransientResourceLoad;
-        _dalamudUtil.DelayedFrameworkUpdate += DalamudUtilOnDelayedFrameworkUpdate;
         _ipcManager.HeelsOffsetChangeEvent += HeelsOffsetChanged;
         _ipcManager.CustomizePlusScaleChange += CustomizePlusChanged;
         _ipcManager.PalettePlusPaletteChange += PalettePlusChanged;
-        _dalamudUtil.FrameworkUpdate += DalamudUtilOnFrameworkUpdate;
 
+        _mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => DalamudUtilOnDelayedFrameworkUpdate());
+        _mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => DalamudUtilOnFrameworkUpdate());
 
         Logger.Debug("Watching Player, ApiController is Connected: " + _apiController.IsConnected);
         if (_apiController.IsConnected)
@@ -134,12 +137,13 @@ public class PlayerManager : IDisposable
     {
         Logger.Verbose("Disposing " + nameof(PlayerManager));
 
+        _mediator.Unsubscribe<DelayedFrameworkUpdateMessage>(this);
+        _mediator.Unsubscribe<FrameworkUpdateMessage>(this);
+
         _apiController.Connected -= ApiControllerOnConnected;
         _apiController.Disconnected -= ApiController_Disconnected;
 
         _ipcManager.PenumbraRedrawEvent -= IpcManager_PenumbraRedrawEvent;
-        _dalamudUtil.DelayedFrameworkUpdate -= DalamudUtilOnDelayedFrameworkUpdate;
-        _dalamudUtil.FrameworkUpdate -= DalamudUtilOnFrameworkUpdate;
 
         _transientResourceManager.TransientResourceLoaded -= HandleTransientResourceLoad;
 

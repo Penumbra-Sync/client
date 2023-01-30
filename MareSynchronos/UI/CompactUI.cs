@@ -13,6 +13,7 @@ using MareSynchronos.API.Dto.User;
 using MareSynchronos.Delegates;
 using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using MareSynchronos.UI.Components;
 using MareSynchronos.UI.Handlers;
@@ -26,6 +27,7 @@ public class CompactUi : Window, IDisposable
     private readonly ApiController _apiController;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
+    private readonly MareMediator _mediator;
     private readonly ConfigurationService _configService;
     private readonly TagHandler _tagHandler;
     public readonly Dictionary<string, bool> ShowUidForEntry = new(StringComparer.Ordinal);
@@ -57,7 +59,7 @@ public class CompactUi : Window, IDisposable
 
     public CompactUi(WindowSystem windowSystem,
         UiShared uiShared, ConfigurationService configService, ApiController apiController, PairManager pairManager,
-        ServerConfigurationManager serverManager) : base("###MareSynchronosMainUI")
+        ServerConfigurationManager serverManager, MareMediator mediator) : base("###MareSynchronosMainUI")
     {
 
 #if DEBUG
@@ -88,12 +90,16 @@ public class CompactUi : Window, IDisposable
         _apiController = apiController;
         _pairManager = pairManager;
         _serverManager = serverManager;
+        _mediator = mediator;
         _tagHandler = new(_serverManager);
 
         _groupPanel = new(this, uiShared, _pairManager, _serverManager, _configService);
         _selectGroupForPairUi = new(_tagHandler);
         _selectPairsForGroupUi = new(_tagHandler);
         _pairGroupsUi = new(_tagHandler, DrawPairedClient, apiController, _selectPairsForGroupUi);
+
+        _mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = true);
+        _mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
 
         _uiShared.GposeStart += UiShared_GposeStart;
         _uiShared.GposeEnd += UiShared_GposeEnd;
@@ -118,7 +124,6 @@ public class CompactUi : Window, IDisposable
         IsOpen = false;
     }
 
-    public event VoidDelegate? OpenSettingsUi;
     public void Dispose()
     {
         Logger.Verbose("Disposing " + nameof(CompactUi));
@@ -700,7 +705,7 @@ public class CompactUi : Window, IDisposable
         ImGui.SetCursorPosY(originalPos.Y + uidTextSize.Y / 2 - buttonSize.Y / 2);
         if (ImGuiComponents.IconButton(FontAwesomeIcon.Cog))
         {
-            OpenSettingsUi?.Invoke();
+            _mediator.Publish(new OpenSettingsUiMessage());
         }
         UiShared.AttachToolTip("Open the Mare Synchronos Settings");
 

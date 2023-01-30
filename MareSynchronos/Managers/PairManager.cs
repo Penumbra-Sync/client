@@ -8,6 +8,7 @@ using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.Factories;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
@@ -24,16 +25,18 @@ public class PairManager : IDisposable
     private readonly PairFactory _pairFactory;
     private readonly UiBuilder _uiBuilder;
     private readonly ConfigurationService _configurationService;
+    private readonly MareMediator _mediator;
 
-    public PairManager(CachedPlayerFactory cachedPlayerFactory, DalamudUtil dalamudUtil, PairFactory pairFactory, UiBuilder uiBuilder, ConfigurationService configurationService)
+    public PairManager(CachedPlayerFactory cachedPlayerFactory, DalamudUtil dalamudUtil, PairFactory pairFactory, UiBuilder uiBuilder, ConfigurationService configurationService, MareMediator mediator)
     {
         _cachedPlayerFactory = cachedPlayerFactory;
         _dalamudUtil = dalamudUtil;
         _pairFactory = pairFactory;
         _uiBuilder = uiBuilder;
         _configurationService = configurationService;
-        _dalamudUtil.ZoneSwitchStart += DalamudUtilOnZoneSwitched;
-        _dalamudUtil.DelayedFrameworkUpdate += DalamudUtilOnDelayedFrameworkUpdate;
+        _mediator = mediator;
+        _mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) => DalamudUtilOnZoneSwitched());
+        _mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => DalamudUtilOnDelayedFrameworkUpdate());
         _directPairsInternal = DirectPairsLazy();
         _groupPairsInternal = GroupPairsLazy();
     }
@@ -137,8 +140,6 @@ public class PairManager : IDisposable
 
     public void Dispose()
     {
-        _dalamudUtil.DelayedFrameworkUpdate -= DalamudUtilOnDelayedFrameworkUpdate;
-        _dalamudUtil.ZoneSwitchStart -= DalamudUtilOnZoneSwitched;
         DisposePairs();
     }
 
