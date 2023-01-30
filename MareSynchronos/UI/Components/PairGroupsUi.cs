@@ -28,59 +28,54 @@ namespace MareSynchronos.UI.Components
             // Only render those tags that actually have pairs in them, otherwise
             // we can end up with a bunch of useless pair groups
             var tagsWithPairsInThem = _tagHandler.GetAllTagsSorted();
+            UiShared.DrawWithID("$group-VisibleCustomTag", () => DrawCategory(TagHandler.CustomVisibleTag, visibleUsers));
             foreach (var tag in tagsWithPairsInThem)
             {
-                UiShared.DrawWithID($"group-{tag}", () => DrawCategory(tag, visibleUsers, onlineUsers, offlineUsers));
+                UiShared.DrawWithID($"group-{tag}", () => DrawCategory(tag, onlineUsers));
             }
+            UiShared.DrawWithID($"group-OnlineCustomTag", () => DrawCategory(TagHandler.CustomOnlineTag, onlineUsers.Where(u => !_tagHandler.HasAnyTag(u.UserPair!)).ToList()));
+            UiShared.DrawWithID($"group-OfflineCustomTag", () => DrawCategory(TagHandler.CustomOfflineTag, offlineUsers));
         }
 
-        public void DrawCategory(string tag, List<Pair> visibleUsers, List<Pair> onlineUsers, List<Pair> offlineUsers)
+        private void DrawCategory(string tag, List<Pair> users)
         {
-            var otherUidsTaggedWithTag = _tagHandler.GetOtherUidsForTag(tag);
-            var visiblePairsInThisTag = visibleUsers
-                .Where(pair => otherUidsTaggedWithTag.Contains(pair.UserData.UID))
-                .ToList();
-            var onlinePairsInThisTag = onlineUsers
-                .Where(pair => otherUidsTaggedWithTag.Contains(pair.UserData.UID))
-                .ToList();
-            var offlinePairsInThisTag = offlineUsers
-                .Where(pair => otherUidsTaggedWithTag.Contains(pair.UserData.UID))
-                .ToList();
-            if (visiblePairsInThisTag.Any() || onlinePairsInThisTag.Any() || offlinePairsInThisTag.Any())
+            List<Pair> usersInThisTag;
+            HashSet<string>? otherUidsTaggedWithTag = null;
+            if (tag is TagHandler.CustomOfflineTag or TagHandler.CustomOnlineTag or TagHandler.CustomVisibleTag)
             {
-                DrawName(tag);
-                UiShared.DrawWithID($"group-{tag}-buttons", () => DrawButtons(tag, visiblePairsInThisTag.Concat(onlinePairsInThisTag).Concat(offlinePairsInThisTag).ToList()));
-                if (_tagHandler.IsTagOpen(tag))
-                {
-                    ImGui.Indent(20);
-                    if (visiblePairsInThisTag.Any())
-                    {
-                        ImGui.Text("Visible");
-                        ImGui.Separator();
-                        DrawPairs(tag, visiblePairsInThisTag);
-                    }
-
-                    if (onlinePairsInThisTag.Any())
-                    {
-                        ImGui.Text("Online");
-                        ImGui.Separator();
-                        DrawPairs(tag, onlinePairsInThisTag);
-                    }
-
-                    if (offlinePairsInThisTag.Any())
-                    {
-                        ImGui.Text("Offline/Unknown");
-                        ImGui.Separator();
-                        DrawPairs(tag, offlinePairsInThisTag);
-                    }
-                    ImGui.Unindent(20);
-                }
+                usersInThisTag = users;
             }
+            else
+            {
+                otherUidsTaggedWithTag = _tagHandler.GetOtherUidsForTag(tag);
+                usersInThisTag = users
+                    .Where(pair => otherUidsTaggedWithTag.Contains(pair.UserData.UID))
+                    .ToList();
+            }
+
+            if (!usersInThisTag.Any()) return;
+
+            DrawName(tag, usersInThisTag.Count, otherUidsTaggedWithTag?.Count);
+            UiShared.DrawWithID($"group-{tag}-buttons", () => DrawButtons(tag, usersInThisTag));
+
+            if (!_tagHandler.IsTagOpen(tag)) return;
+
+            ImGui.Indent(20);
+            DrawPairs(tag, usersInThisTag);
+            ImGui.Unindent(20);
         }
 
-        private void DrawName(string tag)
+        private void DrawName(string tag, int count, int? total)
         {
-            var resultFolderName = $"{tag}";
+            string displayedName = tag switch
+            {
+                TagHandler.CustomOfflineTag => "Offline/Unknown",
+                TagHandler.CustomOnlineTag => "Online",
+                TagHandler.CustomVisibleTag => "Visible",
+                _ => tag
+            };
+
+            string resultFolderName = total != null ? $"{displayedName} ({count}/{total} Pairs)" : $"{displayedName} ({count} Pairs)";
 
             //  FontAwesomeIcon.CaretSquareDown : FontAwesomeIcon.CaretSquareRight
             var icon = _tagHandler.IsTagOpen(tag) ? FontAwesomeIcon.CaretSquareDown : FontAwesomeIcon.CaretSquareRight;

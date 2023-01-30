@@ -67,7 +67,7 @@ public class SelectGroupForPairUi
             var tags = _tagHandler.GetAllTagsSorted();
             var childHeight = tags.Count != 0 ? tags.Count * 25 : 1;
             var childSize = new Vector2(0, childHeight > 100 ? 100 : childHeight) * ImGuiHelpers.GlobalScale;
-            
+
             UiShared.FontText($"Select the groups you want {name} to be in.", UiBuilder.DefaultFont);
             if (ImGui.BeginChild(name + "##listGroups", childSize))
             {
@@ -115,13 +115,17 @@ public class SelectGroupForPairUi
 
     private void HandleAddTag()
     {
-        if (!_tagNameToAdd.IsNullOrWhitespace())
+        if (!_tagNameToAdd.IsNullOrWhitespace() && _tagNameToAdd is not (TagHandler.CustomOfflineTag or TagHandler.CustomOnlineTag or TagHandler.CustomVisibleTag))
         {
             _tagHandler.AddTag(_tagNameToAdd);
             if (_pair != null)
             {
                 _tagHandler.AddTagToPairedUid(_pair.UserPair!, _tagNameToAdd);
             }
+            _tagNameToAdd = string.Empty;
+        }
+        else
+        {
             _tagNameToAdd = string.Empty;
         }
     }

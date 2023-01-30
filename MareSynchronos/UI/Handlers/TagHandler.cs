@@ -6,6 +6,9 @@ namespace MareSynchronos.UI.Handlers
     public class TagHandler
     {
         private readonly ServerConfigurationManager _serverConfigurationManager;
+        public const string CustomVisibleTag = "Mare_Visible";
+        public const string CustomOnlineTag = "Mare_Online";
+        public const string CustomOfflineTag = "Mare_Offline";
 
         public TagHandler(ServerConfigurationManager serverConfigurationManager)
         {

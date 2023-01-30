@@ -554,40 +554,6 @@ public class CompactUi : Window, IDisposable
 
         _pairGroupsUi.Draw(visibleUsers, onlineUsers, offlineUsers);
 
-        visibleUsers = visibleUsers.Where(pair => !_tagHandler.HasAnyTag(pair.UserPair!)).ToList();
-        onlineUsers = onlineUsers.Where(pair => !_tagHandler.HasAnyTag(pair.UserPair!)).ToList();
-        offlineUsers = offlineUsers.Where(pair => !_tagHandler.HasAnyTag(pair.UserPair!)).ToList();
-
-        if (visibleUsers.Any())
-        {
-            ImGui.Text("Visible");
-            ImGui.Separator();
-            foreach (var entry in visibleUsers)
-            {
-                UiShared.DrawWithID(entry.UserData.UID, () => DrawPairedClient(entry));
-            }
-        }
-
-        if (onlineUsers.Any())
-        {
-            ImGui.Text("Online");
-            ImGui.Separator();
-            foreach (var entry in onlineUsers)
-            {
-                UiShared.DrawWithID(entry.UserData.UID, () => DrawPairedClient(entry));
-            }
-        }
-
-        if (offlineUsers.Any())
-        {
-            ImGui.Text("Offline/Unknown");
-            ImGui.Separator();
-            foreach (var entry in offlineUsers)
-            {
-                UiShared.DrawWithID(entry.UserData.UID, () => DrawPairedClient(entry));
-            }
-        }
-
         ImGui.EndChild();
     }
 
