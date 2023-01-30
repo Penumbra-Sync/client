@@ -56,14 +56,14 @@ public class CachedPlayer : IDisposable
 
     public bool WasVisible { get; private set; }
 
-    public void ApplyCharacterData(API.Data.CharacterData characterData, OptionalPluginWarning warning)
+    public void ApplyCharacterData(API.Data.CharacterData characterData, OptionalPluginWarning warning, bool forced = false)
     {
         Logger.Debug("Received data for " + this);
 
         Logger.Debug("Checking for files to download for player " + PlayerName);
         Logger.Debug("Hash for data is " + characterData.DataHash.Value + ", current cache hash is " + _cachedData.DataHash.Value);
 
-        if (string.Equals(characterData.DataHash.Value, _cachedData.DataHash.Value, StringComparison.Ordinal)) return;
+        if (string.Equals(characterData.DataHash.Value, _cachedData.DataHash.Value, StringComparison.Ordinal) && !forced) return;
 
         bool updateModdedPaths = false;
         List<ObjectKind> charaDataToUpdate = new();

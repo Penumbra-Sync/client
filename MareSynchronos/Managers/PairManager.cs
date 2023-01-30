@@ -110,7 +110,15 @@ public class PairManager : IDisposable
 
     public void AddUserPair(UserPairDto dto, bool addToLastAddedUser = true)
     {
-        if (!_allClientPairs.ContainsKey(dto.User)) _allClientPairs[dto.User] = _pairFactory.Create();
+        if (!_allClientPairs.ContainsKey(dto.User))
+        {
+            _allClientPairs[dto.User] = _pairFactory.Create();
+        }
+        else
+        {
+            addToLastAddedUser = false;
+        }
+
         _allClientPairs[dto.User].UserPair = dto;
         if (addToLastAddedUser)
             LastAddedUser = _allClientPairs[dto.User];

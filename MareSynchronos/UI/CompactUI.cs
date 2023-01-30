@@ -503,6 +503,16 @@ public class CompactUi : Window, IDisposable
 
     private void DrawPairedClientMenu(Pair entry)
     {
+        if (entry.IsVisible)
+        {
+            if (UiShared.IconTextButton(FontAwesomeIcon.Sync, "Reload last data"))
+            {
+                entry.ApplyLastReceivedData(forced: true);
+                ImGui.CloseCurrentPopup();
+            }
+            UiShared.AttachToolTip("This reapplies the last received character data to this character");
+        }
+
         var entryUID = entry.UserData.AliasOrUID;
         if (UiShared.IconTextButton(FontAwesomeIcon.Folder, "Pair Groups"))
         {

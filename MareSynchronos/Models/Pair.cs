@@ -83,7 +83,7 @@ public class Pair
         ApplyLastReceivedData();
     }
 
-    public void ApplyLastReceivedData()
+    public void ApplyLastReceivedData(bool forced = false)
     {
         if (CachedPlayer == null) return;
         if (LastReceivedCharacterData == null) return;
@@ -95,7 +95,7 @@ public class Pair
             ShownPalettePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
         };
 
-        CachedPlayer.ApplyCharacterData(RemoveNotSyncedFiles(LastReceivedCharacterData.DeepClone())!, _pluginWarnings);
+        CachedPlayer.ApplyCharacterData(RemoveNotSyncedFiles(LastReceivedCharacterData.DeepClone())!, _pluginWarnings, forced);
     }
 
     private API.Data.CharacterData? RemoveNotSyncedFiles(API.Data.CharacterData? data)
