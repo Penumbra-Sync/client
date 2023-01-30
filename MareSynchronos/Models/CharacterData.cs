@@ -25,6 +25,9 @@ public class CharacterData
 
     [JsonProperty]
     public string CustomizePlusScale { get; set; } = string.Empty;
+    
+    [JsonProperty]
+    public string PalettePlusPalette { get; set; } = string.Empty;
 
     public void AddFileReplacement(ObjectKind objectKind, FileReplacement fileReplacement)
     {
@@ -74,6 +77,7 @@ public class CharacterData
             ManipulationData = ManipulationString,
             HeelsOffset = HeelsOffset,
             CustomizePlusData = CustomizePlusScale,
+            PalettePlusData = PalettePlusPalette,
         };
     }
 

@@ -50,6 +50,12 @@ public class IpcManager : IDisposable
     private readonly ICallGateSubscriber<string, Character?, object> _customizePlusSetBodyScaleToCharacter;
     private readonly ICallGateSubscriber<Character?, object> _customizePlusRevert;
     private readonly ICallGateSubscriber<string?, object> _customizePlusOnScaleUpdate;
+    
+    private readonly ICallGateSubscriber<string> _palettePlusApiVersion;
+    private readonly ICallGateSubscriber<Character, string> _palettePlusGetCharaPalette;
+    private readonly ICallGateSubscriber<Character, string, object> _palettePlusSetCharaPalette;
+    private readonly ICallGateSubscriber<Character, object> _palettePlusRemoveCharaPalette;
+    private readonly ICallGateSubscriber<Character, string, object> _palettePlusPaletteChanged;
 
     private readonly DalamudUtil _dalamudUtil;
     private bool _inGposeQueueMode = false;
@@ -102,6 +108,14 @@ public class IpcManager : IDisposable
         _customizePlusOnScaleUpdate = pi.GetIpcSubscriber<string?, object>("CustomizePlus.OnScaleUpdate");
 
         _customizePlusOnScaleUpdate.Subscribe(OnCustomizePlusScaleChange);
+        
+        _palettePlusApiVersion = pi.GetIpcSubscriber<string>("PalettePlus.ApiVersion");
+        _palettePlusGetCharaPalette = pi.GetIpcSubscriber<Character, string>("PalettePlus.GetCharaPalette");
+        _palettePlusSetCharaPalette = pi.GetIpcSubscriber<Character, string, object>("PalettePlus.SetCharaPalette");
+        _palettePlusRemoveCharaPalette = pi.GetIpcSubscriber<Character, object>("PalettePlus.RemoveCharaPalette");
+        _palettePlusPaletteChanged = pi.GetIpcSubscriber<Character, string, object>("PalettePlus.PaletteChanged");
+
+        _palettePlusPaletteChanged.Subscribe(OnPalettePlusPaletteChange);
 
         if (Initialized)
         {
@@ -168,6 +182,7 @@ public class IpcManager : IDisposable
     public event FloatDelegate? HeelsOffsetChangeEvent;
     public event PenumbraFileResourceDelegate? PenumbraResourceLoadEvent;
     public event StringDelegate? CustomizePlusScaleChange;
+    public event StringDelegate? PalettePlusPaletteChange;
 
     public bool Initialized => CheckPenumbraApi();
     public bool CheckGlamourerApi()
@@ -211,6 +226,18 @@ public class IpcManager : IDisposable
         try
         {
             return string.Equals(_customizePlusApiVersion.InvokeFunc(), "1.0", StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public bool CheckPalettePlusApi()
+    {
+        try
+        {
+            return string.Equals(_palettePlusApiVersion.InvokeFunc(), "1.0.0", StringComparison.Ordinal);
         }
         catch
         {
@@ -501,6 +528,59 @@ public class IpcManager : IDisposable
     {
         if (scale != null) scale = Convert.ToBase64String(Encoding.UTF8.GetBytes(scale));
         CustomizePlusScaleChange?.Invoke(scale);
+    }
+
+    private void OnPalettePlusPaletteChange(Character character, string palette)
+    {
+        if (character.Address == 0 || character.Address != _dalamudUtil.PlayerPointer) return;
+        if (palette != null) palette = Convert.ToBase64String(Encoding.UTF8.GetBytes(palette));
+        PalettePlusPaletteChange?.Invoke(palette);
+    }
+
+    public void PalettePlusSetPalette(IntPtr character, string palette)
+    {
+        if (!CheckPalettePlusApi()) return;
+        ActionQueue.Enqueue(() =>
+        {
+            var gameObj = _dalamudUtil.CreateGameObject(character);
+            if (gameObj is Character c)
+            {
+                string decodedPalette = Encoding.UTF8.GetString(Convert.FromBase64String(palette));
+                
+                if (string.IsNullOrEmpty(decodedPalette))
+                {
+                    Logger.Verbose("PalettePlus removing for " + c.Address.ToString("X"));
+                    _palettePlusRemoveCharaPalette!.InvokeAction(c);
+                }
+                else
+                {
+                    Logger.Verbose("PalettePlus applying for " + c.Address.ToString("X"));
+                    _palettePlusSetCharaPalette!.InvokeAction(c, decodedPalette);
+                }
+            }
+        });
+    }
+
+    public string PalettePlusGetPalette()
+    {
+        if (!CheckPalettePlusApi()) return string.Empty;
+        var palette = _palettePlusGetCharaPalette.InvokeFunc(_dalamudUtil.PlayerCharacter);
+        if (string.IsNullOrEmpty(palette)) return string.Empty;
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes(palette));
+    }
+    
+    public void PalettePlusRemovePalette(IntPtr character)
+    {
+        if (!CheckPalettePlusApi()) return;
+        ActionQueue.Enqueue(() =>
+        {
+            var gameObj = _dalamudUtil.CreateGameObject(character);
+            if (gameObj is Character c)
+            {
+                Logger.Verbose("PalettePlus removing for " + c.Address.ToString("X"));
+                _palettePlusRemoveCharaPalette!.InvokeAction(c);
+            }
+        });
     }
 
     private void PenumbraDispose()

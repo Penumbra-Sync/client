@@ -326,6 +326,7 @@ public class CharacterDataFactory
         previousData.GlamourerString[objectKind] = _ipcManager.GlamourerGetCharacterCustomization(charaPointer);
         previousData.HeelsOffset = _ipcManager.GetHeelsOffset();
         previousData.CustomizePlusScale = _ipcManager.GetCustomizePlusScale();
+        previousData.PalettePlusPalette = _ipcManager.PalettePlusGetPalette();
 
         Logger.Debug("Handling transient update for " + objectKind);
         ManageSemiTransientData(previousData, objectKind, charaPointer);
