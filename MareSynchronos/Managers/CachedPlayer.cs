@@ -129,6 +129,14 @@ public class CachedPlayer : IDisposable
                     charaDataToUpdate.Add(objectKind);
                     continue;
                 }
+
+                bool palettePlusDataDifferent = !string.Equals(_cachedData.PalettePlusData, characterData.PalettePlusData, StringComparison.Ordinal);
+                if (palettePlusDataDifferent)
+                {
+                    Logger.Debug("Updating " + objectKind);
+                    charaDataToUpdate.Add(objectKind);
+                    continue;
+                }
             }
         }
 
@@ -146,6 +154,15 @@ public class CachedPlayer : IDisposable
             {
                 _dalamudUtil.PrintWarnChat("Received Customize+ data for player " + PlayerName + ", but Customize+ is not installed. Install Customize+ to experience their character fully.");
                 warning.ShownCustomizePlusWarning = true;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(characterData.PalettePlusData))
+        {
+            if (!warning.ShownPalettePlusWarning && !_ipcManager.CheckPalettePlusApi())
+            {
+                _dalamudUtil.PrintWarnChat("Received Palette+ data for player " + PlayerName + ", but Palette+ is not installed. Install Palette+ to experience their character fully.");
+                warning.ShownPalettePlusWarning = true;
             }
         }
 
@@ -244,6 +261,7 @@ public class CachedPlayer : IDisposable
                 ct.ThrowIfCancellationRequested();
                 _ipcManager.HeelsSetOffsetForPlayer(_cachedData.HeelsOffset, PlayerCharacter);
                 _ipcManager.CustomizePlusSetBodyScale(PlayerCharacter, _cachedData.CustomizePlusData);
+                _ipcManager.PalettePlusSetPalette(PlayerCharacter, _cachedData.PalettePlusData);
                 RequestedPenumbraRedraw = true;
                 Logger.Debug(
                     $"Request Redraw for {PlayerName}");
@@ -449,6 +467,7 @@ public class CachedPlayer : IDisposable
                 _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerCharacter);
                 _ipcManager.HeelsRestoreOffsetForPlayer(PlayerCharacter);
                 _ipcManager.CustomizePlusRevert(PlayerCharacter);
+                _ipcManager.PalettePlusRemovePalette(PlayerCharacter);
             }
             else
             {

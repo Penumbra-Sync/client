@@ -181,11 +181,13 @@ public partial class UiShared : IDisposable
         var glamourerExists = _ipcManager.CheckGlamourerApi();
         var heelsExists = _ipcManager.CheckHeelsApi();
         var customizeExists = _ipcManager.CheckCustomizePlusApi();
+        var paletteExists = _ipcManager.CheckPalettePlusApi();
 
         var penumbraColor = penumbraExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         var glamourerColor = glamourerExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         var heelsColor = heelsExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         var customizeColor = customizeExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
+        var paletteColor = paletteExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         ImGui.Text("Penumbra:");
         ImGui.SameLine();
         ImGui.TextColored(penumbraColor, penumbraExists ? "Available" : "Unavailable");
@@ -202,6 +204,10 @@ public partial class UiShared : IDisposable
         ImGui.Text("Customize+:");
         ImGui.SameLine();
         ImGui.TextColored(customizeColor, customizeExists ? "Available" : "Unavailable");
+        ImGui.SameLine();
+        ImGui.Text("PalettePlus+:");
+        ImGui.SameLine();
+        ImGui.TextColored(paletteColor, paletteExists ? "Available" : "Unavailable");
 
         if (!penumbraExists || !glamourerExists)
         {

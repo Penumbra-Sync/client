@@ -51,6 +51,7 @@ public class PlayerManager : IDisposable
         _dalamudUtil.DelayedFrameworkUpdate += DalamudUtilOnDelayedFrameworkUpdate;
         _ipcManager.HeelsOffsetChangeEvent += HeelsOffsetChanged;
         _ipcManager.CustomizePlusScaleChange += CustomizePlusChanged;
+        _ipcManager.PalettePlusPaletteChange += PalettePlusChanged;
         _dalamudUtil.FrameworkUpdate += DalamudUtilOnFrameworkUpdate;
 
 
@@ -118,6 +119,17 @@ public class PlayerManager : IDisposable
         }
     }
 
+    private void PalettePlusChanged(string? change)
+    {
+        change ??= string.Empty;
+        var player = _playerRelatedObjects.First(f => f.ObjectKind == ObjectKind.Player);
+        if (LastCreatedCharacterData != null && !string.Equals(LastCreatedCharacterData.PalettePlusData, change, StringComparison.Ordinal) && !player.IsProcessing)
+        {
+            Logger.Debug("PalettePlus data changed to " + change);
+            player.HasTransientsUpdate = true;
+        }
+    }
+
     public void Dispose()
     {
         Logger.Verbose("Disposing " + nameof(PlayerManager));
@@ -134,6 +146,7 @@ public class PlayerManager : IDisposable
         _playerChangedCts?.Cancel();
         _ipcManager.HeelsOffsetChangeEvent -= HeelsOffsetChanged;
         _ipcManager.CustomizePlusScaleChange -= CustomizePlusChanged;
+        _ipcManager.PalettePlusPaletteChange -= PalettePlusChanged;
     }
 
     private unsafe void DalamudUtilOnDelayedFrameworkUpdate()
