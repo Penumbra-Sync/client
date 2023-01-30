@@ -466,7 +466,7 @@ public class SettingsUi : Window, IDisposable
             _configService.Current.ShowCharacterNameInsteadOfNotesForVisible = showNameInsteadOfNotes;
             _configService.Save();
         }
-        UiShared.DrawHelpText("This will show the character name instead of custom set note when visible");
+        UiShared.DrawHelpText("This will show the character name instead of custom set note when a character is visible");
 
         if (ImGui.Checkbox("Reverse user sort", ref reverseUserSort))
         {
