@@ -27,4 +27,5 @@ public class MareConfig : IPluginConfiguration
     public string CurrentServer { get; set; } = string.Empty;
     public bool ShowOnlineNotifications { get; set; } = false;
     public bool ShowOnlineNotificationsOnlyForIndividualPairs { get; set; } = true;
+    public bool ShowCharacterNameInsteadOfNotesForVisible { get; set; } = false;
 }

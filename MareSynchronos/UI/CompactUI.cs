@@ -413,6 +413,12 @@ public class CompactUi : Window, IDisposable
             playerText = entryUID;
         }
 
+        if (_configService.Current.ShowCharacterNameInsteadOfNotesForVisible && entry.IsVisible && !showUidInsteadOfName)
+        {
+            playerText = entry.PlayerName;
+            textIsUid = false;
+        }
+
         ImGui.SameLine();
         if (!string.Equals(EditNickEntry, entry.UserData.UID, StringComparison.Ordinal))
         {
@@ -530,7 +536,8 @@ public class CompactUi : Window, IDisposable
         var users = GetFilteredUsers();
 
         ImGui.BeginChild("list", new Vector2(WindowContentWidth, ySize), border: false);
-        var visibleUsers = users.Where(u => u.IsVisible && u.UserPair!.OtherPermissions.IsPaired()).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
+        var visibleUsers = users.Where(u => u.IsVisible && u.UserPair!.OtherPermissions.IsPaired()).OrderBy(u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible ?
+            u.PlayerName : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase).ToList();
         var onlineUsers = users.Where(u => u.IsOnline && !u.IsVisible && u.UserPair!.OtherPermissions.IsPaired()).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
         var offlineUsers = users.Where(u => !u.IsOnline && !u.IsVisible || !u.UserPair!.OtherPermissions.IsPaired()).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
 

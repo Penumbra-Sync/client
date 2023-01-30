@@ -458,6 +458,25 @@ public class SettingsUi : Window, IDisposable
         UiShared.DrawHelpText("This will open a popup that allows you to set the notes for a user after successfully adding them to your individual pairs.");
 
         ImGui.Separator();
+        UiShared.FontText("UI", _uiShared.UidFont);
+        var showNameInsteadOfNotes = _configService.Current.ShowCharacterNameInsteadOfNotesForVisible;
+        var reverseUserSort = _configService.Current.ReverseUserSort;
+        if (ImGui.Checkbox("Show player name instead of note for visible players", ref showNameInsteadOfNotes))
+        {
+            _configService.Current.ShowCharacterNameInsteadOfNotesForVisible = showNameInsteadOfNotes;
+            _configService.Save();
+        }
+        UiShared.DrawHelpText("This will show the character name instead of custom set note when visible");
+
+        if (ImGui.Checkbox("Reverse user sort", ref reverseUserSort))
+        {
+            _configService.Current.ReverseUserSort = reverseUserSort;
+            _configService.Save();
+        }
+        UiShared.DrawHelpText("This reverses the user sort from A->Z to Z->A");
+
+        ImGui.Separator();
+
         UiShared.FontText("Server Messages", _uiShared.UidFont);
         if (ImGui.Checkbox("Hide Server Info Messages", ref hideInfoMessages))
         {
