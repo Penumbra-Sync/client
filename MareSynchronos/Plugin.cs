@@ -16,6 +16,7 @@ using Dalamud.Game.Gui;
 using MareSynchronos.Export;
 using Dalamud.Data;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.Mediator;
 
 namespace MareSynchronos;
 
@@ -46,6 +47,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly GposeUi _gposeUi;
     private readonly ConfigurationService _configurationService;
+    private readonly MareMediator _mediator;
 
 
     public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager, DataManager gameData,
@@ -56,6 +58,7 @@ public sealed class Plugin : IDalamudPlugin
         _pluginInterface.UiBuilder.DisableGposeUiHide = true;
         _commandManager = commandManager;
         _configurationService = new(_pluginInterface);
+        _mediator = new();
 
         _localization = new Dalamud.Localization("MareSynchronos.Localization.", "", useEmbedded: true);
         _localization.SetupWithLangCode("en");
@@ -138,6 +141,9 @@ public sealed class Plugin : IDalamudPlugin
         _transientResourceManager?.Dispose();
         _dalamudUtil.Dispose();
         _configurationService?.Dispose();
+
+        _mediator.Dispose();
+
         Logger.Debug("Shut down");
     }
 
