@@ -17,6 +17,8 @@ using MareSynchronos.Export;
 using Dalamud.Data;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace MareSynchronos;
 
@@ -48,6 +50,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly GposeUi _gposeUi;
     private readonly ConfigurationService _configurationService;
     private readonly MareMediator _mediator;
+    private readonly ServiceProvider _serviceProvider;
 
 
     public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager, DataManager gameData,
@@ -57,35 +60,52 @@ public sealed class Plugin : IDalamudPlugin
         _pluginInterface = pluginInterface;
         _pluginInterface.UiBuilder.DisableGposeUiHide = true;
         _commandManager = commandManager;
-        _configurationService = new(_pluginInterface);
-        _mediator = new();
 
-        _localization = new Dalamud.Localization("MareSynchronos.Localization.", "", useEmbedded: true);
-        _localization.SetupWithLangCode("en");
+        IServiceCollection collection = new ServiceCollection();
+        // inject dalamud stuff
+        collection.AddSingleton(pluginInterface);
+        collection.AddSingleton(commandManager);
+        collection.AddSingleton(gameData);
+        collection.AddSingleton(framework);
+        collection.AddSingleton(objectTable);
+        collection.AddSingleton(clientState);
+        collection.AddSingleton(condition);
+        collection.AddSingleton(chatGui);
+        collection.AddSingleton(new WindowSystem("MareSynchronos"));
+        collection.AddSingleton<FileDialogManager>();
 
-        _windowSystem = new WindowSystem("MareSynchronos");
+        // add mare related stuff
+        collection.AddSingleton(new Dalamud.Localization("MareSynchronos.Localization.", "", useEmbedded: true));
+
+        collection.AddSingleton<ConfigurationService>();
+        collection.AddSingleton<MareMediator>();
+        collection.AddSingleton<DalamudUtil>();
+        collection.AddSingleton<IpcManager>();
+        collection.AddSingleton<FileCacheManager>();
+        collection.AddSingleton<ServerConfigurationManager>();
+        collection.AddSingleton<PairManager>();
+        collection.AddSingleton<ApiController>();
+        collection.AddSingleton<PeriodicFileScanner>();
+        collection.AddSingleton<FileReplacementFactory>();
+        collection.AddSingleton<MareCharaFileManager>();
+
+        collection.AddSingleton<UiShared>();
+        collection.AddSingleton<SettingsUi>();
+        collection.AddSingleton<CompactUi>();
+        collection.AddSingleton<GposeUi>();
+        collection.AddSingleton<IntroUi>();
+
+        collection.AddTransient<TransientResourceManager>();
+        collection.AddTransient<CharacterDataFactory>();
+        collection.AddTransient<PlayerManager>();
+        collection.AddTransient<OnlinePlayerManager>();
+
+        _serviceProvider = collection.BuildServiceProvider(new ServiceProviderOptions() { ValidateOnBuild = true, ValidateScopes = true });
+
+        _serviceProvider.GetRequiredService<Dalamud.Localization>().SetupWithLangCode("en");
 
         // those can be initialized outside of game login
-        _dalamudUtil = new DalamudUtil(clientState, objectTable, framework, condition, chatGui, gameData);
 
-        _ipcManager = new IpcManager(_pluginInterface, _dalamudUtil);
-        _fileDialogManager = new FileDialogManager();
-        _fileCacheManager = new FileCacheManager(_ipcManager, _configurationService);
-        _serverConfigurationManager = new ServerConfigurationManager(_configurationService, _dalamudUtil);
-        _pairManager = new PairManager(new CachedPlayerFactory(_ipcManager, _dalamudUtil, _fileCacheManager), _dalamudUtil,
-            new PairFactory(_configurationService, _serverConfigurationManager), _pluginInterface.UiBuilder, _configurationService);
-        _apiController = new ApiController(_configurationService, _dalamudUtil, _fileCacheManager, _pairManager, _serverConfigurationManager);
-        _periodicFileScanner = new PeriodicFileScanner(_ipcManager, _configurationService, _fileCacheManager, _apiController, _dalamudUtil);
-        _fileReplacementFactory = new FileReplacementFactory(_fileCacheManager, _ipcManager);
-        _mareCharaFileManager = new(_fileCacheManager, _ipcManager, _configurationService, _dalamudUtil);
-
-        _uiSharedComponent =
-            new UiShared(_ipcManager, _apiController, _periodicFileScanner, _fileDialogManager, _configurationService, _dalamudUtil, _pluginInterface, _localization, _serverConfigurationManager);
-        _settingsUi = new SettingsUi(_windowSystem, _uiSharedComponent, _configurationService, _mareCharaFileManager, _pairManager, _serverConfigurationManager);
-        _compactUi = new CompactUi(_windowSystem, _uiSharedComponent, _configurationService, _apiController, _pairManager, _serverConfigurationManager);
-        _gposeUi = new GposeUi(_windowSystem, _mareCharaFileManager, _dalamudUtil, _fileDialogManager, _configurationService);
-
-        _introUi = new IntroUi(_windowSystem, _uiSharedComponent, _configurationService, _periodicFileScanner, _serverConfigurationManager);
         _settingsUi.SwitchToIntroUi += () =>
         {
             _introUi.IsOpen = true;
@@ -119,6 +139,10 @@ public sealed class Plugin : IDalamudPlugin
     public void Dispose()
     {
         Logger.Verbose("Disposing " + Name);
+
+        var services = _serviceProvider.GetServices<IDisposable>().ToList();
+        services.ForEach(c => c.Dispose());
+
         _apiController?.Dispose();
 
         _commandManager.RemoveHandler(_commandName);
@@ -200,13 +224,10 @@ public sealed class Plugin : IDalamudPlugin
         try
         {
             Logger.Debug("Launching Managers");
-            _transientResourceManager = new TransientResourceManager(_ipcManager, _configurationService, _dalamudUtil, _fileReplacementFactory);
-            var characterCacheFactory =
-                new CharacterDataFactory(_dalamudUtil, _ipcManager, _transientResourceManager, _fileReplacementFactory);
-            _playerManager = new PlayerManager(_apiController, _ipcManager,
-                characterCacheFactory, _dalamudUtil, _transientResourceManager, _periodicFileScanner, _settingsUi);
-            _characterCacheManager = new OnlinePlayerManager(_apiController,
-                _dalamudUtil, _playerManager, _fileCacheManager, _pairManager);
+
+            _transientResourceManager = _serviceProvider.GetRequiredService<TransientResourceManager>();
+            _playerManager = _serviceProvider.GetRequiredService<PlayerManager>();
+            _characterCacheManager = _serviceProvider.GetRequiredService<OnlinePlayerManager>();
         }
         catch (Exception ex)
         {
