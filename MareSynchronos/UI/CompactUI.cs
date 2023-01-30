@@ -713,7 +713,7 @@ public class CompactUi : Window, IDisposable
             ImGui.SetCursorPosY(originalPos.Y + uidTextSize.Y / 2 - buttonSize.Y / 2);
             if (ImGuiComponents.IconButton(FontAwesomeIcon.Copy))
             {
-                ImGui.SetClipboardText(_apiController.UID);
+                ImGui.SetClipboardText(_apiController.DisplayName);
             }
             UiShared.AttachToolTip("Copy your UID to clipboard");
             ImGui.SameLine();
