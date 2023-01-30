@@ -359,40 +359,26 @@ public class CompactUi : Window, IDisposable
 
         var textPos = originalY + pauseIconSize.Y / 2 - textSize.Y / 2;
         ImGui.SetCursorPosY(textPos);
-        FontAwesomeIcon presenceIcon;
         FontAwesomeIcon connectionIcon;
         string connectionText = string.Empty;
-        string presenceText = string.Empty;
-        Vector4 presenceColor;
         Vector4 connectionColor;
         if (!(entry.UserPair!.OwnPermissions.IsPaired() && entry.UserPair!.OtherPermissions.IsPaired()))
         {
             connectionIcon = FontAwesomeIcon.ArrowUp;
             connectionText = entryUID + " has not added you back";
             connectionColor = ImGuiColors.DalamudRed;
-            presenceIcon = FontAwesomeIcon.Question;
-            presenceColor = ImGuiColors.DalamudGrey;
-            presenceText = entryUID + " online status is unknown (not paired)";
         }
         else if (entry.UserPair!.OwnPermissions.IsPaused() || entry.UserPair!.OtherPermissions.IsPaused())
         {
             connectionIcon = FontAwesomeIcon.PauseCircle;
             connectionText = "Pairing status with " + entryUID + " is paused";
             connectionColor = ImGuiColors.DalamudYellow;
-            presenceIcon = FontAwesomeIcon.Question;
-            presenceColor = ImGuiColors.DalamudGrey;
-            presenceText = entryUID + " online status is unknown (paused)";
         }
         else
         {
             connectionIcon = FontAwesomeIcon.Check;
             connectionText = "You are paired with " + entryUID;
             connectionColor = ImGuiColors.ParsedGreen;
-            presenceIcon = entry.IsVisible ? FontAwesomeIcon.Eye : (entry.IsOnline ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink);
-            presenceColor = (entry.IsOnline || entry.IsVisible) ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
-            presenceText = entryUID + " is offline";
-            if (entry.IsOnline && !entry.IsVisible) presenceText = entryUID + " is online";
-            else if (entry.IsOnline && entry.IsVisible) presenceText = entryUID + " is visible: " + entry.PlayerName;
         }
 
         ImGui.PushFont(UiBuilder.IconFont);
@@ -401,10 +387,13 @@ public class CompactUi : Window, IDisposable
         UiShared.AttachToolTip(connectionText);
         ImGui.SameLine();
         ImGui.SetCursorPosY(textPos);
-        ImGui.PushFont(UiBuilder.IconFont);
-        UiShared.ColorText(presenceIcon.ToIconString(), presenceColor);
-        ImGui.PopFont();
-        UiShared.AttachToolTip(presenceText);
+        if (entry is { IsOnline: true, IsVisible: true })
+        {
+            ImGui.PushFont(UiBuilder.IconFont);
+            UiShared.ColorText(FontAwesomeIcon.Eye.ToIconString(), ImGuiColors.ParsedGreen);
+            ImGui.PopFont();
+            UiShared.AttachToolTip(entryUID + " is visible: " + entry.PlayerName!);
+        }
 
         var textIsUid = true;
         ShowUidForEntry.TryGetValue(entry.UserPair!.User.UID, out var showUidInsteadOfName);
