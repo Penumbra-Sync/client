@@ -181,7 +181,7 @@ public class PairManager : IDisposable
             || !_configurationService.Current.ShowOnlineNotificationsOnlyForNamedPairs))
         {
             string note = pair.GetNote();
-            var msg = string.IsNullOrEmpty(note)
+            var msg = !string.IsNullOrEmpty(note)
                 ? $"{note} ({pair.UserData.AliasOrUID}) is now online"
                 : $"{pair.UserData.AliasOrUID} is now online";
             _mediator.Publish(new NotificationMessage("User online", msg, NotificationType.Info, 5000));
