@@ -7,16 +7,15 @@ using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.Managers;
 
-public class OnlinePlayerManager : IDisposable
+public class OnlinePlayerManager : MediatorSubscriberBase, IDisposable
 {
     private readonly ApiController _apiController;
     private readonly DalamudUtil _dalamudUtil;
     private readonly PlayerManager _playerManager;
     private readonly FileCacheManager _fileDbManager;
     private readonly PairManager _pairManager;
-    private readonly MareMediator _mediator;
 
-    public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil, PlayerManager playerManager, FileCacheManager fileDbManager, PairManager pairManager, MareMediator mediator)
+    public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil, PlayerManager playerManager, FileCacheManager fileDbManager, PairManager pairManager, MareMediator mediator) : base(mediator)
     {
         Logger.Verbose("Creating " + nameof(OnlinePlayerManager));
 
@@ -25,41 +24,32 @@ public class OnlinePlayerManager : IDisposable
         _playerManager = playerManager;
         _fileDbManager = fileDbManager;
         _pairManager = pairManager;
-        _mediator = mediator;
-        _playerManager.PlayerHasChanged += PlayerManagerOnPlayerHasChanged;
 
-        _mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
-        _mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
-
-        if (_dalamudUtil.IsLoggedIn)
-        {
-            DalamudUtilOnLogIn();
-        }
+        Mediator.Subscribe<PlayerChangedMessage>(this, (msg) => PlayerManagerOnPlayerHasChanged((PlayerChangedMessage)msg));
+        Mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
+        Mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
+        Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => FrameworkOnUpdate());
     }
 
-    private void PlayerManagerOnPlayerHasChanged(CharacterData characterCache)
+    private void PlayerManagerOnPlayerHasChanged(PlayerChangedMessage msg)
     {
         PushCharacterData(_pairManager.VisibleUsers);
     }
 
     private void DalamudUtilOnLogIn()
     {
-        _mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => FrameworkOnUpdate());
+        Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => FrameworkOnUpdate());
     }
 
     private void DalamudUtilOnLogOut()
     {
-        _mediator.Unsubscribe<DelayedFrameworkUpdateMessage>(this);
+        Mediator.Unsubscribe<DelayedFrameworkUpdateMessage>(this);
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
         Logger.Verbose("Disposing " + nameof(OnlinePlayerManager));
-
-        _playerManager.PlayerHasChanged -= PlayerManagerOnPlayerHasChanged;
-        _mediator.Unsubscribe<DalamudLoginMessage>(this);
-        _mediator.Unsubscribe<DalamudLogoutMessage>(this);
-        _mediator.Unsubscribe<DelayedFrameworkUpdateMessage>(this);
+        base.Dispose();
     }
 
     private void FrameworkOnUpdate()

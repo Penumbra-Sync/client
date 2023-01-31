@@ -44,6 +44,14 @@ public class MareMediator : IDisposable
         }
     }
 
+    internal void UnsubscribeAll(object subscriber)
+    {
+        foreach (var kvp in _subscriberDict)
+        {
+            kvp.Value.RemoveWhere(p => p.Subscriber == subscriber);
+        }
+    }
+
     public void Dispose()
     {
         _subscriberDict.Clear();

@@ -20,4 +20,23 @@ public record ZoneSwitchEndMessage : IMessage;
 public record GposeStartMessage : IMessage;
 public record GposeEndMessage : IMessage;
 public record GposeFrameworkUpdateMessage : IMessage;
+public record ConnectedMessage : IMessage;
+public record DisconnectedMessage : IMessage;
+public record DownloadStartedMessage : IMessage;
+public record DownloadFinishedMessage : IMessage;
+public record PenumbraModSettingChangedMessage : IMessage;
+public record PenumbraInitializedMessage : IMessage;
+public record PenumbraDisposedMessage : IMessage;
+public record PenumbraRedrawMessage(IntPtr Address, int ObjTblIdx) : IMessage;
+public record HeelsOffsetMessage(float Offset) : IMessage;
+public record PenumbraResourceLoadMessage(IntPtr GameObject, string GamePath, string FilePath) : IMessage;
+public record CustomizePlusMessage(string? Data) : IMessage;
+public record PalettePlusMessage(string? Data) : IMessage;
+public record PlayerChangedMessage(API.Data.CharacterData Data) : IMessage;
+public record TransientResourceChangedMessage(IntPtr Address) : IMessage;
+public record PlayerRelatedObjectPointerUpdateMessage(IntPtr[] RelatedObjects) : IMessage;
+
+public record HaltScanMessage(string Source) : IMessage;
+public record ResumeScanMessage(string Source) : IMessage;
+
 #pragma warning restore MA0048 // File name must match type name

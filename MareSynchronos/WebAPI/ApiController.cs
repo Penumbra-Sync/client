@@ -11,7 +11,6 @@ using MareSynchronos.API.SignalR;
 using MareSynchronos.Managers;
 using Dalamud.Utility;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.Delegates;
 using MareSynchronos.Mediator;
 
 namespace MareSynchronos.WebAPI;
@@ -79,11 +78,6 @@ public partial class ApiController : IDisposable, IMareHubClient
     {
         Task.Run(() => CreateConnections(forceGetToken: true));
     }
-
-    public event VoidDelegate? Connected;
-    public event VoidDelegate? Disconnected;
-    public event VoidDelegate? DownloadStarted;
-    public event VoidDelegate? DownloadFinished;
 
     public ConcurrentDictionary<int, List<DownloadFileTransfer>> CurrentDownloads { get; } = new();
 
@@ -309,7 +303,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         _ = ClientHealthCheck(_healthCheckTokenSource.Token);
 
         _initialized = true;
-        Connected?.Invoke();
+        _mediator.Publish(new ConnectedMessage());
     }
 
     public void Dispose()
@@ -346,7 +340,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         CurrentDownloads.Clear();
         _uploadCancellationTokenSource?.Cancel();
         _healthCheckTokenSource?.Cancel();
-        Disconnected?.Invoke();
+        _mediator.Publish(new DisconnectedMessage());
         _pairManager.ClearPairs();
         ServerState = ServerState.Offline;
         Logger.Info("Connection closed");
@@ -361,7 +355,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         Logger.Warn("Connection closed... Reconnecting");
         Logger.Warn(arg?.Message ?? string.Empty);
         Logger.Warn(arg?.StackTrace ?? string.Empty);
-        Disconnected?.Invoke();
+        _mediator.Publish(new DisconnectedMessage());
         _pairManager.ClearPairs();
         return Task.CompletedTask;
     }
@@ -391,7 +385,7 @@ public partial class ApiController : IDisposable, IMareHubClient
             await _mareHub.DisposeAsync().ConfigureAwait(false);
             CurrentUploads.Clear();
             CurrentDownloads.Clear();
-            Disconnected?.Invoke();
+            _mediator.Publish(new DisconnectedMessage());
             _pairManager.ClearPairs();
             _mareHub = null;
         }

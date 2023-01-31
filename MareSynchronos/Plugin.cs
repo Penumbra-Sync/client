@@ -24,9 +24,8 @@ namespace MareSynchronos;
 public sealed class Plugin : IDalamudPlugin
 {
     private const string _commandName = "/mare";
-    private IServiceScope? _runtimeServiceServiceScope;
+    private IServiceScope? _runtimeServiceScope;
     private readonly ServiceProvider _serviceProvider;
-
 
     public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager, DataManager gameData,
         Framework framework, ObjectTable objectTable, ClientState clientState, Condition condition, ChatGui chatGui)
@@ -78,13 +77,11 @@ public sealed class Plugin : IDalamudPlugin
 
         _serviceProvider = collection.BuildServiceProvider(new ServiceProviderOptions() { ValidateOnBuild = true, ValidateScopes = true });
 
-        // those can be initialized outside of game login
-
         _serviceProvider.GetRequiredService<Dalamud.Localization>().SetupWithLangCode("en");
         _serviceProvider.GetRequiredService<DalamudPluginInterface>().UiBuilder.DisableGposeUiHide = true;
 
         var mediator = _serviceProvider.GetRequiredService<MareMediator>();
-        mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => ReLaunchCharacterManager());
+        mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => Task.Run(WaitForPlayerAndLaunchCharacterManager));
         mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
         mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
 
@@ -103,12 +100,11 @@ public sealed class Plugin : IDalamudPlugin
 
         _serviceProvider.GetRequiredService<CommandManager>().RemoveHandler(_commandName);
 
-        _runtimeServiceServiceScope?.Dispose();
+        _runtimeServiceScope?.Dispose();
         _serviceProvider.Dispose();
 
         Logger.Debug("Shut down");
     }
-
 
     private void DalamudUtilOnLogIn()
     {
@@ -136,7 +132,7 @@ public sealed class Plugin : IDalamudPlugin
     private void DalamudUtilOnLogOut()
     {
         Logger.Debug("Client logout");
-        _runtimeServiceServiceScope?.Dispose();
+        _runtimeServiceScope?.Dispose();
         var pi = _serviceProvider.GetRequiredService<DalamudPluginInterface>();
         pi.UiBuilder.Draw -= Draw;
         pi.UiBuilder.OpenConfigUi -= OpenUi;
@@ -145,9 +141,7 @@ public sealed class Plugin : IDalamudPlugin
 
     public void ReLaunchCharacterManager()
     {
-        _runtimeServiceServiceScope?.Dispose();
-
-        Task.Run(WaitForPlayerAndLaunchCharacterManager);
+        
     }
 
     private async Task WaitForPlayerAndLaunchCharacterManager()
@@ -162,10 +156,11 @@ public sealed class Plugin : IDalamudPlugin
         {
             Logger.Debug("Launching Managers");
 
-            _runtimeServiceServiceScope = _serviceProvider.CreateScope();
-            _runtimeServiceServiceScope.ServiceProvider.GetRequiredService<TransientResourceManager>();
-            _runtimeServiceServiceScope.ServiceProvider.GetRequiredService<PlayerManager>();
-            _runtimeServiceServiceScope.ServiceProvider.GetRequiredService<OnlinePlayerManager>();
+            _runtimeServiceScope?.Dispose();
+            _runtimeServiceScope = _serviceProvider.CreateScope();
+            _runtimeServiceScope.ServiceProvider.GetRequiredService<TransientResourceManager>();
+            _runtimeServiceScope.ServiceProvider.GetRequiredService<PlayerManager>();
+            _runtimeServiceScope.ServiceProvider.GetRequiredService<OnlinePlayerManager>();
         }
         catch (Exception ex)
         {

@@ -9,7 +9,6 @@ using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Plugin;
 using Dalamud.Utility;
 using ImGuiNET;
-using MareSynchronos.Delegates;
 using MareSynchronos.FileCache;
 using MareSynchronos.Localization;
 using MareSynchronos.Managers;
@@ -35,7 +34,6 @@ public partial class UiShared : IDisposable
     private readonly DalamudPluginInterface _pluginInterface;
     private readonly Dalamud.Localization _localization;
     private readonly ServerConfigurationManager _serverConfigurationManager;
-    private readonly MareMediator _mediator;
 
     public long FileCacheSize => _cacheScanner.FileCacheSize;
     public string PlayerName => _dalamudUtil.PlayerName;
@@ -46,8 +44,6 @@ public partial class UiShared : IDisposable
     public ImFontPtr UidFont { get; private set; }
     public bool UidFontBuilt { get; private set; }
     public bool IsInGpose => _dalamudUtil.IsInGpose;
-    public event VoidDelegate? GposeStart;
-    public event VoidDelegate? GposeEnd;
     public static bool CtrlPressed() => (GetKeyState(0xA2) & 0x8000) != 0 || (GetKeyState(0xA3) & 0x8000) != 0;
     public static bool ShiftPressed() => (GetKeyState(0xA1) & 0x8000) != 0 || (GetKeyState(0xA0) & 0x8000) != 0;
 
@@ -59,7 +55,7 @@ public partial class UiShared : IDisposable
 
     public UiShared(IpcManager ipcManager, ApiController apiController, PeriodicFileScanner cacheScanner, FileDialogManager fileDialogManager,
         ConfigurationService configService, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization,
-        ServerConfigurationManager serverManager, MareMediator mediator)
+        ServerConfigurationManager serverManager)
     {
         _ipcManager = ipcManager;
         _apiController = apiController;
@@ -70,24 +66,10 @@ public partial class UiShared : IDisposable
         _pluginInterface = pluginInterface;
         _localization = localization;
         _serverConfigurationManager = serverManager;
-        _mediator = mediator;
         _isDirectoryWritable = IsDirectoryWritable(_configService.Current.CacheFolder);
 
         _pluginInterface.UiBuilder.BuildFonts += BuildFont;
         _pluginInterface.UiBuilder.RebuildFonts();
-
-        _mediator.Subscribe<GposeStartMessage>(this, (_) => DalamudUtil_GposeStart());
-        _mediator.Subscribe<GposeEndMessage>(this, (_) => DalamudUtil_GposeEnd());
-    }
-
-    private void DalamudUtil_GposeEnd()
-    {
-        GposeEnd?.Invoke();
-    }
-
-    private void DalamudUtil_GposeStart()
-    {
-        GposeStart?.Invoke();
     }
 
     public static float GetWindowContentRegionWidth()

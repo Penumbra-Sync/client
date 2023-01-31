@@ -10,7 +10,6 @@ using Dalamud.Utility;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.User;
-using MareSynchronos.Delegates;
 using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
@@ -100,9 +99,8 @@ public class CompactUi : Window, IDisposable
 
         _mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = true);
         _mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
-
-        _uiShared.GposeStart += UiShared_GposeStart;
-        _uiShared.GposeEnd += UiShared_GposeEnd;
+        _mediator.Subscribe<GposeStartMessage>(this, (_) => UiShared_GposeStart());
+        _mediator.Subscribe<GposeEndMessage>(this, (_) => UiShared_GposeEnd());
 
         SizeConstraints = new WindowSizeConstraints()
         {
@@ -127,8 +125,6 @@ public class CompactUi : Window, IDisposable
     public void Dispose()
     {
         Logger.Verbose("Disposing " + nameof(CompactUi));
-        _uiShared.GposeStart -= UiShared_GposeStart;
-        _uiShared.GposeEnd -= UiShared_GposeEnd;
         _windowSystem.RemoveWindow(this);
     }
 

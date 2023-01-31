@@ -7,7 +7,6 @@ using System.Collections.Concurrent;
 using System.Text;
 using Penumbra.Api.Enums;
 using Penumbra.Api.Helpers;
-using MareSynchronos.Delegates;
 using MareSynchronos.Mediator;
 
 namespace MareSynchronos.Managers;
@@ -68,6 +67,8 @@ public class IpcManager : IDisposable
     {
         Logger.Verbose("Creating " + nameof(IpcManager));
 
+        _mediator = mediator;
+
         _penumbraInit = Penumbra.Api.Ipc.Initialized.Subscriber(pi, () => PenumbraInit());
         _penumbraDispose = Penumbra.Api.Ipc.Disposed.Subscriber(pi, () => PenumbraDispose());
         _penumbraResolvePlayer = Penumbra.Api.Ipc.ResolvePlayerPath.Subscriber(pi);
@@ -120,11 +121,10 @@ public class IpcManager : IDisposable
 
         if (Initialized)
         {
-            PenumbraInitialized?.Invoke();
+            _mediator.Publish(new PenumbraInitializedMessage());
         }
 
         _dalamudUtil = dalamudUtil;
-        _mediator = mediator;
         _mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => HandleActionQueue());
         _mediator.Subscribe<GposeFrameworkUpdateMessage>(this, (_) => HandleGposeActionQueue());
         _mediator.Subscribe<ZoneSwitchEndMessage>(this, (_) => ClearActionQueue());
@@ -147,7 +147,7 @@ public class IpcManager : IDisposable
 
     private void PenumbraModSettingChangedHandler()
     {
-        PenumbraModSettingChanged?.Invoke();
+        _mediator.Publish(new PenumbraModSettingChangedMessage());
     }
 
     private void ClearActionQueue()
@@ -162,7 +162,7 @@ public class IpcManager : IDisposable
         {
             if (ptr != IntPtr.Zero && string.Compare(arg1, arg2, ignoreCase: true, System.Globalization.CultureInfo.InvariantCulture) != 0)
             {
-                PenumbraResourceLoadEvent?.Invoke(ptr, arg1, arg2);
+                _mediator.Publish(new PenumbraResourceLoadMessage(ptr, arg1, arg2));
             }
         });
     }
@@ -176,15 +176,6 @@ public class IpcManager : IDisposable
             action();
         }
     }
-
-    public event VoidDelegate? PenumbraModSettingChanged;
-    public event VoidDelegate? PenumbraInitialized;
-    public event VoidDelegate? PenumbraDisposed;
-    public event DrawObjectDelegate? PenumbraRedrawEvent;
-    public event FloatDelegate? HeelsOffsetChangeEvent;
-    public event PenumbraFileResourceDelegate? PenumbraResourceLoadEvent;
-    public event StringDelegate? CustomizePlusScaleChange;
-    public event StringDelegate? PalettePlusPaletteChange;
 
     public bool Initialized => CheckPenumbraApi();
     public bool CheckGlamourerApi()
@@ -509,31 +500,31 @@ public class IpcManager : IDisposable
 
     private void RedrawEvent(IntPtr objectAddress, int objectTableIndex)
     {
-        PenumbraRedrawEvent?.Invoke(objectAddress, objectTableIndex);
+        _mediator.Publish(new PenumbraRedrawMessage(objectAddress, objectTableIndex));
     }
 
     private void PenumbraInit()
     {
-        PenumbraInitialized?.Invoke();
+        _mediator.Publish(new PenumbraInitializedMessage());
         _penumbraRedraw!.Invoke("self", RedrawType.Redraw);
     }
 
     private void HeelsOffsetChange(float offset)
     {
-        HeelsOffsetChangeEvent?.Invoke(offset);
+        _mediator.Publish(new HeelsOffsetMessage(offset));
     }
 
     private void OnCustomizePlusScaleChange(string? scale)
     {
         if (scale != null) scale = Convert.ToBase64String(Encoding.UTF8.GetBytes(scale));
-        CustomizePlusScaleChange?.Invoke(scale);
+        _mediator.Publish(new CustomizePlusMessage(scale));
     }
 
     private void OnPalettePlusPaletteChange(Character character, string palette)
     {
         if (character.Address == 0 || character.Address != _dalamudUtil.PlayerPointer) return;
         if (palette != null) palette = Convert.ToBase64String(Encoding.UTF8.GetBytes(palette));
-        PalettePlusPaletteChange?.Invoke(palette);
+        _mediator.Publish(new PalettePlusMessage(palette));
     }
 
     public void PalettePlusSetPalette(IntPtr character, string palette)
@@ -584,7 +575,7 @@ public class IpcManager : IDisposable
 
     private void PenumbraDispose()
     {
-        PenumbraDisposed?.Invoke();
+        _mediator.Publish(new PenumbraDisposedMessage());
         ActionQueue.Clear();
     }
 }

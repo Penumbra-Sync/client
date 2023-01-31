@@ -1,5 +1,4 @@
 ﻿using MareSynchronos.API.Data.Enum;
-using MareSynchronos.Delegates;
 using MareSynchronos.Factories;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
@@ -10,14 +9,11 @@ using System.Collections.Concurrent;
 namespace MareSynchronos.Managers;
 
 
-public class TransientResourceManager : IDisposable
+public class TransientResourceManager : MediatorSubscriberBase, IDisposable
 {
-    private readonly IpcManager _ipcManager;
     private readonly ConfigurationService _configurationService;
     private readonly DalamudUtil _dalamudUtil;
-    private readonly MareMediator _mediator;
 
-    public event DrawObjectDelegate? TransientResourceLoaded;
     public IntPtr[] PlayerRelatedPointers = Array.Empty<IntPtr>();
     private readonly string[] _fileTypesToHandle = new[] { "tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk" };
     [Obsolete]
@@ -26,16 +22,16 @@ public class TransientResourceManager : IDisposable
 
     private ConcurrentDictionary<IntPtr, HashSet<string>> TransientResources { get; } = new();
     private ConcurrentDictionary<ObjectKind, HashSet<FileReplacement>> SemiTransientResources { get; } = new();
-    public TransientResourceManager(IpcManager manager, ConfigurationService configurationService, DalamudUtil dalamudUtil, FileReplacementFactory fileReplacementFactory, MareMediator mediator)
+    public TransientResourceManager(ConfigurationService configurationService, DalamudUtil dalamudUtil, FileReplacementFactory fileReplacementFactory, MareMediator mediator) : base(mediator)
     {
-        manager.PenumbraResourceLoadEvent += Manager_PenumbraResourceLoadEvent;
-        manager.PenumbraModSettingChanged += Manager_PenumbraModSettingChanged;
-        _ipcManager = manager;
         _configurationService = configurationService;
         _dalamudUtil = dalamudUtil;
-        _mediator = mediator;
-        _mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => DalamudUtil_FrameworkUpdate());
-        _mediator.Subscribe<ClassJobChangedMessage>(this, (_) => DalamudUtil_ClassJobChanged());
+
+        mediator.Subscribe<PenumbraResourceLoadMessage>(this, (msg) => Manager_PenumbraResourceLoadEvent((PenumbraResourceLoadMessage)msg));
+        Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, (_) => Manager_PenumbraModSettingChanged());
+        Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => DalamudUtil_FrameworkUpdate());
+        Mediator.Subscribe<ClassJobChangedMessage>(this, (_) => DalamudUtil_ClassJobChanged());
+        Mediator.Subscribe<PlayerRelatedObjectPointerUpdateMessage>(this, (msg) => PlayerRelatedPointers = ((PlayerRelatedObjectPointerUpdateMessage)msg).RelatedObjects);
         // migrate obsolete data to new format
         if (File.Exists(PersistentDataCache))
         {
@@ -87,7 +83,7 @@ public class TransientResourceManager : IDisposable
                     return !verified;
                 });
                 if (!successfulValidation)
-                    TransientResourceLoaded?.Invoke(_dalamudUtil.PlayerPointer, -1);
+                    Mediator.Publish(new TransientResourceChangedMessage(_dalamudUtil.PlayerPointer));
             }
         });
     }
@@ -140,8 +136,11 @@ public class TransientResourceManager : IDisposable
         return new List<FileReplacement>();
     }
 
-    private void Manager_PenumbraResourceLoadEvent(IntPtr gameObject, string gamePath, string filePath)
+    private void Manager_PenumbraResourceLoadEvent(PenumbraResourceLoadMessage msg)
     {
+        var gamePath = msg.GamePath;
+        var gameObject = msg.GameObject;
+        var filePath = msg.FilePath;
         if (!_fileTypesToHandle.Any(type => gamePath.EndsWith(type, StringComparison.OrdinalIgnoreCase)))
         {
             return;
@@ -180,7 +179,7 @@ public class TransientResourceManager : IDisposable
         {
             TransientResources[gameObject].Add(replacedGamePath);
             Logger.Debug($"Adding {replacedGamePath} for {gameObject} ({filePath})");
-            TransientResourceLoaded?.Invoke(gameObject, -1);
+            Mediator.Publish(new TransientResourceChangedMessage(gameObject));
         }
     }
 
@@ -250,12 +249,9 @@ public class TransientResourceManager : IDisposable
         TransientResources[gameObject].Clear();
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
-        _mediator.Unsubscribe<FrameworkUpdateMessage>(this);
-        _mediator.Unsubscribe<ClassJobChangedMessage>(this);
-        _ipcManager.PenumbraResourceLoadEvent -= Manager_PenumbraResourceLoadEvent;
-        _ipcManager.PenumbraModSettingChanged -= Manager_PenumbraModSettingChanged;
+        base.Dispose();
         TransientResources.Clear();
         SemiTransientResources.Clear();
         if (SemiTransientResources.ContainsKey(ObjectKind.Player))

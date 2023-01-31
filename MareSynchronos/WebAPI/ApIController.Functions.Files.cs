@@ -9,6 +9,7 @@ using LZ4;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.Files;
 using MareSynchronos.API.Routes;
+using MareSynchronos.Mediator;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -185,7 +186,7 @@ public partial class ApiController
 
     public async Task DownloadFiles(int currentDownloadId, List<FileReplacementData> fileReplacementDto, CancellationToken ct)
     {
-        DownloadStarted?.Invoke();
+        _mediator.Publish(new HaltScanMessage("Download"));
         try
         {
             await DownloadFilesInternal(currentDownloadId, fileReplacementDto, ct).ConfigureAwait(false);
@@ -196,7 +197,7 @@ public partial class ApiController
         }
         finally
         {
-            DownloadFinished?.Invoke();
+            _mediator.Publish(new ResumeScanMessage("Download"));
         }
     }
 

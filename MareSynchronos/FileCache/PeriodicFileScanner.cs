@@ -3,7 +3,6 @@ using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
 using MareSynchronos.Utils;
-using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.FileCache;
 
@@ -12,49 +11,24 @@ public class PeriodicFileScanner : IDisposable
     private readonly IpcManager _ipcManager;
     private readonly ConfigurationService _configService;
     private readonly FileCacheManager _fileDbManager;
-    private readonly ApiController _apiController;
-    private readonly DalamudUtil _dalamudUtil;
     private readonly MareMediator _mediator;
     private CancellationTokenSource? _scanCancellationTokenSource;
     private Task? _fileScannerTask = null;
     public ConcurrentDictionary<string, int> haltScanLocks = new(StringComparer.Ordinal);
-    public PeriodicFileScanner(IpcManager ipcManager, ConfigurationService configService, FileCacheManager fileDbManager, ApiController apiController, DalamudUtil dalamudUtil, MareMediator mediator)
+
+    public PeriodicFileScanner(IpcManager ipcManager, ConfigurationService configService, FileCacheManager fileDbManager, MareMediator mediator)
     {
         Logger.Verbose("Creating " + nameof(PeriodicFileScanner));
 
         _ipcManager = ipcManager;
         _configService = configService;
         _fileDbManager = fileDbManager;
-        _apiController = apiController;
-        _dalamudUtil = dalamudUtil;
         _mediator = mediator;
-        _ipcManager.PenumbraInitialized += StartScan;
-        _apiController.DownloadStarted += ApiHaltScan;
-        _apiController.DownloadFinished += ApiResumeScan;
 
-        _mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) => ZoneSwitchHaltScan());
-        _mediator.Subscribe<ZoneSwitchEndMessage>(this, (_) => ZoneSwitchResumeScan());
+        _mediator.Subscribe<PenumbraInitializedMessage>(this, (_) => StartScan());
+        _mediator.Subscribe<HaltScanMessage>(this, (msg) => HaltScan(((HaltScanMessage)msg).Source));
+        _mediator.Subscribe<ResumeScanMessage>(this, (msg) => ResumeScan(((ResumeScanMessage)msg).Source));
         _mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => StartScan());
-    }
-
-    private void ApiHaltScan()
-    {
-        HaltScan("Download");
-    }
-
-    private void ApiResumeScan()
-    {
-        ResumeScan("Download");
-    }
-
-    private void ZoneSwitchHaltScan()
-    {
-        HaltScan("Zoning/Gpose");
-    }
-
-    private void ZoneSwitchResumeScan()
-    {
-        ResumeScan("Zoning/Gpose");
     }
 
     public void ResetLocks()
@@ -106,9 +80,6 @@ public class PeriodicFileScanner : IDisposable
     {
         Logger.Verbose("Disposing " + nameof(PeriodicFileScanner));
 
-        _ipcManager.PenumbraInitialized -= StartScan;
-        _apiController.DownloadStarted -= ApiHaltScan;
-        _apiController.DownloadFinished -= ApiResumeScan;
         _scanCancellationTokenSource?.Cancel();
     }
 

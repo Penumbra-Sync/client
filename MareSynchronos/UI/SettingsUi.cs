@@ -58,8 +58,9 @@ public class SettingsUi : Window, IDisposable
 
         _mediator.Subscribe<OpenSettingsUiMessage>(this, (_) => Toggle());
         _mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
-        _uiShared.GposeStart += UiShared_GposeStart;
-        _uiShared.GposeEnd += UiShared_GposeEnd;
+        _mediator.Subscribe<GposeStartMessage>(this, (_) => UiShared_GposeStart());
+        _mediator.Subscribe<GposeEndMessage>(this, (_) => UiShared_GposeEnd());
+        _mediator.Subscribe<PlayerChangedMessage>(this, (msg) => LastCreatedCharacterData = ((PlayerChangedMessage)msg).Data);
 
         windowSystem.AddWindow(this);
     }
@@ -78,9 +79,6 @@ public class SettingsUi : Window, IDisposable
     public void Dispose()
     {
         Logger.Verbose("Disposing " + nameof(SettingsUi));
-
-        _uiShared.GposeStart -= UiShared_GposeStart;
-        _uiShared.GposeEnd -= UiShared_GposeEnd;
 
         _windowSystem.RemoveWindow(this);
     }

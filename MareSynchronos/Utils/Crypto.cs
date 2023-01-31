@@ -6,6 +6,7 @@ namespace MareSynchronos.Utils;
 
 public static class Crypto
 {
+#pragma warning disable SYSLIB0021 // Type or member is obsolete
     public static string GetFileHash(this string filePath)
     {
         using SHA1CryptoServiceProvider cryptoProvider = new();
@@ -29,4 +30,5 @@ public static class Crypto
         using SHA256CryptoServiceProvider cryptoProvider = new();
         return BitConverter.ToString(cryptoProvider.ComputeHash(Encoding.UTF8.GetBytes(character.Name + character.HomeWorld.Id.ToString()))).Replace("-", "", StringComparison.Ordinal);
     }
+#pragma warning restore SYSLIB0021 // Type or member is obsolete
 }

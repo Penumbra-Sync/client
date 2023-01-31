@@ -4,6 +4,7 @@ using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
+using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
@@ -16,6 +17,7 @@ public class CachedPlayer : IDisposable
     private readonly DalamudUtil _dalamudUtil;
     private readonly IpcManager _ipcManager;
     private readonly FileCacheManager _fileDbManager;
+    private readonly MareMediator _mediator;
     private API.Data.CharacterData _cachedData = new();
     private PlayerRelatedObject? _currentCharacterEquipment;
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
@@ -27,13 +29,14 @@ public class CachedPlayer : IDisposable
 
     private Task? _penumbraRedrawEventTask;
 
-    public CachedPlayer(OnlineUserIdentDto onlineUser, IpcManager ipcManager, ApiController apiController, DalamudUtil dalamudUtil, FileCacheManager fileDbManager)
+    public CachedPlayer(OnlineUserIdentDto onlineUser, IpcManager ipcManager, ApiController apiController, DalamudUtil dalamudUtil, FileCacheManager fileDbManager, MareMediator mediator)
     {
         OnlineUser = onlineUser;
         _ipcManager = ipcManager;
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
         _fileDbManager = fileDbManager;
+        _mediator = mediator;
     }
 
     public bool IsVisible
@@ -197,7 +200,6 @@ public class CachedPlayer : IDisposable
         try
         {
             Logger.Verbose("Restoring state for " + PlayerName);
-            _ipcManager.PenumbraRedrawEvent -= IpcManagerOnPenumbraRedrawEvent;
             _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName);
             _downloadCancellationTokenSource?.Cancel();
             _downloadCancellationTokenSource?.Dispose();
@@ -216,6 +218,7 @@ public class CachedPlayer : IDisposable
         }
         finally
         {
+            _mediator.UnsubscribeAll(this);
             _cachedData = new();
             var tempPlayerName = PlayerName;
             PlayerName = string.Empty;
@@ -232,7 +235,7 @@ public class CachedPlayer : IDisposable
         PlayerCharacter = character;
         Logger.Debug("Initializing Player " + this);
 
-        _ipcManager.PenumbraRedrawEvent += IpcManagerOnPenumbraRedrawEvent;
+        _mediator.Subscribe<PenumbraRedrawMessage>(this, (msg) => IpcManagerOnPenumbraRedrawEvent(((PenumbraRedrawMessage)msg)));
         _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
         _currentCharacterEquipment = new PlayerRelatedObject(ObjectKind.Player, IntPtr.Zero, IntPtr.Zero,
             () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName)?.Address ?? IntPtr.Zero);
@@ -414,15 +417,15 @@ public class CachedPlayer : IDisposable
         });
     }
 
-    private void IpcManagerOnPenumbraRedrawEvent(IntPtr address, int idx)
+    private void IpcManagerOnPenumbraRedrawEvent(PenumbraRedrawMessage msg)
     {
-        var player = _dalamudUtil.GetCharacterFromObjectTableByIndex(idx);
+        var player = _dalamudUtil.GetCharacterFromObjectTableByIndex(msg.ObjTblIdx);
         if (player == null || !string.Equals(player.Name.ToString(), PlayerName, StringComparison.OrdinalIgnoreCase)) return;
         if (!_penumbraRedrawEventTask?.IsCompleted ?? false) return;
 
         _penumbraRedrawEventTask = Task.Run(() =>
         {
-            PlayerCharacter = address;
+            PlayerCharacter = msg.Address;
             var cts = new CancellationTokenSource();
             cts.CancelAfter(TimeSpan.FromSeconds(5));
             _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, 10000, cts.Token);

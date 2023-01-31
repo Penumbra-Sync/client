@@ -107,6 +107,7 @@ public class DalamudUtil : IDisposable
                 Logger.Debug("Zone switch/Gpose start");
                 _sentBetweenAreas = true;
                 _mediator.Publish(new ZoneSwitchStartMessage());
+                _mediator.Publish(new HaltScanMessage("Zone switch"));
             }
 
             if (IsInGpose) _mediator.Publish(new GposeFrameworkUpdateMessage());
@@ -119,6 +120,7 @@ public class DalamudUtil : IDisposable
             Logger.Debug("Zone switch/Gpose end");
             _sentBetweenAreas = false;
             _mediator.Publish(new ZoneSwitchEndMessage());
+            _mediator.Publish(new ResumeScanMessage("Zone switch"));
         }
 
         _mediator.Publish(new FrameworkUpdateMessage());
