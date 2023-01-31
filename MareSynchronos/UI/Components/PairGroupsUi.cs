@@ -28,16 +28,17 @@ namespace MareSynchronos.UI.Components
             // Only render those tags that actually have pairs in them, otherwise
             // we can end up with a bunch of useless pair groups
             var tagsWithPairsInThem = _tagHandler.GetAllTagsSorted();
-            UiShared.DrawWithID("$group-VisibleCustomTag", () => DrawCategory(TagHandler.CustomVisibleTag, visibleUsers));
+            var allUsers = visibleUsers.Concat(onlineUsers).Concat(offlineUsers).ToList();
+            UiShared.DrawWithID("$group-VisibleCustomTag", () => DrawCategory(TagHandler.CustomVisibleTag, visibleUsers, allUsers));
             foreach (var tag in tagsWithPairsInThem)
             {
-                UiShared.DrawWithID($"group-{tag}", () => DrawCategory(tag, onlineUsers, visibleUsers));
+                UiShared.DrawWithID($"group-{tag}", () => DrawCategory(tag, onlineUsers, allUsers, visibleUsers));
             }
-            UiShared.DrawWithID($"group-OnlineCustomTag", () => DrawCategory(TagHandler.CustomOnlineTag, onlineUsers.Where(u => !_tagHandler.HasAnyTag(u.UserPair!)).ToList()));
-            UiShared.DrawWithID($"group-OfflineCustomTag", () => DrawCategory(TagHandler.CustomOfflineTag, offlineUsers));
+            UiShared.DrawWithID($"group-OnlineCustomTag", () => DrawCategory(TagHandler.CustomOnlineTag, onlineUsers.Where(u => !_tagHandler.HasAnyTag(u.UserPair!)).ToList(), allUsers));
+            UiShared.DrawWithID($"group-OfflineCustomTag", () => DrawCategory(TagHandler.CustomOfflineTag, offlineUsers, allUsers));
         }
 
-        private void DrawCategory(string tag, List<Pair> users, List<Pair>? visibleUsers = null)
+        private void DrawCategory(string tag, List<Pair> onlineUsers, List<Pair> allUsers, List<Pair>? visibleUsers = null)
         {
             List<Pair> usersInThisTag;
             HashSet<string>? otherUidsTaggedWithTag = null;
@@ -45,13 +46,13 @@ namespace MareSynchronos.UI.Components
             int visibleInThisTag = 0;
             if (tag is TagHandler.CustomOfflineTag or TagHandler.CustomOnlineTag or TagHandler.CustomVisibleTag)
             {
-                usersInThisTag = users;
+                usersInThisTag = onlineUsers;
                 isSpecialTag = true;
             }
             else
             {
                 otherUidsTaggedWithTag = _tagHandler.GetOtherUidsForTag(tag);
-                usersInThisTag = users
+                usersInThisTag = onlineUsers
                     .Where(pair => otherUidsTaggedWithTag.Contains(pair.UserData.UID))
                     .ToList();
                 visibleInThisTag = visibleUsers?.Count(p => otherUidsTaggedWithTag.Contains(p.UserData.UID)) ?? 0;
@@ -61,7 +62,7 @@ namespace MareSynchronos.UI.Components
 
             DrawName(tag, isSpecialTag, visibleInThisTag, usersInThisTag.Count, otherUidsTaggedWithTag?.Count);
             if (!isSpecialTag)
-                UiShared.DrawWithID($"group-{tag}-buttons", () => DrawButtons(tag, usersInThisTag));
+                UiShared.DrawWithID($"group-{tag}-buttons", () => DrawButtons(tag, allUsers.Where(p => otherUidsTaggedWithTag!.Contains(p.UserData.UID)).ToList()));
 
             if (!_tagHandler.IsTagOpen(tag)) return;
 
