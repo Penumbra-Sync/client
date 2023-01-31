@@ -6,29 +6,27 @@ using MareSynchronos.Utils;
 
 namespace MareSynchronos.FileCache;
 
-public class PeriodicFileScanner : IDisposable
+public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
 {
     private readonly IpcManager _ipcManager;
     private readonly ConfigurationService _configService;
     private readonly FileCacheManager _fileDbManager;
-    private readonly MareMediator _mediator;
     private CancellationTokenSource? _scanCancellationTokenSource;
     private Task? _fileScannerTask = null;
     public ConcurrentDictionary<string, int> haltScanLocks = new(StringComparer.Ordinal);
 
-    public PeriodicFileScanner(IpcManager ipcManager, ConfigurationService configService, FileCacheManager fileDbManager, MareMediator mediator)
+    public PeriodicFileScanner(IpcManager ipcManager, ConfigurationService configService, FileCacheManager fileDbManager, MareMediator mediator) : base(mediator)
     {
         Logger.Verbose("Creating " + nameof(PeriodicFileScanner));
 
         _ipcManager = ipcManager;
         _configService = configService;
         _fileDbManager = fileDbManager;
-        _mediator = mediator;
 
-        _mediator.Subscribe<PenumbraInitializedMessage>(this, (_) => StartScan());
-        _mediator.Subscribe<HaltScanMessage>(this, (msg) => HaltScan(((HaltScanMessage)msg).Source));
-        _mediator.Subscribe<ResumeScanMessage>(this, (msg) => ResumeScan(((ResumeScanMessage)msg).Source));
-        _mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => StartScan());
+        Mediator.Subscribe<PenumbraInitializedMessage>(this, (_) => StartScan());
+        Mediator.Subscribe<HaltScanMessage>(this, (msg) => HaltScan(((HaltScanMessage)msg).Source));
+        Mediator.Subscribe<ResumeScanMessage>(this, (msg) => ResumeScan(((ResumeScanMessage)msg).Source));
+        Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => StartScan());
     }
 
     public void ResetLocks()
@@ -76,9 +74,9 @@ public class PeriodicFileScanner : IDisposable
     private TimeSpan _timeUntilNextScan = TimeSpan.Zero;
     private int TimeBetweenScans => _configService.Current.TimeSpanBetweenScansInSeconds;
 
-    public void Dispose()
+    public override void Dispose()
     {
-        Logger.Verbose("Disposing " + nameof(PeriodicFileScanner));
+        base.Dispose();
 
         _scanCancellationTokenSource?.Cancel();
     }

@@ -7,13 +7,13 @@ using MareSynchronos.Mediator;
 using MareSynchronos.Utils;
 
 namespace MareSynchronos.Managers;
-public class NotificationService
+public class NotificationService : MediatorSubscriberBase
 {
     private readonly UiBuilder _uiBuilder;
     private readonly ChatGui _chatGui;
     private readonly ConfigurationService _configurationService;
 
-    public NotificationService(MareMediator mediator, UiBuilder uiBuilder, ChatGui chatGui, ConfigurationService configurationService)
+    public NotificationService(MareMediator mediator, UiBuilder uiBuilder, ChatGui chatGui, ConfigurationService configurationService) : base(mediator)
     {
         _uiBuilder = uiBuilder;
         _chatGui = chatGui;

@@ -13,13 +13,12 @@ using MareSynchronos.Mediator;
 
 namespace MareSynchronos.UI;
 
-internal class IntroUi : Window, IDisposable
+internal class IntroUi : WindowMediatorSubscriberBase, IDisposable
 {
     private readonly UiShared _uiShared;
     private readonly ConfigurationService _configService;
     private readonly PeriodicFileScanner _fileCacheManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
-    private readonly MareMediator _mareMediator;
     private readonly WindowSystem _windowSystem;
     private bool _readFirstPage;
 
@@ -31,15 +30,14 @@ internal class IntroUi : Window, IDisposable
     private readonly Dictionary<string, string> _languages = new(StringComparer.Ordinal) { { "English", "en" }, { "Deutsch", "de" }, { "Français", "fr" } };
     private int _currentLanguage;
 
-    public void Dispose()
+    public override void Dispose()
     {
-        Logger.Verbose("Disposing " + nameof(IntroUi));
-
+        base.Dispose();
         _windowSystem.RemoveWindow(this);
     }
 
     public IntroUi(WindowSystem windowSystem, UiShared uiShared, ConfigurationService configService,
-        PeriodicFileScanner fileCacheManager, ServerConfigurationManager serverConfigurationManager, MareMediator mareMediator) : base("Mare Synchronos Setup")
+        PeriodicFileScanner fileCacheManager, ServerConfigurationManager serverConfigurationManager, MareMediator mareMediator) : base(mareMediator, "Mare Synchronos Setup")
     {
         Logger.Verbose("Creating " + nameof(IntroUi));
 
@@ -47,7 +45,6 @@ internal class IntroUi : Window, IDisposable
         _configService = configService;
         _fileCacheManager = fileCacheManager;
         _serverConfigurationManager = serverConfigurationManager;
-        _mareMediator = mareMediator;
         _windowSystem = windowSystem;
         IsOpen = false;
 
@@ -59,8 +56,8 @@ internal class IntroUi : Window, IDisposable
 
         GetToSLocalization();
 
-        _mareMediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = false);
-        _mareMediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = true);
+        Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = false);
+        Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = true);
 
         _windowSystem.AddWindow(this);
     }
@@ -242,7 +239,7 @@ internal class IntroUi : Window, IDisposable
         }
         else
         {
-            _mareMediator.Publish(new SwitchToMainUiMessage());
+            Mediator.Publish(new SwitchToMainUiMessage());
             IsOpen = false;
         }
     }

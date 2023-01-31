@@ -20,6 +20,7 @@ public class DalamudLoggingProvider : ILoggerProvider
 
     public void Dispose()
     {
+        Logger.Verbose($"Disposing {GetType()}");
         _loggers.Clear();
     }
 }

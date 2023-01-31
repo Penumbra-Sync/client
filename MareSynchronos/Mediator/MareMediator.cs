@@ -4,11 +4,11 @@ namespace MareSynchronos.Mediator;
 
 public class MareMediator : IDisposable
 {
-    private record MediatorSubscriber(object Subscriber, Action<IMessage> Action);
+    private record MediatorSubscriber(IMediatorSubscriber Subscriber, Action<IMessage> Action);
 
     private readonly Dictionary<Type, HashSet<MediatorSubscriber>> _subscriberDict = new();
 
-    public void Subscribe<T>(object subscriber, Action<IMessage> action) where T : IMessage
+    public void Subscribe<T>(IMediatorSubscriber subscriber, Action<IMessage> action) where T : IMessage
     {
         _subscriberDict.TryAdd(typeof(T), new HashSet<MediatorSubscriber>());
 
@@ -18,7 +18,7 @@ public class MareMediator : IDisposable
         }
     }
 
-    public void Unsubscribe<T>(object subscriber) where T : IMessage
+    public void Unsubscribe<T>(IMediatorSubscriber subscriber) where T : IMessage
     {
         if (_subscriberDict.TryGetValue(typeof(T), out var subscribers))
         {
@@ -30,7 +30,7 @@ public class MareMediator : IDisposable
     {
         if (_subscriberDict.TryGetValue(message.GetType(), out var subscribers))
         {
-            foreach (var subscriber in subscribers)
+            foreach (var subscriber in subscribers.ToList())
             {
                 try
                 {
@@ -44,9 +44,9 @@ public class MareMediator : IDisposable
         }
     }
 
-    internal void UnsubscribeAll(object subscriber)
+    internal void UnsubscribeAll(IMediatorSubscriber subscriber)
     {
-        foreach (var kvp in _subscriberDict)
+        foreach (var kvp in _subscriberDict.ToList())
         {
             kvp.Value.RemoveWhere(p => p.Subscriber == subscriber);
         }
@@ -54,6 +54,7 @@ public class MareMediator : IDisposable
 
     public void Dispose()
     {
+        Logger.Verbose($"Disposing {GetType()}");
         _subscriberDict.Clear();
     }
 }

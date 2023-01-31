@@ -17,7 +17,7 @@ public class DownloadUi : Window, IDisposable
 
     public void Dispose()
     {
-        Logger.Verbose("Disposing " + nameof(DownloadUi));
+        Logger.Verbose($"Disposing {GetType()}");
         _windowSystem.RemoveWindow(this);
     }
 

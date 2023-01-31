@@ -17,25 +17,22 @@ using System.Collections.Concurrent;
 
 namespace MareSynchronos.Managers;
 
-public class PairManager : IDisposable
+public class PairManager : MediatorSubscriberBase, IDisposable
 {
     private readonly ConcurrentDictionary<UserData, Pair> _allClientPairs = new(UserDataComparer.Instance);
     private readonly ConcurrentDictionary<GroupData, GroupFullInfoDto> _allGroups = new(GroupDataComparer.Instance);
     private readonly CachedPlayerFactory _cachedPlayerFactory;
     private readonly PairFactory _pairFactory;
-    private readonly UiBuilder _uiBuilder;
     private readonly ConfigurationService _configurationService;
-    private readonly MareMediator _mediator;
 
-    public PairManager(CachedPlayerFactory cachedPlayerFactory, PairFactory pairFactory, UiBuilder uiBuilder, ConfigurationService configurationService, MareMediator mediator)
+    public PairManager(CachedPlayerFactory cachedPlayerFactory, PairFactory pairFactory,
+        ConfigurationService configurationService, MareMediator mediator) : base(mediator)
     {
         _cachedPlayerFactory = cachedPlayerFactory;
         _pairFactory = pairFactory;
-        _uiBuilder = uiBuilder;
         _configurationService = configurationService;
-        _mediator = mediator;
-        _mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) => DalamudUtilOnZoneSwitched());
-        _mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => DalamudUtilOnDelayedFrameworkUpdate());
+        Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) => DalamudUtilOnZoneSwitched());
+        Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => DalamudUtilOnDelayedFrameworkUpdate());
         _directPairsInternal = DirectPairsLazy();
         _groupPairsInternal = GroupPairsLazy();
     }
@@ -137,8 +134,9 @@ public class PairManager : IDisposable
         RecreateLazy();
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
+        base.Dispose();
         DisposePairs();
     }
 
@@ -184,7 +182,7 @@ public class PairManager : IDisposable
             var msg = !string.IsNullOrEmpty(note)
                 ? $"{note} ({pair.UserData.AliasOrUID}) is now online"
                 : $"{pair.UserData.AliasOrUID} is now online";
-            _mediator.Publish(new NotificationMessage("User online", msg, NotificationType.Info, 5000));
+            Mediator.Publish(new NotificationMessage("User online", msg, NotificationType.Info, 5000));
         }
 
         pair.CachedPlayer?.Dispose();

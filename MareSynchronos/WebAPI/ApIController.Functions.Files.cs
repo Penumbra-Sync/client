@@ -186,7 +186,7 @@ public partial class ApiController
 
     public async Task DownloadFiles(int currentDownloadId, List<FileReplacementData> fileReplacementDto, CancellationToken ct)
     {
-        _mediator.Publish(new HaltScanMessage("Download"));
+        Mediator.Publish(new HaltScanMessage("Download"));
         try
         {
             await DownloadFilesInternal(currentDownloadId, fileReplacementDto, ct).ConfigureAwait(false);
@@ -197,7 +197,7 @@ public partial class ApiController
         }
         finally
         {
-            _mediator.Publish(new ResumeScanMessage("Download"));
+            Mediator.Publish(new ResumeScanMessage("Download"));
         }
     }
 

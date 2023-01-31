@@ -3,8 +3,6 @@ using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
-using Dalamud.Game.Gui;
-using Dalamud.Game.Text.SeStringHandling;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using Lumina.Excel.GeneratedSheets;
@@ -270,6 +268,7 @@ public class DalamudUtil : IDisposable
 
     public void Dispose()
     {
+        Logger.Verbose($"Disposing {GetType()}");
         _framework.Update -= FrameworkOnUpdate;
     }
 }

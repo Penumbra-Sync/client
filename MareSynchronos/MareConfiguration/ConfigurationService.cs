@@ -75,6 +75,7 @@ public class ConfigurationService : IDisposable
 
     public void Dispose()
     {
+        Logger.Verbose($"Disposing {GetType()}");
         Save();
         _periodicCheckCts.Cancel();
     }

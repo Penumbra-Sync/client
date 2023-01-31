@@ -14,12 +14,10 @@ using MareSynchronos.Managers;
 using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
-using Lumina.Excel.GeneratedSheets;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace MareSynchronos.UI;
 
-public class SettingsUi : Window, IDisposable
+public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
 {
     private readonly ConfigurationService _configService;
     private readonly WindowSystem _windowSystem;
@@ -27,7 +25,6 @@ public class SettingsUi : Window, IDisposable
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
-    private readonly MareMediator _mediator;
     private readonly UiShared _uiShared;
     public CharacterData? LastCreatedCharacterData { private get; set; }
 
@@ -39,7 +36,7 @@ public class SettingsUi : Window, IDisposable
     public SettingsUi(WindowSystem windowSystem,
         UiShared uiShared, ConfigurationService configService,
         MareCharaFileManager mareCharaFileManager, PairManager pairManager,
-        ServerConfigurationManager serverConfigurationManager, MareMediator mediator) : base("Mare Synchronos Settings")
+        ServerConfigurationManager serverConfigurationManager, MareMediator mediator) : base(mediator, "Mare Synchronos Settings")
     {
         Logger.Verbose("Creating " + nameof(SettingsUi));
 
@@ -54,15 +51,13 @@ public class SettingsUi : Window, IDisposable
         _mareCharaFileManager = mareCharaFileManager;
         _pairManager = pairManager;
         _serverConfigurationManager = serverConfigurationManager;
-        _mediator = mediator;
         _uiShared = uiShared;
 
-
-        _mediator.Subscribe<OpenSettingsUiMessage>(this, (_) => Toggle());
-        _mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
-        _mediator.Subscribe<GposeStartMessage>(this, (_) => UiShared_GposeStart());
-        _mediator.Subscribe<GposeEndMessage>(this, (_) => UiShared_GposeEnd());
-        _mediator.Subscribe<PlayerChangedMessage>(this, (msg) => LastCreatedCharacterData = ((PlayerChangedMessage)msg).Data);
+        Mediator.Subscribe<OpenSettingsUiMessage>(this, (_) => Toggle());
+        Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
+        Mediator.Subscribe<GposeStartMessage>(this, (_) => UiShared_GposeStart());
+        Mediator.Subscribe<GposeEndMessage>(this, (_) => UiShared_GposeEnd());
+        Mediator.Subscribe<PlayerChangedMessage>(this, (msg) => LastCreatedCharacterData = ((PlayerChangedMessage)msg).Data);
 
         windowSystem.AddWindow(this);
     }
@@ -78,10 +73,9 @@ public class SettingsUi : Window, IDisposable
         IsOpen = false;
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
-        Logger.Verbose("Disposing " + nameof(SettingsUi));
-
+        base.Dispose();
         _windowSystem.RemoveWindow(this);
     }
 
@@ -215,7 +209,7 @@ public class SettingsUi : Window, IDisposable
                 {
                     Task.Run(() => ApiController.UserDelete());
                     _deleteAccountPopupModalShown = false;
-                    _mediator.Publish(new SwitchToIntroUiMessage());
+                    Mediator.Publish(new SwitchToIntroUiMessage());
                 }
 
                 ImGui.SameLine();

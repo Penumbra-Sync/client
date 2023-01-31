@@ -15,7 +15,8 @@ public class OnlinePlayerManager : MediatorSubscriberBase, IDisposable
     private readonly FileCacheManager _fileDbManager;
     private readonly PairManager _pairManager;
 
-    public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil, PlayerManager playerManager, FileCacheManager fileDbManager, PairManager pairManager, MareMediator mediator) : base(mediator)
+    public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil, PlayerManager playerManager,
+        FileCacheManager fileDbManager, PairManager pairManager, MareMediator mediator) : base(mediator)
     {
         Logger.Verbose("Creating " + nameof(OnlinePlayerManager));
 
@@ -48,7 +49,6 @@ public class OnlinePlayerManager : MediatorSubscriberBase, IDisposable
 
     public override void Dispose()
     {
-        Logger.Verbose("Disposing " + nameof(OnlinePlayerManager));
         base.Dispose();
     }
 

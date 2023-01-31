@@ -15,7 +15,7 @@ using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
 
 namespace MareSynchronos.WebAPI;
-public partial class ApiController : IDisposable, IMareHubClient
+public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareHubClient
 {
     public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
     public const string MainServiceUri = "wss://maresynchronos.com";
@@ -27,7 +27,6 @@ public partial class ApiController : IDisposable, IMareHubClient
     private readonly FileCacheManager _fileDbManager;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
-    private readonly MareMediator _mediator;
     private CancellationTokenSource _connectionCancellationTokenSource;
     private HubConnection? _mareHub;
 
@@ -45,7 +44,8 @@ public partial class ApiController : IDisposable, IMareHubClient
 
     private HttpClient _httpClient;
 
-    public ApiController(ConfigurationService configService, DalamudUtil dalamudUtil, FileCacheManager fileDbManager, PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator)
+    public ApiController(ConfigurationService configService, DalamudUtil dalamudUtil, FileCacheManager fileDbManager,
+        PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator) : base(mediator)
     {
         Logger.Verbose("Creating " + nameof(ApiController));
 
@@ -54,11 +54,10 @@ public partial class ApiController : IDisposable, IMareHubClient
         _fileDbManager = fileDbManager;
         _pairManager = pairManager;
         _serverManager = serverManager;
-        _mediator = mediator;
         _connectionCancellationTokenSource = new CancellationTokenSource();
 
-        _mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
-        _mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
+        Mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
+        Mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
         ServerState = ServerState.Offline;
         _verifiedUploadedHashes = new(StringComparer.Ordinal);
         _httpClient = new();
@@ -304,14 +303,12 @@ public partial class ApiController : IDisposable, IMareHubClient
         _ = ClientHealthCheck(_healthCheckTokenSource.Token);
 
         _initialized = true;
-        _mediator.Publish(new ConnectedMessage());
+        Mediator.Publish(new ConnectedMessage());
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
-        Logger.Verbose("Disposing " + nameof(ApiController));
-
-        ServerState = ServerState.Offline;
+        base.Dispose();
         Task.Run(async () => await StopConnection(_connectionCancellationTokenSource.Token, ServerState.Disconnected).ConfigureAwait(false));
         _connectionCancellationTokenSource?.Cancel();
         _healthCheckTokenSource?.Cancel();
@@ -341,7 +338,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         CurrentDownloads.Clear();
         _uploadCancellationTokenSource?.Cancel();
         _healthCheckTokenSource?.Cancel();
-        _mediator.Publish(new DisconnectedMessage());
+        Mediator.Publish(new DisconnectedMessage());
         _pairManager.ClearPairs();
         ServerState = ServerState.Offline;
         Logger.Info("Connection closed");
@@ -353,11 +350,11 @@ public partial class ApiController : IDisposable, IMareHubClient
         _connectionDto = null;
         _healthCheckTokenSource?.Cancel();
         ServerState = ServerState.Reconnecting;
-        _mediator.Publish(new NotificationMessage("Connection lost", "Connection lost to " + _serverManager.CurrentServer!.ServerName, NotificationType.Error, 5000));
+        Mediator.Publish(new NotificationMessage("Connection lost", "Connection lost to " + _serverManager.CurrentServer!.ServerName, NotificationType.Error, 5000));
         Logger.Warn("Connection closed... Reconnecting");
         Logger.Warn(arg?.Message ?? string.Empty);
         Logger.Warn(arg?.StackTrace ?? string.Empty);
-        _mediator.Publish(new DisconnectedMessage());
+        Mediator.Publish(new DisconnectedMessage());
         _pairManager.ClearPairs();
         return Task.CompletedTask;
     }
@@ -387,7 +384,7 @@ public partial class ApiController : IDisposable, IMareHubClient
             await _mareHub.DisposeAsync().ConfigureAwait(false);
             CurrentUploads.Clear();
             CurrentDownloads.Clear();
-            _mediator.Publish(new DisconnectedMessage());
+            Mediator.Publish(new DisconnectedMessage());
             _pairManager.ClearPairs();
             _mareHub = null;
         }

@@ -656,6 +656,7 @@ public partial class UiShared : IDisposable
 
     public void Dispose()
     {
+        Logger.Verbose($"Disposing {GetType()}");
         _pluginInterface.UiBuilder.BuildFonts -= BuildFont;
     }
 }

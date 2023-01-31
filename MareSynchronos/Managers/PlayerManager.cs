@@ -10,7 +10,6 @@ using MareSynchronos.Mediator;
 
 namespace MareSynchronos.Managers;
 
-
 public class PlayerManager : MediatorSubscriberBase, IDisposable
 {
     private readonly ApiController _apiController;
@@ -123,8 +122,6 @@ public class PlayerManager : MediatorSubscriberBase, IDisposable
 
     public override void Dispose()
     {
-        Logger.Verbose("Disposing " + nameof(PlayerManager));
-
         base.Dispose();
 
         _playerChangedCts?.Cancel();

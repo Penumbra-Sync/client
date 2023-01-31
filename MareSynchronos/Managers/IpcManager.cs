@@ -11,7 +11,7 @@ using MareSynchronos.Mediator;
 
 namespace MareSynchronos.Managers;
 
-public class IpcManager : IDisposable
+public class IpcManager : MediatorSubscriberBase, IDisposable
 {
     private readonly ICallGateSubscriber<int> _glamourerApiVersion;
     private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyAll;
@@ -57,17 +57,14 @@ public class IpcManager : IDisposable
     private readonly ICallGateSubscriber<Character, string, object> _palettePlusPaletteChanged;
 
     private readonly DalamudUtil _dalamudUtil;
-    private readonly MareMediator _mediator;
     private bool _inGposeQueueMode = false;
     private ConcurrentQueue<Action> ActionQueue => _inGposeQueueMode ? _gposeActionQueue : _normalQueue;
     private readonly ConcurrentQueue<Action> _normalQueue = new();
     private readonly ConcurrentQueue<Action> _gposeActionQueue = new();
 
-    public IpcManager(DalamudPluginInterface pi, DalamudUtil dalamudUtil, MareMediator mediator)
+    public IpcManager(DalamudPluginInterface pi, DalamudUtil dalamudUtil, MareMediator mediator) : base(mediator)
     {
         Logger.Verbose("Creating " + nameof(IpcManager));
-
-        _mediator = mediator;
 
         _penumbraInit = Penumbra.Api.Ipc.Initialized.Subscriber(pi, () => PenumbraInit());
         _penumbraDispose = Penumbra.Api.Ipc.Disposed.Subscriber(pi, () => PenumbraDispose());
@@ -121,13 +118,13 @@ public class IpcManager : IDisposable
 
         if (Initialized)
         {
-            _mediator.Publish(new PenumbraInitializedMessage());
+            Mediator.Publish(new PenumbraInitializedMessage());
         }
 
         _dalamudUtil = dalamudUtil;
-        _mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => HandleActionQueue());
-        _mediator.Subscribe<GposeFrameworkUpdateMessage>(this, (_) => HandleGposeActionQueue());
-        _mediator.Subscribe<ZoneSwitchEndMessage>(this, (_) => ClearActionQueue());
+        Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => HandleActionQueue());
+        Mediator.Subscribe<GposeFrameworkUpdateMessage>(this, (_) => HandleGposeActionQueue());
+        Mediator.Subscribe<ZoneSwitchEndMessage>(this, (_) => ClearActionQueue());
     }
 
     private void HandleGposeActionQueue()
@@ -147,7 +144,7 @@ public class IpcManager : IDisposable
 
     private void PenumbraModSettingChangedHandler()
     {
-        _mediator.Publish(new PenumbraModSettingChangedMessage());
+        Mediator.Publish(new PenumbraModSettingChangedMessage());
     }
 
     private void ClearActionQueue()
@@ -162,7 +159,7 @@ public class IpcManager : IDisposable
         {
             if (ptr != IntPtr.Zero && string.Compare(arg1, arg2, ignoreCase: true, System.Globalization.CultureInfo.InvariantCulture) != 0)
             {
-                _mediator.Publish(new PenumbraResourceLoadMessage(ptr, arg1, arg2));
+                Mediator.Publish(new PenumbraResourceLoadMessage(ptr, arg1, arg2));
             }
         });
     }
@@ -238,9 +235,9 @@ public class IpcManager : IDisposable
         }
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
-        Logger.Verbose("Disposing " + nameof(IpcManager));
+        base.Dispose();
 
         int totalSleepTime = 0;
         while (!ActionQueue.IsEmpty && totalSleepTime < 2000)
@@ -500,31 +497,31 @@ public class IpcManager : IDisposable
 
     private void RedrawEvent(IntPtr objectAddress, int objectTableIndex)
     {
-        _mediator.Publish(new PenumbraRedrawMessage(objectAddress, objectTableIndex));
+        Mediator.Publish(new PenumbraRedrawMessage(objectAddress, objectTableIndex));
     }
 
     private void PenumbraInit()
     {
-        _mediator.Publish(new PenumbraInitializedMessage());
+        Mediator.Publish(new PenumbraInitializedMessage());
         _penumbraRedraw!.Invoke("self", RedrawType.Redraw);
     }
 
     private void HeelsOffsetChange(float offset)
     {
-        _mediator.Publish(new HeelsOffsetMessage(offset));
+        Mediator.Publish(new HeelsOffsetMessage(offset));
     }
 
     private void OnCustomizePlusScaleChange(string? scale)
     {
         if (scale != null) scale = Convert.ToBase64String(Encoding.UTF8.GetBytes(scale));
-        _mediator.Publish(new CustomizePlusMessage(scale));
+        Mediator.Publish(new CustomizePlusMessage(scale));
     }
 
     private void OnPalettePlusPaletteChange(Character character, string palette)
     {
         if (character.Address == 0 || character.Address != _dalamudUtil.PlayerPointer) return;
         if (palette != null) palette = Convert.ToBase64String(Encoding.UTF8.GetBytes(palette));
-        _mediator.Publish(new PalettePlusMessage(palette));
+        Mediator.Publish(new PalettePlusMessage(palette));
     }
 
     public void PalettePlusSetPalette(IntPtr character, string palette)
@@ -575,7 +572,7 @@ public class IpcManager : IDisposable
 
     private void PenumbraDispose()
     {
-        _mediator.Publish(new PenumbraDisposedMessage());
+        Mediator.Publish(new PenumbraDisposedMessage());
         ActionQueue.Clear();
     }
 }

@@ -12,13 +12,12 @@ using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.Managers;
 
-public class CachedPlayer : IDisposable
+public class CachedPlayer : MediatorSubscriberBase, IDisposable
 {
     private readonly ApiController _apiController;
     private readonly DalamudUtil _dalamudUtil;
     private readonly IpcManager _ipcManager;
     private readonly FileCacheManager _fileDbManager;
-    private readonly MareMediator _mediator;
     private API.Data.CharacterData _cachedData = new();
     private PlayerRelatedObject? _currentCharacterEquipment;
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
@@ -30,14 +29,13 @@ public class CachedPlayer : IDisposable
 
     private Task? _penumbraRedrawEventTask;
 
-    public CachedPlayer(OnlineUserIdentDto onlineUser, IpcManager ipcManager, ApiController apiController, DalamudUtil dalamudUtil, FileCacheManager fileDbManager, MareMediator mediator)
+    public CachedPlayer(OnlineUserIdentDto onlineUser, IpcManager ipcManager, ApiController apiController, DalamudUtil dalamudUtil, FileCacheManager fileDbManager, MareMediator mediator) : base(mediator)
     {
         OnlineUser = onlineUser;
         _ipcManager = ipcManager;
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
         _fileDbManager = fileDbManager;
-        _mediator = mediator;
     }
 
     public bool IsVisible
@@ -173,7 +171,7 @@ public class CachedPlayer : IDisposable
 
         if (missingPluginsForData.Any())
         {
-            _mediator.Publish(new NotificationMessage("Missing plugins for " + PlayerName,
+            Mediator.Publish(new NotificationMessage("Missing plugins for " + PlayerName,
                 $"Received data for {PlayerName} that contained information for plugins you have not installed. Install {string.Join(", ", missingPluginsForData)} to experience their character fully.",
                 NotificationType.Warning, 10000));
         }
@@ -202,9 +200,12 @@ public class CachedPlayer : IDisposable
         return true;
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
         if (string.IsNullOrEmpty(PlayerName)) return;
+
+        base.Dispose();
+
         Logger.Debug("Disposing " + PlayerName + " (" + OnlineUser + ")");
         try
         {
@@ -227,7 +228,7 @@ public class CachedPlayer : IDisposable
         }
         finally
         {
-            _mediator.UnsubscribeAll(this);
+            Mediator.UnsubscribeAll(this);
             _cachedData = new();
             var tempPlayerName = PlayerName;
             PlayerName = string.Empty;
@@ -244,7 +245,7 @@ public class CachedPlayer : IDisposable
         PlayerCharacter = character;
         Logger.Debug("Initializing Player " + this);
 
-        _mediator.Subscribe<PenumbraRedrawMessage>(this, (msg) => IpcManagerOnPenumbraRedrawEvent(((PenumbraRedrawMessage)msg)));
+        Mediator.Subscribe<PenumbraRedrawMessage>(this, (msg) => IpcManagerOnPenumbraRedrawEvent(((PenumbraRedrawMessage)msg)));
         _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
         _currentCharacterEquipment = new PlayerRelatedObject(ObjectKind.Player, IntPtr.Zero, IntPtr.Zero,
             () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName)?.Address ?? IntPtr.Zero);

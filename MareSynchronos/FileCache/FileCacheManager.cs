@@ -220,6 +220,7 @@ public class FileCacheManager : IDisposable
 
     public void Dispose()
     {
+        Logger.Verbose($"Disposing {GetType()}");
         WriteOutFullCsv();
     }
 }
