@@ -51,7 +51,7 @@ public class IpcManager : IDisposable
     private readonly ICallGateSubscriber<string?, object> _customizePlusOnScaleUpdate;
     
     private readonly ICallGateSubscriber<string> _palettePlusApiVersion;
-    private readonly ICallGateSubscriber<Character, string> _palettePlusGetCharaPalette;
+    private readonly ICallGateSubscriber<Character, string> _palettePlusBuildCharaPalette;
     private readonly ICallGateSubscriber<Character, string, object> _palettePlusSetCharaPalette;
     private readonly ICallGateSubscriber<Character, object> _palettePlusRemoveCharaPalette;
     private readonly ICallGateSubscriber<Character, string, object> _palettePlusPaletteChanged;
@@ -112,7 +112,7 @@ public class IpcManager : IDisposable
         _customizePlusOnScaleUpdate.Subscribe(OnCustomizePlusScaleChange);
         
         _palettePlusApiVersion = pi.GetIpcSubscriber<string>("PalettePlus.ApiVersion");
-        _palettePlusGetCharaPalette = pi.GetIpcSubscriber<Character, string>("PalettePlus.GetCharaPalette");
+        _palettePlusBuildCharaPalette = pi.GetIpcSubscriber<Character, string>("PalettePlus.BuildCharaPalette");
         _palettePlusSetCharaPalette = pi.GetIpcSubscriber<Character, string, object>("PalettePlus.SetCharaPalette");
         _palettePlusRemoveCharaPalette = pi.GetIpcSubscriber<Character, object>("PalettePlus.RemoveCharaPalette");
         _palettePlusPaletteChanged = pi.GetIpcSubscriber<Character, string, object>("PalettePlus.PaletteChanged");
@@ -551,10 +551,10 @@ public class IpcManager : IDisposable
         });
     }
 
-    public string PalettePlusGetPalette()
+    public string PalettePlusBuildPalette()
     {
         if (!CheckPalettePlusApi()) return string.Empty;
-        var palette = _palettePlusGetCharaPalette.InvokeFunc(_dalamudUtil.PlayerCharacter);
+        var palette = _palettePlusBuildCharaPalette.InvokeFunc(_dalamudUtil.PlayerCharacter);
         if (string.IsNullOrEmpty(palette)) return string.Empty;
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(palette));
     }
