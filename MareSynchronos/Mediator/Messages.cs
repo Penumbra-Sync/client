@@ -22,8 +22,6 @@ public record GposeEndMessage : IMessage;
 public record GposeFrameworkUpdateMessage : IMessage;
 public record ConnectedMessage : IMessage;
 public record DisconnectedMessage : IMessage;
-public record DownloadStartedMessage : IMessage;
-public record DownloadFinishedMessage : IMessage;
 public record PenumbraModSettingChangedMessage : IMessage;
 public record PenumbraInitializedMessage : IMessage;
 public record PenumbraDisposedMessage : IMessage;

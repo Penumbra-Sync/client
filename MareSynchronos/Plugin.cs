@@ -126,7 +126,7 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         _serviceProvider.GetRequiredService<PeriodicFileScanner>().StartScan();
-        ReLaunchCharacterManager();
+        Task.Run(WaitForPlayerAndLaunchCharacterManager);
     }
 
     private void DalamudUtilOnLogOut()
@@ -137,11 +137,6 @@ public sealed class Plugin : IDalamudPlugin
         pi.UiBuilder.Draw -= Draw;
         pi.UiBuilder.OpenConfigUi -= OpenUi;
         _serviceProvider.GetRequiredService<CommandManager>().RemoveHandler(_commandName);
-    }
-
-    public void ReLaunchCharacterManager()
-    {
-        
     }
 
     private async Task WaitForPlayerAndLaunchCharacterManager()
