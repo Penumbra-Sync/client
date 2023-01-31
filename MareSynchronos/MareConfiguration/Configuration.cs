@@ -85,7 +85,6 @@ public class Configuration : IPluginConfiguration
         newConfig.TimeSpanBetweenScansInSeconds = TimeSpanBetweenScansInSeconds;
         newConfig.FileScanPaused = FileScanPaused;
         newConfig.InitialScanComplete = InitialScanComplete;
-        newConfig.HideInfoMessages = HideInfoMessages;
         newConfig.DisableOptionalPluginWarnings = DisableOptionalPluginWarnings;
         newConfig.OpenGposeImportOnGposeStart = OpenGposeImportOnGposeStart;
         newConfig.ShowTransferWindow = ShowTransferWindow;
