@@ -182,20 +182,19 @@ public sealed class Plugin : IDalamudPlugin
 
         if (string.Equals(splitArgs[0], "toggle", StringComparison.OrdinalIgnoreCase))
         {
-            var _serverConfigurationManager = _serviceProvider.GetRequiredService<ServerConfigurationManager>();
-            var _apiController = _serviceProvider.GetRequiredService<ApiController>();
-            if (_serverConfigurationManager.CurrentServer == null) return;
+            var serverConfigurationManager = _serviceProvider.GetRequiredService<ServerConfigurationManager>();
+            if (serverConfigurationManager.CurrentServer == null) return;
             var fullPause = splitArgs.Length > 1 ? splitArgs[1] switch
             {
                 "on" => false,
                 "off" => true,
-                _ => !_serverConfigurationManager.CurrentServer.FullPause,
-            } : !_serverConfigurationManager.CurrentServer.FullPause;
+                _ => !serverConfigurationManager.CurrentServer.FullPause,
+            } : !serverConfigurationManager.CurrentServer.FullPause;
 
-            if (fullPause != _serverConfigurationManager.CurrentServer.FullPause)
+            if (fullPause != serverConfigurationManager.CurrentServer.FullPause)
             {
-                _serverConfigurationManager.CurrentServer.FullPause = fullPause;
-                _serverConfigurationManager.Save();
+                serverConfigurationManager.CurrentServer.FullPause = fullPause;
+                serverConfigurationManager.Save();
                 _ = _serviceProvider.GetRequiredService<ApiController>().CreateConnections();
             }
         }

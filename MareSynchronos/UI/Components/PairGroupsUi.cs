@@ -31,19 +31,22 @@ namespace MareSynchronos.UI.Components
             UiShared.DrawWithID("$group-VisibleCustomTag", () => DrawCategory(TagHandler.CustomVisibleTag, visibleUsers));
             foreach (var tag in tagsWithPairsInThem)
             {
-                UiShared.DrawWithID($"group-{tag}", () => DrawCategory(tag, onlineUsers));
+                UiShared.DrawWithID($"group-{tag}", () => DrawCategory(tag, onlineUsers, visibleUsers));
             }
             UiShared.DrawWithID($"group-OnlineCustomTag", () => DrawCategory(TagHandler.CustomOnlineTag, onlineUsers.Where(u => !_tagHandler.HasAnyTag(u.UserPair!)).ToList()));
             UiShared.DrawWithID($"group-OfflineCustomTag", () => DrawCategory(TagHandler.CustomOfflineTag, offlineUsers));
         }
 
-        private void DrawCategory(string tag, List<Pair> users)
+        private void DrawCategory(string tag, List<Pair> users, List<Pair>? visibleUsers = null)
         {
             List<Pair> usersInThisTag;
             HashSet<string>? otherUidsTaggedWithTag = null;
+            bool isSpecialTag = false;
+            int visibleInThisTag = 0;
             if (tag is TagHandler.CustomOfflineTag or TagHandler.CustomOnlineTag or TagHandler.CustomVisibleTag)
             {
                 usersInThisTag = users;
+                isSpecialTag = true;
             }
             else
             {
@@ -51,12 +54,14 @@ namespace MareSynchronos.UI.Components
                 usersInThisTag = users
                     .Where(pair => otherUidsTaggedWithTag.Contains(pair.UserData.UID))
                     .ToList();
+                visibleInThisTag = visibleUsers?.Count(p => otherUidsTaggedWithTag.Contains(p.UserData.UID)) ?? 0;
             }
 
-            if (!usersInThisTag.Any()) return;
+            if (isSpecialTag && !usersInThisTag.Any()) return;
 
-            DrawName(tag, usersInThisTag.Count, otherUidsTaggedWithTag?.Count);
-            UiShared.DrawWithID($"group-{tag}-buttons", () => DrawButtons(tag, usersInThisTag));
+            DrawName(tag, isSpecialTag, visibleInThisTag, usersInThisTag.Count, otherUidsTaggedWithTag?.Count);
+            if (!isSpecialTag)
+                UiShared.DrawWithID($"group-{tag}-buttons", () => DrawButtons(tag, usersInThisTag));
 
             if (!_tagHandler.IsTagOpen(tag)) return;
 
@@ -65,7 +70,7 @@ namespace MareSynchronos.UI.Components
             ImGui.Unindent(20);
         }
 
-        private void DrawName(string tag, int count, int? total)
+        private void DrawName(string tag, bool isSpecialTag, int visible, int online, int? total)
         {
             string displayedName = tag switch
             {
@@ -75,7 +80,7 @@ namespace MareSynchronos.UI.Components
                 _ => tag
             };
 
-            string resultFolderName = total != null ? $"{displayedName} ({count}/{total} Pairs)" : $"{displayedName} ({count} Pairs)";
+            string resultFolderName = !isSpecialTag ? $"{displayedName} ({visible}/{online}/{total} Pairs)" : $"{displayedName} ({online} Pairs)";
 
             //  FontAwesomeIcon.CaretSquareDown : FontAwesomeIcon.CaretSquareRight
             var icon = _tagHandler.IsTagOpen(tag) ? FontAwesomeIcon.CaretSquareDown : FontAwesomeIcon.CaretSquareRight;
@@ -89,6 +94,17 @@ namespace MareSynchronos.UI.Components
             if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
             {
                 ToggleTagOpen(tag);
+            }
+
+            if (!isSpecialTag && ImGui.IsItemHovered())
+            {
+                ImGui.BeginTooltip();
+                ImGui.TextUnformatted($"Group {tag}");
+                ImGui.Separator();
+                ImGui.TextUnformatted($"{visible} Pairs visible");
+                ImGui.TextUnformatted($"{online} Pairs online");
+                ImGui.TextUnformatted($"{total} Pairs total");
+                ImGui.EndTooltip();
             }
         }
 
