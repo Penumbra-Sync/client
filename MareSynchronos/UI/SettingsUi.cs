@@ -531,7 +531,7 @@ public class SettingsUi : Window, IDisposable
                               + Environment.NewLine + "'Toast' will show Warning toast notifications in the bottom right corner"
                               + Environment.NewLine + "'Both' will show chat as well as the toast notification");
 
-        if (ImGui.BeginCombo("Error Notification Display", warnNotifLocation.ToString()))
+        if (ImGui.BeginCombo("Error Notification Display", errorNotifLocation.ToString()))
         {
             foreach (var item in (NotificationLocation[])Enum.GetValues(typeof(NotificationLocation)))
             {
