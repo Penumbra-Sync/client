@@ -38,7 +38,7 @@ public class PlayerManager : MediatorSubscriberBase, IDisposable
         
         Mediator.Subscribe<CustomizePlusMessage>(this, (msg) => CustomizePlusChanged((CustomizePlusMessage)msg));
         Mediator.Subscribe<HeelsOffsetMessage>(this, (msg) => HeelsOffsetChanged((HeelsOffsetMessage)msg));
-        Mediator.Subscribe<HeelsOffsetMessage>(this, (msg) => PalettePlusChanged((PalettePlusMessage)msg));
+        Mediator.Subscribe<PalettePlusMessage>(this, (msg) => PalettePlusChanged((PalettePlusMessage)msg));
         Mediator.Subscribe<ConnectedMessage>(this, (_) => ApiControllerOnConnected());
         Mediator.Subscribe<DisconnectedMessage>(this, (_) => ApiController_Disconnected());
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => DalamudUtilOnDelayedFrameworkUpdate());
