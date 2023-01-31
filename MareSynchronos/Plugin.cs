@@ -62,6 +62,7 @@ public sealed class Plugin : IDalamudPlugin
         collection.AddSingleton<PeriodicFileScanner>();
         collection.AddSingleton<FileReplacementFactory>();
         collection.AddSingleton<MareCharaFileManager>();
+        collection.AddSingleton<NotificationService>();
 
         collection.AddSingleton<UiShared>();
         collection.AddSingleton<SettingsUi>();
@@ -90,6 +91,7 @@ public sealed class Plugin : IDalamudPlugin
         _serviceProvider.GetRequiredService<GposeUi>();
         _serviceProvider.GetRequiredService<IntroUi>();
         _serviceProvider.GetRequiredService<DownloadUi>();
+        _serviceProvider.GetRequiredService<NotificationService>();
     }
 
     public string Name => "Mare Synchronos";

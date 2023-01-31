@@ -1,5 +1,6 @@
 ﻿using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Interface;
+using Dalamud.Interface.Internal.Notifications;
 using Dalamud.Utility;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Comparer;
@@ -21,16 +22,14 @@ public class PairManager : IDisposable
     private readonly ConcurrentDictionary<UserData, Pair> _allClientPairs = new(UserDataComparer.Instance);
     private readonly ConcurrentDictionary<GroupData, GroupFullInfoDto> _allGroups = new(GroupDataComparer.Instance);
     private readonly CachedPlayerFactory _cachedPlayerFactory;
-    private readonly DalamudUtil _dalamudUtil;
     private readonly PairFactory _pairFactory;
     private readonly UiBuilder _uiBuilder;
     private readonly ConfigurationService _configurationService;
     private readonly MareMediator _mediator;
 
-    public PairManager(CachedPlayerFactory cachedPlayerFactory, DalamudUtil dalamudUtil, PairFactory pairFactory, UiBuilder uiBuilder, ConfigurationService configurationService, MareMediator mediator)
+    public PairManager(CachedPlayerFactory cachedPlayerFactory, PairFactory pairFactory, UiBuilder uiBuilder, ConfigurationService configurationService, MareMediator mediator)
     {
         _cachedPlayerFactory = cachedPlayerFactory;
-        _dalamudUtil = dalamudUtil;
         _pairFactory = pairFactory;
         _uiBuilder = uiBuilder;
         _configurationService = configurationService;
@@ -172,20 +171,24 @@ public class PairManager : IDisposable
     public void MarkPairOnline(OnlineUserIdentDto dto, ApiController controller)
     {
         if (!_allClientPairs.ContainsKey(dto.User)) throw new InvalidOperationException("No user found for " + dto);
+        var pair = _allClientPairs[dto.User];
+        if (pair.CachedPlayer != null) return;
 
-        if (_allClientPairs[dto.User].CachedPlayer != null) return;
-
-        if (_configurationService.Current.ShowOnlineNotifications)
+        if (_configurationService.Current.ShowOnlineNotifications
+            && ((_configurationService.Current.ShowOnlineNotificationsOnlyForIndividualPairs && pair.UserPair != null)
+            || !_configurationService.Current.ShowOnlineNotificationsOnlyForIndividualPairs)
+            && (_configurationService.Current.ShowOnlineNotificationsOnlyForNamedPairs && !string.IsNullOrEmpty(pair.GetNote())
+            || !_configurationService.Current.ShowOnlineNotificationsOnlyForNamedPairs))
         {
-            var pair = _allClientPairs[dto.User];
-            if (_configurationService.Current.ShowOnlineNotificationsOnlyForIndividualPairs && pair.UserPair != null || !_configurationService.Current.ShowOnlineNotificationsOnlyForIndividualPairs)
-            {
-                _uiBuilder.AddNotification(string.Empty, "[Mare Synchronos] " + (pair.GetNote() ?? pair.UserData.AliasOrUID) + " is now online", Dalamud.Interface.Internal.Notifications.NotificationType.Info, 5000);
-            }
+            string note = pair.GetNote();
+            var msg = string.IsNullOrEmpty(note)
+                ? $"{note} ({pair.UserData.AliasOrUID}) is now online"
+                : $"{pair.UserData.AliasOrUID} is now online";
+            _mediator.Publish(new NotificationMessage("User online", msg, NotificationType.Info, 5000));
         }
 
-        _allClientPairs[dto.User].CachedPlayer?.Dispose();
-        _allClientPairs[dto.User].CachedPlayer = _cachedPlayerFactory.Create(dto, controller);
+        pair.CachedPlayer?.Dispose();
+        pair.CachedPlayer = _cachedPlayerFactory.Create(dto, controller);
         RecreateLazy();
     }
 

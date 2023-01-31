@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Dalamud.Interface.Internal.Notifications;
 
 namespace MareSynchronos.Mediator;
 
@@ -37,4 +33,6 @@ public record PlayerRelatedObjectPointerUpdateMessage(IntPtr[] RelatedObjects) :
 public record HaltScanMessage(string Source) : IMessage;
 public record ResumeScanMessage(string Source) : IMessage;
 
+public record NotificationMessage
+    (string Title, string Message, NotificationType Type, uint TimeShownOnScreen = 3000) : IMessage;
 #pragma warning restore MA0048 // File name must match type name

@@ -285,8 +285,6 @@ public class CharacterDataFactory
                 Thread.Sleep(50);
             }
 
-            _dalamudUtil.WaitWhileCharacterIsDrawing(objectKind.ToString(), charaPointer, objectKind == ObjectKind.MinionOrMount ? 1000 : 15000);
-
             var human = (Human*)((Character*)charaPointer)->GameObject.GetDrawObject();
             for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)
             {

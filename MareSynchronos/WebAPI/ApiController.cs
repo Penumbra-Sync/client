@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+﻿using Dalamud.Interface.Internal.Notifications;
+using System.Collections.Concurrent;
 using MareSynchronos.API.Routes;
 using MareSynchronos.FileCache;
 using MareSynchronos.Utils;
@@ -352,6 +353,7 @@ public partial class ApiController : IDisposable, IMareHubClient
         _connectionDto = null;
         _healthCheckTokenSource?.Cancel();
         ServerState = ServerState.Reconnecting;
+        _mediator.Publish(new NotificationMessage("Connection lost", "Connection lost to " + _serverManager.CurrentServer!.ServerName, NotificationType.Error, 5000));
         Logger.Warn("Connection closed... Reconnecting");
         Logger.Warn(arg?.Message ?? string.Empty);
         Logger.Warn(arg?.StackTrace ?? string.Empty);

@@ -19,7 +19,6 @@ public class MareConfig : IPluginConfiguration
     public int TimeSpanBetweenScansInSeconds { get; set; } = 30;
     public bool FileScanPaused { get; set; } = false;
     public bool InitialScanComplete { get; set; } = false;
-    public bool HideInfoMessages { get; set; } = false;
     public bool DisableOptionalPluginWarnings { get; set; } = false;
     public bool OpenGposeImportOnGposeStart { get; set; } = false;
     public bool ShowTransferWindow { get; set; } = true;
@@ -27,5 +26,9 @@ public class MareConfig : IPluginConfiguration
     public string CurrentServer { get; set; } = string.Empty;
     public bool ShowOnlineNotifications { get; set; } = false;
     public bool ShowOnlineNotificationsOnlyForIndividualPairs { get; set; } = true;
+    public bool ShowOnlineNotificationsOnlyForNamedPairs { get; set; } = false;
     public bool ShowCharacterNameInsteadOfNotesForVisible { get; set; } = false;
+    public NotificationLocation InfoNotification { get; set; } = NotificationLocation.Toast;
+    public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;
+    public NotificationLocation ErrorNotification { get; set;} = NotificationLocation.Both;
 }

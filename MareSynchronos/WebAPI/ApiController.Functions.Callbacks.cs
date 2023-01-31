@@ -1,7 +1,9 @@
-﻿using MareSynchronos.API.Data.Enum;
+﻿using Dalamud.Interface.Internal.Notifications;
+using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Dto;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
+using MareSynchronos.Mediator;
 using MareSynchronos.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
 
@@ -253,19 +255,13 @@ public partial class ApiController
         switch (severity)
         {
             case MessageSeverity.Error:
-                Logger.Error(message);
-                _dalamudUtil.PrintErrorChat(message);
+                _mediator.Publish(new NotificationMessage("Warning from " + _serverManager.CurrentServer!.ServerName, message, NotificationType.Error, 7500));
                 break;
             case MessageSeverity.Warning:
-                Logger.Warn(message);
-                _dalamudUtil.PrintWarnChat(message);
+                _mediator.Publish(new NotificationMessage("Warning from " + _serverManager.CurrentServer!.ServerName, message, NotificationType.Warning, 7500));
                 break;
             case MessageSeverity.Information:
-                Logger.Info(message);
-                if (!_configService.Current.HideInfoMessages)
-                {
-                    _dalamudUtil.PrintInfoChat(message);
-                }
+                _mediator.Publish(new NotificationMessage("Info from " + _serverManager.CurrentServer!.ServerName, message, NotificationType.Info, 5000));
                 break;
         }
 

@@ -1,6 +1,4 @@
-﻿using MareSynchronos.Mediator;
-
-namespace MareSynchronos.Utils;
+﻿namespace MareSynchronos.Mediator;
 
 public abstract class MediatorSubscriberBase : IDisposable
 {
@@ -9,7 +7,7 @@ public abstract class MediatorSubscriberBase : IDisposable
         Mediator = mediator;
     }
 
-    protected MareMediator Mediator;
+    protected readonly MareMediator Mediator;
 
     public virtual void Dispose()
     {

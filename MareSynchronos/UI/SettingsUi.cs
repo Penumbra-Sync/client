@@ -14,6 +14,8 @@ using MareSynchronos.Managers;
 using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
+using Lumina.Excel.GeneratedSheets;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace MareSynchronos.UI;
 
@@ -453,10 +455,6 @@ public class SettingsUi : Window, IDisposable
         }
 
         var openPopupOnAddition = _configService.Current.OpenPopupOnAdd;
-        var hideInfoMessages = _configService.Current.HideInfoMessages;
-        var disableOptionalPluginWarnings = _configService.Current.DisableOptionalPluginWarnings;
-        var onlineNotifs = _configService.Current.ShowOnlineNotifications;
-        var onlineNotifsPairsOnly = _configService.Current.ShowOnlineNotificationsOnlyForIndividualPairs;
 
         if (ImGui.Checkbox("Open Notes Popup on user addition", ref openPopupOnAddition))
         {
@@ -485,25 +483,85 @@ public class SettingsUi : Window, IDisposable
 
         ImGui.Separator();
 
-        UiShared.FontText("Server Messages", _uiShared.UidFont);
-        if (ImGui.Checkbox("Hide Server Info Messages", ref hideInfoMessages))
+        var disableOptionalPluginWarnings = _configService.Current.DisableOptionalPluginWarnings;
+        var onlineNotifs = _configService.Current.ShowOnlineNotifications;
+        var onlineNotifsPairsOnly = _configService.Current.ShowOnlineNotificationsOnlyForIndividualPairs;
+        var onlineNotifsNamedOnly = _configService.Current.ShowOnlineNotificationsOnlyForNamedPairs;
+        var infoNotifLocation = _configService.Current.InfoNotification;
+        var warnNotifLocation = _configService.Current.WarningNotification;
+        var errorNotifLocation = _configService.Current.ErrorNotification;
+        UiShared.FontText("Notifications", _uiShared.UidFont);
+
+        if (ImGui.BeginCombo("Info Notification Display", infoNotifLocation.ToString()))
         {
-            _configService.Current.HideInfoMessages = hideInfoMessages;
-            _configService.Save();
+            foreach (var item in (NotificationLocation[])Enum.GetValues(typeof(NotificationLocation)))
+            {
+                bool isSelected = item == infoNotifLocation;
+                if (ImGui.Selectable(item.ToString(), isSelected))
+                {
+                    _configService.Current.InfoNotification = item;
+                    _configService.Save();
+                }
+            }
+            ImGui.EndCombo();
         }
-        UiShared.DrawHelpText("Enabling this will not print any \"Info\" labeled messages into the game chat.");
+        UiShared.DrawHelpText("The location where \"Info\" notifications will display."
+                              + Environment.NewLine + "'Nowhere' will not show any Info notifications"
+                              + Environment.NewLine + "'Chat' will print Info notifications in chat"
+                              + Environment.NewLine + "'Toast' will show Warning toast notifications in the bottom right corner"
+                              + Environment.NewLine + "'Both' will show chat as well as the toast notification");
+
+        if (ImGui.BeginCombo("Warning Notification Display", warnNotifLocation.ToString()))
+        {
+            foreach (var item in (NotificationLocation[])Enum.GetValues(typeof(NotificationLocation)))
+            {
+                bool isSelected = item == warnNotifLocation;
+                if (ImGui.Selectable(item.ToString(), isSelected))
+                {
+                    _configService.Current.WarningNotification = item;
+                    _configService.Save();
+                }
+            }
+            ImGui.EndCombo();
+        }
+
+        UiShared.DrawHelpText("The location where \"Warning\" notifications will display."
+                              + Environment.NewLine + "'Nowhere' will not show any Warning notifications"
+                              + Environment.NewLine + "'Chat' will print Warning notifications in chat"
+                              + Environment.NewLine + "'Toast' will show Warning toast notifications in the bottom right corner"
+                              + Environment.NewLine + "'Both' will show chat as well as the toast notification");
+
+        if (ImGui.BeginCombo("Error Notification Display", warnNotifLocation.ToString()))
+        {
+            foreach (var item in (NotificationLocation[])Enum.GetValues(typeof(NotificationLocation)))
+            {
+                bool isSelected = item == errorNotifLocation;
+                if (ImGui.Selectable(item.ToString(), isSelected))
+                {
+                    _configService.Current.ErrorNotification = item;
+                    _configService.Save();
+                }
+            }
+            ImGui.EndCombo();
+        }
+        UiShared.DrawHelpText("The location where \"Error\" notifications will display."
+                              + Environment.NewLine + "'Nowhere' will not show any Error notifications"
+                              + Environment.NewLine + "'Chat' will print Error notifications in chat"
+                              + Environment.NewLine + "'Toast' will show Error toast notifications in the bottom right corner"
+                              + Environment.NewLine + "'Both' will show chat as well as the toast notification");
+
         if (ImGui.Checkbox("Disable optional plugin warnings", ref disableOptionalPluginWarnings))
         {
             _configService.Current.DisableOptionalPluginWarnings = disableOptionalPluginWarnings;
             _configService.Save();
         }
-        UiShared.DrawHelpText("Enabling this will not print any \"Warning\" labeled messages for missing optional plugins Heels or Customize+ in the game chat.");
+        UiShared.DrawHelpText("Enabling this will not show any \"Warning\" labeled messages for missing optional plugins.");
         if (ImGui.Checkbox("Enable online notifications", ref onlineNotifs))
         {
             _configService.Current.ShowOnlineNotifications = onlineNotifs;
             _configService.Save();
         }
-        UiShared.DrawHelpText("Enabling this will show a small notification in the bottom right corner when pairs go online.");
+        UiShared.DrawHelpText("Enabling this will show a small notification (type: Info) in the bottom right corner when pairs go online.");
 
         if (!onlineNotifs) ImGui.BeginDisabled();
         if (ImGui.Checkbox("Notify only for individual pairs", ref onlineNotifsPairsOnly))
@@ -511,7 +569,13 @@ public class SettingsUi : Window, IDisposable
             _configService.Current.ShowOnlineNotificationsOnlyForIndividualPairs = onlineNotifsPairsOnly;
             _configService.Save();
         }
-        UiShared.DrawHelpText("Enabling this will only show online notifications for individual pairs.");
+        UiShared.DrawHelpText("Enabling this will only show online notifications (type: Info) for individual pairs.");
+        if (ImGui.Checkbox("Notify only for named pairs", ref onlineNotifsNamedOnly))
+        {
+            _configService.Current.ShowOnlineNotificationsOnlyForNamedPairs = onlineNotifsNamedOnly;
+            _configService.Save();
+        }
+        UiShared.DrawHelpText("Enabling this will only show online notifications (type: Info) for pairs where you have set an individual note.");
         if (!onlineNotifs) ImGui.EndDisabled();
     }
 

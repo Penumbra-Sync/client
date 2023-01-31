@@ -13,7 +13,6 @@ using MareSynchronos.FileCache;
 using MareSynchronos.Localization;
 using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;

@@ -3,7 +3,6 @@ using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using MareSynchronos.Models;
-using MareSynchronos.UI;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.Mediator;
 #if DEBUG
@@ -55,10 +54,10 @@ public class PlayerManager : MediatorSubscriberBase, IDisposable
 
         _playerRelatedObjects = new List<PlayerRelatedObject>()
         {
-            new PlayerRelatedObject(ObjectKind.Player, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.PlayerPointer),
-            new PlayerRelatedObject(ObjectKind.MinionOrMount, IntPtr.Zero, IntPtr.Zero, () => (IntPtr)((Character*)_dalamudUtil.PlayerPointer)->CompanionObject),
-            new PlayerRelatedObject(ObjectKind.Pet, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.GetPet()),
-            new PlayerRelatedObject(ObjectKind.Companion, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.GetCompanion()),
+            new(ObjectKind.Player, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.PlayerPointer),
+            new(ObjectKind.MinionOrMount, IntPtr.Zero, IntPtr.Zero, () => (IntPtr)((Character*)_dalamudUtil.PlayerPointer)->CompanionObject),
+            new(ObjectKind.Pet, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.GetPet()),
+            new(ObjectKind.Companion, IntPtr.Zero, IntPtr.Zero, () => _dalamudUtil.GetCompanion()),
         };
     }
 

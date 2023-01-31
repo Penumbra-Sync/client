@@ -1,4 +1,5 @@
-﻿using Dalamud.Logging;
+﻿using Dalamud.Interface.Internal.Notifications;
+using Dalamud.Logging;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Enum;
@@ -143,11 +144,12 @@ public class CachedPlayer : IDisposable
             }
         }
 
+        List<string> missingPluginsForData = new();
         if (characterData.HeelsOffset != default)
         {
             if (!warning.ShownHeelsWarning && !_ipcManager.CheckHeelsApi())
             {
-                _dalamudUtil.PrintWarnChat("Received Heels data for player " + PlayerName + ", but Heels is not installed. Install Heels to experience their character fully.");
+                missingPluginsForData.Add("Heels");
                 warning.ShownHeelsWarning = true;
             }
         }
@@ -155,7 +157,7 @@ public class CachedPlayer : IDisposable
         {
             if (!warning.ShownCustomizePlusWarning && !_ipcManager.CheckCustomizePlusApi())
             {
-                _dalamudUtil.PrintWarnChat("Received Customize+ data for player " + PlayerName + ", but Customize+ is not installed. Install Customize+ to experience their character fully.");
+                missingPluginsForData.Add("Customize+");
                 warning.ShownCustomizePlusWarning = true;
             }
         }
@@ -164,9 +166,16 @@ public class CachedPlayer : IDisposable
         {
             if (!warning.ShownPalettePlusWarning && !_ipcManager.CheckPalettePlusApi())
             {
-                _dalamudUtil.PrintWarnChat("Received Palette+ data for player " + PlayerName + ", but Palette+ is not installed. Install Palette+ to experience their character fully.");
+                missingPluginsForData.Add("Palette+");
                 warning.ShownPalettePlusWarning = true;
             }
+        }
+
+        if (missingPluginsForData.Any())
+        {
+            _mediator.Publish(new NotificationMessage("Missing plugins for " + PlayerName,
+                $"Received data for {PlayerName} that contained information for plugins you have not installed. Install {string.Join(", ", missingPluginsForData)} to experience their character fully.",
+                NotificationType.Warning, 10000));
         }
 
         _cachedData = characterData;

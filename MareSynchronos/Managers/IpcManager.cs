@@ -177,7 +177,7 @@ public class IpcManager : IDisposable
         }
     }
 
-    public bool Initialized => CheckPenumbraApi();
+    public bool Initialized => CheckPenumbraApi() && CheckGlamourerApi();
     public bool CheckGlamourerApi()
     {
         try

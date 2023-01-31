@@ -19,8 +19,6 @@ public class DalamudUtil : IDisposable
     private readonly ObjectTable _objectTable;
     private readonly Framework _framework;
     private readonly Dalamud.Game.ClientState.Conditions.Condition _condition;
-    private readonly ChatGui _chatGui;
-    private readonly Dalamud.Data.DataManager _gameData;
     private readonly MareMediator _mediator;
 
     private uint? _classJobId = 0;
@@ -42,15 +40,13 @@ public class DalamudUtil : IDisposable
     }
 
     public DalamudUtil(ClientState clientState, ObjectTable objectTable, Framework framework,
-        Dalamud.Game.ClientState.Conditions.Condition condition, ChatGui chatGui,
+        Dalamud.Game.ClientState.Conditions.Condition condition,
         Dalamud.Data.DataManager gameData, MareMediator mediator)
     {
         _clientState = clientState;
         _objectTable = objectTable;
         _framework = framework;
         _condition = condition;
-        _chatGui = chatGui;
-        _gameData = gameData;
         _mediator = mediator;
         _framework.Update += FrameworkOnUpdate;
         if (IsLoggedIn)
@@ -66,24 +62,6 @@ public class DalamudUtil : IDisposable
     }
 
     public Lazy<Dictionary<ushort, string>> WorldData { get; private set; }
-
-    public void PrintInfoChat(string message)
-    {
-        SeStringBuilder se = new SeStringBuilder().AddText("[Mare Synchronos] Info: ").AddItalics(message);
-        _chatGui.Print(se.BuiltString);
-    }
-
-    public void PrintWarnChat(string message)
-    {
-        SeStringBuilder se = new SeStringBuilder().AddText("[Mare Synchronos] ").AddUiForeground("Warning: " + message, 31).AddUiForegroundOff();
-        _chatGui.Print(se.BuiltString);
-    }
-
-    public void PrintErrorChat(string message)
-    {
-        SeStringBuilder se = new SeStringBuilder().AddText("[Mare Synchronos] ").AddUiForeground("Error: ", 534).AddItalicsOn().AddUiForeground(message, 534).AddUiForegroundOff().AddItalicsOff();
-        _chatGui.Print(se.BuiltString);
-    }
 
     private unsafe void FrameworkOnUpdate(Framework framework)
     {
