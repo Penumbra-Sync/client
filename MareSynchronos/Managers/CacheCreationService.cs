@@ -17,7 +17,7 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
     private Dictionary<ObjectKind, GameObjectHandler> _cachesToCreate = new();
     private CharacterData _lastCreatedData = new();
     private CancellationTokenSource cts = new();
-    private List<GameObjectHandler> _playerRelatedObjects;
+    private List<GameObjectHandler> _playerRelatedObjects = new();
 
     public unsafe CacheCreationService(MareMediator mediator, CharacterDataFactory characterDataFactory, IpcManager ipcManager,
         ApiController apiController, DalamudUtil dalamudUtil) : base(mediator)
@@ -35,14 +35,15 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
         Mediator.Subscribe<CustomizePlusMessage>(this, (msg) => CustomizePlusChanged((CustomizePlusMessage)msg));
         Mediator.Subscribe<HeelsOffsetMessage>(this, (msg) => HeelsOffsetChanged((HeelsOffsetMessage)msg));
         Mediator.Subscribe<PalettePlusMessage>(this, (msg) => PalettePlusChanged((PalettePlusMessage)msg));
+        Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, (msg) => _cachesToCreate.Add(ObjectKind.Player, _playerRelatedObjects.First(p => p.ObjectKind == ObjectKind.Player)));
 
-        _playerRelatedObjects = new List<GameObjectHandler>()
+        _playerRelatedObjects.AddRange(new List<GameObjectHandler>()
         {
             new(Mediator, ObjectKind.Player, () => dalamudUtil.PlayerPointer),
             new(Mediator, ObjectKind.MinionOrMount, () => (IntPtr)((Character*)dalamudUtil.PlayerPointer)->CompanionObject),
             new(Mediator, ObjectKind.Pet, () => dalamudUtil.GetPet()),
             new(Mediator, ObjectKind.Companion, () => dalamudUtil.GetCompanion()),
-        };
+        });
     }
 
     private void PalettePlusChanged(PalettePlusMessage msg)
@@ -103,6 +104,8 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
         {
             Logger.Debug("Cache Creation stored until previous creation finished");
         }
+
+        Mediator.Publish(new PlayerRelatedObjectPointerUpdateMessage(_playerRelatedObjects.Select(f => f.CurrentAddress).ToArray()));
     }
 
     public override void Dispose()

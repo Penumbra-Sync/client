@@ -272,6 +272,12 @@ public class CharacterDataFactory
         previousData.CustomizePlusScale = _ipcManager.GetCustomizePlusScale();
         previousData.PalettePlusPalette = _ipcManager.PalettePlusBuildPalette();
 
+        Logger.Debug("== Static Replacements ==");
+        foreach (var item in previousData.FileReplacements[objectKind])
+        {
+            Logger.Debug(item.ToString());
+        }
+
         Logger.Debug("Handling transient update for " + objectKind);
         _transientResourceManager.ClearTransientPaths(charaPointer, previousData.FileReplacements[objectKind].SelectMany(c => c.GamePaths).ToList());
 
@@ -281,15 +287,16 @@ public class CharacterDataFactory
         ManageSemiTransientData(objectKind, charaPointer);
 
         var resolvedTransientPaths = GetFileReplacementsFromPaths();
+        Logger.Debug("== Transient Replacements ==");
         foreach (var replacement in resolvedTransientPaths.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)))
         {
+            Logger.Debug(replacement.ToString());
             previousData.FileReplacements[objectKind].Add(replacement);
         }
 
-        foreach (var item in previousData.FileReplacements[objectKind])
-        {
-            Logger.Debug(item.ToString());
-        }
+        _transientResourceManager.CleanSemiTransientResources(objectKind, previousData.FileReplacements[objectKind].ToList());
+
+
 
         st.Stop();
         Logger.Verbose("Building " + objectKind + " Data took " + st.ElapsedMilliseconds + "ms");

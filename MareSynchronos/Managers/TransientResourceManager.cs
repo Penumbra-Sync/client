@@ -1,6 +1,7 @@
 ﻿using MareSynchronos.API.Data.Enum;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
+using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using System.Collections.Concurrent;
 
@@ -83,11 +84,21 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
         }
     }
 
-    public void CleanSemiTransientResources(ObjectKind objectKind)
+    public void CleanSemiTransientResources(ObjectKind objectKind, List<FileReplacement>? fileReplacement = null)
     {
         if (SemiTransientResources.ContainsKey(objectKind))
         {
-            SemiTransientResources[objectKind].Clear();
+            if (fileReplacement == null)
+            {
+                SemiTransientResources[objectKind].Clear();
+                return;
+            }
+
+            foreach (var replacement in fileReplacement.Where(p => !p.HasFileReplacement).SelectMany(p => p.GamePaths).ToList())
+            {
+
+                SemiTransientResources[objectKind].RemoveWhere(p => string.Equals(p, replacement, StringComparison.OrdinalIgnoreCase));
+            }
         }
     }
 

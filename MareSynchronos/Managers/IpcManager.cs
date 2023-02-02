@@ -37,6 +37,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
     private readonly FuncSubscriber<string, string, Dictionary<string, string>, string, int, PenumbraApiEc> _penumbraAddTemporaryMod;
     private readonly FuncSubscriber<string[], string[], (string[], string[][])> _penumbraResolvePaths;
     private readonly FuncSubscriber<bool> _penumbraEnabled;
+    private readonly EventSubscriber<ModSettingChange, string, string, bool> _penumbraModSettingChanged;
     private readonly EventSubscriber<nint, string, string> _penumbraGameObjectResourcePathResolved;
 
     private readonly ICallGateSubscriber<string> _heelsGetApiVersion;
@@ -84,6 +85,11 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         _penumbraAssignTemporaryCollection = Penumbra.Api.Ipc.AssignTemporaryCollection.Subscriber(pi);
         _penumbraResolvePaths = Penumbra.Api.Ipc.ResolvePlayerPaths.Subscriber(pi);
         _penumbraEnabled = Penumbra.Api.Ipc.GetEnabledState.Subscriber(pi);
+        _penumbraModSettingChanged = Penumbra.Api.Ipc.ModSettingChanged.Subscriber(pi, (change, arg1, arg, b) =>
+        {
+            if (change == ModSettingChange.EnableState)
+                Mediator.Publish(new PenumbraModSettingChangedMessage());
+        });
 
         _penumbraGameObjectResourcePathResolved = Penumbra.Api.Ipc.GameObjectResourcePathResolved.Subscriber(pi, (ptr, arg1, arg2) => ResourceLoaded((IntPtr)ptr, arg1, arg2));
 
@@ -258,6 +264,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
 
         ActionQueue.Clear();
 
+        _penumbraModSettingChanged.Dispose();
         _penumbraGameObjectResourcePathResolved.Dispose();
         _penumbraDispose.Dispose();
         _penumbraInit.Dispose();
