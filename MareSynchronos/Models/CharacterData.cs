@@ -1,6 +1,5 @@
 ﻿using Newtonsoft.Json;
 using System.Text;
-using MareSynchronos.Utils;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Data;
 
@@ -10,7 +9,7 @@ namespace MareSynchronos.Models;
 public class CharacterData
 {
     [JsonProperty]
-    public Dictionary<ObjectKind, List<FileReplacement>> FileReplacements { get; set; } = new();
+    public Dictionary<ObjectKind, HashSet<FileReplacement>> FileReplacements { get; set; } = new();
 
     [JsonProperty]
     public Dictionary<ObjectKind, string> GlamourerString { get; set; } = new();
@@ -33,7 +32,7 @@ public class CharacterData
     {
         if (!fileReplacement.HasFileReplacement) return;
 
-        if (!FileReplacements.ContainsKey(objectKind)) FileReplacements.Add(objectKind, new List<FileReplacement>());
+        if (!FileReplacements.ContainsKey(objectKind)) FileReplacements.Add(objectKind, new HashSet<FileReplacement>());
 
         var existingReplacement = FileReplacements[objectKind].SingleOrDefault(f => string.Equals(f.ResolvedPath, fileReplacement.ResolvedPath, StringComparison.OrdinalIgnoreCase));
         if (existingReplacement != null)
@@ -57,16 +56,9 @@ public class CharacterData
             };
         }).ToList());
 
-        Logger.Debug("Adding fileSwaps");
         foreach (var item in FileReplacements)
         {
-            Logger.Debug("Checking fileSwaps for " + item.Key);
             var fileSwapsToAdd = item.Value.Where(f => f.IsFileSwap).Select(f => f.ToFileReplacementDto());
-            Logger.Debug("Adding " + fileSwapsToAdd.Count() + " file swaps");
-            foreach (var swap in fileSwapsToAdd)
-            {
-                Logger.Debug("Adding: " + swap.GamePaths.First() + ":" + swap.FileSwapPath);
-            }
             fileReplacements[item.Key].AddRange(fileSwapsToAdd);
         }
 

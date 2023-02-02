@@ -59,7 +59,6 @@ public sealed class Plugin : IDalamudPlugin
         collection.AddSingleton<PairManager>();
         collection.AddSingleton<ApiController>();
         collection.AddSingleton<PeriodicFileScanner>();
-        collection.AddSingleton<FileReplacementFactory>();
         collection.AddSingleton<MareCharaFileManager>();
         collection.AddSingleton<NotificationService>();
 
@@ -70,9 +69,9 @@ public sealed class Plugin : IDalamudPlugin
         collection.AddSingleton<IntroUi>();
         collection.AddSingleton<DownloadUi>();
 
+        collection.AddScoped<CacheCreationService>();
         collection.AddScoped<TransientResourceManager>();
         collection.AddScoped<CharacterDataFactory>();
-        collection.AddScoped<PlayerManager>();
         collection.AddScoped<OnlinePlayerManager>();
 
         var serviceProvider = collection.BuildServiceProvider(new ServiceProviderOptions() { ValidateOnBuild = true, ValidateScopes = true });

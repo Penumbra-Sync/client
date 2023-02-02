@@ -150,7 +150,7 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
     private void PeriodicFileScan(CancellationToken ct)
     {
         TotalFiles = 1;
-        var penumbraDir = _ipcManager.PenumbraModDirectory();
+        var penumbraDir = _ipcManager.PenumbraModDirectory;
         bool penDirExists = true;
         bool cacheDirExists = true;
         if (string.IsNullOrEmpty(penumbraDir) || !Directory.Exists(penumbraDir))

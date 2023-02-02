@@ -57,7 +57,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
         Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
         Mediator.Subscribe<GposeStartMessage>(this, (_) => UiShared_GposeStart());
         Mediator.Subscribe<GposeEndMessage>(this, (_) => UiShared_GposeEnd());
-        Mediator.Subscribe<PlayerChangedMessage>(this, (msg) => LastCreatedCharacterData = ((PlayerChangedMessage)msg).Data);
+        Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) => LastCreatedCharacterData = ((CharacterDataCreatedMessage)msg).CharacterData.ToAPI());
 
         windowSystem.AddWindow(this);
     }

@@ -11,18 +11,17 @@ public class OnlinePlayerManager : MediatorSubscriberBase, IDisposable
 {
     private readonly ApiController _apiController;
     private readonly DalamudUtil _dalamudUtil;
-    private readonly PlayerManager _playerManager;
     private readonly FileCacheManager _fileDbManager;
     private readonly PairManager _pairManager;
+    private CharacterData? _lastSentData;
 
-    public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil, PlayerManager playerManager,
+    public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil,
         FileCacheManager fileDbManager, PairManager pairManager, MareMediator mediator) : base(mediator)
     {
         Logger.Verbose("Creating " + nameof(OnlinePlayerManager));
 
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
-        _playerManager = playerManager;
         _fileDbManager = fileDbManager;
         _pairManager = pairManager;
 
@@ -30,6 +29,20 @@ public class OnlinePlayerManager : MediatorSubscriberBase, IDisposable
         Mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
         Mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => FrameworkOnUpdate());
+        Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) =>
+        {
+            var newData = ((CharacterDataCreatedMessage)msg).CharacterData.ToAPI();
+            if (_lastSentData == null || _lastSentData != null && !string.Equals(newData.DataHash.Value, _lastSentData.DataHash.Value, StringComparison.Ordinal))
+            {
+                Logger.Debug("Pushing data for visible players");
+                _lastSentData = newData;
+                PushCharacterData(_pairManager.VisibleUsers);
+            }
+            else
+            {
+                Logger.Debug("Not sending data for " + newData.DataHash.Value);
+            }
+        });
     }
 
     private void PlayerManagerOnPlayerHasChanged(PlayerChangedMessage msg)
@@ -78,11 +91,11 @@ public class OnlinePlayerManager : MediatorSubscriberBase, IDisposable
 
     private void PushCharacterData(List<UserData> visiblePlayers)
     {
-        if (visiblePlayers.Any() && _playerManager.LastCreatedCharacterData != null)
+        if (visiblePlayers.Any() && _lastSentData != null)
         {
             Task.Run(async () =>
             {
-                await _apiController.PushCharacterData(_playerManager.LastCreatedCharacterData, visiblePlayers).ConfigureAwait(false);
+                await _apiController.PushCharacterData(_lastSentData, visiblePlayers).ConfigureAwait(false);
             });
         }
     }

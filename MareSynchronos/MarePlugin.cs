@@ -94,8 +94,8 @@ public class MarePlugin : MediatorSubscriberBase, IDisposable
 
             _runtimeServiceScope?.Dispose();
             _runtimeServiceScope = _serviceProvider.CreateScope();
+            _runtimeServiceScope.ServiceProvider.GetRequiredService<CacheCreationService>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<TransientResourceManager>();
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<PlayerManager>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<OnlinePlayerManager>();
         }
         catch (Exception ex)

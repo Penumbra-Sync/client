@@ -97,7 +97,7 @@ public class NotificationService : MediatorSubscriberBase
 
     private void PrintErrorChat(string? message)
     {
-        SeStringBuilder se = new SeStringBuilder().AddText("[Mare Synchronos] ").AddUiForeground("Error: ", 534).AddItalicsOn().AddUiForeground(message ?? string.Empty, 534).AddUiForegroundOff().AddItalicsOff();
-        _chatGui.Print(se.BuiltString);
+        SeStringBuilder se = new SeStringBuilder().AddText("[Mare Synchronos] Error: " + message);
+        _chatGui.PrintError(se.BuiltString);
     }
 }

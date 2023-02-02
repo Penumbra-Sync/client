@@ -35,8 +35,9 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
     private readonly FuncSubscriber<string, string> _penumbraResolvePlayer;
     private readonly FuncSubscriber<string, string[]> _reverseResolvePlayer;
     private readonly FuncSubscriber<string, string, Dictionary<string, string>, string, int, PenumbraApiEc> _penumbraAddTemporaryMod;
+    private readonly FuncSubscriber<string[], string[], (string[], string[][])> _penumbraResolvePaths;
+    private readonly FuncSubscriber<bool> _penumbraEnabled;
     private readonly EventSubscriber<nint, string, string> _penumbraGameObjectResourcePathResolved;
-    private readonly EventSubscriber<ModSettingChange, string, string, bool> _penumbraModSettingChanged;
 
     private readonly ICallGateSubscriber<string> _heelsGetApiVersion;
     private readonly ICallGateSubscriber<float> _heelsGetOffset;
@@ -49,7 +50,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
     private readonly ICallGateSubscriber<string, Character?, object> _customizePlusSetBodyScaleToCharacter;
     private readonly ICallGateSubscriber<Character?, object> _customizePlusRevert;
     private readonly ICallGateSubscriber<string?, object> _customizePlusOnScaleUpdate;
-    
+
     private readonly ICallGateSubscriber<string> _palettePlusApiVersion;
     private readonly ICallGateSubscriber<Character, string> _palettePlusBuildCharaPalette;
     private readonly ICallGateSubscriber<Character, string, object> _palettePlusSetCharaPalette;
@@ -81,9 +82,10 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         _penumbraRemoveTemporaryCollection = Penumbra.Api.Ipc.RemoveTemporaryCollectionByName.Subscriber(pi);
         _penumbraRemoveTemporaryMod = Penumbra.Api.Ipc.RemoveTemporaryMod.Subscriber(pi);
         _penumbraAssignTemporaryCollection = Penumbra.Api.Ipc.AssignTemporaryCollection.Subscriber(pi);
+        _penumbraResolvePaths = Penumbra.Api.Ipc.ResolvePlayerPaths.Subscriber(pi);
+        _penumbraEnabled = Penumbra.Api.Ipc.GetEnabledState.Subscriber(pi);
 
         _penumbraGameObjectResourcePathResolved = Penumbra.Api.Ipc.GameObjectResourcePathResolved.Subscriber(pi, (ptr, arg1, arg2) => ResourceLoaded((IntPtr)ptr, arg1, arg2));
-        _penumbraModSettingChanged = Penumbra.Api.Ipc.ModSettingChanged.Subscriber(pi, (modsetting, a, b, c) => PenumbraModSettingChangedHandler());
 
         _glamourerApiVersion = pi.GetIpcSubscriber<int>("Glamourer.ApiVersion");
         _glamourerGetAllCustomization = pi.GetIpcSubscriber<GameObject?, string>("Glamourer.GetAllCustomizationFromCharacter");
@@ -107,7 +109,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         _customizePlusOnScaleUpdate = pi.GetIpcSubscriber<string?, object>("CustomizePlus.OnScaleUpdate");
 
         _customizePlusOnScaleUpdate.Subscribe(OnCustomizePlusScaleChange);
-        
+
         _palettePlusApiVersion = pi.GetIpcSubscriber<string>("PalettePlus.ApiVersion");
         _palettePlusBuildCharaPalette = pi.GetIpcSubscriber<Character, string>("PalettePlus.BuildCharaPalette");
         _palettePlusSetCharaPalette = pi.GetIpcSubscriber<Character, string, object>("PalettePlus.SetCharaPalette");
@@ -125,6 +127,12 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => HandleActionQueue());
         Mediator.Subscribe<GposeFrameworkUpdateMessage>(this, (_) => HandleGposeActionQueue());
         Mediator.Subscribe<ZoneSwitchEndMessage>(this, (_) => ClearActionQueue());
+        Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => CheckPenumbraModPath());
+    }
+
+    private void CheckPenumbraModPath()
+    {
+        PenumbraModDirectory = GetPenumbraModDirectory();
     }
 
     private void HandleGposeActionQueue()
@@ -140,11 +148,6 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
     public void ToggleGposeQueueMode(bool on)
     {
         _inGposeQueueMode = on;
-    }
-
-    private void PenumbraModSettingChangedHandler()
-    {
-        Mediator.Publish(new PenumbraModSettingChangedMessage());
     }
 
     private void ClearActionQueue()
@@ -191,7 +194,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
     {
         try
         {
-            return _penumbraApiVersion.Invoke() is { Item1: 4, Item2: >= 17 };
+            return _penumbraApiVersion.Invoke() is { Item1: 4, Item2: >= 19 } && _penumbraEnabled.Invoke();
         }
         catch
         {
@@ -259,7 +262,6 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         _penumbraDispose.Dispose();
         _penumbraInit.Dispose();
         _penumbraObjectIsRedrawn.Dispose();
-        _penumbraModSettingChanged.Dispose();
         _heelsOffsetUpdate.Unsubscribe(HeelsOffsetChange);
     }
 
@@ -411,7 +413,9 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         return _penumbraGetMetaManipulations.Invoke();
     }
 
-    public string? PenumbraModDirectory()
+    public string? PenumbraModDirectory;
+
+    public string? GetPenumbraModDirectory()
     {
         if (!CheckPenumbraApi()) return null;
         return _penumbraResolveModDir!.Invoke().ToLowerInvariant();
@@ -495,6 +499,11 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         });
     }
 
+    public (string[] forward, string[][] reverse) PenumbraResolvePaths(string[] forward, string[] reverse)
+    {
+        return _penumbraResolvePaths.Invoke(forward, reverse);
+    }
+
     private void RedrawEvent(IntPtr objectAddress, int objectTableIndex)
     {
         Mediator.Publish(new PenumbraRedrawMessage(objectAddress, objectTableIndex));
@@ -533,7 +542,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
             if (gameObj is Character c)
             {
                 string decodedPalette = Encoding.UTF8.GetString(Convert.FromBase64String(palette));
-                
+
                 if (string.IsNullOrEmpty(decodedPalette))
                 {
                     Logger.Verbose("PalettePlus removing for " + c.Address.ToString("X"));
@@ -555,7 +564,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         if (string.IsNullOrEmpty(palette)) return string.Empty;
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(palette));
     }
-    
+
     public void PalettePlusRemovePalette(IntPtr character)
     {
         if (!CheckPalettePlusApi()) return;

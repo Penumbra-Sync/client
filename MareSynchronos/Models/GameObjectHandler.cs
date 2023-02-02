@@ -3,12 +3,15 @@ using System.Runtime.InteropServices;
 using MareSynchronos.Utils;
 using Penumbra.String;
 using MareSynchronos.API.Data.Enum;
+using MareSynchronos.Mediator;
 
 namespace MareSynchronos.Models;
 
-public class PlayerRelatedObject
+public class GameObjectHandler : MediatorSubscriberBase
 {
+    private readonly MareMediator _mediator;
     private readonly Func<IntPtr> getAddress;
+    private readonly bool _sendUpdates;
 
     public unsafe Character* Character => (Character*)Address;
 
@@ -31,26 +34,31 @@ public class PlayerRelatedObject
         }
     }
 
-    public PlayerRelatedObject(ObjectKind objectKind, IntPtr address, IntPtr drawObjectAddress, Func<IntPtr> getAddress)
+    public GameObjectHandler(MareMediator mediator, ObjectKind objectKind, Func<IntPtr> getAddress, bool sendUpdates = true) : base(mediator)
     {
+        _mediator = mediator;
         ObjectKind = objectKind;
-        Address = address;
-        DrawObjectAddress = drawObjectAddress;
         this.getAddress = getAddress;
+        _sendUpdates = sendUpdates;
         _name = string.Empty;
+
+        Mediator.Subscribe<TransientResourceChangedMessage>(this, (msg) =>
+        {
+            var actualMsg = (TransientResourceChangedMessage)msg;
+            if (actualMsg.Address != Address || !sendUpdates) return;
+            Mediator.Publish(new CreateCacheForObjectMessage(this));
+        });
+
+        Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => CheckAndUpdateObject());
     }
 
     public byte[] EquipSlotData { get; set; } = new byte[40];
     public byte[] CustomizeData { get; set; } = new byte[26];
     public byte? HatState { get; set; }
     public byte? VisorWeaponState { get; set; }
+    private bool _doNotSendUpdate;
 
-    public bool HasTransientsUpdate { get; set; } = false;
-    public bool HasUnprocessedUpdate { get; set; } = false;
-    public bool DoNotSendUpdate { get; set; } = false;
-    public bool IsProcessing { get; set; } = false;
-
-    public unsafe void CheckAndUpdateObject()
+    public unsafe bool CheckAndUpdateObject()
     {
         var curPtr = CurrentAddress;
         if (curPtr != IntPtr.Zero)
@@ -68,7 +76,10 @@ public class PlayerRelatedObject
 
                 Address = curPtr;
                 DrawObjectAddress = (IntPtr)chara->GameObject.DrawObject;
-                HasUnprocessedUpdate = true;
+                if (_sendUpdates && !_doNotSendUpdate)
+                    Mediator.Publish(new CreateCacheForObjectMessage(this));
+
+                return true;
             }
         }
         else if (Address != IntPtr.Zero || DrawObjectAddress != IntPtr.Zero)
@@ -77,12 +88,14 @@ public class PlayerRelatedObject
             DrawObjectAddress = IntPtr.Zero;
             Logger.Verbose(ObjectKind + " Changed: " + _name + ", now: " + Address + ", " + DrawObjectAddress);
         }
+
+        return false;
     }
 
     private unsafe bool CompareAndUpdateByteData(byte* equipSlotData, byte* customizeData)
     {
         bool hasChanges = false;
-        DoNotSendUpdate = false;
+        _doNotSendUpdate = false;
         for (int i = 0; i < EquipSlotData.Length; i++)
         {
             var data = Marshal.ReadByte((IntPtr)equipSlotData, i);
@@ -107,10 +120,10 @@ public class PlayerRelatedObject
         var newWeaponOrVisorState = Marshal.ReadByte((IntPtr)customizeData + 31, 0);
         if (newHatState != HatState)
         {
-            if (HatState != null && !hasChanges && !HasUnprocessedUpdate)
+            if (HatState != null && !hasChanges)
             {
                 Logger.Debug("Not Sending Update, only Hat changed");
-                DoNotSendUpdate = true;
+                _doNotSendUpdate = true;
             }
             HatState = newHatState;
             hasChanges = true;
@@ -120,10 +133,10 @@ public class PlayerRelatedObject
 
         if (newWeaponOrVisorState != VisorWeaponState)
         {
-            if (VisorWeaponState != null && !hasChanges && !HasUnprocessedUpdate)
+            if (VisorWeaponState != null && !hasChanges)
             {
                 Logger.Debug("Not Sending Update, only Visor/Weapon changed");
-                DoNotSendUpdate = true;
+                _doNotSendUpdate = true;
             }
             VisorWeaponState = newWeaponOrVisorState;
             hasChanges = true;

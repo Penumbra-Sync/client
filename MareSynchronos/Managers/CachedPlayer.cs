@@ -19,7 +19,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
     private readonly IpcManager _ipcManager;
     private readonly FileCacheManager _fileDbManager;
     private API.Data.CharacterData _cachedData = new();
-    private PlayerRelatedObject? _currentCharacterEquipment;
+    private GameObjectHandler? _currentCharacterEquipment;
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
     private bool _isVisible;
 
@@ -64,6 +64,18 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
         Logger.Debug("Checking for files to download for player " + PlayerName);
         Logger.Debug("Hash for data is " + characterData.DataHash.Value + ", current cache hash is " + _cachedData.DataHash.Value);
+
+        if (!_ipcManager.CheckPenumbraApi())
+        {
+            Mediator.Publish(new NotificationMessage("Penumbra inactive", "Your Penumbra installation is not active or out of date. Update Penumbra and/or the Enable Mods setting in Penumbra to continue to use Mare.", NotificationType.Error));
+            return;
+        }
+
+        if (!_ipcManager.CheckGlamourerApi())
+        {
+            Mediator.Publish(new NotificationMessage("Glamourer inactive", "Your Glamourer installation is not active or out of date. Update Glamourer to continue to use Mare.", NotificationType.Error));
+            return;
+        }
 
         if (string.Equals(characterData.DataHash.Value, _cachedData.DataHash.Value, StringComparison.Ordinal) && !forced) return;
 
@@ -116,6 +128,14 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
             if (objectKind == ObjectKind.Player)
             {
+                bool manipDataDifferent = !string.Equals(_cachedData.ManipulationData, characterData.ManipulationData, StringComparison.Ordinal);
+                if (manipDataDifferent)
+                {
+                    Logger.Debug("Updating " + objectKind);
+                    charaDataToUpdate.Add(objectKind);
+                    continue;
+                }
+
                 bool heelsOffsetDifferent = _cachedData.HeelsOffset != characterData.HeelsOffset;
                 if (heelsOffsetDifferent)
                 {
@@ -189,8 +209,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             return false;
         }
 
-        _currentCharacterEquipment?.CheckAndUpdateObject();
-        if (_currentCharacterEquipment?.HasUnprocessedUpdate ?? false)
+        if (_currentCharacterEquipment?.CheckAndUpdateObject() ?? false)
         {
             OnPlayerChanged();
         }
@@ -247,8 +266,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
         Mediator.Subscribe<PenumbraRedrawMessage>(this, (msg) => IpcManagerOnPenumbraRedrawEvent(((PenumbraRedrawMessage)msg)));
         _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
-        _currentCharacterEquipment = new PlayerRelatedObject(ObjectKind.Player, IntPtr.Zero, IntPtr.Zero,
-            () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName)?.Address ?? IntPtr.Zero);
+        _currentCharacterEquipment = new GameObjectHandler(Mediator, ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName)?.Address ?? IntPtr.Zero, false);
     }
 
     public override string ToString()
@@ -437,7 +455,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         {
             PlayerCharacter = msg.Address;
             var cts = new CancellationTokenSource();
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
+            cts.CancelAfter(TimeSpan.FromSeconds(10));
             _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, 10000, cts.Token);
             cts.Dispose();
             cts = new CancellationTokenSource();
@@ -460,7 +478,6 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
     private void OnPlayerChanged()
     {
         Logger.Debug($"Player {PlayerName} changed, PenumbraRedraw is {RequestedPenumbraRedraw}");
-        _currentCharacterEquipment!.HasUnprocessedUpdate = false;
         if (!RequestedPenumbraRedraw && PlayerCharacter != IntPtr.Zero)
         {
             Logger.Debug($"Saving new Glamourer data");

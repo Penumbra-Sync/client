@@ -109,8 +109,8 @@ public class FileCacheManager : IDisposable
 
     public FileCacheEntity? GetFileCacheByPath(string path)
     {
-        var cleanedPath = path.Replace("/", "\\", StringComparison.OrdinalIgnoreCase).ToLowerInvariant().Replace(_ipcManager.PenumbraModDirectory()!.ToLowerInvariant(), "", StringComparison.OrdinalIgnoreCase);
-        var entry = _fileCaches.FirstOrDefault(f => f.Value.ResolvedFilepath.EndsWith(cleanedPath, StringComparison.OrdinalIgnoreCase)).Value;
+        var cleanedPath = path.Replace("/", "\\", StringComparison.OrdinalIgnoreCase).ToLowerInvariant().Replace(_ipcManager.PenumbraModDirectory!.ToLowerInvariant(), "", StringComparison.OrdinalIgnoreCase);
+        var entry = _fileCaches.Values.FirstOrDefault(f => f.ResolvedFilepath.EndsWith(cleanedPath, StringComparison.OrdinalIgnoreCase));
 
         if (entry == null)
         {
@@ -140,8 +140,8 @@ public class FileCacheManager : IDisposable
         FileInfo fi = new(path);
         if (!fi.Exists) return null;
         var fullName = fi.FullName.ToLowerInvariant();
-        if (!fullName.Contains(_ipcManager.PenumbraModDirectory()!.ToLowerInvariant(), StringComparison.Ordinal)) return null;
-        string prefixedPath = fullName.Replace(_ipcManager.PenumbraModDirectory()!.ToLowerInvariant(), _penumbraPrefix + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
+        if (!fullName.Contains(_ipcManager.PenumbraModDirectory!.ToLowerInvariant(), StringComparison.Ordinal)) return null;
+        string prefixedPath = fullName.Replace(_ipcManager.PenumbraModDirectory!.ToLowerInvariant(), _penumbraPrefix + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
         return CreateFileCacheEntity(fi, prefixedPath);
     }
 
@@ -203,7 +203,7 @@ public class FileCacheManager : IDisposable
     {
         if (fileCache.PrefixedFilePath.StartsWith(_penumbraPrefix, StringComparison.OrdinalIgnoreCase))
         {
-            fileCache.SetResolvedFilePath(fileCache.PrefixedFilePath.Replace(_penumbraPrefix, _ipcManager.PenumbraModDirectory(), StringComparison.Ordinal));
+            fileCache.SetResolvedFilePath(fileCache.PrefixedFilePath.Replace(_penumbraPrefix, _ipcManager.PenumbraModDirectory, StringComparison.Ordinal));
         }
         else if (fileCache.PrefixedFilePath.StartsWith(_cachePrefix, StringComparison.OrdinalIgnoreCase))
         {

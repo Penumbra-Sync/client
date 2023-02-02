@@ -38,7 +38,7 @@ public partial class UiShared : IDisposable
     public string PlayerName => _dalamudUtil.PlayerName;
     public uint WorldId => _dalamudUtil.WorldId;
     public Dictionary<ushort, string> WorldData => _dalamudUtil.WorldData.Value;
-    public bool HasValidPenumbraModPath => !(_ipcManager.PenumbraModDirectory() ?? string.Empty).IsNullOrEmpty() && Directory.Exists(_ipcManager.PenumbraModDirectory());
+    public bool HasValidPenumbraModPath => !(_ipcManager.PenumbraModDirectory ?? string.Empty).IsNullOrEmpty() && Directory.Exists(_ipcManager.PenumbraModDirectory);
     public bool EditTrackerPosition { get; set; }
     public ImFontPtr UidFont { get; private set; }
     public bool UidFontBuilt { get; private set; }
@@ -468,7 +468,7 @@ public partial class UiShared : IDisposable
             {
                 if (!success) return;
 
-                _isPenumbraDirectory = string.Equals(path.ToLowerInvariant(), _ipcManager.PenumbraModDirectory()?.ToLowerInvariant(), StringComparison.Ordinal);
+                _isPenumbraDirectory = string.Equals(path.ToLowerInvariant(), _ipcManager.PenumbraModDirectory?.ToLowerInvariant(), StringComparison.Ordinal);
                 _isDirectoryWritable = IsDirectoryWritable(path);
                 _cacheDirectoryHasOtherFilesThanCache = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Any(f => new FileInfo(f).Name.Length != 40);
                 _cacheDirectoryIsValidPath = Regex.IsMatch(path, @"^(?:[a-zA-Z]:\\[\w\s\-\\]+?|\/(?:[\w\s\-\/])+?)$", RegexOptions.ECMAScript);

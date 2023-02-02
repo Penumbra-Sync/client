@@ -11,6 +11,7 @@ using MareSynchronos.Utils;
 using Object = FFXIVClientStructs.FFXIV.Client.Graphics.Scene.Object;
 using Penumbra.String;
 using Weapon = MareSynchronos.Interop.Weapon;
+using MareSynchronos.FileCache;
 
 namespace MareSynchronos.Factories;
 
@@ -19,23 +20,23 @@ public class CharacterDataFactory
     private readonly DalamudUtil _dalamudUtil;
     private readonly IpcManager _ipcManager;
     private readonly TransientResourceManager _transientResourceManager;
-    private readonly FileReplacementFactory _fileReplacementFactory;
+    private readonly FileCacheManager _fileCacheManager;
 
-    public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager, TransientResourceManager transientResourceManager, FileReplacementFactory fileReplacementFactory)
+    public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager, TransientResourceManager transientResourceManager, FileCacheManager fileReplacementFactory)
     {
         Logger.Verbose("Creating " + nameof(CharacterDataFactory));
         _dalamudUtil = dalamudUtil;
         _ipcManager = ipcManager;
         _transientResourceManager = transientResourceManager;
-        _fileReplacementFactory = fileReplacementFactory;
+        _fileCacheManager = fileReplacementFactory;
     }
 
-    private unsafe bool CheckForPointer(IntPtr playerPointer)
+    private unsafe bool CheckForNullDrawObject(IntPtr playerPointer)
     {
-        return playerPointer == IntPtr.Zero || ((Character*)playerPointer)->GameObject.GetDrawObject() == null;
+        return ((Character*)playerPointer)->GameObject.DrawObject == null;
     }
 
-    public CharacterData BuildCharacterData(CharacterData previousData, PlayerRelatedObject playerRelatedObject, CancellationToken token)
+    public CharacterData BuildCharacterData(CharacterData previousData, GameObjectHandler playerRelatedObject, CancellationToken token)
     {
         if (!_ipcManager.Initialized)
         {
@@ -45,7 +46,16 @@ public class CharacterDataFactory
         bool pointerIsZero = true;
         try
         {
-            pointerIsZero = CheckForPointer(playerRelatedObject.Address);
+            pointerIsZero = playerRelatedObject.Address == IntPtr.Zero;
+            try
+            {
+                pointerIsZero = CheckForNullDrawObject(playerRelatedObject.Address);
+            }
+            catch
+            {
+                pointerIsZero = true;
+                Logger.Debug("NullRef for " + playerRelatedObject.ObjectKind);
+            }
         }
         catch (Exception ex)
         {
@@ -67,17 +77,20 @@ public class CharacterDataFactory
 
         try
         {
+            pathsToForwardResolve.Clear();
+            pathsToReverseResolve.Clear();
             return CreateCharacterData(previousData, playerRelatedObject, token);
         }
         catch (OperationCanceledException)
         {
             Logger.Debug("Cancelled creating Character data");
+            throw;
         }
         catch (Exception e)
         {
-            Logger.Warn("Failed to create " + playerRelatedObject.ObjectKind + " data");
-            Logger.Warn(e.Message);
-            Logger.Warn(e.StackTrace ?? string.Empty);
+            Logger.Debug("Failed to create " + playerRelatedObject.ObjectKind + " data");
+            Logger.Debug(e.Message);
+            Logger.Debug(e.StackTrace ?? string.Empty);
         }
 
         previousData.FileReplacements = previousFileReplacements;
@@ -85,23 +98,7 @@ public class CharacterDataFactory
         return previousData;
     }
 
-    private (string, string) GetIndentationForInheritanceLevel(int inheritanceLevel)
-    {
-        return (string.Join("", Enumerable.Repeat("\t", inheritanceLevel)), string.Join("", Enumerable.Repeat("\t", inheritanceLevel + 2)));
-    }
-
-    private void DebugPrint(FileReplacement fileReplacement, ObjectKind objectKind, string resourceType, int inheritanceLevel)
-    {
-        var indentation = GetIndentationForInheritanceLevel(inheritanceLevel);
-
-        if (fileReplacement.HasFileReplacement)
-        {
-            Logger.Verbose(indentation.Item1 + objectKind + resourceType + " [" + string.Join(", ", fileReplacement.GamePaths) + "]");
-            Logger.Verbose(indentation.Item2 + "=> " + fileReplacement.ResolvedPath);
-        }
-    }
-
-    private unsafe void AddReplacementsFromRenderModel(RenderModel* mdl, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0)
+    private unsafe void AddReplacementsFromRenderModel(RenderModel* mdl)
     {
         if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
         {
@@ -115,26 +112,23 @@ public class CharacterDataFactory
         }
         catch
         {
-            Logger.Warn("Could not get model data for " + objectKind);
+            Logger.Warn("Could not get model data");
             return;
         }
         Logger.Verbose("Checking File Replacement for Model " + mdlPath);
 
-        FileReplacement mdlFileReplacement = CreateFileReplacement(mdlPath);
-        DebugPrint(mdlFileReplacement, objectKind, "Model", inheritanceLevel);
-
-        cache.AddFileReplacement(objectKind, mdlFileReplacement);
+        AddResolvePath(mdlPath);
 
         for (var mtrlIdx = 0; mtrlIdx < mdl->MaterialCount; mtrlIdx++)
         {
             var mtrl = (Material*)mdl->Materials[mtrlIdx];
             if (mtrl == null) continue;
 
-            AddReplacementsFromMaterial(mtrl, objectKind, cache, inheritanceLevel + 1);
+            AddReplacementsFromMaterial(mtrl);
         }
     }
 
-    private unsafe void AddReplacementsFromMaterial(Material* mtrl, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0)
+    private unsafe void AddReplacementsFromMaterial(Material* mtrl)
     {
         string fileName;
         try
@@ -144,25 +138,15 @@ public class CharacterDataFactory
         }
         catch
         {
-            Logger.Warn("Could not get material data for " + objectKind);
+            Logger.Warn("Could not get material data");
             return;
         }
 
         Logger.Verbose("Checking File Replacement for Material " + fileName);
         var mtrlPath = fileName.Split("|")[2];
 
-        if (cache.FileReplacements.ContainsKey(objectKind))
-        {
-            if (cache.FileReplacements[objectKind].Any(c => c.ResolvedPath.Contains(mtrlPath, StringComparison.Ordinal)))
-            {
-                return;
-            }
-        }
 
-        var mtrlFileReplacement = CreateFileReplacement(mtrlPath);
-        DebugPrint(mtrlFileReplacement, objectKind, "Material", inheritanceLevel);
-
-        cache.AddFileReplacement(objectKind, mtrlFileReplacement);
+        AddResolvePath(mtrlPath);
 
         var mtrlResourceHandle = (MtrlResource*)mtrl->ResourceHandle;
         for (var resIdx = 0; resIdx < mtrlResourceHandle->NumTex; resIdx++)
@@ -181,14 +165,14 @@ public class CharacterDataFactory
 
             Logger.Verbose("Checking File Replacement for Texture " + texPath);
 
-            AddReplacementsFromTexture(texPath, objectKind, cache, inheritanceLevel + 1);
+            AddReplacementsFromTexture(texPath);
         }
 
         try
         {
             var shpkPath = "shader/sm5/shpk/" + new ByteString(mtrlResourceHandle->ShpkString).ToString();
             Logger.Verbose("Checking File Replacement for Shader " + shpkPath);
-            AddReplacementsFromShader(shpkPath, objectKind, cache, inheritanceLevel + 1);
+            AddReplacementsFromShader(shpkPath);
         }
         catch
         {
@@ -196,129 +180,91 @@ public class CharacterDataFactory
         }
     }
 
-    private void AddReplacement(string varPath, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0, bool doNotReverseResolve = false)
+    private void AddReplacement(string varPath, bool doNotReverseResolve = false)
     {
         if (varPath.IsNullOrEmpty()) return;
 
-        if (cache.FileReplacements.ContainsKey(objectKind))
-        {
-            if (cache.FileReplacements[objectKind].Any(c => c.GamePaths.Contains(varPath, StringComparer.Ordinal)))
-            {
-                return;
-            }
-        }
-
-        var variousReplacement = CreateFileReplacement(varPath, doNotReverseResolve);
-        DebugPrint(variousReplacement, objectKind, "Various", inheritanceLevel);
-
-        cache.AddFileReplacement(objectKind, variousReplacement);
+        AddResolvePath(varPath, doNotReverseResolve);
     }
 
-    private void AddReplacementsFromShader(string shpkPath, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0)
+    private void AddReplacementsFromShader(string shpkPath)
     {
         if (string.IsNullOrEmpty(shpkPath)) return;
 
-        if (cache.FileReplacements.ContainsKey(objectKind))
-        {
-            if (cache.FileReplacements[objectKind].Any(c => c.GamePaths.Contains(shpkPath, StringComparer.Ordinal)))
-            {
-                return;
-            }
-        }
-
-        var shpkFileReplacement = CreateFileReplacement(shpkPath, doNotReverseResolve: true);
-        DebugPrint(shpkFileReplacement, objectKind, "Shader", inheritanceLevel);
-        cache.AddFileReplacement(objectKind, shpkFileReplacement);
+        AddResolvePath(shpkPath, doNotReverseResolve: true);
     }
 
-    private void AddReplacementsFromTexture(string texPath, ObjectKind objectKind, CharacterData cache, int inheritanceLevel = 0, bool doNotReverseResolve = true)
+    private void AddReplacementsFromTexture(string texPath, bool doNotReverseResolve = true)
     {
         if (string.IsNullOrEmpty(texPath)) return;
 
-        if (cache.FileReplacements.ContainsKey(objectKind))
-        {
-            if (cache.FileReplacements[objectKind].Any(c => c.GamePaths.Contains(texPath, StringComparer.Ordinal)))
-            {
-                return;
-            }
-        }
-
-        var texFileReplacement = CreateFileReplacement(texPath, doNotReverseResolve);
-        DebugPrint(texFileReplacement, objectKind, "Texture", inheritanceLevel);
-
-        cache.AddFileReplacement(objectKind, texFileReplacement);
+        AddResolvePath(texPath, doNotReverseResolve);
 
         if (texPath.Contains("/--", StringComparison.Ordinal)) return;
 
-        var texDx11Replacement =
-            CreateFileReplacement(texPath.Insert(texPath.LastIndexOf('/') + 1, "--"), doNotReverseResolve);
-
-        DebugPrint(texDx11Replacement, objectKind, "Texture (DX11)", inheritanceLevel);
-
-        cache.AddFileReplacement(objectKind, texDx11Replacement);
+        AddResolvePath(texPath.Insert(texPath.LastIndexOf('/') + 1, "--"), doNotReverseResolve);
     }
 
-    private unsafe CharacterData CreateCharacterData(CharacterData previousData, PlayerRelatedObject playerRelatedObject, CancellationToken token)
+    private unsafe CharacterData CreateCharacterData(CharacterData previousData, GameObjectHandler playerRelatedObject, CancellationToken token)
     {
         var objectKind = playerRelatedObject.ObjectKind;
         var charaPointer = playerRelatedObject.Address;
 
+        if (!previousData.FileReplacements.ContainsKey(objectKind))
+        {
+            previousData.FileReplacements[objectKind] = new(FileReplacementComparer.Instance);
+        }
+
+        _dalamudUtil.WaitWhileCharacterIsDrawing(playerRelatedObject.ObjectKind.ToString(), playerRelatedObject.Address, ct: token);
+
         Stopwatch st = Stopwatch.StartNew();
 
-        if (playerRelatedObject.HasUnprocessedUpdate)
+        Logger.Debug("Handling unprocessed update for " + objectKind);
+
+        if (previousData.FileReplacements.ContainsKey(objectKind))
         {
-            Logger.Debug("Handling unprocessed update for " + objectKind);
+            previousData.FileReplacements[objectKind].Clear();
+        }
 
-            if (previousData.FileReplacements.ContainsKey(objectKind))
+        var chara = _dalamudUtil.CreateGameObject(charaPointer)!;
+        while (!DalamudUtil.IsObjectPresent(chara))
+        {
+            Logger.Verbose("Character is null but it shouldn't be, waiting");
+            Thread.Sleep(50);
+        }
+
+        var human = (Human*)((Character*)charaPointer)->GameObject.DrawObject;
+        for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)
+        {
+            var mdl = (RenderModel*)human->CharacterBase.ModelArray[mdlIdx];
+            if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
             {
-                previousData.FileReplacements[objectKind].Clear();
-            }
-            else
-            {
-                previousData.FileReplacements.Add(objectKind, new());
-            }
-
-            var chara = _dalamudUtil.CreateGameObject(charaPointer)!;
-            while (!DalamudUtil.IsObjectPresent(chara))
-            {
-                Logger.Verbose("Character is null but it shouldn't be, waiting");
-                Thread.Sleep(50);
-            }
-
-            var human = (Human*)((Character*)charaPointer)->GameObject.GetDrawObject();
-            for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)
-            {
-                var mdl = (RenderModel*)human->CharacterBase.ModelArray[mdlIdx];
-                if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
-                {
-                    continue;
-                }
-
-                token.ThrowIfCancellationRequested();
-
-                AddReplacementsFromRenderModel(mdl, objectKind, previousData, 0);
+                continue;
             }
 
+            token.ThrowIfCancellationRequested();
+
+            AddReplacementsFromRenderModel(mdl);
+        }
+
+        if (objectKind == ObjectKind.Player)
+        {
+            AddPlayerSpecificReplacements(objectKind, charaPointer, human);
+        }
+
+        if (objectKind == ObjectKind.Pet)
+        {
             foreach (var item in previousData.FileReplacements[objectKind])
             {
-                _transientResourceManager.RemoveTransientResource(charaPointer, item);
+                _transientResourceManager.AddSemiTransientResource(objectKind, item.GamePaths.First());
             }
 
-            if (objectKind == ObjectKind.Player)
-            {
-                AddPlayerSpecificReplacements(previousData, objectKind, charaPointer, human);
-            }
-
-            if (objectKind == ObjectKind.Pet)
-            {
-                foreach (var item in previousData.FileReplacements[objectKind])
-                {
-                    _transientResourceManager.AddSemiTransientResource(objectKind, item);
-                }
-
-                previousData.FileReplacements[objectKind].Clear();
-            }
+            previousData.FileReplacements[objectKind].Clear();
         }
+
+
+        Dictionary<string, List<string>> resolvedPaths = GetFileReplacementsFromPaths();
+        previousData.FileReplacements[objectKind] = new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)));
 
         previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
         previousData.GlamourerString[objectKind] = _ipcManager.GlamourerGetCharacterCustomization(charaPointer);
@@ -327,52 +273,75 @@ public class CharacterDataFactory
         previousData.PalettePlusPalette = _ipcManager.PalettePlusBuildPalette();
 
         Logger.Debug("Handling transient update for " + objectKind);
-        ManageSemiTransientData(previousData, objectKind, charaPointer);
+        _transientResourceManager.ClearTransientPaths(charaPointer, previousData.FileReplacements[objectKind].SelectMany(c => c.GamePaths).ToList());
+
+        pathsToForwardResolve.Clear();
+        pathsToReverseResolve.Clear();
+
+        ManageSemiTransientData(objectKind, charaPointer);
+
+        var resolvedTransientPaths = GetFileReplacementsFromPaths();
+        foreach (var replacement in resolvedTransientPaths.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)))
+        {
+            previousData.FileReplacements[objectKind].Add(replacement);
+        }
+
+        foreach (var item in previousData.FileReplacements[objectKind])
+        {
+            Logger.Debug(item.ToString());
+        }
 
         st.Stop();
-        Logger.Verbose("Building " + objectKind + " Data took " + st.Elapsed);
+        Logger.Verbose("Building " + objectKind + " Data took " + st.ElapsedMilliseconds + "ms");
         return previousData;
     }
 
-    private unsafe void ManageSemiTransientData(CharacterData previousData, ObjectKind objectKind, IntPtr charaPointer)
+    private Dictionary<string, List<string>> GetFileReplacementsFromPaths()
     {
-        _transientResourceManager.PersistTransientResources(charaPointer, objectKind, CreateFileReplacement);
-
-        // get rid of items that have no file replacements anymore
-        foreach (var entry in previousData.FileReplacements.ToList())
+        var forwardPaths = pathsToForwardResolve.ToArray();
+        var reversePaths = pathsToReverseResolve.ToArray();
+        Dictionary<string, List<string>> resolvedPaths = new(StringComparer.Ordinal);
+        var result = _ipcManager.PenumbraResolvePaths(pathsToForwardResolve.ToArray(), pathsToReverseResolve.ToArray());
+        for (int i = 0; i < forwardPaths.Length; i++)
         {
-            foreach (var item in entry.Value.ToList())
+            var filePath = result.forward[i].ToLowerInvariant();
+            if (resolvedPaths.TryGetValue(filePath, out var list))
             {
-                if (!item.HasFileReplacement) previousData.FileReplacements[entry.Key].Remove(item);
+                list.Add(forwardPaths[i].ToLowerInvariant());
+            }
+            else
+            {
+                resolvedPaths[filePath] = new List<string> { forwardPaths[i].ToLowerInvariant() };
             }
         }
+
+        for (int i = 0; i < reversePaths.Length; i++)
+        {
+            var filePath = reversePaths[i].ToLowerInvariant();
+            if (resolvedPaths.TryGetValue(filePath, out var list))
+            {
+                list.AddRange(result.reverse[i].Select(c => c.ToLowerInvariant()));
+            }
+            else
+            {
+                resolvedPaths[filePath] = new List<string>(result.reverse[i].Select(c => c.ToLowerInvariant()).ToList());
+            }
+        }
+
+        return resolvedPaths;
+    }
+
+    private unsafe void ManageSemiTransientData(ObjectKind objectKind, IntPtr charaPointer)
+    {
+        _transientResourceManager.PersistTransientResources(charaPointer, objectKind);
 
         foreach (var item in _transientResourceManager.GetSemiTransientResources(objectKind))
         {
-            if (!previousData.FileReplacements.ContainsKey(objectKind))
-            {
-                previousData.FileReplacements.Add(objectKind, new());
-            }
-
-            if (!previousData.FileReplacements[objectKind].Any(k => k.GamePaths.Any(p => item.GamePaths.Contains(p, StringComparer.OrdinalIgnoreCase))))
-            {
-                var penumResolve = _ipcManager.PenumbraResolvePath(item.GamePaths.First()).ToLowerInvariant();
-                var gamePath = item.GamePaths.First().ToLowerInvariant();
-                if (string.Equals(penumResolve, gamePath, StringComparison.Ordinal))
-                {
-                    Logger.Verbose("PenumResolve was same as GamePath, not adding " + item);
-                    _transientResourceManager.RemoveTransientResource(charaPointer, item);
-                }
-                else
-                {
-                    Logger.Verbose("Found semi transient resource: " + item);
-                    previousData.FileReplacements[objectKind].Add(item);
-                }
-            }
+            AddResolvePath(item, true);
         }
     }
 
-    private unsafe void AddPlayerSpecificReplacements(CharacterData previousData, ObjectKind objectKind, IntPtr charaPointer, Human* human)
+    private unsafe void AddPlayerSpecificReplacements(ObjectKind objectKind, IntPtr charaPointer, Human* human)
     {
         var weaponObject = (Weapon*)((Object*)human)->ChildObject;
 
@@ -380,42 +349,32 @@ public class CharacterDataFactory
         {
             var mainHandWeapon = weaponObject->WeaponRenderModel->RenderModel;
 
-            AddReplacementsFromRenderModel(mainHandWeapon, objectKind, previousData, 0);
-
-            foreach (var item in previousData.FileReplacements[objectKind])
-            {
-                _transientResourceManager.RemoveTransientResource(charaPointer, item);
-            }
+            AddReplacementsFromRenderModel(mainHandWeapon);
 
             foreach (var item in _transientResourceManager.GetTransientResources((IntPtr)weaponObject))
             {
                 Logger.Verbose("Found transient weapon resource: " + item);
-                AddReplacement(item, objectKind, previousData, 1, doNotReverseResolve: true);
+                AddReplacement(item, doNotReverseResolve: true);
             }
 
             if (weaponObject->NextSibling != (IntPtr)weaponObject)
             {
                 var offHandWeapon = ((Weapon*)weaponObject->NextSibling)->WeaponRenderModel->RenderModel;
 
-                AddReplacementsFromRenderModel(offHandWeapon, objectKind, previousData, 1);
-
-                foreach (var item in previousData.FileReplacements[objectKind])
-                {
-                    _transientResourceManager.RemoveTransientResource((IntPtr)offHandWeapon, item);
-                }
+                AddReplacementsFromRenderModel(offHandWeapon);
 
                 foreach (var item in _transientResourceManager.GetTransientResources((IntPtr)offHandWeapon))
                 {
                     Logger.Verbose("Found transient offhand weapon resource: " + item);
-                    AddReplacement(item, objectKind, previousData, 1, doNotReverseResolve: true);
+                    AddReplacement(item, doNotReverseResolve: true);
                 }
             }
         }
 
-        AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId, objectKind, previousData);
+        AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId);
         try
         {
-            AddReplacementsFromTexture(new ByteString(((HumanExt*)human)->Decal->FileName()).ToString(), objectKind, previousData, 0, doNotReverseResolve: false);
+            AddReplacementsFromTexture(new ByteString(((HumanExt*)human)->Decal->FileName()).ToString(), doNotReverseResolve: false);
         }
         catch
         {
@@ -423,43 +382,29 @@ public class CharacterDataFactory
         }
         try
         {
-            AddReplacementsFromTexture(new ByteString(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), objectKind, previousData, 0, doNotReverseResolve: false);
+            AddReplacementsFromTexture(new ByteString(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), doNotReverseResolve: false);
         }
         catch
         {
             Logger.Warn("Could not get Legacy Body Decal Data");
         }
-
-        foreach (var item in previousData.FileReplacements[objectKind])
-        {
-            _transientResourceManager.RemoveTransientResource(charaPointer, item);
-        }
     }
 
-    private void AddReplacementSkeleton(ushort raceSexId, ObjectKind objectKind, CharacterData cache)
+    private void AddReplacementSkeleton(ushort raceSexId)
     {
         string raceSexIdString = raceSexId.ToString("0000");
 
         string skeletonPath = $"chara/human/c{raceSexIdString}/skeleton/base/b0001/skl_c{raceSexIdString}b0001.sklb";
 
-        var replacement = CreateFileReplacement(skeletonPath, doNotReverseResolve: true);
-        cache.AddFileReplacement(objectKind, replacement);
-
-        DebugPrint(replacement, objectKind, "SKLB", 0);
+        AddResolvePath(skeletonPath, doNotReverseResolve: true);
     }
 
-    private FileReplacement CreateFileReplacement(string path, bool doNotReverseResolve = false)
+    private void AddResolvePath(string path, bool doNotReverseResolve = false)
     {
-        var fileReplacement = _fileReplacementFactory.Create();
-        if (!doNotReverseResolve)
-        {
-            fileReplacement.ReverseResolvePath(path);
-        }
-        else
-        {
-            fileReplacement.ResolvePath(path);
-        }
-
-        return fileReplacement;
+        if (doNotReverseResolve) pathsToForwardResolve.Add(path.ToLowerInvariant());
+        else pathsToReverseResolve.Add(path.ToLowerInvariant());
     }
+
+    private HashSet<string> pathsToForwardResolve = new(StringComparer.Ordinal);
+    private HashSet<string> pathsToReverseResolve = new(StringComparer.Ordinal);
 }
