@@ -4,27 +4,21 @@ using MareSynchronos.Factories;
 using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
-using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.Managers;
 
 public class CacheCreationService : MediatorSubscriberBase, IDisposable
 {
     private readonly CharacterDataFactory _characterDataFactory;
-    private readonly IpcManager _ipcManager;
-    private readonly ApiController _apiController;
     private Task? _cacheCreationTask;
-    private Dictionary<ObjectKind, GameObjectHandler> _cachesToCreate = new();
-    private CharacterData _lastCreatedData = new();
-    private CancellationTokenSource cts = new();
-    private List<GameObjectHandler> _playerRelatedObjects = new();
+    private readonly Dictionary<ObjectKind, GameObjectHandler> _cachesToCreate = new();
+    private readonly CharacterData _lastCreatedData = new();
+    private readonly CancellationTokenSource _cts = new();
+    private readonly List<GameObjectHandler> _playerRelatedObjects = new();
 
-    public unsafe CacheCreationService(MareMediator mediator, CharacterDataFactory characterDataFactory, IpcManager ipcManager,
-        ApiController apiController, DalamudUtil dalamudUtil) : base(mediator)
+    public unsafe CacheCreationService(MareMediator mediator, CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil) : base(mediator)
     {
         _characterDataFactory = characterDataFactory;
-        _ipcManager = ipcManager;
-        _apiController = apiController;
 
         Mediator.Subscribe<CreateCacheForObjectMessage>(this, (msg) =>
         {
@@ -35,7 +29,7 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
         Mediator.Subscribe<CustomizePlusMessage>(this, (msg) => CustomizePlusChanged((CustomizePlusMessage)msg));
         Mediator.Subscribe<HeelsOffsetMessage>(this, (msg) => HeelsOffsetChanged((HeelsOffsetMessage)msg));
         Mediator.Subscribe<PalettePlusMessage>(this, (msg) => PalettePlusChanged((PalettePlusMessage)msg));
-        Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, (msg) => _cachesToCreate.Add(ObjectKind.Player, _playerRelatedObjects.First(p => p.ObjectKind == ObjectKind.Player)));
+        Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, (msg) => _cachesToCreate[ObjectKind.Player] = _playerRelatedObjects.First(p => p.ObjectKind == ObjectKind.Player));
 
         _playerRelatedObjects.AddRange(new List<GameObjectHandler>()
         {
@@ -85,7 +79,7 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
                 {
                     foreach (var obj in toCreate)
                     {
-                        var data = _characterDataFactory.BuildCharacterData(_lastCreatedData, obj.Value, cts.Token);
+                        var data = _characterDataFactory.BuildCharacterData(_lastCreatedData, obj.Value, _cts.Token);
                     }
                     Mediator.Publish(new CharacterDataCreatedMessage(_lastCreatedData));
                 }
@@ -98,7 +92,7 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
                     Logger.Debug("Cache Creation complete");
 
                 }
-            }, cts.Token);
+            }, _cts.Token);
         }
         else if (_cachesToCreate.Any())
         {
@@ -112,6 +106,6 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
     {
         base.Dispose();
         _playerRelatedObjects.ForEach(p => p.Dispose());
-        cts.Dispose();
+        _cts.Dispose();
     }
 }

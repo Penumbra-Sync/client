@@ -288,7 +288,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         switch (objectKind)
         {
             case ObjectKind.Player:
-                _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, 10000, ct);
+                _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, 30000, ct);
                 ct.ThrowIfCancellationRequested();
                 _ipcManager.HeelsSetOffsetForPlayer(_cachedData.HeelsOffset, PlayerCharacter);
                 _ipcManager.CustomizePlusSetBodyScale(PlayerCharacter, _cachedData.CustomizePlusData);
@@ -312,7 +312,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     if (minionOrMount != null)
                     {
                         Logger.Debug($"Request Redraw for Minion/Mount");
-                        _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " minion or mount", (IntPtr)minionOrMount, 10000, ct);
+                        _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " minion or mount", (IntPtr)minionOrMount, 30000, ct);
                         ct.ThrowIfCancellationRequested();
                         if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                         {
@@ -364,7 +364,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     if (companion != IntPtr.Zero)
                     {
                         Logger.Debug("Request Redraw for Companion");
-                        _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " companion", companion, 10000, ct);
+                        _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " companion", companion, 30000, ct);
                         ct.ThrowIfCancellationRequested();
                         if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                         {
@@ -456,7 +456,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             PlayerCharacter = msg.Address;
             var cts = new CancellationTokenSource();
             cts.CancelAfter(TimeSpan.FromSeconds(10));
-            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, 10000, cts.Token);
+            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, 30000, cts.Token);
             cts.Dispose();
             cts = new CancellationTokenSource();
             cts.CancelAfter(TimeSpan.FromSeconds(5));

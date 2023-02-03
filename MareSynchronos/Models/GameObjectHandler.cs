@@ -10,7 +10,7 @@ namespace MareSynchronos.Models;
 public class GameObjectHandler : MediatorSubscriberBase
 {
     private readonly MareMediator _mediator;
-    private readonly Func<IntPtr> getAddress;
+    private readonly Func<IntPtr> _getAddress;
     private readonly bool _sendUpdates;
 
     public unsafe Character* Character => (Character*)Address;
@@ -27,7 +27,7 @@ public class GameObjectHandler : MediatorSubscriberBase
         {
             try
             {
-                return getAddress.Invoke();
+                return _getAddress.Invoke();
             }
             catch
             { return IntPtr.Zero; }
@@ -38,7 +38,7 @@ public class GameObjectHandler : MediatorSubscriberBase
     {
         _mediator = mediator;
         ObjectKind = objectKind;
-        this.getAddress = getAddress;
+        this._getAddress = getAddress;
         _sendUpdates = sendUpdates;
         _name = string.Empty;
 
@@ -76,8 +76,11 @@ public class GameObjectHandler : MediatorSubscriberBase
 
                 Address = curPtr;
                 DrawObjectAddress = (IntPtr)chara->GameObject.DrawObject;
-                if (_sendUpdates && !_doNotSendUpdate)
+                if (_sendUpdates && !_doNotSendUpdate && DrawObjectAddress != IntPtr.Zero)
+                {
+                    Logger.Debug("Sending CreateCacheObjectMessage for " + ObjectKind);
                     Mediator.Publish(new CreateCacheForObjectMessage(this));
+                }
 
                 return true;
             }

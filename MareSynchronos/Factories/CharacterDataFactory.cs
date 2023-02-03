@@ -77,8 +77,8 @@ public class CharacterDataFactory
 
         try
         {
-            pathsToForwardResolve.Clear();
-            pathsToReverseResolve.Clear();
+            _pathsToForwardResolve.Clear();
+            _pathsToReverseResolve.Clear();
             return CreateCharacterData(previousData, playerRelatedObject, token);
         }
         catch (OperationCanceledException)
@@ -215,7 +215,7 @@ public class CharacterDataFactory
             previousData.FileReplacements[objectKind] = new(FileReplacementComparer.Instance);
         }
 
-        _dalamudUtil.WaitWhileCharacterIsDrawing(playerRelatedObject.ObjectKind.ToString(), playerRelatedObject.Address, ct: token);
+        _dalamudUtil.WaitWhileCharacterIsDrawing(playerRelatedObject.ObjectKind.ToString(), playerRelatedObject.Address, 30000, ct: token);
 
         Stopwatch st = Stopwatch.StartNew();
 
@@ -233,7 +233,8 @@ public class CharacterDataFactory
             Thread.Sleep(50);
         }
 
-        var human = (Human*)((Character*)charaPointer)->GameObject.DrawObject;
+        var human = (Human*)((Character*)charaPointer)->GameObject.GetDrawObject();
+
         for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)
         {
             var mdl = (RenderModel*)human->CharacterBase.ModelArray[mdlIdx];
@@ -281,8 +282,8 @@ public class CharacterDataFactory
         Logger.Debug("Handling transient update for " + objectKind);
         _transientResourceManager.ClearTransientPaths(charaPointer, previousData.FileReplacements[objectKind].SelectMany(c => c.GamePaths).ToList());
 
-        pathsToForwardResolve.Clear();
-        pathsToReverseResolve.Clear();
+        _pathsToForwardResolve.Clear();
+        _pathsToReverseResolve.Clear();
 
         ManageSemiTransientData(objectKind, charaPointer);
 
@@ -305,10 +306,10 @@ public class CharacterDataFactory
 
     private Dictionary<string, List<string>> GetFileReplacementsFromPaths()
     {
-        var forwardPaths = pathsToForwardResolve.ToArray();
-        var reversePaths = pathsToReverseResolve.ToArray();
+        var forwardPaths = _pathsToForwardResolve.ToArray();
+        var reversePaths = _pathsToReverseResolve.ToArray();
         Dictionary<string, List<string>> resolvedPaths = new(StringComparer.Ordinal);
-        var result = _ipcManager.PenumbraResolvePaths(pathsToForwardResolve.ToArray(), pathsToReverseResolve.ToArray());
+        var result = _ipcManager.PenumbraResolvePaths(_pathsToForwardResolve.ToArray(), _pathsToReverseResolve.ToArray());
         for (int i = 0; i < forwardPaths.Length; i++)
         {
             var filePath = result.forward[i].ToLowerInvariant();
@@ -408,10 +409,10 @@ public class CharacterDataFactory
 
     private void AddResolvePath(string path, bool doNotReverseResolve = false)
     {
-        if (doNotReverseResolve) pathsToForwardResolve.Add(path.ToLowerInvariant());
-        else pathsToReverseResolve.Add(path.ToLowerInvariant());
+        if (doNotReverseResolve) _pathsToForwardResolve.Add(path.ToLowerInvariant());
+        else _pathsToReverseResolve.Add(path.ToLowerInvariant());
     }
 
-    private HashSet<string> pathsToForwardResolve = new(StringComparer.Ordinal);
-    private HashSet<string> pathsToReverseResolve = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _pathsToForwardResolve = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _pathsToReverseResolve = new(StringComparer.Ordinal);
 }

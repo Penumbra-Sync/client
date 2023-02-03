@@ -5,7 +5,7 @@ using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
-using Lumina.Excel.GeneratedSheets;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using MareSynchronos.Mediator;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
@@ -53,7 +53,7 @@ public class DalamudUtil : IDisposable
         }
         WorldData = new(() =>
         {
-            return gameData.GetExcelSheet<World>(Dalamud.ClientLanguage.English)!
+            return gameData.GetExcelSheet<Lumina.Excel.GeneratedSheets.World>(Dalamud.ClientLanguage.English)!
                 .Where(w => w.IsPublic && !w.Name.RawData.IsEmpty)
                 .ToDictionary(w => (ushort)w.RowId, w => w.Name.ToString());
         });
@@ -232,16 +232,19 @@ public class DalamudUtil : IDisposable
         const int tick = 250;
         int curWaitTime = 0;
         // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
-        while ((obj->DrawObject == null || (obj->RenderFlags & 0b100000000000) == 0b100000000000) && (!ct?.IsCancellationRequested ?? true) && curWaitTime < timeOut) // 0b100000000000 is "still rendering" or something
+        while ((((obj->GetDrawObject() == null
+                    || ((CharacterBase*)obj->GetDrawObject())->HasModelFilesInSlotLoaded != 0
+                    || ((CharacterBase*)obj->GetDrawObject())->HasModelFilesInSlotLoaded != 0))
+                || ((obj->RenderFlags & 0b100000000000) == 0b100000000000))
+                && (!ct?.IsCancellationRequested ?? true)
+                && curWaitTime < timeOut) // 0b100000000000 is "still rendering" or something
         {
             Logger.Verbose($"Waiting for {name} to finish drawing");
             curWaitTime += tick;
             Thread.Sleep(tick);
         }
 
-        if (ct?.IsCancellationRequested ?? false) return;
-        // wait quarter a second just in case
-        Thread.Sleep(tick);
+        return;
     }
 
     public unsafe void DisableDraw(IntPtr characterAddress)

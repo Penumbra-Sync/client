@@ -61,20 +61,9 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
     {
 
 #if DEBUG
-        string dateTime = "DEV VERSION";
+        string dev = "Dev Build";
         var ver = Assembly.GetExecutingAssembly().GetName().Version;
-        this.WindowName = "Mare Synchronos " + ver.Major + "." + ver.Minor + "." + ver.Build + "###MareSynchronosMainUI";
-        try
-        {
-            dateTime = VariousExtensions.GetLinkerTime(Assembly.GetCallingAssembly()).ToString("yyyyMMddHHmmss");
-        }
-        catch (Exception ex)
-        {
-            Logger.Warn("Could not get assembly name");
-            Logger.Warn(ex.Message);
-            Logger.Warn(ex.StackTrace);
-        }
-        this.WindowName = $"Mare Synchronos {dateTime} ({ver.Major}.{ver.Minor}.{ver.Build})###MareSynchronosMainUI";
+        this.WindowName = $"Mare Synchronos {dev} ({ver.Major}.{ver.Minor}.{ver.Build})###MareSynchronosMainUI";
         Toggle();
 #else
         var ver = Assembly.GetExecutingAssembly().GetName().Version;
