@@ -294,7 +294,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
         foreach (var entry in await UserGetOnlinePairs().ConfigureAwait(false))
         {
-            _pairManager.MarkPairOnline(entry, this);
+            _pairManager.MarkPairOnline(entry, this, false);
         }
 
         _healthCheckTokenSource?.Cancel();

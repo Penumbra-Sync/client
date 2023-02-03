@@ -231,17 +231,24 @@ public class DalamudUtil : IDisposable
         var obj = (GameObject*)characterAddress;
         const int tick = 250;
         int curWaitTime = 0;
-        // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
-        while ((((obj->GetDrawObject() == null
-                    || ((CharacterBase*)obj->GetDrawObject())->HasModelFilesInSlotLoaded != 0
-                    || ((CharacterBase*)obj->GetDrawObject())->HasModelFilesInSlotLoaded != 0))
-                || ((obj->RenderFlags & 0b100000000000) == 0b100000000000))
-                && (!ct?.IsCancellationRequested ?? true)
-                && curWaitTime < timeOut) // 0b100000000000 is "still rendering" or something
+        try
         {
-            Logger.Verbose($"Waiting for {name} to finish drawing");
-            curWaitTime += tick;
-            Thread.Sleep(tick);
+            // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
+            while ((!ct?.IsCancellationRequested ?? true)
+                && curWaitTime < timeOut
+                && (((obj->GetDrawObject() == null
+                        || ((CharacterBase*)obj->GetDrawObject())->HasModelFilesInSlotLoaded != 0
+                        || ((CharacterBase*)obj->GetDrawObject())->HasModelFilesInSlotLoaded != 0))
+                    || ((obj->RenderFlags & 0b100000000000) == 0b100000000000))) // 0b100000000000 is "still rendering" or something
+            {
+                Logger.Verbose($"Waiting for {name} to finish drawing");
+                curWaitTime += tick;
+                Thread.Sleep(tick);
+            }
+        }
+        catch (AccessViolationException ex)
+        {
+            Logger.Warn("Error accessing " + characterAddress.ToString("X") + ", object does not exist anymore?", ex);
         }
     }
 

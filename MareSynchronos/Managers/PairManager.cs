@@ -165,13 +165,13 @@ public class PairManager : MediatorSubscriberBase, IDisposable
         }
     }
 
-    public void MarkPairOnline(OnlineUserIdentDto dto, ApiController controller)
+    public void MarkPairOnline(OnlineUserIdentDto dto, ApiController controller, bool sendNotif = true)
     {
         if (!_allClientPairs.ContainsKey(dto.User)) throw new InvalidOperationException("No user found for " + dto);
         var pair = _allClientPairs[dto.User];
         if (pair.CachedPlayer != null) return;
 
-        if (_configurationService.Current.ShowOnlineNotifications
+        if (sendNotif && _configurationService.Current.ShowOnlineNotifications
             && ((_configurationService.Current.ShowOnlineNotificationsOnlyForIndividualPairs && pair.UserPair != null)
             || !_configurationService.Current.ShowOnlineNotificationsOnlyForIndividualPairs)
             && (_configurationService.Current.ShowOnlineNotificationsOnlyForNamedPairs && !string.IsNullOrEmpty(pair.GetNote())
