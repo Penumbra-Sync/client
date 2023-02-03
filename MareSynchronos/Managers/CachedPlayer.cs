@@ -228,6 +228,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         Logger.Debug("Disposing " + PlayerName + " (" + OnlineUser + ")");
         try
         {
+            _currentCharacterEquipment?.Dispose();
             Logger.Verbose("Restoring state for " + PlayerName);
             _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName);
             _downloadCancellationTokenSource?.Cancel();

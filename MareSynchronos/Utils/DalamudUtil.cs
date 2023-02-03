@@ -243,8 +243,6 @@ public class DalamudUtil : IDisposable
             curWaitTime += tick;
             Thread.Sleep(tick);
         }
-
-        return;
     }
 
     public unsafe void DisableDraw(IntPtr characterAddress)

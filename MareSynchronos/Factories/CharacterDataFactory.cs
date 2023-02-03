@@ -300,7 +300,7 @@ public class CharacterDataFactory
 
 
         st.Stop();
-        Logger.Verbose("Building " + objectKind + " Data took " + st.ElapsedMilliseconds + "ms");
+        Logger.Info("Building character data for " + objectKind + " took " + st.ElapsedMilliseconds + "ms");
         return previousData;
     }
 

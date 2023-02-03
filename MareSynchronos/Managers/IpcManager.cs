@@ -455,8 +455,8 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         {
             var collName = "Mare_" + characterName;
             Logger.Verbose("Removing temp collection for " + collName);
-            var ret = _penumbraRemoveTemporaryMod.Invoke("MaraChara", collName, 0);
-            Logger.Verbose("RemoveTemporaryMod: " + ret);
+            var ret = _penumbraRemoveTemporaryMod.Invoke("MareChara", collName, 0);
+            Logger.Verbose("RemoveTemporaryMod: " + ret);   
             var ret2 = _penumbraRemoveTemporaryCollection.Invoke(collName);
             Logger.Verbose("RemoveTemporaryCollection: " + ret2);
         });
