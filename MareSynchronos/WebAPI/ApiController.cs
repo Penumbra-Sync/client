@@ -11,7 +11,6 @@ using MareSynchronos.API.Dto;
 using MareSynchronos.API.SignalR;
 using MareSynchronos.Managers;
 using Dalamud.Utility;
-using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
 
 namespace MareSynchronos.WebAPI;
@@ -20,9 +19,6 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
     public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
     public const string MainServiceUri = "wss://maresynchronos.com";
 
-    public readonly int[] SupportedServerVersions = { IMareHub.ApiVersion };
-
-    private readonly ConfigurationService _configService;
     private readonly DalamudUtil _dalamudUtil;
     private readonly FileCacheManager _fileDbManager;
     private readonly PairManager _pairManager;
@@ -38,18 +34,14 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
     public string AuthFailureMessage { get; private set; } = string.Empty;
 
     public SystemInfoDto SystemInfoDto { get; private set; } = new();
-    public bool IsModerator => (_connectionDto?.IsAdmin ?? false) || (_connectionDto?.IsModerator ?? false);
-
-    public bool IsAdmin => _connectionDto?.IsAdmin ?? false;
 
     private HttpClient _httpClient;
 
-    public ApiController(ConfigurationService configService, DalamudUtil dalamudUtil, FileCacheManager fileDbManager,
+    public ApiController(DalamudUtil dalamudUtil, FileCacheManager fileDbManager,
         PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator) : base(mediator)
     {
         Logger.Verbose("Creating " + nameof(ApiController));
 
-        _configService = configService;
         _dalamudUtil = dalamudUtil;
         _fileDbManager = fileDbManager;
         _pairManager = pairManager;
@@ -86,8 +78,6 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
     public List<FileTransfer> ForbiddenTransfers { get; } = new();
 
     public bool IsConnected => ServerState == ServerState.Connected;
-    public bool IsDownloading => !CurrentDownloads.IsEmpty;
-    public bool IsUploading => CurrentUploads.Count > 0;
 
     public bool ServerAlive => ServerState is ServerState.Connected or ServerState.RateLimited or ServerState.Unauthorized or ServerState.Disconnected;
 
@@ -294,7 +284,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
         foreach (var entry in await UserGetOnlinePairs().ConfigureAwait(false))
         {
-            _pairManager.MarkPairOnline(entry, this);
+            _pairManager.MarkPairOnline(entry);
         }
 
         _healthCheckTokenSource?.Cancel();

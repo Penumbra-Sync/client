@@ -3,7 +3,6 @@ using MareSynchronos.FileCache;
 using MareSynchronos.Managers;
 using MareSynchronos.Mediator;
 using MareSynchronos.Utils;
-using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.Factories;
 
@@ -13,17 +12,19 @@ public class CachedPlayerFactory
     private readonly DalamudUtil _dalamudUtil;
     private readonly FileCacheManager _fileCacheManager;
     private readonly MareMediator _mediator;
+    private readonly TransferManager _transferManager;
 
-    public CachedPlayerFactory(IpcManager ipcManager, DalamudUtil dalamudUtil, FileCacheManager fileCacheManager, MareMediator mediator)
+    public CachedPlayerFactory(IpcManager ipcManager, DalamudUtil dalamudUtil, FileCacheManager fileCacheManager, MareMediator mediator, TransferManager transferManager)
     {
         _ipcManager = ipcManager;
         _dalamudUtil = dalamudUtil;
         _fileCacheManager = fileCacheManager;
         _mediator = mediator;
+        _transferManager = transferManager;
     }
 
-    public CachedPlayer Create(OnlineUserIdentDto dto, ApiController apiController)
+    public CachedPlayer Create(OnlineUserIdentDto dto)
     {
-        return new CachedPlayer(dto, _ipcManager, apiController, _dalamudUtil, _fileCacheManager, _mediator);
+        return new CachedPlayer(dto, _ipcManager, _transferManager, _dalamudUtil, _fileCacheManager, _mediator);
     }
 }

@@ -11,7 +11,6 @@ using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
-using MareSynchronos.WebAPI;
 using System.Collections.Concurrent;
 
 namespace MareSynchronos.Managers;
@@ -165,7 +164,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
         }
     }
 
-    public void MarkPairOnline(OnlineUserIdentDto dto, ApiController controller)
+    public void MarkPairOnline(OnlineUserIdentDto dto)
     {
         if (!_allClientPairs.ContainsKey(dto.User)) throw new InvalidOperationException("No user found for " + dto);
         var pair = _allClientPairs[dto.User];
@@ -185,7 +184,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
         }
 
         pair.CachedPlayer?.Dispose();
-        pair.CachedPlayer = _cachedPlayerFactory.Create(dto, controller);
+        pair.CachedPlayer = _cachedPlayerFactory.Create(dto);
         RecreateLazy();
     }
 

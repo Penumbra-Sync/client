@@ -302,6 +302,37 @@ public partial class UiShared : IDisposable
     public static uint Color(byte r, byte g, byte b, byte a)
     { uint ret = a; ret <<= 8; ret += b; ret <<= 8; ret += g; ret <<= 8; ret += r; return ret; }
 
+    public static void DrawOutlinedFont(string text, Vector4 fontColor, Vector4 outlineColor, int thickness)
+    {
+        var original = ImGui.GetCursorPos();
+
+        ImGui.PushStyleColor(ImGuiCol.Text, outlineColor);
+        ImGui.SetCursorPos(original with { Y = original.Y - thickness });
+        ImGui.TextUnformatted(text);
+        ImGui.SetCursorPos(original with { X = original.X - thickness });
+        ImGui.TextUnformatted(text);
+        ImGui.SetCursorPos(original with { Y = original.Y + thickness });
+        ImGui.TextUnformatted(text);
+        ImGui.SetCursorPos(original with { X = original.X + thickness });
+        ImGui.TextUnformatted(text);
+        ImGui.SetCursorPos(original with { X = original.X - thickness, Y = original.Y - thickness });
+        ImGui.TextUnformatted(text);
+        ImGui.SetCursorPos(original with { X = original.X + thickness, Y = original.Y + thickness });
+        ImGui.TextUnformatted(text);
+        ImGui.SetCursorPos(original with { X = original.X - thickness, Y = original.Y + thickness });
+        ImGui.TextUnformatted(text);
+        ImGui.SetCursorPos(original with { X = original.X + thickness, Y = original.Y - thickness });
+        ImGui.TextUnformatted(text);
+        ImGui.PopStyleColor();
+
+        ImGui.PushStyleColor(ImGuiCol.Text, fontColor);
+        ImGui.SetCursorPos(original);
+        ImGui.TextUnformatted(text);
+        ImGui.SetCursorPos(original);
+        ImGui.TextUnformatted(text);
+        ImGui.PopStyleColor();
+    }
+
     public static void DrawOutlinedFont(ImDrawListPtr drawList, string text, Vector2 textPos, uint fontColor, uint outlineColor, int thickness)
     {
         drawList.AddText(textPos with { Y = textPos.Y - thickness },

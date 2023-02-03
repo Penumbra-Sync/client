@@ -1,33 +1,40 @@
-﻿using System.Numerics;
+﻿using Dalamud.Interface.Colors;
+using System.Numerics;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
+using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.Mediator;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
+using System.Collections.Concurrent;
 
 namespace MareSynchronos.UI;
 
-public class DownloadUi : Window, IDisposable
+public class DownloadUi : WindowMediatorSubscriberBase, IDisposable
 {
     private readonly WindowSystem _windowSystem;
     private readonly ConfigurationService _configService;
     private readonly ApiController _apiController;
     private readonly UiShared _uiShared;
     private bool _wasOpen = false;
+    private readonly ConcurrentDictionary<string, TransferManager.DownloadFileStatus> _currentDownloads = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, string> _downloadPlayerNames = new(StringComparer.Ordinal);
 
-    public void Dispose()
+    public override void Dispose()
     {
-        Logger.Verbose($"Disposing {GetType()}");
+        base.Dispose();
         _windowSystem.RemoveWindow(this);
     }
 
-    public DownloadUi(WindowSystem windowSystem, ConfigurationService configService, ApiController apiController, UiShared uiShared) : base("Mare Synchronos Downloads")
+    public DownloadUi(WindowSystem windowSystem, ConfigurationService configService, ApiController apiController, UiShared uiShared, MareMediator mediator) : base(mediator, "Mare Synchronos Downloads")
     {
         Logger.Verbose("Creating " + nameof(DownloadUi));
         _windowSystem = windowSystem;
         _configService = configService;
         _apiController = apiController;
         _uiShared = uiShared;
+
 
         SizeConstraints = new WindowSizeConstraints()
         {
@@ -45,6 +52,24 @@ public class DownloadUi : Window, IDisposable
         Flags |= ImGuiWindowFlags.NoDecoration;
 
         ForceMainWindow = true;
+
+        Mediator.Subscribe<DownloadStartedMessage>(this, (msg) =>
+        {
+            var actualMsg = (DownloadStartedMessage)msg;
+            _currentDownloads[actualMsg.UID] =
+                new TransferManager.DownloadFileStatus(0, 0, 0, actualMsg.TotalFiles);
+            _downloadPlayerNames[actualMsg.UID] = actualMsg.PlayerName;
+        });
+        Mediator.Subscribe<DownloadFinishedMessage>(this, (msg) =>
+        {
+            var uid = ((DownloadFinishedMessage)msg).UID;
+            _currentDownloads.Remove(uid, out _);
+        });
+        Mediator.Subscribe<DownloadUpdateMessage>(this, (msg) =>
+        {
+            var actualMsg = (DownloadUpdateMessage)msg;
+            _currentDownloads[actualMsg.UID] = actualMsg.Status;
+        });
 
         windowSystem.AddWindow(this);
         IsOpen = true;
@@ -79,60 +104,48 @@ public class DownloadUi : Window, IDisposable
     public override void Draw()
     {
         if (!_configService.Current.ShowTransferWindow) return;
-        if (!_apiController.IsDownloading && !_apiController.IsUploading) return;
 
-        var drawList = ImGui.GetWindowDrawList();
-        var yDistance = 20;
-        var xDistance = 20;
-
-        var basePosition = ImGui.GetWindowPos() + ImGui.GetWindowContentRegionMin();
-
-        try
+        if (_apiController.CurrentUploads.Any())
         {
-            if (_apiController.CurrentUploads.Any())
-            {
-                var currentUploads = _apiController.CurrentUploads.ToList();
-                var totalUploads = currentUploads.Count;
+            var currentUploads = _apiController.CurrentUploads.ToList();
+            var totalUploads = currentUploads.Count;
 
-                var doneUploads = currentUploads.Count(c => c.IsTransferred);
-                var totalUploaded = currentUploads.Sum(c => c.Transferred);
-                var totalToUpload = currentUploads.Sum(c => c.Total);
+            var doneUploads = currentUploads.Count(c => c.IsTransferred);
+            var totalUploaded = currentUploads.Sum(c => c.Transferred);
+            var totalToUpload = currentUploads.Sum(c => c.Total);
 
-                UiShared.DrawOutlinedFont(drawList, "▲",
-                    new Vector2(basePosition.X + 0, basePosition.Y + (int)(yDistance * 0.5)),
-                    UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
-                UiShared.DrawOutlinedFont(drawList, $"Compressing+Uploading {doneUploads}/{totalUploads}",
-                    new Vector2(basePosition.X + xDistance, basePosition.Y + yDistance * 0),
-                    UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
-                UiShared.DrawOutlinedFont(drawList, $"{UiShared.ByteToString(totalUploaded)}/{UiShared.ByteToString(totalToUpload)}",
-                    new Vector2(basePosition.X + xDistance, basePosition.Y + yDistance * 1),
-                    UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
+            UiShared.DrawOutlinedFont("▲", ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 1), 2);
+            var xPosU = ImGui.GetCursorPosX();
+            ImGui.SameLine();
 
-            }
+            ImGui.SetCursorPosX(xPosU);
+            UiShared.DrawOutlinedFont(
+                $"Compressing + Uploading {doneUploads}/{totalUploads})",
+                ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 1), 2);
+            ImGui.SetCursorPosX(xPosU);
+            UiShared.DrawOutlinedFont(
+                $"{UiShared.ByteToString(totalUploaded)}/{UiShared.ByteToString(totalToUpload)}",
+                ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 1), 2);
+
         }
-        catch { }
 
-        try
+        if (!_currentDownloads.Any()) return;
+
+        UiShared.DrawOutlinedFont("▼", ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 1), 2);
+        var xPosD = ImGui.GetCursorPosX();
+        ImGui.SameLine();
+
+        foreach (var item in _currentDownloads.ToList())
         {
-            if (_apiController.CurrentDownloads.Any())
-            {
-                var currentDownloads = _apiController.CurrentDownloads.Where(d => d.Value != null && d.Value.Any()).ToList().SelectMany(k => k.Value).ToList();
-                var multBase = currentDownloads.Any() ? 0 : 2;
-                var doneDownloads = currentDownloads.Count(c => c.IsTransferred);
-                var totalDownloads = currentDownloads.Count;
-                var totalDownloaded = currentDownloads.Sum(c => c.Transferred);
-                var totalToDownload = currentDownloads.Sum(c => c.Total);
-                UiShared.DrawOutlinedFont(drawList, "▼",
-                    new Vector2(basePosition.X + 0, basePosition.Y + (int)(yDistance * multBase + (yDistance * 0.5))),
-                    UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
-                UiShared.DrawOutlinedFont(drawList, $"Downloading {doneDownloads}/{totalDownloads}",
-                    new Vector2(basePosition.X + xDistance, basePosition.Y + yDistance * multBase),
-                    UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
-                UiShared.DrawOutlinedFont(drawList, $"{UiShared.ByteToString(totalDownloaded)}/{UiShared.ByteToString(totalToDownload)}",
-                    new Vector2(basePosition.X + xDistance, basePosition.Y + yDistance * (1 + multBase)),
-                    UiShared.Color(255, 255, 255, 255), UiShared.Color(0, 0, 0, 255), 2);
-            }
+            if (!_downloadPlayerNames.ContainsKey(item.Key)) continue;
+            ImGui.SetCursorPosX(xPosD);
+            UiShared.DrawOutlinedFont(
+                $"Downloading {_downloadPlayerNames[item.Key]} ({item.Value.DownloadedFiles}/{item.Value.TotalFiles})",
+                ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 1), 2);
+            ImGui.SetCursorPosX(xPosD);
+            UiShared.DrawOutlinedFont(
+                $"{UiShared.ByteToString(item.Value.DownloadedBytes)}/{UiShared.ByteToString(item.Value.TotalBytes)}",
+                ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 1), 2);
         }
-        catch { }
     }
 }

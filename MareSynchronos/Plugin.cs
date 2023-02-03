@@ -61,6 +61,7 @@ public sealed class Plugin : IDalamudPlugin
         collection.AddSingleton<PeriodicFileScanner>();
         collection.AddSingleton<MareCharaFileManager>();
         collection.AddSingleton<NotificationService>();
+        collection.AddSingleton<TransferManager>();
 
         collection.AddSingleton<UiShared>();
         collection.AddSingleton<SettingsUi>();

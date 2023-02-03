@@ -1,4 +1,5 @@
 ﻿using Dalamud.Interface.Internal.Notifications;
+using MareSynchronos.Managers;
 using MareSynchronos.Models;
 
 namespace MareSynchronos.Mediator;
@@ -38,5 +39,10 @@ public record NotificationMessage
     (string Title, string Message, NotificationType Type, uint TimeShownOnScreen = 3000) : IMessage;
 public record CreateCacheForObjectMessage(GameObjectHandler ObjectToCreateFor) : IMessage;
 public record CharacterDataCreatedMessage(CharacterData CharacterData) : IMessage;
+public record DownloadReadyMessage(Guid RequestId) : IMessage;
+public record DownloadStartedMessage(string UID, string PlayerName, int TotalFiles) : IMessage;
+public record DownloadFinishedMessage(string UID) : IMessage;
+
+public record DownloadUpdateMessage(string UID, TransferManager.DownloadFileStatus Status) : IMessage;
 
 #pragma warning restore MA0048 // File name must match type name

@@ -8,19 +8,17 @@ using MareSynchronos.FileCache;
 using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
-using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.Managers;
 
 public class CachedPlayer : MediatorSubscriberBase, IDisposable
 {
-    private readonly ApiController _apiController;
     private readonly DalamudUtil _dalamudUtil;
     private readonly IpcManager _ipcManager;
+    private readonly TransferManager _transferManager;
     private readonly FileCacheManager _fileDbManager;
     private API.Data.CharacterData _cachedData = new();
     private GameObjectHandler? _currentCharacterEquipment;
-    private CancellationTokenSource? _downloadCancellationTokenSource = new();
     private bool _isVisible;
 
     private string _lastGlamourerData = string.Empty;
@@ -29,11 +27,11 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
     private Task? _penumbraRedrawEventTask;
 
-    public CachedPlayer(OnlineUserIdentDto onlineUser, IpcManager ipcManager, ApiController apiController, DalamudUtil dalamudUtil, FileCacheManager fileDbManager, MareMediator mediator) : base(mediator)
+    public CachedPlayer(OnlineUserIdentDto onlineUser, IpcManager ipcManager, TransferManager transferManager, DalamudUtil dalamudUtil, FileCacheManager fileDbManager, MareMediator mediator) : base(mediator)
     {
         OnlineUser = onlineUser;
         _ipcManager = ipcManager;
-        _apiController = apiController;
+        _transferManager = transferManager;
         _dalamudUtil = dalamudUtil;
         _fileDbManager = fileDbManager;
     }
@@ -132,6 +130,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 if (manipDataDifferent)
                 {
                     Logger.Debug("Updating " + objectKind);
+                    updateModdedPaths = true;
                     charaDataToUpdate.Add(objectKind);
                     continue;
                 }
@@ -230,9 +229,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         {
             Logger.Verbose("Restoring state for " + PlayerName);
             _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName);
-            _downloadCancellationTokenSource?.Cancel();
-            _downloadCancellationTokenSource?.Dispose();
-            _downloadCancellationTokenSource = null;
+            _transferManager.RemoveDownloadForUid(OnlineUser.User.UID);
             if (PlayerCharacter != IntPtr.Zero)
             {
                 foreach (var item in _cachedData.FileReplacements)
@@ -280,7 +277,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         _ipcManager.PenumbraSetTemporaryMods(PlayerName!, moddedPaths, _cachedData.ManipulationData);
     }
 
-    private unsafe void ApplyCustomizationData(ObjectKind objectKind, CancellationToken ct)
+    private unsafe void ApplyCustomizationData(ObjectKind objectKind)
     {
         if (PlayerCharacter == IntPtr.Zero) return;
         _cachedData.GlamourerData.TryGetValue(objectKind, out var glamourerData);
@@ -288,8 +285,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         switch (objectKind)
         {
             case ObjectKind.Player:
-                _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, 30000, ct);
-                ct.ThrowIfCancellationRequested();
+                _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, 30000);
                 _ipcManager.HeelsSetOffsetForPlayer(_cachedData.HeelsOffset, PlayerCharacter);
                 _ipcManager.CustomizePlusSetBodyScale(PlayerCharacter, _cachedData.CustomizePlusData);
                 _ipcManager.PalettePlusSetPalette(PlayerCharacter, _cachedData.PalettePlusData);
@@ -312,8 +308,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     if (minionOrMount != null)
                     {
                         Logger.Debug($"Request Redraw for Minion/Mount");
-                        _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " minion or mount", (IntPtr)minionOrMount, 30000, ct);
-                        ct.ThrowIfCancellationRequested();
+                        _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " minion or mount", (IntPtr)minionOrMount, 30000);
                         if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                         {
                             _ipcManager.GlamourerApplyAll(glamourerData, (IntPtr)minionOrMount);
@@ -364,8 +359,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     if (companion != IntPtr.Zero)
                     {
                         Logger.Debug("Request Redraw for Companion");
-                        _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " companion", companion, 30000, ct);
-                        ct.ThrowIfCancellationRequested();
+                        _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " companion", companion, 30000);
                         if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                         {
                             _ipcManager.GlamourerApplyAll(glamourerData, companion);
@@ -388,38 +382,25 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             Logger.Debug("Nothing to update for " + this);
         }
 
-        _downloadCancellationTokenSource?.Cancel();
-        _downloadCancellationTokenSource?.Dispose();
-        _downloadCancellationTokenSource = new CancellationTokenSource();
-        var downloadToken = _downloadCancellationTokenSource.Token;
-
-        var downloadId = _apiController.GetDownloadId();
         Task.Run(async () =>
         {
-            List<FileReplacementData> toDownloadReplacements;
-
             if (updateModdedPaths)
             {
                 Dictionary<string, string> moddedPaths;
                 int attempts = 0;
                 //Logger.Verbose(JsonConvert.SerializeObject(_cachedData, Formatting.Indented));
-                while ((toDownloadReplacements = TryCalculateModdedDictionary(out moddedPaths)).Count > 0 && attempts++ <= 10)
+                List<FileReplacementData> toDownloadReplacements;
+                while ((toDownloadReplacements = TryCalculateModdedDictionary(out moddedPaths)).Count > 0 &&
+                       attempts++ <= 10)
                 {
-                    downloadId = _apiController.GetDownloadId();
+                    Logger.Debug(
+                        $"Downloading missing files for player {PlayerName} ({OnlineUser.User.UID}), {string.Join(',', objectKind)}");
+                    var forbidden = await _transferManager.DownloadForPlayer(PlayerName, OnlineUser.User.UID, toDownloadReplacements)
+                        .ConfigureAwait(false);
 
-                    Logger.Debug("Downloading missing files for player " + PlayerName + ", kind: " + objectKind);
-                    if (toDownloadReplacements.Any())
-                    {
-                        await _apiController.DownloadFiles(downloadId, toDownloadReplacements, downloadToken).ConfigureAwait(false);
-                        _apiController.CancelDownload(downloadId);
-                    }
-                    if (downloadToken.IsCancellationRequested)
-                    {
-                        Logger.Verbose("Detected cancellation");
-                        return;
-                    }
-
-                    if ((TryCalculateModdedDictionary(out moddedPaths)).All(c => _apiController.ForbiddenTransfers.Any(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
+                    if ((TryCalculateModdedDictionary(out moddedPaths)).All(c =>
+                            forbidden.Any(f =>
+                                string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
                     {
                         break;
                     }
@@ -432,16 +413,8 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
             foreach (var kind in objectKind)
             {
-                ApplyCustomizationData(kind, downloadToken);
+                ApplyCustomizationData(kind);
             }
-        }, downloadToken).ContinueWith(task =>
-        {
-            _downloadCancellationTokenSource = null;
-
-            if (!task.IsCanceled) return;
-
-            Logger.Debug("Download Task was cancelled");
-            _apiController.CancelDownload(downloadId);
         });
     }
 
@@ -463,7 +436,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             if (RequestedPenumbraRedraw == false)
             {
                 Logger.Debug("Unauthorized character change detected");
-                ApplyCustomizationData(ObjectKind.Player, cts.Token);
+                ApplyCustomizationData(ObjectKind.Player);
             }
             else
             {
