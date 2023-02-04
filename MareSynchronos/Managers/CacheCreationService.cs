@@ -15,6 +15,7 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
     private readonly CharacterData _lastCreatedData = new();
     private readonly CancellationTokenSource _cts = new();
     private readonly List<GameObjectHandler> _playerRelatedObjects = new();
+    private CancellationTokenSource _palettePlusCts = new();
 
     public unsafe CacheCreationService(MareMediator mediator, CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil) : base(mediator)
     {
@@ -45,7 +46,17 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
         if (!string.Equals(msg.Data, _lastCreatedData.PalettePlusPalette, StringComparison.Ordinal))
         {
             _lastCreatedData.PalettePlusPalette = msg.Data ?? string.Empty;
-            Mediator.Publish(new CharacterDataCreatedMessage(_lastCreatedData));
+
+            _palettePlusCts?.Cancel();
+            _palettePlusCts?.Dispose();
+            _palettePlusCts = new();
+            var token = _palettePlusCts.Token;
+
+            Task.Run(async () =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
+                Mediator.Publish(new CharacterDataCreatedMessage(_lastCreatedData));
+            }, token);
         }
     }
 

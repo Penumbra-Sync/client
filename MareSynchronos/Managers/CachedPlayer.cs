@@ -19,7 +19,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
     private readonly IpcManager _ipcManager;
     private readonly FileCacheManager _fileDbManager;
     private API.Data.CharacterData _cachedData = new();
-    private GameObjectHandler? _currentCharacterEquipment;
+    private GameObjectHandler? _currentOtherChara;
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
     private bool _isVisible;
 
@@ -209,7 +209,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             return false;
         }
 
-        if (_currentCharacterEquipment?.CheckAndUpdateObject() ?? false)
+        if (_currentOtherChara?.CheckAndUpdateObject() ?? false)
         {
             OnPlayerChanged();
         }
@@ -228,7 +228,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         Logger.Debug("Disposing " + PlayerName + " (" + OnlineUser + ")");
         try
         {
-            _currentCharacterEquipment?.Dispose();
+            _currentOtherChara?.Dispose();
             Logger.Verbose("Restoring state for " + PlayerName);
             _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName);
             _downloadCancellationTokenSource?.Cancel();
@@ -267,7 +267,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
         Mediator.Subscribe<PenumbraRedrawMessage>(this, (msg) => IpcManagerOnPenumbraRedrawEvent(((PenumbraRedrawMessage)msg)));
         _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
-        _currentCharacterEquipment = new GameObjectHandler(Mediator, ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName)?.Address ?? IntPtr.Zero, false);
+        _currentOtherChara = new GameObjectHandler(Mediator, ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName)?.Address ?? IntPtr.Zero, false);
     }
 
     public override string ToString()

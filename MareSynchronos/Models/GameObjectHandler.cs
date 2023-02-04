@@ -34,22 +34,25 @@ public class GameObjectHandler : MediatorSubscriberBase
         }
     }
 
-    public GameObjectHandler(MareMediator mediator, ObjectKind objectKind, Func<IntPtr> getAddress, bool sendUpdates = true) : base(mediator)
+    public GameObjectHandler(MareMediator mediator, ObjectKind objectKind, Func<IntPtr> getAddress, bool watchedPlayer = true) : base(mediator)
     {
         _mediator = mediator;
         ObjectKind = objectKind;
         this._getAddress = getAddress;
-        _sendUpdates = sendUpdates;
+        _sendUpdates = watchedPlayer;
         _name = string.Empty;
 
-        Mediator.Subscribe<TransientResourceChangedMessage>(this, (msg) =>
+        if (watchedPlayer)
         {
-            var actualMsg = (TransientResourceChangedMessage)msg;
-            if (actualMsg.Address != Address || !sendUpdates) return;
-            Mediator.Publish(new CreateCacheForObjectMessage(this));
-        });
+            Mediator.Subscribe<TransientResourceChangedMessage>(this, (msg) =>
+            {
+                var actualMsg = (TransientResourceChangedMessage)msg;
+                if (actualMsg.Address != Address) return;
+                Mediator.Publish(new CreateCacheForObjectMessage(this));
+            });
 
-        Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => CheckAndUpdateObject());
+            Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => CheckAndUpdateObject());
+        }
     }
 
     public byte[] EquipSlotData { get; set; } = new byte[40];

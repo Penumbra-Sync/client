@@ -294,7 +294,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
         foreach (var entry in await UserGetOnlinePairs().ConfigureAwait(false))
         {
-            _pairManager.MarkPairOnline(entry, this, false);
+            _pairManager.MarkPairOnline(entry, this, sendNotif: false);
         }
 
         _healthCheckTokenSource?.Cancel();
@@ -323,7 +323,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
                 options.Headers.Add("Authorization", "Bearer " + _serverManager.GetToken());
                 options.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling;
             })
-            .WithAutomaticReconnect(new ForeverRetryPolicy())
+            .WithAutomaticReconnect(new ForeverRetryPolicy(Mediator))
             .ConfigureLogging(a =>
             {
                 a.ClearProviders().AddProvider(new DalamudLoggingProvider());
@@ -347,15 +347,10 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
     private Task MareHubOnReconnecting(Exception? arg)
     {
-        _connectionDto = null;
         _healthCheckTokenSource?.Cancel();
         ServerState = ServerState.Reconnecting;
-        Mediator.Publish(new NotificationMessage("Connection lost", "Connection lost to " + _serverManager.CurrentServer!.ServerName, NotificationType.Error, 5000));
-        Logger.Warn("Connection closed... Reconnecting");
-        Logger.Warn(arg?.Message ?? string.Empty);
-        Logger.Warn(arg?.StackTrace ?? string.Empty);
-        Mediator.Publish(new DisconnectedMessage());
-        _pairManager.ClearPairs();
+        Mediator.Publish(new NotificationMessage("Connection lost", "Connection lost to " + _serverManager.CurrentServer!.ServerName, NotificationType.Warning, 5000));
+        Logger.Warn("Connection closed... Reconnecting", arg);
         return Task.CompletedTask;
     }
 

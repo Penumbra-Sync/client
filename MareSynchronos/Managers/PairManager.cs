@@ -32,6 +32,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
         _configurationService = configurationService;
         Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) => DalamudUtilOnZoneSwitched());
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => DalamudUtilOnDelayedFrameworkUpdate());
+        Mediator.Subscribe<DisconnectedMessage>(this, (_) => ClearPairs());
         _directPairsInternal = DirectPairsLazy();
         _groupPairsInternal = GroupPairsLazy();
     }
