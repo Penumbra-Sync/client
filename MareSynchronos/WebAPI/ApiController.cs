@@ -32,6 +32,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
     private CancellationTokenSource? _uploadCancellationTokenSource = new();
     private CancellationTokenSource? _healthCheckTokenSource = new();
+    private bool _doNotNotifiyOnNextInfo = false;
 
     private ConnectionDto? _connectionDto;
     public ServerInfo ServerInfo => _connectionDto?.ServerInfo ?? new ServerInfo();
@@ -347,6 +348,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
     private Task MareHubOnReconnecting(Exception? arg)
     {
+        _doNotNotifiyOnNextInfo = true;
         _healthCheckTokenSource?.Cancel();
         ServerState = ServerState.Reconnecting;
         Mediator.Publish(new NotificationMessage("Connection lost", "Connection lost to " + _serverManager.CurrentServer!.ServerName, NotificationType.Warning, 5000));

@@ -261,6 +261,11 @@ public partial class ApiController
                 Mediator.Publish(new NotificationMessage("Warning from " + _serverManager.CurrentServer!.ServerName, message, NotificationType.Warning, 7500));
                 break;
             case MessageSeverity.Information:
+                if (_doNotNotifiyOnNextInfo)
+                {
+                    _doNotNotifiyOnNextInfo = false;
+                    break;
+                }
                 Mediator.Publish(new NotificationMessage("Info from " + _serverManager.CurrentServer!.ServerName, message, NotificationType.Info, 5000));
                 break;
         }
