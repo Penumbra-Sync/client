@@ -28,11 +28,14 @@ public class ConfigurationMigrator
             MigrateMareConfigV0ToV1(config);
         }
 
-        var mareConfig = JsonConvert.DeserializeObject<MareConfigV0>(File.ReadAllText(ConfigurationPath(MareConfigService.ConfigName)))!;
-
-        if (mareConfig.Version == 0)
+        if (File.Exists(ConfigurationPath(MareConfigService.ConfigName)))
         {
-            MigrateMareConfigV0ToV1(mareConfig);
+            var mareConfig = JsonConvert.DeserializeObject<MareConfigV0>(File.ReadAllText(ConfigurationPath(MareConfigService.ConfigName)))!;
+
+            if (mareConfig.Version == 0)
+            {
+                MigrateMareConfigV0ToV1(mareConfig);
+            }
         }
     }
 
