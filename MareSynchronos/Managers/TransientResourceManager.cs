@@ -10,7 +10,7 @@ namespace MareSynchronos.Managers;
 
 public class TransientResourceManager : MediatorSubscriberBase, IDisposable
 {
-    private readonly ConfigurationService _configurationService;
+    private readonly TransientConfigService _configurationService;
     private readonly DalamudUtil _dalamudUtil;
 
     public IntPtr[] PlayerRelatedPointers = Array.Empty<IntPtr>();
@@ -19,7 +19,7 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
 
     private ConcurrentDictionary<IntPtr, HashSet<string>> TransientResources { get; } = new();
     private ConcurrentDictionary<ObjectKind, HashSet<string>> SemiTransientResources { get; } = new();
-    public TransientResourceManager(ConfigurationService configurationService, DalamudUtil dalamudUtil, MareMediator mediator) : base(mediator)
+    public TransientResourceManager(TransientConfigService configurationService, DalamudUtil dalamudUtil, MareMediator mediator) : base(mediator)
     {
         _configurationService = configurationService;
         _dalamudUtil = dalamudUtil;

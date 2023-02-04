@@ -1,4 +1,4 @@
-﻿namespace MareSynchronos.MareConfiguration;
+﻿namespace MareSynchronos.MareConfiguration.Models;
 
 [Serializable]
 public class SecretKey

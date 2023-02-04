@@ -1,4 +1,6 @@
-﻿namespace MareSynchronos.MareConfiguration;
+﻿using MareSynchronos.MareConfiguration.Configurations;
+
+namespace MareSynchronos.MareConfiguration;
 
 public static class ConfigurationExtensions
 {

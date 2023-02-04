@@ -1,20 +1,21 @@
 ﻿using Dalamud.Configuration;
 using Dalamud.Plugin;
+using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 
-namespace MareSynchronos.MareConfiguration;
+namespace MareSynchronos.MareConfiguration.Configurations.Obsolete;
 
 [Serializable]
-[Obsolete("Migrated to MareConfig")]
+[Obsolete("Deprecated, use MareConfig")]
 public class Configuration : IPluginConfiguration
 {
     public int Version { get; set; } = 6;
     [NonSerialized]
     private DalamudPluginInterface? _pluginInterface;
-    public Dictionary<string, ServerStorage> ServerStorage { get; set; } = new(StringComparer.OrdinalIgnoreCase)
+    public Dictionary<string, ServerStorageV0> ServerStorage { get; set; } = new(StringComparer.OrdinalIgnoreCase)
     {
-        { ApiController.MainServiceUri, new ServerStorage() { ServerName = ApiController.MainServer, ServerUri = ApiController.MainServiceUri } },
+        { ApiController.MainServiceUri, new ServerStorageV0() { ServerName = ApiController.MainServer, ServerUri = ApiController.MainServiceUri } },
     };
     public bool AcceptedAgreement { get; set; } = false;
     public string CacheFolder { get; set; } = string.Empty;
@@ -73,9 +74,9 @@ public class Configuration : IPluginConfiguration
         _pluginInterface!.SavePluginConfig(this);
     }
 
-    public MareConfig ToMareConfig()
+    public MareConfigV0 ToMareConfig()
     {
-        MareConfig newConfig = new();
+        MareConfigV0 newConfig = new();
         Logger.Info("Migrating Config to MareConfig");
 
         newConfig.AcceptedAgreement = AcceptedAgreement;
@@ -97,7 +98,7 @@ public class Configuration : IPluginConfiguration
             Logger.Debug("Migrating " + secret.Key);
             var apiuri = secret.Key;
             var secretkey = secret.Value;
-            ServerStorage toAdd = new();
+            ServerStorageV0 toAdd = new();
             if (string.Equals(apiuri, ApiController.MainServiceUri, StringComparison.OrdinalIgnoreCase))
             {
                 toAdd.ServerUri = ApiController.MainServiceUri;

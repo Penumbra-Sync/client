@@ -26,7 +26,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
     private readonly ApiController _apiController;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
-    private readonly ConfigurationService _configService;
+    private readonly MareConfigService _configService;
     private readonly TagHandler _tagHandler;
     public readonly Dictionary<string, bool> ShowUidForEntry = new(StringComparer.Ordinal);
     private readonly UiShared _uiShared;
@@ -56,7 +56,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
     private readonly PairGroupsUi _pairGroupsUi;
 
     public CompactUi(WindowSystem windowSystem,
-        UiShared uiShared, ConfigurationService configService, ApiController apiController, PairManager pairManager,
+        UiShared uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
         ServerConfigurationManager serverManager, MareMediator mediator) : base(mediator, "###MareSynchronosMainUI")
     {
 
@@ -199,8 +199,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
                 ImGui.InputTextWithHint("##noteforuser", $"Note for {_lastAddedUser.UserData.AliasOrUID}", ref _lastAddedUserComment, 100);
                 if (UiShared.IconTextButton(FontAwesomeIcon.Save, "Save Note"))
                 {
-                    _serverManager.CurrentServer!.UidServerComments[_lastAddedUser.UserData.UID] = _lastAddedUserComment;
-                    _serverManager.Save();
+                    _serverManager.SetNoteForUid(_lastAddedUser.UserData.UID, _lastAddedUserComment);
                     _lastAddedUser = null;
                     _lastAddedUserComment = string.Empty;
                     _showModalForUserAddition = false;
@@ -385,7 +384,8 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
 
         var textIsUid = true;
         ShowUidForEntry.TryGetValue(entry.UserPair!.User.UID, out var showUidInsteadOfName);
-        if (!showUidInsteadOfName && _serverManager.CurrentServer!.UidServerComments.TryGetValue(entry.UserPair!.User.UID, out var playerText))
+        string? playerText = _serverManager.GetNoteForUid(entry.UserPair!.User.UID);
+        if (!showUidInsteadOfName && playerText != null)
         {
             if (string.IsNullOrEmpty(playerText))
             {
@@ -446,8 +446,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
             ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * 2);
             if (ImGui.InputTextWithHint("", "Nick/Notes", ref EditUserComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
             {
-                _serverManager.CurrentServer!.UidServerComments[entry.UserPair!.User.UID] = EditUserComment;
-                _serverManager.Save();
+                _serverManager.SetNoteForUid(entry.UserPair!.User.UID, EditUserComment);
                 EditNickEntry = string.Empty;
             }
 

@@ -1,4 +1,4 @@
-﻿namespace MareSynchronos.MareConfiguration;
+﻿namespace MareSynchronos.MareConfiguration.Models;
 
 public enum NotificationLocation
 {

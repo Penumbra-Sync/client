@@ -16,10 +16,10 @@ public class GposeUi : WindowMediatorSubscriberBase, IDisposable
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly DalamudUtil _dalamudUtil;
     private readonly FileDialogManager _fileDialogManager;
-    private readonly ConfigurationService _configService;
+    private readonly MareConfigService _configService;
 
     public GposeUi(WindowSystem windowSystem, MareCharaFileManager mareCharaFileManager,
-        DalamudUtil dalamudUtil, FileDialogManager fileDialogManager, ConfigurationService configService,
+        DalamudUtil dalamudUtil, FileDialogManager fileDialogManager, MareConfigService configService,
         MareMediator mediator) : base(mediator, "Mare Synchronos Gpose Import UI###MareSynchronosGposeUI")
     {
         _windowSystem = windowSystem;

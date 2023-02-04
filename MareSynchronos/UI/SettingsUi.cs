@@ -14,12 +14,13 @@ using MareSynchronos.Managers;
 using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
+using MareSynchronos.MareConfiguration.Models;
 
 namespace MareSynchronos.UI;
 
 public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
 {
-    private readonly ConfigurationService _configService;
+    private readonly MareConfigService _configService;
     private readonly WindowSystem _windowSystem;
     private ApiController ApiController => _uiShared.ApiController;
     private readonly MareCharaFileManager _mareCharaFileManager;
@@ -34,7 +35,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
     private bool _wasOpen = false;
 
     public SettingsUi(WindowSystem windowSystem,
-        UiShared uiShared, ConfigurationService configService,
+        UiShared uiShared, MareConfigService configService,
         MareCharaFileManager mareCharaFileManager, PairManager pairManager,
         ServerConfigurationManager serverConfigurationManager, MareMediator mediator) : base(mediator, "Mare Synchronos Settings")
     {

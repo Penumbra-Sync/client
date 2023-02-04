@@ -12,13 +12,13 @@ public class MareCharaFileManager
 {
     private readonly FileCacheManager _manager;
     private readonly IpcManager _ipcManager;
-    private readonly ConfigurationService _configService;
+    private readonly MareConfigService _configService;
     private readonly DalamudUtil _dalamudUtil;
     private readonly MareCharaFileDataFactory _factory;
     public MareCharaFileHeader? LoadedCharaFile { get; private set; }
     public bool CurrentlyWorking { get; private set; } = false;
 
-    public MareCharaFileManager(FileCacheManager manager, IpcManager ipcManager, ConfigurationService configService, DalamudUtil dalamudUtil)
+    public MareCharaFileManager(FileCacheManager manager, IpcManager ipcManager, MareConfigService configService, DalamudUtil dalamudUtil)
     {
         _factory = new(manager);
         _manager = manager;

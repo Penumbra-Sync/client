@@ -3,6 +3,7 @@ using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface;
 using Dalamud.Interface.Internal.Notifications;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.Mediator;
 using MareSynchronos.Utils;
 
@@ -11,9 +12,9 @@ public class NotificationService : MediatorSubscriberBase
 {
     private readonly UiBuilder _uiBuilder;
     private readonly ChatGui _chatGui;
-    private readonly ConfigurationService _configurationService;
+    private readonly MareConfigService _configurationService;
 
-    public NotificationService(MareMediator mediator, UiBuilder uiBuilder, ChatGui chatGui, ConfigurationService configurationService) : base(mediator)
+    public NotificationService(MareMediator mediator, UiBuilder uiBuilder, ChatGui chatGui, MareConfigService configurationService) : base(mediator)
     {
         _uiBuilder = uiBuilder;
         _chatGui = chatGui;

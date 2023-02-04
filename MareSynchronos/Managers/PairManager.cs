@@ -22,10 +22,10 @@ public class PairManager : MediatorSubscriberBase, IDisposable
     private readonly ConcurrentDictionary<GroupData, GroupFullInfoDto> _allGroups = new(GroupDataComparer.Instance);
     private readonly CachedPlayerFactory _cachedPlayerFactory;
     private readonly PairFactory _pairFactory;
-    private readonly ConfigurationService _configurationService;
+    private readonly MareConfigService _configurationService;
 
     public PairManager(CachedPlayerFactory cachedPlayerFactory, PairFactory pairFactory,
-        ConfigurationService configurationService, MareMediator mediator) : base(mediator)
+        MareConfigService configurationService, MareMediator mediator) : base(mediator)
     {
         _cachedPlayerFactory = cachedPlayerFactory;
         _pairFactory = pairFactory;

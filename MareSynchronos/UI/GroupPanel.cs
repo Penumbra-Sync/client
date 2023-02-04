@@ -25,7 +25,7 @@ namespace MareSynchronos.UI
         private ApiController ApiController => _uiShared.ApiController;
         private readonly PairManager _pairManager;
         private readonly ServerConfigurationManager _serverConfigurationManager;
-        private readonly ConfigurationService _configService;
+        private readonly MareConfigService _configService;
         private readonly Dictionary<string, bool> _showGidForEntry = new(StringComparer.Ordinal);
         private string _editGroupEntry = string.Empty;
         private string _editGroupComment = string.Empty;
@@ -53,7 +53,7 @@ namespace MareSynchronos.UI
         private bool _modalChangePwOpened;
         private int _bulkInviteCount = 10;
 
-        public GroupPanel(CompactUi mainUi, UiShared uiShared, PairManager pairManager, ServerConfigurationManager serverConfigurationManager, ConfigurationService configurationService)
+        public GroupPanel(CompactUi mainUi, UiShared uiShared, PairManager pairManager, ServerConfigurationManager serverConfigurationManager, MareConfigService configurationService)
         {
             _mainUi = mainUi;
             _uiShared = uiShared;
@@ -241,13 +241,11 @@ namespace MareSynchronos.UI
             }
 
             _showGidForEntry.TryGetValue(groupDto.GID, out var showGidInsteadOfName);
-            if (!showGidInsteadOfName && _serverConfigurationManager.CurrentServer!.GidServerComments.TryGetValue(groupDto.GID, out var groupComment))
+            var groupComment = _serverConfigurationManager.GetNoteForGid(groupDto.GID);
+            if (!showGidInsteadOfName && !string.IsNullOrEmpty(groupComment))
             {
-                if (!string.IsNullOrEmpty(groupComment))
-                {
-                    groupName = groupComment;
-                    textIsGid = false;
-                }
+                groupName = groupComment;
+                textIsGid = false;
             }
 
             if (!string.Equals(_editGroupEntry, groupDto.GID, StringComparison.Ordinal))
@@ -271,9 +269,8 @@ namespace MareSynchronos.UI
 
                 if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
                 {
-                    _serverConfigurationManager.CurrentServer!.GidServerComments[_editGroupEntry] = _editGroupComment;
-                    _serverConfigurationManager.Save();
-                    _editGroupComment = _serverConfigurationManager.CurrentServer!.GidServerComments.TryGetValue(groupDto.GID, out string? value) ? value : string.Empty;
+                    _serverConfigurationManager.SetNoteForGid(_editGroupEntry, _editGroupComment);
+                    _editGroupComment = _serverConfigurationManager.GetNoteForGid(groupDto.GID) ?? string.Empty;
                     _editGroupEntry = groupDto.GID;
                 }
             }
@@ -283,8 +280,7 @@ namespace MareSynchronos.UI
                 ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * 2);
                 if (ImGui.InputTextWithHint("", "Comment/Notes", ref _editGroupComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
                 {
-                    _serverConfigurationManager.CurrentServer!.GidServerComments[groupDto.GID] = _editGroupComment;
-                    _serverConfigurationManager.Save();
+                    _serverConfigurationManager.SetNoteForGid(groupDto.GID, _editGroupComment);
                     _editGroupEntry = string.Empty;
                 }
 
@@ -436,7 +432,7 @@ namespace MareSynchronos.UI
                     .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsPinned())
                     .ThenBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase)
                     .ToList();
-                    
+
                 if (visibleUsers.Any())
                 {
                     ImGui.Text("Visible");
@@ -820,18 +816,8 @@ namespace MareSynchronos.UI
 
             var textIsUid = true;
             _mainUi.ShowUidForEntry.TryGetValue(entry.UID, out var showUidInsteadOfName);
-            if (!showUidInsteadOfName && _serverConfigurationManager.CurrentServer!.UidServerComments.TryGetValue(entry.UID, out var playerText))
-            {
-                if (string.IsNullOrEmpty(playerText))
-                {
-                    playerText = entryUID;
-                }
-                else
-                {
-                    textIsUid = false;
-                }
-            }
-            else
+            var playerText = _serverConfigurationManager.GetNoteForUid(entry.UID);
+            if (showUidInsteadOfName || string.IsNullOrEmpty(playerText))
             {
                 playerText = entryUID;
             }
@@ -866,9 +852,8 @@ namespace MareSynchronos.UI
 
                 if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
                 {
-                    _serverConfigurationManager.CurrentServer!.UidServerComments[_mainUi.EditNickEntry] = _mainUi.EditUserComment;
-                    _serverConfigurationManager.Save();
-                    _mainUi.EditUserComment = _serverConfigurationManager.CurrentServer.UidServerComments.TryGetValue(entry.UID, out string? value) ? value : string.Empty;
+                    _serverConfigurationManager.SetNoteForUid(_mainUi.EditNickEntry, _mainUi.EditUserComment);
+                    _mainUi.EditUserComment = _serverConfigurationManager.GetNoteForUid(entry.UID) ?? string.Empty;
                     _mainUi.EditNickEntry = entry.UID;
                 }
             }
@@ -881,8 +866,7 @@ namespace MareSynchronos.UI
                 ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * buttons);
                 if (ImGui.InputTextWithHint("", "Nick/Notes", ref _mainUi.EditUserComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
                 {
-                    _serverConfigurationManager.CurrentServer!.UidServerComments[entry.UID] = _mainUi.EditUserComment;
-                    _serverConfigurationManager.Save();
+                    _serverConfigurationManager.SetNoteForUid(entry.UID, _mainUi.EditUserComment);
                     _mainUi.EditNickEntry = string.Empty;
                 }
 

@@ -22,7 +22,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
     public readonly int[] SupportedServerVersions = { IMareHub.ApiVersion };
 
-    private readonly ConfigurationService _configService;
+    private readonly MareConfigService _configService;
     private readonly DalamudUtil _dalamudUtil;
     private readonly FileCacheManager _fileDbManager;
     private readonly PairManager _pairManager;
@@ -45,7 +45,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
     private HttpClient _httpClient;
 
-    public ApiController(ConfigurationService configService, DalamudUtil dalamudUtil, FileCacheManager fileDbManager,
+    public ApiController(MareConfigService configService, DalamudUtil dalamudUtil, FileCacheManager fileDbManager,
         PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator) : base(mediator)
     {
         Logger.Verbose("Creating " + nameof(ApiController));

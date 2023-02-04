@@ -10,7 +10,7 @@ namespace MareSynchronos.UI;
 public class DownloadUi : Window, IDisposable
 {
     private readonly WindowSystem _windowSystem;
-    private readonly ConfigurationService _configService;
+    private readonly MareConfigService _configService;
     private readonly ApiController _apiController;
     private readonly UiShared _uiShared;
     private bool _wasOpen = false;
@@ -21,7 +21,7 @@ public class DownloadUi : Window, IDisposable
         _windowSystem.RemoveWindow(this);
     }
 
-    public DownloadUi(WindowSystem windowSystem, ConfigurationService configService, ApiController apiController, UiShared uiShared) : base("Mare Synchronos Downloads")
+    public DownloadUi(WindowSystem windowSystem, MareConfigService configService, ApiController apiController, UiShared uiShared) : base("Mare Synchronos Downloads")
     {
         Logger.Verbose("Creating " + nameof(DownloadUi));
         _windowSystem = windowSystem;

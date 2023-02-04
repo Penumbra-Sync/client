@@ -48,7 +48,12 @@ public sealed class Plugin : IDalamudPlugin
         // add mare related stuff
         collection.AddSingleton(new Dalamud.Localization("MareSynchronos.Localization.", "", useEmbedded: true));
 
-        collection.AddSingleton<ConfigurationService>();
+        collection.AddSingleton<ConfigurationMigrator>();
+        collection.AddSingleton<MareConfigService>();
+        collection.AddSingleton<ServerTagConfigService>();
+        collection.AddSingleton<TransientConfigService>();
+        collection.AddSingleton<NotesConfigService>();
+        collection.AddSingleton<ServerConfigService>();
         collection.AddSingleton<MareMediator>();
         collection.AddSingleton<DalamudUtil>();
         collection.AddSingleton<IpcManager>();

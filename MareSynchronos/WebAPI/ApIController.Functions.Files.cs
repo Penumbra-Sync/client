@@ -337,6 +337,7 @@ public partial class ApiController
     {
         if (!IsConnected) return;
         Logger.Debug("Sending Character data to service " + _serverManager.CurrentApiUrl);
+        visibleCharacters = visibleCharacters.ToList();
 
         CancelUpload();
         _uploadCancellationTokenSource = new CancellationTokenSource();

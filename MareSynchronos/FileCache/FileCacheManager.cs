@@ -12,14 +12,14 @@ public class FileCacheManager : IDisposable
     private const string _penumbraPrefix = "{penumbra}";
     private const string _cachePrefix = "{cache}";
     private readonly IpcManager _ipcManager;
-    private readonly ConfigurationService _configService;
+    private readonly MareConfigService _configService;
     private readonly string _csvPath;
     private string CsvBakPath => _csvPath + ".bak";
     private readonly ConcurrentDictionary<string, FileCacheEntity> _fileCaches = new(StringComparer.Ordinal);
     public const string CsvSplit = "|";
     private readonly object _fileWriteLock = new();
 
-    public FileCacheManager(IpcManager ipcManager, ConfigurationService configService)
+    public FileCacheManager(IpcManager ipcManager, MareConfigService configService)
     {
         _ipcManager = ipcManager;
         _configService = configService;

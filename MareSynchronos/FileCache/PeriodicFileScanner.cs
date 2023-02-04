@@ -9,13 +9,13 @@ namespace MareSynchronos.FileCache;
 public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
 {
     private readonly IpcManager _ipcManager;
-    private readonly ConfigurationService _configService;
+    private readonly MareConfigService _configService;
     private readonly FileCacheManager _fileDbManager;
     private CancellationTokenSource? _scanCancellationTokenSource;
     private Task? _fileScannerTask = null;
     public ConcurrentDictionary<string, int> haltScanLocks = new(StringComparer.Ordinal);
 
-    public PeriodicFileScanner(IpcManager ipcManager, ConfigurationService configService, FileCacheManager fileDbManager, MareMediator mediator) : base(mediator)
+    public PeriodicFileScanner(IpcManager ipcManager, MareConfigService configService, FileCacheManager fileDbManager, MareMediator mediator) : base(mediator)
     {
         Logger.Verbose("Creating " + nameof(PeriodicFileScanner));
 

@@ -23,6 +23,8 @@ public class MarePlugin : MediatorSubscriberBase, IDisposable
     {
         _serviceProvider = serviceProvider;
 
+        _serviceProvider.GetRequiredService<ConfigurationMigrator>().Migrate();
+
         mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => Task.Run(WaitForPlayerAndLaunchCharacterManager));
         mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
         mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
@@ -59,7 +61,7 @@ public class MarePlugin : MediatorSubscriberBase, IDisposable
             HelpMessage = "Opens the Mare Synchronos UI",
         });
 
-        if (!_serviceProvider.GetRequiredService<ConfigurationService>().Current.HasValidSetup()
+        if (!_serviceProvider.GetRequiredService<MareConfigService>().Current.HasValidSetup()
             || !_serviceProvider.GetRequiredService<ServerConfigurationManager>().HasValidConfig())
         {
             _serviceProvider.GetRequiredService<MareMediator>().Publish(new SwitchToIntroUiMessage());
@@ -148,7 +150,7 @@ public class MarePlugin : MediatorSubscriberBase, IDisposable
     private void OpenUi()
     {
 
-        if (_serviceProvider.GetRequiredService<ConfigurationService>().Current.HasValidSetup())
+        if (_serviceProvider.GetRequiredService<MareConfigService>().Current.HasValidSetup())
             _serviceProvider.GetRequiredService<CompactUi>().Toggle();
         else
             _serviceProvider.GetRequiredService<IntroUi>().Toggle();

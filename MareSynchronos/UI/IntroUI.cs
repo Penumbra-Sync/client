@@ -10,13 +10,14 @@ using Dalamud.Interface;
 using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
+using MareSynchronos.MareConfiguration.Models;
 
 namespace MareSynchronos.UI;
 
 internal class IntroUi : WindowMediatorSubscriberBase, IDisposable
 {
     private readonly UiShared _uiShared;
-    private readonly ConfigurationService _configService;
+    private readonly MareConfigService _configService;
     private readonly PeriodicFileScanner _fileCacheManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly WindowSystem _windowSystem;
@@ -36,7 +37,7 @@ internal class IntroUi : WindowMediatorSubscriberBase, IDisposable
         _windowSystem.RemoveWindow(this);
     }
 
-    public IntroUi(WindowSystem windowSystem, UiShared uiShared, ConfigurationService configService,
+    public IntroUi(WindowSystem windowSystem, UiShared uiShared, MareConfigService configService,
         PeriodicFileScanner fileCacheManager, ServerConfigurationManager serverConfigurationManager, MareMediator mareMediator) : base(mareMediator, "Mare Synchronos Setup")
     {
         Logger.Verbose("Creating " + nameof(IntroUi));

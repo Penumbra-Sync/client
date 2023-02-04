@@ -1,11 +1,12 @@
-﻿using MareSynchronos.Utils;
+﻿using Dalamud.Interface.Windowing;
+using MareSynchronos.Utils;
 
 namespace MareSynchronos.Mediator;
 
-public abstract class MediatorSubscriberBase : IMediatorSubscriber
+public abstract class WindowMediatorSubscriberBase : Window, IMediatorSubscriber
 {
     public MareMediator Mediator { get; }
-    protected MediatorSubscriberBase(MareMediator mediator)
+    protected WindowMediatorSubscriberBase(MareMediator mediator, string name) : base(name)
     {
         Mediator = mediator;
     }

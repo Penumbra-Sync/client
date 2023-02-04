@@ -12,11 +12,11 @@ namespace MareSynchronos.Models;
 
 public class Pair
 {
-    private readonly ConfigurationService _configService;
+    private readonly MareConfigService _configService;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private OptionalPluginWarning? _pluginWarnings;
 
-    public Pair(ConfigurationService configService, ServerConfigurationManager serverConfigurationManager)
+    public Pair(MareConfigService configService, ServerConfigurationManager serverConfigurationManager)
     {
         _configService = configService;
         _serverConfigurationManager = serverConfigurationManager;
@@ -36,18 +36,12 @@ public class Pair
 
     public string? GetNote()
     {
-        if (_serverConfigurationManager.CurrentServer!.UidServerComments.TryGetValue(UserData.UID, out string? note))
-        {
-            return string.IsNullOrEmpty(note) ? null : note;
-        }
-
-        return null;
+        return _serverConfigurationManager.GetNoteForUid(UserData.UID);
     }
 
     public void SetNote(string note)
     {
-        _serverConfigurationManager.CurrentServer!.UidServerComments[UserData.UID] = note;
-        _serverConfigurationManager.Save();
+        _serverConfigurationManager.SetNoteForUid(UserData.UID, note);
     }
 
     public bool HasAnyConnection()

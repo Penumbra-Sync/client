@@ -13,6 +13,7 @@ using MareSynchronos.FileCache;
 using MareSynchronos.Localization;
 using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
@@ -28,7 +29,7 @@ public partial class UiShared : IDisposable
     private readonly ApiController _apiController;
     private readonly PeriodicFileScanner _cacheScanner;
     public readonly FileDialogManager FileDialogManager;
-    private readonly ConfigurationService _configService;
+    private readonly MareConfigService _configService;
     private readonly DalamudUtil _dalamudUtil;
     private readonly DalamudPluginInterface _pluginInterface;
     private readonly Dalamud.Localization _localization;
@@ -53,7 +54,7 @@ public partial class UiShared : IDisposable
     public ApiController ApiController => _apiController;
 
     public UiShared(IpcManager ipcManager, ApiController apiController, PeriodicFileScanner cacheScanner, FileDialogManager fileDialogManager,
-        ConfigurationService configService, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization,
+        MareConfigService configService, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization,
         ServerConfigurationManager serverManager)
     {
         _ipcManager = ipcManager;
@@ -631,8 +632,6 @@ public partial class UiShared : IDisposable
 
         splitNotes.RemoveAll(n => string.Equals(n, _notesStart) || string.Equals(n, _notesEnd));
 
-        var comments = _serverConfigurationManager.CurrentServer!.UidServerComments;
-
         foreach (var note in splitNotes)
         {
             try
@@ -640,8 +639,8 @@ public partial class UiShared : IDisposable
                 var splittedEntry = note.Split(":", 2, StringSplitOptions.RemoveEmptyEntries);
                 var uid = splittedEntry[0];
                 var comment = splittedEntry[1].Trim('"');
-                if (comments.ContainsKey(uid) && !overwrite) continue;
-                _serverConfigurationManager.CurrentServer.UidServerComments[uid] = comment;
+                if (_serverConfigurationManager.GetNoteForUid(uid) != null && !overwrite) continue;
+                _serverConfigurationManager.SetNoteForUid(uid, comment);
             }
             catch
             {
@@ -649,7 +648,7 @@ public partial class UiShared : IDisposable
             }
         }
 
-        _serverConfigurationManager.Save();
+        _serverConfigurationManager.SaveNotes();
 
         return true;
     }
