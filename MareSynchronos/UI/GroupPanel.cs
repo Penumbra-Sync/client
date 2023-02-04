@@ -821,6 +821,10 @@ namespace MareSynchronos.UI
             {
                 playerText = entryUID;
             }
+            else
+            {
+                textIsUid = false;
+            }
 
             if (_configService.Current.ShowCharacterNameInsteadOfNotesForVisible && pair.IsVisible && !showUidInsteadOfName)
             {
