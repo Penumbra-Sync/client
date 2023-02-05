@@ -97,13 +97,13 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
         {
             var toCreate = _cachesToCreate.ToList();
             _cachesToCreate.Clear();
-            _cacheCreationTask = Task.Run(() =>
+            _cacheCreationTask = Task.Run(async () =>
             {
                 try
                 {
                     foreach (var obj in toCreate)
                     {
-                        var data = _characterDataFactory.BuildCharacterData(_lastCreatedData, obj.Value, _cts.Token);
+                        var data = await _characterDataFactory.BuildCharacterData(_lastCreatedData, obj.Value, _cts.Token).ConfigureAwait(false);
                     }
                     Mediator.Publish(new CharacterDataCreatedMessage(_lastCreatedData));
                 }

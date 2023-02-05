@@ -86,7 +86,7 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
         }
     }
 
-    public void CleanSemiTransientResources(ObjectKind objectKind, List<FileReplacement>? fileReplacement = null)
+    public void CleanUpSemiTransientResources(ObjectKind objectKind, List<FileReplacement>? fileReplacement = null)
     {
         if (SemiTransientResources.ContainsKey(objectKind))
         {
@@ -98,7 +98,6 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
 
             foreach (var replacement in fileReplacement.Where(p => !p.HasFileReplacement).SelectMany(p => p.GamePaths).ToList())
             {
-
                 SemiTransientResources[objectKind].RemoveWhere(p => string.Equals(p, replacement, StringComparison.OrdinalIgnoreCase));
             }
         }
