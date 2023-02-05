@@ -75,8 +75,8 @@ namespace MareSynchronos.UI.Components
         {
             string displayedName = tag switch
             {
-                TagHandler.CustomOfflineTag => "Offline/Unknown",
-                TagHandler.CustomOnlineTag => "Online",
+                TagHandler.CustomOfflineTag => "Offline/Unpaired",
+                TagHandler.CustomOnlineTag => "Online/Paused",
                 TagHandler.CustomVisibleTag => "Visible",
                 _ => tag
             };
@@ -103,7 +103,7 @@ namespace MareSynchronos.UI.Components
                 ImGui.TextUnformatted($"Group {tag}");
                 ImGui.Separator();
                 ImGui.TextUnformatted($"{visible} Pairs visible");
-                ImGui.TextUnformatted($"{online} Pairs online");
+                ImGui.TextUnformatted($"{online} Pairs online/paused");
                 ImGui.TextUnformatted($"{total} Pairs total");
                 ImGui.EndTooltip();
             }

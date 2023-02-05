@@ -26,6 +26,14 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
             var actualMsg = (CreateCacheForObjectMessage)msg;
             _cachesToCreate[actualMsg.ObjectToCreateFor.ObjectKind] = actualMsg.ObjectToCreateFor;
         });
+        Mediator.Subscribe<ClearCacheForObjectMessage>(this, (msg) =>
+        {
+            var actualMsg = (ClearCacheForObjectMessage)msg;
+            _lastCreatedData.FileReplacements.Remove(actualMsg.ObjectToCreateFor.ObjectKind);
+            _lastCreatedData.GlamourerString.Remove(actualMsg.ObjectToCreateFor.ObjectKind);
+            Mediator.Publish(new CharacterDataCreatedMessage(_lastCreatedData));
+        });
+        Mediator.Subscribe<FrameworkUpdateMessage>(this, (msg) => UpdatePointers());
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (msg) => ProcessCacheCreation());
         Mediator.Subscribe<CustomizePlusMessage>(this, (msg) => CustomizePlusChanged((CustomizePlusMessage)msg));
         Mediator.Subscribe<HeelsOffsetMessage>(this, (msg) => HeelsOffsetChanged((HeelsOffsetMessage)msg));
@@ -78,6 +86,11 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
         }
     }
 
+    private void UpdatePointers()
+    {
+        Mediator.Publish(new PlayerRelatedObjectPointerUpdateMessage(_playerRelatedObjects.Select(f => f.CurrentAddress).ToArray()));
+    }
+
     private void ProcessCacheCreation()
     {
         if (_cachesToCreate.Any() && (_cacheCreationTask?.IsCompleted ?? true))
@@ -109,8 +122,6 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
         {
             Logger.Debug("Cache Creation stored until previous creation finished");
         }
-
-        Mediator.Publish(new PlayerRelatedObjectPointerUpdateMessage(_playerRelatedObjects.Select(f => f.CurrentAddress).ToArray()));
     }
 
     public override void Dispose()

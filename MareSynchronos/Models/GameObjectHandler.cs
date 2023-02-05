@@ -4,6 +4,8 @@ using MareSynchronos.Utils;
 using Penumbra.String;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.Mediator;
+using System;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace MareSynchronos.Models;
 
@@ -57,6 +59,8 @@ public class GameObjectHandler : MediatorSubscriberBase
 
     public byte[] EquipSlotData { get; set; } = new byte[40];
     public byte[] CustomizeData { get; set; } = new byte[26];
+    private Task? _petClearTask;
+    private CancellationTokenSource? _petCts = new();
     public byte? HatState { get; set; }
     public byte? VisorWeaponState { get; set; }
     private bool _doNotSendUpdate;
@@ -64,8 +68,14 @@ public class GameObjectHandler : MediatorSubscriberBase
     public unsafe bool CheckAndUpdateObject()
     {
         var curPtr = CurrentAddress;
-        if (curPtr != IntPtr.Zero)
+        if (curPtr != IntPtr.Zero && (IntPtr)((Character*)curPtr)->GameObject.DrawObject != IntPtr.Zero)
         {
+            if (ObjectKind == ObjectKind.Pet && _petCts != null)
+            {
+                Logger.Debug("Cancelling PetClearTask for " + ObjectKind);
+                _petCts?.Cancel();
+                _petCts = null;
+            }
             var chara = (Character*)curPtr;
             bool addr = Address == IntPtr.Zero || Address != curPtr;
             bool equip = CompareAndUpdateByteData(chara->EquipSlotData, chara->CustomizeData);
@@ -93,9 +103,30 @@ public class GameObjectHandler : MediatorSubscriberBase
             Address = IntPtr.Zero;
             DrawObjectAddress = IntPtr.Zero;
             Logger.Verbose(ObjectKind + " Changed: " + _name + ", now: " + Address + ", " + DrawObjectAddress);
+            if (_sendUpdates && ObjectKind == ObjectKind.Pet)
+            {
+                _petCts?.Cancel();
+                _petCts?.Dispose();
+                _petCts = new();
+                var token = _petCts.Token;
+                _petClearTask = Task.Run(() => PetClearTask(token), token);
+            }
+            else if (_sendUpdates)
+            {
+                Logger.Debug("Sending ClearCachedForObjectMessage for " + ObjectKind);
+                Mediator.Publish(new ClearCacheForObjectMessage(this));
+            }
         }
 
         return false;
+    }
+
+    private async Task PetClearTask(CancellationToken token)
+    {
+        Logger.Debug("Running PetClearTask for " + ObjectKind);
+        await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
+        Logger.Debug("Sending ClearCachedForObjectMessage for " + ObjectKind);
+        Mediator.Publish(new ClearCacheForObjectMessage(this));
     }
 
     private unsafe bool CompareAndUpdateByteData(byte* equipSlotData, byte* customizeData)

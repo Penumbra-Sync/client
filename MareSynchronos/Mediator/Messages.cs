@@ -37,6 +37,7 @@ public record ResumeScanMessage(string Source) : IMessage;
 public record NotificationMessage
     (string Title, string Message, NotificationType Type, uint TimeShownOnScreen = 3000) : IMessage;
 public record CreateCacheForObjectMessage(GameObjectHandler ObjectToCreateFor) : IMessage;
+public record ClearCacheForObjectMessage(GameObjectHandler ObjectToCreateFor) : IMessage;
 public record CharacterDataCreatedMessage(CharacterData CharacterData) : IMessage;
 
 #pragma warning restore MA0048 // File name must match type name

@@ -535,8 +535,9 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
         ImGui.BeginChild("list", new Vector2(WindowContentWidth, ySize), border: false);
         var visibleUsers = users.Where(u => u.IsVisible && u.UserPair!.OtherPermissions.IsPaired()).OrderBy(u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible ?
             u.PlayerName : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase).ToList();
-        var onlineUsers = users.Where(u => u.IsOnline && !u.IsVisible && u.UserPair!.OtherPermissions.IsPaired()).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
-        var offlineUsers = users.Where(u => !u.IsOnline && !u.IsVisible || !u.UserPair!.OtherPermissions.IsPaired()).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
+        var onlineUsers = users.Where(u => u.IsOnline || (u.UserPair.OwnPermissions.IsPaused() || u.UserPair.OtherPermissions.IsPaused())).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
+        var offlineUsers = users.Where(u => (!u.IsOnline && !u.IsVisible || !u.UserPair!.OtherPermissions.IsPaired()) && !(u.UserPair.OwnPermissions.IsPaused() || u.UserPair.OtherPermissions.IsPaused()))
+            .OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
 
         if (_configService.Current.ReverseUserSort)
         {
@@ -604,15 +605,18 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
         var color = UiShared.GetBoolColor(!_serverManager.CurrentServer!.FullPause);
         var connectedIcon = !_serverManager.CurrentServer.FullPause ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
 
-        ImGui.PushStyleColor(ImGuiCol.Text, color);
-        if (ImGuiComponents.IconButton(connectedIcon))
+        if (_apiController.ServerState != ServerState.Reconnecting)
         {
-            _serverManager.CurrentServer.FullPause = !_serverManager.CurrentServer.FullPause;
-            _serverManager.Save();
-            _ = _apiController.CreateConnections();
+            ImGui.PushStyleColor(ImGuiCol.Text, color);
+            if (ImGuiComponents.IconButton(connectedIcon))
+            {
+                _serverManager.CurrentServer.FullPause = !_serverManager.CurrentServer.FullPause;
+                _serverManager.Save();
+                _ = _apiController.CreateConnections();
+            }
+            ImGui.PopStyleColor();
+            UiShared.AttachToolTip(!_serverManager.CurrentServer.FullPause ? "Disconnect from " + _serverManager.CurrentServer.ServerName : "Connect to " + _serverManager.CurrentServer.ServerName);
         }
-        ImGui.PopStyleColor();
-        UiShared.AttachToolTip(!_serverManager.CurrentServer.FullPause ? "Disconnect from " + _serverManager.CurrentServer.ServerName : "Connect to " + _serverManager.CurrentServer.ServerName);
     }
 
     private void DrawTransfers()

@@ -253,19 +253,9 @@ public class CharacterDataFactory
             AddPlayerSpecificReplacements(objectKind, charaPointer, human);
         }
 
-        if (objectKind == ObjectKind.Pet)
-        {
-            foreach (var item in previousData.FileReplacements[objectKind])
-            {
-                _transientResourceManager.AddSemiTransientResource(objectKind, item.GamePaths.First());
-            }
-
-            previousData.FileReplacements[objectKind].Clear();
-        }
-
-
         Dictionary<string, List<string>> resolvedPaths = GetFileReplacementsFromPaths();
-        previousData.FileReplacements[objectKind] = new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)));
+        previousData.FileReplacements[objectKind] = new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)), FileReplacementComparer.Instance)
+            .Where(p => p.HasFileReplacement).ToHashSet();
 
         previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
         previousData.GlamourerString[objectKind] = _ipcManager.GlamourerGetCharacterCustomization(charaPointer);
@@ -274,9 +264,17 @@ public class CharacterDataFactory
         previousData.PalettePlusPalette = _ipcManager.PalettePlusBuildPalette();
 
         Logger.Debug("== Static Replacements ==");
-        foreach (var item in previousData.FileReplacements[objectKind])
+        foreach (var item in previousData.FileReplacements[objectKind].Where(i => i.HasFileReplacement).OrderBy(i => i.GamePaths.First(), StringComparer.OrdinalIgnoreCase))
         {
             Logger.Debug(item.ToString());
+        }
+
+        if (objectKind == ObjectKind.Pet)
+        {
+            foreach (var item in previousData.FileReplacements[objectKind].Where(i => i.HasFileReplacement).SelectMany(p => p.GamePaths))
+            {
+                _transientResourceManager.AddSemiTransientResource(objectKind, item);
+            }
         }
 
         Logger.Debug("Handling transient update for " + objectKind);
@@ -289,7 +287,7 @@ public class CharacterDataFactory
 
         var resolvedTransientPaths = GetFileReplacementsFromPaths();
         Logger.Debug("== Transient Replacements ==");
-        foreach (var replacement in resolvedTransientPaths.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)))
+        foreach (var replacement in resolvedTransientPaths.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)).OrderBy(f => f.ResolvedPath, StringComparer.Ordinal))
         {
             Logger.Debug(replacement.ToString());
             previousData.FileReplacements[objectKind].Add(replacement);
@@ -297,7 +295,10 @@ public class CharacterDataFactory
 
         _transientResourceManager.CleanSemiTransientResources(objectKind, previousData.FileReplacements[objectKind].ToList());
 
-
+        foreach (var item in previousData.FileReplacements)
+        {
+            previousData.FileReplacements[item.Key] = new HashSet<FileReplacement>(item.Value.Where(v => v.HasFileReplacement).OrderBy(v => v.ResolvedPath, StringComparer.Ordinal), FileReplacementComparer.Instance);
+        }
 
         st.Stop();
         Logger.Info("Building character data for " + objectKind + " took " + st.ElapsedMilliseconds + "ms");

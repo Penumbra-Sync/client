@@ -237,7 +237,7 @@ public class DalamudUtil : IDisposable
             while ((!ct?.IsCancellationRequested ?? true)
                 && curWaitTime < timeOut
                 && (((obj->GetDrawObject() == null
-                        || ((CharacterBase*)obj->GetDrawObject())->HasModelFilesInSlotLoaded != 0
+                        || ((CharacterBase*)obj->GetDrawObject())->HasModelInSlotLoaded != 0
                         || ((CharacterBase*)obj->GetDrawObject())->HasModelFilesInSlotLoaded != 0))
                     || ((obj->RenderFlags & 0b100000000000) == 0b100000000000))) // 0b100000000000 is "still rendering" or something
             {
@@ -245,6 +245,10 @@ public class DalamudUtil : IDisposable
                 curWaitTime += tick;
                 Thread.Sleep(tick);
             }
+        }
+        catch (NullReferenceException ex)
+        {
+            Logger.Warn("Error accessing " + characterAddress.ToString("X") + ", object does not exist anymore?", ex);
         }
         catch (AccessViolationException ex)
         {

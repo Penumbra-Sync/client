@@ -74,17 +74,17 @@ internal class Logger : ILogger
         switch (logLevel)
         {
             case LogLevel.Debug:
-                PluginLog.Debug($"[{_name}] [{eventId}] {formatter(state, exception)}");
+                Debug($"[{_name}] [{eventId}] {formatter(state, exception)}");
                 break;
             case LogLevel.Error:
             case LogLevel.Critical:
-                PluginLog.Error($"[{_name}] [{eventId}] {formatter(state, exception)}");
+                Error($"[{_name}] [{eventId}] {formatter(state, exception)}", exception);
                 break;
             case LogLevel.Information:
-                PluginLog.Information($"[{_name}] [{eventId}] {formatter(state, exception)}");
+                Info($"[{_name}] [{eventId}] {formatter(state, exception)}");
                 break;
             case LogLevel.Warning:
-                PluginLog.Warning($"[{_name}] [{eventId}] {formatter(state, exception)}");
+                Warn($"[{_name}] [{eventId}] {formatter(state, exception)}", exception);
                 break;
             case LogLevel.Trace:
             default:

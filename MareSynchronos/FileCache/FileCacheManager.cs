@@ -85,7 +85,9 @@ public class FileCacheManager : IDisposable
     {
         if (_fileCaches.Any(f => string.Equals(f.Value.Hash, hash, StringComparison.Ordinal)))
         {
-            return GetValidatedFileCache(_fileCaches.FirstOrDefault(f => string.Equals(f.Value.Hash, hash, StringComparison.Ordinal)).Value);
+            return GetValidatedFileCache(_fileCaches.Where(f => string.Equals(f.Value.Hash, hash, StringComparison.Ordinal))
+                .OrderByDescending(f => f.Value.PrefixedFilePath.Length)
+                .FirstOrDefault(f => string.Equals(f.Value.Hash, hash, StringComparison.Ordinal)).Value);
         }
 
         return null;

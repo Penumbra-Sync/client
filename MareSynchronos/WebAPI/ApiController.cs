@@ -204,9 +204,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
             }
             catch (HttpRequestException ex)
             {
-                Logger.Warn(ex.GetType().ToString());
-                Logger.Warn(ex.Message);
-                Logger.Warn(ex.StackTrace ?? string.Empty);
+                Logger.Warn("HttpRequestException on Connection", ex);
 
                 if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
@@ -222,9 +220,8 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
             }
             catch (Exception ex)
             {
-                Logger.Warn(ex.GetType().ToString());
-                Logger.Warn(ex.Message);
-                Logger.Warn(ex.StackTrace ?? string.Empty);
+                Logger.Warn("Exception on Connection", ex);
+
                 Logger.Info("Failed to establish connection, retrying");
                 await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token).ConfigureAwait(false);
             }
@@ -236,14 +233,8 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         while (!ct.IsCancellationRequested && _mareHub != null)
         {
             await Task.Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
-            if (ct.IsCancellationRequested) break;
             var needsRestart = await CheckClientHealth().ConfigureAwait(false);
-            Logger.Debug("Checked Client Health State, healthy: " + !needsRestart);
-            if (needsRestart)
-            {
-                ServerState = ServerState.Offline;
-                _ = CreateConnections();
-            }
+            Logger.Debug("Checked Client Health State");
         }
     }
 
@@ -328,7 +319,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
             .ConfigureLogging(a =>
             {
                 a.ClearProviders().AddProvider(new DalamudLoggingProvider());
-                a.SetMinimumLevel(LogLevel.Warning);
+                a.SetMinimumLevel(LogLevel.Information);
             })
             .Build();
     }
@@ -385,11 +376,6 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
             _pairManager.ClearPairs();
             _mareHub = null;
         }
-    }
-
-    public async Task<ConnectionDto> Heartbeat(string characterIdentification)
-    {
-        return await _mareHub!.InvokeAsync<ConnectionDto>(nameof(Heartbeat), characterIdentification).ConfigureAwait(false);
     }
 
     public async Task<ConnectionDto> GetConnectionDto()

@@ -28,23 +28,6 @@ public class CharacterData
     [JsonProperty]
     public string PalettePlusPalette { get; set; } = string.Empty;
 
-    public void AddFileReplacement(ObjectKind objectKind, FileReplacement fileReplacement)
-    {
-        if (!fileReplacement.HasFileReplacement) return;
-
-        if (!FileReplacements.ContainsKey(objectKind)) FileReplacements.Add(objectKind, new HashSet<FileReplacement>());
-
-        var existingReplacement = FileReplacements[objectKind].SingleOrDefault(f => string.Equals(f.ResolvedPath, fileReplacement.ResolvedPath, StringComparison.OrdinalIgnoreCase));
-        if (existingReplacement != null)
-        {
-            existingReplacement.GamePaths.AddRange(fileReplacement.GamePaths.Where(e => !existingReplacement.GamePaths.Contains(e, StringComparer.OrdinalIgnoreCase)));
-        }
-        else
-        {
-            FileReplacements[objectKind].Add(fileReplacement);
-        }
-    }
-
     public API.Data.CharacterData ToAPI()
     {
         var fileReplacements = FileReplacements.ToDictionary(k => k.Key, k => k.Value.Where(f => f.HasFileReplacement && !f.IsFileSwap).GroupBy(f => f.Hash, StringComparer.OrdinalIgnoreCase).Select(g =>
@@ -76,7 +59,7 @@ public class CharacterData
     public override string ToString()
     {
         StringBuilder stringBuilder = new();
-        foreach (var fileReplacement in FileReplacements.SelectMany(k => k.Value).OrderBy(a => a.GamePaths[0], StringComparer.Ordinal))
+        foreach (var fileReplacement in FileReplacements.SelectMany(k => k.Value).OrderBy(a => a.GamePaths.First(), StringComparer.Ordinal))
         {
             stringBuilder.AppendLine(fileReplacement.ToString());
         }

@@ -10,6 +10,7 @@ using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.Files;
 using MareSynchronos.API.Routes;
 using MareSynchronos.Mediator;
+using MareSynchronos.UI;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -20,17 +21,23 @@ public partial class ApiController
 {
     private readonly Dictionary<string, DateTime> _verifiedUploadedHashes;
     private readonly ConcurrentDictionary<Guid, bool> _downloadReady = new();
+    private bool currentUploadCancelled = false;
 
     private int _downloadId = 0;
-    public async void CancelUpload()
+    public async Task<bool> CancelUpload()
     {
-        if (_uploadCancellationTokenSource != null)
+        if (CurrentUploads.Any())
         {
-            Logger.Debug("Cancelling upload");
+            Logger.Debug("Cancelling current upload");
             _uploadCancellationTokenSource?.Cancel();
+            _uploadCancellationTokenSource?.Dispose();
+            _uploadCancellationTokenSource = null;
             CurrentUploads.Clear();
             await FilesAbortUpload().ConfigureAwait(false);
+            return true;
         }
+
+        return false;
     }
 
     public async Task FilesAbortUpload()
@@ -333,19 +340,45 @@ public partial class ApiController
         CancelDownload(currentDownloadId);
     }
 
-    public async Task PushCharacterData(API.Data.CharacterData character, List<UserData> visibleCharacters)
+    public async Task PushCharacterData(CharacterData data, List<UserData> visibleCharacters)
     {
         if (!IsConnected) return;
-        Logger.Debug("Sending Character data to service " + _serverManager.CurrentApiUrl);
-        visibleCharacters = visibleCharacters.ToList();
 
-        CancelUpload();
-        _uploadCancellationTokenSource = new CancellationTokenSource();
-        var uploadToken = _uploadCancellationTokenSource.Token;
-        Logger.Verbose("New Token Created");
+        try
+        {
+            currentUploadCancelled = await CancelUpload().ConfigureAwait(false);
 
-        List<string> unverifiedUploadHashes = new();
-        foreach (var item in character.FileReplacements.SelectMany(c => c.Value.Where(f => string.IsNullOrEmpty(f.FileSwapPath)).Select(v => v.Hash).Distinct(StringComparer.Ordinal)).Distinct(StringComparer.Ordinal).ToList())
+            _uploadCancellationTokenSource = new CancellationTokenSource();
+            var uploadToken = _uploadCancellationTokenSource.Token;
+            Logger.Debug($"Sending Character data {data.DataHash.Value} to service {_serverManager.CurrentApiUrl}");
+
+            HashSet<string> unverifiedUploads = VerifyFiles(data);
+            if (unverifiedUploads.Any())
+            {
+                await UploadMissingFiles(unverifiedUploads, uploadToken).ConfigureAwait(false);
+                Logger.Info("Upload complete for " + data.DataHash.Value);
+            }
+            await PushCharacterDataInternal(data, visibleCharacters.ToList()).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.Debug("Upload operation was cancelled");
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn("Error during upload of files", ex);
+        }
+        finally
+        {
+            if (!currentUploadCancelled)
+                currentUploadCancelled = await CancelUpload().ConfigureAwait(false);
+        }
+    }
+
+    private HashSet<string> VerifyFiles(CharacterData data)
+    {
+        HashSet<string> unverifiedUploadHashes = new(StringComparer.Ordinal);
+        foreach (var item in data.FileReplacements.SelectMany(c => c.Value.Where(f => string.IsNullOrEmpty(f.FileSwapPath)).Select(v => v.Hash).Distinct(StringComparer.Ordinal)).Distinct(StringComparer.Ordinal).ToList())
         {
             if (!_verifiedUploadedHashes.TryGetValue(item, out var verifiedTime))
             {
@@ -359,103 +392,93 @@ public partial class ApiController
             }
         }
 
-        if (unverifiedUploadHashes.Any())
+        return unverifiedUploadHashes;
+    }
+
+    private async Task UploadMissingFiles(HashSet<string> unverifiedUploadHashes, CancellationToken uploadToken)
+    {
+        unverifiedUploadHashes = unverifiedUploadHashes.Where(h => _fileDbManager.GetFileCacheByHash(h) != null).ToHashSet(StringComparer.Ordinal);
+
+        Logger.Debug("Verifying " + unverifiedUploadHashes.Count + " files");
+        var filesToUpload = await FilesSend(unverifiedUploadHashes.ToList()).ConfigureAwait(false);
+
+        foreach (var file in filesToUpload.Where(f => !f.IsForbidden))
         {
-            unverifiedUploadHashes = unverifiedUploadHashes.Where(h => _fileDbManager.GetFileCacheByHash(h) != null).ToList();
-
-            Logger.Debug("Verifying " + unverifiedUploadHashes.Count + " files");
-            var filesToUpload = await FilesSend(unverifiedUploadHashes).ConfigureAwait(false);
-
-            foreach (var file in filesToUpload.Where(f => !f.IsForbidden))
+            try
             {
-                try
+                CurrentUploads.Add(new UploadFileTransfer(file)
                 {
-                    CurrentUploads.Add(new UploadFileTransfer(file)
-                    {
-                        Total = new FileInfo(_fileDbManager.GetFileCacheByHash(file.Hash)!.ResolvedFilepath).Length,
-                    });
-                }
-                catch (Exception ex)
-                {
-                    Logger.Warn("Tried to request file " + file.Hash + " but file was not present");
-                    Logger.Warn(ex.StackTrace!);
-                }
+                    Total = new FileInfo(_fileDbManager.GetFileCacheByHash(file.Hash)!.ResolvedFilepath).Length,
+                });
             }
-
-            foreach (var file in filesToUpload.Where(c => c.IsForbidden))
+            catch (Exception ex)
             {
-                if (ForbiddenTransfers.All(f => !string.Equals(f.Hash, file.Hash, StringComparison.Ordinal)))
-                {
-                    ForbiddenTransfers.Add(new UploadFileTransfer(file)
-                    {
-                        LocalFile = _fileDbManager.GetFileCacheByHash(file.Hash)?.ResolvedFilepath ?? string.Empty,
-                    });
-                }
+                Logger.Warn("Tried to request file " + file.Hash + " but file was not present", ex);
             }
-
-            var totalSize = CurrentUploads.Sum(c => c.Total);
-            Logger.Debug("Compressing and uploading files");
-            foreach (var file in CurrentUploads.Where(f => f.CanBeTransferred && !f.IsTransferred).ToList())
-            {
-                Logger.Debug("Compressing and uploading " + file);
-                var data = await GetCompressedFileData(file.Hash, uploadToken).ConfigureAwait(false);
-                CurrentUploads.Single(e => string.Equals(e.Hash, data.Item1, StringComparison.Ordinal)).Total = data.Item2.Length;
-                await UploadFile(data.Item2, file.Hash, uploadToken).ConfigureAwait(false);
-                if (!uploadToken.IsCancellationRequested) continue;
-                Logger.Warn("Cancel in filesToUpload loop detected");
-                CurrentUploads.Clear();
-                break;
-            }
-
-            if (CurrentUploads.Any())
-            {
-                var compressedSize = CurrentUploads.Sum(c => c.Total);
-                Logger.Debug($"Compressed {totalSize} to {compressedSize} ({(compressedSize / (double)totalSize):P2})");
-
-                Logger.Debug("Upload tasks complete, waiting for server to confirm");
-                Logger.Debug("Uploads open: " + CurrentUploads.Any(c => c.IsInTransfer));
-                const double waitStep = 1.0d;
-                while (CurrentUploads.Any(c => c.IsInTransfer) && !uploadToken.IsCancellationRequested)
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(waitStep), uploadToken).ConfigureAwait(false);
-                    Logger.Debug("Waiting for uploads to finish");
-                }
-            }
-
-            foreach (var item in unverifiedUploadHashes)
-            {
-                _verifiedUploadedHashes[item] = DateTime.UtcNow;
-            }
-
-            CurrentUploads.Clear();
-        }
-        else
-        {
-            Logger.Debug("All files already verified");
         }
 
-        if (!uploadToken.IsCancellationRequested)
+        foreach (var file in filesToUpload.Where(c => c.IsForbidden))
         {
-            Logger.Info("Pushing character data for " + character.GetHashCode() + " to " + string.Join(", ", visibleCharacters.Select(c => c.AliasOrUID)));
-            StringBuilder sb = new();
-            foreach (var item in character.FileReplacements)
+            if (ForbiddenTransfers.All(f => !string.Equals(f.Hash, file.Hash, StringComparison.Ordinal)))
             {
-                sb.AppendLine($"FileReplacements for {item.Key}: {item.Value.Count}");
+                ForbiddenTransfers.Add(new UploadFileTransfer(file)
+                {
+                    LocalFile = _fileDbManager.GetFileCacheByHash(file.Hash)?.ResolvedFilepath ?? string.Empty,
+                });
             }
-            foreach (var item in character.GlamourerData)
-            {
-                sb.AppendLine($"GlamourerData for {item.Key}: {!string.IsNullOrEmpty(item.Value)}");
-            }
-            Logger.Debug("Chara data contained: " + Environment.NewLine + sb.ToString());
-            await UserPushData(new(visibleCharacters, character)).ConfigureAwait(false);
-        }
-        else
-        {
-            Logger.Warn("=== Upload operation was cancelled ===");
+
+            _verifiedUploadedHashes[file.Hash] = DateTime.UtcNow;
         }
 
-        Logger.Verbose("Upload complete for " + character.DataHash);
-        _uploadCancellationTokenSource = null;
+        var totalSize = CurrentUploads.Sum(c => c.Total);
+        Logger.Debug("Compressing and uploading files");
+        foreach (var file in CurrentUploads.Where(f => f.CanBeTransferred && !f.IsTransferred).ToList())
+        {
+            Logger.Debug("Compressing and uploading " + file);
+            var data = await GetCompressedFileData(file.Hash, uploadToken).ConfigureAwait(false);
+            CurrentUploads.Single(e => string.Equals(e.Hash, data.Item1, StringComparison.Ordinal)).Total = data.Item2.Length;
+            await UploadFile(data.Item2, file.Hash, uploadToken).ConfigureAwait(false);
+            _verifiedUploadedHashes[file.Hash] = DateTime.UtcNow;
+            uploadToken.ThrowIfCancellationRequested();
+        }
+
+        if (CurrentUploads.Any())
+        {
+            var compressedSize = CurrentUploads.Sum(c => c.Total);
+            Logger.Debug($"Compressed {UiShared.ByteToString(totalSize)} to {UiShared.ByteToString(compressedSize)} ({(compressedSize / (double)totalSize):P2})");
+
+            Logger.Debug("Upload tasks complete, waiting for server to confirm");
+            Logger.Debug("Uploads open: " + CurrentUploads.Any(c => c.IsInTransfer));
+            const double waitStep = 1.0d;
+            while (CurrentUploads.Any(c => c.IsInTransfer) && !uploadToken.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(waitStep), uploadToken).ConfigureAwait(false);
+                Logger.Debug("Waiting for uploads to finish");
+            }
+        }
+
+        foreach(var file in unverifiedUploadHashes.Where(c=>!CurrentUploads.Any(u=> string.Equals(u.Hash, c, StringComparison.Ordinal))))
+        {
+            _verifiedUploadedHashes[file] = DateTime.UtcNow;
+        }
+
+        CurrentUploads.Clear();
+    }
+
+    private async Task PushCharacterDataInternal(CharacterData character, List<UserData> visibleCharacters)
+    {
+        Logger.Info("Pushing character data for " + character.DataHash.Value + " to " + string.Join(", ", visibleCharacters.Select(c => c.AliasOrUID)));
+        StringBuilder sb = new();
+        foreach (var item in character.FileReplacements)
+        {
+            sb.AppendLine($"FileReplacements for {item.Key}: {item.Value.Count}");
+        }
+        foreach (var item in character.GlamourerData)
+        {
+            sb.AppendLine($"GlamourerData for {item.Key}: {!string.IsNullOrEmpty(item.Value)}");
+        }
+        Logger.Debug("Chara data contained: " + Environment.NewLine + sb.ToString());
+        await UserPushData(new(visibleCharacters, character)).ConfigureAwait(false);
     }
 
     private async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)

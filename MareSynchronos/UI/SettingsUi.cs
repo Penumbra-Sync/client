@@ -784,11 +784,20 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
         _uiShared.DrawFileScanState();
         _uiShared.DrawTimeSpanBetweenScansSetting();
         _uiShared.DrawCacheDirectorySetting();
-        ImGui.Text($"Local storage size: {UiShared.ByteToString(_uiShared.FileCacheSize)}");
+        ImGui.Text($"Currently utilized local storage: {UiShared.ByteToString(_uiShared.FileCacheSize)}");
+        ImGui.Dummy(new Vector2(10, 10));
+        ImGui.Text("To clear the local storage accept the following disclaimer");
+        ImGui.Indent();
+        ImGui.Checkbox("##readClearCache", ref _readClearCache);
         ImGui.SameLine();
-        if (ImGui.Button("Clear local storage"))
+        UiShared.TextWrapped("I understand that: " + Environment.NewLine + "- By clearing the local storage I put the file servers of my connected service under extra strain by having to redownload all data."
+            + Environment.NewLine + "- This is not a step to try to fix sync issues."
+            + Environment.NewLine + "- This can make the situation of not getting other players data worse in situations of heavy file server load.");
+        if (!_readClearCache)
+            ImGui.BeginDisabled();
+        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Clear local storage"))
         {
-            if (UiShared.CtrlPressed())
+            if (UiShared.CtrlPressed() && _readClearCache)
             {
                 Task.Run(() =>
                 {
@@ -801,10 +810,16 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
                 });
             }
         }
-        UiShared.AttachToolTip("You normally do not need to do this. This will solely remove all downloaded data from all players and will require you to re-download everything again." + Environment.NewLine
+        UiShared.AttachToolTip("You normally do not need to do this. THIS IS NOT SOMETHING YOU SHOULD BE DOING TO TRY TO FIX SYNC ISSUES." + Environment.NewLine
+            + "This will solely remove all downloaded data from all players and will require you to re-download everything again." + Environment.NewLine
             + "Mares storage is self-clearing and will not surpass the limit you have set it to." + Environment.NewLine
             + "If you still think you need to do this hold CTRL while pressing the button.");
+        if (!_readClearCache)
+            ImGui.EndDisabled();
+        ImGui.Unindent();
     }
+
+    private bool _readClearCache = false;
 
     public override void OnClose()
     {
