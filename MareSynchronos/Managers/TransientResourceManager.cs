@@ -24,32 +24,34 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
         _configurationService = configurationService;
         _dalamudUtil = dalamudUtil;
 
-        mediator.Subscribe<PenumbraResourceLoadMessage>(this, (msg) => Manager_PenumbraResourceLoadEvent((PenumbraResourceLoadMessage)msg));
-        Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, (_) => Manager_PenumbraModSettingChanged());
-        Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => DalamudUtil_FrameworkUpdate());
-        Mediator.Subscribe<ClassJobChangedMessage>(this, (_) => DalamudUtil_ClassJobChanged());
-        Mediator.Subscribe<PlayerRelatedObjectPointerUpdateMessage>(this, (msg) => PlayerRelatedPointers = ((PlayerRelatedObjectPointerUpdateMessage)msg).RelatedObjects);
-
         SemiTransientResources.TryAdd(ObjectKind.Player, new HashSet<string>(StringComparer.Ordinal));
-        if (_configurationService.Current.PlayerPersistentTransientCache.TryGetValue(PlayerPersistentDataKey, out var linesInConfig))
+        if (_configurationService.Current.PlayerPersistentTransientCache.TryGetValue(PlayerPersistentDataKey, out var gamePaths))
         {
             int restored = 0;
-            foreach (var file in linesInConfig)
+            foreach (var gamePath in gamePaths)
             {
+                if (string.IsNullOrEmpty(gamePath)) continue;
+
                 try
                 {
-                    Logger.Debug("Loaded persistent transient resource " + file);
-                    SemiTransientResources[ObjectKind.Player].Add(file);
+                    Logger.Debug("Loaded persistent transient resource " + gamePath);
+                    SemiTransientResources[ObjectKind.Player].Add(gamePath);
                     restored++;
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn("Error during loading persistent transient resource " + file, ex);
+                    Logger.Warn("Error during loading persistent transient resource " + gamePath, ex);
                 }
 
             }
-            Logger.Debug($"Restored {restored}/{linesInConfig.Count()} semi persistent resources");
+            Logger.Debug($"Restored {restored}/{gamePaths.Count()} semi persistent resources");
         }
+
+        Mediator.Subscribe<PenumbraResourceLoadMessage>(this, (msg) => Manager_PenumbraResourceLoadEvent((PenumbraResourceLoadMessage)msg));
+        Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, (_) => Manager_PenumbraModSettingChanged());
+        Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => DalamudUtil_FrameworkUpdate());
+        Mediator.Subscribe<ClassJobChangedMessage>(this, (_) => DalamudUtil_ClassJobChanged());
+        Mediator.Subscribe<PlayerRelatedObjectPointerUpdateMessage>(this, (msg) => PlayerRelatedPointers = ((PlayerRelatedObjectPointerUpdateMessage)msg).RelatedObjects);
     }
 
     private void Manager_PenumbraModSettingChanged()
@@ -116,10 +118,10 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
     {
         if (SemiTransientResources.TryGetValue(objectKind, out var result))
         {
-            return result;
+            return result ?? new HashSet<string>(StringComparer.Ordinal);
         }
 
-        return new HashSet<string>();
+        return new HashSet<string>(StringComparer.Ordinal);
     }
 
     private void Manager_PenumbraResourceLoadEvent(PenumbraResourceLoadMessage msg)
@@ -186,7 +188,7 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
 
         if (objectKind == ObjectKind.Player && SemiTransientResources.TryGetValue(ObjectKind.Player, out var fileReplacements))
         {
-            _configurationService.Current.PlayerPersistentTransientCache[PlayerPersistentDataKey] = fileReplacements;
+            _configurationService.Current.PlayerPersistentTransientCache[PlayerPersistentDataKey] = fileReplacements.Where(f => !string.IsNullOrEmpty(f)).ToHashSet(StringComparer.Ordinal);
             _configurationService.Save();
         }
         TransientResources[gameObject].Clear();

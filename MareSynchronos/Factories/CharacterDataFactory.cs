@@ -59,9 +59,7 @@ public class CharacterDataFactory
         }
         catch (Exception ex)
         {
-            Logger.Warn("Could not create data for " + playerRelatedObject.ObjectKind);
-            Logger.Warn(ex.Message);
-            Logger.Warn(ex.StackTrace ?? string.Empty);
+            Logger.Warn("Could not create data for " + playerRelatedObject.ObjectKind, ex);
         }
 
         if (pointerIsZero)
@@ -88,9 +86,7 @@ public class CharacterDataFactory
         }
         catch (Exception e)
         {
-            Logger.Debug("Failed to create " + playerRelatedObject.ObjectKind + " data");
-            Logger.Debug(e.Message);
-            Logger.Debug(e.StackTrace ?? string.Empty);
+            Logger.Warn("Failed to create " + playerRelatedObject.ObjectKind + " data", e);
         }
 
         previousData.FileReplacements = previousFileReplacements;
@@ -410,6 +406,7 @@ public class CharacterDataFactory
 
     private void AddResolvePath(string path, bool doNotReverseResolve = false)
     {
+        if (string.IsNullOrEmpty(path)) return;
         if (doNotReverseResolve) _pathsToForwardResolve.Add(path.ToLowerInvariant());
         else _pathsToReverseResolve.Add(path.ToLowerInvariant());
     }
