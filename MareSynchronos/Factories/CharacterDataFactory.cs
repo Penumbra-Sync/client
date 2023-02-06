@@ -119,17 +119,17 @@ public class CharacterDataFactory
         Stopwatch st = Stopwatch.StartNew();
 
         // gather up data from ipc
-        previousData.ManipulationString = await _dalamudUtil.RunOnFrameworkThread(_ipcManager.PenumbraGetMetaManipulations).ConfigureAwait(false);
+        previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
+        previousData.HeelsOffset = _ipcManager.GetHeelsOffset();
         previousData.GlamourerString[playerRelatedObject.ObjectKind] = await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.GlamourerGetCharacterCustomization(playerRelatedObject.Address))
             .ConfigureAwait(false);
-        previousData.HeelsOffset = await _dalamudUtil.RunOnFrameworkThread(_ipcManager.GetHeelsOffset).ConfigureAwait(false);
         previousData.CustomizePlusScale = await _dalamudUtil.RunOnFrameworkThread(_ipcManager.GetCustomizePlusScale).ConfigureAwait(false);
         previousData.PalettePlusPalette = await _dalamudUtil.RunOnFrameworkThread(_ipcManager.PalettePlusBuildPalette).ConfigureAwait(false);
 
         // gather static replacements from render model
         var (forwardResolve, reverseResolve) = BuildDataFromModel(objectKind, charaPointer, token);
         Dictionary<string, List<string>> resolvedPaths = GetFileReplacementsFromPaths(forwardResolve, reverseResolve);
-        previousData.FileReplacements[objectKind] = 
+        previousData.FileReplacements[objectKind] =
             new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)), FileReplacementComparer.Instance)
             .Where(p => p.HasFileReplacement).ToHashSet();
 
