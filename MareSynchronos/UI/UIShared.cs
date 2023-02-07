@@ -14,13 +14,14 @@ using MareSynchronos.Localization;
 using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Models;
+using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.UI;
 
-public partial class UiShared : IDisposable
+public partial class UiShared : MediatorSubscriberBase
 {
     [LibraryImport("user32")]
     internal static partial short GetKeyState(int nVirtKey);
@@ -52,10 +53,15 @@ public partial class UiShared : IDisposable
                                            ImGuiWindowFlags.NoScrollWithMouse;
 
     public ApiController ApiController => _apiController;
+    private bool _penumbraExists = false;
+    private bool _glamourerExists = false;
+    private bool _customizePlusExists = false;
+    private bool _heelsExists = false;
+    private bool _palettePlusExists = false;
 
     public UiShared(IpcManager ipcManager, ApiController apiController, PeriodicFileScanner cacheScanner, FileDialogManager fileDialogManager,
         MareConfigService configService, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization,
-        ServerConfigurationManager serverManager)
+        ServerConfigurationManager serverManager, MareMediator mediator) : base(mediator)
     {
         _ipcManager = ipcManager;
         _apiController = apiController;
@@ -70,6 +76,15 @@ public partial class UiShared : IDisposable
 
         _pluginInterface.UiBuilder.BuildFonts += BuildFont;
         _pluginInterface.UiBuilder.RebuildFonts();
+
+        Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) =>
+        {
+            _penumbraExists = _ipcManager.CheckPenumbraApi();
+            _glamourerExists = ipcManager.CheckGlamourerApi();
+            _customizePlusExists = _ipcManager.CheckCustomizePlusApi();
+            _heelsExists = _ipcManager.CheckHeelsApi();
+            _palettePlusExists = _ipcManager.CheckPalettePlusApi();
+        });
     }
 
     public static float GetWindowContentRegionWidth()
@@ -162,39 +177,33 @@ public partial class UiShared : IDisposable
 
     public bool DrawOtherPluginState()
     {
-        var penumbraExists = _ipcManager.CheckPenumbraApi();
-        var glamourerExists = _ipcManager.CheckGlamourerApi();
-        var heelsExists = _ipcManager.CheckHeelsApi();
-        var customizeExists = _ipcManager.CheckCustomizePlusApi();
-        var paletteExists = _ipcManager.CheckPalettePlusApi();
-
-        var penumbraColor = penumbraExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
-        var glamourerColor = glamourerExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
-        var heelsColor = heelsExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
-        var customizeColor = customizeExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
-        var paletteColor = paletteExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
+        var penumbraColor = _penumbraExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
+        var glamourerColor = _glamourerExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
+        var heelsColor = _heelsExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
+        var customizeColor = _customizePlusExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
+        var paletteColor = _palettePlusExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         ImGui.Text("Penumbra:");
         ImGui.SameLine();
-        ImGui.TextColored(penumbraColor, penumbraExists ? "Available" : "Unavailable");
+        ImGui.TextColored(penumbraColor, _penumbraExists ? "Available" : "Unavailable");
         ImGui.SameLine();
         ImGui.Text("Glamourer:");
         ImGui.SameLine();
-        ImGui.TextColored(glamourerColor, glamourerExists ? "Available" : "Unavailable");
+        ImGui.TextColored(glamourerColor, _glamourerExists ? "Available" : "Unavailable");
         ImGui.Text("Optional Addons");
         ImGui.SameLine();
         ImGui.Text("Heels:");
         ImGui.SameLine();
-        ImGui.TextColored(heelsColor, heelsExists ? "Available" : "Unavailable");
+        ImGui.TextColored(heelsColor, _heelsExists ? "Available" : "Unavailable");
         ImGui.SameLine();
         ImGui.Text("Customize+:");
         ImGui.SameLine();
-        ImGui.TextColored(customizeColor, customizeExists ? "Available" : "Unavailable");
+        ImGui.TextColored(customizeColor, _customizePlusExists ? "Available" : "Unavailable");
         ImGui.SameLine();
         ImGui.Text("Palette+:");
         ImGui.SameLine();
-        ImGui.TextColored(paletteColor, paletteExists ? "Available" : "Unavailable");
+        ImGui.TextColored(paletteColor, _palettePlusExists ? "Available" : "Unavailable");
 
-        if (!penumbraExists || !glamourerExists)
+        if (!_penumbraExists || !_glamourerExists)
         {
             ImGui.TextColored(ImGuiColors.DalamudRed, "You need to install both Penumbra and Glamourer and keep them up to date to use Mare Synchronos.");
             return false;
@@ -653,9 +662,9 @@ public partial class UiShared : IDisposable
         return true;
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
-        Logger.Verbose($"Disposing {GetType()}");
+        base.Dispose();
         _pluginInterface.UiBuilder.BuildFonts -= BuildFont;
     }
 }

@@ -530,21 +530,22 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
         var ySize = TransferPartHeight == 0
             ? 1
             : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - TransferPartHeight - ImGui.GetCursorPosY();
-        var users = GetFilteredUsers();
-
-        ImGui.BeginChild("list", new Vector2(WindowContentWidth, ySize), border: false);
-        var visibleUsers = users.Where(u => u.IsVisible && u.UserPair!.OtherPermissions.IsPaired()).OrderBy(u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible ?
-            u.PlayerName : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase).ToList();
-        var onlineUsers = users.Where(u => u.IsOnline || (u.UserPair.OwnPermissions.IsPaused() || u.UserPair.OtherPermissions.IsPaused())).OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
-        var offlineUsers = users.Where(u => (!u.IsOnline && !u.IsVisible || !u.UserPair!.OtherPermissions.IsPaired()) && !(u.UserPair.OwnPermissions.IsPaused() || u.UserPair.OtherPermissions.IsPaused()))
-            .OrderBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
+        var users = GetFilteredUsers()
+            .OrderBy(
+                u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
+                    ? u.PlayerName
+                    : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase).ToList();
 
         if (_configService.Current.ReverseUserSort)
         {
-            visibleUsers.Reverse();
-            onlineUsers.Reverse();
-            offlineUsers.Reverse();
+            users.Reverse();
         }
+
+        var onlineUsers = users.Where(u => u.IsOnline || u.UserPair.OwnPermissions.IsPaused()).ToList();
+        var visibleUsers = onlineUsers.Where(u => u.IsVisible).ToList();
+        var offlineUsers = users.Except(onlineUsers).ToList();
+
+        ImGui.BeginChild("list", new Vector2(WindowContentWidth, ySize), border: false);
 
         _pairGroupsUi.Draw(visibleUsers, onlineUsers, offlineUsers);
 
@@ -557,7 +558,8 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
         {
             if (_characterOrCommentFilter.IsNullOrEmpty()) return true;
             return p.UserData.AliasOrUID.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ||
-                   (p.GetNote()?.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false);
+                   (p.GetNote()?.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                   (p.PlayerName?.Contains(_characterOrCommentFilter) ?? false);
         }).ToList();
     }
 
