@@ -117,7 +117,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         _customizePlusOnScaleUpdate.Subscribe(OnCustomizePlusScaleChange);
 
         _palettePlusApiVersion = pi.GetIpcSubscriber<string>("PalettePlus.ApiVersion");
-        _palettePlusBuildCharaPalette = pi.GetIpcSubscriber<Character, string>("PalettePlus.BuildCharaPalette");
+        _palettePlusBuildCharaPalette = pi.GetIpcSubscriber<Character, string>("PalettePlus.BuildCharaPaletteOrEmpty");
         _palettePlusSetCharaPalette = pi.GetIpcSubscriber<Character, string, object>("PalettePlus.SetCharaPalette");
         _palettePlusRemoveCharaPalette = pi.GetIpcSubscriber<Character, object>("PalettePlus.RemoveCharaPalette");
         _palettePlusPaletteChanged = pi.GetIpcSubscriber<Character, string, object>("PalettePlus.PaletteChanged");
@@ -236,7 +236,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
     {
         try
         {
-            return string.Equals(_palettePlusApiVersion.InvokeFunc(), "1.0.0", StringComparison.Ordinal);
+            return string.Equals(_palettePlusApiVersion.InvokeFunc(), "1.1.0", StringComparison.Ordinal);
         }
         catch
         {
