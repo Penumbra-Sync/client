@@ -11,23 +11,33 @@ using Object = FFXIVClientStructs.FFXIV.Client.Graphics.Scene.Object;
 using Penumbra.String;
 using Weapon = MareSynchronos.Interop.Weapon;
 using MareSynchronos.FileCache;
+using MareSynchronos.Mediator;
+using System.Collections.Concurrent;
 
 namespace MareSynchronos.Factories;
 
-public class CharacterDataFactory
+public class CharacterDataFactory : MediatorSubscriberBase
 {
     private readonly DalamudUtil _dalamudUtil;
     private readonly IpcManager _ipcManager;
     private readonly TransientResourceManager _transientResourceManager;
     private readonly FileCacheManager _fileCacheManager;
+    private ConcurrentQueue<Task<string>> _processingQueue = new();
 
-    public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager, TransientResourceManager transientResourceManager, FileCacheManager fileReplacementFactory)
+    public CharacterDataFactory(DalamudUtil dalamudUtil, IpcManager ipcManager, TransientResourceManager transientResourceManager, FileCacheManager fileReplacementFactory, MareMediator mediator) : base(mediator)
     {
         Logger.Verbose("Creating " + nameof(CharacterDataFactory));
         _dalamudUtil = dalamudUtil;
         _ipcManager = ipcManager;
         _transientResourceManager = transientResourceManager;
         _fileCacheManager = fileReplacementFactory;
+        Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) =>
+        {
+            while (_processingQueue.TryDequeue(out var result))
+            {
+                result.RunSynchronously();
+            }
+        });
     }
 
     private unsafe bool CheckForNullDrawObject(IntPtr playerPointer)
@@ -74,10 +84,12 @@ public class CharacterDataFactory
 
         try
         {
+            _processingQueue.Clear();
             return await CreateCharacterData(previousData, playerRelatedObject, token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
+            _processingQueue.Clear();
             Logger.Debug("Cancelled creating Character data");
             throw;
         }
@@ -121,17 +133,23 @@ public class CharacterDataFactory
         // gather up data from ipc
         previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
         previousData.HeelsOffset = _ipcManager.GetHeelsOffset();
-        previousData.GlamourerString[playerRelatedObject.ObjectKind] = await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.GlamourerGetCharacterCustomization(playerRelatedObject.Address))
-            .ConfigureAwait(false);
-        previousData.CustomizePlusScale = await _dalamudUtil.RunOnFrameworkThread(_ipcManager.GetCustomizePlusScale).ConfigureAwait(false);
-        previousData.PalettePlusPalette = await _dalamudUtil.RunOnFrameworkThread(_ipcManager.PalettePlusBuildPalette).ConfigureAwait(false);
+        Task<string> getGlamourerData = new(() => _ipcManager.GlamourerGetCharacterCustomization(playerRelatedObject.Address));
+        _processingQueue.Enqueue(getGlamourerData);
+        Task<string> getCustomizeData = new(() => _ipcManager.GetCustomizePlusScale());
+        _processingQueue.Enqueue(getCustomizeData);
+        Task<string> getPalettePlusData = new(() => _ipcManager.PalettePlusBuildPalette());
+        _processingQueue.Enqueue(getPalettePlusData);
+        Task.WaitAll(new[] { getGlamourerData, getCustomizeData, getPalettePlusData }, token);
+        previousData.GlamourerString[playerRelatedObject.ObjectKind] = getGlamourerData.Result;
+        previousData.CustomizePlusScale = getCustomizeData.Result;
+        previousData.PalettePlusPalette = getPalettePlusData.Result;
 
         // gather static replacements from render model
         var (forwardResolve, reverseResolve) = BuildDataFromModel(objectKind, charaPointer, token);
         Dictionary<string, List<string>> resolvedPaths = GetFileReplacementsFromPaths(forwardResolve, reverseResolve);
         previousData.FileReplacements[objectKind] =
-            new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)), FileReplacementComparer.Instance)
-            .Where(p => p.HasFileReplacement).ToHashSet();
+                new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)), FileReplacementComparer.Instance)
+                .Where(p => p.HasFileReplacement).ToHashSet();
 
         Logger.Debug("== Static Replacements ==");
         foreach (var replacement in previousData.FileReplacements[objectKind].Where(i => i.HasFileReplacement).OrderBy(i => i.GamePaths.First(), StringComparer.OrdinalIgnoreCase))
@@ -339,6 +357,8 @@ public class CharacterDataFactory
     private void AddReplacementsFromTexture(string texPath, HashSet<string> forwardResolve, HashSet<string> reverseResolve, bool doNotReverseResolve = true)
     {
         if (string.IsNullOrEmpty(texPath)) return;
+
+        Logger.Verbose("Checking file Replacement for texture " + texPath);
 
         if (doNotReverseResolve)
             forwardResolve.Add(texPath);

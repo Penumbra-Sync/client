@@ -64,6 +64,12 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
     private readonly ConcurrentQueue<Action> _normalQueue = new();
     private readonly ConcurrentQueue<Action> _gposeActionQueue = new();
 
+    private bool _penumbraAvailable = false;
+    private bool _glamourerAvailable = false;
+    private bool _customizePlusAvailable = false;
+    private bool _heelsAvailable = false;
+    private bool _palettePlusAvailable = false;
+
     public IpcManager(DalamudPluginInterface pi, DalamudUtil dalamudUtil, MareMediator mediator) : base(mediator)
     {
         Logger.Verbose("Creating " + nameof(IpcManager));
@@ -139,6 +145,11 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
     private void CheckPenumbraModPath()
     {
         PenumbraModDirectory = GetPenumbraModDirectory();
+        _glamourerAvailable = CheckGlamourerApiInternal();
+        _penumbraAvailable = CheckPenumbraApiInternal();
+        _heelsAvailable = CheckHeelsApiInternal();
+        _customizePlusAvailable = CheckCustomizePlusApiInternal();
+        _palettePlusAvailable = CheckPalettePlusApiInternal();
     }
 
     private void HandleGposeActionQueue()
@@ -183,8 +194,11 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         }
     }
 
-    public bool Initialized => CheckPenumbraApi() && CheckGlamourerApi();
-    public bool CheckGlamourerApi()
+    public bool Initialized => CheckPenumbraApiInternal() && CheckGlamourerApiInternal();
+
+    public bool CheckGlamourerApi() => _glamourerAvailable;
+
+    public bool CheckGlamourerApiInternal()
     {
         try
         {
@@ -196,7 +210,9 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         }
     }
 
-    public bool CheckPenumbraApi()
+    public bool CheckPenumbraApi() => _penumbraAvailable;
+
+    public bool CheckPenumbraApiInternal()
     {
         try
         {
@@ -208,7 +224,9 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         }
     }
 
-    public bool CheckHeelsApi()
+    public bool CheckHeelsApi() => _heelsAvailable;
+
+    public bool CheckHeelsApiInternal()
     {
         try
         {
@@ -220,7 +238,9 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         }
     }
 
-    public bool CheckCustomizePlusApi()
+    public bool CheckCustomizePlusApi() => _customizePlusAvailable;
+
+    public bool CheckCustomizePlusApiInternal()
     {
         try
         {
@@ -232,7 +252,9 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         }
     }
 
-    public bool CheckPalettePlusApi()
+    public bool CheckPalettePlusApi() => _palettePlusAvailable;
+
+    public bool CheckPalettePlusApiInternal()
     {
         try
         {
@@ -456,7 +478,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
             var collName = "Mare_" + characterName;
             Logger.Verbose("Removing temp collection for " + collName);
             var ret = _penumbraRemoveTemporaryMod.Invoke("MareChara", collName, 0);
-            Logger.Verbose("RemoveTemporaryMod: " + ret);   
+            Logger.Verbose("RemoveTemporaryMod: " + ret);
             var ret2 = _penumbraRemoveTemporaryCollection.Invoke(collName);
             Logger.Verbose("RemoveTemporaryCollection: " + ret2);
         });
