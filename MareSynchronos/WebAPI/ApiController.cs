@@ -186,11 +186,11 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
                 await _mareHub.StartAsync(token).ConfigureAwait(false);
 
+                await InitializeData().ConfigureAwait(false);
+
                 _connectionDto = await GetConnectionDto().ConfigureAwait(false);
 
                 ServerState = ServerState.Connected;
-
-                await InitializeData().ConfigureAwait(false);
 
                 if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
                 {
