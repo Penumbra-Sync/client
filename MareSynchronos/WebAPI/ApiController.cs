@@ -186,11 +186,11 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
                 await _mareHub.StartAsync(token).ConfigureAwait(false);
 
-                await InitializeData().ConfigureAwait(false);
-
                 _connectionDto = await GetConnectionDto().ConfigureAwait(false);
 
                 ServerState = ServerState.Connected;
+
+                await InitializeData().ConfigureAwait(false);
 
                 if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
                 {
@@ -374,6 +374,12 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         ServerState = ServerState.Connecting;
         await InitializeData().ConfigureAwait(false);
         _connectionDto = await GetConnectionDto().ConfigureAwait(false);
+        if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
+        {
+            CancellationTokenSource cts = new();
+            await StopConnection(cts.Token, ServerState.VersionMisMatch).ConfigureAwait(false);
+            return;
+        }
         ServerState = ServerState.Connected;
     }
 
