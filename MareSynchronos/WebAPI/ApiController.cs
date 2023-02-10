@@ -13,6 +13,8 @@ using MareSynchronos.Managers;
 using Dalamud.Utility;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
+using MessagePack;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MareSynchronos.WebAPI;
 public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareHubClient
@@ -314,6 +316,12 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
             {
                 options.Headers.Add("Authorization", "Bearer " + _serverManager.GetToken());
                 options.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling;
+            })
+            .AddMessagePackProtocol(opt =>
+            {
+                opt.SerializerOptions =
+                    MessagePackSerializerOptions.Standard
+                        .WithCompression(MessagePackCompression.Lz4Block);
             })
             .WithAutomaticReconnect(new ForeverRetryPolicy(Mediator))
             .ConfigureLogging(a =>
