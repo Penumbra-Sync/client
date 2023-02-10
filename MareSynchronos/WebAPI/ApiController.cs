@@ -13,6 +13,9 @@ using MareSynchronos.Managers;
 using Dalamud.Utility;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
+using MessagePack;
+using Microsoft.Extensions.DependencyInjection;
+using MessagePack.Resolvers;
 
 namespace MareSynchronos.WebAPI;
 public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareHubClient
@@ -183,11 +186,11 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
                 await _mareHub.StartAsync(token).ConfigureAwait(false);
 
-                await InitializeData().ConfigureAwait(false);
-
                 _connectionDto = await GetConnectionDto().ConfigureAwait(false);
 
                 ServerState = ServerState.Connected;
+
+                await InitializeData().ConfigureAwait(false);
 
                 if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
                 {
@@ -315,6 +318,25 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
                 options.Headers.Add("Authorization", "Bearer " + _serverManager.GetToken());
                 options.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling;
             })
+            .AddMessagePackProtocol(opt =>
+            {
+                var resolver = CompositeResolver.Create(StandardResolverAllowPrivate.Instance,
+                    BuiltinResolver.Instance,
+                    AttributeFormatterResolver.Instance,
+                    // replace enum resolver
+                    DynamicEnumAsStringResolver.Instance,
+                    DynamicGenericResolver.Instance,
+                    DynamicUnionResolver.Instance,
+                    DynamicObjectResolver.Instance,
+                    PrimitiveObjectResolver.Instance,
+                    // final fallback(last priority)
+                    StandardResolver.Instance);
+
+                opt.SerializerOptions =
+                    MessagePackSerializerOptions.Standard
+                        .WithCompression(MessagePackCompression.Lz4Block)
+                        .WithResolver(resolver);
+            })
             .WithAutomaticReconnect(new ForeverRetryPolicy(Mediator))
             .ConfigureLogging(a =>
             {
@@ -352,6 +374,12 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         ServerState = ServerState.Connecting;
         await InitializeData().ConfigureAwait(false);
         _connectionDto = await GetConnectionDto().ConfigureAwait(false);
+        if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
+        {
+            CancellationTokenSource cts = new();
+            await StopConnection(cts.Token, ServerState.VersionMisMatch).ConfigureAwait(false);
+            return;
+        }
         ServerState = ServerState.Connected;
     }
 
