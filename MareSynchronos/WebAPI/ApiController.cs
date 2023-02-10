@@ -15,6 +15,7 @@ using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
 using MessagePack;
 using Microsoft.Extensions.DependencyInjection;
+using MessagePack.Resolvers;
 
 namespace MareSynchronos.WebAPI;
 public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareHubClient
@@ -319,9 +320,22 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
             })
             .AddMessagePackProtocol(opt =>
             {
+                var resolver = CompositeResolver.Create(StandardResolverAllowPrivate.Instance,
+                    BuiltinResolver.Instance,
+                    AttributeFormatterResolver.Instance,
+                    // replace enum resolver
+                    DynamicEnumAsStringResolver.Instance,
+                    DynamicGenericResolver.Instance,
+                    DynamicUnionResolver.Instance,
+                    DynamicObjectResolver.Instance,
+                    PrimitiveObjectResolver.Instance,
+                    // final fallback(last priority)
+                    StandardResolver.Instance);
+
                 opt.SerializerOptions =
                     MessagePackSerializerOptions.Standard
-                        .WithCompression(MessagePackCompression.Lz4Block);
+                        .WithCompression(MessagePackCompression.Lz4Block)
+                        .WithResolver(resolver);
             })
             .WithAutomaticReconnect(new ForeverRetryPolicy(Mediator))
             .ConfigureLogging(a =>
