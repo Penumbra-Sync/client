@@ -124,6 +124,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
             Logger.Info("Not recreating Connection, paused");
             _connectionDto = null;
             await StopConnection(_connectionCancellationTokenSource.Token, ServerState.Disconnected).ConfigureAwait(false);
+            _connectionCancellationTokenSource.Cancel();
             return;
         }
 
@@ -133,6 +134,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
             Logger.Warn("No secret key set for current character");
             _connectionDto = null;
             await StopConnection(_connectionCancellationTokenSource.Token, ServerState.NoSecretKey).ConfigureAwait(false);
+            _connectionCancellationTokenSource.Cancel();
             return;
         }
 
