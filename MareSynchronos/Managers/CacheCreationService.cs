@@ -28,10 +28,13 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
         });
         Mediator.Subscribe<ClearCacheForObjectMessage>(this, (msg) =>
         {
-            var actualMsg = (ClearCacheForObjectMessage)msg;
-            _lastCreatedData.FileReplacements.Remove(actualMsg.ObjectToCreateFor.ObjectKind);
-            _lastCreatedData.GlamourerString.Remove(actualMsg.ObjectToCreateFor.ObjectKind);
-            Mediator.Publish(new CharacterDataCreatedMessage(_lastCreatedData));
+            Task.Run(() =>
+            {
+                var actualMsg = (ClearCacheForObjectMessage)msg;
+                _lastCreatedData.FileReplacements.Remove(actualMsg.ObjectToCreateFor.ObjectKind);
+                _lastCreatedData.GlamourerString.Remove(actualMsg.ObjectToCreateFor.ObjectKind);
+                Mediator.Publish(new CharacterDataCreatedMessage(_lastCreatedData));
+            });
         });
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (msg) => UpdatePointers());
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (msg) => ProcessCacheCreation());
