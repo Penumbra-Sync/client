@@ -6,6 +6,8 @@ using MareSynchronos.Utils;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.MareConfiguration;
+using Lumina.Extensions;
+using static MareSynchronos.Export.MareCharaFileData;
 
 namespace MareSynchronos.Export;
 public class MareCharaFileManager
@@ -41,8 +43,48 @@ public class MareCharaFileManager
             using var lz4Stream = new LZ4Stream(unwrapped, LZ4StreamMode.Decompress, LZ4StreamFlags.HighCompression);
             using var reader = new BinaryReader(lz4Stream);
             LoadedCharaFile = MareCharaFileHeader.FromBinaryReader(filePath, reader);
-            Logger.Debug("Read Mare Chara File");
-            Logger.Debug("Version: " + (LoadedCharaFile?.Version ?? -1));
+            /*using var unwrapped2 = File.OpenRead(filePath);
+            using var lz4Stream2 = new LZ4Stream(unwrapped2, LZ4StreamMode.Decompress, LZ4StreamFlags.HighCompression);
+            using var reader2 = new BinaryReader(lz4Stream2);
+            using var writer = File.OpenWrite(filePath + ".raw");
+            using var wr = new BinaryWriter(writer);
+            var bufferSize = 4 * 1024 * 1024;
+            var buffer = new byte[bufferSize];
+            int chunk = 0;
+            int length = 0;
+            while ((length = reader2.Read(buffer)) > 0)
+            {
+                if (length < bufferSize) bufferSize = (int)length;
+                Logger.Verbose($"Reading chunk {chunk++} {bufferSize}/{length} of {filePath}");
+                wr.Write(length > bufferSize ? buffer : buffer.Take((int)length).ToArray());
+            }*/
+            Logger.Info("Read Mare Chara File");
+            Logger.Info("Version: " + (LoadedCharaFile?.Version ?? -1));
+            long expectedLength = 0;
+            if (LoadedCharaFile != null)
+            {
+                Logger.Verbose("Data");
+                foreach (var item in LoadedCharaFile.CharaFileData.FileSwaps)
+                {
+                    foreach (var gamePath in item.GamePaths)
+                    {
+                        Logger.Verbose("Swap: " + gamePath + " => " + item.FileSwapPath);
+                    }
+                }
+
+                var itemNr = 0;
+                foreach (var item in LoadedCharaFile.CharaFileData.Files)
+                {
+                    itemNr++;
+                    expectedLength += item.Length;
+                    foreach (var gamePath in item.GamePaths)
+                    {
+                        Logger.Verbose($"File {itemNr}: " + gamePath + " = " + item.Length);
+                    }
+                }
+
+                Logger.Info("Expected length: " + expectedLength);
+            }
 
         }
         catch { throw; }
@@ -78,7 +120,7 @@ public class MareCharaFileManager
                     extractedFiles.Union(fileSwaps).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal),
                     LoadedCharaFile.CharaFileData.ManipulationData);
                 _ipcManager.GlamourerApplyAll(LoadedCharaFile.CharaFileData.GlamourerData, charaTarget.Address);
-                _dalamudUtil.WaitWhileGposeCharacterIsDrawing(charaTarget.Address);
+                _dalamudUtil.WaitWhileGposeCharacterIsDrawing(charaTarget.Address, 30000);
                 _ipcManager.PenumbraRemoveTemporaryCollection(charaTarget.Name.TextValue);
                 _ipcManager.ToggleGposeQueueMode(on: false);
             }
@@ -108,13 +150,16 @@ public class MareCharaFileManager
             var buffer = new byte[bufferSize];
             using var fs = File.OpenWrite(fileName);
             using var wr = new BinaryWriter(fs);
+            int chunk = 0;
             while (length > 0)
             {
                 if (length < bufferSize) bufferSize = (int)length;
+                Logger.Verbose($"Reading chunk {chunk++} {bufferSize}/{length} of {fileName}");
                 buffer = reader.ReadBytes(bufferSize);
                 wr.Write(length > bufferSize ? buffer : buffer.Take((int)length).ToArray());
                 length -= bufferSize;
             }
+            wr.Flush();
             foreach (var path in fileData.GamePaths)
             {
                 gamePathToFilePath[path] = fileName;
@@ -142,18 +187,18 @@ public class MareCharaFileManager
             var bufferSize = 4 * 1024 * 1024;
             byte[] buffer = new byte[bufferSize];
 
-            if (dto.FileReplacements.TryGetValue(ObjectKind.Player, out var replacement))
+            var playerReplacements = dto.FileReplacements[ObjectKind.Player];
+            foreach(var item in output.CharaFileData.Files)
             {
-                foreach (var file in replacement.Select(item => _manager.GetFileCacheByHash(item.Hash)).Where(file => file != null))
+                var itemFromData = playerReplacements.First(f => f.GamePaths.Any(p => item.GamePaths.Contains(p, StringComparer.OrdinalIgnoreCase)));
+                var file = _manager.GetFileCacheByHash(itemFromData.Hash)!;
+                var length = new FileInfo(file!.ResolvedFilepath).Length;
+                using var fsRead = File.OpenRead(file.ResolvedFilepath);
+                using var br = new BinaryReader(fsRead);
+                int readBytes = 0;
+                while ((readBytes = br.Read(buffer, 0, bufferSize)) > 0)
                 {
-                    var length = new FileInfo(file!.ResolvedFilepath).Length;
-                    using var fsRead = File.OpenRead(file.ResolvedFilepath);
-                    using var br = new BinaryReader(fsRead);
-                    int readBytes = 0;
-                    while ((readBytes = br.Read(buffer, 0, bufferSize)) > 0)
-                    {
-                        writer.Write(readBytes == bufferSize ? buffer : buffer.Take(readBytes).ToArray());
-                    }
+                    writer.Write(readBytes == bufferSize ? buffer : buffer.Take(readBytes).ToArray());
                 }
             }
         }
