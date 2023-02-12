@@ -6,8 +6,6 @@ using MareSynchronos.Utils;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.MareConfiguration;
-using Lumina.Extensions;
-using static MareSynchronos.Export.MareCharaFileData;
 
 namespace MareSynchronos.Export;
 public class MareCharaFileManager
@@ -19,6 +17,7 @@ public class MareCharaFileManager
     private readonly MareCharaFileDataFactory _factory;
     public MareCharaFileHeader? LoadedCharaFile { get; private set; }
     public bool CurrentlyWorking { get; private set; } = false;
+    private static int GlobalFileCounter = 0;
 
     public MareCharaFileManager(FileCacheManager manager, IpcManager ipcManager, MareConfigService configService, DalamudUtil dalamudUtil)
     {
@@ -141,10 +140,9 @@ public class MareCharaFileManager
     private Dictionary<string, string> ExtractFilesFromCharaFile(MareCharaFileHeader charaFileHeader, BinaryReader reader)
     {
         Dictionary<string, string> gamePathToFilePath = new(StringComparer.Ordinal);
-        int i = 0;
         foreach (var fileData in charaFileHeader.CharaFileData.Files)
         {
-            var fileName = Path.Combine(_configService.Current.CacheFolder, "mare_" + (i++) + ".tmp");
+            var fileName = Path.Combine(_configService.Current.CacheFolder, "mare_" + (GlobalFileCounter++) + ".tmp");
             var length = fileData.Length;
             var bufferSize = 4 * 1024 * 1024;
             var buffer = new byte[bufferSize];
