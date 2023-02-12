@@ -722,9 +722,44 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
         if (_apiController.ServerState is not ServerState.Connected)
         {
             UiShared.ColorTextWrapped(GetServerError(), GetUidColor());
+            if (_apiController.ServerState is ServerState.NoSecretKey)
+            {
+                DrawAddCharacter();
+            }
         }
     }
 
+    private void DrawAddCharacter()
+    {
+        ImGui.Dummy(new(10));
+        var keys = _serverManager.CurrentServer!.SecretKeys;
+        if (keys.TryGetValue(secretKeyIdx, out var secretKey))
+        {
+            var friendlyName = secretKey.FriendlyName;
+
+            if (UiShared.IconTextButton(FontAwesomeIcon.Plus, "Add current character with secret key"))
+            {
+                _serverManager.CurrentServer!.Authentications.Add(new MareConfiguration.Models.Authentication()
+                {
+                    CharacterName = _uiShared.PlayerName,
+                    WorldId = _uiShared.WorldId,
+                    SecretKeyIdx = secretKeyIdx
+                });
+
+                _serverManager.Save();
+
+                _ = _apiController.CreateConnections(true);
+            }
+
+            _uiShared.DrawCombo("Secret Key##addCharacterSecretKey", keys, (f) => f.Value.FriendlyName, (f) => secretKeyIdx = f.Key);
+        }
+        else
+        {
+            UiShared.ColorTextWrapped("No secret keys are configured for the current server.", ImGuiColors.DalamudYellow);
+        }
+    }
+
+    private int secretKeyIdx = 0;
 
     private string GetServerError()
     {
@@ -739,7 +774,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
                 "Your plugin or the server you are connecting to is out of date. Please update your plugin now. If you already did so, contact the server provider to update their server to the latest version.",
             ServerState.RateLimited => "You are rate limited for (re)connecting too often. Disconnect, wait 10 minutes and try again.",
             ServerState.Connected => string.Empty,
-            ServerState.NoSecretKey => "You have no secret key set for this current character. Open the settings and set a secret key for this current character. If this character does not exist in Mare, it needs to be added. You can reuse one secret key for different characters.",
+            ServerState.NoSecretKey => "You have no secret key set for this current character. Use the button below or open the settings and set a secret key for the current character. You can reuse the same secret key for multiple characters.",
             _ => string.Empty
         };
     }

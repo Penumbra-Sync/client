@@ -3,7 +3,6 @@ using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using Microsoft.Extensions.Logging.Abstractions;
 using System.Diagnostics;
 
 namespace MareSynchronos.Managers;
@@ -172,6 +171,7 @@ public class ServerConfigurationManager
     {
         var server = GetServerByIndex(serverSelectionIndex);
         server.Authentications.Remove(item);
+        Save();
     }
 
     internal void AddServer(ServerStorage serverStorage)

@@ -275,33 +275,25 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
                                 _serverConfigurationManager.Save();
                             }
 
-                            if (ImGui.BeginCombo("World", worldPreview))
-                            {
-                                foreach (var world in data)
+                            _uiShared.DrawCombo("World##" + item.CharacterName + i, data, (w) => w.Value,
+                                (w) =>
                                 {
-                                    bool isSelected = worldIdx == world.Key;
-                                    if (ImGui.Selectable(world.Value, isSelected))
+                                    if (item.WorldId != w.Key)
                                     {
-                                        item.WorldId = world.Key;
+                                        item.WorldId = w.Key;
                                         _serverConfigurationManager.Save();
                                     }
-                                }
-                                ImGui.EndCombo();
-                            }
+                                }, EqualityComparer<KeyValuePair<ushort, string>>.Default.Equals(data.FirstOrDefault(f => f.Key == worldIdx), default) ? data.First() : data.First(f => f.Key == worldIdx));
 
-                            if (ImGui.BeginCombo("Secret Key", friendlyName))
-                            {
-                                foreach (var kvp in keys)
+                            _uiShared.DrawCombo("Secret Key##" + item.CharacterName + i, keys, (w) => w.Value.FriendlyName,
+                                (w) =>
                                 {
-                                    bool isSelected = kvp.Key == secretKeyIdx;
-                                    if (ImGui.Selectable(kvp.Value.FriendlyName, isSelected))
+                                    if (w.Key != item.SecretKeyIdx)
                                     {
-                                        item.SecretKeyIdx = kvp.Key;
+                                        item.SecretKeyIdx = w.Key;
                                         _serverConfigurationManager.Save();
                                     }
-                                }
-                                ImGui.EndCombo();
-                            }
+                                }, EqualityComparer<KeyValuePair<int, SecretKey>>.Default.Equals(keys.FirstOrDefault(f => f.Key == item.SecretKeyIdx), default) ? keys.First() : keys.First(f => f.Key == item.SecretKeyIdx));
 
                             if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Character"))
                             {
@@ -482,63 +474,40 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
         var onlineNotifs = _configService.Current.ShowOnlineNotifications;
         var onlineNotifsPairsOnly = _configService.Current.ShowOnlineNotificationsOnlyForIndividualPairs;
         var onlineNotifsNamedOnly = _configService.Current.ShowOnlineNotificationsOnlyForNamedPairs;
-        var infoNotifLocation = _configService.Current.InfoNotification;
         var warnNotifLocation = _configService.Current.WarningNotification;
         var errorNotifLocation = _configService.Current.ErrorNotification;
         UiShared.FontText("Notifications", _uiShared.UidFont);
 
-        if (ImGui.BeginCombo("Info Notification Display", infoNotifLocation.ToString()))
+        _uiShared.DrawCombo("Info Notification Display##settingsUi", (NotificationLocation[])Enum.GetValues(typeof(NotificationLocation)), (i) => i.ToString(),
+        (i) =>
         {
-            foreach (var item in (NotificationLocation[])Enum.GetValues(typeof(NotificationLocation)))
-            {
-                bool isSelected = item == infoNotifLocation;
-                if (ImGui.Selectable(item.ToString(), isSelected))
-                {
-                    _configService.Current.InfoNotification = item;
-                    _configService.Save();
-                }
-            }
-            ImGui.EndCombo();
-        }
+            _configService.Current.InfoNotification = i;
+            _configService.Save();
+        }, _configService.Current.InfoNotification);
         UiShared.DrawHelpText("The location where \"Info\" notifications will display."
-                              + Environment.NewLine + "'Nowhere' will not show any Info notifications"
-                              + Environment.NewLine + "'Chat' will print Info notifications in chat"
-                              + Environment.NewLine + "'Toast' will show Warning toast notifications in the bottom right corner"
-                              + Environment.NewLine + "'Both' will show chat as well as the toast notification");
+                      + Environment.NewLine + "'Nowhere' will not show any Info notifications"
+                      + Environment.NewLine + "'Chat' will print Info notifications in chat"
+                      + Environment.NewLine + "'Toast' will show Warning toast notifications in the bottom right corner"
+                      + Environment.NewLine + "'Both' will show chat as well as the toast notification");
 
-        if (ImGui.BeginCombo("Warning Notification Display", warnNotifLocation.ToString()))
+        _uiShared.DrawCombo("Warning Notification Display##settingsUi", (NotificationLocation[])Enum.GetValues(typeof(NotificationLocation)), (i) => i.ToString(),
+        (i) =>
         {
-            foreach (var item in (NotificationLocation[])Enum.GetValues(typeof(NotificationLocation)))
-            {
-                bool isSelected = item == warnNotifLocation;
-                if (ImGui.Selectable(item.ToString(), isSelected))
-                {
-                    _configService.Current.WarningNotification = item;
-                    _configService.Save();
-                }
-            }
-            ImGui.EndCombo();
-        }
-
+            _configService.Current.WarningNotification = i;
+            _configService.Save();
+        }, _configService.Current.WarningNotification);
         UiShared.DrawHelpText("The location where \"Warning\" notifications will display."
                               + Environment.NewLine + "'Nowhere' will not show any Warning notifications"
                               + Environment.NewLine + "'Chat' will print Warning notifications in chat"
                               + Environment.NewLine + "'Toast' will show Warning toast notifications in the bottom right corner"
                               + Environment.NewLine + "'Both' will show chat as well as the toast notification");
 
-        if (ImGui.BeginCombo("Error Notification Display", errorNotifLocation.ToString()))
+        _uiShared.DrawCombo("Error Notification Display##settingsUi", (NotificationLocation[])Enum.GetValues(typeof(NotificationLocation)), (i) => i.ToString(),
+        (i) =>
         {
-            foreach (var item in (NotificationLocation[])Enum.GetValues(typeof(NotificationLocation)))
-            {
-                bool isSelected = item == errorNotifLocation;
-                if (ImGui.Selectable(item.ToString(), isSelected))
-                {
-                    _configService.Current.ErrorNotification = item;
-                    _configService.Save();
-                }
-            }
-            ImGui.EndCombo();
-        }
+            _configService.Current.ErrorNotification = i;
+            _configService.Save();
+        }, _configService.Current.ErrorNotification);
         UiShared.DrawHelpText("The location where \"Error\" notifications will display."
                               + Environment.NewLine + "'Nowhere' will not show any Error notifications"
                               + Environment.NewLine + "'Chat' will print Error notifications in chat"

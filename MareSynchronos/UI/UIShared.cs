@@ -40,6 +40,7 @@ public partial class UiShared : MediatorSubscriberBase
     public string PlayerName => _dalamudUtil.PlayerName;
     public uint WorldId => _dalamudUtil.WorldId;
     public Dictionary<ushort, string> WorldData => _dalamudUtil.WorldData.Value;
+    private Dictionary<string, object> _selectedComboItems = new(StringComparer.Ordinal);
     public bool HasValidPenumbraModPath => !(_ipcManager.PenumbraModDirectory ?? string.Empty).IsNullOrEmpty() && Directory.Exists(_ipcManager.PenumbraModDirectory);
     public bool EditTrackerPosition { get; set; }
     public ImFontPtr UidFont { get; private set; }
@@ -98,6 +99,45 @@ public partial class UiShared : MediatorSubscriberBase
         var buttonSize = ImGuiHelpers.GetButtonSize(icon.ToIconString());
         ImGui.PopFont();
         return buttonSize;
+    }
+
+
+    public T? DrawCombo<T>(string comboName, IEnumerable<T> comboItems, Func<T, string> toName,
+        Action<T>? onSelected = null, T? initialSelectedItem = default)
+    {
+        if (!comboItems.Any()) return default;
+
+        if (!_selectedComboItems.TryGetValue(comboName, out var selectedItem) && selectedItem == null)
+        {
+            if (!EqualityComparer<T>.Default.Equals(initialSelectedItem, default))
+            {
+                selectedItem = initialSelectedItem;
+                _selectedComboItems[comboName] = selectedItem!;
+                onSelected?.Invoke(initialSelectedItem);
+            }
+            else
+            {
+                selectedItem = comboItems.First();
+                _selectedComboItems[comboName] = selectedItem!;
+            }
+        }
+
+        if (ImGui.BeginCombo(comboName, toName((T)selectedItem!)))
+        {
+            foreach (var item in comboItems)
+            {
+                bool isSelected = EqualityComparer<T>.Default.Equals(item, (T)selectedItem);
+                if (ImGui.Selectable(toName(item), isSelected))
+                {
+                    _selectedComboItems[comboName] = item!;
+                    onSelected?.Invoke(item!);
+                }
+            }
+
+            ImGui.EndCombo();
+        }
+
+        return (T)_selectedComboItems[comboName];
     }
 
     private void BuildFont()
