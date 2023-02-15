@@ -56,8 +56,8 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
 
         Mediator.Subscribe<OpenSettingsUiMessage>(this, (_) => Toggle());
         Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
-        Mediator.Subscribe<GposeStartMessage>(this, (_) => UiShared_GposeStart());
-        Mediator.Subscribe<GposeEndMessage>(this, (_) => UiShared_GposeEnd());
+        Mediator.Subscribe<CutsceneStartMessage>(this, (_) => UiShared_GposeStart());
+        Mediator.Subscribe<CutsceneEndMessage>(this, (_) => UiShared_GposeEnd());
         Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) => LastCreatedCharacterData = ((CharacterDataCreatedMessage)msg).CharacterData.ToAPI());
 
         windowSystem.AddWindow(this);

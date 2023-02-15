@@ -45,7 +45,7 @@ public partial class UiShared : MediatorSubscriberBase
     public bool EditTrackerPosition { get; set; }
     public ImFontPtr UidFont { get; private set; }
     public bool UidFontBuilt { get; private set; }
-    public bool IsInGpose => _dalamudUtil.IsInGpose;
+    public bool IsInGpose => _dalamudUtil.IsInCutscene;
     public static bool CtrlPressed() => (GetKeyState(0xA2) & 0x8000) != 0 || (GetKeyState(0xA3) & 0x8000) != 0;
     public static bool ShiftPressed() => (GetKeyState(0xA1) & 0x8000) != 0 || (GetKeyState(0xA0) & 0x8000) != 0;
 

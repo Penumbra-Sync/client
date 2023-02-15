@@ -16,12 +16,13 @@ public class DalamudUtil : IDisposable
     private readonly ClientState _clientState;
     private readonly ObjectTable _objectTable;
     private readonly Framework _framework;
-    private readonly Dalamud.Game.ClientState.Conditions.Condition _condition;
+    private readonly Condition _condition;
     private readonly MareMediator _mediator;
 
     private uint? _classJobId = 0;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
     private bool _sentBetweenAreas = false;
+    public bool IsInCutscene { get; private set; } = false;
     public bool IsInGpose { get; private set; } = false;
 
     public unsafe bool IsGameObjectPresent(IntPtr key)
@@ -38,8 +39,7 @@ public class DalamudUtil : IDisposable
     }
 
     public DalamudUtil(ClientState clientState, ObjectTable objectTable, Framework framework,
-        Dalamud.Game.ClientState.Conditions.Condition condition,
-        Dalamud.Data.DataManager gameData, MareMediator mediator)
+        Condition condition, Dalamud.Data.DataManager gameData, MareMediator mediator)
     {
         _clientState = clientState;
         _objectTable = objectTable;
@@ -76,7 +76,25 @@ public class DalamudUtil : IDisposable
             _mediator.Publish(new GposeEndMessage());
         }
 
-        if (_condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51] || IsInGpose)
+        if (_condition[ConditionFlag.WatchingCutscene] && !IsInCutscene)
+        {
+            Logger.Debug("Cutscene start");
+            IsInCutscene = true;
+            _mediator.Publish(new CutsceneStartMessage());
+            _mediator.Publish(new HaltScanMessage("Cutscene"));
+
+        }
+        else if (!_condition[ConditionFlag.WatchingCutscene] && IsInCutscene)
+        {
+            Logger.Debug("Cutscene end");
+            IsInCutscene = false;
+            _mediator.Publish(new CutsceneEndMessage());
+            _mediator.Publish(new ResumeScanMessage("Cutscene"));
+        }
+
+        if (IsInCutscene) { _mediator.Publish(new CutsceneFrameworkUpdateMessage()); return; }
+
+        if (_condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51])
         {
             if (!_sentBetweenAreas)
             {
@@ -85,8 +103,6 @@ public class DalamudUtil : IDisposable
                 _mediator.Publish(new ZoneSwitchStartMessage());
                 _mediator.Publish(new HaltScanMessage("Zone switch"));
             }
-
-            if (IsInGpose) _mediator.Publish(new GposeFrameworkUpdateMessage());
 
             return;
         }
@@ -234,16 +250,21 @@ public class DalamudUtil : IDisposable
         try
         {
             // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
-            while ((!ct?.IsCancellationRequested ?? true)
-                && curWaitTime < timeOut
-                && (((obj->GetDrawObject() == null
+            var stillDrawing = _framework.RunOnFrameworkThread(() => ((obj->GetDrawObject() == null
                         || ((CharacterBase*)obj->GetDrawObject())->HasModelInSlotLoaded != 0
                         || ((CharacterBase*)obj->GetDrawObject())->HasModelFilesInSlotLoaded != 0))
-                    || ((obj->RenderFlags & 0b100000000000) == 0b100000000000))) // 0b100000000000 is "still rendering" or something
+                    || ((obj->RenderFlags & 0b100000000000) == 0b100000000000)).Result;
+            while ((!ct?.IsCancellationRequested ?? true)
+                && curWaitTime < timeOut
+                && stillDrawing) // 0b100000000000 is "still rendering" or something
             {
                 Logger.Verbose($"Waiting for {name} to finish drawing");
                 curWaitTime += tick;
                 Thread.Sleep(tick);
+                stillDrawing = _framework.RunOnFrameworkThread(() => ((obj->GetDrawObject() == null
+                        || ((CharacterBase*)obj->GetDrawObject())->HasModelInSlotLoaded != 0
+                        || ((CharacterBase*)obj->GetDrawObject())->HasModelFilesInSlotLoaded != 0))
+                    || ((obj->RenderFlags & 0b100000000000) == 0b100000000000)).Result;
             }
         }
         catch (NullReferenceException ex)
@@ -254,12 +275,6 @@ public class DalamudUtil : IDisposable
         {
             Logger.Warn("Error accessing " + characterAddress.ToString("X") + ", object does not exist anymore?", ex);
         }
-    }
-
-    public unsafe void DisableDraw(IntPtr characterAddress)
-    {
-        var obj = (GameObject*)characterAddress;
-        obj->DisableDraw();
     }
 
     public unsafe void WaitWhileGposeCharacterIsDrawing(IntPtr characterAddress, int timeOut = 5000)

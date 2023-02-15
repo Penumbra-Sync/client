@@ -140,7 +140,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
 
         _dalamudUtil = dalamudUtil;
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => HandleActionQueue());
-        Mediator.Subscribe<GposeFrameworkUpdateMessage>(this, (_) => HandleGposeActionQueue());
+        Mediator.Subscribe<CutsceneFrameworkUpdateMessage>(this, (_) => HandleGposeActionQueue());
         Mediator.Subscribe<ZoneSwitchEndMessage>(this, (_) => ClearActionQueue());
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => PeriodicApiStateCheck());
     }

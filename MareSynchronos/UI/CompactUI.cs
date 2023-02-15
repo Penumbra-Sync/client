@@ -86,8 +86,8 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
 
         Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = true);
         Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
-        Mediator.Subscribe<GposeStartMessage>(this, (_) => UiShared_GposeStart());
-        Mediator.Subscribe<GposeEndMessage>(this, (_) => UiShared_GposeEnd());
+        Mediator.Subscribe<CutsceneStartMessage>(this, (_) => UiShared_GposeStart());
+        Mediator.Subscribe<CutsceneEndMessage>(this, (_) => UiShared_GposeEnd());
 
         SizeConstraints = new WindowSizeConstraints()
         {

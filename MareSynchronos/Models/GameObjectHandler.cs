@@ -56,43 +56,59 @@ public class GameObjectHandler : MediatorSubscriberBase
             });
         }
 
-        Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) =>
+        Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
+
+        Mediator.Subscribe<ZoneSwitchEndMessage>(this, (_) => ZoneSwitchEnd());
+        Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) => ZoneSwitchStart());
+
+        Mediator.Subscribe<CutsceneStartMessage>(this, (_) =>
         {
-            if (_delayedZoningTask?.IsCompleted ?? true)
+            Mediator.Unsubscribe<ZoneSwitchStartMessage>(this);
+            Mediator.Unsubscribe<FrameworkUpdateMessage>(this);
+        });
+        Mediator.Subscribe<CutsceneEndMessage>(this, (_) =>
+        {
+            Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) => ZoneSwitchStart());
+            Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
+        });
+    }
+
+    private void FrameworkUpdate()
+    {
+        if (_delayedZoningTask?.IsCompleted ?? true)
+        {
+            CheckAndUpdateObject();
+        }
+    }
+
+    private void ZoneSwitchEnd()
+    {
+        if (!_sendUpdates) return;
+
+        _clearCts?.Cancel();
+        _clearCts?.Dispose();
+        _clearCts = null;
+        _zoningCts.CancelAfter(2500);
+    }
+
+    private void ZoneSwitchStart()
+    {
+        if (!_sendUpdates) return;
+
+        _zoningCts = new();
+        Logger.Debug("Starting Delay After Zoning for " + ObjectKind + " " + Name);
+        _delayedZoningTask = Task.Run(async () =>
+        {
+            try
             {
-                CheckAndUpdateObject();
+                await Task.Delay(TimeSpan.FromSeconds(120), _zoningCts.Token).ConfigureAwait(false);
             }
-        });
-
-        Mediator.Subscribe<ZoneSwitchEndMessage>(this, (_) =>
-        {
-            if (!watchedObject) return;
-
-            _clearCts?.Cancel();
-            _clearCts?.Dispose();
-            _clearCts = null;
-            _zoningCts.CancelAfter(2500);
-        });
-
-        Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) =>
-        {
-            if (!watchedObject) return;
-
-            _zoningCts = new();
-            Logger.Debug("Starting Delay After Zoning for " + ObjectKind + " " + Name);
-            _delayedZoningTask = Task.Run(async () =>
+            catch { }
+            finally
             {
-                try
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(120), _zoningCts.Token).ConfigureAwait(false);
-                }
-                catch { }
-                finally
-                {
-                    Logger.Debug("Delay complete for " + ObjectKind);
-                    _zoningCts.Dispose();
-                }
-            });
+                Logger.Debug("Delay complete for " + ObjectKind);
+                _zoningCts.Dispose();
+            }
         });
     }
 

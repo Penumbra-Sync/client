@@ -454,13 +454,13 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
         if (objectKind == ObjectKind.Player)
         {
-            Logger.Debug($"Restoring Customization for {PlayerCharacter}: {_originalGlamourerData}");
+            Logger.Debug($"Restoring Customization for {OnlineUser.User.AliasOrUID}/{PlayerName}: {_originalGlamourerData}");
             _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerCharacter);
-            Logger.Debug($"Restoring Equipment for {PlayerCharacter}: {_lastGlamourerData}");
+            Logger.Debug($"Restoring Equipment for {OnlineUser.User.AliasOrUID}/{PlayerName}: {_lastGlamourerData}");
             _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerCharacter);
-            Logger.Debug("Restoring Heels");
+            Logger.Debug($"Restoring Heels for {OnlineUser.User.AliasOrUID}/{PlayerName}");
             _ipcManager.HeelsRestoreOffsetForPlayer(PlayerCharacter);
-            Logger.Debug("Restoring C+");
+            Logger.Debug($"Restoring C+ for {OnlineUser.User.AliasOrUID}/{PlayerName}");
             _ipcManager.CustomizePlusRevert(PlayerCharacter);
             _ipcManager.PalettePlusRemovePalette(PlayerCharacter);
         }
