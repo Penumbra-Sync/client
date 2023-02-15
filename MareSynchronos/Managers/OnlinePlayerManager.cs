@@ -1,5 +1,4 @@
 ﻿using MareSynchronos.API.Data;
-using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
 using MareSynchronos.Mediator;
 using MareSynchronos.Utils;
@@ -70,22 +69,22 @@ public class OnlinePlayerManager : MediatorSubscriberBase, IDisposable
         if (!_dalamudUtil.IsPlayerPresent || !_apiController.IsConnected) return;
 
         var playerCharacters = _dalamudUtil.GetPlayerCharacters();
-        var onlinePairs = _pairManager.OnlineUserPairs;
+        var newVisiblePlayers = new List<UserData>();
         foreach (var pChar in playerCharacters)
         {
             var pair = _pairManager.FindPair(pChar);
             if (pair == null) continue;
 
-            pair.InitializePair(pChar.Address, pChar.Name.ToString());
+            if (pair.InitializePair(pChar.Name.ToString()))
+            {
+                newVisiblePlayers.Add(pair.UserData ?? pair.GroupPair.First().Value.User);
+            }
         }
 
-        var newlyVisiblePlayers = onlinePairs.Select(v => v.CachedPlayer)
-            .Where(p => p != null && p.PlayerCharacter != IntPtr.Zero && p.IsVisible && !p.WasVisible).Select(p => (UserDto)p!.OnlineUser)
-            .ToList();
-        if (newlyVisiblePlayers.Any())
+        if (newVisiblePlayers.Any())
         {
             Logger.Verbose("Has new visible players, pushing character data");
-            PushCharacterData(newlyVisiblePlayers.Select(c => c.User).ToList());
+            PushCharacterData(newVisiblePlayers);
         }
     }
 

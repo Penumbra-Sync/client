@@ -21,13 +21,8 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
     private API.Data.CharacterData _cachedData = new();
     private GameObjectHandler? _currentOtherChara;
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
-    private bool _isVisible;
-
     private string _lastGlamourerData = string.Empty;
-
     private string _originalGlamourerData = string.Empty;
-
-    private Task? _penumbraRedrawEventTask;
 
     public CachedPlayer(OnlineUserIdentDto onlineUser, IpcManager ipcManager, ApiController apiController, DalamudUtil dalamudUtil, FileCacheManager fileDbManager, MareMediator mediator) : base(mediator)
     {
@@ -38,26 +33,10 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         _fileDbManager = fileDbManager;
     }
 
-    public bool IsVisible
-    {
-        get => _isVisible;
-        set
-        {
-            WasVisible = _isVisible;
-            _isVisible = value;
-        }
-    }
-
     public OnlineUserIdentDto OnlineUser { get; set; }
-    public IntPtr PlayerCharacter { get; set; } = IntPtr.Zero;
+    public IntPtr PlayerCharacter => _currentOtherChara?.CurrentAddress ?? IntPtr.Zero;
     public string? PlayerName { get; private set; }
-
     public string PlayerNameHash => OnlineUser.Ident;
-
-    public bool RequestedPenumbraRedraw { get; set; }
-
-    public bool WasVisible { get; private set; }
-
     public void ApplyCharacterData(API.Data.CharacterData characterData, OptionalPluginWarning warning, bool forced = false)
     {
         Logger.Debug("Received data for " + this);
@@ -67,13 +46,11 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
         if (!_ipcManager.CheckPenumbraApi())
         {
-            Mediator.Publish(new NotificationMessage("Penumbra inactive", "Your Penumbra installation is not active or out of date. Update Penumbra and/or the Enable Mods setting in Penumbra to continue to use Mare.", NotificationType.Error));
             return;
         }
 
         if (!_ipcManager.CheckGlamourerApi())
         {
-            Mediator.Publish(new NotificationMessage("Glamourer inactive", "Your Glamourer installation is not active or out of date. Update Glamourer to continue to use Mare.", NotificationType.Error));
             return;
         }
 
@@ -90,14 +67,16 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
             bool hasNewButNotOldFileReplacements = newFileReplacements != null && existingFileReplacements == null;
             bool hasOldButNotNewFileReplacements = existingFileReplacements != null && newFileReplacements == null;
+
             bool hasNewButNotOldGlamourerData = newGlamourerData != null && existingGlamourerData == null;
             bool hasOldButNotNewGlamourerData = existingGlamourerData != null && newGlamourerData == null;
+
             bool hasNewAndOldFileReplacements = newFileReplacements != null && existingFileReplacements != null;
             bool hasNewAndOldGlamourerData = newGlamourerData != null && existingGlamourerData != null;
 
             if (hasNewButNotOldFileReplacements || hasOldButNotNewFileReplacements || hasNewButNotOldGlamourerData || hasOldButNotNewGlamourerData)
             {
-                Logger.Debug("Updating " + objectKind);
+                Logger.Debug($"Updating {objectKind} (Some new data arrived: {hasNewButNotOldFileReplacements} {hasOldButNotNewFileReplacements} {hasNewButNotOldGlamourerData} {hasOldButNotNewGlamourerData})");
                 updateModdedPaths = true;
                 charaDataToUpdate.Add(objectKind);
                 continue;
@@ -105,10 +84,10 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
             if (hasNewAndOldFileReplacements)
             {
-                bool listsAreEqual = Enumerable.SequenceEqual(_cachedData.FileReplacements[objectKind], characterData.FileReplacements[objectKind]);
+                bool listsAreEqual = Enumerable.SequenceEqual(_cachedData.FileReplacements[objectKind], characterData.FileReplacements[objectKind], FileReplacementDataComparer.Instance);
                 if (!listsAreEqual)
                 {
-                    Logger.Debug("Updating " + objectKind);
+                    Logger.Debug($"Updating {objectKind} (FileReplacements not equal)");
                     updateModdedPaths = true;
                     charaDataToUpdate.Add(objectKind);
                     continue;
@@ -120,7 +99,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 bool glamourerDataDifferent = !string.Equals(_cachedData.GlamourerData[objectKind], characterData.GlamourerData[objectKind], StringComparison.Ordinal);
                 if (glamourerDataDifferent)
                 {
-                    Logger.Debug("Updating " + objectKind);
+                    Logger.Debug($"Updating {objectKind} (Diff glamourer data)");
                     charaDataToUpdate.Add(objectKind);
                     continue;
                 }
@@ -131,7 +110,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 bool manipDataDifferent = !string.Equals(_cachedData.ManipulationData, characterData.ManipulationData, StringComparison.Ordinal);
                 if (manipDataDifferent)
                 {
-                    Logger.Debug("Updating " + objectKind);
+                    Logger.Debug($"Updating {objectKind} (Diff manip data)");
                     charaDataToUpdate.Add(objectKind);
                     continue;
                 }
@@ -139,7 +118,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 bool heelsOffsetDifferent = _cachedData.HeelsOffset != characterData.HeelsOffset;
                 if (heelsOffsetDifferent)
                 {
-                    Logger.Debug("Updating " + objectKind);
+                    Logger.Debug($"Updating {objectKind} (Diff heels data)");
                     charaDataToUpdate.Add(objectKind);
                     continue;
                 }
@@ -147,7 +126,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 bool customizeDataDifferent = !string.Equals(_cachedData.CustomizePlusData, characterData.CustomizePlusData, StringComparison.Ordinal);
                 if (customizeDataDifferent)
                 {
-                    Logger.Debug("Updating " + objectKind);
+                    Logger.Debug($"Updating {objectKind} (Diff customize data)");
                     charaDataToUpdate.Add(objectKind);
                     continue;
                 }
@@ -155,7 +134,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 bool palettePlusDataDifferent = !string.Equals(_cachedData.PalettePlusData, characterData.PalettePlusData, StringComparison.Ordinal);
                 if (palettePlusDataDifferent)
                 {
-                    Logger.Debug("Updating " + objectKind);
+                    Logger.Debug($"Updating {objectKind} (Diff palette data)");
                     charaDataToUpdate.Add(objectKind);
                     continue;
                 }
@@ -203,33 +182,27 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
     public bool CheckExistence()
     {
-        var curPlayerCharacter = _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName!)?.Address ?? IntPtr.Zero;
-        if (PlayerCharacter == IntPtr.Zero || PlayerCharacter != curPlayerCharacter)
+        if (PlayerName == null || _currentOtherChara == null 
+            || !string.Equals(PlayerName, _currentOtherChara.Name, StringComparison.Ordinal)
+            || _currentOtherChara.Address == IntPtr.Zero)
         {
             return false;
         }
-
-        if (_currentOtherChara?.CheckAndUpdateObject() ?? false)
-        {
-            OnPlayerChanged();
-        }
-
-        IsVisible = true;
 
         return true;
     }
 
     public override void Dispose()
     {
-        if (string.IsNullOrEmpty(PlayerName)) return;
+        if (string.IsNullOrEmpty(PlayerName)) return; // already disposed
 
         base.Dispose();
 
         Logger.Debug("Disposing " + PlayerName + " (" + OnlineUser + ")");
         try
         {
+            Logger.Verbose($"Restoring state for {PlayerName} ({OnlineUser})");
             _currentOtherChara?.Dispose();
-            Logger.Verbose("Restoring state for " + PlayerName);
             _ipcManager.PenumbraRemoveTemporaryCollection(PlayerName);
             _downloadCancellationTokenSource?.Cancel();
             _downloadCancellationTokenSource?.Dispose();
@@ -241,6 +214,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     RevertCustomizationData(item.Key);
                 }
             }
+            _currentOtherChara = null;
         }
         catch (Exception ex)
         {
@@ -248,26 +222,30 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         }
         finally
         {
-            Mediator.UnsubscribeAll(this);
             _cachedData = new();
-            var tempPlayerName = PlayerName;
-            PlayerName = string.Empty;
-            PlayerCharacter = IntPtr.Zero;
-            IsVisible = false;
-            Logger.Debug("Disposing " + tempPlayerName + " complete");
+            Logger.Debug("Disposing " + PlayerName + " complete");
+            PlayerName = null;
         }
     }
 
-    public void Initialize(IntPtr character, string name)
+    public void Initialize(string name)
     {
-        IsVisible = true;
         PlayerName = name;
-        PlayerCharacter = character;
-        Logger.Debug("Initializing Player " + this);
-
-        Mediator.Subscribe<PenumbraRedrawMessage>(this, (msg) => IpcManagerOnPenumbraRedrawEvent(((PenumbraRedrawMessage)msg)));
-        _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
         _currentOtherChara = new GameObjectHandler(Mediator, ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName)?.Address ?? IntPtr.Zero, false);
+
+        _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
+        _lastGlamourerData = _originalGlamourerData;
+        Mediator.Subscribe<PenumbraRedrawMessage>(this, (msg) => IpcManagerOnPenumbraRedrawEvent(((PenumbraRedrawMessage)msg)));
+        Mediator.Subscribe<CharacterChangedMessage>(this, (msg) =>
+        {
+            var actualMsg = (CharacterChangedMessage)msg;
+            if (actualMsg.GameObjectHandler == _currentOtherChara && !_ipcManager.RequestedRedraw(_currentOtherChara.Address))
+            {
+                _lastGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
+            }
+        });
+
+        Logger.Debug("Initializing Player " + this);
     }
 
     public override string ToString()
@@ -294,9 +272,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 _ipcManager.HeelsSetOffsetForPlayer(_cachedData.HeelsOffset, PlayerCharacter);
                 _ipcManager.CustomizePlusSetBodyScale(PlayerCharacter, _cachedData.CustomizePlusData);
                 _ipcManager.PalettePlusSetPalette(PlayerCharacter, _cachedData.PalettePlusData);
-                RequestedPenumbraRedraw = true;
-                Logger.Debug(
-                    $"Request Redraw for {PlayerName}");
+                Logger.Debug($"Request Redraw for {PlayerName}");
                 if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                 {
                     _ipcManager.GlamourerApplyAll(glamourerData, PlayerCharacter);
@@ -312,7 +288,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     var minionOrMount = ((Character*)PlayerCharacter)->CompanionObject;
                     if (minionOrMount != null)
                     {
-                        Logger.Debug($"Request Redraw for Minion/Mount");
+                        Logger.Debug($"Request Redraw for {PlayerName} Minion/Mount");
                         _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " minion or mount", (IntPtr)minionOrMount, 30000, ct);
                         ct.ThrowIfCancellationRequested();
                         if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
@@ -337,7 +313,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                         var totalWait = 0;
                         var newPet = IntPtr.Zero;
                         const int maxWait = 3000;
-                        Logger.Debug($"Request Redraw for Pet, waiting {maxWait}ms");
+                        Logger.Debug($"Request Redraw for {PlayerName} Pet");
 
                         do
                         {
@@ -364,7 +340,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     var companion = _dalamudUtil.GetCompanion(PlayerCharacter);
                     if (companion != IntPtr.Zero)
                     {
-                        Logger.Debug("Request Redraw for Companion");
+                        Logger.Debug($"Request Redraw for {PlayerName} Companion");
                         _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " companion", companion, 30000, ct);
                         ct.ThrowIfCancellationRequested();
                         if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
@@ -403,7 +379,6 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             {
                 Dictionary<string, string> moddedPaths;
                 int attempts = 0;
-                //Logger.Verbose(JsonConvert.SerializeObject(_cachedData, Formatting.Indented));
                 while ((toDownloadReplacements = TryCalculateModdedDictionary(out moddedPaths)).Count > 0 && attempts++ <= 10)
                 {
                     downloadId = _apiController.GetDownloadId();
@@ -446,44 +421,31 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         });
     }
 
+    private CancellationTokenSource _redrawCts = new CancellationTokenSource();
+
     private void IpcManagerOnPenumbraRedrawEvent(PenumbraRedrawMessage msg)
     {
         var player = _dalamudUtil.GetCharacterFromObjectTableByIndex(msg.ObjTblIdx);
         if (player == null || !string.Equals(player.Name.ToString(), PlayerName, StringComparison.OrdinalIgnoreCase)) return;
-        if (!_penumbraRedrawEventTask?.IsCompleted ?? false) return;
+        _redrawCts.Cancel();
+        _redrawCts.Dispose();
+        _redrawCts = new();
+        _redrawCts.CancelAfter(TimeSpan.FromSeconds(30));
+        var token = _redrawCts.Token;
 
-        _penumbraRedrawEventTask = Task.Run(() =>
+        Task.Run(() =>
         {
-            PlayerCharacter = msg.Address;
-            var cts = new CancellationTokenSource();
-            cts.CancelAfter(TimeSpan.FromSeconds(10));
-            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, 30000, cts.Token);
-            cts.Dispose();
-            cts = new CancellationTokenSource();
-            cts.CancelAfter(TimeSpan.FromSeconds(5));
-            if (RequestedPenumbraRedraw == false)
+            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, ct: token);
+            if (!msg.WasRequested)
             {
                 Logger.Debug("Unauthorized character change detected");
-                ApplyCustomizationData(ObjectKind.Player, cts.Token);
+                ApplyCustomizationData(ObjectKind.Player, token);
             }
             else
             {
-                RequestedPenumbraRedraw = false;
-                Logger.Debug(
-                    $"Penumbra Redraw done for {PlayerName}");
+                Logger.Debug($"Penumbra Redraw done for {PlayerName}");
             }
-            cts.Dispose();
-        });
-    }
-
-    private void OnPlayerChanged()
-    {
-        Logger.Debug($"Player {PlayerName} changed, PenumbraRedraw is {RequestedPenumbraRedraw}");
-        if (!RequestedPenumbraRedraw && PlayerCharacter != IntPtr.Zero)
-        {
-            Logger.Debug($"Saving new Glamourer data");
-            _lastGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
-        }
+        }, token);
     }
 
     private unsafe void RevertCustomizationData(ObjectKind objectKind)
@@ -492,18 +454,15 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
         if (objectKind == ObjectKind.Player)
         {
-            if (_ipcManager.CheckGlamourerApi())
-            {
-                _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerCharacter);
-                _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerCharacter);
-                _ipcManager.HeelsRestoreOffsetForPlayer(PlayerCharacter);
-                _ipcManager.CustomizePlusRevert(PlayerCharacter);
-                _ipcManager.PalettePlusRemovePalette(PlayerCharacter);
-            }
-            else
-            {
-                _ipcManager.PenumbraRedraw(PlayerCharacter);
-            }
+            Logger.Debug($"Restoring Customization for {PlayerCharacter}: {_originalGlamourerData}");
+            _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerCharacter);
+            Logger.Debug($"Restoring Equipment for {PlayerCharacter}: {_lastGlamourerData}");
+            _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerCharacter);
+            Logger.Debug("Restoring Heels");
+            _ipcManager.HeelsRestoreOffsetForPlayer(PlayerCharacter);
+            Logger.Debug("Restoring C+");
+            _ipcManager.CustomizePlusRevert(PlayerCharacter);
+            _ipcManager.PalettePlusRemovePalette(PlayerCharacter);
         }
         else if (objectKind == ObjectKind.MinionOrMount)
         {

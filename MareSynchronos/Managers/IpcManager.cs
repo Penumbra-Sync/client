@@ -8,6 +8,7 @@ using System.Text;
 using Penumbra.Api.Enums;
 using Penumbra.Api.Helpers;
 using MareSynchronos.Mediator;
+using Dalamud.Interface.Internal.Notifications;
 
 namespace MareSynchronos.Managers;
 
@@ -63,6 +64,8 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
     private ConcurrentQueue<Action> ActionQueue => _inGposeQueueMode ? _gposeActionQueue : _normalQueue;
     private readonly ConcurrentQueue<Action> _normalQueue = new();
     private readonly ConcurrentQueue<Action> _gposeActionQueue = new();
+
+    private ConcurrentDictionary<IntPtr, bool> _penumbraRedrawRequests = new();
 
     private bool _penumbraAvailable = false;
     private bool _glamourerAvailable = false;
@@ -139,17 +142,17 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => HandleActionQueue());
         Mediator.Subscribe<GposeFrameworkUpdateMessage>(this, (_) => HandleGposeActionQueue());
         Mediator.Subscribe<ZoneSwitchEndMessage>(this, (_) => ClearActionQueue());
-        Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => CheckPenumbraModPath());
+        Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => PeriodicApiStateCheck());
     }
 
-    private void CheckPenumbraModPath()
+    private void PeriodicApiStateCheck()
     {
-        PenumbraModDirectory = GetPenumbraModDirectory();
         _glamourerAvailable = CheckGlamourerApiInternal();
         _penumbraAvailable = CheckPenumbraApiInternal();
         _heelsAvailable = CheckHeelsApiInternal();
         _customizePlusAvailable = CheckCustomizePlusApiInternal();
         _palettePlusAvailable = CheckPalettePlusApiInternal();
+        PenumbraModDirectory = GetPenumbraModDirectory();
     }
 
     private void HandleGposeActionQueue()
@@ -198,29 +201,54 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
 
     public bool CheckGlamourerApi() => _glamourerAvailable;
 
+    private bool _shownGlamourerUnavailable = false;
+
     public bool CheckGlamourerApiInternal()
     {
+        bool apiAvailable = false;
         try
         {
-            return _glamourerApiVersion.InvokeFunc() >= 0;
+            apiAvailable = _glamourerApiVersion.InvokeFunc() >= 0;
+            _shownGlamourerUnavailable = _shownGlamourerUnavailable && !apiAvailable;
+            return apiAvailable;
         }
         catch
         {
-            return false;
+            return apiAvailable;
+        }
+        finally
+        {
+            if (!apiAvailable && !_shownGlamourerUnavailable)
+            {
+                _shownGlamourerUnavailable = true;
+                Mediator.Publish(new NotificationMessage("Glamourer inactive", "Your Glamourer installation is not active or out of date. Update Glamourer to continue to use Mare.", NotificationType.Error));
+            }
         }
     }
 
     public bool CheckPenumbraApi() => _penumbraAvailable;
 
+    private bool _shownPenumbraUnavailable = false;
     public bool CheckPenumbraApiInternal()
     {
+        bool apiAvailable = false;
         try
         {
-            return _penumbraApiVersion.Invoke() is { Item1: 4, Item2: >= 19 } && _penumbraEnabled.Invoke();
+            apiAvailable = _penumbraApiVersion.Invoke() is { Item1: 4, Item2: >= 19 } && _penumbraEnabled.Invoke();
+            _shownPenumbraUnavailable = _shownPenumbraUnavailable && !apiAvailable;
+            return apiAvailable;
         }
         catch
         {
-            return false;
+            return apiAvailable;
+        }
+        finally
+        {
+            if (!apiAvailable && !_shownPenumbraUnavailable)
+            {
+                _shownPenumbraUnavailable = true;
+                Mediator.Publish(new NotificationMessage("Penumbra inactive", "Your Penumbra installation is not active or out of date. Update Penumbra and/or the Enable Mods setting in Penumbra to continue to use Mare.", NotificationType.Error));
+            }
         }
     }
 
@@ -373,34 +401,40 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
             var gameObj = _dalamudUtil.CreateGameObject(obj);
             if (gameObj is Character c)
             {
+                _penumbraRedrawRequests[obj] = true;
+
                 Logger.Verbose("Glamourer applying for " + c.Address.ToString("X"));
                 _glamourerApplyAll!.InvokeAction(customization, c);
             }
         });
     }
 
-    public void GlamourerApplyOnlyEquipment(string customization, IntPtr character)
+    public void GlamourerApplyOnlyEquipment(string customization, IntPtr obj)
     {
         if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
         ActionQueue.Enqueue(() =>
         {
-            var gameObj = _dalamudUtil.CreateGameObject(character);
+            var gameObj = _dalamudUtil.CreateGameObject(obj);
             if (gameObj is Character c)
             {
+                _penumbraRedrawRequests[obj] = true;
+
                 Logger.Verbose("Glamourer apply only equipment to " + c.Address.ToString("X"));
                 _glamourerApplyOnlyEquipment!.InvokeAction(customization, c);
             }
         });
     }
 
-    public void GlamourerApplyOnlyCustomization(string customization, IntPtr character)
+    public void GlamourerApplyOnlyCustomization(string customization, IntPtr obj)
     {
         if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
         ActionQueue.Enqueue(() =>
         {
-            var gameObj = _dalamudUtil.CreateGameObject(character);
+            var gameObj = _dalamudUtil.CreateGameObject(obj);
             if (gameObj is Character c)
             {
+                _penumbraRedrawRequests[obj] = true;
+
                 Logger.Verbose("Glamourer apply only customization to " + c.Address.ToString("X"));
                 _glamourerApplyOnlyCustomization!.InvokeAction(customization, c);
             }
@@ -458,16 +492,11 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
             var gameObj = _dalamudUtil.CreateGameObject(obj);
             if (gameObj != null)
             {
+                _penumbraRedrawRequests[obj] = true;
                 Logger.Verbose("Redrawing " + gameObj);
                 _penumbraRedrawObject!.Invoke(gameObj, RedrawType.Redraw);
             }
         });
-    }
-
-    public void PenumbraRedraw(string actorName)
-    {
-        if (!CheckPenumbraApi()) return;
-        ActionQueue.Enqueue(() => _penumbraRedraw!.Invoke(actorName, RedrawType.Redraw));
     }
 
     public void PenumbraRemoveTemporaryCollection(string characterName)
@@ -535,7 +564,14 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
 
     private void RedrawEvent(IntPtr objectAddress, int objectTableIndex)
     {
-        Mediator.Publish(new PenumbraRedrawMessage(objectAddress, objectTableIndex));
+        bool wasRequested = false;
+        if (_penumbraRedrawRequests.TryGetValue(objectAddress, out var redrawRequest))
+        {
+            wasRequested = redrawRequest;
+            _penumbraRedrawRequests[objectAddress] = false;
+        }
+
+        Mediator.Publish(new PenumbraRedrawMessage(objectAddress, objectTableIndex, wasRequested));
     }
 
     private void PenumbraInit()
@@ -612,5 +648,15 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
     {
         Mediator.Publish(new PenumbraDisposedMessage());
         ActionQueue.Clear();
+    }
+
+    internal bool RequestedRedraw(nint address)
+    {
+        if (_penumbraRedrawRequests.TryGetValue(address, out var requested))
+        {
+            return requested;
+        }
+
+        return false;
     }
 }

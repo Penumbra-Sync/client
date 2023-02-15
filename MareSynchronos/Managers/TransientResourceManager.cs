@@ -134,7 +134,7 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
         }
         if (!PlayerRelatedPointers.Contains(gameObject))
         {
-            Logger.Debug("Got resource " + gamePath + " for ptr " + gameObject.ToString("X"));
+            //Logger.Debug("Got resource " + gamePath + " for ptr " + gameObject.ToString("X"));
             return;
         }
 

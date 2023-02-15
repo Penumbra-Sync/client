@@ -63,7 +63,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
     }
 
     public List<Pair> OnlineUserPairs => _allClientPairs.Where(p => !string.IsNullOrEmpty(p.Value.PlayerNameHash)).Select(p => p.Value).ToList();
-    public List<UserData> VisibleUsers => _allClientPairs.Where(p => p.Value.CachedPlayer != null && p.Value.CachedPlayer.IsVisible).Select(p => p.Key).ToList();
+    public List<UserData> VisibleUsers => _allClientPairs.Where(p => p.Value.CachedPlayer?.PlayerName != null).Select(p => p.Key).ToList();
 
     public Pair? LastAddedUser { get; internal set; }
 
@@ -273,7 +273,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
 
     private void DalamudUtilOnDelayedFrameworkUpdate()
     {
-        foreach (var player in _allClientPairs.Select(p => p.Value).Where(p => p.CachedPlayer != null && p.CachedPlayer.IsVisible).ToList())
+        foreach (var player in _allClientPairs.Select(p => p.Value).Where(p => p.CachedPlayer?.PlayerName != null).ToList())
         {
             if (!player.CachedPlayer!.CheckExistence())
             {

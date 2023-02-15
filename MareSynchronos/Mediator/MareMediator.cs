@@ -48,7 +48,9 @@ public class MareMediator : IDisposable
     {
         foreach (var kvp in _subscriberDict.ToList())
         {
-            kvp.Value.RemoveWhere(p => p.Subscriber == subscriber);
+            var unSubbed = kvp.Value.RemoveWhere(p => p.Subscriber == subscriber);
+            if (unSubbed > 0)
+                Logger.Verbose(subscriber + " unsubscribed from " + kvp.Key.Name);
         }
     }
 

@@ -224,6 +224,12 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
                     Thread.Sleep(1);
                 }, ct);
 
+                if (!_ipcManager.CheckPenumbraApi())
+                {
+                    Logger.Warn("Penumbra not available");
+                    return;
+                }
+
                 if (ct.IsCancellationRequested) return;
             }
         }
@@ -237,6 +243,12 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
         }
 
         Task.WaitAll(dbTasks);
+
+        if (!_ipcManager.CheckPenumbraApi())
+        {
+            Logger.Warn("Penumbra not available");
+            return;
+        }
 
         if (entitiesToUpdate.Any() || entitiesToRemove.Any())
         {
@@ -254,6 +266,12 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
         }
 
         Logger.Verbose("Scanner validated existing db files");
+
+        if (!_ipcManager.CheckPenumbraApi())
+        {
+            Logger.Warn("Penumbra not available");
+            return;
+        }
 
         if (ct.IsCancellationRequested) return;
 
@@ -278,6 +296,12 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
                 Interlocked.Increment(ref _currentFileProgress);
                 Thread.Sleep(1);
             }, ct);
+
+            if (!_ipcManager.CheckPenumbraApi())
+            {
+                Logger.Warn("Penumbra not available");
+                return;
+            }
 
             if (ct.IsCancellationRequested) return;
         }

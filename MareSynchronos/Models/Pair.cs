@@ -30,7 +30,7 @@ public class Pair
     public string? PlayerName => CachedPlayer?.PlayerName ?? string.Empty;
     public UserData UserData => UserPair?.User ?? GroupPair.First().Value.User;
     public bool IsOnline => CachedPlayer != null;
-    public bool IsVisible => CachedPlayer != null && CachedPlayer.IsVisible;
+    public bool IsVisible => CachedPlayer?.PlayerName != null;
     public bool IsPaused => UserPair != null && UserPair.OtherPermissions.IsPaired() ? (UserPair.OtherPermissions.IsPaused() || UserPair.OwnPermissions.IsPaused())
             : GroupPair.All(p => p.Key.GroupUserPermissions.IsPaused() || p.Value.GroupUserPermissions.IsPaused());
 
@@ -49,9 +49,9 @@ public class Pair
         return UserPair != null || GroupPair.Any();
     }
 
-    public void InitializePair(nint address, string name)
+    public bool InitializePair(string name)
     {
-        if (!PlayerName.IsNullOrEmpty()) return;
+        if (!PlayerName.IsNullOrEmpty()) return false;
 
         if (CachedPlayer == null) throw new InvalidOperationException("CachedPlayer not initialized");
         _pluginWarnings ??= new()
@@ -61,9 +61,11 @@ public class Pair
             ShownPalettePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
         };
 
-        CachedPlayer.Initialize(address, name);
+        CachedPlayer.Initialize(name);
 
         ApplyLastReceivedData();
+
+        return true;
     }
 
     public void ApplyData(OnlineUserCharaDataDto data)
