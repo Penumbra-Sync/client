@@ -4,6 +4,7 @@ using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using System.Collections.Concurrent;
+using System.Linq;
 
 namespace MareSynchronos.Managers;
 

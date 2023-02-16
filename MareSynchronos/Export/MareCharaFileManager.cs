@@ -100,6 +100,7 @@ public class MareCharaFileManager
             var unwrapped = File.OpenRead(LoadedCharaFile.FilePath);
             await using (unwrapped.ConfigureAwait(false))
             {
+                CancellationTokenSource disposeCts = new();
                 using var lz4Stream = new LZ4Stream(unwrapped, LZ4StreamMode.Decompress, LZ4StreamFlags.HighCompression);
                 using var reader = new BinaryReader(lz4Stream);
                 LoadedCharaFile.AdvanceReaderToData(reader);
@@ -118,7 +119,7 @@ public class MareCharaFileManager
                 _ipcManager.PenumbraSetTemporaryMods(charaTarget.Name.TextValue,
                     extractedFiles.Union(fileSwaps).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal),
                     LoadedCharaFile.CharaFileData.ManipulationData);
-                _ipcManager.GlamourerApplyAll(LoadedCharaFile.CharaFileData.GlamourerData, charaTarget.Address);
+                await _ipcManager.GlamourerApplyAll(LoadedCharaFile.CharaFileData.GlamourerData, charaTarget.Address, disposeCts.Token).ConfigureAwait(false);
                 _dalamudUtil.WaitWhileGposeCharacterIsDrawing(charaTarget.Address, 30000);
                 _ipcManager.PenumbraRemoveTemporaryCollection(charaTarget.Name.TextValue);
                 _ipcManager.ToggleGposeQueueMode(on: false);

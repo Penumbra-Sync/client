@@ -71,6 +71,20 @@ public class GameObjectHandler : MediatorSubscriberBase
             Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) => ZoneSwitchStart());
             Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
         });
+        Mediator.Subscribe<PenumbraStartRedrawMessage>(this, (msg) =>
+        {
+            if (((PenumbraStartRedrawMessage)msg).Address == Address)
+            {
+                Mediator.Unsubscribe<FrameworkUpdateMessage>(this);
+            }
+        });
+        Mediator.Subscribe<PenumbraEndRedrawMessage>(this, (msg) =>
+        {
+            if (((PenumbraEndRedrawMessage)msg).Address == Address)
+            {
+                Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
+            }
+        });
     }
 
     private void FrameworkUpdate()
@@ -120,7 +134,7 @@ public class GameObjectHandler : MediatorSubscriberBase
     public byte? VisorWeaponState { get; set; }
     private bool _doNotSendUpdate;
 
-    public unsafe bool CheckAndUpdateObject()
+    private unsafe bool CheckAndUpdateObject()
     {
         var curPtr = CurrentAddress;
         if (curPtr != IntPtr.Zero && (IntPtr)((Character*)curPtr)->GameObject.DrawObject != IntPtr.Zero)
@@ -226,7 +240,6 @@ public class GameObjectHandler : MediatorSubscriberBase
                 _doNotSendUpdate = true;
             }
             HatState = newHatState;
-            hasChanges = true;
         }
 
         newWeaponOrVisorState &= 0b1101; // ignore drawing weapon
@@ -239,7 +252,6 @@ public class GameObjectHandler : MediatorSubscriberBase
                 _doNotSendUpdate = true;
             }
             VisorWeaponState = newWeaponOrVisorState;
-            hasChanges = true;
         }
 
         return hasChanges;

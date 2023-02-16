@@ -91,7 +91,7 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
 
     private void UpdatePointers()
     {
-        Mediator.Publish(new PlayerRelatedObjectPointerUpdateMessage(_playerRelatedObjects.Select(f => f.CurrentAddress).ToArray()));
+        Mediator.Publish(new PlayerRelatedObjectPointerUpdateMessage(_playerRelatedObjects.Select(f => f.Address).ToArray()));
     }
 
     private void ProcessCacheCreation()

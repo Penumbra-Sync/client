@@ -34,9 +34,10 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
     }
 
     public OnlineUserIdentDto OnlineUser { get; set; }
-    public IntPtr PlayerCharacter => _currentOtherChara?.CurrentAddress ?? IntPtr.Zero;
+    public IntPtr PlayerCharacter => _currentOtherChara?.Address ?? IntPtr.Zero;
     public string? PlayerName { get; private set; }
     public string PlayerNameHash => OnlineUser.Ident;
+
     public void ApplyCharacterData(API.Data.CharacterData characterData, OptionalPluginWarning warning, bool forced = false)
     {
         Logger.Debug("Received data for " + this);
@@ -56,14 +57,25 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
         if (string.Equals(characterData.DataHash.Value, _cachedData.DataHash.Value, StringComparison.Ordinal) && !forced) return;
 
-        bool updateModdedPaths = false;
-        List<ObjectKind> charaDataToUpdate = new();
+        CheckUpdatedData(characterData, out bool updateModdedPaths, out List<ObjectKind> charaDataToUpdate);
+
+        NotifyForMissingPlugins(characterData, warning);
+
+        _cachedData = characterData;
+
+        DownloadAndApplyCharacter(characterData, charaDataToUpdate, updateModdedPaths);
+    }
+
+    private void CheckUpdatedData(API.Data.CharacterData newData, out bool updateModdedPaths, out List<ObjectKind> charaDataToUpdate)
+    {
+        updateModdedPaths = false;
+        charaDataToUpdate = new();
         foreach (var objectKind in Enum.GetValues<ObjectKind>())
         {
             _cachedData.FileReplacements.TryGetValue(objectKind, out var existingFileReplacements);
-            characterData.FileReplacements.TryGetValue(objectKind, out var newFileReplacements);
+            newData.FileReplacements.TryGetValue(objectKind, out var newFileReplacements);
             _cachedData.GlamourerData.TryGetValue(objectKind, out var existingGlamourerData);
-            characterData.GlamourerData.TryGetValue(objectKind, out var newGlamourerData);
+            newData.GlamourerData.TryGetValue(objectKind, out var newGlamourerData);
 
             bool hasNewButNotOldFileReplacements = newFileReplacements != null && existingFileReplacements == null;
             bool hasOldButNotNewFileReplacements = existingFileReplacements != null && newFileReplacements == null;
@@ -84,7 +96,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
             if (hasNewAndOldFileReplacements)
             {
-                bool listsAreEqual = Enumerable.SequenceEqual(_cachedData.FileReplacements[objectKind], characterData.FileReplacements[objectKind], FileReplacementDataComparer.Instance);
+                bool listsAreEqual = Enumerable.SequenceEqual(_cachedData.FileReplacements[objectKind], newData.FileReplacements[objectKind], FileReplacementDataComparer.Instance);
                 if (!listsAreEqual)
                 {
                     Logger.Debug($"Updating {objectKind} (FileReplacements not equal)");
@@ -96,7 +108,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
             if (hasNewAndOldGlamourerData)
             {
-                bool glamourerDataDifferent = !string.Equals(_cachedData.GlamourerData[objectKind], characterData.GlamourerData[objectKind], StringComparison.Ordinal);
+                bool glamourerDataDifferent = !string.Equals(_cachedData.GlamourerData[objectKind], newData.GlamourerData[objectKind], StringComparison.Ordinal);
                 if (glamourerDataDifferent)
                 {
                     Logger.Debug($"Updating {objectKind} (Diff glamourer data)");
@@ -107,7 +119,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
             if (objectKind == ObjectKind.Player)
             {
-                bool manipDataDifferent = !string.Equals(_cachedData.ManipulationData, characterData.ManipulationData, StringComparison.Ordinal);
+                bool manipDataDifferent = !string.Equals(_cachedData.ManipulationData, newData.ManipulationData, StringComparison.Ordinal);
                 if (manipDataDifferent)
                 {
                     Logger.Debug($"Updating {objectKind} (Diff manip data)");
@@ -115,7 +127,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     continue;
                 }
 
-                bool heelsOffsetDifferent = _cachedData.HeelsOffset != characterData.HeelsOffset;
+                bool heelsOffsetDifferent = _cachedData.HeelsOffset != newData.HeelsOffset;
                 if (heelsOffsetDifferent)
                 {
                     Logger.Debug($"Updating {objectKind} (Diff heels data)");
@@ -123,7 +135,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     continue;
                 }
 
-                bool customizeDataDifferent = !string.Equals(_cachedData.CustomizePlusData, characterData.CustomizePlusData, StringComparison.Ordinal);
+                bool customizeDataDifferent = !string.Equals(_cachedData.CustomizePlusData, newData.CustomizePlusData, StringComparison.Ordinal);
                 if (customizeDataDifferent)
                 {
                     Logger.Debug($"Updating {objectKind} (Diff customize data)");
@@ -131,7 +143,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     continue;
                 }
 
-                bool palettePlusDataDifferent = !string.Equals(_cachedData.PalettePlusData, characterData.PalettePlusData, StringComparison.Ordinal);
+                bool palettePlusDataDifferent = !string.Equals(_cachedData.PalettePlusData, newData.PalettePlusData, StringComparison.Ordinal);
                 if (palettePlusDataDifferent)
                 {
                     Logger.Debug($"Updating {objectKind} (Diff palette data)");
@@ -140,7 +152,10 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 }
             }
         }
+    }
 
+    private void NotifyForMissingPlugins(API.Data.CharacterData characterData, OptionalPluginWarning warning)
+    {
         List<string> missingPluginsForData = new();
         if (characterData.HeelsOffset != default)
         {
@@ -174,15 +189,11 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 $"Received data for {PlayerName} that contained information for plugins you have not installed. Install {string.Join(", ", missingPluginsForData)} to experience their character fully.",
                 NotificationType.Warning, 10000));
         }
-
-        _cachedData = characterData;
-
-        DownloadAndApplyCharacter(charaDataToUpdate, updateModdedPaths);
     }
 
     public bool CheckExistence()
     {
-        if (PlayerName == null || _currentOtherChara == null 
+        if (PlayerName == null || _currentOtherChara == null
             || !string.Equals(PlayerName, _currentOtherChara.Name, StringComparison.Ordinal)
             || _currentOtherChara.Address == IntPtr.Zero)
         {
@@ -192,7 +203,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         return true;
     }
 
-    public override void Dispose()
+    public override async void Dispose()
     {
         if (string.IsNullOrEmpty(PlayerName)) return; // already disposed
 
@@ -211,7 +222,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             {
                 foreach (var item in _cachedData.FileReplacements)
                 {
-                    RevertCustomizationData(item.Key);
+                    await RevertCustomizationData(item.Key).ConfigureAwait(false);
                 }
             }
             _currentOtherChara = null;
@@ -231,7 +242,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
     public void Initialize(string name)
     {
         PlayerName = name;
-        _currentOtherChara = new GameObjectHandler(Mediator, ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName)?.Address ?? IntPtr.Zero, false);
+        _currentOtherChara = new GameObjectHandler(Mediator, ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName)?.Address ?? IntPtr.Zero, watchedObject: false);
 
         _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
         _lastGlamourerData = _originalGlamourerData;
@@ -259,45 +270,46 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         _ipcManager.PenumbraSetTemporaryMods(PlayerName!, moddedPaths, _cachedData.ManipulationData);
     }
 
-    private unsafe void ApplyCustomizationData(ObjectKind objectKind, CancellationToken ct)
+    private async Task ApplyCustomizationData(ObjectKind objectKind)
     {
         if (PlayerCharacter == IntPtr.Zero) return;
         _cachedData.GlamourerData.TryGetValue(objectKind, out var glamourerData);
 
+        CancellationTokenSource applicationTokenSource = new();
+        applicationTokenSource.CancelAfter(TimeSpan.FromSeconds(30));
+
         switch (objectKind)
         {
             case ObjectKind.Player:
-                _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, 30000, ct);
-                ct.ThrowIfCancellationRequested();
+                _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, 30000);
                 _ipcManager.HeelsSetOffsetForPlayer(_cachedData.HeelsOffset, PlayerCharacter);
                 _ipcManager.CustomizePlusSetBodyScale(PlayerCharacter, _cachedData.CustomizePlusData);
                 _ipcManager.PalettePlusSetPalette(PlayerCharacter, _cachedData.PalettePlusData);
                 Logger.Debug($"Request Redraw for {PlayerName}");
                 if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                 {
-                    _ipcManager.GlamourerApplyAll(glamourerData, PlayerCharacter);
+                    await _ipcManager.GlamourerApplyAll(glamourerData, PlayerCharacter, applicationTokenSource.Token).ConfigureAwait(false);
                 }
                 else
                 {
-                    _ipcManager.PenumbraRedraw(PlayerCharacter);
+                    await _ipcManager.PenumbraRedraw(PlayerCharacter, applicationTokenSource.Token).ConfigureAwait(false);
                 }
                 break;
 
             case ObjectKind.MinionOrMount:
                 {
-                    var minionOrMount = ((Character*)PlayerCharacter)->CompanionObject;
+                    var minionOrMount = _dalamudUtil.GetMinionOrMount(PlayerCharacter);
                     if (minionOrMount != null)
                     {
                         Logger.Debug($"Request Redraw for {PlayerName} Minion/Mount");
-                        _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " minion or mount", (IntPtr)minionOrMount, 30000, ct);
-                        ct.ThrowIfCancellationRequested();
+                        _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " minion or mount", (IntPtr)minionOrMount, 30000);
                         if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                         {
-                            _ipcManager.GlamourerApplyAll(glamourerData, (IntPtr)minionOrMount);
+                            await _ipcManager.GlamourerApplyAll(glamourerData, (IntPtr)minionOrMount, applicationTokenSource.Token).ConfigureAwait(false);
                         }
                         else
                         {
-                            _ipcManager.PenumbraRedraw((IntPtr)minionOrMount);
+                            await _ipcManager.PenumbraRedraw((IntPtr)minionOrMount, applicationTokenSource.Token).ConfigureAwait(false);
                         }
                     }
 
@@ -324,11 +336,11 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
                         if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                         {
-                            _ipcManager.GlamourerApplyAll(glamourerData, newPet);
+                            await _ipcManager.GlamourerApplyAll(glamourerData, newPet, applicationTokenSource.Token).ConfigureAwait(false);
                         }
                         else
                         {
-                            _ipcManager.PenumbraRedraw(newPet);
+                            await _ipcManager.PenumbraRedraw(newPet, applicationTokenSource.Token).ConfigureAwait(false);
                         }
                     }
 
@@ -341,15 +353,14 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     if (companion != IntPtr.Zero)
                     {
                         Logger.Debug($"Request Redraw for {PlayerName} Companion");
-                        _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " companion", companion, 30000, ct);
-                        ct.ThrowIfCancellationRequested();
+                        _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " companion", companion, 30000);
                         if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                         {
-                            _ipcManager.GlamourerApplyAll(glamourerData, companion);
+                            await _ipcManager.GlamourerApplyAll(glamourerData, companion, applicationTokenSource.Token).ConfigureAwait(false);
                         }
                         else
                         {
-                            _ipcManager.PenumbraRedraw(companion);
+                            await _ipcManager.PenumbraRedraw(companion, applicationTokenSource.Token).ConfigureAwait(false);
                         }
                     }
 
@@ -358,7 +369,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         }
     }
 
-    private void DownloadAndApplyCharacter(List<ObjectKind> objectKind, bool updateModdedPaths)
+    private void DownloadAndApplyCharacter(API.Data.CharacterData charaData, List<ObjectKind> objectKind, bool updateModdedPaths)
     {
         if (!objectKind.Any())
         {
@@ -375,11 +386,12 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         {
             List<FileReplacementData> toDownloadReplacements;
 
+            Dictionary<string, string> moddedPaths = new(StringComparer.Ordinal);
+
             if (updateModdedPaths)
             {
-                Dictionary<string, string> moddedPaths;
                 int attempts = 0;
-                while ((toDownloadReplacements = TryCalculateModdedDictionary(out moddedPaths)).Count > 0 && attempts++ <= 10)
+                while ((toDownloadReplacements = TryCalculateModdedDictionary(charaData, out moddedPaths)).Count > 0 && attempts++ <= 10)
                 {
                     downloadId = _apiController.GetDownloadId();
 
@@ -389,37 +401,55 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                         await _apiController.DownloadFiles(downloadId, toDownloadReplacements, downloadToken).ConfigureAwait(false);
                         _apiController.CancelDownload(downloadId);
                     }
+
                     if (downloadToken.IsCancellationRequested)
                     {
                         Logger.Verbose("Detected cancellation");
                         return;
                     }
 
-                    if ((TryCalculateModdedDictionary(out moddedPaths)).All(c => _apiController.ForbiddenTransfers.Any(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
+                    if ((TryCalculateModdedDictionary(charaData, out moddedPaths)).All(c => _apiController.ForbiddenTransfers.Any(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
                     {
                         break;
                     }
 
                     await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
                 }
-
-                ApplyBaseData(moddedPaths);
             }
 
-            foreach (var kind in objectKind)
+            while (!_applicationTask?.IsCompleted ?? false)
             {
-                ApplyCustomizationData(kind, downloadToken);
+                // block until current application is done
+                Logger.Debug("Waiting for current data application to finish");
+                await Task.Delay(250).ConfigureAwait(false);
+                if (downloadToken.IsCancellationRequested) return;
             }
+
+            _applicationTask = Task.Run(async () =>
+            {
+                if (moddedPaths.Any())
+                {
+                    ApplyBaseData(moddedPaths);
+                }
+
+                foreach (var kind in objectKind)
+                {
+                    await ApplyCustomizationData(kind).ConfigureAwait(false);
+                }
+            });
+
         }, downloadToken).ContinueWith(task =>
         {
             _downloadCancellationTokenSource = null;
 
             if (!task.IsCanceled) return;
 
-            Logger.Debug("Download Task was cancelled");
+            Logger.Debug("Application was cancelled");
             _apiController.CancelDownload(downloadId);
         });
     }
+
+    private Task? _applicationTask;
 
     private CancellationTokenSource _redrawCts = new CancellationTokenSource();
 
@@ -433,31 +463,27 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         _redrawCts.CancelAfter(TimeSpan.FromSeconds(30));
         var token = _redrawCts.Token;
 
-        Task.Run(() =>
+        Task.Run(async () =>
         {
             _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, ct: token);
-            if (!msg.WasRequested)
-            {
-                Logger.Debug("Unauthorized character change detected");
-                ApplyCustomizationData(ObjectKind.Player, token);
-            }
-            else
-            {
-                Logger.Debug($"Penumbra Redraw done for {PlayerName}");
-            }
+            Logger.Debug("Unauthorized character change detected");
+            await ApplyCustomizationData(ObjectKind.Player).ConfigureAwait(false);
         }, token);
     }
 
-    private unsafe void RevertCustomizationData(ObjectKind objectKind)
+    private async Task RevertCustomizationData(ObjectKind objectKind)
     {
         if (PlayerCharacter == IntPtr.Zero) return;
+
+        var cancelToken = new CancellationTokenSource();
+        cancelToken.CancelAfter(TimeSpan.FromSeconds(10));
 
         if (objectKind == ObjectKind.Player)
         {
             Logger.Debug($"Restoring Customization for {OnlineUser.User.AliasOrUID}/{PlayerName}: {_originalGlamourerData}");
-            _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerCharacter);
+            await _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerCharacter, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
             Logger.Debug($"Restoring Equipment for {OnlineUser.User.AliasOrUID}/{PlayerName}: {_lastGlamourerData}");
-            _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerCharacter);
+            await _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerCharacter, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
             Logger.Debug($"Restoring Heels for {OnlineUser.User.AliasOrUID}/{PlayerName}");
             _ipcManager.HeelsRestoreOffsetForPlayer(PlayerCharacter);
             Logger.Debug($"Restoring C+ for {OnlineUser.User.AliasOrUID}/{PlayerName}");
@@ -466,10 +492,10 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         }
         else if (objectKind == ObjectKind.MinionOrMount)
         {
-            var minionOrMount = ((Character*)PlayerCharacter)->CompanionObject;
+            var minionOrMount = _dalamudUtil.GetMinionOrMount(PlayerCharacter);
             if (minionOrMount != null)
             {
-                _ipcManager.PenumbraRedraw((IntPtr)minionOrMount);
+                await _ipcManager.PenumbraRedraw(minionOrMount.Value, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
             }
         }
         else if (objectKind == ObjectKind.Pet)
@@ -477,7 +503,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             var pet = _dalamudUtil.GetPet(PlayerCharacter);
             if (pet != IntPtr.Zero)
             {
-                _ipcManager.PenumbraRedraw(pet);
+                await _ipcManager.PenumbraRedraw(pet, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
             }
         }
         else if (objectKind == ObjectKind.Companion)
@@ -485,18 +511,18 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             var companion = _dalamudUtil.GetCompanion(PlayerCharacter);
             if (companion != IntPtr.Zero)
             {
-                _ipcManager.PenumbraRedraw(companion);
+                await _ipcManager.PenumbraRedraw(companion, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
             }
         }
     }
 
-    private List<FileReplacementData> TryCalculateModdedDictionary(out Dictionary<string, string> moddedDictionary)
+    private List<FileReplacementData> TryCalculateModdedDictionary(API.Data.CharacterData charaData, out Dictionary<string, string> moddedDictionary)
     {
         List<FileReplacementData> missingFiles = new();
         moddedDictionary = new Dictionary<string, string>(StringComparer.Ordinal);
         try
         {
-            foreach (var item in _cachedData.FileReplacements.SelectMany(k => k.Value.Where(v => string.IsNullOrEmpty(v.FileSwapPath))).ToList())
+            foreach (var item in charaData.FileReplacements.SelectMany(k => k.Value.Where(v => string.IsNullOrEmpty(v.FileSwapPath))).ToList())
             {
                 foreach (var gamePath in item.GamePaths)
                 {

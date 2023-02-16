@@ -233,6 +233,17 @@ public class DalamudUtil : IDisposable
         return null;
     }
 
+    public unsafe IntPtr? GetMinionOrMount(IntPtr chara)
+    {
+        var minionOrMount = ((Character*)chara)->CompanionObject;
+        if (minionOrMount != null)
+        {
+            return (IntPtr)minionOrMount;
+        }
+
+        return null;
+    }
+
     public async Task<T> RunOnFrameworkThread<T>(Func<T> func)
     {
         return await _framework.RunOnFrameworkThread(func).ConfigureAwait(false);
