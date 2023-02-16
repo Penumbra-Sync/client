@@ -197,6 +197,10 @@ public class MarePlugin : MediatorSubscriberBase, IDisposable
         {
             _serviceProvider.GetRequiredService<GposeUi>().Toggle();
         }
+        else if (string.Equals(splitArgs[0], "rescan", StringComparison.OrdinalIgnoreCase))
+        {
+            _serviceProvider.GetRequiredService<PeriodicFileScanner>().InvokeScan(forced: true);
+        }
     }
 
     private void OpenUi()
