@@ -1,9 +1,11 @@
 ﻿using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using System.Runtime.InteropServices;
 using MareSynchronos.Utils;
 using Penumbra.String;
-using MareSynchronos.API.Data.Enum;
 using MareSynchronos.Mediator;
+using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;
 
 namespace MareSynchronos.Models;
 
@@ -18,9 +20,15 @@ public class GameObjectHandler : MediatorSubscriberBase
     public string Name { get; private set; }
     public ObjectKind ObjectKind { get; }
     public IntPtr Address { get; set; }
-    public IntPtr DrawObjectAddress { get; set; }
+    private IntPtr DrawObjectAddress { get; set; }
     private Task? _delayedZoningTask;
     private CancellationTokenSource _zoningCts = new();
+    private bool _haltProcessing = false;
+
+    public override string ToString()
+    {
+        return $"{Name} (Addr: {Address.ToString("X")}, DrawObj: {DrawObjectAddress.ToString("X")})";
+    }
 
     public IntPtr CurrentAddress
     {
@@ -63,26 +71,24 @@ public class GameObjectHandler : MediatorSubscriberBase
 
         Mediator.Subscribe<CutsceneStartMessage>(this, (_) =>
         {
-            Mediator.Unsubscribe<ZoneSwitchStartMessage>(this);
-            Mediator.Unsubscribe<FrameworkUpdateMessage>(this);
+            _haltProcessing = true;
         });
         Mediator.Subscribe<CutsceneEndMessage>(this, (_) =>
         {
-            Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) => ZoneSwitchStart());
-            Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
+            _haltProcessing = false;
         });
         Mediator.Subscribe<PenumbraStartRedrawMessage>(this, (msg) =>
         {
             if (((PenumbraStartRedrawMessage)msg).Address == Address)
             {
-                Mediator.Unsubscribe<FrameworkUpdateMessage>(this);
+                _haltProcessing = true;
             }
         });
         Mediator.Subscribe<PenumbraEndRedrawMessage>(this, (msg) =>
         {
             if (((PenumbraEndRedrawMessage)msg).Address == Address)
             {
-                Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
+                _haltProcessing = false;
             }
         });
     }
@@ -97,7 +103,7 @@ public class GameObjectHandler : MediatorSubscriberBase
 
     private void ZoneSwitchEnd()
     {
-        if (!_sendUpdates) return;
+        if (!_sendUpdates || _haltProcessing) return;
 
         _clearCts?.Cancel();
         _clearCts?.Dispose();
@@ -107,7 +113,7 @@ public class GameObjectHandler : MediatorSubscriberBase
 
     private void ZoneSwitchStart()
     {
-        if (!_sendUpdates) return;
+        if (!_sendUpdates || _haltProcessing) return;
 
         _zoningCts = new();
         Logger.Debug("Starting Delay After Zoning for " + ObjectKind + " " + Name);
@@ -126,18 +132,37 @@ public class GameObjectHandler : MediatorSubscriberBase
         });
     }
 
-    public byte[] EquipSlotData { get; set; } = new byte[40];
-    public byte[] CustomizeData { get; set; } = new byte[26];
+    public bool IsBeingDrawn { get; private set; }
+    private byte[] EquipSlotData { get; set; } = new byte[40];
+    private byte[] CustomizeData { get; set; } = new byte[26];
     private Task? _clearTask;
     private CancellationTokenSource? _clearCts = new();
-    public byte? HatState { get; set; }
-    public byte? VisorWeaponState { get; set; }
+    private byte? HatState { get; set; }
+    private byte? VisorWeaponState { get; set; }
     private bool _doNotSendUpdate;
 
-    private unsafe bool CheckAndUpdateObject()
+    private unsafe void CheckAndUpdateObject()
     {
         var curPtr = CurrentAddress;
-        if (curPtr != IntPtr.Zero && (IntPtr)((Character*)curPtr)->GameObject.DrawObject != IntPtr.Zero)
+        bool drawObj = false;
+        try
+        {
+            var drawObjAddr = (IntPtr)((GameObject*)curPtr)->GetDrawObject();
+            drawObj = drawObjAddr != DrawObjectAddress;
+            DrawObjectAddress = drawObjAddr;
+
+            IsBeingDrawn = (((CharacterBase*)drawObjAddr)->HasModelInSlotLoaded != 0)
+                           || (((CharacterBase*)drawObjAddr)->HasModelFilesInSlotLoaded != 0)
+                           || (((GameObject*)curPtr)->RenderFlags & 0b100000000000) == 0b100000000000;
+        }
+        catch
+        {
+            IsBeingDrawn = true;
+        }
+
+        if (_haltProcessing) return;
+
+        if (curPtr != IntPtr.Zero && DrawObjectAddress != IntPtr.Zero)
         {
             if (_clearCts != null)
             {
@@ -149,7 +174,6 @@ public class GameObjectHandler : MediatorSubscriberBase
             bool addr = Address == IntPtr.Zero || Address != curPtr;
             bool equip = CompareAndUpdateEquipByteData(chara->EquipSlotData);
             var customize = CompareAndUpdateCustomizeData(chara->CustomizeData);
-            bool drawObj = (IntPtr)chara->GameObject.DrawObject != DrawObjectAddress;
             var name = new ByteString(chara->GameObject.Name).ToString();
             bool nameChange = (!string.Equals(name, Name, StringComparison.Ordinal));
             if (addr || equip || customize || drawObj || nameChange)
@@ -169,8 +193,6 @@ public class GameObjectHandler : MediatorSubscriberBase
                 {
                     Mediator.Publish(new CharacterChangedMessage(this));
                 }
-
-                return true;
             }
         }
         else if (Address != IntPtr.Zero || DrawObjectAddress != IntPtr.Zero)
@@ -187,8 +209,6 @@ public class GameObjectHandler : MediatorSubscriberBase
                 _clearTask = Task.Run(() => ClearTask(token), token);
             }
         }
-
-        return false;
     }
 
     private async Task ClearTask(CancellationToken token)

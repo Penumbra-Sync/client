@@ -281,18 +281,18 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         switch (objectKind)
         {
             case ObjectKind.Player:
-                _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, 30000);
+                _dalamudUtil.WaitWhileCharacterIsDrawing(_currentOtherChara!, 30000);
                 _ipcManager.HeelsSetOffsetForPlayer(_cachedData.HeelsOffset, PlayerCharacter);
                 _ipcManager.CustomizePlusSetBodyScale(PlayerCharacter, _cachedData.CustomizePlusData);
                 _ipcManager.PalettePlusSetPalette(PlayerCharacter, _cachedData.PalettePlusData);
                 Logger.Debug($"Request Redraw for {PlayerName}");
                 if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                 {
-                    await _ipcManager.GlamourerApplyAll(glamourerData, PlayerCharacter, applicationTokenSource.Token).ConfigureAwait(false);
+                    await _ipcManager.GlamourerApplyAll(glamourerData, _currentOtherChara!, applicationTokenSource.Token).ConfigureAwait(false);
                 }
                 else
                 {
-                    await _ipcManager.PenumbraRedraw(PlayerCharacter, applicationTokenSource.Token).ConfigureAwait(false);
+                    await _ipcManager.PenumbraRedraw(_currentOtherChara!, applicationTokenSource.Token).ConfigureAwait(false);
                 }
                 break;
 
@@ -301,15 +301,18 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     var minionOrMount = _dalamudUtil.GetMinionOrMount(PlayerCharacter);
                     if (minionOrMount != null)
                     {
+                        using GameObjectHandler tempHandler = new(Mediator, ObjectKind.MinionOrMount,
+                            () => minionOrMount.Value, false);
+
                         Logger.Debug($"Request Redraw for {PlayerName} Minion/Mount");
-                        _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " minion or mount", (IntPtr)minionOrMount, 30000);
+                        _dalamudUtil.WaitWhileCharacterIsDrawing(tempHandler, 30000);
                         if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                         {
-                            await _ipcManager.GlamourerApplyAll(glamourerData, (IntPtr)minionOrMount, applicationTokenSource.Token).ConfigureAwait(false);
+                            await _ipcManager.GlamourerApplyAll(glamourerData, tempHandler, applicationTokenSource.Token).ConfigureAwait(false);
                         }
                         else
                         {
-                            await _ipcManager.PenumbraRedraw((IntPtr)minionOrMount, applicationTokenSource.Token).ConfigureAwait(false);
+                            await _ipcManager.PenumbraRedraw(tempHandler, applicationTokenSource.Token).ConfigureAwait(false);
                         }
                     }
 
@@ -334,13 +337,15 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                             newPet = _dalamudUtil.GetPet(PlayerCharacter);
                         } while (newPet == pet && totalWait < maxWait);
 
+                        using var tempHandler = new GameObjectHandler(Mediator, ObjectKind.Pet, () => newPet, false);
+
                         if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                         {
-                            await _ipcManager.GlamourerApplyAll(glamourerData, newPet, applicationTokenSource.Token).ConfigureAwait(false);
+                            await _ipcManager.GlamourerApplyAll(glamourerData, tempHandler, applicationTokenSource.Token).ConfigureAwait(false);
                         }
                         else
                         {
-                            await _ipcManager.PenumbraRedraw(newPet, applicationTokenSource.Token).ConfigureAwait(false);
+                            await _ipcManager.PenumbraRedraw(tempHandler, applicationTokenSource.Token).ConfigureAwait(false);
                         }
                     }
 
@@ -353,14 +358,17 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     if (companion != IntPtr.Zero)
                     {
                         Logger.Debug($"Request Redraw for {PlayerName} Companion");
-                        _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName! + " companion", companion, 30000);
+
+                        using GameObjectHandler tempHandler = new(Mediator, ObjectKind.Companion, () => companion, false);
+
+                        _dalamudUtil.WaitWhileCharacterIsDrawing(tempHandler, 30000);
                         if (_ipcManager.CheckGlamourerApi() && !string.IsNullOrEmpty(glamourerData))
                         {
-                            await _ipcManager.GlamourerApplyAll(glamourerData, companion, applicationTokenSource.Token).ConfigureAwait(false);
+                            await _ipcManager.GlamourerApplyAll(glamourerData, tempHandler, applicationTokenSource.Token).ConfigureAwait(false);
                         }
                         else
                         {
-                            await _ipcManager.PenumbraRedraw(companion, applicationTokenSource.Token).ConfigureAwait(false);
+                            await _ipcManager.PenumbraRedraw(tempHandler, applicationTokenSource.Token).ConfigureAwait(false);
                         }
                     }
 
@@ -465,7 +473,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
         Task.Run(async () =>
         {
-            _dalamudUtil.WaitWhileCharacterIsDrawing(PlayerName!, PlayerCharacter, ct: token);
+            _dalamudUtil.WaitWhileCharacterIsDrawing(_currentOtherChara!, ct: token);
             Logger.Debug("Unauthorized character change detected");
             await ApplyCustomizationData(ObjectKind.Player).ConfigureAwait(false);
         }, token);
@@ -481,9 +489,9 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         if (objectKind == ObjectKind.Player)
         {
             Logger.Debug($"Restoring Customization for {OnlineUser.User.AliasOrUID}/{PlayerName}: {_originalGlamourerData}");
-            await _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, PlayerCharacter, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
+            await _ipcManager.GlamourerApplyOnlyCustomization(_originalGlamourerData, _currentOtherChara!, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
             Logger.Debug($"Restoring Equipment for {OnlineUser.User.AliasOrUID}/{PlayerName}: {_lastGlamourerData}");
-            await _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, PlayerCharacter, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
+            await _ipcManager.GlamourerApplyOnlyEquipment(_lastGlamourerData, _currentOtherChara!, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
             Logger.Debug($"Restoring Heels for {OnlineUser.User.AliasOrUID}/{PlayerName}");
             _ipcManager.HeelsRestoreOffsetForPlayer(PlayerCharacter);
             Logger.Debug($"Restoring C+ for {OnlineUser.User.AliasOrUID}/{PlayerName}");
@@ -495,7 +503,9 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             var minionOrMount = _dalamudUtil.GetMinionOrMount(PlayerCharacter);
             if (minionOrMount != null)
             {
-                await _ipcManager.PenumbraRedraw(minionOrMount.Value, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
+                using GameObjectHandler tempHandler = new(Mediator, ObjectKind.MinionOrMount, () => minionOrMount.Value,
+                    false);
+                await _ipcManager.PenumbraRedraw(tempHandler, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
             }
         }
         else if (objectKind == ObjectKind.Pet)
@@ -503,7 +513,9 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             var pet = _dalamudUtil.GetPet(PlayerCharacter);
             if (pet != IntPtr.Zero)
             {
-                await _ipcManager.PenumbraRedraw(pet, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
+                using GameObjectHandler tempHandler = new(Mediator, ObjectKind.Pet, () => pet,
+                    false);
+                await _ipcManager.PenumbraRedraw(tempHandler, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
             }
         }
         else if (objectKind == ObjectKind.Companion)
@@ -511,7 +523,9 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             var companion = _dalamudUtil.GetCompanion(PlayerCharacter);
             if (companion != IntPtr.Zero)
             {
-                await _ipcManager.PenumbraRedraw(companion, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
+                using GameObjectHandler tempHandler = new(Mediator, ObjectKind.Pet, () => companion,
+                    false);
+                await _ipcManager.PenumbraRedraw(tempHandler, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
             }
         }
     }

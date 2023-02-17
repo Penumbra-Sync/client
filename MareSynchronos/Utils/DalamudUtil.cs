@@ -7,6 +7,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using MareSynchronos.Mediator;
+using MareSynchronos.Models;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 namespace MareSynchronos.Utils;
@@ -249,42 +250,33 @@ public class DalamudUtil : IDisposable
         return await _framework.RunOnFrameworkThread(func).ConfigureAwait(false);
     }
 
-    public unsafe void WaitWhileCharacterIsDrawing(string name, IntPtr characterAddress, int timeOut = 5000, CancellationToken? ct = null)
+    public unsafe void WaitWhileCharacterIsDrawing(GameObjectHandler handler, int timeOut = 5000, CancellationToken? ct = null)
     {
-        if (!_clientState.IsLoggedIn || characterAddress == IntPtr.Zero) return;
+        if (!_clientState.IsLoggedIn || handler.Address == IntPtr.Zero) return;
 
-        Logger.Verbose($"Starting wait for {name} to draw");
+        Logger.Verbose($"Starting wait for {handler} to draw");
 
-        var obj = (GameObject*)characterAddress;
         const int tick = 250;
         int curWaitTime = 0;
         try
         {
             // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
-            var stillDrawing = _framework.RunOnFrameworkThread(() => ((obj->GetDrawObject() == null
-                        || ((CharacterBase*)obj->GetDrawObject())->HasModelInSlotLoaded != 0
-                        || ((CharacterBase*)obj->GetDrawObject())->HasModelFilesInSlotLoaded != 0))
-                    || ((obj->RenderFlags & 0b100000000000) == 0b100000000000)).Result;
             while ((!ct?.IsCancellationRequested ?? true)
-                && curWaitTime < timeOut
-                && stillDrawing) // 0b100000000000 is "still rendering" or something
+                   && curWaitTime < timeOut
+                   && handler.IsBeingDrawn) // 0b100000000000 is "still rendering" or something
             {
-                Logger.Verbose($"Waiting for {name} to finish drawing");
+                Logger.Verbose($"Waiting for {handler} to finish drawing");
                 curWaitTime += tick;
                 Thread.Sleep(tick);
-                stillDrawing = _framework.RunOnFrameworkThread(() => ((obj->GetDrawObject() == null
-                        || ((CharacterBase*)obj->GetDrawObject())->HasModelInSlotLoaded != 0
-                        || ((CharacterBase*)obj->GetDrawObject())->HasModelFilesInSlotLoaded != 0))
-                    || ((obj->RenderFlags & 0b100000000000) == 0b100000000000)).Result;
             }
         }
         catch (NullReferenceException ex)
         {
-            Logger.Warn("Error accessing " + characterAddress.ToString("X") + ", object does not exist anymore?", ex);
+            Logger.Warn("Error accessing " + handler + ", object does not exist anymore?", ex);
         }
         catch (AccessViolationException ex)
         {
-            Logger.Warn("Error accessing " + characterAddress.ToString("X") + ", object does not exist anymore?", ex);
+            Logger.Warn("Error accessing " + handler + ", object does not exist anymore?", ex);
         }
     }
 

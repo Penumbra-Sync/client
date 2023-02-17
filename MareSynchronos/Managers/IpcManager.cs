@@ -9,6 +9,7 @@ using Penumbra.Api.Enums;
 using Penumbra.Api.Helpers;
 using MareSynchronos.Mediator;
 using Dalamud.Interface.Internal.Notifications;
+using MareSynchronos.Models;
 
 namespace MareSynchronos.Managers;
 
@@ -396,10 +397,11 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         });
     }
 
-    private async Task PenumbraRedrawAction(IntPtr obj, Action action, CancellationToken token, bool fireAndForget)
+    private async Task PenumbraRedrawAction(GameObjectHandler obj, Action action, CancellationToken token, bool fireAndForget)
     {
-        Mediator.Publish(new PenumbraStartRedrawMessage(obj));
-        _penumbraRedrawRequests[obj] = !fireAndForget;
+        Mediator.Publish(new PenumbraStartRedrawMessage(obj.Address));
+
+        _penumbraRedrawRequests[obj.Address] = !fireAndForget;
 
         ActionQueue.Enqueue(action);
 
@@ -407,48 +409,45 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         {
             var disposeToken = _disposalCts.Token;
             var combinedToken = CancellationTokenSource.CreateLinkedTokenSource(disposeToken, token).Token;
-            while (_penumbraRedrawRequests[obj] && !combinedToken.IsCancellationRequested)
-            {
-                Logger.Debug("Waiting for Penumbra Reply");
-                await Task.Delay(100).ConfigureAwait(true);
-            }
 
-            Logger.Debug("Received Penumbra reply, waiting for draw");
+            await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
 
             if (!combinedToken.IsCancellationRequested)
-                _dalamudUtil.WaitWhileCharacterIsDrawing(obj.ToString("X"), obj, 10000, combinedToken);
-        }
+                _dalamudUtil.WaitWhileCharacterIsDrawing(obj, 30000, combinedToken);
 
-        Mediator.Publish(new PenumbraEndRedrawMessage(obj));
+            _penumbraRedrawRequests[obj.Address] = false;
+        }
+        Mediator.Publish(new PenumbraEndRedrawMessage(obj.Address));
+
     }
 
-    public async Task GlamourerApplyAll(string? customization, IntPtr obj, CancellationToken token, bool fireAndForget = false)
+    public async Task GlamourerApplyAll(string? customization, GameObjectHandler handler, CancellationToken token, bool fireAndForget = false)
     {
         if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
-        var gameObj = _dalamudUtil.CreateGameObject(obj);
+        var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
         if (gameObj is Character c)
         {
-            await PenumbraRedrawAction(obj, () => _glamourerApplyAll!.InvokeAction(customization, c), token, fireAndForget).ConfigureAwait(false);
-        }
-    }
-
-    public async Task GlamourerApplyOnlyEquipment(string customization, IntPtr obj, CancellationToken token, bool fireAndForget = false)
-    {
-        if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
-        var gameObj = _dalamudUtil.CreateGameObject(obj);
-        if (gameObj is Character c)
-        {
-            await PenumbraRedrawAction(obj, () => _glamourerApplyOnlyEquipment!.InvokeAction(customization, c), token, fireAndForget).ConfigureAwait(false);
+            await PenumbraRedrawAction(handler, () => _glamourerApplyAll!.InvokeAction(customization, c), token, fireAndForget).ConfigureAwait(false);
         }
     }
 
-    public async Task GlamourerApplyOnlyCustomization(string customization, IntPtr obj, CancellationToken token, bool fireAndForget = false)
+    public async Task GlamourerApplyOnlyEquipment(string customization, GameObjectHandler handler, CancellationToken token, bool fireAndForget = false)
     {
         if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
-        var gameObj = _dalamudUtil.CreateGameObject(obj);
+        var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
         if (gameObj is Character c)
         {
-            await PenumbraRedrawAction(obj, () => _glamourerApplyOnlyCustomization!.InvokeAction(customization, c), token, fireAndForget).ConfigureAwait(false);
+            await PenumbraRedrawAction(handler, () => _glamourerApplyOnlyEquipment!.InvokeAction(customization, c), token, fireAndForget).ConfigureAwait(false);
+        }
+    }
+
+    public async Task GlamourerApplyOnlyCustomization(string customization, GameObjectHandler handler, CancellationToken token, bool fireAndForget = false)
+    {
+        if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
+        var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
+        if (gameObj is Character c)
+        {
+            await PenumbraRedrawAction(handler, () => _glamourerApplyOnlyCustomization!.InvokeAction(customization, c), token, fireAndForget).ConfigureAwait(false);
         }
     }
 
@@ -495,13 +494,13 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         return _penumbraResolveModDir!.Invoke().ToLowerInvariant();
     }
 
-    public async Task PenumbraRedraw(IntPtr obj, CancellationToken token, bool fireAndForget = false)
+    public async Task PenumbraRedraw(GameObjectHandler handler, CancellationToken token, bool fireAndForget = false)
     {
         if (!CheckPenumbraApi()) return;
-        var gameObj = _dalamudUtil.CreateGameObject(obj);
+        var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
         if (gameObj is Character c)
         {
-            await PenumbraRedrawAction(obj, () => _penumbraRedrawObject!.Invoke(c, RedrawType.Redraw), token, fireAndForget).ConfigureAwait(false);
+            await PenumbraRedrawAction(handler, () => _penumbraRedrawObject!.Invoke(c, RedrawType.Redraw), token, fireAndForget).ConfigureAwait(false);
         }
     }
 

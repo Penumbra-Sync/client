@@ -3,13 +3,16 @@ using LZ4;
 using MareSynchronos.FileCache;
 using MareSynchronos.Managers;
 using MareSynchronos.Utils;
-using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.Mediator;
+using MareSynchronos.Models;
+using CharacterData = MareSynchronos.API.Data.CharacterData;
 
 namespace MareSynchronos.Export;
 public class MareCharaFileManager
 {
+    private readonly MareMediator _mediator;
     private readonly FileCacheManager _manager;
     private readonly IpcManager _ipcManager;
     private readonly MareConfigService _configService;
@@ -19,9 +22,10 @@ public class MareCharaFileManager
     public bool CurrentlyWorking { get; private set; } = false;
     private static int GlobalFileCounter = 0;
 
-    public MareCharaFileManager(FileCacheManager manager, IpcManager ipcManager, MareConfigService configService, DalamudUtil dalamudUtil)
+    public MareCharaFileManager(MareMediator mediator, FileCacheManager manager, IpcManager ipcManager, MareConfigService configService, DalamudUtil dalamudUtil)
     {
         _factory = new(manager);
+        _mediator = mediator;
         _manager = manager;
         _ipcManager = ipcManager;
         _configService = configService;
@@ -119,7 +123,8 @@ public class MareCharaFileManager
                 _ipcManager.PenumbraSetTemporaryMods(charaTarget.Name.TextValue,
                     extractedFiles.Union(fileSwaps).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal),
                     LoadedCharaFile.CharaFileData.ManipulationData);
-                await _ipcManager.GlamourerApplyAll(LoadedCharaFile.CharaFileData.GlamourerData, charaTarget.Address, disposeCts.Token).ConfigureAwait(false);
+                using GameObjectHandler tempHandler = new(_mediator, ObjectKind.Player, () => charaTarget.Address, false);
+                await _ipcManager.GlamourerApplyAll(LoadedCharaFile.CharaFileData.GlamourerData, tempHandler, disposeCts.Token).ConfigureAwait(false);
                 _dalamudUtil.WaitWhileGposeCharacterIsDrawing(charaTarget.Address, 30000);
                 _ipcManager.PenumbraRemoveTemporaryCollection(charaTarget.Name.TextValue);
                 _ipcManager.ToggleGposeQueueMode(on: false);
