@@ -21,6 +21,14 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
     {
         _characterDataFactory = characterDataFactory;
 
+        _playerRelatedObjects.AddRange(new List<GameObjectHandler>()
+        {
+            new(Mediator, ObjectKind.Player, () => dalamudUtil.PlayerPointer),
+            new(Mediator, ObjectKind.MinionOrMount, () => (IntPtr)((Character*)dalamudUtil.PlayerPointer)->CompanionObject),
+            new(Mediator, ObjectKind.Pet, () => dalamudUtil.GetPet()),
+            new(Mediator, ObjectKind.Companion, () => dalamudUtil.GetCompanion()),
+        });
+
         Mediator.Subscribe<CreateCacheForObjectMessage>(this, (msg) =>
         {
             var actualMsg = (CreateCacheForObjectMessage)msg;
@@ -42,14 +50,6 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
         Mediator.Subscribe<HeelsOffsetMessage>(this, (msg) => HeelsOffsetChanged((HeelsOffsetMessage)msg));
         Mediator.Subscribe<PalettePlusMessage>(this, (msg) => PalettePlusChanged((PalettePlusMessage)msg));
         Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, (msg) => _cachesToCreate[ObjectKind.Player] = _playerRelatedObjects.First(p => p.ObjectKind == ObjectKind.Player));
-
-        _playerRelatedObjects.AddRange(new List<GameObjectHandler>()
-        {
-            new(Mediator, ObjectKind.Player, () => dalamudUtil.PlayerPointer),
-            new(Mediator, ObjectKind.MinionOrMount, () => (IntPtr)((Character*)dalamudUtil.PlayerPointer)->CompanionObject),
-            new(Mediator, ObjectKind.Pet, () => dalamudUtil.GetPet()),
-            new(Mediator, ObjectKind.Companion, () => dalamudUtil.GetCompanion()),
-        });
     }
 
     private void PalettePlusChanged(PalettePlusMessage msg)

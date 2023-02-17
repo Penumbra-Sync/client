@@ -97,10 +97,9 @@ public class GameObjectHandler : MediatorSubscriberBase
 
     private void FrameworkUpdate()
     {
-        if (_delayedZoningTask?.IsCompleted ?? true)
-        {
-            CheckAndUpdateObject();
-        }
+        if (!_delayedZoningTask?.IsCompleted ?? false) return;
+
+        CheckAndUpdateObject();
     }
 
     private void ZoneSwitchEnd()
@@ -146,11 +145,11 @@ public class GameObjectHandler : MediatorSubscriberBase
     private unsafe void CheckAndUpdateObject()
     {
         var curPtr = CurrentAddress;
-        bool drawObj = false;
+        bool drawObjDiff = false;
         try
         {
             var drawObjAddr = (IntPtr)((GameObject*)curPtr)->GetDrawObject();
-            drawObj = drawObjAddr != DrawObjectAddress;
+            drawObjDiff = drawObjAddr != DrawObjectAddress;
             DrawObjectAddress = drawObjAddr;
 
             IsBeingDrawn = (((CharacterBase*)drawObjAddr)->HasModelInSlotLoaded != 0)
@@ -172,26 +171,25 @@ public class GameObjectHandler : MediatorSubscriberBase
                 _clearCts?.Cancel();
                 _clearCts = null;
             }
+            bool addrDiff = Address != curPtr;
+            Address = curPtr;
             var chara = (Character*)curPtr;
-            bool addr = Address == IntPtr.Zero || Address != curPtr;
-            bool equip = CompareAndUpdateEquipByteData(chara->EquipSlotData);
-            var customize = CompareAndUpdateCustomizeData(chara->CustomizeData);
+            bool equipDiff = CompareAndUpdateEquipByteData(chara->EquipSlotData);
+            var customizeDiff = CompareAndUpdateCustomizeData(chara->CustomizeData);
             var name = new ByteString(chara->GameObject.Name).ToString();
             bool nameChange = (!string.Equals(name, Name, StringComparison.Ordinal));
-            if (addr || equip || customize || drawObj || nameChange)
+            if (addrDiff || equipDiff || customizeDiff || drawObjDiff || nameChange)
             {
                 Name = name;
                 Logger.Verbose($"{ObjectKind} changed: {Name}, now: {curPtr:X}, {(IntPtr)chara->GameObject.DrawObject:X}");
 
-                Address = curPtr;
-                DrawObjectAddress = (IntPtr)chara->GameObject.DrawObject;
-                if (_sendUpdates && !_doNotSendUpdate && DrawObjectAddress != IntPtr.Zero)
+                if (_sendUpdates && !_doNotSendUpdate)
                 {
                     Logger.Debug("Sending CreateCacheObjectMessage for " + ObjectKind);
                     Mediator.Publish(new CreateCacheForObjectMessage(this));
                 }
 
-                if (equip)
+                if (equipDiff && !_sendUpdates)
                 {
                     Mediator.Publish(new CharacterChangedMessage(this));
                 }
@@ -237,6 +235,7 @@ public class GameObjectHandler : MediatorSubscriberBase
 
         return hasChanges;
     }
+
     private unsafe bool CompareAndUpdateCustomizeData(byte* customizeData)
     {
         bool hasChanges = false;
