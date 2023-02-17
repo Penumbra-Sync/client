@@ -38,7 +38,7 @@ public class MareMediator : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error("Error executing " + subscriber, ex);
+                    Logger.Error("Error executing " + message.GetType() + " for subscriber " + subscriber + ", removing from Mediator", ex);
                     subscribers.RemoveWhere(s => s == subscriber);
                 }
             }

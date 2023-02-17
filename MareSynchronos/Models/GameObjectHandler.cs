@@ -30,7 +30,7 @@ public class GameObjectHandler : MediatorSubscriberBase
         return $"{Name} (Addr: {Address.ToString("X")}, DrawObj: {DrawObjectAddress.ToString("X")})";
     }
 
-    public IntPtr CurrentAddress
+    private IntPtr CurrentAddress
     {
         get
         {
@@ -91,6 +91,8 @@ public class GameObjectHandler : MediatorSubscriberBase
                 _haltProcessing = false;
             }
         });
+
+        CheckAndUpdateObject();
     }
 
     private void FrameworkUpdate()
