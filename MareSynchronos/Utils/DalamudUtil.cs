@@ -5,15 +5,16 @@ using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using MareSynchronos.Mediator;
 using MareSynchronos.Models;
+using Microsoft.Extensions.Logging;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 namespace MareSynchronos.Utils;
 
 public class DalamudUtil : IDisposable
 {
+    private readonly ILogger<DalamudUtil> _logger;
     private readonly ClientState _clientState;
     private readonly ObjectTable _objectTable;
     private readonly Framework _framework;
@@ -39,9 +40,10 @@ public class DalamudUtil : IDisposable
         return false;
     }
 
-    public DalamudUtil(ClientState clientState, ObjectTable objectTable, Framework framework,
+    public DalamudUtil(ILogger<DalamudUtil> logger, ClientState clientState, ObjectTable objectTable, Framework framework,
         Condition condition, Dalamud.Data.DataManager gameData, MareMediator mediator)
     {
+        _logger = logger;
         _clientState = clientState;
         _objectTable = objectTable;
         _framework = framework;
@@ -66,20 +68,20 @@ public class DalamudUtil : IDisposable
     {
         if (GposeTarget != null && !IsInGpose)
         {
-            Logger.Debug("Gpose start");
+            _logger.LogDebug("Gpose start");
             IsInGpose = true;
             _mediator.Publish(new GposeStartMessage());
         }
         else if (GposeTarget == null && IsInGpose)
         {
-            Logger.Debug("Gpose end");
+            _logger.LogDebug("Gpose end");
             IsInGpose = false;
             _mediator.Publish(new GposeEndMessage());
         }
 
         if (_condition[ConditionFlag.WatchingCutscene] && !IsInCutscene)
         {
-            Logger.Debug("Cutscene start");
+            _logger.LogDebug("Cutscene start");
             IsInCutscene = true;
             _mediator.Publish(new CutsceneStartMessage());
             _mediator.Publish(new HaltScanMessage("Cutscene"));
@@ -87,7 +89,7 @@ public class DalamudUtil : IDisposable
         }
         else if (!_condition[ConditionFlag.WatchingCutscene] && IsInCutscene)
         {
-            Logger.Debug("Cutscene end");
+            _logger.LogDebug("Cutscene end");
             IsInCutscene = false;
             _mediator.Publish(new CutsceneEndMessage());
             _mediator.Publish(new ResumeScanMessage("Cutscene"));
@@ -99,7 +101,7 @@ public class DalamudUtil : IDisposable
         {
             if (!_sentBetweenAreas)
             {
-                Logger.Debug("Zone switch/Gpose start");
+                _logger.LogDebug("Zone switch/Gpose start");
                 _sentBetweenAreas = true;
                 _mediator.Publish(new ZoneSwitchStartMessage());
                 _mediator.Publish(new HaltScanMessage("Zone switch"));
@@ -110,7 +112,7 @@ public class DalamudUtil : IDisposable
 
         if (_sentBetweenAreas)
         {
-            Logger.Debug("Zone switch/Gpose end");
+            _logger.LogDebug("Zone switch/Gpose end");
             _sentBetweenAreas = false;
             _mediator.Publish(new ZoneSwitchEndMessage());
             _mediator.Publish(new ResumeScanMessage("Zone switch"));
@@ -124,13 +126,13 @@ public class DalamudUtil : IDisposable
 
         if (localPlayer != null && !IsLoggedIn)
         {
-            Logger.Debug("Logged in");
+            _logger.LogDebug("Logged in");
             IsLoggedIn = true;
             _mediator.Publish(new DalamudLoginMessage());
         }
         else if (localPlayer == null && IsLoggedIn)
         {
-            Logger.Debug("Logged out");
+            _logger.LogDebug("Logged out");
             IsLoggedIn = false;
             _mediator.Publish(new DalamudLogoutMessage());
         }
@@ -250,11 +252,11 @@ public class DalamudUtil : IDisposable
         return await _framework.RunOnFrameworkThread(func).ConfigureAwait(false);
     }
 
-    public unsafe void WaitWhileCharacterIsDrawing(GameObjectHandler handler, int timeOut = 5000, CancellationToken? ct = null)
+    public unsafe void WaitWhileCharacterIsDrawing(ILogger logger, GameObjectHandler handler, Guid redrawId, int timeOut = 5000, CancellationToken? ct = null)
     {
         if (!_clientState.IsLoggedIn || handler.Address == IntPtr.Zero) return;
 
-        Logger.Verbose($"Starting wait for {handler} to draw");
+        logger.LogTrace($"[{redrawId}] Starting wait for {handler} to draw");
 
         const int tick = 250;
         int curWaitTime = 0;
@@ -265,18 +267,20 @@ public class DalamudUtil : IDisposable
                    && curWaitTime < timeOut
                    && handler.IsBeingDrawn) // 0b100000000000 is "still rendering" or something
             {
-                Logger.Verbose($"Waiting for {handler} to finish drawing");
+                logger.LogTrace($"[{redrawId}] Waiting for {handler} to finish drawing");
                 curWaitTime += tick;
                 Thread.Sleep(tick);
             }
+
+            logger.LogTrace($"[{redrawId}] Finished drawing after {curWaitTime}ms");
         }
         catch (NullReferenceException ex)
         {
-            Logger.Warn("Error accessing " + handler + ", object does not exist anymore?", ex);
+            logger.LogWarning("Error accessing " + handler + ", object does not exist anymore?", ex);
         }
         catch (AccessViolationException ex)
         {
-            Logger.Warn("Error accessing " + handler + ", object does not exist anymore?", ex);
+            logger.LogWarning("Error accessing " + handler + ", object does not exist anymore?", ex);
         }
     }
 
@@ -286,11 +290,11 @@ public class DalamudUtil : IDisposable
         var obj = (GameObject*)characterAddress;
         const int tick = 250;
         int curWaitTime = 0;
-        Logger.Verbose("RenderFlags:" + obj->RenderFlags.ToString("X"));
+        _logger.LogTrace("RenderFlags:" + obj->RenderFlags.ToString("X"));
         // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
         while (obj->RenderFlags != 0x00 && curWaitTime < timeOut)
         {
-            Logger.Verbose($"Waiting for gpose actor to finish drawing");
+            _logger.LogTrace($"Waiting for gpose actor to finish drawing");
             curWaitTime += tick;
             Thread.Sleep(tick);
         }
@@ -300,7 +304,7 @@ public class DalamudUtil : IDisposable
 
     public void Dispose()
     {
-        Logger.Verbose($"Disposing {GetType()}");
+        _logger.LogTrace($"Disposing {GetType()}");
         _framework.Update -= FrameworkOnUpdate;
     }
 }

@@ -8,11 +8,15 @@ using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using CharacterData = MareSynchronos.API.Data.CharacterData;
+using Microsoft.Extensions.Logging;
+using MareSynchronos.Factories;
 
 namespace MareSynchronos.Export;
 public class MareCharaFileManager
 {
+    private readonly ILogger<MareCharaFileManager> _logger;
     private readonly MareMediator _mediator;
+    private readonly GameObjectHandlerFactory _gameObjectHandlerFactory;
     private readonly FileCacheManager _manager;
     private readonly IpcManager _ipcManager;
     private readonly MareConfigService _configService;
@@ -22,10 +26,13 @@ public class MareCharaFileManager
     public bool CurrentlyWorking { get; private set; } = false;
     private static int GlobalFileCounter = 0;
 
-    public MareCharaFileManager(MareMediator mediator, FileCacheManager manager, IpcManager ipcManager, MareConfigService configService, DalamudUtil dalamudUtil)
+    public MareCharaFileManager(ILogger<MareCharaFileManager> logger, MareMediator mediator, GameObjectHandlerFactory gameObjectHandlerFactory,
+        FileCacheManager manager, IpcManager ipcManager, MareConfigService configService, DalamudUtil dalamudUtil)
     {
         _factory = new(manager);
+        _logger = logger;
         _mediator = mediator;
+        _gameObjectHandlerFactory = gameObjectHandlerFactory;
         _manager = manager;
         _ipcManager = ipcManager;
         _configService = configService;
@@ -58,20 +65,20 @@ public class MareCharaFileManager
             while ((length = reader2.Read(buffer)) > 0)
             {
                 if (length < bufferSize) bufferSize = (int)length;
-                Logger.Verbose($"Reading chunk {chunk++} {bufferSize}/{length} of {filePath}");
+                _logger.LogTrace($"Reading chunk {chunk++} {bufferSize}/{length} of {filePath}");
                 wr.Write(length > bufferSize ? buffer : buffer.Take((int)length).ToArray());
             }*/
-            Logger.Info("Read Mare Chara File");
-            Logger.Info("Version: " + (LoadedCharaFile?.Version ?? -1));
+            _logger.LogInformation("Read Mare Chara File");
+            _logger.LogInformation("Version: " + (LoadedCharaFile?.Version ?? -1));
             long expectedLength = 0;
             if (LoadedCharaFile != null)
             {
-                Logger.Verbose("Data");
+                _logger.LogTrace("Data");
                 foreach (var item in LoadedCharaFile.CharaFileData.FileSwaps)
                 {
                     foreach (var gamePath in item.GamePaths)
                     {
-                        Logger.Verbose("Swap: " + gamePath + " => " + item.FileSwapPath);
+                        _logger.LogTrace("Swap: " + gamePath + " => " + item.FileSwapPath);
                     }
                 }
 
@@ -82,11 +89,11 @@ public class MareCharaFileManager
                     expectedLength += item.Length;
                     foreach (var gamePath in item.GamePaths)
                     {
-                        Logger.Verbose($"File {itemNr}: " + gamePath + " = " + item.Length);
+                        _logger.LogTrace($"File {itemNr}: " + gamePath + " = " + item.Length);
                     }
                 }
 
-                Logger.Info("Expected length: " + expectedLength);
+                _logger.LogInformation("Expected length: " + expectedLength);
             }
 
         }
@@ -108,7 +115,7 @@ public class MareCharaFileManager
                 using var lz4Stream = new LZ4Stream(unwrapped, LZ4StreamMode.Decompress, LZ4StreamFlags.HighCompression);
                 using var reader = new BinaryReader(lz4Stream);
                 LoadedCharaFile.AdvanceReaderToData(reader);
-                Logger.Debug("Applying to " + charaTarget.Name.TextValue);
+                _logger.LogDebug("Applying to " + charaTarget.Name.TextValue);
                 extractedFiles = ExtractFilesFromCharaFile(LoadedCharaFile, reader);
                 Dictionary<string, string> fileSwaps = new(StringComparer.Ordinal);
                 foreach (var fileSwap in LoadedCharaFile.CharaFileData.FileSwaps)
@@ -118,15 +125,16 @@ public class MareCharaFileManager
                         fileSwaps.Add(path, fileSwap.FileSwapPath);
                     }
                 }
+                var applicationId = Guid.NewGuid();
                 _ipcManager.ToggleGposeQueueMode(on: true);
-                _ipcManager.PenumbraRemoveTemporaryCollection(charaTarget.Name.TextValue);
-                _ipcManager.PenumbraSetTemporaryMods(charaTarget.Name.TextValue,
+                _ipcManager.PenumbraRemoveTemporaryCollection(_logger, applicationId, charaTarget.Name.TextValue);
+                _ipcManager.PenumbraSetTemporaryMods(_logger, applicationId, charaTarget.Name.TextValue,
                     extractedFiles.Union(fileSwaps).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal),
                     LoadedCharaFile.CharaFileData.ManipulationData);
-                using GameObjectHandler tempHandler = new(_mediator, ObjectKind.Player, () => charaTarget.Address, false);
-                await _ipcManager.GlamourerApplyAll(LoadedCharaFile.CharaFileData.GlamourerData, tempHandler, disposeCts.Token).ConfigureAwait(false);
+                using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.Player, () => charaTarget.Address, false);
+                await _ipcManager.GlamourerApplyAll(_logger, tempHandler, LoadedCharaFile.CharaFileData.GlamourerData, applicationId, disposeCts.Token).ConfigureAwait(false);
                 _dalamudUtil.WaitWhileGposeCharacterIsDrawing(charaTarget.Address, 30000);
-                _ipcManager.PenumbraRemoveTemporaryCollection(charaTarget.Name.TextValue);
+                _ipcManager.PenumbraRemoveTemporaryCollection(_logger, applicationId, charaTarget.Name.TextValue);
                 _ipcManager.ToggleGposeQueueMode(on: false);
             }
         }
@@ -135,7 +143,7 @@ public class MareCharaFileManager
         {
             CurrentlyWorking = false;
 
-            Logger.Debug("Clearing local files");
+            _logger.LogDebug("Clearing local files");
             foreach (var file in extractedFiles)
             {
                 File.Delete(file.Value);
@@ -158,7 +166,7 @@ public class MareCharaFileManager
             while (length > 0)
             {
                 if (length < bufferSize) bufferSize = (int)length;
-                Logger.Verbose($"Reading chunk {chunk++} {bufferSize}/{length} of {fileName}");
+                _logger.LogTrace($"Reading chunk {chunk++} {bufferSize}/{length} of {fileName}");
                 buffer = reader.ReadBytes(bufferSize);
                 wr.Write(length > bufferSize ? buffer : buffer.Take((int)length).ToArray());
                 length -= bufferSize;
@@ -167,7 +175,7 @@ public class MareCharaFileManager
             foreach (var path in fileData.GamePaths)
             {
                 gamePathToFilePath[path] = fileName;
-                Logger.Verbose(path + " => " + fileName);
+                _logger.LogTrace(path + " => " + fileName);
             }
         }
 
@@ -192,7 +200,7 @@ public class MareCharaFileManager
             byte[] buffer = new byte[bufferSize];
 
             var playerReplacements = dto.FileReplacements[ObjectKind.Player];
-            foreach(var item in output.CharaFileData.Files)
+            foreach (var item in output.CharaFileData.Files)
             {
                 var itemFromData = playerReplacements.First(f => f.GamePaths.Any(p => item.GamePaths.Contains(p, StringComparer.OrdinalIgnoreCase)));
                 var file = _manager.GetFileCacheByHash(itemFromData.Hash)!;

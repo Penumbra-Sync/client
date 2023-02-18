@@ -11,9 +11,9 @@ using MareSynchronos.API.Dto.Files;
 using MareSynchronos.API.Routes;
 using MareSynchronos.Mediator;
 using MareSynchronos.UI;
-using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.WebAPI;
 
@@ -28,7 +28,7 @@ public partial class ApiController
     {
         if (CurrentUploads.Any())
         {
-            Logger.Debug("Cancelling current upload");
+            _logger.LogDebug("Cancelling current upload");
             _uploadCancellationTokenSource?.Cancel();
             _uploadCancellationTokenSource?.Dispose();
             _uploadCancellationTokenSource = null;
@@ -102,7 +102,7 @@ public partial class ApiController
             localTimeoutCts.Dispose();
             composite.Dispose();
 
-            Logger.Debug($"Download {requestId} ready");
+            _logger.LogDebug($"Download {requestId} ready");
         }
         catch (TaskCanceledException)
         {
@@ -133,14 +133,14 @@ public partial class ApiController
     {
         var requestId = await GetQueueRequest(fileTransfer, ct).ConfigureAwait(false);
 
-        Logger.Debug($"GUID {requestId} for file {fileTransfer.Hash} on server {fileTransfer.DownloadUri}");
+        _logger.LogDebug($"GUID {requestId} for file {fileTransfer.Hash} on server {fileTransfer.DownloadUri}");
 
         await WaitForDownloadReady(fileTransfer, requestId, ct).ConfigureAwait(false);
 
         HttpResponseMessage response = null!;
         var requestUrl = MareFiles.CacheGetFullPath(fileTransfer.DownloadUri, requestId);
 
-        Logger.Debug($"Downloading {requestUrl} for file {fileTransfer.Hash}");
+        _logger.LogDebug($"Downloading {requestUrl} for file {fileTransfer.Hash}");
         try
         {
             response = await SendRequestAsync(HttpMethod.Get, requestUrl, ct).ConfigureAwait(false);
@@ -148,7 +148,7 @@ public partial class ApiController
         }
         catch (HttpRequestException ex)
         {
-            Logger.Warn($"Error during download of {requestUrl}, HttpStatusCode: {ex.StatusCode}");
+            _logger.LogWarning($"Error during download of {requestUrl}, HttpStatusCode: {ex.StatusCode}");
             if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized)
             {
                 throw new Exception($"Http error {ex.StatusCode} (cancelled: {ct.IsCancellationRequested}): {requestUrl}", ex);
@@ -173,12 +173,12 @@ public partial class ApiController
                     progress.Report(bytesRead);
                 }
 
-                Logger.Debug($"{requestUrl} downloaded to {tempPath}");
+                _logger.LogDebug($"{requestUrl} downloaded to {tempPath}");
             }
         }
         catch (Exception ex)
         {
-            Logger.Warn($"Error during file download of {requestUrl}", ex);
+            _logger.LogWarning($"Error during file download of {requestUrl}", ex);
             try
             {
                 if (!tempPath.IsNullOrEmpty())
@@ -220,11 +220,11 @@ public partial class ApiController
 
         if (requestMessage.Content != null)
         {
-            Logger.Debug("Sending " + requestMessage.Method + " to " + requestMessage.RequestUri + " (Content: " + await (((JsonContent)requestMessage.Content).ReadAsStringAsync()) + ")");
+            _logger.LogDebug("Sending " + requestMessage.Method + " to " + requestMessage.RequestUri + " (Content: " + await (((JsonContent)requestMessage.Content).ReadAsStringAsync()) + ")");
         }
         else
         {
-            Logger.Debug("Sending " + requestMessage.Method + " to " + requestMessage.RequestUri);
+            _logger.LogDebug("Sending " + requestMessage.Method + " to " + requestMessage.RequestUri);
         }
 
         try
@@ -235,7 +235,7 @@ public partial class ApiController
         }
         catch (Exception ex)
         {
-            Logger.Error("Error during SendRequestInternal for " + requestMessage.RequestUri, ex);
+            _logger.LogCritical("Error during SendRequestInternal for " + requestMessage.RequestUri, ex);
             throw;
         }
     }
@@ -249,12 +249,12 @@ public partial class ApiController
 
     private async Task DownloadFilesInternal(int currentDownloadId, List<FileReplacementData> fileReplacement, CancellationToken ct)
     {
-        Logger.Debug("Downloading files (Download ID " + currentDownloadId + ")");
+        _logger.LogDebug("Downloading files (Download ID " + currentDownloadId + ")");
 
         List<DownloadFileDto> downloadFileInfoFromService = new();
         downloadFileInfoFromService.AddRange(await FilesGetSizes(fileReplacement.Select(f => f.Hash).ToList()).ConfigureAwait(false));
 
-        Logger.Debug("Files with size 0 or less: " + string.Join(", ", downloadFileInfoFromService.Where(f => f.Size <= 0).Select(f => f.Hash)));
+        _logger.LogDebug("Files with size 0 or less: " + string.Join(", ", downloadFileInfoFromService.Where(f => f.Size <= 0).Select(f => f.Hash)));
 
         CurrentDownloads[currentDownloadId] = downloadFileInfoFromService.Distinct().Select(d => new DownloadFileTransfer(d))
             .Where(d => d.CanBeTransferred).ToList();
@@ -296,13 +296,13 @@ public partial class ApiController
                 catch (OperationCanceledException)
                 {
                     File.Delete(tempPath);
-                    Logger.Debug("Detected cancellation, removing " + currentDownloadId);
+                    _logger.LogDebug("Detected cancellation, removing " + currentDownloadId);
                     CancelDownload(currentDownloadId);
                     return;
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error("Error during download of " + file.Hash, ex);
+                    _logger.LogCritical("Error during download of " + file.Hash, ex);
                     return;
                 }
 
@@ -329,14 +329,14 @@ public partial class ApiController
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn("Issue adding file to the DB");
-                    Logger.Warn(ex.Message);
-                    Logger.Warn(ex.StackTrace);
+                    _logger.LogWarning("Issue adding file to the DB");
+                    _logger.LogWarning(ex.Message);
+                    _logger.LogWarning(ex.StackTrace);
                 }
             }
         }).ConfigureAwait(false);
 
-        Logger.Debug("Download complete, removing " + currentDownloadId);
+        _logger.LogDebug("Download complete, removing " + currentDownloadId);
         CancelDownload(currentDownloadId);
     }
 
@@ -350,23 +350,23 @@ public partial class ApiController
 
             _uploadCancellationTokenSource = new CancellationTokenSource();
             var uploadToken = _uploadCancellationTokenSource.Token;
-            Logger.Debug($"Sending Character data {data.DataHash.Value} to service {_serverManager.CurrentApiUrl}");
+            _logger.LogDebug($"Sending Character data {data.DataHash.Value} to service {_serverManager.CurrentApiUrl}");
 
             HashSet<string> unverifiedUploads = VerifyFiles(data);
             if (unverifiedUploads.Any())
             {
                 await UploadMissingFiles(unverifiedUploads, uploadToken).ConfigureAwait(false);
-                Logger.Info("Upload complete for " + data.DataHash.Value);
+                _logger.LogInformation("Upload complete for " + data.DataHash.Value);
             }
             await PushCharacterDataInternal(data, visibleCharacters.ToList()).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
-            Logger.Debug("Upload operation was cancelled");
+            _logger.LogDebug("Upload operation was cancelled");
         }
         catch (Exception ex)
         {
-            Logger.Warn("Error during upload of files", ex);
+            _logger.LogWarning("Error during upload of files", ex);
         }
         finally
         {
@@ -387,7 +387,7 @@ public partial class ApiController
 
             if (verifiedTime < DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(10)))
             {
-                Logger.Verbose("Verifying " + item + ", last verified: " + verifiedTime);
+                _logger.LogTrace("Verifying " + item + ", last verified: " + verifiedTime);
                 unverifiedUploadHashes.Add(item);
             }
         }
@@ -399,7 +399,7 @@ public partial class ApiController
     {
         unverifiedUploadHashes = unverifiedUploadHashes.Where(h => _fileDbManager.GetFileCacheByHash(h) != null).ToHashSet(StringComparer.Ordinal);
 
-        Logger.Debug("Verifying " + unverifiedUploadHashes.Count + " files");
+        _logger.LogDebug("Verifying " + unverifiedUploadHashes.Count + " files");
         var filesToUpload = await FilesSend(unverifiedUploadHashes.ToList()).ConfigureAwait(false);
 
         foreach (var file in filesToUpload.Where(f => !f.IsForbidden))
@@ -413,7 +413,7 @@ public partial class ApiController
             }
             catch (Exception ex)
             {
-                Logger.Warn("Tried to request file " + file.Hash + " but file was not present", ex);
+                _logger.LogWarning("Tried to request file " + file.Hash + " but file was not present", ex);
             }
         }
 
@@ -431,10 +431,10 @@ public partial class ApiController
         }
 
         var totalSize = CurrentUploads.Sum(c => c.Total);
-        Logger.Debug("Compressing and uploading files");
+        _logger.LogDebug("Compressing and uploading files");
         foreach (var file in CurrentUploads.Where(f => f.CanBeTransferred && !f.IsTransferred).ToList())
         {
-            Logger.Debug("Compressing and uploading " + file);
+            _logger.LogDebug("Compressing and uploading " + file);
             var data = await GetCompressedFileData(file.Hash, uploadToken).ConfigureAwait(false);
             CurrentUploads.Single(e => string.Equals(e.Hash, data.Item1, StringComparison.Ordinal)).Total = data.Item2.Length;
             await UploadFile(data.Item2, file.Hash, uploadToken).ConfigureAwait(false);
@@ -445,15 +445,15 @@ public partial class ApiController
         if (CurrentUploads.Any())
         {
             var compressedSize = CurrentUploads.Sum(c => c.Total);
-            Logger.Debug($"Compressed {UiShared.ByteToString(totalSize)} to {UiShared.ByteToString(compressedSize)} ({(compressedSize / (double)totalSize):P2})");
+            _logger.LogDebug($"Compressed {UiShared.ByteToString(totalSize)} to {UiShared.ByteToString(compressedSize)} ({(compressedSize / (double)totalSize):P2})");
 
-            Logger.Debug("Upload tasks complete, waiting for server to confirm");
-            Logger.Debug("Uploads open: " + CurrentUploads.Any(c => c.IsInTransfer));
+            _logger.LogDebug("Upload tasks complete, waiting for server to confirm");
+            _logger.LogDebug("Uploads open: " + CurrentUploads.Any(c => c.IsInTransfer));
             const double waitStep = 1.0d;
             while (CurrentUploads.Any(c => c.IsInTransfer) && !uploadToken.IsCancellationRequested)
             {
                 await Task.Delay(TimeSpan.FromSeconds(waitStep), uploadToken).ConfigureAwait(false);
-                Logger.Debug("Waiting for uploads to finish");
+                _logger.LogDebug("Waiting for uploads to finish");
             }
         }
 
@@ -467,7 +467,7 @@ public partial class ApiController
 
     private async Task PushCharacterDataInternal(CharacterData character, List<UserData> visibleCharacters)
     {
-        Logger.Info("Pushing character data for " + character.DataHash.Value + " to " + string.Join(", ", visibleCharacters.Select(c => c.AliasOrUID)));
+        _logger.LogInformation("Pushing character data for " + character.DataHash.Value + " to " + string.Join(", ", visibleCharacters.Select(c => c.AliasOrUID)));
         StringBuilder sb = new();
         foreach (var item in character.FileReplacements)
         {
@@ -477,7 +477,7 @@ public partial class ApiController
         {
             sb.AppendLine($"GlamourerData for {item.Key}: {!string.IsNullOrEmpty(item.Value)}");
         }
-        Logger.Debug("Chara data contained: " + Environment.NewLine + sb.ToString());
+        _logger.LogDebug("Chara data contained: " + Environment.NewLine + sb.ToString());
         await UserPushData(new(visibleCharacters, character)).ConfigureAwait(false);
     }
 

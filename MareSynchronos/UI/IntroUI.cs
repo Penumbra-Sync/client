@@ -2,7 +2,6 @@
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
-using MareSynchronos.Utils;
 using MareSynchronos.Localization;
 using Dalamud.Utility;
 using MareSynchronos.FileCache;
@@ -11,6 +10,7 @@ using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
 using MareSynchronos.MareConfiguration.Models;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
@@ -37,10 +37,10 @@ internal class IntroUi : WindowMediatorSubscriberBase, IDisposable
         _windowSystem.RemoveWindow(this);
     }
 
-    public IntroUi(WindowSystem windowSystem, UiShared uiShared, MareConfigService configService,
-        PeriodicFileScanner fileCacheManager, ServerConfigurationManager serverConfigurationManager, MareMediator mareMediator) : base(mareMediator, "Mare Synchronos Setup")
+    public IntroUi(ILogger<IntroUi> logger, WindowSystem windowSystem, UiShared uiShared, MareConfigService configService,
+        PeriodicFileScanner fileCacheManager, ServerConfigurationManager serverConfigurationManager, MareMediator mareMediator) : base(logger, mareMediator, "Mare Synchronos Setup")
     {
-        Logger.Verbose("Creating " + nameof(IntroUi));
+        _logger.LogTrace("Creating " + nameof(IntroUi));
 
         _uiShared = uiShared;
         _configService = configService;

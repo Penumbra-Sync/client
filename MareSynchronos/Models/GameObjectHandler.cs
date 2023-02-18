@@ -2,10 +2,10 @@
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using System.Runtime.InteropServices;
-using MareSynchronos.Utils;
 using Penumbra.String;
 using MareSynchronos.Mediator;
 using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Models;
 
@@ -27,23 +27,10 @@ public class GameObjectHandler : MediatorSubscriberBase
 
     public override string ToString()
     {
-        return $"{Name} (Addr: {Address.ToString("X")}, DrawObj: {DrawObjectAddress.ToString("X")})";
+        return $"{Name} ({Address.ToString("X")},{DrawObjectAddress.ToString("X")})";
     }
 
-    private IntPtr CurrentAddress
-    {
-        get
-        {
-            try
-            {
-                return _getAddress.Invoke();
-            }
-            catch
-            { return IntPtr.Zero; }
-        }
-    }
-
-    public GameObjectHandler(MareMediator mediator, ObjectKind objectKind, Func<IntPtr> getAddress, bool watchedObject = true) : base(mediator)
+    public GameObjectHandler(ILogger<GameObjectHandler> logger, MareMediator mediator, ObjectKind objectKind, Func<IntPtr> getAddress, bool watchedObject = true) : base(logger, mediator)
     {
         _mediator = mediator;
         ObjectKind = objectKind;
@@ -97,10 +84,9 @@ public class GameObjectHandler : MediatorSubscriberBase
 
     private void FrameworkUpdate()
     {
-        if (_delayedZoningTask?.IsCompleted ?? true)
-        {
-            CheckAndUpdateObject();
-        }
+        if (!_delayedZoningTask?.IsCompleted ?? false) return;
+
+        CheckAndUpdateObject();
     }
 
     private void ZoneSwitchEnd()
@@ -118,7 +104,7 @@ public class GameObjectHandler : MediatorSubscriberBase
         if (!_sendUpdates || _haltProcessing) return;
 
         _zoningCts = new();
-        Logger.Debug("Starting Delay After Zoning for " + ObjectKind + " " + Name);
+        _logger.LogDebug($"[{this}] Starting Delay After Zoning");
         _delayedZoningTask = Task.Run(async () =>
         {
             try
@@ -128,7 +114,7 @@ public class GameObjectHandler : MediatorSubscriberBase
             catch { }
             finally
             {
-                Logger.Debug("Delay complete for " + ObjectKind);
+                _logger.LogDebug($"[{this}] Delay after zoning complete");
                 _zoningCts.Dispose();
             }
         });
@@ -145,12 +131,12 @@ public class GameObjectHandler : MediatorSubscriberBase
 
     private unsafe void CheckAndUpdateObject()
     {
-        var curPtr = CurrentAddress;
-        bool drawObj = false;
+        var curPtr = _getAddress.Invoke();
+        bool drawObjDiff = false;
         try
         {
             var drawObjAddr = (IntPtr)((GameObject*)curPtr)->GetDrawObject();
-            drawObj = drawObjAddr != DrawObjectAddress;
+            drawObjDiff = drawObjAddr != DrawObjectAddress;
             DrawObjectAddress = drawObjAddr;
 
             IsBeingDrawn = (((CharacterBase*)drawObjAddr)->HasModelInSlotLoaded != 0)
@@ -159,7 +145,10 @@ public class GameObjectHandler : MediatorSubscriberBase
         }
         catch
         {
-            IsBeingDrawn = true;
+            if (curPtr != IntPtr.Zero)
+            {
+                IsBeingDrawn = true;
+            }
         }
 
         if (_haltProcessing) return;
@@ -168,30 +157,29 @@ public class GameObjectHandler : MediatorSubscriberBase
         {
             if (_clearCts != null)
             {
-                Logger.Debug("Cancelling Clear Task for " + ObjectKind + " " + Name);
+                _logger.LogDebug($"[{this}] Cancelling Clear Task");
                 _clearCts?.Cancel();
                 _clearCts = null;
             }
+            bool addrDiff = Address != curPtr;
+            Address = curPtr;
             var chara = (Character*)curPtr;
-            bool addr = Address == IntPtr.Zero || Address != curPtr;
-            bool equip = CompareAndUpdateEquipByteData(chara->EquipSlotData);
-            var customize = CompareAndUpdateCustomizeData(chara->CustomizeData);
+            bool equipDiff = CompareAndUpdateEquipByteData(chara->EquipSlotData);
+            var customizeDiff = _sendUpdates ? CompareAndUpdateCustomizeData(chara->CustomizeData) : false;
             var name = new ByteString(chara->GameObject.Name).ToString();
             bool nameChange = (!string.Equals(name, Name, StringComparison.Ordinal));
-            if (addr || equip || customize || drawObj || nameChange)
+            if (addrDiff || equipDiff || customizeDiff || drawObjDiff || nameChange)
             {
                 Name = name;
-                Logger.Verbose($"{ObjectKind} changed: {Name}, now: {curPtr:X}, {(IntPtr)chara->GameObject.DrawObject:X}");
+                _logger.LogTrace($"[{this}] Changed");
 
-                Address = curPtr;
-                DrawObjectAddress = (IntPtr)chara->GameObject.DrawObject;
-                if (_sendUpdates && !_doNotSendUpdate && DrawObjectAddress != IntPtr.Zero)
+                if (_sendUpdates && !_doNotSendUpdate)
                 {
-                    Logger.Debug("Sending CreateCacheObjectMessage for " + ObjectKind);
+                    _logger.LogDebug($"[{this}] Sending CreateCacheObjectMessage");
                     Mediator.Publish(new CreateCacheForObjectMessage(this));
                 }
 
-                if (equip)
+                if (equipDiff && !_sendUpdates)
                 {
                     Mediator.Publish(new CharacterChangedMessage(this));
                 }
@@ -201,7 +189,7 @@ public class GameObjectHandler : MediatorSubscriberBase
         {
             Address = IntPtr.Zero;
             DrawObjectAddress = IntPtr.Zero;
-            Logger.Verbose(ObjectKind + " Changed, DrawObj Zero: " + Name + ", now: " + Address + ", " + DrawObjectAddress);
+            _logger.LogTrace($"[{this}] Changed -> Null");
             if (_sendUpdates && ObjectKind != ObjectKind.Player)
             {
                 _clearCts?.Cancel();
@@ -215,9 +203,9 @@ public class GameObjectHandler : MediatorSubscriberBase
 
     private async Task ClearTask(CancellationToken token)
     {
-        Logger.Debug("Running Clear Task for " + ObjectKind);
+        _logger.LogDebug($"[{this}] Running Clear Task");
         await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
-        Logger.Debug("Sending ClearCachedForObjectMessage for " + ObjectKind);
+        _logger.LogDebug($"[{this}] Sending ClearCachedForObjectMessage");
         Mediator.Publish(new ClearCacheForObjectMessage(this));
         _clearCts = null;
     }
@@ -237,6 +225,7 @@ public class GameObjectHandler : MediatorSubscriberBase
 
         return hasChanges;
     }
+
     private unsafe bool CompareAndUpdateCustomizeData(byte* customizeData)
     {
         bool hasChanges = false;
@@ -258,7 +247,7 @@ public class GameObjectHandler : MediatorSubscriberBase
         {
             if (HatState != null && !hasChanges)
             {
-                Logger.Debug("Not Sending Update, only Hat changed");
+                _logger.LogDebug($"[{this}] Not Sending Update, only Hat changed");
                 _doNotSendUpdate = true;
             }
             HatState = newHatState;
@@ -270,7 +259,7 @@ public class GameObjectHandler : MediatorSubscriberBase
         {
             if (VisorWeaponState != null && !hasChanges)
             {
-                Logger.Debug("Not Sending Update, only Visor/Weapon changed");
+                _logger.LogDebug($"[{this}] Not Sending Update, only Visor/Weapon changed");
                 _doNotSendUpdate = true;
             }
             VisorWeaponState = newWeaponOrVisorState;

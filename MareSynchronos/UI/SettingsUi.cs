@@ -4,7 +4,6 @@ using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using MareSynchronos.WebAPI;
 using System.Numerics;
-using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Utils;
 using Dalamud.Utility;
 using Newtonsoft.Json;
@@ -15,6 +14,7 @@ using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
 using MareSynchronos.MareConfiguration.Models;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
@@ -34,12 +34,12 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
     private string _lastTab = string.Empty;
     private bool _wasOpen = false;
 
-    public SettingsUi(WindowSystem windowSystem,
+    public SettingsUi(ILogger<SettingsUi> logger, WindowSystem windowSystem,
         UiShared uiShared, MareConfigService configService,
         MareCharaFileManager mareCharaFileManager, PairManager pairManager,
-        ServerConfigurationManager serverConfigurationManager, MareMediator mediator) : base(mediator, "Mare Synchronos Settings")
+        ServerConfigurationManager serverConfigurationManager, MareMediator mediator) : base(logger, mediator, "Mare Synchronos Settings")
     {
-        Logger.Verbose("Creating " + nameof(SettingsUi));
+        _logger.LogTrace("Creating " + nameof(SettingsUi));
 
         SizeConstraints = new WindowSizeConstraints()
         {
@@ -564,6 +564,12 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
             }
         }
         UiShared.AttachToolTip("Use this when reporting mods being rejected from the server.");
+
+        _uiShared.DrawCombo<LogLevel>("Log Level", Enum.GetValues<LogLevel>(), (l) => l.ToString(), (l) =>
+        {
+            _configService.Current.LogLevel = l;
+            _configService.Save();
+        }, _configService.Current.LogLevel);
     }
 
     private void DrawBlockedTransfers()
@@ -719,7 +725,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
                             }
                             catch (Exception ex)
                             {
-                                Logger.Error("Error saving data", ex);
+                                _logger.LogCritical("Error saving data", ex);
                             }
                         });
                     });

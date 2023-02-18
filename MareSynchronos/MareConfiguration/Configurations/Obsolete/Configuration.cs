@@ -1,8 +1,8 @@
 ﻿using Dalamud.Configuration;
 using Dalamud.Plugin;
 using MareSynchronos.MareConfiguration.Models;
-using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.MareConfiguration.Configurations.Obsolete;
 
@@ -56,28 +56,16 @@ public class Configuration : IPluginConfiguration
     public HashSet<string> OpenPairTags = new(StringComparer.Ordinal);
 
 
-    // the below exist just to make saving less cumbersome
-    public void Initialize(DalamudPluginInterface pluginInterface)
-    {
-        _pluginInterface = pluginInterface;
-
-        if (!Directory.Exists(CacheFolder))
-        {
-            InitialScanComplete = false;
-        }
-
-        Save();
-    }
-
     public void Save()
     {
         _pluginInterface!.SavePluginConfig(this);
     }
 
-    public MareConfigV0 ToMareConfig()
+    public MareConfigV0 ToMareConfig(ILogger logger)
     {
+
         MareConfigV0 newConfig = new();
-        Logger.Info("Migrating Config to MareConfig");
+        logger.LogInformation("Migrating Config to MareConfig");
 
         newConfig.AcceptedAgreement = AcceptedAgreement;
         newConfig.CacheFolder = CacheFolder;
@@ -95,7 +83,7 @@ public class Configuration : IPluginConfiguration
         // create all server storage based on current clientsecret
         foreach (var secret in ClientSecret)
         {
-            Logger.Debug("Migrating " + secret.Key);
+            logger.LogDebug("Migrating " + secret.Key);
             var apiuri = secret.Key;
             var secretkey = secret.Value;
             ServerStorageV0 toAdd = new();

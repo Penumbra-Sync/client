@@ -7,6 +7,7 @@ using MareSynchronos.Export;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
 using MareSynchronos.Utils;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
@@ -18,9 +19,9 @@ public class GposeUi : WindowMediatorSubscriberBase, IDisposable
     private readonly FileDialogManager _fileDialogManager;
     private readonly MareConfigService _configService;
 
-    public GposeUi(WindowSystem windowSystem, MareCharaFileManager mareCharaFileManager,
+    public GposeUi(ILogger<GposeUi> logger, WindowSystem windowSystem, MareCharaFileManager mareCharaFileManager,
         DalamudUtil dalamudUtil, FileDialogManager fileDialogManager, MareConfigService configService,
-        MareMediator mediator) : base(mediator, "Mare Synchronos Gpose Import UI###MareSynchronosGposeUI")
+        MareMediator mediator) : base(logger, mediator, "Mare Synchronos Gpose Import UI###MareSynchronosGposeUI")
     {
         _windowSystem = windowSystem;
         _mareCharaFileManager = mareCharaFileManager;

@@ -2,7 +2,7 @@
 using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
-using MareSynchronos.Utils;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.FileCache;
 
@@ -15,10 +15,10 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
     private Task? _fileScannerTask = null;
     public ConcurrentDictionary<string, int> haltScanLocks = new(StringComparer.Ordinal);
 
-    public PeriodicFileScanner(IpcManager ipcManager, MareConfigService configService, FileCacheManager fileDbManager, MareMediator mediator) : base(mediator)
+    public PeriodicFileScanner(ILogger<PeriodicFileScanner> logger, IpcManager ipcManager, MareConfigService configService,
+        FileCacheManager fileDbManager, MareMediator mediator) : base(logger, mediator)
     {
-        Logger.Verbose("Creating " + nameof(PeriodicFileScanner));
-
+        _logger.LogTrace("Creating " + nameof(PeriodicFileScanner));
         _ipcManager = ipcManager;
         _configService = configService;
         _fileDbManager = fileDbManager;
@@ -156,19 +156,19 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
         if (string.IsNullOrEmpty(penumbraDir) || !Directory.Exists(penumbraDir))
         {
             penDirExists = false;
-            Logger.Warn("Penumbra directory is not set or does not exist.");
+            _logger.LogWarning("Penumbra directory is not set or does not exist.");
         }
         if (string.IsNullOrEmpty(_configService.Current.CacheFolder) || !Directory.Exists(_configService.Current.CacheFolder))
         {
             cacheDirExists = false;
-            Logger.Warn("Mare Cache directory is not set or does not exist.");
+            _logger.LogWarning("Mare Cache directory is not set or does not exist.");
         }
         if (!penDirExists || !cacheDirExists)
         {
             return;
         }
 
-        Logger.Debug("Getting files from " + penumbraDir + " and " + _configService.Current.CacheFolder);
+        _logger.LogDebug("Getting files from " + penumbraDir + " and " + _configService.Current.CacheFolder);
         string[] ext = { ".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk" };
 
         var scannedFiles = new ConcurrentDictionary<string, bool>(Directory.EnumerateFiles(penumbraDir!, "*.*", SearchOption.AllDirectories)
@@ -204,20 +204,20 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
                             scannedFiles[validatedCacheResult.Item2.ResolvedFilepath] = true;
                         if (validatedCacheResult.Item1 == FileState.RequireUpdate)
                         {
-                            Logger.Verbose("To update: " + validatedCacheResult.Item2.ResolvedFilepath);
+                            _logger.LogTrace("To update: " + validatedCacheResult.Item2.ResolvedFilepath);
                             entitiesToUpdate.Add(validatedCacheResult.Item2);
                         }
                         else if (validatedCacheResult.Item1 == FileState.RequireDeletion)
                         {
-                            Logger.Verbose("To delete: " + validatedCacheResult.Item2.ResolvedFilepath);
+                            _logger.LogTrace("To delete: " + validatedCacheResult.Item2.ResolvedFilepath);
                             entitiesToRemove.Add(validatedCacheResult.Item2);
                         }
                     }
                     catch (Exception ex)
                     {
-                        Logger.Warn("Failed validating " + cache.ResolvedFilepath);
-                        Logger.Warn(ex.Message);
-                        Logger.Warn(ex.StackTrace);
+                        _logger.LogWarning("Failed validating " + cache.ResolvedFilepath);
+                        _logger.LogWarning(ex.Message);
+                        _logger.LogWarning(ex.StackTrace);
                     }
 
                     Interlocked.Increment(ref _currentFileProgress);
@@ -226,7 +226,7 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
 
                 if (!_ipcManager.CheckPenumbraApi())
                 {
-                    Logger.Warn("Penumbra not available");
+                    _logger.LogWarning("Penumbra not available");
                     return;
                 }
 
@@ -239,14 +239,14 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
         }
         catch (Exception ex)
         {
-            Logger.Warn("Error during enumerating FileCaches: " + ex.Message);
+            _logger.LogWarning("Error during enumerating FileCaches: " + ex.Message);
         }
 
         Task.WaitAll(dbTasks);
 
         if (!_ipcManager.CheckPenumbraApi())
         {
-            Logger.Warn("Penumbra not available");
+            _logger.LogWarning("Penumbra not available");
             return;
         }
 
@@ -265,11 +265,11 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
             _fileDbManager.WriteOutFullCsv();
         }
 
-        Logger.Verbose("Scanner validated existing db files");
+        _logger.LogTrace("Scanner validated existing db files");
 
         if (!_ipcManager.CheckPenumbraApi())
         {
-            Logger.Warn("Penumbra not available");
+            _logger.LogWarning("Penumbra not available");
             return;
         }
 
@@ -288,9 +288,9 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn("Failed adding " + c.Key);
-                    Logger.Warn(ex.Message);
-                    Logger.Warn(ex.StackTrace);
+                    _logger.LogWarning("Failed adding " + c.Key);
+                    _logger.LogWarning(ex.Message);
+                    _logger.LogWarning(ex.StackTrace);
                 }
 
                 Interlocked.Increment(ref _currentFileProgress);
@@ -299,7 +299,7 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
 
             if (!_ipcManager.CheckPenumbraApi())
             {
-                Logger.Warn("Penumbra not available");
+                _logger.LogWarning("Penumbra not available");
                 return;
             }
 
@@ -308,9 +308,9 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
 
         Task.WaitAll(dbTasks);
 
-        Logger.Verbose("Scanner added new files to db");
+        _logger.LogTrace("Scanner added new files to db");
 
-        Logger.Debug("Scan complete");
+        _logger.LogDebug("Scan complete");
         TotalFiles = 0;
         _currentFileProgress = 0;
         entitiesToRemove.Clear();
@@ -327,7 +327,7 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
     public void StartScan()
     {
         if (!_ipcManager.Initialized || !_configService.Current.HasValidSetup()) return;
-        Logger.Verbose("Penumbra is active, configuration is valid, scan");
+        _logger.LogTrace("Penumbra is active, configuration is valid, scan");
         InvokeScan(forced: true);
     }
 }
