@@ -3,8 +3,8 @@ using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
-using System.Linq;
 
 namespace MareSynchronos.Managers;
 
@@ -20,7 +20,8 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
 
     private ConcurrentDictionary<IntPtr, HashSet<string>> TransientResources { get; } = new();
     private ConcurrentDictionary<ObjectKind, HashSet<string>> SemiTransientResources { get; } = new();
-    public TransientResourceManager(TransientConfigService configurationService, DalamudUtil dalamudUtil, MareMediator mediator) : base(mediator)
+    public TransientResourceManager(ILogger<TransientResourceManager> logger, TransientConfigService configurationService,
+        DalamudUtil dalamudUtil, MareMediator mediator) : base(logger, mediator)
     {
         _configurationService = configurationService;
         _dalamudUtil = dalamudUtil;
@@ -35,17 +36,17 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
 
                 try
                 {
-                    Logger.Debug("Loaded persistent transient resource " + gamePath);
+                    _logger.LogDebug("Loaded persistent transient resource " + gamePath);
                     SemiTransientResources[ObjectKind.Player].Add(gamePath);
                     restored++;
                 }
                 catch (Exception ex)
                 {
-                    Logger.Warn("Error during loading persistent transient resource " + gamePath, ex);
+                    _logger.LogWarning("Error during loading persistent transient resource " + gamePath, ex);
                 }
 
             }
-            Logger.Debug($"Restored {restored}/{gamePaths.Count()} semi persistent resources");
+            _logger.LogDebug($"Restored {restored}/{gamePaths.Count()} semi persistent resources");
         }
 
         Mediator.Subscribe<PenumbraResourceLoadMessage>(this, (msg) => Manager_PenumbraResourceLoadEvent((PenumbraResourceLoadMessage)msg));
@@ -59,7 +60,7 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
     {
         Task.Run(() =>
         {
-            Logger.Debug("Penumbra Mod Settings changed, verifying SemiTransientResources");
+            _logger.LogDebug("Penumbra Mod Settings changed, verifying SemiTransientResources");
             foreach (var item in SemiTransientResources)
             {
                 Mediator.Publish(new TransientResourceChangedMessage(_dalamudUtil.PlayerPointer));
@@ -81,7 +82,7 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
         {
             if (!_dalamudUtil.IsGameObjectPresent(item.Key))
             {
-                Logger.Debug("Object not present anymore: " + item.Key.ToString("X"));
+                _logger.LogDebug("Object not present anymore: " + item.Key.ToString("X"));
                 TransientResources.TryRemove(item.Key, out _);
             }
         }
@@ -135,7 +136,7 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
         }
         if (!PlayerRelatedPointers.Contains(gameObject))
         {
-            //Logger.Debug("Got resource " + gamePath + " for ptr " + gameObject.ToString("X"));
+            //_logger.LogDebug("Got resource " + gamePath + " for ptr " + gameObject.ToString("X"));
             return;
         }
 
@@ -157,12 +158,12 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
         if (TransientResources[gameObject].Contains(replacedGamePath) ||
             SemiTransientResources.Any(r => r.Value.Any(f => string.Equals(f, gamePath, StringComparison.OrdinalIgnoreCase))))
         {
-            Logger.Verbose("Not adding " + replacedGamePath + ":" + filePath);
+            _logger.LogTrace("Not adding " + replacedGamePath + ":" + filePath);
         }
         else
         {
             TransientResources[gameObject].Add(replacedGamePath);
-            Logger.Debug($"Adding {replacedGamePath} for {gameObject} ({filePath})");
+            _logger.LogDebug($"Adding {replacedGamePath} for {gameObject} ({filePath})");
             Mediator.Publish(new TransientResourceChangedMessage(gameObject));
         }
     }
@@ -180,7 +181,7 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
         }
 
         var transientResources = resources.ToList();
-        Logger.Debug("Persisting " + transientResources.Count + " transient resources");
+        _logger.LogDebug("Persisting " + transientResources.Count + " transient resources");
         foreach (var gamePath in transientResources)
         {
             SemiTransientResources[objectKind].Add(gamePath);

@@ -7,17 +7,20 @@ using MareSynchronos.API.Dto.User;
 using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Utils;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Models;
 
 public class Pair
 {
+    private readonly ILogger<Pair> _logger;
     private readonly MareConfigService _configService;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private OptionalPluginWarning? _pluginWarnings;
 
-    public Pair(MareConfigService configService, ServerConfigurationManager serverConfigurationManager)
+    public Pair(ILogger<Pair> logger, MareConfigService configService, ServerConfigurationManager serverConfigurationManager)
     {
+        _logger = logger;
         _configService = configService;
         _serverConfigurationManager = serverConfigurationManager;
     }
@@ -96,10 +99,10 @@ public class Pair
 
     private API.Data.CharacterData? RemoveNotSyncedFiles(API.Data.CharacterData? data)
     {
-        Logger.Verbose("Removing not synced files");
+        _logger.LogTrace("Removing not synced files");
         if (data == null || (UserPair != null && UserPair.OtherPermissions.IsPaired()))
         {
-            Logger.Verbose("Nothing to remove or user is paired directly");
+            _logger.LogTrace("Nothing to remove or user is paired directly");
             return data;
         }
 
@@ -114,7 +117,7 @@ public class Pair
 
         if (disableAnimations || disableSounds)
         {
-            Logger.Verbose($"Data cleaned up: Animations disabled: {disableAnimations}, Sounds disabled: {disableSounds}");
+            _logger.LogTrace($"Data cleaned up: Animations disabled: {disableAnimations}, Sounds disabled: {disableSounds}");
             foreach (var kvp in data.FileReplacements)
             {
                 if (disableSounds)

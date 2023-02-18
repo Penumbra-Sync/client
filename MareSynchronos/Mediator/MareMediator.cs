@@ -1,4 +1,4 @@
-﻿using MareSynchronos.Utils;
+﻿using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Mediator;
 
@@ -7,6 +7,12 @@ public class MareMediator : IDisposable
     private record MediatorSubscriber(IMediatorSubscriber Subscriber, Action<IMessage> Action);
 
     private readonly Dictionary<Type, HashSet<MediatorSubscriber>> _subscriberDict = new();
+    private readonly ILogger<MareMediator> _logger;
+
+    public MareMediator(ILogger<MareMediator> logger)
+    {
+        _logger = logger;
+    }
 
     public void Subscribe<T>(IMediatorSubscriber subscriber, Action<IMessage> action) where T : IMessage
     {
@@ -38,7 +44,7 @@ public class MareMediator : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error("Error executing " + message.GetType() + " for subscriber " + subscriber + ", removing from Mediator", ex);
+                    _logger.LogCritical("Error executing " + message.GetType() + " for subscriber " + subscriber + ", removing from Mediator", ex);
                     subscribers.RemoveWhere(s => s == subscriber);
                 }
             }
@@ -51,13 +57,13 @@ public class MareMediator : IDisposable
         {
             var unSubbed = kvp.Value.RemoveWhere(p => p.Subscriber == subscriber);
             if (unSubbed > 0)
-                Logger.Verbose(subscriber + " unsubscribed from " + kvp.Key.Name);
+                _logger.LogTrace(subscriber + " unsubscribed from " + kvp.Key.Name);
         }
     }
 
     public void Dispose()
     {
-        Logger.Verbose($"Disposing {GetType()}");
+        _logger.LogTrace($"Disposing {GetType()}");
         _subscriberDict.Clear();
     }
 }

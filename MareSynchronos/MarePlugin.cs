@@ -10,6 +10,7 @@ using MareSynchronos.FileCache;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos;
 
@@ -71,7 +72,7 @@ public class MarePlugin : MediatorSubscriberBase, IDisposable
     private const string _commandName = "/mare";
     private IServiceScope? _runtimeServiceScope;
 
-    public MarePlugin(ServiceProvider serviceProvider, MareMediator mediator) : base(mediator)
+    public MarePlugin(ILogger<MarePlugin> logger, ServiceProvider serviceProvider, MareMediator mediator) : base(logger, mediator)
     {
         _serviceProvider = serviceProvider;
 
@@ -98,12 +99,12 @@ public class MarePlugin : MediatorSubscriberBase, IDisposable
         _runtimeServiceScope?.Dispose();
         _serviceProvider.Dispose();
 
-        Logger.Debug("Shut down");
+        _logger.LogDebug("Shut down");
     }
 
     private void DalamudUtilOnLogIn()
     {
-        Logger.Debug("Client login");
+        _logger?.LogDebug("Client login");
 
         var pi = _serviceProvider.GetRequiredService<DalamudPluginInterface>();
         pi.UiBuilder.Draw += Draw;
@@ -126,7 +127,8 @@ public class MarePlugin : MediatorSubscriberBase, IDisposable
 
     private void DalamudUtilOnLogOut()
     {
-        Logger.Debug("Client logout");
+        _logger?.LogDebug("Client logout");
+
         _runtimeServiceScope?.Dispose();
         var pi = _serviceProvider.GetRequiredService<DalamudPluginInterface>();
         pi.UiBuilder.Draw -= Draw;
@@ -144,7 +146,7 @@ public class MarePlugin : MediatorSubscriberBase, IDisposable
 
         try
         {
-            Logger.Debug("Launching Managers");
+            _logger?.LogDebug("Launching Managers");
 
             _runtimeServiceScope?.Dispose();
             _runtimeServiceScope = _serviceProvider.CreateScope();
@@ -154,7 +156,7 @@ public class MarePlugin : MediatorSubscriberBase, IDisposable
         }
         catch (Exception ex)
         {
-            Logger.Warn(ex.Message);
+            _logger?.LogWarning(ex.Message);
         }
     }
 

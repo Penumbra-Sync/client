@@ -18,6 +18,7 @@ using Dalamud.Data;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos;
 
@@ -25,13 +26,18 @@ public sealed class Plugin : IDalamudPlugin
 {
     private readonly MarePlugin plugin;
     public string Name => "Mare Synchronos";
+    private readonly ILogger<Plugin> _pluginLogger;
 
     public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager, DataManager gameData,
         Framework framework, ObjectTable objectTable, ClientState clientState, Condition condition, ChatGui chatGui)
     {
-        Logger.Debug("Launching " + Name);
-
         IServiceCollection collection = new ServiceCollection();
+        collection.AddLogging(o =>
+        {
+            o.AddDalamudLogging();
+            o.SetMinimumLevel(LogLevel.Trace);
+        });
+
         // inject dalamud stuff
         collection.AddSingleton(pluginInterface);
         collection.AddSingleton(commandManager);
@@ -66,6 +72,7 @@ public sealed class Plugin : IDalamudPlugin
         collection.AddSingleton<PeriodicFileScanner>();
         collection.AddSingleton<MareCharaFileManager>();
         collection.AddSingleton<NotificationService>();
+        collection.AddSingleton<GameObjectHandlerFactory>();
 
         collection.AddSingleton<UiShared>();
         collection.AddSingleton<SettingsUi>();
@@ -81,16 +88,20 @@ public sealed class Plugin : IDalamudPlugin
 
         var serviceProvider = collection.BuildServiceProvider(new ServiceProviderOptions() { ValidateOnBuild = true, ValidateScopes = true });
 
+        _pluginLogger = serviceProvider.GetRequiredService<ILogger<Plugin>>();
+        _pluginLogger.LogDebug("Launching " + Name);
+
         serviceProvider.GetRequiredService<Dalamud.Localization>().SetupWithLangCode("en");
         serviceProvider.GetRequiredService<DalamudPluginInterface>().UiBuilder.DisableGposeUiHide = true;
 
         var mediator = serviceProvider.GetRequiredService<MareMediator>();
-        plugin = new MarePlugin(serviceProvider, mediator);
+        var logger = serviceProvider.GetRequiredService<ILogger<MarePlugin>>();
+        plugin = new MarePlugin(logger, serviceProvider, mediator);
     }
 
     public void Dispose()
     {
-        Logger.Verbose($"Disposing {GetType()}");
+        _pluginLogger.LogTrace($"Disposing {GetType()}");
         plugin.Dispose();
     }
 }

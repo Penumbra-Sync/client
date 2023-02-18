@@ -1,6 +1,6 @@
 ﻿using MareSynchronos.API.Dto.User;
-using MareSynchronos.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.WebAPI;
 
@@ -22,7 +22,7 @@ public partial class ApiController
         }
         catch (Exception ex)
         {
-            Logger.Warn("Failed to Push character data: " + ex.Message);
+            _logger.LogWarning("Failed to Push character data: " + ex.Message);
         }
     }
 
@@ -38,7 +38,6 @@ public partial class ApiController
 
     public async Task UserSetPairPermissions(UserPermissionsDto dto)
     {
-        Logger.Verbose("Sending UserSetPairPermissions: " + dto);
         await _mareHub!.SendAsync(nameof(UserSetPairPermissions), dto).ConfigureAwait(false);
     }
 

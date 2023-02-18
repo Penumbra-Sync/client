@@ -3,6 +3,7 @@ using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
 namespace MareSynchronos.Managers;
@@ -10,6 +11,7 @@ namespace MareSynchronos.Managers;
 public class ServerConfigurationManager
 {
     private readonly Dictionary<JwtCache, string> _tokenDictionary = new();
+    private readonly ILogger<ServerConfigurationManager> _logger;
     private readonly ServerConfigService _configService;
     private readonly ServerTagConfigService _serverTagConfig;
     private readonly NotesConfigService _notesConfig;
@@ -29,8 +31,10 @@ public class ServerConfigurationManager
         return _notesConfig.Current.ServerNotes[CurrentApiUrl];
     }
 
-    public ServerConfigurationManager(ServerConfigService configService, ServerTagConfigService serverTagConfig, NotesConfigService notesConfig, DalamudUtil dalamudUtil)
+    public ServerConfigurationManager(ILogger<ServerConfigurationManager> logger, ServerConfigService configService,
+        ServerTagConfigService serverTagConfig, NotesConfigService notesConfig, DalamudUtil dalamudUtil)
     {
+        _logger = logger;
         _configService = configService;
         _serverTagConfig = serverTagConfig;
         _notesConfig = notesConfig;
@@ -78,7 +82,7 @@ public class ServerConfigurationManager
     public void Save()
     {
         var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
-        Logger.Debug(caller + " Calling config save");
+        _logger.LogDebug(caller + " Calling config save");
         _configService.Save();
     }
 
