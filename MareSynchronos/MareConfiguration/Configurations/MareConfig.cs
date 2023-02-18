@@ -25,5 +25,5 @@ public class MareConfig : IMareConfiguration
     public NotificationLocation InfoNotification { get; set; } = NotificationLocation.Toast;
     public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;
     public NotificationLocation ErrorNotification { get; set; } = NotificationLocation.Both;
-    public LogLevel LogLevel { get; internal set; } = LogLevel.Information;
+    public LogLevel LogLevel { get; set; } = LogLevel.Information;
 }
