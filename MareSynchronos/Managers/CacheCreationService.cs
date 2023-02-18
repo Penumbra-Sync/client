@@ -4,6 +4,7 @@ using MareSynchronos.Factories;
 using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Managers;
 
@@ -17,7 +18,8 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
     private readonly List<GameObjectHandler> _playerRelatedObjects = new();
     private CancellationTokenSource _palettePlusCts = new();
 
-    public unsafe CacheCreationService(MareMediator mediator, CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil) : base(mediator)
+    public unsafe CacheCreationService(ILogger<CacheCreationService> logger, MareMediator mediator, GameObjectHandlerFactory gameObjectHandlerFactory,
+        CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil) : base(logger, mediator)
     {
         _characterDataFactory = characterDataFactory;
 
@@ -34,6 +36,15 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
             var actualMsg = (CreateCacheForObjectMessage)msg;
             _cachesToCreate[actualMsg.ObjectToCreateFor.ObjectKind] = actualMsg.ObjectToCreateFor;
         });
+
+        _playerRelatedObjects.AddRange(new List<GameObjectHandler>()
+        {
+            gameObjectHandlerFactory.Create(ObjectKind.Player, () => dalamudUtil.PlayerPointer, true),
+            gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => (IntPtr)((Character*)dalamudUtil.PlayerPointer)->CompanionObject, true),
+            gameObjectHandlerFactory.Create(ObjectKind.Pet, () => dalamudUtil.GetPet(), true),
+            gameObjectHandlerFactory.Create(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), true),
+        });
+
         Mediator.Subscribe<ClearCacheForObjectMessage>(this, (msg) =>
         {
             Task.Run(() =>
@@ -112,18 +123,18 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error("Error during Cache Creation Processing", ex);
+                    _logger.LogCritical("Error during Cache Creation Processing", ex);
                 }
                 finally
                 {
-                    Logger.Debug("Cache Creation complete");
+                    _logger.LogDebug("Cache Creation complete");
 
                 }
             }, _cts.Token);
         }
         else if (_cachesToCreate.Any())
         {
-            Logger.Debug("Cache Creation stored until previous creation finished");
+            _logger.LogDebug("Cache Creation stored until previous creation finished");
         }
     }
 

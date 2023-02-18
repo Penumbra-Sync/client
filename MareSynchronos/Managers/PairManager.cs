@@ -12,6 +12,7 @@ using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 
 namespace MareSynchronos.Managers;
@@ -24,8 +25,8 @@ public class PairManager : MediatorSubscriberBase, IDisposable
     private readonly PairFactory _pairFactory;
     private readonly MareConfigService _configurationService;
 
-    public PairManager(CachedPlayerFactory cachedPlayerFactory, PairFactory pairFactory,
-        MareConfigService configurationService, MareMediator mediator) : base(mediator)
+    public PairManager(ILogger<PairManager> logger, CachedPlayerFactory cachedPlayerFactory, PairFactory pairFactory,
+        MareConfigService configurationService, MareMediator mediator) : base(logger, mediator)
     {
         _cachedPlayerFactory = cachedPlayerFactory;
         _pairFactory = pairFactory;
@@ -127,7 +128,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
 
     public void ClearPairs()
     {
-        Logger.Debug("Clearing all Pairs");
+        _logger.LogDebug("Clearing all Pairs");
         DisposePairs();
         _allClientPairs.Clear();
         _allGroups.Clear();
@@ -142,7 +143,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
 
     public void DisposePairs()
     {
-        Logger.Debug("Disposing all Pairs");
+        _logger.LogDebug("Disposing all Pairs");
         foreach (var item in _allClientPairs)
         {
             item.Value.CachedPlayer?.Dispose();

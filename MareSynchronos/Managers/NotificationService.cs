@@ -5,7 +5,7 @@ using Dalamud.Interface.Internal.Notifications;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.Mediator;
-using MareSynchronos.Utils;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Managers;
 public class NotificationService : MediatorSubscriberBase
@@ -14,7 +14,7 @@ public class NotificationService : MediatorSubscriberBase
     private readonly ChatGui _chatGui;
     private readonly MareConfigService _configurationService;
 
-    public NotificationService(MareMediator mediator, UiBuilder uiBuilder, ChatGui chatGui, MareConfigService configurationService) : base(mediator)
+    public NotificationService(ILogger<NotificationService> logger, MareMediator mediator, UiBuilder uiBuilder, ChatGui chatGui, MareConfigService configurationService) : base(logger, mediator)
     {
         _uiBuilder = uiBuilder;
         _chatGui = chatGui;
@@ -24,7 +24,7 @@ public class NotificationService : MediatorSubscriberBase
 
     private void ShowNotification(NotificationMessage msg)
     {
-        Logger.Info(msg.ToString());
+        _logger.LogInformation(msg.ToString());
 
         switch (msg.Type)
         {

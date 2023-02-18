@@ -1,18 +1,20 @@
-﻿using MareSynchronos.Utils;
+﻿using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Mediator;
 
 public abstract class MediatorSubscriberBase : IMediatorSubscriber
 {
+    protected ILogger _logger { get; }
     public MareMediator Mediator { get; }
-    protected MediatorSubscriberBase(MareMediator mediator)
+    protected MediatorSubscriberBase(ILogger logger, MareMediator mediator)
     {
+        _logger = logger;
         Mediator = mediator;
     }
 
     public virtual void Dispose()
     {
-        Logger.Verbose($"Disposing {GetType()}");
+        _logger.LogTrace($"Disposing {GetType()}");
         Mediator.UnsubscribeAll(this);
     }
 }

@@ -2,17 +2,19 @@
 using MareSynchronos.MareConfiguration.Configurations;
 using MareSynchronos.MareConfiguration.Configurations.Obsolete;
 using MareSynchronos.MareConfiguration.Models;
-using MareSynchronos.Utils;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
 namespace MareSynchronos.MareConfiguration;
 
 public class ConfigurationMigrator
 {
+    private readonly ILogger<ConfigurationMigrator> _logger;
     private readonly DalamudPluginInterface _pi;
 
-    public ConfigurationMigrator(DalamudPluginInterface pi)
+    public ConfigurationMigrator(ILogger<ConfigurationMigrator> logger, DalamudPluginInterface pi)
     {
+        _logger = logger;
         _pi = pi;
     }
 
@@ -21,9 +23,9 @@ public class ConfigurationMigrator
 #pragma warning disable CS0618 // ignore Obsolete tag, the point of this migrator is to migrate obsolete configs to new ones
         if (_pi.GetPluginConfig() is Configuration oldConfig)
         {
-            Logger.Info("Migrating Configuration from old config style to 1");
+            _logger.LogInformation("Migrating Configuration from old config style to 1");
 
-            var config = oldConfig.ToMareConfig();
+            var config = oldConfig.ToMareConfig(_logger);
             File.Move(_pi.ConfigFile.FullName, _pi.ConfigFile.FullName + ".old", overwrite: true);
             MigrateMareConfigV0ToV1(config);
         }
@@ -41,7 +43,7 @@ public class ConfigurationMigrator
 
     private void MigrateMareConfigV0ToV1(MareConfigV0 mareConfigV0)
     {
-        Logger.Info("Migrating Configuration from version 0 to 1");
+        _logger.LogInformation("Migrating Configuration from version 0 to 1");
         if (File.Exists(ConfigurationPath(MareConfigService.ConfigName)))
             File.Copy(ConfigurationPath(MareConfigService.ConfigName), ConfigurationPath(MareConfigService.ConfigName) + ".migrated." + mareConfigV0.Version + ".bak", true);
 

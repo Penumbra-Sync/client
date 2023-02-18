@@ -1,6 +1,6 @@
 ﻿using Dalamud.Plugin;
 using MareSynchronos.MareConfiguration.Configurations;
-using MareSynchronos.Utils;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
 namespace MareSynchronos.MareConfiguration;
@@ -44,7 +44,7 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
             var lastWriteTime = GetConfigLastWriteTime();
             if (lastWriteTime != _configLastWriteTime)
             {
-                Logger.Debug($"Config {ConfigurationName} changed, reloading config");
+                //_logger.LogDebug($"Config {ConfigurationName} changed, reloading config");
                 _currentConfigInternal = LazyConfig();
             }
         }
@@ -98,7 +98,7 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
             }
         }
 
-        Logger.Debug("Saving dirty config " + ConfigurationName);
+        //_logger.LogDebug("Saving dirty config " + ConfigurationName);
 
         try
         {
@@ -117,7 +117,7 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
 
     public void Dispose()
     {
-        Logger.Verbose($"Disposing {GetType()}");
+        //_logger.LogTrace($"Disposing {GetType()}");
         _periodicCheckCts.Cancel();
     }
 }

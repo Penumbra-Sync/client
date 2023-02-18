@@ -16,8 +16,8 @@ using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using MareSynchronos.UI.Components;
 using MareSynchronos.UI.Handlers;
-using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
@@ -55,9 +55,9 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
     private readonly SelectPairForGroupUi _selectPairsForGroupUi;
     private readonly PairGroupsUi _pairGroupsUi;
 
-    public CompactUi(WindowSystem windowSystem,
+    public CompactUi(ILogger<CompactUi> logger, WindowSystem windowSystem,
         UiShared uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
-        ServerConfigurationManager serverManager, MareMediator mediator) : base(mediator, "###MareSynchronosMainUI")
+        ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator, "###MareSynchronosMainUI")
     {
 
 #if DEBUG
@@ -69,7 +69,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
         var ver = Assembly.GetExecutingAssembly().GetName().Version;
         this.WindowName = "Mare Synchronos " + ver.Major + "." + ver.Minor + "." + ver.Build + "###MareSynchronosMainUI";
 #endif
-        Logger.Verbose("Creating " + nameof(CompactUi));
+        _logger.LogTrace("Creating " + nameof(CompactUi));
 
         _windowSystem = windowSystem;
         _uiShared = uiShared;

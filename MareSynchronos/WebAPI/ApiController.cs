@@ -48,10 +48,10 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
     private HttpClient _httpClient;
 
-    public ApiController(MareConfigService configService, DalamudUtil dalamudUtil, FileCacheManager fileDbManager,
-        PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator) : base(mediator)
+    public ApiController(ILogger<ApiController> logger, MareConfigService configService, DalamudUtil dalamudUtil, FileCacheManager fileDbManager,
+        PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
     {
-        Logger.Verbose("Creating " + nameof(ApiController));
+        _logger.LogTrace("Creating " + nameof(ApiController));
 
         _configService = configService;
         _dalamudUtil = dalamudUtil;
@@ -107,21 +107,21 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         get => _serverState;
         private set
         {
-            Logger.Debug($"New ServerState: {value}, prev ServerState: {_serverState}");
+            _logger.LogDebug($"New ServerState: {value}, prev ServerState: {_serverState}");
             _serverState = value;
         }
     }
 
     public async Task CreateConnections(bool forceGetToken = false)
     {
-        Logger.Debug("CreateConnections called");
+        _logger.LogDebug("CreateConnections called");
 
         _httpClient?.Dispose();
         _httpClient = new();
 
         if (_serverManager.CurrentServer?.FullPause ?? true)
         {
-            Logger.Info("Not recreating Connection, paused");
+            _logger.LogInformation("Not recreating Connection, paused");
             _connectionDto = null;
             await StopConnection(_connectionCancellationTokenSource.Token, ServerState.Disconnected).ConfigureAwait(false);
             _connectionCancellationTokenSource.Cancel();
@@ -131,7 +131,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         var secretKey = _serverManager.GetSecretKey();
         if (secretKey.IsNullOrEmpty())
         {
-            Logger.Warn("No secret key set for current character");
+            _logger.LogWarning("No secret key set for current character");
             _connectionDto = null;
             await StopConnection(_connectionCancellationTokenSource.Token, ServerState.NoSecretKey).ConfigureAwait(false);
             _connectionCancellationTokenSource.Cancel();
@@ -140,7 +140,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
         await StopConnection(_connectionCancellationTokenSource.Token, ServerState.Disconnected).ConfigureAwait(false);
 
-        Logger.Info("Recreating Connection");
+        _logger.LogInformation("Recreating Connection");
 
         _connectionCancellationTokenSource.Cancel();
         _connectionCancellationTokenSource = new CancellationTokenSource();
@@ -155,11 +155,11 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
             try
             {
-                Logger.Debug("Building connection");
+                _logger.LogDebug("Building connection");
 
                 if (_serverManager.GetToken() == null || forceGetToken)
                 {
-                    Logger.Debug("Requesting new JWT");
+                    _logger.LogDebug("Requesting new JWT");
                     using HttpClient httpClient = new();
                     var postUri = MareAuth.AuthFullPath(new Uri(_serverManager.CurrentApiUrl
                         .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
@@ -173,12 +173,12 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
                     AuthFailureMessage = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
                     result.EnsureSuccessStatusCode();
                     _serverManager.SaveToken(await result.Content.ReadAsStringAsync().ConfigureAwait(false));
-                    Logger.Debug("JWT Success");
+                    _logger.LogDebug("JWT Success");
                 }
 
                 while (!_dalamudUtil.IsPlayerPresent && !token.IsCancellationRequested)
                 {
-                    Logger.Debug("Player not loaded in yet, waiting");
+                    _logger.LogDebug("Player not loaded in yet, waiting");
                     await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
                 }
 
@@ -209,7 +209,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
             }
             catch (HttpRequestException ex)
             {
-                Logger.Warn("HttpRequestException on Connection", ex);
+                _logger.LogWarning("HttpRequestException on Connection", ex);
 
                 if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
@@ -219,15 +219,15 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
                 else
                 {
                     ServerState = ServerState.Reconnecting;
-                    Logger.Info("Failed to establish connection, retrying");
+                    _logger.LogInformation("Failed to establish connection, retrying");
                     await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token).ConfigureAwait(false);
                 }
             }
             catch (Exception ex)
             {
-                Logger.Warn("Exception on Connection", ex);
+                _logger.LogWarning("Exception on Connection", ex);
 
-                Logger.Info("Failed to establish connection, retrying");
+                _logger.LogInformation("Failed to establish connection, retrying");
                 await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token).ConfigureAwait(false);
             }
         }
@@ -239,7 +239,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         {
             await Task.Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
             var needsRestart = await CheckClientHealth().ConfigureAwait(false);
-            Logger.Debug("Checked Client Health State");
+            _logger.LogDebug("Checked Client Health State");
         }
     }
 
@@ -247,7 +247,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
     {
         if (_mareHub == null) return;
 
-        Logger.Debug("Initializing data");
+        _logger.LogDebug("Initializing data");
         OnDownloadReady((guid) => Client_DownloadReady(guid));
         OnReceiveServerMessage((sev, msg) => Client_ReceiveServerMessage(sev, msg));
         OnUpdateSystemInfo((dto) => Client_UpdateSystemInfo(dto));
@@ -271,12 +271,12 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
         foreach (var userPair in await UserGetPairedClients().ConfigureAwait(false))
         {
-            Logger.Debug($"Pair: {userPair}");
+            _logger.LogDebug($"Pair: {userPair}");
             _pairManager.AddUserPair(userPair, addToLastAddedUser: false);
         }
         foreach (var entry in await GroupsGetAll().ConfigureAwait(false))
         {
-            Logger.Debug($"Group: {entry}");
+            _logger.LogDebug($"Group: {entry}");
             _pairManager.AddGroup(entry);
         }
         foreach (var group in _pairManager.GroupPairs.Keys)
@@ -284,7 +284,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
             var users = await GroupsGetUsersInGroup(group).ConfigureAwait(false);
             foreach (var user in users)
             {
-                Logger.Debug($"GroupPair: {user}");
+                _logger.LogDebug($"GroupPair: {user}");
                 _pairManager.AddGroupPair(user);
             }
         }
@@ -342,7 +342,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
             .WithAutomaticReconnect(new ForeverRetryPolicy(Mediator))
             .ConfigureLogging(a =>
             {
-                a.ClearProviders().AddProvider(new DalamudLoggingProvider());
+                a.ClearProviders().AddProvider(new DalamudLoggingProvider(_configService));
                 a.SetMinimumLevel(LogLevel.Information);
             })
             .Build();
@@ -357,7 +357,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         Mediator.Publish(new DisconnectedMessage());
         _pairManager.ClearPairs();
         ServerState = ServerState.Offline;
-        Logger.Info("Connection closed");
+        _logger.LogInformation("Connection closed");
         return Task.CompletedTask;
     }
 
@@ -367,7 +367,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         _healthCheckTokenSource?.Cancel();
         ServerState = ServerState.Reconnecting;
         Mediator.Publish(new NotificationMessage("Connection lost", "Connection lost to " + _serverManager.CurrentServer!.ServerName, NotificationType.Warning, 5000));
-        Logger.Warn("Connection closed... Reconnecting", arg);
+        _logger.LogWarning("Connection closed... Reconnecting", arg);
         return Task.CompletedTask;
     }
 
@@ -394,7 +394,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
             _initialized = false;
             _healthCheckTokenSource?.Cancel();
             _uploadCancellationTokenSource?.Cancel();
-            Logger.Info("Stopping existing connection");
+            _logger.LogInformation("Stopping existing connection");
             _mareHub.Closed -= MareHubOnClosed;
             _mareHub.Reconnecting -= MareHubOnReconnecting;
             _mareHub.Reconnected -= MareHubOnReconnected;

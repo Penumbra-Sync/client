@@ -18,6 +18,7 @@ using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
@@ -60,9 +61,9 @@ public partial class UiShared : MediatorSubscriberBase
     private bool _heelsExists = false;
     private bool _palettePlusExists = false;
 
-    public UiShared(IpcManager ipcManager, ApiController apiController, PeriodicFileScanner cacheScanner, FileDialogManager fileDialogManager,
+    public UiShared(ILogger<UiShared> logger, IpcManager ipcManager, ApiController apiController, PeriodicFileScanner cacheScanner, FileDialogManager fileDialogManager,
         MareConfigService configService, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization,
-        ServerConfigurationManager serverManager, MareMediator mediator) : base(mediator)
+        ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
     {
         _ipcManager = ipcManager;
         _apiController = apiController;
@@ -154,13 +155,13 @@ public partial class UiShared : MediatorSubscriberBase
             }
             catch (Exception ex)
             {
-                Logger.Warn($"Font failed to load. {fontFile}");
-                Logger.Warn(ex.ToString());
+                _logger.LogWarning($"Font failed to load. {fontFile}");
+                _logger.LogWarning(ex.ToString());
             }
         }
         else
         {
-            Logger.Debug($"Font doesn't exist. {fontFile}");
+            _logger.LogDebug($"Font doesn't exist. {fontFile}");
         }
     }
 
@@ -693,7 +694,7 @@ public partial class UiShared : MediatorSubscriberBase
             }
             catch
             {
-                Logger.Warn("Could not parse " + note);
+                _logger.LogWarning("Could not parse " + note);
             }
         }
 

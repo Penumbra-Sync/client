@@ -1,6 +1,7 @@
 ﻿using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Utils;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
@@ -11,6 +12,7 @@ public class FileCacheManager : IDisposable
 {
     private const string _penumbraPrefix = "{penumbra}";
     private const string _cachePrefix = "{cache}";
+    private readonly ILogger<FileCacheManager> _logger;
     private readonly IpcManager _ipcManager;
     private readonly MareConfigService _configService;
     private readonly string _csvPath;
@@ -19,8 +21,9 @@ public class FileCacheManager : IDisposable
     public const string CsvSplit = "|";
     private readonly object _fileWriteLock = new();
 
-    public FileCacheManager(IpcManager ipcManager, MareConfigService configService)
+    public FileCacheManager(ILogger<FileCacheManager> logger, IpcManager ipcManager, MareConfigService configService)
     {
+        _logger = logger;
         _ipcManager = ipcManager;
         _configService = configService;
         _csvPath = Path.Combine(configService.ConfigurationDirectory, "FileCache.csv");
@@ -48,7 +51,7 @@ public class FileCacheManager : IDisposable
                 }
                 catch (Exception)
                 {
-                    Logger.Warn($"Failed to initialize entry {entry}, ignoring");
+                    _logger.LogWarning($"Failed to initialize entry {entry}, ignoring");
                 }
             }
         }
@@ -116,7 +119,7 @@ public class FileCacheManager : IDisposable
 
         if (entry == null)
         {
-            Logger.Debug("Found no entries for " + cleanedPath);
+            _logger.LogDebug("Found no entries for " + cleanedPath);
             return CreateFileEntry(path);
         }
 
@@ -127,7 +130,7 @@ public class FileCacheManager : IDisposable
 
     public FileCacheEntity? CreateCacheEntry(string path)
     {
-        Logger.Verbose("Creating cache entry for " + path);
+        _logger.LogTrace("Creating cache entry for " + path);
         FileInfo fi = new(path);
         if (!fi.Exists) return null;
         var fullName = fi.FullName.ToLowerInvariant();
@@ -138,7 +141,7 @@ public class FileCacheManager : IDisposable
 
     public FileCacheEntity? CreateFileEntry(string path)
     {
-        Logger.Verbose("Creating file entry for " + path);
+        _logger.LogTrace("Creating file entry for " + path);
         FileInfo fi = new(path);
         if (!fi.Exists) return null;
         var fullName = fi.FullName.ToLowerInvariant();
@@ -158,7 +161,7 @@ public class FileCacheManager : IDisposable
             File.AppendAllLines(_csvPath, new[] { entity.CsvEntry });
         }
         var result = GetFileCacheByPath(fileInfo.FullName);
-        Logger.Debug("Creating file cache for " + fileInfo.FullName + " success: " + (result != null));
+        _logger.LogDebug("Creating file cache for " + fileInfo.FullName + " success: " + (result != null));
         return result;
     }
 
@@ -188,13 +191,13 @@ public class FileCacheManager : IDisposable
 
     public void RemoveHash(FileCacheEntity entity)
     {
-        Logger.Verbose("Removing " + entity.ResolvedFilepath);
+        _logger.LogTrace("Removing " + entity.ResolvedFilepath);
         _fileCaches.Remove(entity.PrefixedFilePath, out _);
     }
 
     public void UpdateHash(FileCacheEntity fileCache)
     {
-        Logger.Verbose("Updating hash for " + fileCache.ResolvedFilepath);
+        _logger.LogTrace("Updating hash for " + fileCache.ResolvedFilepath);
         fileCache.Hash = Crypto.GetFileHash(fileCache.ResolvedFilepath);
         fileCache.LastModifiedDateTicks = new FileInfo(fileCache.ResolvedFilepath).LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture);
         _fileCaches.Remove(fileCache.PrefixedFilePath, out _);
@@ -222,7 +225,7 @@ public class FileCacheManager : IDisposable
 
     public void Dispose()
     {
-        Logger.Verbose($"Disposing {GetType()}");
+        _logger.LogTrace($"Disposing {GetType()}");
         WriteOutFullCsv();
     }
 }

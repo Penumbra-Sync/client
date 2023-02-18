@@ -3,6 +3,7 @@ using MareSynchronos.FileCache;
 using MareSynchronos.Mediator;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Managers;
 
@@ -14,32 +15,29 @@ public class OnlinePlayerManager : MediatorSubscriberBase, IDisposable
     private readonly PairManager _pairManager;
     private CharacterData? _lastSentData;
 
-    public OnlinePlayerManager(ApiController apiController, DalamudUtil dalamudUtil,
-        FileCacheManager fileDbManager, PairManager pairManager, MareMediator mediator) : base(mediator)
+    public OnlinePlayerManager(ILogger<OnlinePlayerManager> logger, ApiController apiController, DalamudUtil dalamudUtil,
+        FileCacheManager fileDbManager, PairManager pairManager, MareMediator mediator) : base(logger, mediator)
     {
-        Logger.Verbose("Creating " + nameof(OnlinePlayerManager));
-
+        _logger.LogTrace("Creating " + nameof(OnlinePlayerManager));
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
         _fileDbManager = fileDbManager;
         _pairManager = pairManager;
 
         Mediator.Subscribe<PlayerChangedMessage>(this, (msg) => PlayerManagerOnPlayerHasChanged((PlayerChangedMessage)msg));
-        Mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
-        Mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => FrameworkOnUpdate());
         Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) =>
         {
             var newData = ((CharacterDataCreatedMessage)msg).CharacterData.ToAPI();
             if (_lastSentData == null || _lastSentData != null && !string.Equals(newData.DataHash.Value, _lastSentData.DataHash.Value, StringComparison.Ordinal))
             {
-                Logger.Debug("Pushing data for visible players");
+                _logger.LogDebug("Pushing data for visible players");
                 _lastSentData = newData;
                 PushCharacterData(_pairManager.VisibleUsers);
             }
             else
             {
-                Logger.Debug("Not sending data for " + newData.DataHash.Value);
+                _logger.LogDebug("Not sending data for " + newData.DataHash.Value);
             }
         });
     }
@@ -47,16 +45,6 @@ public class OnlinePlayerManager : MediatorSubscriberBase, IDisposable
     private void PlayerManagerOnPlayerHasChanged(PlayerChangedMessage msg)
     {
         PushCharacterData(_pairManager.VisibleUsers);
-    }
-
-    private void DalamudUtilOnLogIn()
-    {
-        Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => FrameworkOnUpdate());
-    }
-
-    private void DalamudUtilOnLogOut()
-    {
-        Mediator.Unsubscribe<DelayedFrameworkUpdateMessage>(this);
     }
 
     public override void Dispose()
@@ -83,7 +71,7 @@ public class OnlinePlayerManager : MediatorSubscriberBase, IDisposable
 
         if (newVisiblePlayers.Any())
         {
-            Logger.Verbose("Has new visible players, pushing character data");
+            _logger.LogTrace("Has new visible players, pushing character data");
             PushCharacterData(newVisiblePlayers);
         }
     }

@@ -1,5 +1,6 @@
 ﻿using Dalamud.Plugin;
 using MareSynchronos.MareConfiguration.Configurations;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.MareConfiguration;
 

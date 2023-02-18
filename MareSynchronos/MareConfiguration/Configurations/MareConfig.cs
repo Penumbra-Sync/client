@@ -1,4 +1,5 @@
 ﻿using MareSynchronos.MareConfiguration.Models;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.MareConfiguration.Configurations;
 
@@ -24,4 +25,5 @@ public class MareConfig : IMareConfiguration
     public NotificationLocation InfoNotification { get; set; } = NotificationLocation.Toast;
     public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;
     public NotificationLocation ErrorNotification { get; set; } = NotificationLocation.Both;
+    public LogLevel LogLevel { get; set; } = LogLevel.Information;
 }

@@ -2,13 +2,14 @@
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
 public class DownloadUi : Window, IDisposable
 {
+    private readonly ILogger<DownloadUi> _logger;
     private readonly WindowSystem _windowSystem;
     private readonly MareConfigService _configService;
     private readonly ApiController _apiController;
@@ -17,13 +18,14 @@ public class DownloadUi : Window, IDisposable
 
     public void Dispose()
     {
-        Logger.Verbose($"Disposing {GetType()}");
+        _logger.LogTrace($"Disposing {GetType()}");
         _windowSystem.RemoveWindow(this);
     }
 
-    public DownloadUi(WindowSystem windowSystem, MareConfigService configService, ApiController apiController, UiShared uiShared) : base("Mare Synchronos Downloads")
+    public DownloadUi(ILogger<DownloadUi> logger, WindowSystem windowSystem, MareConfigService configService, ApiController apiController, UiShared uiShared) : base("Mare Synchronos Downloads")
     {
-        Logger.Verbose("Creating " + nameof(DownloadUi));
+        _logger = logger;
+        _logger.LogTrace("Creating " + nameof(DownloadUi));
         _windowSystem = windowSystem;
         _configService = configService;
         _apiController = apiController;

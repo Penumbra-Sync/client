@@ -1,5 +1,4 @@
 ﻿using MareSynchronos.API.Dto.Group;
-using MareSynchronos.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
 
 namespace MareSynchronos.WebAPI;
@@ -67,7 +66,6 @@ public partial class ApiController
     public async Task GroupChangeIndividualPermissionState(GroupPairUserPermissionDto dto)
     {
         CheckConnection();
-        Logger.Debug("Sending " + dto);
         await _mareHub!.SendAsync(nameof(GroupChangeIndividualPermissionState), dto).ConfigureAwait(false);
     }
 
