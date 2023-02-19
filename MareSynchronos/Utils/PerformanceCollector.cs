@@ -36,9 +36,17 @@ public class PerformanceCollector : IDisposable
 
             foreach (var entries in _performanceCounters.ToList())
             {
-                if (entries.Value.ToList().Last().Item1.AddMinutes(10) < TimeOnly.FromDateTime(DateTime.Now))
+                try
                 {
-                    _performanceCounters.Remove(entries.Key, out _);
+                    var last = entries.Value.ToList().Last();
+                    if (last.Item1.AddMinutes(10) < TimeOnly.FromDateTime(DateTime.Now))
+                    {
+                        _performanceCounters.Remove(entries.Key, out _);
+                    }
+                }
+                catch (Exception e)
+                {
+                    _logger.LogDebug("Error removing performance counter {counter}", entries.Key);
                 }
             }
         }
