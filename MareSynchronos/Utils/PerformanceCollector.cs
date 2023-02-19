@@ -36,7 +36,7 @@ public class PerformanceCollector : IDisposable
 
             foreach (var entries in _performanceCounters.ToList())
             {
-                if (entries.Value.Last().Item1.AddMinutes(10) < TimeOnly.FromDateTime(DateTime.Now))
+                if (entries.Value.ToList().Last().Item1.AddMinutes(10) < TimeOnly.FromDateTime(DateTime.Now))
                 {
                     _performanceCounters.Remove(entries.Key, out _);
                 }
