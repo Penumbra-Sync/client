@@ -86,29 +86,31 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
             if (hasNewButNotOldFileReplacements || hasOldButNotNewFileReplacements || hasNewButNotOldGlamourerData || hasOldButNotNewGlamourerData)
             {
-                _logger.LogDebug("Updating {object} (Some new data arrived: NewButNotOldFiles:{hasNewButNotOldFileReplacements}," +
-                    " OldButNotNewFiles:{hasOldButNotNewFileReplacements}, NewButNotOldGlam:{hasNewButNotOldGlamourerData}, OldButNotNewGlam:{hasOldButNotNewGlamourerData})",
-                    this, hasNewButNotOldFileReplacements, hasOldButNotNewFileReplacements, hasOldButNotNewGlamourerData, hasNewButNotOldGlamourerData);
+                _logger.LogDebug("Updating {object}/{kind} (Some new data arrived: NewButNotOldFiles:{hasNewButNotOldFileReplacements}," +
+                    " OldButNotNewFiles:{hasOldButNotNewFileReplacements}, NewButNotOldGlam:{hasNewButNotOldGlamourerData}, OldButNotNewGlam:{hasOldButNotNewGlamourerData}) => {change}",
+                    this, objectKind, hasNewButNotOldFileReplacements, hasOldButNotNewFileReplacements, hasNewButNotOldGlamourerData, hasOldButNotNewGlamourerData, PlayerChanges.Mods);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.Mods);
             }
-
-            if (hasNewAndOldFileReplacements)
+            else
             {
-                bool listsAreEqual = Enumerable.SequenceEqual(oldData.FileReplacements[objectKind], newData.FileReplacements[objectKind], FileReplacementDataComparer.Instance);
-                if (!listsAreEqual || forced)
+                if (hasNewAndOldFileReplacements)
                 {
-                    _logger.LogDebug("Updating {object}/{kind} (FileReplacements not equal)", this, objectKind);
-                    charaDataToUpdate[objectKind].Add(PlayerChanges.Mods);
+                    bool listsAreEqual = Enumerable.SequenceEqual(oldData.FileReplacements[objectKind], newData.FileReplacements[objectKind], FileReplacementDataComparer.Instance);
+                    if (!listsAreEqual || forced)
+                    {
+                        _logger.LogDebug("Updating {object}/{kind} (FileReplacements not equal) => {change}", this, objectKind, PlayerChanges.Mods);
+                        charaDataToUpdate[objectKind].Add(PlayerChanges.Mods);
+                    }
                 }
-            }
 
-            if (hasNewAndOldGlamourerData)
-            {
-                bool glamourerDataDifferent = !string.Equals(oldData.GlamourerData[objectKind], newData.GlamourerData[objectKind], StringComparison.Ordinal);
-                if (forced || glamourerDataDifferent)
+                if (hasNewAndOldGlamourerData)
                 {
-                    _logger.LogDebug("Updating {object}/{kind} (Diff glamourer data)", this, objectKind);
-                    charaDataToUpdate[objectKind].Add(PlayerChanges.Mods);
+                    bool glamourerDataDifferent = !string.Equals(oldData.GlamourerData[objectKind], newData.GlamourerData[objectKind], StringComparison.Ordinal);
+                    if (forced || glamourerDataDifferent)
+                    {
+                        _logger.LogDebug("Updating {object}/{kind} (Glamourer different) => {change}", this, objectKind, PlayerChanges.Mods);
+                        charaDataToUpdate[objectKind].Add(PlayerChanges.Mods);
+                    }
                 }
             }
 
@@ -117,7 +119,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 bool manipDataDifferent = !string.Equals(oldData.ManipulationData, newData.ManipulationData, StringComparison.Ordinal);
                 if (manipDataDifferent || forced)
                 {
-                    _logger.LogDebug("Updating {object}/{kind} (Diff manip data)", this, objectKind);
+                    _logger.LogDebug("Updating {object}/{kind} (Diff manip data) => {change}", this, objectKind, PlayerChanges.Mods);
                     charaDataToUpdate[objectKind].Add(PlayerChanges.Mods);
                     continue;
                 }
@@ -125,7 +127,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 bool heelsOffsetDifferent = oldData.HeelsOffset != newData.HeelsOffset;
                 if (heelsOffsetDifferent || forced)
                 {
-                    _logger.LogDebug("Updating {object}/{kind} (Diff heels data)", this, objectKind);
+                    _logger.LogDebug("Updating {object}/{kind} (Diff heels data) => {change}", this, objectKind, PlayerChanges.Heels);
                     charaDataToUpdate[objectKind].Add(PlayerChanges.Heels);
                     continue;
                 }
@@ -133,7 +135,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 bool customizeDataDifferent = !string.Equals(oldData.CustomizePlusData, newData.CustomizePlusData, StringComparison.Ordinal);
                 if (customizeDataDifferent || forced)
                 {
-                    _logger.LogDebug("Updating {object}/{kind} (Diff customize data)", this, objectKind);
+                    _logger.LogDebug("Updating {object}/{kind} (Diff customize data) => {change}", this, objectKind, PlayerChanges.Customize);
                     charaDataToUpdate[objectKind].Add(PlayerChanges.Customize);
                     continue;
                 }
@@ -141,7 +143,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 bool palettePlusDataDifferent = !string.Equals(oldData.PalettePlusData, newData.PalettePlusData, StringComparison.Ordinal);
                 if (palettePlusDataDifferent || forced)
                 {
-                    _logger.LogDebug("Updating {object}/{kind} (Diff palette data)", this, objectKind);
+                    _logger.LogDebug("Updating {object}/{kind} (Diff palette data) => {change}", this, objectKind, PlayerChanges.Palette);
                     charaDataToUpdate[objectKind].Add(PlayerChanges.Palette);
                     continue;
                 }
@@ -224,19 +226,19 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         {
             Guid applicationId = Guid.NewGuid();
             _logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser);
-            _currentOtherChara?.Dispose();
             _ipcManager.PenumbraRemoveTemporaryCollection(_logger, applicationId, name);
             _downloadCancellationTokenSource?.Cancel();
             _downloadCancellationTokenSource?.Dispose();
             _downloadCancellationTokenSource = null;
             if (PlayerCharacter != IntPtr.Zero)
             {
+                var ptr = PlayerCharacter;
                 foreach (var item in _cachedData.FileReplacements)
                 {
-                    var task = Task.Run(async () => await RevertCustomizationData(item.Key, name, applicationId).ConfigureAwait(false));
-                    Task.WaitAll(new[] { task });
+                    Task.Run(async () => await RevertCustomizationData(ptr, item.Key, name, applicationId).ConfigureAwait(false));
                 }
             }
+            _currentOtherChara?.Dispose();
             _currentOtherChara = null;
         }
         catch (Exception ex)
@@ -262,8 +264,9 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         Mediator.Subscribe<CharacterChangedMessage>(this, (msg) =>
         {
             var actualMsg = (CharacterChangedMessage)msg;
-            if (actualMsg.GameObjectHandler == _currentOtherChara && !_ipcManager.RequestedRedraw(_currentOtherChara.Address))
+            if (actualMsg.GameObjectHandler == _currentOtherChara && (_applicationTask?.IsCompleted ?? true))
             {
+                _logger.LogTrace("Saving new Glamourer Data for {this}", this);
                 _lastGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
             }
         });
@@ -273,7 +276,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
     public override string ToString()
     {
-        return OnlineUser.User.AliasOrUID + ":" + PlayerName + ":HasChar " + (PlayerCharacter != IntPtr.Zero);
+        return OnlineUser.User.AliasOrUID + ":" + PlayerName + ":" + ((PlayerCharacter != IntPtr.Zero) ? "HasChar" : "NoChar");
     }
 
     private void ApplyBaseData(Guid applicationId, Dictionary<string, string> moddedPaths, string manipulationData)
@@ -281,6 +284,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         _ipcManager.PenumbraRemoveTemporaryCollection(_logger, applicationId, PlayerName!);
         _ipcManager.PenumbraSetTemporaryMods(_logger, applicationId, PlayerName!, moddedPaths, manipulationData);
     }
+
     private async Task ApplyCustomizationData(Guid applicationId, KeyValuePair<ObjectKind, HashSet<PlayerChanges>> changes, API.Data.CharacterData charaData)
     {
         if (PlayerCharacter == IntPtr.Zero) return;
@@ -312,7 +316,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     _ipcManager.CustomizePlusSetBodyScale(handler.Address, charaData.CustomizePlusData);
                     break;
                 case PlayerChanges.Heels:
-                    _ipcManager.HeelsSetOffsetForPlayer(charaData.HeelsOffset, handler.Address);
+                    _ipcManager.HeelsSetOffsetForPlayer(handler.Address, charaData.HeelsOffset);
                     break;
                 case PlayerChanges.Mods:
                     if (charaData.GlamourerData.TryGetValue(changes.Key, out var glamourerData))
@@ -327,6 +331,8 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             }
             break;
         }
+
+        if (handler != _currentOtherChara) handler.Dispose();
     }
 
     private void DownloadAndApplyCharacter(API.Data.CharacterData charaData, Dictionary<ObjectKind, HashSet<PlayerChanges>> updatedData)
@@ -381,28 +387,30 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             while (!_applicationTask?.IsCompleted ?? false)
             {
                 // block until current application is done
-                _logger.LogDebug("Waiting for current data application to finish");
+                _logger.LogDebug("Waiting for current data application (Id: {id}) to finish", _applicationId);
                 await Task.Delay(250).ConfigureAwait(false);
                 if (downloadToken.IsCancellationRequested) return;
             }
 
             _applicationTask = Task.Run(async () =>
             {
-                Guid applicationId = Guid.NewGuid();
-                _logger.LogDebug("[{applicationId}] Starting application task", applicationId);
+                _applicationId = Guid.NewGuid();
+                _logger.LogDebug("[{applicationId}] Starting application task", _applicationId);
 
                 if (updateModdedPaths)
                 {
                     if (moddedPaths.Any())
                     {
-                        ApplyBaseData(applicationId, moddedPaths, charaData.ManipulationData);
-                    }
-
-                    foreach (var kind in updatedData)
-                    {
-                        await ApplyCustomizationData(applicationId, kind, charaData).ConfigureAwait(false);
+                        ApplyBaseData(_applicationId, moddedPaths, charaData.ManipulationData);
                     }
                 }
+
+                foreach (var kind in updatedData)
+                {
+                    await ApplyCustomizationData(_applicationId, kind, charaData).ConfigureAwait(false);
+                }
+
+                _logger.LogDebug("[{applicationId}] Application finished", _applicationId);
             });
 
         }, downloadToken).ContinueWith(task =>
@@ -411,7 +419,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
                 if (!task.IsCanceled) return;
 
-                _logger.LogDebug("Application was cancelled");
+                _logger.LogDebug("Download was cancelled");
                 _apiController.CancelDownload(downloadId);
             });
     }
@@ -419,6 +427,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
     private Task? _applicationTask;
 
     private CancellationTokenSource _redrawCts = new();
+    private Guid _applicationId;
 
     private void IpcManagerOnPenumbraRedrawEvent(PenumbraRedrawMessage msg)
     {
@@ -441,9 +450,9 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         }, token);
     }
 
-    private async Task RevertCustomizationData(ObjectKind objectKind, string name, Guid applicationId)
+    private async Task RevertCustomizationData(IntPtr address, ObjectKind objectKind, string name, Guid applicationId)
     {
-        if (PlayerCharacter == IntPtr.Zero) return;
+        if (address == IntPtr.Zero) return;
 
         var cancelToken = new CancellationTokenSource();
         cancelToken.CancelAfter(TimeSpan.FromSeconds(10));
@@ -452,19 +461,20 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
         if (objectKind == ObjectKind.Player)
         {
+            using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.Player, () => address, false);
             _logger.LogDebug("[{applicationId}] Restoring Customization for {alias}/{name}: {data}", applicationId, OnlineUser.User.AliasOrUID, name, _originalGlamourerData);
-            await _ipcManager.GlamourerApplyOnlyCustomization(_logger, _currentOtherChara!, _originalGlamourerData, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
+            await _ipcManager.GlamourerApplyOnlyCustomization(_logger, tempHandler, _originalGlamourerData, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
             _logger.LogDebug("[{applicationId}] Restoring Equipment for {alias}/{name}: {data}", applicationId, OnlineUser.User.AliasOrUID, name, _lastGlamourerData);
-            await _ipcManager.GlamourerApplyOnlyEquipment(_logger, _currentOtherChara!, _lastGlamourerData, applicationId, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
+            await _ipcManager.GlamourerApplyOnlyEquipment(_logger, tempHandler, _lastGlamourerData, applicationId, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
             _logger.LogDebug("[{applicationId}] Restoring Heels for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
-            _ipcManager.HeelsRestoreOffsetForPlayer(PlayerCharacter);
+            _ipcManager.HeelsRestoreOffsetForPlayer(address);
             _logger.LogDebug("[{applicationId}] Restoring C+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
-            _ipcManager.CustomizePlusRevert(PlayerCharacter);
-            _ipcManager.PalettePlusRemovePalette(PlayerCharacter);
+            _ipcManager.CustomizePlusRevert(address);
+            _ipcManager.PalettePlusRemovePalette(address);
         }
         else if (objectKind == ObjectKind.MinionOrMount)
         {
-            var minionOrMount = _dalamudUtil.GetMinionOrMount(PlayerCharacter);
+            var minionOrMount = _dalamudUtil.GetMinionOrMount(address);
             if (minionOrMount != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => minionOrMount, isWatched: false);
@@ -473,7 +483,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         }
         else if (objectKind == ObjectKind.Pet)
         {
-            var pet = _dalamudUtil.GetPet(PlayerCharacter);
+            var pet = _dalamudUtil.GetPet(address);
             if (pet != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => pet, isWatched: false);
@@ -482,7 +492,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         }
         else if (objectKind == ObjectKind.Companion)
         {
-            var companion = _dalamudUtil.GetCompanion(PlayerCharacter);
+            var companion = _dalamudUtil.GetCompanion(address);
             if (companion != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => companion, isWatched: false);

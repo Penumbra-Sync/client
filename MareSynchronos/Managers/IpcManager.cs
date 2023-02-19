@@ -333,7 +333,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         return _heelsGetOffset.InvokeFunc();
     }
 
-    public void HeelsSetOffsetForPlayer(float offset, IntPtr character)
+    public void HeelsSetOffsetForPlayer(IntPtr character, float offset)
     {
         if (!CheckHeelsApi()) return;
         ActionQueue.Enqueue(() =>

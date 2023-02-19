@@ -26,6 +26,7 @@ public class GameObjectHandler : MediatorSubscriberBase
     private Task? _delayedZoningTask;
     private CancellationTokenSource _zoningCts = new();
     private bool _haltProcessing = false;
+    private bool _ignoreSendAfterRedraw = false;
 
     public override string ToString()
     {
@@ -80,6 +81,12 @@ public class GameObjectHandler : MediatorSubscriberBase
             if (((PenumbraEndRedrawMessage)msg).Address == Address)
             {
                 _haltProcessing = false;
+                Task.Run(async () =>
+                {
+                    _ignoreSendAfterRedraw = true;
+                    await Task.Delay(500).ConfigureAwait(false);
+                    _ignoreSendAfterRedraw = false;
+                });
             }
         });
 
@@ -96,8 +103,15 @@ public class GameObjectHandler : MediatorSubscriberBase
     {
         if (!_delayedZoningTask?.IsCompleted ?? false) return;
 
-        _performanceCollector.LogPerformance(this, "CheckAndUpdateObject>" + (_isOwnedObject ? "Self+" : "Other+") + ObjectKind + "/"
-            + (string.IsNullOrEmpty(Name) ? "Unk" : Name) + "+" + Address.ToString("X"), CheckAndUpdateObject);
+        try
+        {
+            _performanceCollector.LogPerformance(this, "CheckAndUpdateObject>" + (_isOwnedObject ? "Self+" : "Other+") + ObjectKind + "/"
+                + (string.IsNullOrEmpty(Name) ? "Unk" : Name) + "+" + Address.ToString("X"), CheckAndUpdateObject);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error during FrameworkUpdate of {this}", this);
+        }
     }
 
     private void ZoneSwitchEnd()
@@ -141,6 +155,8 @@ public class GameObjectHandler : MediatorSubscriberBase
 
     private unsafe void CheckAndUpdateObject()
     {
+        if (_haltProcessing) return;
+
         var curPtr = _getAddress.Invoke();
         bool drawObjDiff = false;
         try
@@ -167,8 +183,6 @@ public class GameObjectHandler : MediatorSubscriberBase
             }
         }
 
-        if (_haltProcessing) return;
-
         if (curPtr != IntPtr.Zero && DrawObjectAddress != IntPtr.Zero)
         {
             if (_clearCts != null)
@@ -186,19 +200,22 @@ public class GameObjectHandler : MediatorSubscriberBase
             bool equipDiff = CompareAndUpdateEquipByteData(chara->EquipSlotData);
             if (equipDiff && !_isOwnedObject) // send the message out immediately and cancel out, no reason to continue if not self
             {
-                _logger.LogTrace("[{this}] Changed", this);
-                Mediator.Publish(new CharacterChangedMessage(this));
-                return;
+                if (!_ignoreSendAfterRedraw)
+                {
+                    _logger.LogTrace("[{this}] Changed", this);
+                    Mediator.Publish(new CharacterChangedMessage(this));
+                    return;
+                }
             }
 
             var customizeDiff = CompareAndUpdateCustomizeData(chara->CustomizeData, out bool doNotSendUpdate);
 
             if (addrDiff || equipDiff || customizeDiff || drawObjDiff || nameChange)
             {
-                _logger.LogTrace("[{this}] Changed", this);
-
                 if (_isOwnedObject && !doNotSendUpdate)
                 {
+                    _logger.LogTrace("[{this}] Changed", this);
+
                     _logger.LogDebug("[{this}] Sending CreateCacheObjectMessage", this);
                     Mediator.Publish(new CreateCacheForObjectMessage(this));
                 }
