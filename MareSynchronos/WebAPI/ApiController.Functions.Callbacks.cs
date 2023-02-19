@@ -19,7 +19,7 @@ public partial class ApiController
         }
         catch (Exception ex)
         {
-            _logger.LogCritical("Error on executing safely", ex);
+            _logger.LogCritical(ex, "Error on executing safely");
         }
     }
 

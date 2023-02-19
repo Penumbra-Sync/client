@@ -131,7 +131,7 @@ public class MareCharaFileManager
                 _ipcManager.PenumbraSetTemporaryMods(_logger, applicationId, charaTarget.Name.TextValue,
                     extractedFiles.Union(fileSwaps).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal),
                     LoadedCharaFile.CharaFileData.ManipulationData);
-                using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.Player, () => charaTarget.Address, false);
+                using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.Player, () => charaTarget.Address, isWatched: false);
                 await _ipcManager.GlamourerApplyAll(_logger, tempHandler, LoadedCharaFile.CharaFileData.GlamourerData, applicationId, disposeCts.Token).ConfigureAwait(false);
                 _dalamudUtil.WaitWhileGposeCharacterIsDrawing(charaTarget.Address, 30000);
                 _ipcManager.PenumbraRemoveTemporaryCollection(_logger, applicationId, charaTarget.Name.TextValue);

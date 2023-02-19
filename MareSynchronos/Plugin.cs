@@ -24,7 +24,7 @@ namespace MareSynchronos;
 
 public sealed class Plugin : IDalamudPlugin
 {
-    private readonly MarePlugin plugin;
+    private readonly MarePlugin _plugin;
     public string Name => "Mare Synchronos";
     private readonly ILogger<Plugin> _pluginLogger;
 
@@ -73,6 +73,7 @@ public sealed class Plugin : IDalamudPlugin
         collection.AddSingleton<MareCharaFileManager>();
         collection.AddSingleton<NotificationService>();
         collection.AddSingleton<GameObjectHandlerFactory>();
+        collection.AddSingleton<PerformanceCollector>();
 
         collection.AddSingleton<UiShared>();
         collection.AddSingleton<SettingsUi>();
@@ -96,12 +97,12 @@ public sealed class Plugin : IDalamudPlugin
 
         var mediator = serviceProvider.GetRequiredService<MareMediator>();
         var logger = serviceProvider.GetRequiredService<ILogger<MarePlugin>>();
-        plugin = new MarePlugin(logger, serviceProvider, mediator);
+        _plugin = new MarePlugin(logger, serviceProvider, mediator);
     }
 
     public void Dispose()
     {
         _pluginLogger.LogTrace($"Disposing {GetType()}");
-        plugin.Dispose();
+        _plugin.Dispose();
     }
 }

@@ -156,7 +156,7 @@ public class MarePlugin : MediatorSubscriberBase, IDisposable
         }
         catch (Exception ex)
         {
-            _logger?.LogWarning(ex.Message);
+            _logger?.LogCritical(ex, "Error during launch of managers");
         }
     }
 
@@ -202,6 +202,17 @@ public class MarePlugin : MediatorSubscriberBase, IDisposable
         else if (string.Equals(splitArgs[0], "rescan", StringComparison.OrdinalIgnoreCase))
         {
             _serviceProvider.GetRequiredService<PeriodicFileScanner>().InvokeScan(forced: true);
+        }
+        else if (string.Equals(splitArgs[0], "perf", StringComparison.OrdinalIgnoreCase))
+        {
+            if (splitArgs.Length > 1 && int.TryParse(splitArgs[1], out var limitBySeconds))
+            {
+                _serviceProvider.GetRequiredService<PerformanceCollector>().PrintPerformanceStats(limitBySeconds);
+            }
+            else
+            {
+                _serviceProvider.GetRequiredService<PerformanceCollector>().PrintPerformanceStats();
+            }
         }
     }
 

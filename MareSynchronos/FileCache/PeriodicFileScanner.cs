@@ -1,7 +1,9 @@
 ﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
+using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.FileCache;
@@ -11,18 +13,19 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
     private readonly IpcManager _ipcManager;
     private readonly MareConfigService _configService;
     private readonly FileCacheManager _fileDbManager;
+    private readonly PerformanceCollector _performanceCollector;
     private CancellationTokenSource? _scanCancellationTokenSource;
     private Task? _fileScannerTask = null;
     public ConcurrentDictionary<string, int> haltScanLocks = new(StringComparer.Ordinal);
 
     public PeriodicFileScanner(ILogger<PeriodicFileScanner> logger, IpcManager ipcManager, MareConfigService configService,
-        FileCacheManager fileDbManager, MareMediator mediator) : base(logger, mediator)
+        FileCacheManager fileDbManager, MareMediator mediator, PerformanceCollector performanceCollector) : base(logger, mediator)
     {
         _logger.LogTrace("Creating " + nameof(PeriodicFileScanner));
         _ipcManager = ipcManager;
         _configService = configService;
         _fileDbManager = fileDbManager;
-
+        _performanceCollector = performanceCollector;
         Mediator.Subscribe<PenumbraInitializedMessage>(this, (_) => StartScan());
         Mediator.Subscribe<HaltScanMessage>(this, (msg) => HaltScan(((HaltScanMessage)msg).Source));
         Mediator.Subscribe<ResumeScanMessage>(this, (msg) => ResumeScan(((ResumeScanMessage)msg).Source));
@@ -104,7 +107,7 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
                     isForced = false;
                     TotalFiles = 0;
                     _currentFileProgress = 0;
-                    PeriodicFileScan(token);
+                    _performanceCollector.LogPerformance(this, "PeriodicFileScan", () => PeriodicFileScan(token));
                     TotalFiles = 0;
                     _currentFileProgress = 0;
                 }
@@ -204,20 +207,18 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
                             scannedFiles[validatedCacheResult.Item2.ResolvedFilepath] = true;
                         if (validatedCacheResult.Item1 == FileState.RequireUpdate)
                         {
-                            _logger.LogTrace("To update: " + validatedCacheResult.Item2.ResolvedFilepath);
+                            _logger.LogTrace("To update: {path}", validatedCacheResult.Item2.ResolvedFilepath);
                             entitiesToUpdate.Add(validatedCacheResult.Item2);
                         }
                         else if (validatedCacheResult.Item1 == FileState.RequireDeletion)
                         {
-                            _logger.LogTrace("To delete: " + validatedCacheResult.Item2.ResolvedFilepath);
+                            _logger.LogTrace("To delete: {path}", validatedCacheResult.Item2.ResolvedFilepath);
                             entitiesToRemove.Add(validatedCacheResult.Item2);
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning("Failed validating " + cache.ResolvedFilepath);
-                        _logger.LogWarning(ex.Message);
-                        _logger.LogWarning(ex.StackTrace);
+                        _logger.LogWarning(ex, "Failed validating {path}", cache.ResolvedFilepath);
                     }
 
                     Interlocked.Increment(ref _currentFileProgress);
@@ -239,7 +240,7 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("Error during enumerating FileCaches: " + ex.Message);
+            _logger.LogWarning(ex, "Error during enumerating FileCaches");
         }
 
         Task.WaitAll(dbTasks);
@@ -288,9 +289,7 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning("Failed adding " + c.Key);
-                    _logger.LogWarning(ex.Message);
-                    _logger.LogWarning(ex.StackTrace);
+                    _logger.LogWarning(ex, "Failed adding {file}", c.Key);
                 }
 
                 Interlocked.Increment(ref _currentFileProgress);

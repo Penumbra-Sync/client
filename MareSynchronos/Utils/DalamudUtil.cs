@@ -8,6 +8,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 namespace MareSynchronos.Utils;
@@ -20,7 +21,7 @@ public class DalamudUtil : IDisposable
     private readonly Framework _framework;
     private readonly Condition _condition;
     private readonly MareMediator _mediator;
-
+    private readonly PerformanceCollector _performanceCollector;
     private uint? _classJobId = 0;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
     private bool _sentBetweenAreas = false;
@@ -41,7 +42,7 @@ public class DalamudUtil : IDisposable
     }
 
     public DalamudUtil(ILogger<DalamudUtil> logger, ClientState clientState, ObjectTable objectTable, Framework framework,
-        Condition condition, Dalamud.Data.DataManager gameData, MareMediator mediator)
+        Condition condition, Dalamud.Data.DataManager gameData, MareMediator mediator, PerformanceCollector performanceCollector)
     {
         _logger = logger;
         _clientState = clientState;
@@ -49,6 +50,7 @@ public class DalamudUtil : IDisposable
         _framework = framework;
         _condition = condition;
         _mediator = mediator;
+        _performanceCollector = performanceCollector;
         _framework.Update += FrameworkOnUpdate;
         if (IsLoggedIn)
         {
@@ -64,7 +66,12 @@ public class DalamudUtil : IDisposable
 
     public Lazy<Dictionary<ushort, string>> WorldData { get; private set; }
 
-    private unsafe void FrameworkOnUpdate(Framework framework)
+    private void FrameworkOnUpdate(Framework framework)
+    {
+        _performanceCollector.LogPerformance(this, "FrameworkOnUpdate", FrameworkOnUpdateInternal);
+    }
+
+    private unsafe void FrameworkOnUpdateInternal()
     {
         if (GposeTarget != null && !IsInGpose)
         {
@@ -171,9 +178,10 @@ public class DalamudUtil : IDisposable
         return obj != null && obj.IsValid();
     }
 
-    public unsafe IntPtr GetMinion()
+    public unsafe IntPtr GetMinion(IntPtr? playerPointer = null)
     {
-        return (IntPtr)((FFXIVClientStructs.FFXIV.Client.Game.Character.Character*)PlayerPointer)->CompanionObject;
+        playerPointer ??= PlayerPointer;
+        return (IntPtr)((Character*)playerPointer)->CompanionObject;
     }
 
     public unsafe IntPtr GetPet(IntPtr? playerPointer = null)
@@ -188,6 +196,12 @@ public class DalamudUtil : IDisposable
         var mgr = CharacterManager.Instance();
         playerPointer ??= PlayerPointer;
         return (IntPtr)mgr->LookupBuddyByOwnerObject((BattleChara*)playerPointer);
+    }
+
+    public unsafe IntPtr GetMinionOrMount(IntPtr? playerPointer = null)
+    {
+        playerPointer ??= PlayerPointer;
+        return _objectTable.GetObjectAddress(((GameObject*)playerPointer)->ObjectIndex + 1);
     }
 
     public string PlayerName => _clientState.LocalPlayer?.Name.ToString() ?? "--";
@@ -236,17 +250,6 @@ public class DalamudUtil : IDisposable
         return null;
     }
 
-    public unsafe IntPtr? GetMinionOrMount(IntPtr chara)
-    {
-        var minionOrMount = ((Character*)chara)->CompanionObject;
-        if (minionOrMount != null)
-        {
-            return (IntPtr)minionOrMount;
-        }
-
-        return null;
-    }
-
     public async Task<T> RunOnFrameworkThread<T>(Func<T> func)
     {
         return await _framework.RunOnFrameworkThread(func).ConfigureAwait(false);
@@ -276,11 +279,11 @@ public class DalamudUtil : IDisposable
         }
         catch (NullReferenceException ex)
         {
-            logger.LogWarning("Error accessing " + handler + ", object does not exist anymore?", ex);
+            logger.LogWarning(ex, "Error accessing " + handler + ", object does not exist anymore?");
         }
         catch (AccessViolationException ex)
         {
-            logger.LogWarning("Error accessing " + handler + ", object does not exist anymore?", ex);
+            logger.LogWarning(ex, "Error accessing " + handler + ", object does not exist anymore?");
         }
     }
 

@@ -32,8 +32,8 @@ public record PalettePlusMessage(string? Data) : IMessage;
 public record PlayerChangedMessage(API.Data.CharacterData Data) : IMessage;
 public record CharacterChangedMessage(GameObjectHandler GameObjectHandler) : IMessage;
 public record TransientResourceChangedMessage(IntPtr Address) : IMessage;
-public record PlayerRelatedObjectPointerUpdateMessage(IntPtr[] RelatedObjects) : IMessage;
-
+public record AddWatchedGameObjectHandler(GameObjectHandler Handler) : IMessage;
+public record RemoveWatchedGameObjectHandler(GameObjectHandler Handler) : IMessage;
 public record HaltScanMessage(string Source) : IMessage;
 public record ResumeScanMessage(string Source) : IMessage;
 

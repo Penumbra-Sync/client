@@ -23,14 +23,6 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
     {
         _characterDataFactory = characterDataFactory;
 
-        _playerRelatedObjects.AddRange(new List<GameObjectHandler>()
-        {
-            new(Mediator, ObjectKind.Player, () => dalamudUtil.PlayerPointer),
-            new(Mediator, ObjectKind.MinionOrMount, () => (IntPtr)((Character*)dalamudUtil.PlayerPointer)->CompanionObject),
-            new(Mediator, ObjectKind.Pet, () => dalamudUtil.GetPet()),
-            new(Mediator, ObjectKind.Companion, () => dalamudUtil.GetCompanion()),
-        });
-
         Mediator.Subscribe<CreateCacheForObjectMessage>(this, (msg) =>
         {
             var actualMsg = (CreateCacheForObjectMessage)msg;
@@ -39,10 +31,10 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
 
         _playerRelatedObjects.AddRange(new List<GameObjectHandler>()
         {
-            gameObjectHandlerFactory.Create(ObjectKind.Player, () => dalamudUtil.PlayerPointer, true),
-            gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => (IntPtr)((Character*)dalamudUtil.PlayerPointer)->CompanionObject, true),
-            gameObjectHandlerFactory.Create(ObjectKind.Pet, () => dalamudUtil.GetPet(), true),
-            gameObjectHandlerFactory.Create(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), true),
+            gameObjectHandlerFactory.Create(ObjectKind.Player, () => dalamudUtil.PlayerPointer, isWatched: true),
+            gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => dalamudUtil.GetMinionOrMount(), isWatched: true),
+            gameObjectHandlerFactory.Create(ObjectKind.Pet, () => dalamudUtil.GetPet(), isWatched: true),
+            gameObjectHandlerFactory.Create(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), isWatched: true),
         });
 
         Mediator.Subscribe<ClearCacheForObjectMessage>(this, (msg) =>
@@ -55,7 +47,6 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
                 Mediator.Publish(new CharacterDataCreatedMessage(_lastCreatedData));
             });
         });
-        Mediator.Subscribe<FrameworkUpdateMessage>(this, (msg) => UpdatePointers());
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (msg) => ProcessCacheCreation());
         Mediator.Subscribe<CustomizePlusMessage>(this, (msg) => CustomizePlusChanged((CustomizePlusMessage)msg));
         Mediator.Subscribe<HeelsOffsetMessage>(this, (msg) => HeelsOffsetChanged((HeelsOffsetMessage)msg));
@@ -100,11 +91,6 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
         }
     }
 
-    private void UpdatePointers()
-    {
-        Mediator.Publish(new PlayerRelatedObjectPointerUpdateMessage(_playerRelatedObjects.Select(f => f.Address).ToArray()));
-    }
-
     private void ProcessCacheCreation()
     {
         if (_cachesToCreate.Any() && (_cacheCreationTask?.IsCompleted ?? true))
@@ -123,7 +109,7 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogCritical("Error during Cache Creation Processing", ex);
+                    _logger.LogCritical(ex, "Error during Cache Creation Processing");
                 }
                 finally
                 {

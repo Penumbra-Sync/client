@@ -14,7 +14,7 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
     private readonly TransientConfigService _configurationService;
     private readonly DalamudUtil _dalamudUtil;
 
-    public IntPtr[] PlayerRelatedPointers = Array.Empty<IntPtr>();
+    public HashSet<GameObjectHandler> PlayerRelatedPointers = new();
     private readonly string[] _fileTypesToHandle = new[] { "tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk" };
     private string PlayerPersistentDataKey => _dalamudUtil.PlayerName + "_" + _dalamudUtil.WorldId;
 
@@ -36,24 +36,33 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
 
                 try
                 {
-                    _logger.LogDebug("Loaded persistent transient resource " + gamePath);
+                    _logger.LogDebug("Loaded persistent transient resource {path}", gamePath);
                     SemiTransientResources[ObjectKind.Player].Add(gamePath);
                     restored++;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning("Error during loading persistent transient resource " + gamePath, ex);
+                    _logger.LogWarning(ex, "Error during loading persistent transient resource {path}", gamePath);
                 }
 
             }
-            _logger.LogDebug($"Restored {restored}/{gamePaths.Count()} semi persistent resources");
+            _logger.LogDebug("Restored {restored}/{total} semi persistent resources", restored, gamePaths.Count());
         }
 
         Mediator.Subscribe<PenumbraResourceLoadMessage>(this, (msg) => Manager_PenumbraResourceLoadEvent((PenumbraResourceLoadMessage)msg));
         Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, (_) => Manager_PenumbraModSettingChanged());
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => DalamudUtil_FrameworkUpdate());
         Mediator.Subscribe<ClassJobChangedMessage>(this, (_) => DalamudUtil_ClassJobChanged());
-        Mediator.Subscribe<PlayerRelatedObjectPointerUpdateMessage>(this, (msg) => PlayerRelatedPointers = ((PlayerRelatedObjectPointerUpdateMessage)msg).RelatedObjects);
+        Mediator.Subscribe<AddWatchedGameObjectHandler>(this, (msg) =>
+        {
+            var actualMsg = ((AddWatchedGameObjectHandler)msg);
+            PlayerRelatedPointers.Add(actualMsg.Handler);
+        });
+        Mediator.Subscribe<RemoveWatchedGameObjectHandler>(this, (msg) =>
+        {
+            var actualMsg = ((RemoveWatchedGameObjectHandler)msg);
+            PlayerRelatedPointers.Remove(actualMsg.Handler);
+        });
     }
 
     private void Manager_PenumbraModSettingChanged()
@@ -134,7 +143,7 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
         {
             return;
         }
-        if (!PlayerRelatedPointers.Contains(gameObject))
+        if (!PlayerRelatedPointers.Select(p => p.Address).Contains(gameObject))
         {
             //_logger.LogDebug("Got resource " + gamePath + " for ptr " + gameObject.ToString("X"));
             return;
@@ -158,12 +167,12 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
         if (TransientResources[gameObject].Contains(replacedGamePath) ||
             SemiTransientResources.Any(r => r.Value.Any(f => string.Equals(f, gamePath, StringComparison.OrdinalIgnoreCase))))
         {
-            _logger.LogTrace("Not adding " + replacedGamePath + ":" + filePath);
+            _logger.LogTrace("Not adding {replacedPath} : {filePath}", replacedGamePath, filePath);
         }
         else
         {
             TransientResources[gameObject].Add(replacedGamePath);
-            _logger.LogDebug($"Adding {replacedGamePath} for {gameObject} ({filePath})");
+            _logger.LogDebug("Adding {replacedGamePath} for {gameObject} ({filePath})", replacedGamePath, gameObject, filePath);
             Mediator.Publish(new TransientResourceChangedMessage(gameObject));
         }
     }

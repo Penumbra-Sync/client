@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using MareSynchronos.Utils;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 
 namespace MareSynchronos.Mediator;
 
@@ -8,10 +10,12 @@ public class MareMediator : IDisposable
 
     private readonly Dictionary<Type, HashSet<MediatorSubscriber>> _subscriberDict = new();
     private readonly ILogger<MareMediator> _logger;
+    private readonly PerformanceCollector _performanceCollector;
 
-    public MareMediator(ILogger<MareMediator> logger)
+    public MareMediator(ILogger<MareMediator> logger, PerformanceCollector performanceCollector)
     {
         _logger = logger;
+        _performanceCollector = performanceCollector;
     }
 
     public void Subscribe<T>(IMediatorSubscriber subscriber, Action<IMessage> action) where T : IMessage
@@ -36,18 +40,22 @@ public class MareMediator : IDisposable
     {
         if (_subscriberDict.TryGetValue(message.GetType(), out var subscribers))
         {
-            foreach (var subscriber in subscribers.ToList())
+            Stopwatch globalStopwatch = Stopwatch.StartNew();
+            _performanceCollector.LogPerformance(this, $"Publish>{message.GetType().Name}", () =>
             {
-                try
+                foreach (var subscriber in subscribers.ToList())
                 {
-                    subscriber.Action.Invoke(message);
+                    try
+                    {
+                        _performanceCollector.LogPerformance(this, $"Publish>{message.GetType().Name}+{subscriber.Subscriber.GetType().Name}", () => subscriber.Action.Invoke(message));
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogCritical(ex, "Error executing {type} for subscriber {subscriber}, removing from Mediator", message.GetType(), subscriber);
+                        subscribers.RemoveWhere(s => s == subscriber);
+                    }
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogCritical("Error executing " + message.GetType() + " for subscriber " + subscriber + ", removing from Mediator", ex);
-                    subscribers.RemoveWhere(s => s == subscriber);
-                }
-            }
+            });
         }
     }
 
@@ -57,13 +65,13 @@ public class MareMediator : IDisposable
         {
             var unSubbed = kvp.Value.RemoveWhere(p => p.Subscriber == subscriber);
             if (unSubbed > 0)
-                _logger.LogTrace(subscriber + " unsubscribed from " + kvp.Key.Name);
+                _logger.LogDebug("{sub} unsubscribed from {msg}", subscriber, kvp.Key.Name);
         }
     }
 
     public void Dispose()
     {
-        _logger.LogTrace($"Disposing {GetType()}");
+        _logger.LogTrace("Disposing {type}", GetType());
         _subscriberDict.Clear();
     }
 }

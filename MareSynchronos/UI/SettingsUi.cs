@@ -15,6 +15,7 @@ using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
 using MareSynchronos.MareConfiguration.Models;
 using Microsoft.Extensions.Logging;
+using MareSynchronos.Utils;
 
 namespace MareSynchronos.UI;
 
@@ -26,6 +27,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
+    private readonly PerformanceCollector _performanceCollector;
     private readonly UiShared _uiShared;
     public CharacterData? LastCreatedCharacterData { private get; set; }
 
@@ -37,7 +39,8 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
     public SettingsUi(ILogger<SettingsUi> logger, WindowSystem windowSystem,
         UiShared uiShared, MareConfigService configService,
         MareCharaFileManager mareCharaFileManager, PairManager pairManager,
-        ServerConfigurationManager serverConfigurationManager, MareMediator mediator) : base(logger, mediator, "Mare Synchronos Settings")
+        ServerConfigurationManager serverConfigurationManager,
+        MareMediator mediator, PerformanceCollector performanceCollector) : base(logger, mediator, "Mare Synchronos Settings")
     {
         _logger.LogTrace("Creating " + nameof(SettingsUi));
 
@@ -52,6 +55,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
         _mareCharaFileManager = mareCharaFileManager;
         _pairManager = pairManager;
         _serverConfigurationManager = serverConfigurationManager;
+        _performanceCollector = performanceCollector;
         _uiShared = uiShared;
 
         Mediator.Subscribe<OpenSettingsUiMessage>(this, (_) => Toggle());
@@ -545,7 +549,6 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
 
     private bool _deleteFilesPopupModalShown = false;
     private bool _deleteAccountPopupModalShown = false;
-
     private void DrawDebug()
     {
         _lastTab = "Debug";
@@ -565,11 +568,31 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
         }
         UiShared.AttachToolTip("Use this when reporting mods being rejected from the server.");
 
-        _uiShared.DrawCombo<LogLevel>("Log Level", Enum.GetValues<LogLevel>(), (l) => l.ToString(), (l) =>
+        _uiShared.DrawCombo("Log Level", Enum.GetValues<LogLevel>(), (l) => l.ToString(), (l) =>
         {
             _configService.Current.LogLevel = l;
             _configService.Save();
         }, _configService.Current.LogLevel);
+
+        bool logPerformance = _configService.Current.LogPerformance;
+        if (ImGui.Checkbox("Log Performance Counters", ref logPerformance))
+        {
+            _configService.Current.LogPerformance = logPerformance;
+            _configService.Save();
+        }
+        UiShared.DrawHelpText("Enabling this can incur a (slight) performance impact. Enabling this for extended periods of time is not recommended.");
+
+        if (!logPerformance) ImGui.BeginDisabled();
+        if (UiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Print Performance Stats to /xllog"))
+        {
+            _performanceCollector.PrintPerformanceStats();
+        }
+        ImGui.SameLine();
+        if (UiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Print Performance Stats (last 60s) to /xllog"))
+        {
+            _performanceCollector.PrintPerformanceStats(60);
+        }
+        if (!logPerformance) ImGui.EndDisabled();
     }
 
     private void DrawBlockedTransfers()
@@ -725,7 +748,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
                             }
                             catch (Exception ex)
                             {
-                                _logger.LogCritical("Error saving data", ex);
+                                _logger.LogCritical(ex, "Error saving data");
                             }
                         });
                     });

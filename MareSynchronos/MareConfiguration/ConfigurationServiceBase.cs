@@ -102,7 +102,7 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
 
         try
         {
-            File.Copy(ConfigurationPath, ConfigurationPath + ".bak." + DateTime.Now.ToString("yyyyMMddHHmmss"), true);
+            File.Copy(ConfigurationPath, ConfigurationPath + ".bak." + DateTime.Now.ToString("yyyyMMddHHmmss"), overwrite: true);
         }
         catch { }
 

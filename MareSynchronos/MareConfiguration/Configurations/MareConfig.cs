@@ -26,4 +26,5 @@ public class MareConfig : IMareConfiguration
     public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;
     public NotificationLocation ErrorNotification { get; set; } = NotificationLocation.Both;
     public LogLevel LogLevel { get; set; } = LogLevel.Information;
+    public bool LogPerformance { get; set; } = false;
 }

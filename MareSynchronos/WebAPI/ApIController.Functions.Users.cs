@@ -22,7 +22,7 @@ public partial class ApiController
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("Failed to Push character data: " + ex.Message);
+            _logger.LogWarning(ex, "Failed to Push character data");
         }
     }
 

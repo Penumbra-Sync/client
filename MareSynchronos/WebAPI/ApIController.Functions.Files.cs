@@ -21,7 +21,7 @@ public partial class ApiController
 {
     private readonly Dictionary<string, DateTime> _verifiedUploadedHashes;
     private readonly ConcurrentDictionary<Guid, bool> _downloadReady = new();
-    private bool currentUploadCancelled = false;
+    private bool _currentUploadCancelled = false;
 
     private int _downloadId = 0;
     public async Task<bool> CancelUpload()
@@ -148,7 +148,7 @@ public partial class ApiController
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogWarning($"Error during download of {requestUrl}, HttpStatusCode: {ex.StatusCode}");
+            _logger.LogWarning(ex, $"Error during download of {requestUrl}, HttpStatusCode: {ex.StatusCode}");
             if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized)
             {
                 throw new Exception($"Http error {ex.StatusCode} (cancelled: {ct.IsCancellationRequested}): {requestUrl}", ex);
@@ -178,7 +178,7 @@ public partial class ApiController
         }
         catch (Exception ex)
         {
-            _logger.LogWarning($"Error during file download of {requestUrl}", ex);
+            _logger.LogWarning(ex, $"Error during file download of {requestUrl}");
             try
             {
                 if (!tempPath.IsNullOrEmpty())
@@ -235,7 +235,7 @@ public partial class ApiController
         }
         catch (Exception ex)
         {
-            _logger.LogCritical("Error during SendRequestInternal for " + requestMessage.RequestUri, ex);
+            _logger.LogCritical(ex, "Error during SendRequestInternal for " + requestMessage.RequestUri);
             throw;
         }
     }
@@ -302,7 +302,7 @@ public partial class ApiController
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogCritical("Error during download of " + file.Hash, ex);
+                    _logger.LogError(ex, "Error during download of " + file.Hash);
                     return;
                 }
 
@@ -329,9 +329,7 @@ public partial class ApiController
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning("Issue adding file to the DB");
-                    _logger.LogWarning(ex.Message);
-                    _logger.LogWarning(ex.StackTrace);
+                    _logger.LogWarning(ex, "Issue creating cache entry");
                 }
             }
         }).ConfigureAwait(false);
@@ -346,7 +344,7 @@ public partial class ApiController
 
         try
         {
-            currentUploadCancelled = await CancelUpload().ConfigureAwait(false);
+            _currentUploadCancelled = await CancelUpload().ConfigureAwait(false);
 
             _uploadCancellationTokenSource = new CancellationTokenSource();
             var uploadToken = _uploadCancellationTokenSource.Token;
@@ -366,12 +364,12 @@ public partial class ApiController
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("Error during upload of files", ex);
+            _logger.LogWarning(ex, "Error during upload of files");
         }
         finally
         {
-            if (!currentUploadCancelled)
-                currentUploadCancelled = await CancelUpload().ConfigureAwait(false);
+            if (!_currentUploadCancelled)
+                _currentUploadCancelled = await CancelUpload().ConfigureAwait(false);
         }
     }
 
@@ -413,7 +411,7 @@ public partial class ApiController
             }
             catch (Exception ex)
             {
-                _logger.LogWarning("Tried to request file " + file.Hash + " but file was not present", ex);
+                _logger.LogWarning(ex, "Tried to request file " + file.Hash + " but file was not present");
             }
         }
 

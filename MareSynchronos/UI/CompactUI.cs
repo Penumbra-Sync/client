@@ -748,7 +748,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
 
                 _serverManager.Save();
 
-                _ = _apiController.CreateConnections(true);
+                _ = _apiController.CreateConnections(forceGetToken: true);
             }
 
             _uiShared.DrawCombo("Secret Key##addCharacterSecretKey", keys, (f) => f.Value.FriendlyName, (f) => secretKeyIdx = f.Key);

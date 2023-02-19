@@ -6,15 +6,16 @@ using Penumbra.String;
 using MareSynchronos.Mediator;
 using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;
 using Microsoft.Extensions.Logging;
+using MareSynchronos.Utils;
 
 namespace MareSynchronos.Models;
 
 public class GameObjectHandler : MediatorSubscriberBase
 {
+    private readonly PerformanceCollector _performanceCollector;
     private readonly MareMediator _mediator;
     private readonly Func<IntPtr> _getAddress;
-    private readonly bool _sendUpdates;
-
+    private readonly bool _isOwnedObject;
     public unsafe Character* Character => (Character*)Address;
 
     public string Name { get; private set; }
@@ -27,15 +28,16 @@ public class GameObjectHandler : MediatorSubscriberBase
 
     public override string ToString()
     {
-        return $"{Name} ({Address.ToString("X")},{DrawObjectAddress.ToString("X")})";
+        return $"{ObjectKind}:{Name} ({Address:X},{DrawObjectAddress:X})";
     }
 
-    public GameObjectHandler(ILogger<GameObjectHandler> logger, MareMediator mediator, ObjectKind objectKind, Func<IntPtr> getAddress, bool watchedObject = true) : base(logger, mediator)
+    public GameObjectHandler(ILogger<GameObjectHandler> logger, PerformanceCollector performanceCollector, MareMediator mediator, ObjectKind objectKind, Func<IntPtr> getAddress, bool watchedObject = true) : base(logger, mediator)
     {
+        _performanceCollector = performanceCollector;
         _mediator = mediator;
         ObjectKind = objectKind;
         _getAddress = getAddress;
-        _sendUpdates = watchedObject;
+        _isOwnedObject = watchedObject;
         Name = string.Empty;
 
         if (watchedObject)
@@ -49,6 +51,7 @@ public class GameObjectHandler : MediatorSubscriberBase
                     Mediator.Publish(new CreateCacheForObjectMessage(this));
                 }
             });
+            Mediator.Publish(new AddWatchedGameObjectHandler(this));
         }
 
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
@@ -82,16 +85,23 @@ public class GameObjectHandler : MediatorSubscriberBase
         CheckAndUpdateObject();
     }
 
+    public override void Dispose()
+    {
+        base.Dispose();
+        Mediator.Publish(new RemoveWatchedGameObjectHandler(this));
+    }
+
     private void FrameworkUpdate()
     {
         if (!_delayedZoningTask?.IsCompleted ?? false) return;
 
-        CheckAndUpdateObject();
+        _performanceCollector.LogPerformance(this, "CheckAndUpdateObject>" + (_isOwnedObject ? "Self+" : "Other+") + ObjectKind + "/" 
+            + (string.IsNullOrEmpty(Name) ? "Unk" : Name) + "+" + Address.ToString("X"), CheckAndUpdateObject);
     }
 
     private void ZoneSwitchEnd()
     {
-        if (!_sendUpdates || _haltProcessing) return;
+        if (!_isOwnedObject || _haltProcessing) return;
 
         _clearCts?.Cancel();
         _clearCts?.Dispose();
@@ -101,10 +111,10 @@ public class GameObjectHandler : MediatorSubscriberBase
 
     private void ZoneSwitchStart()
     {
-        if (!_sendUpdates || _haltProcessing) return;
+        if (!_isOwnedObject || _haltProcessing) return;
 
         _zoningCts = new();
-        _logger.LogDebug($"[{this}] Starting Delay After Zoning");
+        _logger.LogDebug("[{obj}] Starting Delay After Zoning", this);
         _delayedZoningTask = Task.Run(async () =>
         {
             try
@@ -114,7 +124,7 @@ public class GameObjectHandler : MediatorSubscriberBase
             catch { }
             finally
             {
-                _logger.LogDebug($"[{this}] Delay after zoning complete");
+                _logger.LogDebug("[{this}] Delay after zoning complete", this);
                 _zoningCts.Dispose();
             }
         });
@@ -127,7 +137,6 @@ public class GameObjectHandler : MediatorSubscriberBase
     private CancellationTokenSource? _clearCts = new();
     private byte? HatState { get; set; }
     private byte? VisorWeaponState { get; set; }
-    private bool _doNotSendUpdate;
 
     private unsafe void CheckAndUpdateObject()
     {
@@ -135,16 +144,22 @@ public class GameObjectHandler : MediatorSubscriberBase
         bool drawObjDiff = false;
         try
         {
-            var drawObjAddr = (IntPtr)((GameObject*)curPtr)->GetDrawObject();
-            drawObjDiff = drawObjAddr != DrawObjectAddress;
-            DrawObjectAddress = drawObjAddr;
+            if (curPtr != IntPtr.Zero)
+            {
+                var drawObjAddr = (IntPtr)((GameObject*)curPtr)->GetDrawObject();
+                drawObjDiff = drawObjAddr != DrawObjectAddress;
+                DrawObjectAddress = drawObjAddr;
 
-            IsBeingDrawn = (((CharacterBase*)drawObjAddr)->HasModelInSlotLoaded != 0)
-                           || (((CharacterBase*)drawObjAddr)->HasModelFilesInSlotLoaded != 0)
-                           || (((GameObject*)curPtr)->RenderFlags & 0b100000000000) == 0b100000000000;
+                IsBeingDrawn = DrawObjectAddress == IntPtr.Zero || (((CharacterBase*)DrawObjectAddress)->HasModelInSlotLoaded != 0)
+                               || (((CharacterBase*)DrawObjectAddress)->HasModelFilesInSlotLoaded != 0)
+                               || (((GameObject*)curPtr)->RenderFlags & 0b100000000000) == 0b100000000000;
+            }
         }
-        catch
+        catch (Exception ex)
         {
+            var name = new ByteString(((Character*)curPtr)->GameObject.Name).ToString();
+
+            _logger.LogError(ex, "Error during checking for draw object for {name}", this);
             if (curPtr != IntPtr.Zero)
             {
                 IsBeingDrawn = true;
@@ -157,31 +172,34 @@ public class GameObjectHandler : MediatorSubscriberBase
         {
             if (_clearCts != null)
             {
-                _logger.LogDebug($"[{this}] Cancelling Clear Task");
+                _logger.LogDebug("[{this}] Cancelling Clear Task", this);
                 _clearCts?.Cancel();
                 _clearCts = null;
             }
             bool addrDiff = Address != curPtr;
             Address = curPtr;
             var chara = (Character*)curPtr;
-            bool equipDiff = CompareAndUpdateEquipByteData(chara->EquipSlotData);
-            var customizeDiff = _sendUpdates ? CompareAndUpdateCustomizeData(chara->CustomizeData) : false;
             var name = new ByteString(chara->GameObject.Name).ToString();
             bool nameChange = (!string.Equals(name, Name, StringComparison.Ordinal));
+            Name = name;
+            bool equipDiff = CompareAndUpdateEquipByteData(chara->EquipSlotData);
+            if (equipDiff && !_isOwnedObject) // send the message out immediately and cancel out, no reason to continue if not self
+            {
+                _logger.LogTrace("[{this}] Changed", this);
+                Mediator.Publish(new CharacterChangedMessage(this));
+                return;
+            }
+
+            var customizeDiff = CompareAndUpdateCustomizeData(chara->CustomizeData, out bool doNotSendUpdate);
+
             if (addrDiff || equipDiff || customizeDiff || drawObjDiff || nameChange)
             {
-                Name = name;
-                _logger.LogTrace($"[{this}] Changed");
+                _logger.LogTrace("[{this}] Changed", this);
 
-                if (_sendUpdates && !_doNotSendUpdate)
+                if (_isOwnedObject && !doNotSendUpdate)
                 {
-                    _logger.LogDebug($"[{this}] Sending CreateCacheObjectMessage");
+                    _logger.LogDebug("[{this}] Sending CreateCacheObjectMessage", this);
                     Mediator.Publish(new CreateCacheForObjectMessage(this));
-                }
-
-                if (equipDiff && !_sendUpdates)
-                {
-                    Mediator.Publish(new CharacterChangedMessage(this));
                 }
             }
         }
@@ -189,8 +207,8 @@ public class GameObjectHandler : MediatorSubscriberBase
         {
             Address = IntPtr.Zero;
             DrawObjectAddress = IntPtr.Zero;
-            _logger.LogTrace($"[{this}] Changed -> Null");
-            if (_sendUpdates && ObjectKind != ObjectKind.Player)
+            _logger.LogTrace("[{this}] Changed -> Null", this);
+            if (_isOwnedObject && ObjectKind != ObjectKind.Player)
             {
                 _clearCts?.Cancel();
                 _clearCts?.Dispose();
@@ -203,9 +221,9 @@ public class GameObjectHandler : MediatorSubscriberBase
 
     private async Task ClearTask(CancellationToken token)
     {
-        _logger.LogDebug($"[{this}] Running Clear Task");
+        _logger.LogDebug("[{this}] Running Clear Task", this);
         await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
-        _logger.LogDebug($"[{this}] Sending ClearCachedForObjectMessage");
+        _logger.LogDebug("[{this}] Sending ClearCachedForObjectMessage", this);
         Mediator.Publish(new ClearCacheForObjectMessage(this));
         _clearCts = null;
     }
@@ -226,10 +244,10 @@ public class GameObjectHandler : MediatorSubscriberBase
         return hasChanges;
     }
 
-    private unsafe bool CompareAndUpdateCustomizeData(byte* customizeData)
+    private unsafe bool CompareAndUpdateCustomizeData(byte* customizeData, out bool doNotSendUpdate)
     {
         bool hasChanges = false;
-        _doNotSendUpdate = false;
+        doNotSendUpdate = false;
 
         for (int i = 0; i < CustomizeData.Length; i++)
         {
@@ -247,8 +265,8 @@ public class GameObjectHandler : MediatorSubscriberBase
         {
             if (HatState != null && !hasChanges)
             {
-                _logger.LogDebug($"[{this}] Not Sending Update, only Hat changed");
-                _doNotSendUpdate = true;
+                _logger.LogDebug("[{this}] Not Sending Update, only Hat changed", this);
+                doNotSendUpdate = true;
             }
             HatState = newHatState;
         }
@@ -259,8 +277,8 @@ public class GameObjectHandler : MediatorSubscriberBase
         {
             if (VisorWeaponState != null && !hasChanges)
             {
-                _logger.LogDebug($"[{this}] Not Sending Update, only Visor/Weapon changed");
-                _doNotSendUpdate = true;
+                _logger.LogDebug("[{this}] Not Sending Update, only Visor/Weapon changed", this);
+                doNotSendUpdate = true;
             }
             VisorWeaponState = newWeaponOrVisorState;
         }

@@ -45,7 +45,7 @@ public class ConfigurationMigrator
     {
         _logger.LogInformation("Migrating Configuration from version 0 to 1");
         if (File.Exists(ConfigurationPath(MareConfigService.ConfigName)))
-            File.Copy(ConfigurationPath(MareConfigService.ConfigName), ConfigurationPath(MareConfigService.ConfigName) + ".migrated." + mareConfigV0.Version + ".bak", true);
+            File.Copy(ConfigurationPath(MareConfigService.ConfigName), ConfigurationPath(MareConfigService.ConfigName) + ".migrated." + mareConfigV0.Version + ".bak", overwrite: true);
 
         MareConfig mareConfigV1 = mareConfigV0.ToV1();
 

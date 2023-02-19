@@ -11,8 +11,6 @@ namespace MareSynchronos.MareConfiguration.Configurations.Obsolete;
 public class Configuration : IPluginConfiguration
 {
     public int Version { get; set; } = 6;
-    [NonSerialized]
-    private DalamudPluginInterface? _pluginInterface;
     public Dictionary<string, ServerStorageV0> ServerStorage { get; set; } = new(StringComparer.OrdinalIgnoreCase)
     {
         { ApiController.MainServiceUri, new ServerStorageV0() { ServerName = ApiController.MainServer, ServerUri = ApiController.MainServiceUri } },
@@ -54,12 +52,6 @@ public class Configuration : IPluginConfiguration
     /// </summary>
     public Dictionary<string, HashSet<string>> ServerAvailablePairTags = new(StringComparer.Ordinal);
     public HashSet<string> OpenPairTags = new(StringComparer.Ordinal);
-
-
-    public void Save()
-    {
-        _pluginInterface!.SavePluginConfig(this);
-    }
 
     public MareConfigV0 ToMareConfig(ILogger logger)
     {

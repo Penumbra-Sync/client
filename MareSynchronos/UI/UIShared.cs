@@ -41,7 +41,7 @@ public partial class UiShared : MediatorSubscriberBase
     public string PlayerName => _dalamudUtil.PlayerName;
     public uint WorldId => _dalamudUtil.WorldId;
     public Dictionary<ushort, string> WorldData => _dalamudUtil.WorldData.Value;
-    private Dictionary<string, object> _selectedComboItems = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, object> _selectedComboItems = new(StringComparer.Ordinal);
     public bool HasValidPenumbraModPath => !(_ipcManager.PenumbraModDirectory ?? string.Empty).IsNullOrEmpty() && Directory.Exists(_ipcManager.PenumbraModDirectory);
     public bool EditTrackerPosition { get; set; }
     public ImFontPtr UidFont { get; private set; }
@@ -114,7 +114,8 @@ public partial class UiShared : MediatorSubscriberBase
             {
                 selectedItem = initialSelectedItem;
                 _selectedComboItems[comboName] = selectedItem!;
-                onSelected?.Invoke(initialSelectedItem);
+                if (!EqualityComparer<T>.Default.Equals(initialSelectedItem, default))
+                    onSelected?.Invoke(initialSelectedItem);
             }
             else
             {
@@ -155,13 +156,12 @@ public partial class UiShared : MediatorSubscriberBase
             }
             catch (Exception ex)
             {
-                _logger.LogWarning($"Font failed to load. {fontFile}");
-                _logger.LogWarning(ex.ToString());
+                _logger.LogWarning(ex, "Font failed to load. {fontFile}", fontFile);
             }
         }
         else
         {
-            _logger.LogDebug($"Font doesn't exist. {fontFile}");
+            _logger.LogDebug("Font doesn't exist. {fontFile}", fontFile);
         }
     }
 
@@ -522,7 +522,7 @@ public partial class UiShared : MediatorSubscriberBase
                 _isPenumbraDirectory = string.Equals(path.ToLowerInvariant(), _ipcManager.PenumbraModDirectory?.ToLowerInvariant(), StringComparison.Ordinal);
                 _isDirectoryWritable = IsDirectoryWritable(path);
                 _cacheDirectoryHasOtherFilesThanCache = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Any(f => new FileInfo(f).Name.Length != 40);
-                _cacheDirectoryIsValidPath = Regex.IsMatch(path, @"^(?:[a-zA-Z]:\\[\w\s\-\\]+?|\/(?:[\w\s\-\/])+?)$", RegexOptions.ECMAScript);
+                _cacheDirectoryIsValidPath = PathRegex().IsMatch(path);
 
                 if (!string.IsNullOrEmpty(path)
                     && Directory.Exists(path)
@@ -586,8 +586,8 @@ public partial class UiShared : MediatorSubscriberBase
         {
             if (throwIfFails)
                 throw;
-            else
-                return false;
+
+            return false;
         }
     }
 
@@ -663,7 +663,7 @@ public partial class UiShared : MediatorSubscriberBase
             var note = entry.GetNote();
             if (note.IsNullOrEmpty()) continue;
 
-            sb.AppendLine(entry.UserData.UID + ":\"" + entry.GetNote() + "\"");
+            sb.Append(entry.UserData.UID).Append(":\"").Append(entry.GetNote()).AppendLine("\"");
         }
         sb.AppendLine(_notesEnd);
 
@@ -675,12 +675,12 @@ public partial class UiShared : MediatorSubscriberBase
         var splitNotes = notes.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).ToList();
         var splitNotesStart = splitNotes.FirstOrDefault();
         var splitNotesEnd = splitNotes.LastOrDefault();
-        if (!string.Equals(splitNotesStart, _notesStart) || !string.Equals(splitNotesEnd, _notesEnd))
+        if (!string.Equals(splitNotesStart, _notesStart, StringComparison.Ordinal) || !string.Equals(splitNotesEnd, _notesEnd, StringComparison.Ordinal))
         {
             return false;
         }
 
-        splitNotes.RemoveAll(n => string.Equals(n, _notesStart) || string.Equals(n, _notesEnd));
+        splitNotes.RemoveAll(n => string.Equals(n, _notesStart, StringComparison.Ordinal) || string.Equals(n, _notesEnd, StringComparison.Ordinal));
 
         foreach (var note in splitNotes)
         {
@@ -694,7 +694,7 @@ public partial class UiShared : MediatorSubscriberBase
             }
             catch
             {
-                _logger.LogWarning("Could not parse " + note);
+                _logger.LogWarning("Could not parse {note}", note);
             }
         }
 
@@ -708,4 +708,7 @@ public partial class UiShared : MediatorSubscriberBase
         base.Dispose();
         _pluginInterface.UiBuilder.BuildFonts -= BuildFont;
     }
+
+    [GeneratedRegex(@"^(?:[a-zA-Z]:\\[\w\s\-\\]+?|\/(?:[\w\s\-\/])+?)$", RegexOptions.ECMAScript)]
+    private static partial Regex PathRegex();
 }

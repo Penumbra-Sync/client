@@ -107,7 +107,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         get => _serverState;
         private set
         {
-            _logger.LogDebug($"New ServerState: {value}, prev ServerState: {_serverState}");
+            _logger.LogDebug("New ServerState: {value}, prev ServerState: {_serverState}", value, _serverState);
             _serverState = value;
         }
     }
@@ -209,23 +209,21 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
             }
             catch (HttpRequestException ex)
             {
-                _logger.LogWarning("HttpRequestException on Connection", ex);
+                _logger.LogWarning(ex, "HttpRequestException on Connection");
 
                 if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
                     await StopConnection(token, ServerState.Unauthorized).ConfigureAwait(false);
                     return;
                 }
-                else
-                {
-                    ServerState = ServerState.Reconnecting;
-                    _logger.LogInformation("Failed to establish connection, retrying");
-                    await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token).ConfigureAwait(false);
-                }
+
+                ServerState = ServerState.Reconnecting;
+                _logger.LogInformation("Failed to establish connection, retrying");
+                await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning("Exception on Connection", ex);
+                _logger.LogWarning(ex, "Exception on Connection");
 
                 _logger.LogInformation("Failed to establish connection, retrying");
                 await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token).ConfigureAwait(false);
@@ -238,7 +236,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         while (!ct.IsCancellationRequested && _mareHub != null)
         {
             await Task.Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
-            var needsRestart = await CheckClientHealth().ConfigureAwait(false);
+            _ = await CheckClientHealth().ConfigureAwait(false);
             _logger.LogDebug("Checked Client Health State");
         }
     }
@@ -271,12 +269,12 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
         foreach (var userPair in await UserGetPairedClients().ConfigureAwait(false))
         {
-            _logger.LogDebug($"Pair: {userPair}");
+            _logger.LogDebug("Individual Pair: {userPair}", userPair);
             _pairManager.AddUserPair(userPair, addToLastAddedUser: false);
         }
         foreach (var entry in await GroupsGetAll().ConfigureAwait(false))
         {
-            _logger.LogDebug($"Group: {entry}");
+            _logger.LogDebug("Group: {entry}", entry);
             _pairManager.AddGroup(entry);
         }
         foreach (var group in _pairManager.GroupPairs.Keys)
@@ -284,7 +282,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
             var users = await GroupsGetUsersInGroup(group).ConfigureAwait(false);
             foreach (var user in users)
             {
-                _logger.LogDebug($"GroupPair: {user}");
+                _logger.LogDebug("Group Pair: {user}", user);
                 _pairManager.AddGroupPair(user);
             }
         }
@@ -367,7 +365,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         _healthCheckTokenSource?.Cancel();
         ServerState = ServerState.Reconnecting;
         Mediator.Publish(new NotificationMessage("Connection lost", "Connection lost to " + _serverManager.CurrentServer!.ServerName, NotificationType.Warning, 5000));
-        _logger.LogWarning("Connection closed... Reconnecting", arg);
+        _logger.LogWarning(arg, "Connection closed... Reconnecting");
         return Task.CompletedTask;
     }
 

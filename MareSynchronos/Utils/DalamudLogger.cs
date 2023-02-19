@@ -1,6 +1,7 @@
 ﻿using Dalamud.Logging;
 using MareSynchronos.MareConfiguration;
 using Microsoft.Extensions.Logging;
+using System.Text;
 
 namespace MareSynchronos.Utils;
 
@@ -20,13 +21,19 @@ internal class DalamudLogger : ILogger
         if (!IsEnabled(logLevel)) return;
 
         if (exception == null)
-            PluginLog.Information($"[{_name}]{{{(int)logLevel}}} {formatter(state, exception)}");
-        else if (logLevel == LogLevel.Warning)
-            PluginLog.Warning($"[{_name}]{{{(int)logLevel}}} {formatter(state, exception)}");
-        else if (logLevel == LogLevel.Error)
-            PluginLog.Error($"[{_name}]{{{(int)logLevel}}} {formatter(state, exception)}");
+            PluginLog.Information($"[{_name}]{{{(int)logLevel}}} {state}");
         else
-            PluginLog.Fatal($"[{_name}]{{{(int)logLevel}}} {formatter(state, exception)}");
+        {
+            StringBuilder sb = new();
+            sb.AppendLine($"[{_name}]{{{(int)logLevel}}} {state}: {exception.Message}");
+            sb.AppendLine(exception.StackTrace);
+            if (logLevel == LogLevel.Warning)
+                PluginLog.Warning(sb.ToString());
+            else if (logLevel == LogLevel.Error)
+                PluginLog.Error(sb.ToString());
+            else
+                PluginLog.Fatal(sb.ToString());
+        }
     }
 
     public bool IsEnabled(LogLevel logLevel)

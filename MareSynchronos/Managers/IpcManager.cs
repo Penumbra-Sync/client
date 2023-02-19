@@ -66,7 +66,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
     private readonly ConcurrentQueue<Action> _normalQueue = new();
     private readonly ConcurrentQueue<Action> _gposeActionQueue = new();
 
-    private ConcurrentDictionary<IntPtr, bool> _penumbraRedrawRequests = new();
+    private readonly ConcurrentDictionary<IntPtr, bool> _penumbraRedrawRequests = new();
     private CancellationTokenSource _disposalCts = new();
 
     private bool _penumbraAvailable = false;
@@ -163,7 +163,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         if (_gposeActionQueue.TryDequeue(out var action))
         {
             if (action == null) return;
-            _logger.LogDebug("Execution action in gpose queue: " + action.Method);
+            _logger.LogDebug("Execution action in gpose queue: {method}", action.Method);
             action();
         }
     }
@@ -195,7 +195,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         if (ActionQueue.TryDequeue(out var action))
         {
             if (action == null) return;
-            _logger.LogDebug("Execution action in queue: " + action.Method);
+            _logger.LogDebug("Execution action in queue: {method}", action.Method);
             action();
         }
     }
@@ -341,7 +341,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj != null)
             {
-                _logger.LogTrace("Applying Heels data to " + character.ToString("X"));
+                _logger.LogTrace("Applying Heels data to {chara}", character.ToString("X"));
                 _heelsRegisterPlayer.InvokeAction(gameObj, offset);
             }
         });
@@ -355,7 +355,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj != null)
             {
-                _logger.LogTrace("Restoring Heels data to " + character.ToString("X"));
+                _logger.LogTrace("Restoring Heels data to {chara}", character.ToString("X"));
                 _heelsUnregisterPlayer.InvokeAction(gameObj);
             }
         });
@@ -378,7 +378,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
             if (gameObj is Character c)
             {
                 string decodedScale = Encoding.UTF8.GetString(Convert.FromBase64String(scale));
-                _logger.LogTrace("CustomizePlus applying for " + c.Address.ToString("X"));
+                _logger.LogTrace("CustomizePlus applying for {chara}", c.Address.ToString("X"));
                 _customizePlusSetBodyScaleToCharacter!.InvokeAction(decodedScale, c);
             }
         });
@@ -392,13 +392,13 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj is Character c)
             {
-                _logger.LogTrace("CustomizePlus reverting for " + c.Address.ToString("X"));
+                _logger.LogTrace("CustomizePlus reverting for {chara}", c.Address.ToString("X"));
                 _customizePlusRevert!.InvokeAction(c);
             }
         });
     }
 
-    private async Task PenumbraRedrawAction(Microsoft.Extensions.Logging.ILogger logger, GameObjectHandler obj, Guid applicationId, Action action, CancellationToken token, bool fireAndForget)
+    private async Task PenumbraRedrawAction(ILogger logger, GameObjectHandler obj, Guid applicationId, Action action, bool fireAndForget, CancellationToken token)
     {
         Mediator.Publish(new PenumbraStartRedrawMessage(obj.Address));
 
@@ -428,7 +428,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
         if (gameObj is Character c)
         {
-            await PenumbraRedrawAction(logger, handler, applicationId, () => _glamourerApplyAll!.InvokeAction(customization, c), token, fireAndForget).ConfigureAwait(false);
+            await PenumbraRedrawAction(logger, handler, applicationId, () => _glamourerApplyAll!.InvokeAction(customization, c), fireAndForget, token).ConfigureAwait(false);
         }
     }
 
@@ -438,7 +438,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
         if (gameObj is Character c)
         {
-            await PenumbraRedrawAction(logger, handler, applicationId, () => _glamourerApplyOnlyEquipment!.InvokeAction(customization, c), token, fireAndForget).ConfigureAwait(false);
+            await PenumbraRedrawAction(logger, handler, applicationId, () => _glamourerApplyOnlyEquipment!.InvokeAction(customization, c), fireAndForget, token).ConfigureAwait(false);
         }
     }
 
@@ -448,7 +448,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
         if (gameObj is Character c)
         {
-            await PenumbraRedrawAction(logger, handler, applicationId, () => _glamourerApplyOnlyCustomization!.InvokeAction(customization, c), token, fireAndForget).ConfigureAwait(false);
+            await PenumbraRedrawAction(logger, handler, applicationId, () => _glamourerApplyOnlyCustomization!.InvokeAction(customization, c), fireAndForget, token).ConfigureAwait(false);
         }
     }
 
@@ -501,7 +501,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
         if (gameObj is Character c)
         {
-            await PenumbraRedrawAction(logger, handler, applicationId, () => _penumbraRedrawObject!.Invoke(c, RedrawType.Redraw), token, fireAndForget).ConfigureAwait(false);
+            await PenumbraRedrawAction(logger, handler, applicationId, () => _penumbraRedrawObject!.Invoke(c, RedrawType.Redraw), fireAndForget, token).ConfigureAwait(false);
         }
     }
 
@@ -511,11 +511,11 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         ActionQueue.Enqueue(() =>
         {
             var collName = "Mare_" + characterName;
-            logger.LogTrace($"[{applicationId}] Removing temp collection for {collName}");
+            logger.LogTrace("[{applicationId}] Removing temp collection for {collName}", applicationId, collName);
             var ret = _penumbraRemoveTemporaryMod.Invoke("MareChara", collName, 0);
-            logger.LogTrace($"[{applicationId}] RemoveTemporaryMod: {ret}");
+            logger.LogTrace("[{applicationId}] RemoveTemporaryMod: {ret}", applicationId, ret);
             var ret2 = _penumbraRemoveTemporaryCollection.Invoke(collName);
-            logger.LogTrace($"[{applicationId}] RemoveTemporaryCollection: {ret2}");
+            logger.LogTrace("[{applicationId}] RemoveTemporaryCollection: {ret2}", applicationId, ret2);
         });
     }
 
@@ -550,16 +550,16 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
             }
             var collName = "Mare_" + characterName;
             var ret = _penumbraCreateNamedTemporaryCollection.Invoke(collName);
-            logger.LogTrace($"[{applicationId}] Creating Temp Collection {collName}, Success: {ret}");
+            logger.LogTrace("[{applicationId}] Creating Temp Collection {collName}, Success: {ret}", applicationId, collName, ret);
             var retAssign = _penumbraAssignTemporaryCollection.Invoke(collName, idx.Value, c: true);
-            logger.LogTrace($"[{applicationId}] Assigning Temp Collection {collName} to index {idx.Value}");
+            logger.LogTrace("[{applicationId}] Assigning Temp Collection {collName} to index {idx}", applicationId, collName, idx.Value);
             foreach (var mod in modPaths)
             {
-                logger.LogTrace($"[{applicationId}] {mod.Key} => {mod.Value}");
+                logger.LogTrace("[{applicationId}] Change: {from} => {to}", applicationId, mod.Key, mod.Value);
             }
 
             var ret2 = _penumbraAddTemporaryMod.Invoke("MareChara", collName, modPaths, manipulationData, 0);
-            logger.LogTrace($"[{applicationId}] Setting temp mods for {collName}, Success: {ret2}");
+            logger.LogTrace("[{applicationId}] Setting temp mods for {collName}, Success: {ret2}", applicationId, collName, ret2);
         });
     }
 
@@ -617,12 +617,12 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
 
                 if (string.IsNullOrEmpty(decodedPalette))
                 {
-                    _logger.LogTrace("PalettePlus removing for " + c.Address.ToString("X"));
+                    _logger.LogTrace("PalettePlus removing for {addr}", c.Address.ToString("X"));
                     _palettePlusRemoveCharaPalette!.InvokeAction(c);
                 }
                 else
                 {
-                    _logger.LogTrace("PalettePlus applying for " + c.Address.ToString("X"));
+                    _logger.LogTrace("PalettePlus applying for {addr}", c.Address.ToString("X"));
                     _palettePlusSetCharaPalette!.InvokeAction(c, decodedPalette);
                 }
             }
@@ -645,7 +645,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj is Character c)
             {
-                _logger.LogTrace("PalettePlus removing for " + c.Address.ToString("X"));
+                _logger.LogTrace("PalettePlus removing for {addr}", c.Address.ToString("X"));
                 _palettePlusRemoveCharaPalette!.InvokeAction(c);
             }
         });

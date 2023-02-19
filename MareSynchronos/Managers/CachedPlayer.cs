@@ -45,10 +45,10 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
     public void ApplyCharacterData(API.Data.CharacterData characterData, OptionalPluginWarning warning, bool forced = false)
     {
-        _logger.LogDebug("Received data for " + this);
+        _logger.LogDebug("Received data for {player}", this);
 
-        _logger.LogDebug("Checking for files to download for player " + PlayerName);
-        _logger.LogDebug("Hash for data is " + characterData.DataHash.Value + ", current cache hash is " + _cachedData.DataHash.Value);
+        _logger.LogDebug("Checking for files to download for player {name}", this);
+        _logger.LogDebug("Hash for data is {newHash}, current cache hash is {oldHash}", characterData.DataHash.Value, _cachedData.DataHash.Value);
 
         if (!_ipcManager.CheckPenumbraApi()) return;
         if (!_ipcManager.CheckGlamourerApi()) return;
@@ -86,7 +86,9 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
             if (hasNewButNotOldFileReplacements || hasOldButNotNewFileReplacements || hasNewButNotOldGlamourerData || hasOldButNotNewGlamourerData)
             {
-                _logger.LogDebug($"Updating {objectKind} (Some new data arrived: {hasNewButNotOldFileReplacements} {hasOldButNotNewFileReplacements} {hasNewButNotOldGlamourerData} {hasOldButNotNewGlamourerData})");
+                _logger.LogDebug("Updating {object} (Some new data arrived: NewButNotOldFiles:{hasNewButNotOldFileReplacements}," +
+                    " OldButNotNewFiles:{hasOldButNotNewFileReplacements}, NewButNotOldGlam:{hasNewButNotOldGlamourerData}, OldButNotNewGlam:{hasOldButNotNewGlamourerData})",
+                    this, hasNewButNotOldFileReplacements, hasOldButNotNewFileReplacements, hasOldButNotNewGlamourerData, hasNewButNotOldGlamourerData);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.Mods);
             }
 
@@ -95,7 +97,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 bool listsAreEqual = Enumerable.SequenceEqual(oldData.FileReplacements[objectKind], newData.FileReplacements[objectKind], FileReplacementDataComparer.Instance);
                 if (!listsAreEqual || forced)
                 {
-                    _logger.LogDebug($"Updating {objectKind} (FileReplacements not equal)");
+                    _logger.LogDebug("Updating {object}/{kind} (FileReplacements not equal)", this, objectKind);
                     charaDataToUpdate[objectKind].Add(PlayerChanges.Mods);
                 }
             }
@@ -105,7 +107,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 bool glamourerDataDifferent = !string.Equals(oldData.GlamourerData[objectKind], newData.GlamourerData[objectKind], StringComparison.Ordinal);
                 if (forced || glamourerDataDifferent)
                 {
-                    _logger.LogDebug($"Updating {objectKind} (Diff glamourer data)");
+                    _logger.LogDebug("Updating {object}/{kind} (Diff glamourer data)", this, objectKind);
                     charaDataToUpdate[objectKind].Add(PlayerChanges.Mods);
                 }
             }
@@ -115,28 +117,31 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 bool manipDataDifferent = !string.Equals(oldData.ManipulationData, newData.ManipulationData, StringComparison.Ordinal);
                 if (manipDataDifferent || forced)
                 {
-                    _logger.LogDebug($"Updating {objectKind} (Diff manip data)");
+                    _logger.LogDebug("Updating {object}/{kind} (Diff manip data)", this, objectKind);
                     charaDataToUpdate[objectKind].Add(PlayerChanges.Mods);
                     continue;
                 }
 
                 bool heelsOffsetDifferent = oldData.HeelsOffset != newData.HeelsOffset;
                 if (heelsOffsetDifferent || forced)
-                    _logger.LogDebug($"Updating {objectKind} (Diff heels data)");
+                {
+                    _logger.LogDebug("Updating {object}/{kind} (Diff heels data)", this, objectKind);
                     charaDataToUpdate[objectKind].Add(PlayerChanges.Heels);
                     continue;
                 }
 
                 bool customizeDataDifferent = !string.Equals(oldData.CustomizePlusData, newData.CustomizePlusData, StringComparison.Ordinal);
                 if (customizeDataDifferent || forced)
-                    _logger.LogDebug($"Updating {objectKind} (Diff customize data)");
+                {
+                    _logger.LogDebug("Updating {object}/{kind} (Diff customize data)", this, objectKind);
                     charaDataToUpdate[objectKind].Add(PlayerChanges.Customize);
                     continue;
                 }
 
                 bool palettePlusDataDifferent = !string.Equals(oldData.PalettePlusData, newData.PalettePlusData, StringComparison.Ordinal);
                 if (palettePlusDataDifferent || forced)
-                    _logger.LogDebug($"Updating {objectKind} (Diff palette data)");
+                {
+                    _logger.LogDebug("Updating {object}/{kind} (Diff palette data)", this, objectKind);
                     charaDataToUpdate[objectKind].Add(PlayerChanges.Palette);
                     continue;
                 }
@@ -150,7 +155,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         }
     }
 
-    private enum PlayerChanges
+    public enum PlayerChanges
     {
         Heels = 1,
         Customize = 2,
@@ -207,18 +212,18 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         return true;
     }
 
-    public override async void Dispose()
+    public override void Dispose()
     {
         if (string.IsNullOrEmpty(PlayerName)) return; // already disposed
 
         base.Dispose();
         var name = PlayerName;
         PlayerName = null;
-        _logger.LogDebug("Disposing " + name + " (" + OnlineUser + ")");
+        _logger.LogDebug("Disposing {name} ({user})", name, OnlineUser);
         try
         {
             Guid applicationId = Guid.NewGuid();
-            _logger.LogTrace($"[{applicationId}] Restoring state for {name} ({OnlineUser})");
+            _logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser);
             _currentOtherChara?.Dispose();
             _ipcManager.PenumbraRemoveTemporaryCollection(_logger, applicationId, name);
             _downloadCancellationTokenSource?.Cancel();
@@ -228,19 +233,19 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             {
                 foreach (var item in _cachedData.FileReplacements)
                 {
-                    await RevertCustomizationData(item.Key, name, applicationId).ConfigureAwait(false);
+                    RevertCustomizationData(item.Key, name, applicationId).RunSynchronously();
                 }
             }
             _currentOtherChara = null;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex.Message + Environment.NewLine + ex.StackTrace);
+            _logger.LogWarning(ex, "Error on disposal of {name}", name);
         }
         finally
         {
             _cachedData = new();
-            _logger.LogDebug("Disposing " + name + " complete");
+            _logger.LogDebug("Disposing {name} complete", name);
             PlayerName = null;
         }
     }
@@ -248,7 +253,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
     public void Initialize(string name)
     {
         PlayerName = name;
-        _currentOtherChara = _gameObjectHandlerFactory.Create(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName)?.Address ?? IntPtr.Zero, false);
+        _currentOtherChara = _gameObjectHandlerFactory.Create(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName)?.Address ?? IntPtr.Zero, isWatched: false);
 
         _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
         _lastGlamourerData = _originalGlamourerData;
@@ -262,7 +267,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             }
         });
 
-        _logger.LogDebug("Initializing Player " + this);
+        _logger.LogDebug("Initializing Player {obj}", this);
     }
 
     public override string ToString()
@@ -276,15 +281,14 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         _ipcManager.PenumbraSetTemporaryMods(_logger, applicationId, PlayerName!, moddedPaths, manipulationData);
     }
     private async Task ApplyCustomizationData(Guid applicationId, KeyValuePair<ObjectKind, HashSet<PlayerChanges>> changes, API.Data.CharacterData charaData)
-    private async Task ApplyCustomizationData(ObjectKind objectKind)
     {
         if (PlayerCharacter == IntPtr.Zero) return;
         var handler = changes.Key switch
         {
             ObjectKind.Player => _currentOtherChara!,
-            ObjectKind.Companion => _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetCompanion(PlayerCharacter), false),
-            ObjectKind.MinionOrMount => _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetMinionOrMount(PlayerCharacter) ?? IntPtr.Zero, false),
-            ObjectKind.Pet => _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetPet(PlayerCharacter), false),
+            ObjectKind.Companion => _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetCompanion(PlayerCharacter), isWatched: false),
+            ObjectKind.MinionOrMount => _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetMinionOrMount(PlayerCharacter), isWatched: false),
+            ObjectKind.Pet => _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetPet(PlayerCharacter), isWatched: false),
             _ => throw new NotSupportedException("ObjectKind not supported: " + changes.Key)
         };
 
@@ -293,12 +297,11 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         applicationTokenSource.CancelAfter(TimeSpan.FromSeconds(30));
 
         if (handler.Address == IntPtr.Zero) return;
-        _logger.LogDebug($"[{applicationId}] Applying Customization Data for {handler}");
+        _logger.LogDebug("[{applicationId}] Applying Customization Data for {handler}", applicationId, handler);
         _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, handler, applicationId, 30000);
-                            () => minionOrMount.Value, false);
         foreach (var change in changes.Value)
         {
-            _logger.LogDebug($"[{applicationId}] Processing {change} for {handler}");
+            _logger.LogDebug("[{applicationId}] Processing {change} for {handler}", applicationId, change, handler);
             switch (change)
             {
                 case PlayerChanges.Palette:
@@ -306,10 +309,10 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     break;
                 case PlayerChanges.Customize:
                     _ipcManager.CustomizePlusSetBodyScale(handler.Address, charaData.CustomizePlusData);
-
                     break;
                 case PlayerChanges.Heels:
                     _ipcManager.HeelsSetOffsetForPlayer(charaData.HeelsOffset, handler.Address);
+                    break;
                 case PlayerChanges.Mods:
                     if (charaData.GlamourerData.TryGetValue(changes.Key, out var glamourerData))
                     {
@@ -318,10 +321,10 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     else
                     {
                         await _ipcManager.PenumbraRedraw(_logger, handler, applicationId, applicationTokenSource.Token).ConfigureAwait(false);
-                        }
                     }
                     break;
             }
+            break;
         }
     }
 
@@ -329,7 +332,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
     {
         if (!updatedData.Any())
         {
-            _logger.LogDebug("Nothing to update for " + this);
+            _logger.LogDebug("Nothing to update for {obj}", this);
         }
 
         var updateModdedPaths = updatedData.Values.Any(v => v.Any(p => p == PlayerChanges.Mods));
@@ -352,8 +355,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 while ((toDownloadReplacements = TryCalculateModdedDictionary(charaData, out moddedPaths)).Count > 0 && attempts++ <= 10)
                 {
                     downloadId = _apiController.GetDownloadId();
-                    _logger.LogDebug("Downloading missing files for player " + PlayerName + ", kind: " + updatedData);
-                    Logger.Debug("Downloading missing files for player " + PlayerName + ", kind: " + objectKind);
+                    _logger.LogDebug("Downloading missing files for player {name}, {kind}", PlayerName, updatedData);
                     if (toDownloadReplacements.Any())
                     {
                         await _apiController.DownloadFiles(downloadId, toDownloadReplacements, downloadToken).ConfigureAwait(false);
@@ -384,35 +386,38 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             }
 
             _applicationTask = Task.Run(async () =>
+            {
                 Guid applicationId = Guid.NewGuid();
-                _logger.LogDebug($"[{applicationId}] Starting application task");
+                _logger.LogDebug("[{applicationId}] Starting application task", applicationId);
 
                 if (updateModdedPaths)
-                if (moddedPaths.Any())
                 {
-                    ApplyBaseData(applicationId, moddedPaths, charaData.ManipulationData);
-                }
+                    if (moddedPaths.Any())
+                    {
+                        ApplyBaseData(applicationId, moddedPaths, charaData.ManipulationData);
+                    }
 
-                foreach (var kind in updatedData)
-                    await ApplyCustomizationData(applicationId, kind, charaData).ConfigureAwait(false);
-                    await ApplyCustomizationData(kind).ConfigureAwait(false);
+                    foreach (var kind in updatedData)
+                    {
+                        await ApplyCustomizationData(applicationId, kind, charaData).ConfigureAwait(false);
+                    }
                 }
             });
 
         }, downloadToken).ContinueWith(task =>
-        {
-            _downloadCancellationTokenSource = null;
+            {
+                _downloadCancellationTokenSource = null;
 
-            if (!task.IsCanceled) return;
+                if (!task.IsCanceled) return;
 
-            _logger.LogDebug("Application was cancelled");
-            _apiController.CancelDownload(downloadId);
-        });
+                _logger.LogDebug("Application was cancelled");
+                _apiController.CancelDownload(downloadId);
+            });
     }
 
     private Task? _applicationTask;
 
-    private CancellationTokenSource _redrawCts = new CancellationTokenSource();
+    private CancellationTokenSource _redrawCts = new();
 
     private void IpcManagerOnPenumbraRedrawEvent(PenumbraRedrawMessage msg)
     {
@@ -425,13 +430,13 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         var token = _redrawCts.Token;
 
         Task.Run(async () =>
+        {
             var applicationId = Guid.NewGuid();
             _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, _currentOtherChara!, applicationId, ct: token);
             _logger.LogDebug("Unauthorized character change detected");
             await ApplyCustomizationData(applicationId, new(ObjectKind.Player,
                 new HashSet<PlayerChanges>(new[] { PlayerChanges.Palette, PlayerChanges.Customize, PlayerChanges.Heels, PlayerChanges.Mods })),
                 _cachedData).ConfigureAwait(false);
-            await ApplyCustomizationData(ObjectKind.Player).ConfigureAwait(false);
         }, token);
     }
 
@@ -442,27 +447,26 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         var cancelToken = new CancellationTokenSource();
         cancelToken.CancelAfter(TimeSpan.FromSeconds(10));
 
-        _logger.LogDebug($"[{applicationId}] Reverting all Customization for {OnlineUser.User.AliasOrUID}/{name} {objectKind}");
+        _logger.LogDebug("[{applicationId}] Reverting all Customization for {alias}/{name} {objectKind}", applicationId, OnlineUser.User.AliasOrUID, name, objectKind);
 
         if (objectKind == ObjectKind.Player)
         {
-            _logger.LogDebug($"[{applicationId}] Restoring Customization for {OnlineUser.User.AliasOrUID}/{name}: {_originalGlamourerData}");
+            _logger.LogDebug("[{applicationId}] Restoring Customization for {alias}/{name}: {data}", applicationId, OnlineUser.User.AliasOrUID, name, _originalGlamourerData);
             await _ipcManager.GlamourerApplyOnlyCustomization(_logger, _currentOtherChara!, _originalGlamourerData, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
-            _logger.LogDebug($"[{applicationId}] Restoring Equipment for {OnlineUser.User.AliasOrUID}/{name}: {_lastGlamourerData}");
+            _logger.LogDebug("[{applicationId}] Restoring Equipment for {alias}/{name}: {data}", applicationId, OnlineUser.User.AliasOrUID, name, _lastGlamourerData);
             await _ipcManager.GlamourerApplyOnlyEquipment(_logger, _currentOtherChara!, _lastGlamourerData, applicationId, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
-            _logger.LogDebug($"[{applicationId}] Restoring Heels for {OnlineUser.User.AliasOrUID}/{name}");
+            _logger.LogDebug("[{applicationId}] Restoring Heels for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             _ipcManager.HeelsRestoreOffsetForPlayer(PlayerCharacter);
-            _logger.LogDebug($"[{applicationId}] Restoring C+ for {OnlineUser.User.AliasOrUID}/{name}");
+            _logger.LogDebug("[{applicationId}] Restoring C+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             _ipcManager.CustomizePlusRevert(PlayerCharacter);
             _ipcManager.PalettePlusRemovePalette(PlayerCharacter);
         }
         else if (objectKind == ObjectKind.MinionOrMount)
         {
             var minionOrMount = _dalamudUtil.GetMinionOrMount(PlayerCharacter);
-            if (minionOrMount != null)
+            if (minionOrMount != IntPtr.Zero)
             {
-                using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => minionOrMount.Value,
-                    false);
+                using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => minionOrMount, isWatched: false);
                 await _ipcManager.PenumbraRedraw(_logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
             }
         }
@@ -471,8 +475,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             var pet = _dalamudUtil.GetPet(PlayerCharacter);
             if (pet != IntPtr.Zero)
             {
-                using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => pet,
-                    false);
+                using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => pet, isWatched: false);
                 await _ipcManager.PenumbraRedraw(_logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
             }
         }
@@ -481,8 +484,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             var companion = _dalamudUtil.GetCompanion(PlayerCharacter);
             if (companion != IntPtr.Zero)
             {
-                using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => companion,
-                    false);
+                using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => companion, isWatched: false);
                 await _ipcManager.PenumbraRedraw(_logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
             }
         }
@@ -505,7 +507,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     }
                     else
                     {
-                        _logger.LogTrace("Missing file: " + item.Hash);
+                        _logger.LogTrace("Missing file: {hash}", item.Hash);
                         missingFiles.Add(item);
                     }
                 }
@@ -515,7 +517,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             {
                 foreach (var gamePath in item.GamePaths)
                 {
-                    _logger.LogTrace("Adding file swap for " + gamePath + ":" + item.FileSwapPath);
+                    _logger.LogTrace("Adding file swap for {path}: {fileSwap}", gamePath, item.FileSwapPath);
                     moddedDictionary[gamePath] = item.FileSwapPath;
                 }
             }
@@ -524,7 +526,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         {
             PluginLog.Error(ex, "Something went wrong during calculation replacements");
         }
-        _logger.LogDebug("ModdedPaths calculated, missing files: " + missingFiles.Count);
+        _logger.LogDebug("ModdedPaths calculated, missing files: {count}", missingFiles.Count);
         return missingFiles;
     }
 }

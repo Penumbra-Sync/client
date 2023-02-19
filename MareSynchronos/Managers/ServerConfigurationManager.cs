@@ -228,7 +228,7 @@ public class ServerConfigurationManager
         CurrentServerTagStorage().ServerAvailablePairTags.Remove(tag);
         foreach (var uid in GetUidsForTag(tag))
         {
-            RemoveTagForUid(uid, tag, false);
+            RemoveTagForUid(uid, tag, save: false);
         }
         _serverTagConfig.Save();
     }
