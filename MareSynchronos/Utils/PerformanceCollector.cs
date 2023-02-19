@@ -3,29 +3,52 @@ using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
-using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace MareSynchronos.Utils;
 
-public class PerformanceCollector
+public class PerformanceCollector : IDisposable
 {
     private readonly ConcurrentDictionary<string, RollingList<Tuple<TimeOnly, long>>> _performanceCounters = new(StringComparer.Ordinal);
     private readonly ILogger<PerformanceCollector> _logger;
     private readonly MareConfigService _mareConfigService;
-    private const string counterSplit = "=>";
+    private const string _counterSplit = "=>";
+    private readonly CancellationTokenSource _periodicLogPruneTask = new();
 
     public PerformanceCollector(ILogger<PerformanceCollector> logger, MareConfigService mareConfigService)
     {
         _logger = logger;
         _mareConfigService = mareConfigService;
+        _ = Task.Run(PeriodicLogPrune, _periodicLogPruneTask.Token);
+    }
+
+    public void Dispose()
+    {
+        _logger.LogTrace("Disposing {this}", GetType());
+        _periodicLogPruneTask.Cancel();
+    }
+
+    private async Task PeriodicLogPrune()
+    {
+        while (!_periodicLogPruneTask.Token.IsCancellationRequested)
+        {
+            await Task.Delay(TimeSpan.FromMinutes(10), _periodicLogPruneTask.Token).ConfigureAwait(false);
+
+            foreach (var entries in _performanceCounters.ToList())
+            {
+                if (entries.Value.Last().Item1.AddMinutes(10) < TimeOnly.FromDateTime(DateTime.Now))
+                {
+                    _performanceCounters.Remove(entries.Key, out _);
+                }
+            }
+        }
     }
 
     public T LogPerformance<T>(object sender, string counterName, Func<T> func)
     {
         if (!_mareConfigService.Current.LogPerformance) return func.Invoke();
 
-        counterName = sender.GetType().Name + counterSplit + counterName;
+        counterName = sender.GetType().Name + _counterSplit + counterName;
 
         if (!_performanceCounters.TryGetValue(counterName, out var list))
         {
@@ -52,7 +75,7 @@ public class PerformanceCollector
     {
         if (!_mareConfigService.Current.LogPerformance) { act.Invoke(); return; }
 
-        counterName = sender.GetType().Name + counterSplit + counterName;
+        counterName = sender.GetType().Name + _counterSplit + counterName;
 
         if (!_performanceCounters.TryGetValue(counterName, out var list))
         {
@@ -107,10 +130,10 @@ public class PerformanceCollector
         sb.Append("-Counter Name".PadRight(longestCounterName, '-'));
         sb.AppendLine();
         var orderedData = data.OrderBy(k => k.Key, StringComparer.OrdinalIgnoreCase).ToList();
-        var previousCaller = orderedData.First().Key.Split(counterSplit, StringSplitOptions.RemoveEmptyEntries)[0];
+        var previousCaller = orderedData.First().Key.Split(_counterSplit, StringSplitOptions.RemoveEmptyEntries)[0];
         foreach (var entry in orderedData)
         {
-            var newCaller = entry.Key.Split(counterSplit, StringSplitOptions.RemoveEmptyEntries)[0];
+            var newCaller = entry.Key.Split(_counterSplit, StringSplitOptions.RemoveEmptyEntries)[0];
             if (!string.Equals(previousCaller, newCaller, StringComparison.Ordinal))
             {
                 DrawSeparator(sb, longestCounterName);
