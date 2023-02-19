@@ -201,6 +201,7 @@ public class DalamudUtil : IDisposable
     public unsafe IntPtr GetMinionOrMount(IntPtr? playerPointer = null)
     {
         playerPointer ??= PlayerPointer;
+        if (playerPointer == IntPtr.Zero) return IntPtr.Zero;
         return _objectTable.GetObjectAddress(((GameObject*)playerPointer)->ObjectIndex + 1);
     }
 

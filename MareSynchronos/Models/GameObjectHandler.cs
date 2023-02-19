@@ -1,38 +1,27 @@
 ﻿using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
-using System.Runtime.InteropServices;
-using Penumbra.String;
 using MareSynchronos.Mediator;
-using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;
-using Microsoft.Extensions.Logging;
 using MareSynchronos.Utils;
+using Microsoft.Extensions.Logging;
+using Penumbra.String;
+using System.Runtime.InteropServices;
+using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;
 
 namespace MareSynchronos.Models;
 
 public class GameObjectHandler : MediatorSubscriberBase
 {
-    private readonly PerformanceCollector _performanceCollector;
-    private readonly MareMediator _mediator;
     private readonly Func<IntPtr> _getAddress;
     private readonly bool _isOwnedObject;
-    public unsafe Character* Character => (Character*)Address;
-
-    public string Name { get; private set; }
-    public ObjectKind ObjectKind { get; }
-    public IntPtr Address { get; set; }
-    public IntPtr CurrentAddress => _getAddress.Invoke();
-    private IntPtr DrawObjectAddress { get; set; }
+    private readonly MareMediator _mediator;
+    private readonly PerformanceCollector _performanceCollector;
+    private CancellationTokenSource? _clearCts = new();
+    private Task? _clearTask;
     private Task? _delayedZoningTask;
-    private CancellationTokenSource _zoningCts = new();
     private bool _haltProcessing = false;
     private bool _ignoreSendAfterRedraw = false;
-
-    public override string ToString()
-    {
-        return $"{ObjectKind}:{Name} ({Address:X},{DrawObjectAddress:X})";
-    }
-
+    private CancellationTokenSource _zoningCts = new();
     public GameObjectHandler(ILogger<GameObjectHandler> logger, PerformanceCollector performanceCollector, MareMediator mediator, ObjectKind objectKind, Func<IntPtr> getAddress, bool watchedObject = true) : base(logger, mediator)
     {
         _performanceCollector = performanceCollector;
@@ -93,65 +82,33 @@ public class GameObjectHandler : MediatorSubscriberBase
         CheckAndUpdateObject();
     }
 
+    public IntPtr Address { get; set; }
+    public unsafe Character* Character => (Character*)Address;
+
+    public IntPtr CurrentAddress => _getAddress.Invoke();
+    public bool IsBeingDrawn { get; private set; }
+    public string Name { get; private set; }
+    public ObjectKind ObjectKind { get; }
+    private byte[] CustomizeData { get; set; } = new byte[26];
+    private IntPtr DrawObjectAddress { get; set; }
+    private byte[] EquipSlotData { get; set; } = new byte[40];
+
+    private byte? HatState { get; set; }
+
+    private byte? VisorWeaponState { get; set; }
+
     public override void Dispose()
     {
         base.Dispose();
-        Mediator.Publish(new RemoveWatchedGameObjectHandler(this));
+        if (_isOwnedObject)
+            Mediator.Publish(new RemoveWatchedGameObjectHandler(this));
     }
 
-    private void FrameworkUpdate()
+    public override string ToString()
     {
-        if (!_delayedZoningTask?.IsCompleted ?? false) return;
-
-        try
-        {
-            _performanceCollector.LogPerformance(this, "CheckAndUpdateObject>" + (_isOwnedObject ? "Self+" : "Other+") + ObjectKind + "/"
-                + (string.IsNullOrEmpty(Name) ? "Unk" : Name) + "+" + Address.ToString("X"), CheckAndUpdateObject);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Error during FrameworkUpdate of {this}", this);
-        }
+        var owned = (_isOwnedObject ? "Self" : "Other");
+        return $"{owned}/{ObjectKind}:{Name} ({Address:X},{DrawObjectAddress:X})";
     }
-
-    private void ZoneSwitchEnd()
-    {
-        if (!_isOwnedObject || _haltProcessing) return;
-
-        _clearCts?.Cancel();
-        _clearCts?.Dispose();
-        _clearCts = null;
-        _zoningCts.CancelAfter(2500);
-    }
-
-    private void ZoneSwitchStart()
-    {
-        if (!_isOwnedObject || _haltProcessing) return;
-
-        _zoningCts = new();
-        _logger.LogDebug("[{obj}] Starting Delay After Zoning", this);
-        _delayedZoningTask = Task.Run(async () =>
-        {
-            try
-            {
-                await Task.Delay(TimeSpan.FromSeconds(120), _zoningCts.Token).ConfigureAwait(false);
-            }
-            catch { }
-            finally
-            {
-                _logger.LogDebug("[{this}] Delay after zoning complete", this);
-                _zoningCts.Dispose();
-            }
-        });
-    }
-
-    public bool IsBeingDrawn { get; private set; }
-    private byte[] EquipSlotData { get; set; } = new byte[40];
-    private byte[] CustomizeData { get; set; } = new byte[26];
-    private Task? _clearTask;
-    private CancellationTokenSource? _clearCts = new();
-    private byte? HatState { get; set; }
-    private byte? VisorWeaponState { get; set; }
 
     private unsafe void CheckAndUpdateObject()
     {
@@ -246,22 +203,6 @@ public class GameObjectHandler : MediatorSubscriberBase
         _clearCts = null;
     }
 
-    private unsafe bool CompareAndUpdateEquipByteData(byte* equipSlotData)
-    {
-        bool hasChanges = false;
-        for (int i = 0; i < EquipSlotData.Length; i++)
-        {
-            var data = Marshal.ReadByte((IntPtr)equipSlotData, i);
-            if (EquipSlotData[i] != data)
-            {
-                EquipSlotData[i] = data;
-                hasChanges = true;
-            }
-        }
-
-        return hasChanges;
-    }
-
     private unsafe bool CompareAndUpdateCustomizeData(byte* customizeData, out bool doNotSendUpdate)
     {
         bool hasChanges = false;
@@ -302,5 +243,67 @@ public class GameObjectHandler : MediatorSubscriberBase
         }
 
         return hasChanges;
+    }
+
+    private unsafe bool CompareAndUpdateEquipByteData(byte* equipSlotData)
+    {
+        bool hasChanges = false;
+        for (int i = 0; i < EquipSlotData.Length; i++)
+        {
+            var data = Marshal.ReadByte((IntPtr)equipSlotData, i);
+            if (EquipSlotData[i] != data)
+            {
+                EquipSlotData[i] = data;
+                hasChanges = true;
+            }
+        }
+
+        return hasChanges;
+    }
+
+    private void FrameworkUpdate()
+    {
+        if (!_delayedZoningTask?.IsCompleted ?? false) return;
+
+        try
+        {
+            _performanceCollector.LogPerformance(this, "CheckAndUpdateObject>" + (_isOwnedObject ? "Self+" : "Other+") + ObjectKind + "/"
+                + (string.IsNullOrEmpty(Name) ? "Unk" : Name) + "+" + Address.ToString("X"), CheckAndUpdateObject);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error during FrameworkUpdate of {this}", this);
+        }
+    }
+
+    private void ZoneSwitchEnd()
+    {
+        if (!_isOwnedObject || _haltProcessing) return;
+
+        _clearCts?.Cancel();
+        _clearCts?.Dispose();
+        _clearCts = null;
+        _zoningCts.CancelAfter(2500);
+    }
+
+    private void ZoneSwitchStart()
+    {
+        if (!_isOwnedObject || _haltProcessing) return;
+
+        _zoningCts = new();
+        _logger.LogDebug("[{obj}] Starting Delay After Zoning", this);
+        _delayedZoningTask = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(120), _zoningCts.Token).ConfigureAwait(false);
+            }
+            catch { }
+            finally
+            {
+                _logger.LogDebug("[{this}] Delay after zoning complete", this);
+                _zoningCts.Dispose();
+            }
+        });
     }
 }

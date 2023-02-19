@@ -214,6 +214,10 @@ public class MarePlugin : MediatorSubscriberBase, IDisposable
                 _serviceProvider.GetRequiredService<PerformanceCollector>().PrintPerformanceStats();
             }
         }
+        else if (string.Equals(splitArgs[0], "medi", StringComparison.OrdinalIgnoreCase))
+        {
+            _serviceProvider.GetRequiredService<MareMediator>().PrintSubscriberInfo();
+        }
     }
 
     private void OpenUi()

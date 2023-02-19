@@ -1,6 +1,7 @@
 ﻿using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.Text;
 
 namespace MareSynchronos.Mediator;
 
@@ -63,9 +64,30 @@ public class MareMediator : IDisposable
     {
         foreach (var kvp in _subscriberDict.ToList())
         {
-            var unSubbed = kvp.Value.RemoveWhere(p => p.Subscriber == subscriber);
+            var unSubbed = _subscriberDict[kvp.Key].RemoveWhere(p => p.Subscriber == subscriber);
             if (unSubbed > 0)
                 _logger.LogDebug("{sub} unsubscribed from {msg}", subscriber, kvp.Key.Name);
+        }
+    }
+
+    public void PrintSubscriberInfo()
+    {
+        foreach (var kvp in _subscriberDict.ToList().SelectMany(c => c.Value.Select(v => v))
+            .DistinctBy(p => p.Subscriber).OrderBy(p => p.Subscriber.GetType().FullName, StringComparer.Ordinal))
+        {
+            _logger.LogInformation("Subscriber {type}: {sub}", kvp.Subscriber.GetType().FullName, kvp);
+            StringBuilder sb = new();
+            sb.Append("=> ");
+            foreach (var item in _subscriberDict.ToList())
+            {
+                if (item.Value.Any(v => v.Subscriber == kvp.Subscriber))
+                {
+                    sb.Append(item.Key.Name + ", ");
+                }
+            }
+            if (!string.Equals(sb.ToString(), "=> ", StringComparison.Ordinal))
+                _logger.LogInformation("{sb}", sb.ToString());
+            _logger.LogInformation("---");
         }
     }
 

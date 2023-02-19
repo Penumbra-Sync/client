@@ -230,16 +230,17 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             _downloadCancellationTokenSource?.Cancel();
             _downloadCancellationTokenSource?.Dispose();
             _downloadCancellationTokenSource = null;
-            if (PlayerCharacter != IntPtr.Zero)
+            var ptr = PlayerCharacter;
+            _currentOtherChara?.Dispose();
+            _currentOtherChara = null;
+
+            if (ptr != IntPtr.Zero)
             {
-                var ptr = PlayerCharacter;
                 foreach (var item in _cachedData.FileReplacements)
                 {
                     Task.Run(async () => await RevertCustomizationData(ptr, item.Key, name, applicationId).ConfigureAwait(false));
                 }
             }
-            _currentOtherChara?.Dispose();
-            _currentOtherChara = null;
         }
         catch (Exception ex)
         {
@@ -288,12 +289,13 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
     private async Task ApplyCustomizationData(Guid applicationId, KeyValuePair<ObjectKind, HashSet<PlayerChanges>> changes, API.Data.CharacterData charaData)
     {
         if (PlayerCharacter == IntPtr.Zero) return;
+        var ptr = PlayerCharacter;
         var handler = changes.Key switch
         {
             ObjectKind.Player => _currentOtherChara!,
-            ObjectKind.Companion => _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetCompanion(PlayerCharacter), isWatched: false),
-            ObjectKind.MinionOrMount => _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetMinionOrMount(PlayerCharacter), isWatched: false),
-            ObjectKind.Pet => _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetPet(PlayerCharacter), isWatched: false),
+            ObjectKind.Companion => _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetCompanion(ptr), isWatched: false),
+            ObjectKind.MinionOrMount => _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetMinionOrMount(ptr), isWatched: false),
+            ObjectKind.Pet => _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetPet(ptr), isWatched: false),
             _ => throw new NotSupportedException("ObjectKind not supported: " + changes.Key)
         };
 
