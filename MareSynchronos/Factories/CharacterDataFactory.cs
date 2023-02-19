@@ -151,9 +151,12 @@ public class CharacterDataFactory : MediatorSubscriberBase
         Task<string> getPalettePlusData = new(() => _ipcManager.PalettePlusBuildPalette());
         _processingQueue.Enqueue(getPalettePlusData);
         Task.WaitAll(new[] { getGlamourerData, getCustomizeData, getPalettePlusData }, token);
-        previousData.GlamourerString[playerRelatedObject.ObjectKind] = getGlamourerData.Result;
-        previousData.CustomizePlusScale = getCustomizeData.Result;
-        previousData.PalettePlusPalette = getPalettePlusData.Result;
+        previousData.GlamourerString[playerRelatedObject.ObjectKind] = await getGlamourerData.ConfigureAwait(true);
+        previousData.CustomizePlusScale = await getCustomizeData.ConfigureAwait(true);
+        previousData.PalettePlusPalette = await getPalettePlusData.ConfigureAwait(true);
+        _logger.LogDebug("Glamourer is now: {data}", previousData.GlamourerString[playerRelatedObject.ObjectKind]);
+        _logger.LogDebug("Customize is now: {data}", previousData.CustomizePlusScale);
+        _logger.LogDebug("Palette is now: {data}", previousData.PalettePlusPalette);
 
         // gather static replacements from render model
         var (forwardResolve, reverseResolve) = BuildDataFromModel(objectKind, charaPointer, token);

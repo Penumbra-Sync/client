@@ -55,7 +55,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
         if (string.Equals(characterData.DataHash.Value, _cachedData.DataHash.Value, StringComparison.Ordinal) && !forced) return;
 
-        CheckUpdatedData(_cachedData, characterData, forced, out var charaDataToUpdate);
+        CheckUpdatedData(_cachedData.DeepClone(), characterData, forced, out var charaDataToUpdate);
 
         NotifyForMissingPlugins(characterData, warning);
 
@@ -121,7 +121,6 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 {
                     _logger.LogDebug("Updating {object}/{kind} (Diff manip data) => {change}", this, objectKind, PlayerChanges.Mods);
                     charaDataToUpdate[objectKind].Add(PlayerChanges.Mods);
-                    continue;
                 }
 
                 bool heelsOffsetDifferent = oldData.HeelsOffset != newData.HeelsOffset;
@@ -129,7 +128,6 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 {
                     _logger.LogDebug("Updating {object}/{kind} (Diff heels data) => {change}", this, objectKind, PlayerChanges.Heels);
                     charaDataToUpdate[objectKind].Add(PlayerChanges.Heels);
-                    continue;
                 }
 
                 bool customizeDataDifferent = !string.Equals(oldData.CustomizePlusData, newData.CustomizePlusData, StringComparison.Ordinal);
@@ -137,7 +135,6 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 {
                     _logger.LogDebug("Updating {object}/{kind} (Diff customize data) => {change}", this, objectKind, PlayerChanges.Customize);
                     charaDataToUpdate[objectKind].Add(PlayerChanges.Customize);
-                    continue;
                 }
 
                 bool palettePlusDataDifferent = !string.Equals(oldData.PalettePlusData, newData.PalettePlusData, StringComparison.Ordinal);
@@ -145,7 +142,6 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 {
                     _logger.LogDebug("Updating {object}/{kind} (Diff palette data) => {change}", this, objectKind, PlayerChanges.Palette);
                     charaDataToUpdate[objectKind].Add(PlayerChanges.Palette);
-                    continue;
                 }
             }
         }
@@ -153,7 +149,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         foreach (var data in charaDataToUpdate.ToList())
         {
             if (!data.Value.Any()) charaDataToUpdate.Remove(data.Key);
-            else charaDataToUpdate[data.Key] = data.Value.OrderBy(p => (int)p).ToHashSet();
+            else charaDataToUpdate[data.Key] = data.Value.OrderByDescending(p => (int)p).ToHashSet();
         }
     }
 
@@ -331,7 +327,6 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     }
                     break;
             }
-            break;
         }
 
         if (handler != _currentOtherChara) handler.Dispose();
