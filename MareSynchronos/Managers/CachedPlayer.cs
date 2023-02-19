@@ -233,7 +233,8 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             {
                 foreach (var item in _cachedData.FileReplacements)
                 {
-                    RevertCustomizationData(item.Key, name, applicationId).RunSynchronously();
+                    var task = Task.Run(async () => await RevertCustomizationData(item.Key, name, applicationId).ConfigureAwait(false));
+                    Task.WaitAll(new[] { task });
                 }
             }
             _currentOtherChara = null;

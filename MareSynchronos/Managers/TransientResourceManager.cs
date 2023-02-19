@@ -143,7 +143,7 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
         {
             return;
         }
-        if (!PlayerRelatedPointers.Select(p => p.Address).Contains(gameObject))
+        if (!PlayerRelatedPointers.Select(p => p.CurrentAddress).Contains(gameObject))
         {
             //_logger.LogDebug("Got resource " + gamePath + " for ptr " + gameObject.ToString("X"));
             return;
@@ -172,7 +172,7 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
         else
         {
             TransientResources[gameObject].Add(replacedGamePath);
-            _logger.LogDebug("Adding {replacedGamePath} for {gameObject} ({filePath})", replacedGamePath, gameObject, filePath);
+            _logger.LogDebug("Adding {replacedGamePath} for {gameObject} ({filePath})", replacedGamePath, gameObject.ToString("X"), filePath);
             Mediator.Publish(new TransientResourceChangedMessage(gameObject));
         }
     }

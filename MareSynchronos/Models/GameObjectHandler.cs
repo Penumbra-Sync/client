@@ -21,6 +21,7 @@ public class GameObjectHandler : MediatorSubscriberBase
     public string Name { get; private set; }
     public ObjectKind ObjectKind { get; }
     public IntPtr Address { get; set; }
+    public IntPtr CurrentAddress => _getAddress.Invoke();
     private IntPtr DrawObjectAddress { get; set; }
     private Task? _delayedZoningTask;
     private CancellationTokenSource _zoningCts = new();
@@ -95,7 +96,7 @@ public class GameObjectHandler : MediatorSubscriberBase
     {
         if (!_delayedZoningTask?.IsCompleted ?? false) return;
 
-        _performanceCollector.LogPerformance(this, "CheckAndUpdateObject>" + (_isOwnedObject ? "Self+" : "Other+") + ObjectKind + "/" 
+        _performanceCollector.LogPerformance(this, "CheckAndUpdateObject>" + (_isOwnedObject ? "Self+" : "Other+") + ObjectKind + "/"
             + (string.IsNullOrEmpty(Name) ? "Unk" : Name) + "+" + Address.ToString("X"), CheckAndUpdateObject);
     }
 
