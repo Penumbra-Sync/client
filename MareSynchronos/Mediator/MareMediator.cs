@@ -43,7 +43,7 @@ public class MareMediator : IDisposable
             Stopwatch globalStopwatch = Stopwatch.StartNew();
             _performanceCollector.LogPerformance(this, $"Publish>{message.GetType().Name}", () =>
             {
-                foreach (var subscriber in subscribers.ToList())
+                foreach (var subscriber in subscribers.Where(s => s.Subscriber != null).ToList())
                 {
                     try
                     {
@@ -52,7 +52,7 @@ public class MareMediator : IDisposable
                     catch (Exception ex)
                     {
                         _logger.LogCritical(ex, "Error executing {type} for subscriber {subscriber}, removing from Mediator", message.GetType(), subscriber);
-                        subscribers.RemoveWhere(s => s == subscriber);
+                        _subscriberDict[message.GetType()].RemoveWhere(s => s == subscriber);
                     }
                 }
             });
