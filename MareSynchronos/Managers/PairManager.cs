@@ -141,12 +141,13 @@ public class PairManager : MediatorSubscriberBase, IDisposable
         DisposePairs();
     }
 
-    public void DisposePairs()
+    private void DisposePairs()
     {
         _logger.LogDebug("Disposing all Pairs");
         foreach (var item in _allClientPairs)
         {
             item.Value.CachedPlayer?.Dispose();
+            item.Value.CachedPlayer = null;
         }
     }
 
@@ -179,7 +180,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
             && (_configurationService.Current.ShowOnlineNotificationsOnlyForNamedPairs && !string.IsNullOrEmpty(pair.GetNote())
             || !_configurationService.Current.ShowOnlineNotificationsOnlyForNamedPairs))
         {
-            string note = pair.GetNote();
+            string? note = pair.GetNote();
             var msg = !string.IsNullOrEmpty(note)
                 ? $"{note} ({pair.UserData.AliasOrUID}) is now online"
                 : $"{pair.UserData.AliasOrUID} is now online";
@@ -187,6 +188,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
         }
 
         pair.CachedPlayer?.Dispose();
+        pair.CachedPlayer = null;
         pair.CachedPlayer = _cachedPlayerFactory.Create(dto, controller);
         RecreateLazy();
     }
@@ -274,11 +276,12 @@ public class PairManager : MediatorSubscriberBase, IDisposable
 
     private void DalamudUtilOnDelayedFrameworkUpdate()
     {
-        foreach (var player in _allClientPairs.Select(p => p.Value).Where(p => p.CachedPlayer?.PlayerName != null).ToList())
+        foreach (Pair pair in _allClientPairs.Select(p => p.Value).Where(p => p.CachedPlayer?.PlayerName != null).ToList())
         {
-            if (!player.CachedPlayer!.CheckExistence())
+            if (!pair.CachedPlayer?.CheckExistence() ?? false)
             {
-                player.CachedPlayer.Dispose();
+                pair.CachedPlayer?.Dispose();
+                pair.CachedPlayer = null;
             }
         }
     }

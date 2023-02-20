@@ -38,8 +38,8 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         _fileDbManager = fileDbManager;
     }
 
-    public OnlineUserIdentDto OnlineUser { get; set; }
-    public IntPtr PlayerCharacter => _currentOtherChara?.Address ?? IntPtr.Zero;
+    private OnlineUserIdentDto OnlineUser { get; set; }
+    private IntPtr PlayerCharacter => _currentOtherChara?.Address ?? IntPtr.Zero;
     public string? PlayerName { get; private set; }
     public string PlayerNameHash => OnlineUser.Ident;
 
@@ -55,19 +55,22 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
         if (string.Equals(characterData.DataHash.Value, _cachedData.DataHash.Value, StringComparison.Ordinal) && !forced) return;
 
-        CheckUpdatedData(_cachedData.DeepClone(), characterData, forced, out var charaDataToUpdate);
+        var charaDataToUpdate = CheckUpdatedData(_cachedData.DeepClone(), characterData, forced);
 
-        NotifyForMissingPlugins(characterData, warning);
+        if (charaDataToUpdate.TryGetValue(ObjectKind.Player, out var playerChanges))
+        {
+            NotifyForMissingPlugins(playerChanges, warning);
+        }
 
         DownloadAndApplyCharacter(characterData, charaDataToUpdate);
 
         _cachedData = characterData;
     }
 
-    private void CheckUpdatedData(API.Data.CharacterData oldData, API.Data.CharacterData newData, bool forced, out Dictionary<ObjectKind, HashSet<PlayerChanges>> charaDataToUpdate)
+    private Dictionary<ObjectKind, HashSet<PlayerChanges>> CheckUpdatedData(API.Data.CharacterData oldData, API.Data.CharacterData newData, bool forced)
     {
-        charaDataToUpdate = new();
-        foreach (var objectKind in Enum.GetValues<ObjectKind>())
+        var charaDataToUpdate = new Dictionary<ObjectKind, HashSet<PlayerChanges>>();
+        foreach (ObjectKind objectKind in Enum.GetValues<ObjectKind>())
         {
             charaDataToUpdate[objectKind] = new();
             oldData.FileReplacements.TryGetValue(objectKind, out var existingFileReplacements);
@@ -106,7 +109,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 if (hasNewAndOldGlamourerData)
                 {
                     bool glamourerDataDifferent = !string.Equals(oldData.GlamourerData[objectKind], newData.GlamourerData[objectKind], StringComparison.Ordinal);
-                    if (forced || glamourerDataDifferent)
+                    if (glamourerDataDifferent || forced)
                     {
                         _logger.LogDebug("Updating {object}/{kind} (Glamourer different) => {change}", this, objectKind, PlayerChanges.Mods);
                         charaDataToUpdate[objectKind].Add(PlayerChanges.Mods);
@@ -114,46 +117,47 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 }
             }
 
-            if (objectKind == ObjectKind.Player)
+            if (objectKind != ObjectKind.Player) continue;
+
+            bool manipDataDifferent = !string.Equals(oldData.ManipulationData, newData.ManipulationData, StringComparison.Ordinal);
+            if (manipDataDifferent || forced)
             {
-                bool manipDataDifferent = !string.Equals(oldData.ManipulationData, newData.ManipulationData, StringComparison.Ordinal);
-                if (manipDataDifferent || forced)
-                {
-                    _logger.LogDebug("Updating {object}/{kind} (Diff manip data) => {change}", this, objectKind, PlayerChanges.Mods);
-                    charaDataToUpdate[objectKind].Add(PlayerChanges.Mods);
-                }
+                _logger.LogDebug("Updating {object}/{kind} (Diff manip data) => {change}", this, objectKind, PlayerChanges.Mods);
+                charaDataToUpdate[objectKind].Add(PlayerChanges.Mods);
+            }
 
-                bool heelsOffsetDifferent = oldData.HeelsOffset != newData.HeelsOffset;
-                if (heelsOffsetDifferent || forced)
-                {
-                    _logger.LogDebug("Updating {object}/{kind} (Diff heels data) => {change}", this, objectKind, PlayerChanges.Heels);
-                    charaDataToUpdate[objectKind].Add(PlayerChanges.Heels);
-                }
+            bool heelsOffsetDifferent = oldData.HeelsOffset != newData.HeelsOffset;
+            if (heelsOffsetDifferent || forced)
+            {
+                _logger.LogDebug("Updating {object}/{kind} (Diff heels data) => {change}", this, objectKind, PlayerChanges.Heels);
+                charaDataToUpdate[objectKind].Add(PlayerChanges.Heels);
+            }
 
-                bool customizeDataDifferent = !string.Equals(oldData.CustomizePlusData, newData.CustomizePlusData, StringComparison.Ordinal);
-                if (customizeDataDifferent || forced)
-                {
-                    _logger.LogDebug("Updating {object}/{kind} (Diff customize data) => {change}", this, objectKind, PlayerChanges.Customize);
-                    charaDataToUpdate[objectKind].Add(PlayerChanges.Customize);
-                }
+            bool customizeDataDifferent = !string.Equals(oldData.CustomizePlusData, newData.CustomizePlusData, StringComparison.Ordinal);
+            if (customizeDataDifferent || forced)
+            {
+                _logger.LogDebug("Updating {object}/{kind} (Diff customize data) => {change}", this, objectKind, PlayerChanges.Customize);
+                charaDataToUpdate[objectKind].Add(PlayerChanges.Customize);
+            }
 
-                bool palettePlusDataDifferent = !string.Equals(oldData.PalettePlusData, newData.PalettePlusData, StringComparison.Ordinal);
-                if (palettePlusDataDifferent || forced)
-                {
-                    _logger.LogDebug("Updating {object}/{kind} (Diff palette data) => {change}", this, objectKind, PlayerChanges.Palette);
-                    charaDataToUpdate[objectKind].Add(PlayerChanges.Palette);
-                }
+            bool palettePlusDataDifferent = !string.Equals(oldData.PalettePlusData, newData.PalettePlusData, StringComparison.Ordinal);
+            if (palettePlusDataDifferent || forced)
+            {
+                _logger.LogDebug("Updating {object}/{kind} (Diff palette data) => {change}", this, objectKind, PlayerChanges.Palette);
+                charaDataToUpdate[objectKind].Add(PlayerChanges.Palette);
             }
         }
 
-        foreach (var data in charaDataToUpdate.ToList())
+        foreach (KeyValuePair<ObjectKind, HashSet<PlayerChanges>> data in charaDataToUpdate.ToList())
         {
             if (!data.Value.Any()) charaDataToUpdate.Remove(data.Key);
             else charaDataToUpdate[data.Key] = data.Value.OrderByDescending(p => (int)p).ToHashSet();
         }
+
+        return charaDataToUpdate;
     }
 
-    public enum PlayerChanges
+    private enum PlayerChanges
     {
         Heels = 1,
         Customize = 2,
@@ -161,10 +165,10 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         Mods = 4
     }
 
-    private void NotifyForMissingPlugins(API.Data.CharacterData characterData, OptionalPluginWarning warning)
+    private void NotifyForMissingPlugins(HashSet<PlayerChanges> changes, OptionalPluginWarning warning)
     {
         List<string> missingPluginsForData = new();
-        if (characterData.HeelsOffset != default)
+        if (changes.Contains(PlayerChanges.Heels))
         {
             if (!warning.ShownHeelsWarning && !_ipcManager.CheckHeelsApi())
             {
@@ -172,7 +176,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 warning.ShownHeelsWarning = true;
             }
         }
-        if (!string.IsNullOrEmpty(characterData.CustomizePlusData))
+        if (changes.Contains(PlayerChanges.Customize))
         {
             if (!warning.ShownCustomizePlusWarning && !_ipcManager.CheckCustomizePlusApi())
             {
@@ -181,7 +185,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             }
         }
 
-        if (!string.IsNullOrEmpty(characterData.PalettePlusData))
+        if (changes.Contains(PlayerChanges.Palette))
         {
             if (!warning.ShownPalettePlusWarning && !_ipcManager.CheckPalettePlusApi())
             {
@@ -226,13 +230,12 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             _downloadCancellationTokenSource?.Cancel();
             _downloadCancellationTokenSource?.Dispose();
             _downloadCancellationTokenSource = null;
-            var ptr = PlayerCharacter;
+            nint ptr = PlayerCharacter;
             _currentOtherChara?.Dispose();
-            _currentOtherChara = null;
 
             if (ptr != IntPtr.Zero && !_dalamudUtil.IsZoning)
             {
-                foreach (var item in _cachedData.FileReplacements)
+                foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData.FileReplacements)
                 {
                     Task.Run(async () => await RevertCustomizationData(ptr, item.Key, name, applicationId).ConfigureAwait(false));
                 }
@@ -244,6 +247,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         }
         finally
         {
+            _currentOtherChara = null;
             _cachedData = new();
             _logger.LogDebug("Disposing {name} complete", name);
             PlayerName = null;
