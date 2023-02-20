@@ -20,13 +20,13 @@ internal class DalamudLogger : ILogger
     {
         if (!IsEnabled(logLevel)) return;
 
-        if (exception == null)
+        if ((int)logLevel <= (int)LogLevel.Information)
             PluginLog.Information($"[{_name}]{{{(int)logLevel}}} {state}");
         else
         {
             StringBuilder sb = new();
-            sb.AppendLine($"[{_name}]{{{(int)logLevel}}} {state}: {exception.Message}");
-            sb.AppendLine(exception.StackTrace);
+            sb.AppendLine($"[{_name}]{{{(int)logLevel}}} {state}: {exception?.Message}");
+            sb.AppendLine(exception?.StackTrace);
             if (logLevel == LogLevel.Warning)
                 PluginLog.Warning(sb.ToString());
             else if (logLevel == LogLevel.Error)

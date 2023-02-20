@@ -39,6 +39,8 @@ public class MareMediator : IDisposable
             {
                 throw new InvalidOperationException("Already subscribed");
             }
+
+            _logger.LogDebug("Subscriber added for message {message}: {sub}", typeof(T), subscriber);
         }
     }
 
@@ -80,13 +82,20 @@ public class MareMediator : IDisposable
 
     internal void UnsubscribeAll(IMediatorSubscriber subscriber)
     {
-        lock (_subscriberDict)
+        lock (_addRemoveLock)
         {
-            foreach (KeyValuePair<Type, HashSet<SubscriberAction>> kvp in _subscriberDict.ToList())
+            foreach (KeyValuePair<Type, HashSet<SubscriberAction>> kvp in _subscriberDict)
             {
                 int unSubbed = _subscriberDict[kvp.Key]?.RemoveWhere(p => p.Subscriber == subscriber) ?? 0;
                 if (unSubbed > 0)
+                {
                     _logger.LogDebug("{sub} unsubscribed from {msg}", subscriber, kvp.Key.Name);
+                    _logger.LogTrace("Remaining Subscribers:");
+                    foreach (var item in _subscriberDict[kvp.Key])
+                    {
+                        _logger.LogTrace("{Key}: {item}", kvp.Key, item.Subscriber);
+                    }
+                }
             }
         }
     }
@@ -96,7 +105,7 @@ public class MareMediator : IDisposable
         foreach (var kvp in _subscriberDict.ToList().SelectMany(c => c.Value.Select(v => v))
             .DistinctBy(p => p.Subscriber).OrderBy(p => p.Subscriber.GetType().FullName, StringComparer.Ordinal))
         {
-            _logger.LogInformation("Subscriber {type}: {sub}", kvp.Subscriber.GetType().FullName, kvp);
+            _logger.LogInformation("Subscriber {type}: {sub}", kvp.Subscriber.GetType().FullName, kvp.Subscriber.ToString());
             StringBuilder sb = new();
             sb.Append("=> ");
             foreach (var item in _subscriberDict.ToList())

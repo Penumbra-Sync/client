@@ -303,7 +303,12 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         CancellationTokenSource applicationTokenSource = new();
         applicationTokenSource.CancelAfter(TimeSpan.FromSeconds(30));
 
-        if (handler.Address == IntPtr.Zero) return;
+        if (handler.Address == IntPtr.Zero)
+        {
+            if (handler != _currentOtherChara) handler.Dispose();
+            return;
+        }
+
         _logger.LogDebug("[{applicationId}] Applying Customization Data for {handler}", applicationId, handler);
         _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, handler, applicationId, 30000);
         foreach (var change in changes.Value)

@@ -207,7 +207,7 @@ public class CharacterDataFactory : MediatorSubscriberBase
         }
 
         st.Stop();
-        _logger.LogInformation("Building character data for {obj} took {time}ms", objectKind, st.ElapsedTicks / 60.0d);
+        _logger.LogInformation("Building character data for {obj} took {time}ms", objectKind, TimeSpan.FromTicks(st.ElapsedTicks).TotalMilliseconds);
 
         return previousData;
     }

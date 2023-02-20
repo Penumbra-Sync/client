@@ -21,14 +21,12 @@ public class PairManager : MediatorSubscriberBase, IDisposable
 {
     private readonly ConcurrentDictionary<UserData, Pair> _allClientPairs = new(UserDataComparer.Instance);
     private readonly ConcurrentDictionary<GroupData, GroupFullInfoDto> _allGroups = new(GroupDataComparer.Instance);
-    private readonly CachedPlayerFactory _cachedPlayerFactory;
     private readonly PairFactory _pairFactory;
     private readonly MareConfigService _configurationService;
 
-    public PairManager(ILogger<PairManager> logger, CachedPlayerFactory cachedPlayerFactory, PairFactory pairFactory,
+    public PairManager(ILogger<PairManager> logger, PairFactory pairFactory,
         MareConfigService configurationService, MareMediator mediator) : base(logger, mediator)
     {
-        _cachedPlayerFactory = cachedPlayerFactory;
         _pairFactory = pairFactory;
         _configurationService = configurationService;
         Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) => DalamudUtilOnZoneSwitched());
@@ -64,7 +62,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
     }
 
     public List<Pair> OnlineUserPairs => _allClientPairs.Where(p => !string.IsNullOrEmpty(p.Value.PlayerNameHash)).Select(p => p.Value).ToList();
-    public List<UserData> VisibleUsers => _allClientPairs.Where(p => p.Value.CachedPlayer?.PlayerName != null).Select(p => p.Key).ToList();
+    public List<UserData> VisibleUsers => _allClientPairs.Where(p => p.Value.HasCachedPlayer).Select(p => p.Key).ToList();
 
     public Pair? LastAddedUser { get; internal set; }
 
@@ -91,8 +89,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
             {
                 if (_allClientPairs.TryRemove(item.Key, out var pair))
                 {
-                    pair.CachedPlayer?.Dispose();
-                    pair.CachedPlayer = null;
+                    pair.MarkOffline();
                 }
             }
         }
@@ -141,14 +138,17 @@ public class PairManager : MediatorSubscriberBase, IDisposable
         DisposePairs();
     }
 
-    private void DisposePairs()
+    private void DisposePairs(bool recreate = false)
     {
         _logger.LogDebug("Disposing all Pairs");
         foreach (var item in _allClientPairs)
         {
-            item.Value.CachedPlayer?.Dispose();
-            item.Value.CachedPlayer = null;
+            if (recreate)
+                item.Value.RecreateCachedPlayer();
+            else
+                item.Value.Dispose();
         }
+        RecreateLazy();
     }
 
     public Pair? FindPair(PlayerCharacter? pChar)
@@ -162,8 +162,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
     {
         if (_allClientPairs.TryGetValue(user, out var pair))
         {
-            pair.CachedPlayer?.Dispose();
-            pair.CachedPlayer = null;
+            pair.MarkOffline();
             RecreateLazy();
         }
     }
@@ -172,7 +171,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
     {
         if (!_allClientPairs.ContainsKey(dto.User)) throw new InvalidOperationException("No user found for " + dto);
         var pair = _allClientPairs[dto.User];
-        if (pair.CachedPlayer != null) return;
+        if (pair.HasCachedPlayer) return;
 
         if (sendNotif && _configurationService.Current.ShowOnlineNotifications
             && ((_configurationService.Current.ShowOnlineNotificationsOnlyForIndividualPairs && pair.UserPair != null)
@@ -187,9 +186,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
             Mediator.Publish(new NotificationMessage("User online", msg, NotificationType.Info, 5000));
         }
 
-        pair.CachedPlayer?.Dispose();
-        pair.CachedPlayer = null;
-        pair.CachedPlayer = _cachedPlayerFactory.Create(dto, controller);
+        pair.RecreateCachedPlayer(dto, controller);
         RecreateLazy();
     }
 
@@ -217,8 +214,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
 
             if (!pair.HasAnyConnection())
             {
-                pair.CachedPlayer?.Dispose();
-                pair.CachedPlayer = null;
+                pair.Dispose();
                 _allClientPairs.TryRemove(dto.User, out _);
             }
 
@@ -233,8 +229,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
             pair.UserPair = null;
             if (!pair.HasAnyConnection())
             {
-                pair.CachedPlayer?.Dispose();
-                pair.CachedPlayer = null;
+                pair.Dispose();
                 _allClientPairs.TryRemove(dto.User, out _);
             }
             else
@@ -276,19 +271,18 @@ public class PairManager : MediatorSubscriberBase, IDisposable
 
     private void DalamudUtilOnDelayedFrameworkUpdate()
     {
-        foreach (Pair pair in _allClientPairs.Select(p => p.Value).Where(p => p.CachedPlayer?.PlayerName != null).ToList())
+        foreach (Pair pair in _allClientPairs.Select(p => p.Value).Where(p => p.HasCachedPlayer).ToList())
         {
-            if (!pair.CachedPlayer?.CheckExistence() ?? false)
+            if (!pair.CachedPlayerExists)
             {
-                pair.CachedPlayer?.Dispose();
-                pair.CachedPlayer = null;
+                pair.Dispose();
             }
         }
     }
 
     private void DalamudUtilOnZoneSwitched()
     {
-        DisposePairs();
+        DisposePairs(true);
     }
 
     public void SetGroupInfo(GroupInfoDto dto)

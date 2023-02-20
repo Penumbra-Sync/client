@@ -14,7 +14,7 @@ public abstract class MediatorSubscriberBase : IMediatorSubscriber
 
     public virtual void Dispose()
     {
-        _logger.LogTrace($"Disposing {GetType()}");
+        _logger.LogTrace("Disposing {type} ({this})", GetType(), this);
         Mediator.UnsubscribeAll(this);
     }
 }

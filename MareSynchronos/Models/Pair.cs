@@ -4,29 +4,34 @@ using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
+using MareSynchronos.Factories;
 using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Utils;
+using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Models;
 
-public class Pair
+public class Pair : IDisposable
 {
     private readonly ILogger<Pair> _logger;
+    private readonly CachedPlayerFactory _cachedPlayerFactory;
     private readonly MareConfigService _configService;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private OptionalPluginWarning? _pluginWarnings;
 
-    public Pair(ILogger<Pair> logger, MareConfigService configService, ServerConfigurationManager serverConfigurationManager)
+    public Pair(ILogger<Pair> logger, CachedPlayerFactory cachedPlayerFactory, MareConfigService configService, ServerConfigurationManager serverConfigurationManager)
     {
         _logger = logger;
+        _cachedPlayerFactory = cachedPlayerFactory;
         _configService = configService;
         _serverConfigurationManager = serverConfigurationManager;
     }
 
     public UserPairDto? UserPair { get; set; }
-    public CachedPlayer? CachedPlayer { get; set; }
+    private CachedPlayer? CachedPlayer { get; set; }
+    public bool HasCachedPlayer => CachedPlayer != null && !string.IsNullOrEmpty(CachedPlayer.PlayerName);
     public API.Data.CharacterData? LastReceivedCharacterData { get; set; }
     public Dictionary<GroupFullInfoDto, GroupPairFullInfoDto> GroupPair { get; set; } = new(GroupDtoComparer.Instance);
     public string PlayerNameHash => CachedPlayer?.PlayerNameHash ?? string.Empty;
@@ -126,5 +131,36 @@ public class Pair
         }
 
         return data;
+    }
+
+    public bool CachedPlayerExists => CachedPlayer?.CheckExistence() ?? false;
+
+    private OnlineUserIdentDto? _onlineUserIdentDto = null;
+    private ApiController? _apiController = null;
+
+    public void RecreateCachedPlayer(OnlineUserIdentDto? dto = null, ApiController? controller = null)
+    {
+        if (dto == null && _onlineUserIdentDto == null || _apiController == null && controller == null) return;
+        if (dto != null || controller != null)
+        {
+            _onlineUserIdentDto = dto;
+            _apiController = controller;
+        }
+        CachedPlayer?.Dispose();
+        CachedPlayer = null;
+        CachedPlayer = _cachedPlayerFactory.Create(_onlineUserIdentDto!, _apiController!);
+    }
+
+    public void MarkOffline()
+    {
+        _onlineUserIdentDto = null;
+        CachedPlayer?.Dispose();
+        CachedPlayer = null;
+    }
+
+    public void Dispose()
+    {
+        CachedPlayer?.Dispose();
+        CachedPlayer = null;
     }
 }
