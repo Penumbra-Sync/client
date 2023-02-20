@@ -135,11 +135,11 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
             }
         });
 
-        if (FileCacheSize < (long)_configService.Current.MaxLocalCacheInGiB * 1024 * 1024 * 1024) return false;
+        if (FileCacheSize < (long)(_configService.Current.MaxLocalCacheInGiB * 1024 * 1024 * 1024)) return false;
 
         var allFiles = Directory.EnumerateFiles(_configService.Current.CacheFolder)
             .Select(f => new FileInfo(f)).OrderBy(f => f.LastAccessTime).ToList();
-        while (FileCacheSize > (long)_configService.Current.MaxLocalCacheInGiB * 1024 * 1024 * 1024)
+        while (FileCacheSize > (long)(_configService.Current.MaxLocalCacheInGiB * 1024 * 1024 * 1024))
         {
             var oldestFile = allFiles[0];
             FileCacheSize -= oldestFile.Length;

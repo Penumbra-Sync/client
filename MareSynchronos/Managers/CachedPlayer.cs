@@ -403,12 +403,9 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 _applicationId = Guid.NewGuid();
                 _logger.LogDebug("[{applicationId}] Starting application task", _applicationId);
 
-                if (updateModdedPaths)
+                if (updateModdedPaths && (moddedPaths.Any() || !string.IsNullOrEmpty(charaData.ManipulationData)))
                 {
-                    if (moddedPaths.Any())
-                    {
-                        ApplyBaseData(_applicationId, moddedPaths, charaData.ManipulationData);
-                    }
+                    ApplyBaseData(_applicationId, moddedPaths, charaData.ManipulationData);
                 }
 
                 foreach (var kind in updatedData)
