@@ -424,7 +424,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
 
     public async Task GlamourerApplyAll(ILogger logger, GameObjectHandler handler, string? customization, Guid applicationId, CancellationToken token, bool fireAndForget = false)
     {
-        if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
+        if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization) || _dalamudUtil.IsZoning) return;
         var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
         if (gameObj is Character c)
         {
@@ -434,7 +434,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
 
     public async Task GlamourerApplyOnlyEquipment(ILogger logger, GameObjectHandler handler, string customization, Guid applicationId, CancellationToken token, bool fireAndForget = false)
     {
-        if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
+        if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization) || _dalamudUtil.IsZoning) return;
         var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
         if (gameObj is Character c)
         {
@@ -444,7 +444,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
 
     public async Task GlamourerApplyOnlyCustomization(ILogger logger, GameObjectHandler handler, string customization, Guid applicationId, CancellationToken token, bool fireAndForget = false)
     {
-        if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization)) return;
+        if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization) || _dalamudUtil.IsZoning) return;
         var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
         if (gameObj is Character c)
         {
@@ -477,7 +477,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
 
     public void GlamourerRevertCharacterCustomization(GameObject character)
     {
-        if (!CheckGlamourerApi()) return;
+        if (!CheckGlamourerApi() || _dalamudUtil.IsZoning) return;
         ActionQueue.Enqueue(() => _glamourerRevertCustomization!.InvokeAction(character));
     }
 
@@ -497,7 +497,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
 
     public async Task PenumbraRedraw(ILogger logger, GameObjectHandler handler, Guid applicationId, CancellationToken token, bool fireAndForget = false)
     {
-        if (!CheckPenumbraApi()) return;
+        if (!CheckPenumbraApi() || _dalamudUtil.IsZoning) return;
         var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
         if (gameObj is Character c)
         {

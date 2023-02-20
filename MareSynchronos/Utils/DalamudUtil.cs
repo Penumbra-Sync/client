@@ -26,6 +26,7 @@ public class DalamudUtil : IDisposable
     private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
     private bool _sentBetweenAreas = false;
     public bool IsInCutscene { get; private set; } = false;
+    public bool IsZoning => _condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51];
     public bool IsInGpose { get; private set; } = false;
 
     public unsafe bool IsGameObjectPresent(IntPtr key)

@@ -230,7 +230,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             _currentOtherChara?.Dispose();
             _currentOtherChara = null;
 
-            if (ptr != IntPtr.Zero)
+            if (ptr != IntPtr.Zero && !_dalamudUtil.IsZoning)
             {
                 foreach (var item in _cachedData.FileReplacements)
                 {
@@ -462,7 +462,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             _logger.LogDebug("[{applicationId}] Restoring Customization for {alias}/{name}: {data}", applicationId, OnlineUser.User.AliasOrUID, name, _originalGlamourerData);
             await _ipcManager.GlamourerApplyOnlyCustomization(_logger, tempHandler, _originalGlamourerData, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
             _logger.LogDebug("[{applicationId}] Restoring Equipment for {alias}/{name}: {data}", applicationId, OnlineUser.User.AliasOrUID, name, _lastGlamourerData);
-            await _ipcManager.GlamourerApplyOnlyEquipment(_logger, tempHandler, _lastGlamourerData, applicationId, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
+            await _ipcManager.GlamourerApplyOnlyEquipment(_logger, tempHandler, _lastGlamourerData, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
             _logger.LogDebug("[{applicationId}] Restoring Heels for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             _ipcManager.HeelsRestoreOffsetForPlayer(address);
             _logger.LogDebug("[{applicationId}] Restoring C+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
@@ -475,7 +475,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             if (minionOrMount != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => minionOrMount, isWatched: false);
-                await _ipcManager.PenumbraRedraw(_logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
+                await _ipcManager.PenumbraRedraw(_logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
             }
         }
         else if (objectKind == ObjectKind.Pet)
@@ -484,7 +484,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             if (pet != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => pet, isWatched: false);
-                await _ipcManager.PenumbraRedraw(_logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
+                await _ipcManager.PenumbraRedraw(_logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
             }
         }
         else if (objectKind == ObjectKind.Companion)
@@ -493,7 +493,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             if (companion != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => companion, isWatched: false);
-                await _ipcManager.PenumbraRedraw(_logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: true).ConfigureAwait(false);
+                await _ipcManager.PenumbraRedraw(_logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
             }
         }
     }
