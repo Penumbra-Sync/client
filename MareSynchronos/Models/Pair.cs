@@ -154,12 +154,15 @@ public class Pair : IDisposable
     public void MarkOffline()
     {
         _onlineUserIdentDto = null;
+        LastReceivedCharacterData = null;
         CachedPlayer?.Dispose();
         CachedPlayer = null;
     }
 
     public void Dispose()
     {
+        _onlineUserIdentDto = null;
+        LastReceivedCharacterData = null;
         CachedPlayer?.Dispose();
         CachedPlayer = null;
     }
