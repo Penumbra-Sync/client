@@ -261,7 +261,7 @@ public partial class ApiController
 
         foreach (var dto in downloadFileInfoFromService.Where(c => c.IsForbidden))
         {
-            if (ForbiddenTransfers.All(f => !string.Equals(f.Hash, dto.Hash, StringComparison.Ordinal)))
+            if (!ForbiddenTransfers.Any(f => string.Equals(f.Hash, dto.Hash, StringComparison.Ordinal)))
             {
                 ForbiddenTransfers.Add(new DownloadFileTransfer(dto));
             }
@@ -455,7 +455,7 @@ public partial class ApiController
             }
         }
 
-        foreach(var file in unverifiedUploadHashes.Where(c=>!CurrentUploads.Any(u=> string.Equals(u.Hash, c, StringComparison.Ordinal))))
+        foreach (var file in unverifiedUploadHashes.Where(c => !CurrentUploads.Any(u => string.Equals(u.Hash, c, StringComparison.Ordinal))))
         {
             _verifiedUploadedHashes[file] = DateTime.UtcNow;
         }
@@ -467,9 +467,10 @@ public partial class ApiController
     {
         _logger.LogInformation("Pushing character data for " + character.DataHash.Value + " to " + string.Join(", ", visibleCharacters.Select(c => c.AliasOrUID)));
         StringBuilder sb = new();
-        foreach (var item in character.FileReplacements)
+        foreach (var kvp in character.FileReplacements.ToList())
         {
-            sb.AppendLine($"FileReplacements for {item.Key}: {item.Value.Count}");
+            sb.AppendLine($"FileReplacements for {kvp.Key}: {kvp.Value.Count}");
+            character.FileReplacements[kvp.Key].RemoveAll(i => ForbiddenTransfers.Any(f => string.Equals(f.Hash, i.Hash, StringComparison.OrdinalIgnoreCase)));
         }
         foreach (var item in character.GlamourerData)
         {
