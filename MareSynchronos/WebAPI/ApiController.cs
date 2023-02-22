@@ -360,7 +360,6 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
             CurrentUploads.Clear();
             CurrentDownloads.Clear();
             Mediator.Publish(new DisconnectedMessage());
-            _pairManager.ClearPairs();
             _mareHub = null;
         }
     }

@@ -146,7 +146,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
             if (recreate)
                 item.Value.RecreateCachedPlayer();
             else
-                item.Value.Dispose();
+                item.Value.MarkOffline();
         }
         RecreateLazy();
     }
@@ -214,7 +214,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
 
             if (!pair.HasAnyConnection())
             {
-                pair.Dispose();
+                pair.MarkOffline();
                 _allClientPairs.TryRemove(dto.User, out _);
             }
 
@@ -229,7 +229,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
             pair.UserPair = null;
             if (!pair.HasAnyConnection())
             {
-                pair.Dispose();
+                pair.MarkOffline();
                 _allClientPairs.TryRemove(dto.User, out _);
             }
             else
@@ -275,7 +275,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
         {
             if (!pair.CachedPlayerExists)
             {
-                pair.Dispose();
+                pair.RecreateCachedPlayer();
             }
         }
     }

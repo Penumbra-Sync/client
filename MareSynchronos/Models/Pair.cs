@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Models;
 
-public class Pair : IDisposable
+public class Pair
 {
     private readonly ILogger<Pair> _logger;
     private readonly CachedPlayerFactory _cachedPlayerFactory;
@@ -140,7 +140,7 @@ public class Pair : IDisposable
 
     public void RecreateCachedPlayer(OnlineUserIdentDto? dto = null, ApiController? controller = null)
     {
-        if (dto == null && _onlineUserIdentDto == null || _apiController == null && controller == null) return;
+        if ((dto == null && _onlineUserIdentDto == null) || (_apiController == null && controller == null)) return;
         if (dto != null || controller != null)
         {
             _onlineUserIdentDto = dto;
@@ -152,14 +152,6 @@ public class Pair : IDisposable
     }
 
     public void MarkOffline()
-    {
-        _onlineUserIdentDto = null;
-        LastReceivedCharacterData = null;
-        CachedPlayer?.Dispose();
-        CachedPlayer = null;
-    }
-
-    public void Dispose()
     {
         _onlineUserIdentDto = null;
         LastReceivedCharacterData = null;

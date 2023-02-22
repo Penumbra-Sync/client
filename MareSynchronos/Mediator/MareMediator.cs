@@ -72,7 +72,7 @@ public class MareMediator : IDisposable
                         lock (_addRemoveLock)
                         {
                             var removed = _subscriberDict[message.GetType()].RemoveWhere(s => s == subscriber);
-                            _logger.LogCritical(ex, "Error executing {type} for subscriber {subscriber}, removed from Mediator: {removeCount}", message.GetType(), subscriber, removed);
+                            _logger.LogCritical(ex, "Error executing {type} for subscriber {subscriber}, removed from Mediator: {removeCount}", message.GetType().Name, subscriber.Subscriber.GetType().Name, removed);
                         }
                     }
                 }

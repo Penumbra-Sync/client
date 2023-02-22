@@ -206,7 +206,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
     {
         if (PlayerName == null || _currentOtherChara == null
             || !string.Equals(PlayerName, _currentOtherChara.Name, StringComparison.Ordinal)
-            || _currentOtherChara.Address == IntPtr.Zero)
+            || _currentOtherChara.CurrentAddress == IntPtr.Zero)
         {
             return false;
         }
