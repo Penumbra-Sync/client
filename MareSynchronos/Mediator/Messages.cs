@@ -36,7 +36,6 @@ public record AddWatchedGameObjectHandler(GameObjectHandler Handler) : IMessage;
 public record RemoveWatchedGameObjectHandler(GameObjectHandler Handler) : IMessage;
 public record HaltScanMessage(string Source) : IMessage;
 public record ResumeScanMessage(string Source) : IMessage;
-
 public record NotificationMessage
     (string Title, string Message, NotificationType Type, uint TimeShownOnScreen = 3000) : IMessage;
 public record CreateCacheForObjectMessage(GameObjectHandler ObjectToCreateFor) : IMessage;
@@ -44,4 +43,7 @@ public record ClearCacheForObjectMessage(GameObjectHandler ObjectToCreateFor) : 
 public record CharacterDataCreatedMessage(CharacterData CharacterData) : IMessage;
 public record PenumbraStartRedrawMessage(IntPtr Address) : IMessage;
 public record PenumbraEndRedrawMessage(IntPtr Address) : IMessage;
+public record HubReconnectingMessage(Exception? Exception) : IMessage;
+public record HubReconnectedMessage(string? Arg) : IMessage;
+public record HubClosedMessage(Exception? Exception) : IMessage;
 #pragma warning restore MA0048 // File name must match type name
