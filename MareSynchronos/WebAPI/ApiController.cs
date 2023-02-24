@@ -20,7 +20,6 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
     public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
     public const string MainServiceUri = "wss://maresynchronos.com";
 
-    public readonly int[] SupportedServerVersions = { IMareHub.ApiVersion };
     private readonly HubFactory _hubFactory;
     private readonly MareConfigService _configService;
     private readonly DalamudUtil _dalamudUtil;
@@ -32,16 +31,13 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
     private CancellationTokenSource? _uploadCancellationTokenSource = new();
     private CancellationTokenSource? _healthCheckTokenSource = new();
-    private bool _doNotNotifiyOnNextInfo = false;
+    private bool _doNotNotifyOnNextInfo = false;
 
     private ConnectionDto? _connectionDto;
     public ServerInfo ServerInfo => _connectionDto?.ServerInfo ?? new ServerInfo();
     public string AuthFailureMessage { get; private set; } = string.Empty;
 
     public SystemInfoDto SystemInfoDto { get; private set; } = new();
-    public bool IsModerator => (_connectionDto?.IsAdmin ?? false) || (_connectionDto?.IsModerator ?? false);
-
-    public bool IsAdmin => _connectionDto?.IsAdmin ?? false;
 
     private HttpClient _httpClient;
 
@@ -326,7 +322,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
     private void MareHubOnReconnecting(Exception? arg)
     {
-        _doNotNotifiyOnNextInfo = true;
+        _doNotNotifyOnNextInfo = true;
         _healthCheckTokenSource?.Cancel();
         ServerState = ServerState.Reconnecting;
         Mediator.Publish(new NotificationMessage("Connection lost", "Connection lost to " + _serverManager.CurrentServer!.ServerName, NotificationType.Warning, 5000));
@@ -336,14 +332,23 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
     private async void MareHubOnReconnected(string? arg)
     {
         ServerState = ServerState.Connecting;
-        await InitializeData().ConfigureAwait(false);
-        _connectionDto = await GetConnectionDto().ConfigureAwait(false);
-        if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
+        try
         {
-            await StopConnection(ServerState.VersionMisMatch).ConfigureAwait(false);
-            return;
+            await InitializeData().ConfigureAwait(false);
+            _connectionDto = await GetConnectionDto().ConfigureAwait(false);
+            if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
+            {
+                await StopConnection(ServerState.VersionMisMatch).ConfigureAwait(false);
+                return;
+            }
+            ServerState = ServerState.Connected;
         }
-        ServerState = ServerState.Connected;
+        catch (Exception ex)
+        {
+            _logger.LogCritical(ex, "Failure to obtain data after reconnection");
+            await StopConnection(ServerState.Disconnected).ConfigureAwait(false);
+        }
+
     }
 
     private async Task StopConnection(ServerState state)
@@ -361,6 +366,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
             CurrentDownloads.Clear();
             Mediator.Publish(new DisconnectedMessage());
             _mareHub = null;
+            _connectionDto = null;
         }
     }
 
