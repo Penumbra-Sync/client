@@ -10,13 +10,15 @@ using Dalamud.Utility;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.User;
-using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.Mediator;
-using MareSynchronos.Models;
+using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.Services.Mediator;
+using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.UI.Components;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
+using MareSynchronos.WebAPI.FileTransfer;
+using MareSynchronos.WebAPI.SignalR.Utils;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;

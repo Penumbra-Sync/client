@@ -1,6 +1,6 @@
 ﻿using Dalamud.Configuration;
-using Dalamud.Plugin;
 using MareSynchronos.MareConfiguration.Models;
+using MareSynchronos.MareConfiguration.Models.Obsolete;
 using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;
 

@@ -1,7 +1,7 @@
 ﻿using System.Numerics;
 using Dalamud.Interface;
 using ImGuiNET;
-using MareSynchronos.Models;
+using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI.Components;

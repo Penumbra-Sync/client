@@ -1,4 +1,4 @@
-﻿namespace MareSynchronos.MareConfiguration.Models;
+﻿namespace MareSynchronos.MareConfiguration.Models.Obsolete;
 
 [Serializable]
 [Obsolete("Deprecated, use ServerStorage")]
@@ -19,11 +19,11 @@ public class ServerStorageV0
     {
         return new ServerStorage()
         {
-            ServerUri = this.ServerUri,
-            ServerName = this.ServerName,
-            Authentications = this.Authentications.ToList(),
-            FullPause = this.FullPause,
-            SecretKeys = this.SecretKeys.ToDictionary(p => p.Key, p => p.Value)
+            ServerUri = ServerUri,
+            ServerName = ServerName,
+            Authentications = Authentications.ToList(),
+            FullPause = FullPause,
+            SecretKeys = SecretKeys.ToDictionary(p => p.Key, p => p.Value)
         };
     }
 }

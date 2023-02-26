@@ -11,10 +11,10 @@ using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Data.Extensions;
-using MareSynchronos.Managers;
-using MareSynchronos.Models;
 using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.Services.ServerConfiguration;
 
 namespace MareSynchronos.UI
 {

@@ -4,18 +4,20 @@ using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using MareSynchronos.WebAPI;
 using System.Numerics;
-using MareSynchronos.WebAPI.Utils;
 using Dalamud.Utility;
-using Newtonsoft.Json;
-using MareSynchronos.Export;
 using MareSynchronos.API.Data;
-using MareSynchronos.Managers;
 using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.Mediator;
 using MareSynchronos.MareConfiguration.Models;
 using Microsoft.Extensions.Logging;
-using MareSynchronos.Utils;
+using MareSynchronos.WebAPI.FileTransfer;
+using MareSynchronos.WebAPI.SignalR.Utils;
+using MareSynchronos.PlayerData.Pairs;
+using System.Text.Json;
+using MareSynchronos.PlayerData.Export;
+using MareSynchronos.Services.Mediator;
+using MareSynchronos.Services.ServerConfiguration;
+using MareSynchronos.Services;
 
 namespace MareSynchronos.UI;
 
@@ -27,7 +29,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
-    private readonly PerformanceCollector _performanceCollector;
+    private readonly PerformanceCollectorService _performanceCollector;
     private readonly FileTransferManager _fileTransferManager;
     private readonly UiShared _uiShared;
     public CharacterData? LastCreatedCharacterData { private get; set; }
@@ -41,7 +43,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
         UiShared uiShared, MareConfigService configService,
         MareCharaFileManager mareCharaFileManager, PairManager pairManager,
         ServerConfigurationManager serverConfigurationManager,
-        MareMediator mediator, PerformanceCollector performanceCollector,
+        MareMediator mediator, PerformanceCollectorService performanceCollector,
         FileTransferManager fileTransferManager) : base(logger, mediator, "Mare Synchronos Settings")
     {
         _logger.LogTrace("Creating " + nameof(SettingsUi));
@@ -562,7 +564,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
         {
             if (LastCreatedCharacterData != null)
             {
-                ImGui.SetClipboardText(JsonConvert.SerializeObject(LastCreatedCharacterData, Formatting.Indented));
+                ImGui.SetClipboardText(JsonSerializer.Serialize(LastCreatedCharacterData, new JsonSerializerOptions() { WriteIndented = true }));
             }
             else
             {

@@ -1,16 +1,19 @@
 ﻿using Dalamud.Game.Command;
 using Dalamud.Plugin;
 using Dalamud.Interface.ImGuiFileDialog;
-using MareSynchronos.Managers;
 using MareSynchronos.WebAPI;
 using Dalamud.Interface.Windowing;
 using MareSynchronos.UI;
-using MareSynchronos.Utils;
 using MareSynchronos.FileCache;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.Mediator;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MareSynchronos.Services;
+using MareSynchronos.PlayerData.Services;
+using MareSynchronos.Interop;
+using MareSynchronos.Services.Mediator;
+using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.Services.ServerConfiguration;
 
 namespace MareSynchronos;
 
@@ -207,11 +210,11 @@ public class MarePlugin : MediatorSubscriberBase, IDisposable
         {
             if (splitArgs.Length > 1 && int.TryParse(splitArgs[1], out var limitBySeconds))
             {
-                _serviceProvider.GetRequiredService<PerformanceCollector>().PrintPerformanceStats(limitBySeconds);
+                _serviceProvider.GetRequiredService<PerformanceCollectorService>().PrintPerformanceStats(limitBySeconds);
             }
             else
             {
-                _serviceProvider.GetRequiredService<PerformanceCollector>().PrintPerformanceStats();
+                _serviceProvider.GetRequiredService<PerformanceCollectorService>().PrintPerformanceStats();
             }
         }
         else if (string.Equals(splitArgs[0], "medi", StringComparison.OrdinalIgnoreCase))

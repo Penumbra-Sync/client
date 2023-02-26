@@ -6,11 +6,11 @@ using MareSynchronos.Localization;
 using Dalamud.Utility;
 using MareSynchronos.FileCache;
 using Dalamud.Interface;
-using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.Mediator;
 using MareSynchronos.MareConfiguration.Models;
 using Microsoft.Extensions.Logging;
+using MareSynchronos.Services.Mediator;
+using MareSynchronos.Services.ServerConfiguration;
 
 namespace MareSynchronos.UI;
 

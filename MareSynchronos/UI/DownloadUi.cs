@@ -1,9 +1,8 @@
 ﻿using System.Numerics;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
-using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.WebAPI;
+using MareSynchronos.WebAPI.FileTransfer;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;

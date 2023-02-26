@@ -1,9 +1,8 @@
 ﻿using System.Collections.Concurrent;
-using System.Diagnostics;
-using MareSynchronos.Managers;
+using MareSynchronos.Interop;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.Mediator;
-using MareSynchronos.Utils;
+using MareSynchronos.Services;
+using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.FileCache;
@@ -13,13 +12,13 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
     private readonly IpcManager _ipcManager;
     private readonly MareConfigService _configService;
     private readonly FileCacheManager _fileDbManager;
-    private readonly PerformanceCollector _performanceCollector;
+    private readonly PerformanceCollectorService _performanceCollector;
     private CancellationTokenSource? _scanCancellationTokenSource;
     private Task? _fileScannerTask = null;
     public ConcurrentDictionary<string, int> haltScanLocks = new(StringComparer.Ordinal);
 
     public PeriodicFileScanner(ILogger<PeriodicFileScanner> logger, IpcManager ipcManager, MareConfigService configService,
-        FileCacheManager fileDbManager, MareMediator mediator, PerformanceCollector performanceCollector) : base(logger, mediator)
+        FileCacheManager fileDbManager, MareMediator mediator, PerformanceCollectorService performanceCollector) : base(logger, mediator)
     {
         _logger.LogTrace("Creating " + nameof(PeriodicFileScanner));
         _ipcManager = ipcManager;

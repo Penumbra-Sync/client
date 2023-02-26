@@ -1,4 +1,4 @@
-﻿using MareSynchronos.Managers;
+﻿using MareSynchronos.Interop;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;

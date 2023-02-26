@@ -1,7 +1,6 @@
 ﻿using Dalamud.Plugin;
 using MareSynchronos.MareConfiguration.Configurations;
-using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace MareSynchronos.MareConfiguration;
 
@@ -73,7 +72,7 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
         }
         else
         {
-            config = JsonConvert.DeserializeObject<T>(File.ReadAllText(ConfigurationPath));
+            config = JsonSerializer.Deserialize<T>(File.ReadAllText(ConfigurationPath));
             if (config == null)
             {
                 config = (T)Activator.CreateInstance(typeof(T))!;
@@ -106,7 +105,10 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
         }
         catch { }
 
-        File.WriteAllText(ConfigurationPath, JsonConvert.SerializeObject(Current, Formatting.Indented));
+        File.WriteAllText(ConfigurationPath, JsonSerializer.Serialize(Current, new JsonSerializerOptions()
+        {
+            WriteIndented = true
+        }));
         _configLastWriteTime = new FileInfo(ConfigurationPath).LastWriteTimeUtc;
     }
 

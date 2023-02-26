@@ -3,7 +3,7 @@ using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Utility;
 using ImGuiNET;
-using MareSynchronos.Models;
+using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI.Components;

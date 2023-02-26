@@ -1,24 +1,29 @@
 ﻿using Dalamud.Game.Command;
 using Dalamud.Plugin;
-using MareSynchronos.Factories;
 using Dalamud.Game;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState;
 using Dalamud.Interface.ImGuiFileDialog;
-using MareSynchronos.Managers;
 using MareSynchronos.WebAPI;
 using Dalamud.Interface.Windowing;
 using MareSynchronos.UI;
-using MareSynchronos.Utils;
 using Dalamud.Game.ClientState.Conditions;
 using MareSynchronos.FileCache;
 using Dalamud.Game.Gui;
-using MareSynchronos.Export;
 using Dalamud.Data;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.Mediator;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MareSynchronos.WebAPI.FileTransfer;
+using MareSynchronos.WebAPI.SignalR;
+using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.Services;
+using MareSynchronos.Interop;
+using MareSynchronos.PlayerData.Factories;
+using MareSynchronos.PlayerData.Export;
+using MareSynchronos.PlayerData.Services;
+using MareSynchronos.Services.Mediator;
+using MareSynchronos.Services.ServerConfiguration;
 
 namespace MareSynchronos;
 
@@ -73,7 +78,7 @@ public sealed class Plugin : IDalamudPlugin
         collection.AddSingleton<MareCharaFileManager>();
         collection.AddSingleton<NotificationService>();
         collection.AddSingleton<GameObjectHandlerFactory>();
-        collection.AddSingleton<PerformanceCollector>();
+        collection.AddSingleton<PerformanceCollectorService>();
         collection.AddSingleton<HubFactory>();
         collection.AddSingleton<FileTransferManager>();
 
@@ -86,7 +91,7 @@ public sealed class Plugin : IDalamudPlugin
 
         collection.AddScoped<CacheCreationService>();
         collection.AddScoped<TransientResourceManager>();
-        collection.AddScoped<CharacterDataFactory>();
+        collection.AddScoped<PlayerDataFactory>();
         collection.AddScoped<OnlinePlayerManager>();
 
         var serviceProvider = collection.BuildServiceProvider(new ServiceProviderOptions() { ValidateOnBuild = true, ValidateScopes = true });
