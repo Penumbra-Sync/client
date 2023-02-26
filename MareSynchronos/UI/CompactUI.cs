@@ -63,8 +63,8 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
 
 #if DEBUG
         string dev = "Dev Build";
-        var ver = Assembly.GetExecutingAssembly().GetName().Version;
-        this.WindowName = $"Mare Synchronos {dev} ({ver.Major}.{ver.Minor}.{ver.Build})###MareSynchronosMainUI";
+        var ver = Assembly.GetExecutingAssembly().GetName().Version!;
+        WindowName = $"Mare Synchronos {dev} ({ver.Major}.{ver.Minor}.{ver.Build})###MareSynchronosMainUI";
         Toggle();
 #else
         var ver = Assembly.GetExecutingAssembly().GetName().Version;
@@ -444,7 +444,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
 
             if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
             {
-                var pair = _pairManager.DirectPairs.Find(p => p.UserData.UID == EditNickEntry);
+                var pair = _pairManager.DirectPairs.Find(p => string.Equals(p.UserData.UID, EditNickEntry, StringComparison.Ordinal));
                 if (pair != null)
                 {
                     pair.SetNote(EditUserComment);

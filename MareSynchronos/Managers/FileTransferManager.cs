@@ -13,7 +13,6 @@ using Microsoft.Extensions.Logging;
 using MareSynchronos.FileCache;
 using MareSynchronos.UI;
 using LZ4;
-using System.Runtime.CompilerServices;
 
 namespace MareSynchronos.Managers;
 
@@ -281,7 +280,7 @@ public class FileTransferManager : MediatorSubscriberBase
 
     private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage, CancellationToken? ct = null)
     {
-        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", this._serverManager.GetToken());
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _serverManager.GetToken());
 
         if (requestMessage.Content != null && requestMessage.Content is not StreamContent)
         {
@@ -313,7 +312,7 @@ public class FileTransferManager : MediatorSubscriberBase
         return await SendRequestInternalAsync(requestMessage, ct).ConfigureAwait(false);
     }
 
-    private async Task<HttpResponseMessage> SendRequestStreamAsync(HttpMethod method, Uri uri, StreamContent content, CancellationToken ct)
+    private async Task<HttpResponseMessage> SendRequestStreamAsync(HttpMethod method, Uri uri, ProgressableStreamContent content, CancellationToken ct)
     {
         using var requestMessage = new HttpRequestMessage(method, uri);
         requestMessage.Content = content;
@@ -324,14 +323,14 @@ public class FileTransferManager : MediatorSubscriberBase
     {
         if (_filesCdnUri is null) throw new InvalidOperationException("FileTransferManager is not initialized");
         var response = await SendRequestAsync(HttpMethod.Get, MareFiles.ServerFilesGetSizesFullPath(_filesCdnUri), hashes, ct).ConfigureAwait(false);
-        return await response.Content.ReadFromJsonAsync<List<DownloadFileDto>>().ConfigureAwait(false);
+        return await response.Content.ReadFromJsonAsync<List<DownloadFileDto>>().ConfigureAwait(false) ?? new List<DownloadFileDto>();
     }
 
     private async Task<List<UploadFileDto>> FilesSend(List<string> hashes, CancellationToken ct)
     {
         if (_filesCdnUri is null) throw new InvalidOperationException("FileTransferManager is not initialized");
         var response = await SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesFilesSendFullPath(_filesCdnUri), hashes, ct).ConfigureAwait(false);
-        return await response.Content.ReadFromJsonAsync<List<UploadFileDto>>().ConfigureAwait(false);
+        return await response.Content.ReadFromJsonAsync<List<UploadFileDto>>().ConfigureAwait(false) ?? new List<UploadFileDto>();
     }
 
     private async Task DownloadFilesInternal(int currentDownloadId, List<FileReplacementData> fileReplacement, CancellationToken ct)
@@ -485,18 +484,22 @@ public class FileTransferManager : MediatorSubscriberBase
 
         var totalSize = CurrentUploads.Sum(c => c.Total);
         _logger.LogDebug("Compressing and uploading files");
+        Task uploadTask = Task.CompletedTask;
         foreach (var file in CurrentUploads.Where(f => f.CanBeTransferred && !f.IsTransferred).ToList())
         {
-            _logger.LogDebug("Compressing and uploading " + file);
+            _logger.LogDebug("Compressing " + file);
             var data = await GetCompressedFileData(file.Hash, uploadToken).ConfigureAwait(false);
             CurrentUploads.Single(e => string.Equals(e.Hash, data.Item1, StringComparison.Ordinal)).Total = data.Item2.Length;
-            await UploadFile(data.Item2, file.Hash, uploadToken).ConfigureAwait(false);
+            await uploadTask.ConfigureAwait(false);
+            uploadTask = UploadFile(data.Item2, file.Hash, uploadToken);
             _verifiedUploadedHashes[file.Hash] = DateTime.UtcNow;
             uploadToken.ThrowIfCancellationRequested();
         }
 
         if (CurrentUploads.Any())
         {
+            await uploadTask.ConfigureAwait(false);
+
             var compressedSize = CurrentUploads.Sum(c => c.Total);
             _logger.LogDebug($"Compressed {UiShared.ByteToString(totalSize)} to {UiShared.ByteToString(compressedSize)} ({(compressedSize / (double)totalSize):P2})");
 
@@ -520,17 +523,23 @@ public class FileTransferManager : MediatorSubscriberBase
 
     private async Task UploadFile(byte[] compressedFile, string fileHash, CancellationToken uploadToken)
     {
-        if (_filesCdnUri is null) throw new InvalidOperationException("FileTransferManager is not initialized");
+        if (!IsInitialized) throw new InvalidOperationException("FileTransferManager is not initialized");
+
+        _logger.LogInformation("Uploading {file}, {size}", fileHash, UiShared.ByteToString(compressedFile.Length));
 
         if (uploadToken.IsCancellationRequested) return;
 
         using var ms = new MemoryStream(compressedFile);
 
-        var streamContent = new StreamContent(ms);
+        Progress<UploadProgress> prog = new((prog) =>
+        {
+            CurrentUploads.Single(f => string.Equals(f.Hash, fileHash, StringComparison.Ordinal)).Transferred = prog.Uploaded;
+        });
+        var streamContent = new ProgressableStreamContent(ms, prog);
         streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
 
-        var response = await SendRequestStreamAsync(HttpMethod.Post, MareFiles.ServerFilesUploadFullPath(_filesCdnUri, fileHash), streamContent, uploadToken).ConfigureAwait(false);
-        _logger.LogInformation("Upload Status: {status}", response.StatusCode);
+        var response = await SendRequestStreamAsync(HttpMethod.Post, MareFiles.ServerFilesUploadFullPath(_filesCdnUri!, fileHash), streamContent, uploadToken).ConfigureAwait(false);
+        _logger.LogDebug("Upload Status: {status}", response.StatusCode);
     }
 
     internal void Reset()
@@ -548,5 +557,107 @@ public class FileTransferManager : MediatorSubscriberBase
         if (_filesCdnUri is null) throw new InvalidOperationException("FileTransferManager is not initialized");
 
         await SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesDeleteAllFullPath(_filesCdnUri)).ConfigureAwait(false);
+    }
+
+    private class UploadProgress
+    {
+        public UploadProgress(long uploaded, long size)
+        {
+            Uploaded = uploaded;
+            Size = size;
+        }
+
+        public long Uploaded { get; }
+        public long Size { get; }
+    }
+
+    private class ProgressableStreamContent : StreamContent
+    {
+        private const int DefaultBufferSize = 4096;
+        private readonly int _bufferSize;
+        private readonly IProgress<UploadProgress> _progress;
+        private readonly Stream _streamToWrite;
+        private bool _contentConsumed;
+
+        public ProgressableStreamContent(Stream streamToWrite, IProgress<UploadProgress> downloader)
+            : this(streamToWrite, DefaultBufferSize, downloader)
+        {
+        }
+
+        public ProgressableStreamContent(Stream streamToWrite, int bufferSize, IProgress<UploadProgress> progress)
+            : base(streamToWrite, bufferSize)
+        {
+            if (streamToWrite == null)
+            {
+                throw new ArgumentNullException("streamToWrite");
+            }
+
+            if (bufferSize <= 0)
+            {
+                throw new ArgumentOutOfRangeException("bufferSize");
+            }
+
+            _streamToWrite = streamToWrite;
+            _bufferSize = bufferSize;
+            _progress = progress;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _streamToWrite.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+
+        protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            PrepareContent();
+
+            var buffer = new byte[_bufferSize];
+            var size = _streamToWrite.Length;
+            var uploaded = 0;
+
+            using (_streamToWrite)
+            {
+                while (true)
+                {
+                    var length = _streamToWrite.Read(buffer, 0, buffer.Length);
+                    if (length <= 0)
+                    {
+                        break;
+                    }
+
+                    uploaded += length;
+                    _progress.Report(new UploadProgress(uploaded, size));
+                    await stream.WriteAsync(buffer, 0, length).ConfigureAwait(false);
+                }
+            }
+        }
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = _streamToWrite.Length;
+            return true;
+        }
+
+        private void PrepareContent()
+        {
+            if (_contentConsumed)
+            {
+                if (_streamToWrite.CanSeek)
+                {
+                    _streamToWrite.Position = 0;
+                }
+                else
+                {
+                    throw new InvalidOperationException("The stream has already been read.");
+                }
+            }
+
+            _contentConsumed = true;
+        }
     }
 }

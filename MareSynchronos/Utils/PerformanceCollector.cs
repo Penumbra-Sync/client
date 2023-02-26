@@ -46,7 +46,7 @@ public class PerformanceCollector : IDisposable
                 }
                 catch (Exception e)
                 {
-                    _logger.LogDebug("Error removing performance counter {counter}", entries.Key);
+                    _logger.LogDebug(e, "Error removing performance counter {counter}", entries.Key);
                 }
             }
         }
