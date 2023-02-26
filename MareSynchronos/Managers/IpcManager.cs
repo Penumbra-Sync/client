@@ -307,7 +307,11 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         while (!ActionQueue.IsEmpty && totalSleepTime < 2000)
         {
             _logger.LogTrace("Waiting for actionqueue to clear...");
-            HandleActionQueue();
+            PeriodicApiStateCheck();
+            if (CheckPenumbraApi())
+            {
+                HandleActionQueue();
+            }
             Thread.Sleep(16);
             totalSleepTime += 16;
         }

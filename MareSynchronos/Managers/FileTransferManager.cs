@@ -32,6 +32,8 @@ public class FileTransferManager : MediatorSubscriberBase
     private CancellationTokenSource? _uploadCancellationTokenSource = new();
     private Uri? _filesCdnUri;
     private bool IsInitialized => _filesCdnUri != null;
+    public bool IsDownloading => !CurrentDownloads.IsEmpty;
+    public bool IsUploading => CurrentUploads.Count > 0;
 
     public FileTransferManager(ILogger<FileTransferManager> logger, MareMediator mediator,
         MareConfigService configService, FileCacheManager fileDbManager, ServerConfigurationManager serverManager) : base(logger, mediator)
@@ -45,11 +47,17 @@ public class FileTransferManager : MediatorSubscriberBase
         {
             _downloadReady[((DownloadReadyMessage)msg).RequestId] = true;
         });
-    }
 
-    public void SetApiUri(Uri uri)
-    {
-        _filesCdnUri = uri;
+        Mediator.Subscribe<ConnectedMessage>(this, (msg) =>
+        {
+            _filesCdnUri = ((ConnectedMessage)msg).Connection.ServerInfo.FileServerAddress;
+        });
+
+        Mediator.Subscribe<DisconnectedMessage>(this, (msg) =>
+        {
+            Reset();
+            _filesCdnUri = null;
+        });
     }
 
     public override void Dispose()
@@ -417,7 +425,7 @@ public class FileTransferManager : MediatorSubscriberBase
         CancelDownload(currentDownloadId);
     }
 
-    public async Task UploadFiles(CharacterData data)
+    public async Task<CharacterData> UploadFiles(CharacterData data)
     {
         CancelUpload();
 
@@ -431,6 +439,13 @@ public class FileTransferManager : MediatorSubscriberBase
             await UploadMissingFiles(unverifiedUploads, uploadToken).ConfigureAwait(false);
             _logger.LogInformation("Upload complete for " + data.DataHash.Value);
         }
+
+        foreach (var kvp in data.FileReplacements)
+        {
+            data.FileReplacements[kvp.Key].RemoveAll(i => ForbiddenTransfers.Any(f => string.Equals(f.Hash, i.Hash, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        return data;
     }
 
     private async Task UploadMissingFiles(HashSet<string> unverifiedUploadHashes, CancellationToken uploadToken)

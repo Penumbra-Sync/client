@@ -13,6 +13,7 @@ using Dalamud.Utility;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Mediator;
 using MareSynchronos.Factories;
+using System.Reflection;
 
 namespace MareSynchronos.WebAPI;
 public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareHubClient
@@ -23,10 +24,8 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
     private readonly HubFactory _hubFactory;
     private readonly MareConfigService _configService;
     private readonly DalamudUtil _dalamudUtil;
-    private readonly FileCacheManager _fileDbManager;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
-    private readonly FileTransferManager _fileTransferManager;
     private CancellationTokenSource _connectionCancellationTokenSource;
     private HubConnection? _mareHub;
 
@@ -38,18 +37,16 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
     public string AuthFailureMessage { get; private set; } = string.Empty;
     public SystemInfoDto SystemInfoDto { get; private set; } = new();
 
-    public ApiController(ILogger<ApiController> logger, HubFactory hubFactory, MareConfigService configService, DalamudUtil dalamudUtil, FileCacheManager fileDbManager,
-        PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator, FileTransferManager fileTransferManager) : base(logger, mediator)
+    public ApiController(ILogger<ApiController> logger, HubFactory hubFactory, MareConfigService configService, DalamudUtil dalamudUtil,
+        PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
     {
         _logger.LogTrace("Creating " + nameof(ApiController));
 
         _hubFactory = hubFactory;
         _configService = configService;
         _dalamudUtil = dalamudUtil;
-        _fileDbManager = fileDbManager;
         _pairManager = pairManager;
         _serverManager = serverManager;
-        _fileTransferManager = fileTransferManager;
         _connectionCancellationTokenSource = new CancellationTokenSource();
 
         Mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
@@ -77,18 +74,32 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         Task.Run(() => CreateConnections(forceGetToken: true));
     }
 
-    public ConcurrentDictionary<int, List<DownloadFileTransfer>> CurrentDownloads => _fileTransferManager.CurrentDownloads;
-
-    public List<FileTransfer> CurrentUploads => _fileTransferManager.CurrentUploads;
-
-    public List<FileTransfer> ForbiddenTransfers => _fileTransferManager.ForbiddenTransfers;
-
     public bool IsConnected => ServerState == ServerState.Connected;
-    public bool IsDownloading => !CurrentDownloads.IsEmpty;
-    public bool IsUploading => CurrentUploads.Count > 0;
-
     public bool ServerAlive => ServerState is ServerState.Connected or ServerState.RateLimited or ServerState.Unauthorized or ServerState.Disconnected;
+    public bool IsCurrentVersion => (Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0)) >= (_connectionDto?.CurrentClientVersion ?? new Version(0, 0, 0, 0));
+    /*{
+        var currentVersion = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0);
+        var serverSentVersion = _connectionDto?.CurrentClientVersion ?? new Version(0, 0, 0);
+        var isCurrent = true;
+        if (currentVersion.Major > serverSentVersion.Major)
+        {
+            if (currentVersion.Minor > serverSentVersion.Minor)
+            {
+                if (currentVersion.Build > serverSentVersion.Build)
+                {
+                    isCurrent = true;
+                }
+            }
+            else { isCurrent = true; }
+        }
+        else
+        {
+            isCurrent = true;
+        }
 
+        return isCurrent;
+    }*/
+    public Version CurrentClientVersion => _connectionDto?.CurrentClientVersion ?? new Version(0, 0, 0);
     public string UID => _connectionDto?.User.UID ?? string.Empty;
     public string DisplayName => _connectionDto?.User.AliasOrUID ?? string.Empty;
     public int OnlineUsers => SystemInfoDto.OnlineUsers;
@@ -109,8 +120,6 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
     public async Task CreateConnections(bool forceGetToken = false)
     {
         _logger.LogDebug("CreateConnections called");
-
-        _fileTransferManager.Reset();
 
         if (_serverManager.CurrentServer?.FullPause ?? true)
         {
@@ -138,7 +147,6 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         _connectionCancellationTokenSource.Cancel();
         _connectionCancellationTokenSource = new CancellationTokenSource();
         var token = _connectionCancellationTokenSource.Token;
-        _fileTransferManager.Clear();
         while (ServerState is not ServerState.Connected && !token.IsCancellationRequested)
         {
             AuthFailureMessage = string.Empty;
@@ -184,8 +192,6 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
                 await InitializeData().ConfigureAwait(false);
 
                 _connectionDto = await GetConnectionDto().ConfigureAwait(false);
-
-                _fileTransferManager.SetApiUri(_connectionDto.ServerInfo.FileServerAddress);
 
                 ServerState = ServerState.Connected;
 
@@ -286,7 +292,6 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         _ = ClientHealthCheck(_healthCheckTokenSource.Token);
 
         _initialized = true;
-        Mediator.Publish(new ConnectedMessage());
     }
 
     public override void Dispose()
@@ -299,7 +304,6 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
     private void MareHubOnClosed(Exception? arg)
     {
-        _fileTransferManager.Reset();
         _healthCheckTokenSource?.Cancel();
         Mediator.Publish(new DisconnectedMessage());
         _pairManager.ClearPairs();
@@ -328,7 +332,6 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         ServerState = ServerState.Connecting;
         try
         {
-            _fileTransferManager.Reset();
             await InitializeData().ConfigureAwait(false);
             _connectionDto = await GetConnectionDto().ConfigureAwait(false);
             if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
@@ -336,7 +339,6 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
                 await StopConnection(ServerState.VersionMisMatch).ConfigureAwait(false);
                 return;
             }
-            _fileTransferManager.SetApiUri(_connectionDto.ServerInfo.FileServerAddress);
             ServerState = ServerState.Connected;
         }
         catch (Exception ex)
@@ -355,11 +357,8 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         {
             _initialized = false;
             _healthCheckTokenSource?.Cancel();
-            _fileTransferManager.Reset();
             _logger.LogInformation("Stopping existing connection");
             await _hubFactory.DisposeHubAsync().ConfigureAwait(false);
-            CurrentUploads.Clear();
-            CurrentDownloads.Clear();
             Mediator.Publish(new DisconnectedMessage());
             _mareHub = null;
             _connectionDto = null;
@@ -368,7 +367,9 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
 
     public async Task<ConnectionDto> GetConnectionDto()
     {
-        return await _mareHub!.InvokeAsync<ConnectionDto>(nameof(GetConnectionDto)).ConfigureAwait(false);
+        var dto = await _mareHub!.InvokeAsync<ConnectionDto>(nameof(GetConnectionDto)).ConfigureAwait(false);
+        Mediator.Publish(new ConnectedMessage(dto));
+        return dto;
     }
 
     public async Task<bool> CheckClientHealth()

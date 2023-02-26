@@ -1,4 +1,5 @@
 ﻿using Dalamud.Interface.Internal.Notifications;
+using MareSynchronos.API.Dto;
 using MareSynchronos.Models;
 
 namespace MareSynchronos.Mediator;
@@ -19,7 +20,7 @@ public record GposeStartMessage : IMessage;
 public record GposeEndMessage : IMessage;
 public record CutsceneEndMessage : IMessage;
 public record CutsceneFrameworkUpdateMessage : IMessage;
-public record ConnectedMessage : IMessage;
+public record ConnectedMessage(ConnectionDto Connection) : IMessage;
 public record DisconnectedMessage : IMessage;
 public record PenumbraModSettingChangedMessage : IMessage;
 public record PenumbraInitializedMessage : IMessage;

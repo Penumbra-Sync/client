@@ -14,8 +14,6 @@ public partial class ApiController
 
         try
         {
-            await _fileTransferManager.UploadFiles(data).ConfigureAwait(false);
-
             await PushCharacterDataInternal(data, visibleCharacters.ToList()).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
@@ -35,7 +33,6 @@ public partial class ApiController
         foreach (var kvp in character.FileReplacements.ToList())
         {
             sb.AppendLine($"FileReplacements for {kvp.Key}: {kvp.Value.Count}");
-            character.FileReplacements[kvp.Key].RemoveAll(i => ForbiddenTransfers.Any(f => string.Equals(f.Hash, i.Hash, StringComparison.OrdinalIgnoreCase)));
         }
         foreach (var item in character.GlamourerData)
         {

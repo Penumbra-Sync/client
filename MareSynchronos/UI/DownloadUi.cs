@@ -1,6 +1,7 @@
 ﻿using System.Numerics;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
+using MareSynchronos.Managers;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;
@@ -12,7 +13,7 @@ public class DownloadUi : Window, IDisposable
     private readonly ILogger<DownloadUi> _logger;
     private readonly WindowSystem _windowSystem;
     private readonly MareConfigService _configService;
-    private readonly ApiController _apiController;
+    private readonly FileTransferManager _fileTransferManager;
     private readonly UiShared _uiShared;
     private bool _wasOpen = false;
 
@@ -22,13 +23,14 @@ public class DownloadUi : Window, IDisposable
         _windowSystem.RemoveWindow(this);
     }
 
-    public DownloadUi(ILogger<DownloadUi> logger, WindowSystem windowSystem, MareConfigService configService, ApiController apiController, UiShared uiShared) : base("Mare Synchronos Downloads")
+    public DownloadUi(ILogger<DownloadUi> logger, WindowSystem windowSystem, MareConfigService configService,
+        FileTransferManager fileTransferManager, UiShared uiShared) : base("Mare Synchronos Downloads")
     {
         _logger = logger;
         _logger.LogTrace("Creating " + nameof(DownloadUi));
         _windowSystem = windowSystem;
         _configService = configService;
-        _apiController = apiController;
+        _fileTransferManager = fileTransferManager;
         _uiShared = uiShared;
 
         SizeConstraints = new WindowSizeConstraints()
@@ -81,7 +83,7 @@ public class DownloadUi : Window, IDisposable
     public override void Draw()
     {
         if (!_configService.Current.ShowTransferWindow) return;
-        if (!_apiController.IsDownloading && !_apiController.IsUploading) return;
+        if (!_fileTransferManager.IsDownloading && !_fileTransferManager.IsUploading) return;
 
         var drawList = ImGui.GetWindowDrawList();
         var yDistance = 20;
@@ -91,9 +93,9 @@ public class DownloadUi : Window, IDisposable
 
         try
         {
-            if (_apiController.CurrentUploads.Any())
+            if (_fileTransferManager.CurrentUploads.Any())
             {
-                var currentUploads = _apiController.CurrentUploads.ToList();
+                var currentUploads = _fileTransferManager.CurrentUploads.ToList();
                 var totalUploads = currentUploads.Count;
 
                 var doneUploads = currentUploads.Count(c => c.IsTransferred);
@@ -116,9 +118,9 @@ public class DownloadUi : Window, IDisposable
 
         try
         {
-            if (_apiController.CurrentDownloads.Any())
+            if (_fileTransferManager.CurrentDownloads.Any())
             {
-                var currentDownloads = _apiController.CurrentDownloads.Where(d => d.Value != null && d.Value.Any()).ToList().SelectMany(k => k.Value).ToList();
+                var currentDownloads = _fileTransferManager.CurrentDownloads.Where(d => d.Value != null && d.Value.Any()).ToList().SelectMany(k => k.Value).ToList();
                 var multBase = currentDownloads.Any() ? 0 : 2;
                 var doneDownloads = currentDownloads.Count(c => c.IsTransferred);
                 var totalDownloads = currentDownloads.Count;

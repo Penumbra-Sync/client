@@ -13,17 +13,18 @@ public class OnlinePlayerManager : MediatorSubscriberBase, IDisposable
     private readonly DalamudUtil _dalamudUtil;
     private readonly FileCacheManager _fileDbManager;
     private readonly PairManager _pairManager;
+    private readonly FileTransferManager _fileTransferManager;
     private CharacterData? _lastSentData;
 
     public OnlinePlayerManager(ILogger<OnlinePlayerManager> logger, ApiController apiController, DalamudUtil dalamudUtil,
-        FileCacheManager fileDbManager, PairManager pairManager, MareMediator mediator) : base(logger, mediator)
+        FileCacheManager fileDbManager, PairManager pairManager, MareMediator mediator, FileTransferManager fileTransferManager) : base(logger, mediator)
     {
         _logger.LogTrace("Creating " + nameof(OnlinePlayerManager));
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
         _fileDbManager = fileDbManager;
         _pairManager = pairManager;
-
+        _fileTransferManager = fileTransferManager;
         Mediator.Subscribe<PlayerChangedMessage>(this, (msg) => PlayerManagerOnPlayerHasChanged((PlayerChangedMessage)msg));
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => FrameworkOnUpdate());
         Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) =>
@@ -82,7 +83,8 @@ public class OnlinePlayerManager : MediatorSubscriberBase, IDisposable
         {
             Task.Run(async () =>
             {
-                await _apiController.PushCharacterData(_lastSentData, visiblePlayers).ConfigureAwait(false);
+                var dataToSend = await _fileTransferManager.UploadFiles(_lastSentData.DeepClone()).ConfigureAwait(false);
+                await _apiController.PushCharacterData(dataToSend, visiblePlayers).ConfigureAwait(false);
             });
         }
     }

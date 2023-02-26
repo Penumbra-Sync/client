@@ -3,9 +3,7 @@ using MareSynchronos.Factories;
 using MareSynchronos.Mediator;
 using MareSynchronos.Models;
 using MareSynchronos.Utils;
-using MareSynchronos.WebAPI.Utils;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 
 namespace MareSynchronos.Managers;
 
@@ -18,7 +16,6 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
     private readonly CancellationTokenSource _cts = new();
     private readonly List<GameObjectHandler> _playerRelatedObjects = new();
     private CancellationTokenSource _palettePlusCts = new();
-    public ConcurrentDictionary<int, List<DownloadFileTransfer>> CurrentDownloads { get; } = new();
 
     public unsafe CacheCreationService(ILogger<CacheCreationService> logger, MareMediator mediator, GameObjectHandlerFactory gameObjectHandlerFactory,
         CharacterDataFactory characterDataFactory, DalamudUtil dalamudUtil) : base(logger, mediator)

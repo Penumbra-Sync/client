@@ -614,7 +614,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
 
             ImGui.TableHeadersRow();
 
-            foreach (var item in ApiController.ForbiddenTransfers)
+            foreach (var item in _fileTransferManager.ForbiddenTransfers)
             {
                 ImGui.TableNextColumn();
                 if (item is UploadFileTransfer transfer)
@@ -656,8 +656,8 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
         if (ImGui.BeginTable("TransfersTable", 2))
         {
             ImGui.TableSetupColumn(
-                $"Uploads ({UiShared.ByteToString(ApiController.CurrentUploads.Sum(a => a.Transferred))} / {UiShared.ByteToString(ApiController.CurrentUploads.Sum(a => a.Total))})");
-            ImGui.TableSetupColumn($"Downloads ({UiShared.ByteToString(ApiController.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Transferred))} / {UiShared.ByteToString(ApiController.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Total))})");
+                $"Uploads ({UiShared.ByteToString(_fileTransferManager.CurrentUploads.Sum(a => a.Transferred))} / {UiShared.ByteToString(_fileTransferManager.CurrentUploads.Sum(a => a.Total))})");
+            ImGui.TableSetupColumn($"Downloads ({UiShared.ByteToString(_fileTransferManager.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Transferred))} / {UiShared.ByteToString(_fileTransferManager.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Total))})");
 
             ImGui.TableHeadersRow();
 
@@ -668,7 +668,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
                 ImGui.TableSetupColumn("Uploaded");
                 ImGui.TableSetupColumn("Size");
                 ImGui.TableHeadersRow();
-                foreach (var transfer in ApiController.CurrentUploads.ToArray())
+                foreach (var transfer in _fileTransferManager.CurrentUploads.ToArray())
                 {
                     var color = UiShared.UploadColor((transfer.Transferred, transfer.Total));
                     ImGui.PushStyleColor(ImGuiCol.Text, color);
@@ -692,7 +692,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
                 ImGui.TableSetupColumn("Downloaded");
                 ImGui.TableSetupColumn("Size");
                 ImGui.TableHeadersRow();
-                foreach (var transfer in ApiController.CurrentDownloads.SelectMany(k => k.Value).ToArray())
+                foreach (var transfer in _fileTransferManager.CurrentDownloads.SelectMany(k => k.Value).ToArray())
                 {
                     var color = UiShared.UploadColor((transfer.Transferred, transfer.Total));
                     ImGui.PushStyleColor(ImGuiCol.Text, color);

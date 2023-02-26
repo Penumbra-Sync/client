@@ -26,6 +26,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
     private readonly ApiController _apiController;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
+    private readonly FileTransferManager _fileTransferManager;
     private readonly MareConfigService _configService;
     private readonly TagHandler _tagHandler;
     public readonly Dictionary<string, bool> ShowUidForEntry = new(StringComparer.Ordinal);
@@ -57,7 +58,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
 
     public CompactUi(ILogger<CompactUi> logger, WindowSystem windowSystem,
         UiShared uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
-        ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator, "###MareSynchronosMainUI")
+        ServerConfigurationManager serverManager, MareMediator mediator, FileTransferManager fileTransferManager) : base(logger, mediator, "###MareSynchronosMainUI")
     {
 
 #if DEBUG
@@ -77,6 +78,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
         _apiController = apiController;
         _pairManager = pairManager;
         _serverManager = serverManager;
+        _fileTransferManager = fileTransferManager;
         _tagHandler = new(_serverManager);
 
         _groupPanel = new(this, uiShared, _pairManager, _serverManager, _configService);
@@ -118,6 +120,19 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
     public override void Draw()
     {
         WindowContentWidth = UiShared.GetWindowContentRegionWidth();
+        if (!_apiController.IsCurrentVersion)
+        {
+            var ver = _apiController.CurrentClientVersion;
+            if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
+            var unsupported = "UNSUPPORTED VERSION";
+            var uidTextSize = ImGui.CalcTextSize(unsupported);
+            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMax().X + ImGui.GetWindowContentRegionMin().X) / 2 - uidTextSize.X / 2);
+            ImGui.TextColored(ImGuiColors.DalamudRed, unsupported);
+            if (_uiShared.UidFontBuilt) ImGui.PopFont();
+            UiShared.ColorTextWrapped($"Your Mare Synchronos installation is out of date, the current version is {ver.Major}.{ver.Minor}.{ver.Build}. " +
+                $"It is highly recommended to keep Mare Synchronos up to date. Open /xlplugins and update the plugin.", ImGuiColors.DalamudRed);
+        }
+
         UiShared.DrawWithID("header", DrawUIDHeader);
         ImGui.Separator();
         UiShared.DrawWithID("serverstatus", DrawServerStatus);
@@ -623,7 +638,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
 
     private void DrawTransfers()
     {
-        var currentUploads = _apiController.CurrentUploads.ToList();
+        var currentUploads = _fileTransferManager.CurrentUploads.ToList();
         ImGui.PushFont(UiBuilder.IconFont);
         ImGui.Text(FontAwesomeIcon.Upload.ToIconString());
         ImGui.PopFont();
@@ -648,7 +663,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
             ImGui.Text("No uploads in progress");
         }
 
-        var currentDownloads = _apiController.CurrentDownloads.SelectMany(k => k.Value).ToList();
+        var currentDownloads = _fileTransferManager.CurrentDownloads.SelectMany(k => k.Value).ToList();
         ImGui.PushFont(UiBuilder.IconFont);
         ImGui.Text(FontAwesomeIcon.Download.ToIconString());
         ImGui.PopFont();
