@@ -167,7 +167,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
         }
     }
 
-    public void MarkPairOnline(OnlineUserIdentDto dto, ApiController controller, bool sendNotif = true)
+    public void MarkPairOnline(OnlineUserIdentDto dto, bool sendNotif = true)
     {
         if (!_allClientPairs.ContainsKey(dto.User)) throw new InvalidOperationException("No user found for " + dto);
         var pair = _allClientPairs[dto.User];
@@ -186,7 +186,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
             Mediator.Publish(new NotificationMessage("User online", msg, NotificationType.Info, 5000));
         }
 
-        pair.RecreateCachedPlayer(dto, controller);
+        pair.RecreateCachedPlayer(dto);
         RecreateLazy();
     }
 

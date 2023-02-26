@@ -1,30 +1,79 @@
-﻿using System.Collections.Concurrent;
-using System.Net;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using System.Runtime.CompilerServices;
-using System.Text;
-using Dalamud.Utility;
-using LZ4;
+﻿using Dalamud.Utility;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.Files;
 using MareSynchronos.API.Routes;
 using MareSynchronos.Mediator;
-using MareSynchronos.UI;
 using MareSynchronos.WebAPI.Utils;
-using Microsoft.AspNetCore.SignalR.Client;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Net;
+using MareSynchronos.MareConfiguration;
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using MareSynchronos.FileCache;
+using MareSynchronos.UI;
+using LZ4;
+using System.Runtime.CompilerServices;
 
-namespace MareSynchronos.WebAPI;
+namespace MareSynchronos.Managers;
 
-public partial class ApiController
+public class FileTransferManager : MediatorSubscriberBase
 {
-    private readonly Dictionary<string, DateTime> _verifiedUploadedHashes;
-    private readonly ConcurrentDictionary<Guid, bool> _downloadReady = new();
-    private bool _currentUploadCancelled = false;
-
+    private readonly MareConfigService _configService;
+    private readonly FileCacheManager _fileDbManager;
+    private readonly ServerConfigurationManager _serverManager;
+    private HttpClient _httpClient;
     private int _downloadId = 0;
-    public async Task<bool> CancelUpload()
+    private readonly Dictionary<string, DateTime> _verifiedUploadedHashes = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<Guid, bool> _downloadReady = new();
+    public List<FileTransfer> CurrentUploads { get; } = new();
+    public List<FileTransfer> ForbiddenTransfers { get; } = new();
+    public ConcurrentDictionary<int, List<DownloadFileTransfer>> CurrentDownloads { get; } = new();
+    private CancellationTokenSource? _uploadCancellationTokenSource = new();
+    private Uri? _filesCdnUri;
+    private bool IsInitialized => _filesCdnUri != null;
+
+    public FileTransferManager(ILogger<FileTransferManager> logger, MareMediator mediator,
+        MareConfigService configService, FileCacheManager fileDbManager, ServerConfigurationManager serverManager) : base(logger, mediator)
+    {
+        _httpClient = new HttpClient();
+        _configService = configService;
+        _fileDbManager = fileDbManager;
+        _serverManager = serverManager;
+
+        Mediator.Subscribe<DownloadReadyMessage>(this, (msg) =>
+        {
+            _downloadReady[((DownloadReadyMessage)msg).RequestId] = true;
+        });
+    }
+
+    public void SetApiUri(Uri uri)
+    {
+        _filesCdnUri = uri;
+    }
+
+    public override void Dispose()
+    {
+        base.Dispose();
+        _uploadCancellationTokenSource?.Cancel();
+        _uploadCancellationTokenSource?.Dispose();
+        _httpClient.Dispose();
+    }
+
+    public void CancelDownload(int downloadId)
+    {
+        while (CurrentDownloads.ContainsKey(downloadId))
+        {
+            CurrentDownloads.TryRemove(downloadId, out _);
+        }
+    }
+
+    public void Clear()
+    {
+        _verifiedUploadedHashes.Clear();
+    }
+
+    public bool CancelUpload()
     {
         if (CurrentUploads.Any())
         {
@@ -33,22 +82,47 @@ public partial class ApiController
             _uploadCancellationTokenSource?.Dispose();
             _uploadCancellationTokenSource = null;
             CurrentUploads.Clear();
-            await FilesAbortUpload().ConfigureAwait(false);
             return true;
         }
 
         return false;
     }
 
-    public async Task FilesAbortUpload()
+    public async Task DownloadFiles(int currentDownloadId, List<FileReplacementData> fileReplacementDto, CancellationToken ct)
     {
-        await _mareHub!.SendAsync(nameof(FilesAbortUpload)).ConfigureAwait(false);
+        Mediator.Publish(new HaltScanMessage("Download"));
+        try
+        {
+            await DownloadFilesInternal(currentDownloadId, fileReplacementDto, ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            CancelDownload(currentDownloadId);
+        }
+        finally
+        {
+            Mediator.Publish(new ResumeScanMessage("Download"));
+        }
     }
 
-    public async Task FilesDeleteAll()
+    private HashSet<string> VerifyFiles(CharacterData data)
     {
-        _verifiedUploadedHashes.Clear();
-        await _mareHub!.SendAsync(nameof(FilesDeleteAll)).ConfigureAwait(false);
+        HashSet<string> unverifiedUploadHashes = new(StringComparer.Ordinal);
+        foreach (var item in data.FileReplacements.SelectMany(c => c.Value.Where(f => string.IsNullOrEmpty(f.FileSwapPath)).Select(v => v.Hash).Distinct(StringComparer.Ordinal)).Distinct(StringComparer.Ordinal).ToList())
+        {
+            if (!_verifiedUploadedHashes.TryGetValue(item, out var verifiedTime))
+            {
+                verifiedTime = DateTime.MinValue;
+            }
+
+            if (verifiedTime < DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(10)))
+            {
+                _logger.LogTrace("Verifying " + item + ", last verified: " + verifiedTime);
+                unverifiedUploadHashes.Add(item);
+            }
+        }
+
+        return unverifiedUploadHashes;
     }
 
     private async Task<Guid> GetQueueRequest(DownloadFileTransfer downloadFileTransfer, CancellationToken ct)
@@ -191,23 +265,6 @@ public partial class ApiController
 
     public int GetDownloadId() => _downloadId++;
 
-    public async Task DownloadFiles(int currentDownloadId, List<FileReplacementData> fileReplacementDto, CancellationToken ct)
-    {
-        Mediator.Publish(new HaltScanMessage("Download"));
-        try
-        {
-            await DownloadFilesInternal(currentDownloadId, fileReplacementDto, ct).ConfigureAwait(false);
-        }
-        catch
-        {
-            CancelDownload(currentDownloadId);
-        }
-        finally
-        {
-            Mediator.Publish(new ResumeScanMessage("Download"));
-        }
-    }
-
     private async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, Uri uri, CancellationToken? ct = null)
     {
         using var requestMessage = new HttpRequestMessage(method, uri);
@@ -218,9 +275,10 @@ public partial class ApiController
     {
         requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", this._serverManager.GetToken());
 
-        if (requestMessage.Content != null)
+        if (requestMessage.Content != null && requestMessage.Content is not StreamContent)
         {
-            _logger.LogDebug("Sending " + requestMessage.Method + " to " + requestMessage.RequestUri + " (Content: " + await (((JsonContent)requestMessage.Content).ReadAsStringAsync()) + ")");
+            var content = await (((JsonContent)requestMessage.Content).ReadAsStringAsync()).ConfigureAwait(false);
+            _logger.LogDebug("Sending " + requestMessage.Method + " to " + requestMessage.RequestUri + " (Content: " + content + ")");
         }
         else
         {
@@ -247,12 +305,33 @@ public partial class ApiController
         return await SendRequestInternalAsync(requestMessage, ct).ConfigureAwait(false);
     }
 
+    private async Task<HttpResponseMessage> SendRequestStreamAsync(HttpMethod method, Uri uri, StreamContent content, CancellationToken ct)
+    {
+        using var requestMessage = new HttpRequestMessage(method, uri);
+        requestMessage.Content = content;
+        return await SendRequestInternalAsync(requestMessage, ct).ConfigureAwait(false);
+    }
+
+    private async Task<List<DownloadFileDto>> FilesGetSizes(List<string> hashes, CancellationToken ct)
+    {
+        if (_filesCdnUri is null) throw new InvalidOperationException("FileTransferManager is not initialized");
+        var response = await SendRequestAsync(HttpMethod.Get, MareFiles.ServerFilesGetSizesFullPath(_filesCdnUri), hashes, ct).ConfigureAwait(false);
+        return await response.Content.ReadFromJsonAsync<List<DownloadFileDto>>().ConfigureAwait(false);
+    }
+
+    private async Task<List<UploadFileDto>> FilesSend(List<string> hashes, CancellationToken ct)
+    {
+        if (_filesCdnUri is null) throw new InvalidOperationException("FileTransferManager is not initialized");
+        var response = await SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesFilesSendFullPath(_filesCdnUri), hashes, ct).ConfigureAwait(false);
+        return await response.Content.ReadFromJsonAsync<List<UploadFileDto>>().ConfigureAwait(false);
+    }
+
     private async Task DownloadFilesInternal(int currentDownloadId, List<FileReplacementData> fileReplacement, CancellationToken ct)
     {
         _logger.LogDebug("Downloading files (Download ID " + currentDownloadId + ")");
 
         List<DownloadFileDto> downloadFileInfoFromService = new();
-        downloadFileInfoFromService.AddRange(await FilesGetSizes(fileReplacement.Select(f => f.Hash).ToList()).ConfigureAwait(false));
+        downloadFileInfoFromService.AddRange(await FilesGetSizes(fileReplacement.Select(f => f.Hash).ToList(), ct).ConfigureAwait(false));
 
         _logger.LogDebug("Files with size 0 or less: " + string.Join(", ", downloadFileInfoFromService.Where(f => f.Size <= 0).Select(f => f.Hash)));
 
@@ -338,59 +417,20 @@ public partial class ApiController
         CancelDownload(currentDownloadId);
     }
 
-    public async Task PushCharacterData(CharacterData data, List<UserData> visibleCharacters)
+    public async Task UploadFiles(CharacterData data)
     {
-        if (!IsConnected) return;
+        CancelUpload();
 
-        try
+        _uploadCancellationTokenSource = new CancellationTokenSource();
+        var uploadToken = _uploadCancellationTokenSource.Token;
+        _logger.LogDebug($"Sending Character data {data.DataHash.Value} to service {_serverManager.CurrentApiUrl}");
+
+        HashSet<string> unverifiedUploads = VerifyFiles(data);
+        if (unverifiedUploads.Any())
         {
-            _currentUploadCancelled = await CancelUpload().ConfigureAwait(false);
-
-            _uploadCancellationTokenSource = new CancellationTokenSource();
-            var uploadToken = _uploadCancellationTokenSource.Token;
-            _logger.LogDebug($"Sending Character data {data.DataHash.Value} to service {_serverManager.CurrentApiUrl}");
-
-            HashSet<string> unverifiedUploads = VerifyFiles(data);
-            if (unverifiedUploads.Any())
-            {
-                await UploadMissingFiles(unverifiedUploads, uploadToken).ConfigureAwait(false);
-                _logger.LogInformation("Upload complete for " + data.DataHash.Value);
-            }
-            await PushCharacterDataInternal(data, visibleCharacters.ToList()).ConfigureAwait(false);
+            await UploadMissingFiles(unverifiedUploads, uploadToken).ConfigureAwait(false);
+            _logger.LogInformation("Upload complete for " + data.DataHash.Value);
         }
-        catch (OperationCanceledException)
-        {
-            _logger.LogDebug("Upload operation was cancelled");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Error during upload of files");
-        }
-        finally
-        {
-            if (!_currentUploadCancelled)
-                _currentUploadCancelled = await CancelUpload().ConfigureAwait(false);
-        }
-    }
-
-    private HashSet<string> VerifyFiles(CharacterData data)
-    {
-        HashSet<string> unverifiedUploadHashes = new(StringComparer.Ordinal);
-        foreach (var item in data.FileReplacements.SelectMany(c => c.Value.Where(f => string.IsNullOrEmpty(f.FileSwapPath)).Select(v => v.Hash).Distinct(StringComparer.Ordinal)).Distinct(StringComparer.Ordinal).ToList())
-        {
-            if (!_verifiedUploadedHashes.TryGetValue(item, out var verifiedTime))
-            {
-                verifiedTime = DateTime.MinValue;
-            }
-
-            if (verifiedTime < DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(10)))
-            {
-                _logger.LogTrace("Verifying " + item + ", last verified: " + verifiedTime);
-                unverifiedUploadHashes.Add(item);
-            }
-        }
-
-        return unverifiedUploadHashes;
     }
 
     private async Task UploadMissingFiles(HashSet<string> unverifiedUploadHashes, CancellationToken uploadToken)
@@ -398,7 +438,7 @@ public partial class ApiController
         unverifiedUploadHashes = unverifiedUploadHashes.Where(h => _fileDbManager.GetFileCacheByHash(h) != null).ToHashSet(StringComparer.Ordinal);
 
         _logger.LogDebug("Verifying " + unverifiedUploadHashes.Count + " files");
-        var filesToUpload = await FilesSend(unverifiedUploadHashes.ToList()).ConfigureAwait(false);
+        var filesToUpload = await FilesSend(unverifiedUploadHashes.ToList(), uploadToken).ConfigureAwait(false);
 
         foreach (var file in filesToUpload.Where(f => !f.IsForbidden))
         {
@@ -445,14 +485,7 @@ public partial class ApiController
             var compressedSize = CurrentUploads.Sum(c => c.Total);
             _logger.LogDebug($"Compressed {UiShared.ByteToString(totalSize)} to {UiShared.ByteToString(compressedSize)} ({(compressedSize / (double)totalSize):P2})");
 
-            _logger.LogDebug("Upload tasks complete, waiting for server to confirm");
-            _logger.LogDebug("Uploads open: " + CurrentUploads.Any(c => c.IsInTransfer));
-            const double waitStep = 1.0d;
-            while (CurrentUploads.Any(c => c.IsInTransfer) && !uploadToken.IsCancellationRequested)
-            {
-                await Task.Delay(TimeSpan.FromSeconds(waitStep), uploadToken).ConfigureAwait(false);
-                _logger.LogDebug("Waiting for uploads to finish");
-            }
+            _logger.LogDebug("Upload tasks complete");
         }
 
         foreach (var file in unverifiedUploadHashes.Where(c => !CurrentUploads.Any(u => string.Equals(u.Hash, c, StringComparison.Ordinal))))
@@ -461,23 +494,6 @@ public partial class ApiController
         }
 
         CurrentUploads.Clear();
-    }
-
-    private async Task PushCharacterDataInternal(CharacterData character, List<UserData> visibleCharacters)
-    {
-        _logger.LogInformation("Pushing character data for " + character.DataHash.Value + " to " + string.Join(", ", visibleCharacters.Select(c => c.AliasOrUID)));
-        StringBuilder sb = new();
-        foreach (var kvp in character.FileReplacements.ToList())
-        {
-            sb.AppendLine($"FileReplacements for {kvp.Key}: {kvp.Value.Count}");
-            character.FileReplacements[kvp.Key].RemoveAll(i => ForbiddenTransfers.Any(f => string.Equals(f.Hash, i.Hash, StringComparison.OrdinalIgnoreCase)));
-        }
-        foreach (var item in character.GlamourerData)
-        {
-            sb.AppendLine($"GlamourerData for {item.Key}: {!string.IsNullOrEmpty(item.Value)}");
-        }
-        _logger.LogDebug("Chara data contained: " + Environment.NewLine + sb.ToString());
-        await UserPushData(new(visibleCharacters, character)).ConfigureAwait(false);
     }
 
     private async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)
@@ -489,52 +505,33 @@ public partial class ApiController
 
     private async Task UploadFile(byte[] compressedFile, string fileHash, CancellationToken uploadToken)
     {
+        if (_filesCdnUri is null) throw new InvalidOperationException("FileTransferManager is not initialized");
+
         if (uploadToken.IsCancellationRequested) return;
 
-        async IAsyncEnumerable<byte[]> AsyncFileData([EnumeratorCancellation] CancellationToken token)
-        {
-            var chunkSize = 1024 * 512; // 512kb
-            using var ms = new MemoryStream(compressedFile);
-            var buffer = new byte[chunkSize];
-            int bytesRead;
-            while ((bytesRead = await ms.ReadAsync(buffer, 0, chunkSize, token).ConfigureAwait(false)) > 0 && !token.IsCancellationRequested)
-            {
-                CurrentUploads.Single(f => string.Equals(f.Hash, fileHash, StringComparison.Ordinal)).Transferred += bytesRead;
-                token.ThrowIfCancellationRequested();
-                yield return bytesRead == chunkSize ? buffer.ToArray() : buffer.Take(bytesRead).ToArray();
-            }
-        }
+        using var ms = new MemoryStream(compressedFile);
 
-        await FilesUploadStreamAsync(fileHash, AsyncFileData(uploadToken)).ConfigureAwait(false);
+        var streamContent = new StreamContent(ms);
+        streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+
+        var response = await SendRequestStreamAsync(HttpMethod.Post, MareFiles.ServerFilesUploadFullPath(_filesCdnUri, fileHash), streamContent, uploadToken).ConfigureAwait(false);
+        _logger.LogInformation("Upload Status: {status}", response.StatusCode);
     }
 
-    public async Task FilesUploadStreamAsync(string hash, IAsyncEnumerable<byte[]> fileContent)
+    internal void Reset()
     {
-        await _mareHub!.InvokeAsync(nameof(FilesUploadStreamAsync), hash, fileContent).ConfigureAwait(false);
+        _uploadCancellationTokenSource?.Cancel();
+        _uploadCancellationTokenSource?.Dispose();
+        _uploadCancellationTokenSource = null;
+        CurrentDownloads.Clear();
+        CurrentUploads.Clear();
+        _verifiedUploadedHashes.Clear();
     }
 
-    public async Task<bool> FilesIsUploadFinished()
+    public async Task DeleteAllFiles()
     {
-        return await _mareHub!.InvokeAsync<bool>(nameof(FilesIsUploadFinished)).ConfigureAwait(false);
-    }
+        if (_filesCdnUri is null) throw new InvalidOperationException("FileTransferManager is not initialized");
 
-    public async Task<List<DownloadFileDto>> FilesGetSizes(List<string> hashes)
-    {
-        return await _mareHub!.InvokeAsync<List<DownloadFileDto>>(nameof(FilesGetSizes), hashes).ConfigureAwait(false);
-    }
-
-    public async Task<List<UploadFileDto>> FilesSend(List<string> fileListHashes)
-    {
-        return await _mareHub!.InvokeAsync<List<UploadFileDto>>(nameof(FilesSend), fileListHashes).ConfigureAwait(false);
-    }
-
-
-    public void CancelDownload(int downloadId)
-    {
-        while (CurrentDownloads.ContainsKey(downloadId))
-        {
-            CurrentDownloads.TryRemove(downloadId, out _);
-        }
+        await SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesDeleteAllFullPath(_filesCdnUri)).ConfigureAwait(false);
     }
 }
-

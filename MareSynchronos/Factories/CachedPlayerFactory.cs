@@ -3,7 +3,6 @@ using MareSynchronos.FileCache;
 using MareSynchronos.Managers;
 using MareSynchronos.Mediator;
 using MareSynchronos.Utils;
-using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Factories;
@@ -16,10 +15,11 @@ public class CachedPlayerFactory
     private readonly GameObjectHandlerFactory _gameObjectHandlerFactory;
     private readonly MareMediator _mediator;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly FileTransferManager _fileTransferManager;
 
     public CachedPlayerFactory(IpcManager ipcManager, DalamudUtil dalamudUtil, FileCacheManager fileCacheManager,
         GameObjectHandlerFactory gameObjectHandlerFactory,
-        MareMediator mediator, ILoggerFactory loggerFactory)
+        MareMediator mediator, ILoggerFactory loggerFactory, FileTransferManager fileTransferManager)
     {
         _ipcManager = ipcManager;
         _dalamudUtil = dalamudUtil;
@@ -27,10 +27,11 @@ public class CachedPlayerFactory
         _gameObjectHandlerFactory = gameObjectHandlerFactory;
         _mediator = mediator;
         _loggerFactory = loggerFactory;
+        _fileTransferManager = fileTransferManager;
     }
 
-    public CachedPlayer Create(OnlineUserIdentDto dto, ApiController apiController)
+    public CachedPlayer Create(OnlineUserIdentDto dto)
     {
-        return new CachedPlayer(_loggerFactory.CreateLogger<CachedPlayer>(), dto, _gameObjectHandlerFactory, _ipcManager, apiController, _dalamudUtil, _fileCacheManager, _mediator);
+        return new CachedPlayer(_loggerFactory.CreateLogger<CachedPlayer>(), dto, _gameObjectHandlerFactory, _ipcManager, _fileTransferManager, _dalamudUtil, _fileCacheManager, _mediator);
     }
 }

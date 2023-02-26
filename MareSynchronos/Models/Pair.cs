@@ -136,19 +136,17 @@ public class Pair
     public bool CachedPlayerExists => CachedPlayer?.CheckExistence() ?? false;
 
     private OnlineUserIdentDto? _onlineUserIdentDto = null;
-    private ApiController? _apiController = null;
 
-    public void RecreateCachedPlayer(OnlineUserIdentDto? dto = null, ApiController? controller = null)
+    public void RecreateCachedPlayer(OnlineUserIdentDto? dto = null)
     {
-        if ((dto == null && _onlineUserIdentDto == null) || (_apiController == null && controller == null)) return;
-        if (dto != null || controller != null)
+        if ((dto == null && _onlineUserIdentDto == null)) return;
+        if (dto != null)
         {
             _onlineUserIdentDto = dto;
-            _apiController = controller;
         }
         CachedPlayer?.Dispose();
         CachedPlayer = null;
-        CachedPlayer = _cachedPlayerFactory.Create(_onlineUserIdentDto!, _apiController!);
+        CachedPlayer = _cachedPlayerFactory.Create(_onlineUserIdentDto!);
     }
 
     public void MarkOffline()

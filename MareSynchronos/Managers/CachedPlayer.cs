@@ -10,12 +10,13 @@ using MareSynchronos.Models;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;
+using System.Runtime.CompilerServices;
 
 namespace MareSynchronos.Managers;
 
 public class CachedPlayer : MediatorSubscriberBase, IDisposable
 {
-    private readonly ApiController _apiController;
+    private readonly FileTransferManager transferManager;
     private readonly DalamudUtil _dalamudUtil;
     private readonly GameObjectHandlerFactory _gameObjectHandlerFactory;
     private readonly IpcManager _ipcManager;
@@ -27,13 +28,13 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
     private string _originalGlamourerData = string.Empty;
 
     public CachedPlayer(ILogger<CachedPlayer> logger, OnlineUserIdentDto onlineUser, GameObjectHandlerFactory gameObjectHandlerFactory,
-        IpcManager ipcManager, ApiController apiController,
+        IpcManager ipcManager, FileTransferManager apiController,
         DalamudUtil dalamudUtil, FileCacheManager fileDbManager, MareMediator mediator) : base(logger, mediator)
     {
         OnlineUser = onlineUser;
         _gameObjectHandlerFactory = gameObjectHandlerFactory;
         _ipcManager = ipcManager;
-        _apiController = apiController;
+        transferManager = apiController;
         _dalamudUtil = dalamudUtil;
         _fileDbManager = fileDbManager;
     }
@@ -61,6 +62,8 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         {
             NotifyForMissingPlugins(playerChanges, warning);
         }
+
+        _logger.LogDebug("Downloading and applying character for {name}", this);
 
         DownloadAndApplyCharacter(characterData, charaDataToUpdate);
 
@@ -355,7 +358,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         _downloadCancellationTokenSource = new CancellationTokenSource();
         var downloadToken = _downloadCancellationTokenSource.Token;
 
-        var downloadId = _apiController.GetDownloadId();
+        var downloadId = transferManager.GetDownloadId();
         Task.Run(async () =>
         {
             List<FileReplacementData> toDownloadReplacements;
@@ -367,12 +370,12 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 int attempts = 0;
                 while ((toDownloadReplacements = TryCalculateModdedDictionary(charaData, out moddedPaths)).Count > 0 && attempts++ <= 10)
                 {
-                    downloadId = _apiController.GetDownloadId();
+                    downloadId = transferManager.GetDownloadId();
                     _logger.LogDebug("Downloading missing files for player {name}, {kind}", PlayerName, updatedData);
                     if (toDownloadReplacements.Any())
                     {
-                        await _apiController.DownloadFiles(downloadId, toDownloadReplacements, downloadToken).ConfigureAwait(false);
-                        _apiController.CancelDownload(downloadId);
+                        await transferManager.DownloadFiles(downloadId, toDownloadReplacements, downloadToken).ConfigureAwait(false);
+                        transferManager.CancelDownload(downloadId);
                     }
 
                     if (downloadToken.IsCancellationRequested)
@@ -381,7 +384,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                         return;
                     }
 
-                    if ((TryCalculateModdedDictionary(charaData, out moddedPaths)).All(c => _apiController.ForbiddenTransfers.Any(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
+                    if ((TryCalculateModdedDictionary(charaData, out moddedPaths)).All(c => transferManager.ForbiddenTransfers.Any(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
                     {
                         break;
                     }
@@ -423,7 +426,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 if (!task.IsCanceled) return;
 
                 _logger.LogDebug("Download was cancelled");
-                _apiController.CancelDownload(downloadId);
+                transferManager.CancelDownload(downloadId);
             });
     }
 

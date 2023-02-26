@@ -214,7 +214,7 @@ public partial class ApiController
     public Task Client_UserSendOnline(OnlineUserIdentDto dto)
     {
         _logger.LogDebug($"Client_UserSendOnline: {dto}");
-        ExecuteSafely(() => _pairManager.MarkPairOnline(dto, this));
+        ExecuteSafely(() => _pairManager.MarkPairOnline(dto));
         return Task.CompletedTask;
     }
 
@@ -276,7 +276,7 @@ public partial class ApiController
     public Task Client_DownloadReady(Guid requestId)
     {
         _logger.LogDebug($"Server sent {requestId} ready");
-        _downloadReady[requestId] = true;
+        Mediator.Publish(new DownloadReadyMessage(requestId));
         return Task.CompletedTask;
     }
 }

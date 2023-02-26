@@ -28,6 +28,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly PerformanceCollector _performanceCollector;
+    private readonly FileTransferManager _fileTransferManager;
     private readonly UiShared _uiShared;
     public CharacterData? LastCreatedCharacterData { private get; set; }
 
@@ -40,7 +41,8 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
         UiShared uiShared, MareConfigService configService,
         MareCharaFileManager mareCharaFileManager, PairManager pairManager,
         ServerConfigurationManager serverConfigurationManager,
-        MareMediator mediator, PerformanceCollector performanceCollector) : base(logger, mediator, "Mare Synchronos Settings")
+        MareMediator mediator, PerformanceCollector performanceCollector,
+        FileTransferManager fileTransferManager) : base(logger, mediator, "Mare Synchronos Settings")
     {
         _logger.LogTrace("Creating " + nameof(SettingsUi));
 
@@ -56,6 +58,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
         _pairManager = pairManager;
         _serverConfigurationManager = serverConfigurationManager;
         _performanceCollector = performanceCollector;
+        _fileTransferManager = fileTransferManager;
         _uiShared = uiShared;
 
         Mediator.Subscribe<OpenSettingsUiMessage>(this, (_) => Toggle());
@@ -175,7 +178,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
 
                 if (ImGui.Button("Delete everything", new Vector2(buttonSize, 0)))
                 {
-                    Task.Run(() => ApiController.FilesDeleteAll());
+                    Task.Run(() => _fileTransferManager.DeleteAllFiles());
                     _deleteFilesPopupModalShown = false;
                 }
 
