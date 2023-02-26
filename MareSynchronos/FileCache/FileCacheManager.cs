@@ -51,7 +51,7 @@ public class FileCacheManager : IDisposable
                 }
                 catch (Exception)
                 {
-                    _logger.LogWarning($"Failed to initialize entry {entry}, ignoring");
+                    _logger.LogWarning("Failed to initialize entry {entry}, ignoring", entry);
                 }
             }
         }

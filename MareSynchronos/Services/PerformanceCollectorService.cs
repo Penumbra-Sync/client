@@ -39,7 +39,7 @@ public class PerformanceCollectorService : IDisposable
             {
                 try
                 {
-                    var last = entries.Value.ToList().Last();
+                    var last = entries.Value.ToList()[entries.Value.ToList().Count - 1];
                     if (last.Item1.AddMinutes(10) < TimeOnly.FromDateTime(DateTime.Now))
                     {
                         _performanceCounters.Remove(entries.Key, out _);
@@ -139,7 +139,7 @@ public class PerformanceCollectorService : IDisposable
         sb.Append("-Counter Name".PadRight(longestCounterName, '-'));
         sb.AppendLine();
         var orderedData = data.OrderBy(k => k.Key, StringComparer.OrdinalIgnoreCase).ToList();
-        var previousCaller = orderedData.First().Key.Split(_counterSplit, StringSplitOptions.RemoveEmptyEntries)[0];
+        var previousCaller = orderedData[0].Key.Split(_counterSplit, StringSplitOptions.RemoveEmptyEntries)[0];
         foreach (var entry in orderedData)
         {
             var newCaller = entry.Key.Split(_counterSplit, StringSplitOptions.RemoveEmptyEntries)[0];

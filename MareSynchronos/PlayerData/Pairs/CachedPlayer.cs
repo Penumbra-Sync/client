@@ -9,14 +9,14 @@ using MareSynchronos.PlayerData.Factories;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
-using MareSynchronos.WebAPI.FileTransfer;
+using MareSynchronos.WebAPI.Files;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.PlayerData.Pairs;
 
 public class CachedPlayer : MediatorSubscriberBase, IDisposable
 {
-    private readonly FileTransferManager transferManager;
+    private readonly FileTransferManager _transferManager;
     private readonly DalamudUtil _dalamudUtil;
     private readonly GameObjectHandlerFactory _gameObjectHandlerFactory;
     private readonly IpcManager _ipcManager;
@@ -28,13 +28,13 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
     private string _originalGlamourerData = string.Empty;
 
     public CachedPlayer(ILogger<CachedPlayer> logger, OnlineUserIdentDto onlineUser, GameObjectHandlerFactory gameObjectHandlerFactory,
-        IpcManager ipcManager, FileTransferManager apiController,
+        IpcManager ipcManager, FileTransferManager transferManager,
         DalamudUtil dalamudUtil, FileCacheManager fileDbManager, MareMediator mediator) : base(logger, mediator)
     {
         OnlineUser = onlineUser;
         _gameObjectHandlerFactory = gameObjectHandlerFactory;
         _ipcManager = ipcManager;
-        transferManager = apiController;
+        _transferManager = transferManager;
         _dalamudUtil = dalamudUtil;
         _fileDbManager = fileDbManager;
     }
@@ -358,7 +358,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         _downloadCancellationTokenSource = new CancellationTokenSource();
         var downloadToken = _downloadCancellationTokenSource.Token;
 
-        var downloadId = transferManager.GetDownloadId();
+        var downloadId = _transferManager.GetDownloadId();
         Task.Run(async () =>
         {
             List<FileReplacementData> toDownloadReplacements;
@@ -370,12 +370,12 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 int attempts = 0;
                 while ((toDownloadReplacements = TryCalculateModdedDictionary(charaData, out moddedPaths)).Count > 0 && attempts++ <= 10)
                 {
-                    downloadId = transferManager.GetDownloadId();
+                    downloadId = _transferManager.GetDownloadId();
                     _logger.LogDebug("Downloading missing files for player {name}, {kind}", PlayerName, updatedData);
                     if (toDownloadReplacements.Any())
                     {
-                        await transferManager.DownloadFiles(downloadId, toDownloadReplacements, downloadToken).ConfigureAwait(false);
-                        transferManager.CancelDownload(downloadId);
+                        await _transferManager.DownloadFiles(downloadId, toDownloadReplacements, downloadToken).ConfigureAwait(false);
+                        _transferManager.CancelDownload(downloadId);
                     }
 
                     if (downloadToken.IsCancellationRequested)
@@ -384,7 +384,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                         return;
                     }
 
-                    if (TryCalculateModdedDictionary(charaData, out moddedPaths).All(c => transferManager.ForbiddenTransfers.Any(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
+                    if (TryCalculateModdedDictionary(charaData, out moddedPaths).All(c => _transferManager.ForbiddenTransfers.Any(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
                     {
                         break;
                     }
@@ -426,7 +426,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 if (!task.IsCanceled) return;
 
                 _logger.LogDebug("Download was cancelled");
-                transferManager.CancelDownload(downloadId);
+                _transferManager.CancelDownload(downloadId);
             });
     }
 

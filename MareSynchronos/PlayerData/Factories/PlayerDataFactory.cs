@@ -137,7 +137,7 @@ public class PlayerDataFactory : MediatorSubscriberBase
         while (!DalamudUtil.IsObjectPresent(_dalamudUtil.CreateGameObject(charaPointer)) && totalWaitTime > 0)
         {
             _logger.LogTrace("Character is null but it shouldn't be, waiting");
-            await Task.Delay(50).ConfigureAwait(false);
+            await Task.Delay(50, token).ConfigureAwait(false);
             totalWaitTime -= 50;
         }
 
@@ -396,6 +396,9 @@ public class PlayerDataFactory : MediatorSubscriberBase
         string raceSexIdString = raceSexId.ToString("0000", CultureInfo.InvariantCulture);
 
         string skeletonPath = $"chara/human/c{raceSexIdString}/skeleton/base/b0001/skl_c{raceSexIdString}b0001.sklb";
+
+        _logger.LogTrace("Checking skeleton {path}", skeletonPath);
+
         forwardResolve.Add(skeletonPath);
     }
 

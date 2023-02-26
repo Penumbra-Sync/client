@@ -17,7 +17,7 @@ public class ServerConfigurationManager
     private readonly DalamudUtil _dalamudUtil;
 
     public string CurrentApiUrl => string.IsNullOrEmpty(_configService.Current.CurrentServer) ? ApiController.MainServiceUri : _configService.Current.CurrentServer;
-    public ServerStorage? CurrentServer => _configService.Current.ServerStorage.ContainsKey(CurrentApiUrl) ? _configService.Current.ServerStorage[CurrentApiUrl] : null;
+    public ServerStorage? CurrentServer => _configService.Current.ServerStorage.TryGetValue(CurrentApiUrl, out ServerStorage? value) ? value : null;
     private ServerTagStorage CurrentServerTagStorage()
     {
         TryCreateCurrentServerTagStorage();

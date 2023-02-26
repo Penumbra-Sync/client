@@ -87,7 +87,7 @@ public class ConfigurationMigrator
     private string ConfigurationPath(string configName) => Path.Combine(_pi.ConfigDirectory.FullName, configName);
 
 
-    private void SaveConfig(IMareConfiguration config, string path)
+    private static void SaveConfig(IMareConfiguration config, string path)
     {
         File.WriteAllText(path, JsonConvert.SerializeObject(config, Formatting.Indented));
     }

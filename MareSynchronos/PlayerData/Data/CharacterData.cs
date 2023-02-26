@@ -53,7 +53,7 @@ public class CharacterData
         StringBuilder stringBuilder = new();
         foreach (var fileReplacement in FileReplacements.SelectMany(k => k.Value).OrderBy(a => a.GamePaths.First(), StringComparer.Ordinal))
         {
-            stringBuilder.AppendLine(fileReplacement.ToString());
+            stringBuilder.Append(fileReplacement).AppendLine();
         }
         return stringBuilder.ToString();
     }

@@ -3,7 +3,6 @@ using MareSynchronos.Interop;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
-using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.SignalR.Utils;
 using MessagePack;
 using MessagePack.Resolvers;

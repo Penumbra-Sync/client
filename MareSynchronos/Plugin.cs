@@ -14,7 +14,6 @@ using Dalamud.Data;
 using MareSynchronos.MareConfiguration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using MareSynchronos.WebAPI.FileTransfer;
 using MareSynchronos.WebAPI.SignalR;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
@@ -24,6 +23,7 @@ using MareSynchronos.PlayerData.Export;
 using MareSynchronos.PlayerData.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
+using MareSynchronos.WebAPI.Files;
 
 namespace MareSynchronos;
 

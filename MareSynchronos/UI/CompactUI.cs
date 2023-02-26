@@ -17,7 +17,7 @@ using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.UI.Components;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
-using MareSynchronos.WebAPI.FileTransfer;
+using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.SignalR.Utils;
 using Microsoft.Extensions.Logging;
 
@@ -576,7 +576,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
             if (_characterOrCommentFilter.IsNullOrEmpty()) return true;
             return p.UserData.AliasOrUID.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ||
                    (p.GetNote()?.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                   (p.PlayerName?.Contains(_characterOrCommentFilter) ?? false);
+                   (p.PlayerName?.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false);
         }).ToList();
     }
 
@@ -673,7 +673,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
 
         if (currentDownloads.Any())
         {
-            var totalDownloads = currentDownloads.Count();
+            var totalDownloads = currentDownloads.Count;
             var doneDownloads = currentDownloads.Count(c => c.IsTransferred);
             var totalDownloaded = currentDownloads.Sum(c => c.Transferred);
             var totalToDownload = currentDownloads.Sum(c => c.Total);
@@ -750,7 +750,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
     {
         ImGui.Dummy(new(10));
         var keys = _serverManager.CurrentServer!.SecretKeys;
-        if (keys.TryGetValue(secretKeyIdx, out var secretKey))
+        if (keys.TryGetValue(_secretKeyIdx, out var secretKey))
         {
             var friendlyName = secretKey.FriendlyName;
 
@@ -760,7 +760,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
                 {
                     CharacterName = _uiShared.PlayerName,
                     WorldId = _uiShared.WorldId,
-                    SecretKeyIdx = secretKeyIdx
+                    SecretKeyIdx = _secretKeyIdx
                 });
 
                 _serverManager.Save();
@@ -768,7 +768,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
                 _ = _apiController.CreateConnections(forceGetToken: true);
             }
 
-            _uiShared.DrawCombo("Secret Key##addCharacterSecretKey", keys, (f) => f.Value.FriendlyName, (f) => secretKeyIdx = f.Key);
+            _uiShared.DrawCombo("Secret Key##addCharacterSecretKey", keys, (f) => f.Value.FriendlyName, (f) => _secretKeyIdx = f.Key);
         }
         else
         {
@@ -776,7 +776,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
         }
     }
 
-    private int secretKeyIdx = 0;
+    private int _secretKeyIdx = 0;
 
     private string GetServerError()
     {

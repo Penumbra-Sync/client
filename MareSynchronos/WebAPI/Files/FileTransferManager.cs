@@ -13,15 +13,16 @@ using MareSynchronos.UI;
 using LZ4;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
+using System;
 
-namespace MareSynchronos.WebAPI.FileTransfer;
+namespace MareSynchronos.WebAPI.Files;
 
 public class FileTransferManager : MediatorSubscriberBase
 {
     private readonly MareConfigService _configService;
     private readonly FileCacheManager _fileDbManager;
     private readonly ServerConfigurationManager _serverManager;
-    private HttpClient _httpClient;
+    private readonly HttpClient _httpClient;
     private int _downloadId = 0;
     private readonly Dictionary<string, DateTime> _verifiedUploadedHashes = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<Guid, bool> _downloadReady = new();
@@ -323,14 +324,14 @@ public class FileTransferManager : MediatorSubscriberBase
     {
         if (_filesCdnUri is null) throw new InvalidOperationException("FileTransferManager is not initialized");
         var response = await SendRequestAsync(HttpMethod.Get, MareFiles.ServerFilesGetSizesFullPath(_filesCdnUri), hashes, ct).ConfigureAwait(false);
-        return await response.Content.ReadFromJsonAsync<List<DownloadFileDto>>().ConfigureAwait(false) ?? new List<DownloadFileDto>();
+        return await response.Content.ReadFromJsonAsync<List<DownloadFileDto>>(cancellationToken: ct).ConfigureAwait(false) ?? new List<DownloadFileDto>();
     }
 
     private async Task<List<UploadFileDto>> FilesSend(List<string> hashes, CancellationToken ct)
     {
         if (_filesCdnUri is null) throw new InvalidOperationException("FileTransferManager is not initialized");
         var response = await SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesFilesSendFullPath(_filesCdnUri), hashes, ct).ConfigureAwait(false);
-        return await response.Content.ReadFromJsonAsync<List<UploadFileDto>>().ConfigureAwait(false) ?? new List<UploadFileDto>();
+        return await response.Content.ReadFromJsonAsync<List<UploadFileDto>>(cancellationToken: ct).ConfigureAwait(false) ?? new List<UploadFileDto>();
     }
 
     private async Task DownloadFilesInternal(int currentDownloadId, List<FileReplacementData> fileReplacement, CancellationToken ct)
@@ -573,14 +574,14 @@ public class FileTransferManager : MediatorSubscriberBase
 
     private class ProgressableStreamContent : StreamContent
     {
-        private const int DefaultBufferSize = 4096;
+        private const int _defaultBufferSize = 4096;
         private readonly int _bufferSize;
         private readonly IProgress<UploadProgress> _progress;
         private readonly Stream _streamToWrite;
         private bool _contentConsumed;
 
         public ProgressableStreamContent(Stream streamToWrite, IProgress<UploadProgress> downloader)
-            : this(streamToWrite, DefaultBufferSize, downloader)
+            : this(streamToWrite, _defaultBufferSize, downloader)
         {
         }
 
@@ -589,12 +590,12 @@ public class FileTransferManager : MediatorSubscriberBase
         {
             if (streamToWrite == null)
             {
-                throw new ArgumentNullException("streamToWrite");
+                throw new ArgumentNullException(nameof(streamToWrite));
             }
 
             if (bufferSize <= 0)
             {
-                throw new ArgumentOutOfRangeException("bufferSize");
+                throw new ArgumentOutOfRangeException(nameof(bufferSize));
             }
 
             _streamToWrite = streamToWrite;
@@ -632,7 +633,7 @@ public class FileTransferManager : MediatorSubscriberBase
 
                     uploaded += length;
                     _progress.Report(new UploadProgress(uploaded, size));
-                    await stream.WriteAsync(buffer, 0, length).ConfigureAwait(false);
+                    await stream.WriteAsync(buffer.AsMemory(0, length)).ConfigureAwait(false);
                 }
             }
         }

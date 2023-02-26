@@ -4,7 +4,7 @@ using MareSynchronos.Interop;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using MareSynchronos.WebAPI.FileTransfer;
+using MareSynchronos.WebAPI.Files;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.PlayerData.Pairs;

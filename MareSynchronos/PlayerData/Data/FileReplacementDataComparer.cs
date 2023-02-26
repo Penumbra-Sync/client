@@ -5,12 +5,12 @@ namespace MareSynchronos.PlayerData.Data;
 public class FileReplacementDataComparer : IEqualityComparer<FileReplacementData>
 {
     public static FileReplacementDataComparer Instance => _instance;
-    private static FileReplacementDataComparer _instance = new();
+    private static readonly FileReplacementDataComparer _instance = new();
     private FileReplacementDataComparer() { }
     public bool Equals(FileReplacementData? x, FileReplacementData? y)
     {
         if (x == null || y == null) return false;
-        return x.Hash.Equals(y.Hash) && CompareLists(x.GamePaths.ToHashSet(StringComparer.Ordinal), y.GamePaths.ToHashSet(StringComparer.Ordinal)) && string.Equals(x.FileSwapPath, y.FileSwapPath, StringComparison.Ordinal);
+        return x.Hash.Equals(y.Hash) && CompareHashSets(x.GamePaths.ToHashSet(StringComparer.Ordinal), y.GamePaths.ToHashSet(StringComparer.Ordinal)) && string.Equals(x.FileSwapPath, y.FileSwapPath, StringComparison.Ordinal);
     }
 
     public int GetHashCode(FileReplacementData obj)
@@ -29,7 +29,7 @@ public class FileReplacementDataComparer : IEqualityComparer<FileReplacementData
         return hash;
     }
 
-    private bool CompareLists(HashSet<string> list1, HashSet<string> list2)
+    private static bool CompareHashSets(HashSet<string> list1, HashSet<string> list2)
     {
         if (list1.Count != list2.Count)
             return false;

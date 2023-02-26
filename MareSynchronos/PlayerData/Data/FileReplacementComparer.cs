@@ -3,7 +3,7 @@
 public class FileReplacementComparer : IEqualityComparer<FileReplacement>
 {
     public static FileReplacementComparer Instance => _instance;
-    private static FileReplacementComparer _instance = new();
+    private static readonly FileReplacementComparer _instance = new();
     private FileReplacementComparer() { }
     public bool Equals(FileReplacement? x, FileReplacement? y)
     {
@@ -27,7 +27,7 @@ public class FileReplacementComparer : IEqualityComparer<FileReplacement>
         return hash;
     }
 
-    private bool CompareLists(HashSet<string> list1, HashSet<string> list2)
+    private static bool CompareLists(HashSet<string> list1, HashSet<string> list2)
     {
         if (list1.Count != list2.Count)
             return false;

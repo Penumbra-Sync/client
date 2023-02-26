@@ -2,7 +2,7 @@
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.WebAPI.FileTransfer;
+using MareSynchronos.WebAPI.Files;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;

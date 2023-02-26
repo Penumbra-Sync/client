@@ -3,7 +3,7 @@ using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
 using MareSynchronos.PlayerData.Factories;
 using MareSynchronos.Services.Mediator;
-using MareSynchronos.WebAPI.FileTransfer;
+using MareSynchronos.WebAPI.Files;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.PlayerData.Pairs;
