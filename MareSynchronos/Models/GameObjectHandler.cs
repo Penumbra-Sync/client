@@ -165,11 +165,11 @@ public class GameObjectHandler : MediatorSubscriberBase
                 }
             }
 
-            var customizeDiff = CompareAndUpdateCustomizeData(chara->CustomizeData, out bool doNotSendUpdate);
+            var customizeDiff = CompareAndUpdateCustomizeData(chara->CustomizeData);
 
             if (addrDiff || equipDiff || customizeDiff || drawObjDiff || nameChange)
             {
-                if (_isOwnedObject && !doNotSendUpdate)
+                if (_isOwnedObject)
                 {
                     _logger.LogTrace("[{this}] Changed", this);
 
@@ -203,11 +203,10 @@ public class GameObjectHandler : MediatorSubscriberBase
         _clearCts = null;
     }
 
-    private unsafe bool CompareAndUpdateCustomizeData(byte* customizeData, out bool doNotSendUpdate)
+    private unsafe bool CompareAndUpdateCustomizeData(byte* customizeData)
     {
         bool hasChanges = false;
-        doNotSendUpdate = false;
-
+        
         for (int i = 0; i < CustomizeData.Length; i++)
         {
             var data = Marshal.ReadByte((IntPtr)customizeData, i);
@@ -216,30 +215,6 @@ public class GameObjectHandler : MediatorSubscriberBase
                 CustomizeData[i] = data;
                 hasChanges = true;
             }
-        }
-
-        var newHatState = Marshal.ReadByte((IntPtr)customizeData + 30, 0);
-        var newWeaponOrVisorState = Marshal.ReadByte((IntPtr)customizeData + 31, 0);
-        if (newHatState != HatState)
-        {
-            if (HatState != null && !hasChanges)
-            {
-                _logger.LogDebug("[{this}] Not Sending Update, only Hat changed", this);
-                doNotSendUpdate = true;
-            }
-            HatState = newHatState;
-        }
-
-        newWeaponOrVisorState &= 0b1101; // ignore drawing weapon
-
-        if (newWeaponOrVisorState != VisorWeaponState)
-        {
-            if (VisorWeaponState != null && !hasChanges)
-            {
-                _logger.LogDebug("[{this}] Not Sending Update, only Visor/Weapon changed", this);
-                doNotSendUpdate = true;
-            }
-            VisorWeaponState = newWeaponOrVisorState;
         }
 
         return hasChanges;
