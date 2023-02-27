@@ -131,7 +131,7 @@ public class CharacterDataFactory : MediatorSubscriberBase
         }
 
         // wait until chara is not drawing and present so nothing spontaneously explodes
-        _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, playerRelatedObject, Guid.NewGuid(), 30000, ct: token);
+        await _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, playerRelatedObject, Guid.NewGuid(), 30000, ct: token).ConfigureAwait(false);
         int totalWaitTime = 10000;
         while (!DalamudUtil.IsObjectPresent(_dalamudUtil.CreateGameObject(charaPointer)) && totalWaitTime > 0)
         {

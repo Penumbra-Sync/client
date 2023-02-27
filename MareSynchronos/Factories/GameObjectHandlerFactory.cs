@@ -11,16 +11,18 @@ public class GameObjectHandlerFactory
     private readonly ILoggerFactory _loggerFactory;
     private readonly MareMediator _mediator;
     private readonly PerformanceCollector _performanceCollector;
+    private readonly DalamudUtil _dalamudUtil;
 
-    public GameObjectHandlerFactory(ILoggerFactory loggerFactory, MareMediator mediator, PerformanceCollector performanceCollector)
+    public GameObjectHandlerFactory(ILoggerFactory loggerFactory, MareMediator mediator, PerformanceCollector performanceCollector, DalamudUtil dalamudUtil)
     {
         _loggerFactory = loggerFactory;
         _mediator = mediator;
         _performanceCollector = performanceCollector;
+        _dalamudUtil = dalamudUtil;
     }
 
     public GameObjectHandler Create(ObjectKind objectKind, Func<IntPtr> getAddress, bool isWatched)
     {
-        return new GameObjectHandler(_loggerFactory.CreateLogger<GameObjectHandler>(), _performanceCollector, _mediator, objectKind, getAddress, isWatched);
+        return new GameObjectHandler(_loggerFactory.CreateLogger<GameObjectHandler>(), _performanceCollector, _mediator, _dalamudUtil, objectKind, getAddress, isWatched);
     }
 }

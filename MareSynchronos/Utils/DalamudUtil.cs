@@ -262,7 +262,7 @@ public class DalamudUtil : IDisposable
         return await _framework.RunOnFrameworkThread(func).ConfigureAwait(false);
     }
 
-    public unsafe void WaitWhileCharacterIsDrawing(ILogger logger, GameObjectHandler handler, Guid redrawId, int timeOut = 5000, CancellationToken? ct = null)
+    public async Task WaitWhileCharacterIsDrawing(ILogger logger, GameObjectHandler handler, Guid redrawId, int timeOut = 5000, CancellationToken? ct = null)
     {
         if (!_clientState.IsLoggedIn || handler.Address == IntPtr.Zero) return;
 
@@ -275,7 +275,7 @@ public class DalamudUtil : IDisposable
             // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
             while ((!ct?.IsCancellationRequested ?? true)
                    && curWaitTime < timeOut
-                   && handler.IsBeingDrawn) // 0b100000000000 is "still rendering" or something
+                   && await handler.IsBeingDrawn().ConfigureAwait(false)) // 0b100000000000 is "still rendering" or something
             {
                 logger.LogTrace($"[{redrawId}] Waiting for {handler} to finish drawing");
                 curWaitTime += tick;

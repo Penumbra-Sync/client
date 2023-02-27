@@ -15,6 +15,7 @@ public class GameObjectHandler : MediatorSubscriberBase
     private readonly Func<IntPtr> _getAddress;
     private readonly bool _isOwnedObject;
     private readonly MareMediator _mediator;
+    private readonly DalamudUtil _dalamudUtil;
     private readonly PerformanceCollector _performanceCollector;
     private CancellationTokenSource? _clearCts = new();
     private Task? _clearTask;
@@ -22,11 +23,13 @@ public class GameObjectHandler : MediatorSubscriberBase
     private bool _haltProcessing = false;
     private bool _ignoreSendAfterRedraw = false;
     private CancellationTokenSource _zoningCts = new();
-    public GameObjectHandler(ILogger<GameObjectHandler> logger, PerformanceCollector performanceCollector, MareMediator mediator, ObjectKind objectKind, Func<IntPtr> getAddress, bool watchedObject = true) : base(logger, mediator)
+    public GameObjectHandler(ILogger<GameObjectHandler> logger, PerformanceCollector performanceCollector,
+        MareMediator mediator, DalamudUtil dalamudUtil, ObjectKind objectKind, Func<IntPtr> getAddress, bool watchedObject = true) : base(logger, mediator)
     {
         _performanceCollector = performanceCollector;
         _mediator = mediator;
         ObjectKind = objectKind;
+        _dalamudUtil = dalamudUtil;
         _getAddress = getAddress;
         _isOwnedObject = watchedObject;
         Name = string.Empty;
@@ -86,7 +89,6 @@ public class GameObjectHandler : MediatorSubscriberBase
     public unsafe Character* Character => (Character*)Address;
 
     public IntPtr CurrentAddress => _getAddress.Invoke();
-    public bool IsBeingDrawn { get; private set; }
     public string Name { get; private set; }
     public ObjectKind ObjectKind { get; }
     private byte[] CustomizeData { get; set; } = new byte[26];
@@ -110,6 +112,41 @@ public class GameObjectHandler : MediatorSubscriberBase
         return $"{owned}/{ObjectKind}:{Name} ({Address:X},{DrawObjectAddress:X})";
     }
 
+    private unsafe IntPtr GetDrawObj()
+    {
+        return (IntPtr)((GameObject*)_getAddress.Invoke())->GetDrawObject();
+    }
+
+    private unsafe bool IsBeingDrawn(IntPtr drawObj, IntPtr curPtr)
+    {
+        return drawObj == IntPtr.Zero || (((CharacterBase*)drawObj)->HasModelInSlotLoaded != 0)
+                       || (((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0)
+                       || (((GameObject*)curPtr)->RenderFlags & 0b100000000000) == 0b100000000000;
+    }
+
+    public async Task<bool> IsBeingDrawn()
+    {
+        var curPtr = _getAddress.Invoke();
+        try
+        {
+            return await _dalamudUtil.RunOnFrameworkThread(() =>
+            {
+                var drawObj = GetDrawObj();
+                return IsBeingDrawn(drawObj, curPtr);
+            }).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during checking for draw object for {name}", curPtr);
+            if (curPtr != IntPtr.Zero)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private unsafe void CheckAndUpdateObject()
     {
         if (_haltProcessing) return;
@@ -123,21 +160,12 @@ public class GameObjectHandler : MediatorSubscriberBase
                 var drawObjAddr = (IntPtr)((GameObject*)curPtr)->GetDrawObject();
                 drawObjDiff = drawObjAddr != DrawObjectAddress;
                 DrawObjectAddress = drawObjAddr;
-
-                IsBeingDrawn = DrawObjectAddress == IntPtr.Zero || (((CharacterBase*)DrawObjectAddress)->HasModelInSlotLoaded != 0)
-                               || (((CharacterBase*)DrawObjectAddress)->HasModelFilesInSlotLoaded != 0)
-                               || (((GameObject*)curPtr)->RenderFlags & 0b100000000000) == 0b100000000000;
             }
         }
         catch (Exception ex)
         {
             var name = new ByteString(((Character*)curPtr)->GameObject.Name).ToString();
-
             _logger.LogError(ex, "Error during checking for draw object for {name}", this);
-            if (curPtr != IntPtr.Zero)
-            {
-                IsBeingDrawn = true;
-            }
         }
 
         if (curPtr != IntPtr.Zero && DrawObjectAddress != IntPtr.Zero)
@@ -206,7 +234,7 @@ public class GameObjectHandler : MediatorSubscriberBase
     private unsafe bool CompareAndUpdateCustomizeData(byte* customizeData)
     {
         bool hasChanges = false;
-        
+
         for (int i = 0; i < CustomizeData.Length; i++)
         {
             var data = Marshal.ReadByte((IntPtr)customizeData, i);

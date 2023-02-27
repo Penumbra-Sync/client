@@ -310,7 +310,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         }
 
         _logger.LogDebug("[{applicationId}] Applying Customization Data for {handler}", applicationId, handler);
-        _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, handler, applicationId, 30000);
+        await _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, handler, applicationId, 30000).ConfigureAwait(false);
         foreach (var change in changes.Value)
         {
             _logger.LogDebug("[{applicationId}] Processing {change} for {handler}", applicationId, change, handler);
@@ -445,7 +445,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         Task.Run(async () =>
         {
             var applicationId = Guid.NewGuid();
-            _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, _currentOtherChara!, applicationId, ct: token);
+            await _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, _currentOtherChara!, applicationId, ct: token).ConfigureAwait(false);
             _logger.LogDebug("Unauthorized character change detected");
             await ApplyCustomizationData(applicationId, new(ObjectKind.Player,
                 new HashSet<PlayerChanges>(new[] { PlayerChanges.Palette, PlayerChanges.Customize, PlayerChanges.Heels, PlayerChanges.Mods })),

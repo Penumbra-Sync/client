@@ -414,7 +414,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
             await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
 
             if (!combinedToken.IsCancellationRequested)
-                _dalamudUtil.WaitWhileCharacterIsDrawing(logger, obj, applicationId, 30000, combinedToken);
+                await _dalamudUtil.WaitWhileCharacterIsDrawing(logger, obj, applicationId, 30000, combinedToken).ConfigureAwait(false);
 
             _penumbraRedrawRequests[obj.Address] = false;
         }
