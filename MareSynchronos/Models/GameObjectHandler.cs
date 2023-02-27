@@ -126,25 +126,25 @@ public class GameObjectHandler : MediatorSubscriberBase
 
     public async Task<bool> IsBeingDrawn()
     {
-        var curPtr = _getAddress.Invoke();
-        try
+        return await _dalamudUtil.RunOnFrameworkThread(() =>
         {
-            return await _dalamudUtil.RunOnFrameworkThread(() =>
+            var curPtr = _getAddress.Invoke();
+
+            try
             {
                 var drawObj = GetDrawObj();
                 return IsBeingDrawn(drawObj, curPtr);
-            }).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error during checking for draw object for {name}", curPtr);
-            if (curPtr != IntPtr.Zero)
-            {
-                return true;
             }
-        }
+            catch (Exception ex)
+            {
+                if (curPtr != IntPtr.Zero)
+                {
+                    return true;
+                }
 
-        return false;
+                return false;
+            }
+        }).ConfigureAwait(false);
     }
 
     private unsafe void CheckAndUpdateObject()
