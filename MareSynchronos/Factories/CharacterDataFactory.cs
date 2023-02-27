@@ -145,18 +145,14 @@ public class CharacterDataFactory : MediatorSubscriberBase
         // gather up data from ipc
         previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
         previousData.HeelsOffset = _ipcManager.GetHeelsOffset();
-        Task<string> getGlamourerData = new(() => _ipcManager.GlamourerGetCharacterCustomization(playerRelatedObject.Address));
-        _processingQueue.Enqueue(getGlamourerData);
-        Task<string> getCustomizeData = new(() => _ipcManager.GetCustomizePlusScale());
-        _processingQueue.Enqueue(getCustomizeData);
-        Task<string> getPalettePlusData = new(() => _ipcManager.PalettePlusBuildPalette());
-        _processingQueue.Enqueue(getPalettePlusData);
-        Task.WaitAll(new[] { getGlamourerData, getCustomizeData, getPalettePlusData }, token);
-        previousData.GlamourerString[playerRelatedObject.ObjectKind] = await getGlamourerData.ConfigureAwait(true);
-        previousData.CustomizePlusScale = await getCustomizeData.ConfigureAwait(true);
-        previousData.PalettePlusPalette = await getPalettePlusData.ConfigureAwait(true);
+        Task<string> getGlamourerData = Task.Run(() => _ipcManager.GlamourerGetCharacterCustomization(playerRelatedObject.Address));
+        Task<string> getCustomizeData = Task.Run(() => _ipcManager.GetCustomizePlusScale());
+        Task<string> getPalettePlusData = Task.Run(() => _ipcManager.PalettePlusBuildPalette());
+        previousData.GlamourerString[playerRelatedObject.ObjectKind] = await getGlamourerData.ConfigureAwait(false);
         _logger.LogDebug("Glamourer is now: {data}", previousData.GlamourerString[playerRelatedObject.ObjectKind]);
+        previousData.CustomizePlusScale = await getCustomizeData.ConfigureAwait(false);
         _logger.LogDebug("Customize is now: {data}", previousData.CustomizePlusScale);
+        previousData.PalettePlusPalette = await getPalettePlusData.ConfigureAwait(false);
         _logger.LogDebug("Palette is now: {data}", previousData.PalettePlusPalette);
 
         // gather static replacements from render model

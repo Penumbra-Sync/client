@@ -124,7 +124,7 @@ public class GameObjectHandler : MediatorSubscriberBase
                        || (((GameObject*)curPtr)->RenderFlags & 0b100000000000) == 0b100000000000;
     }
 
-    public async Task<bool> IsBeingDrawn()
+    public async Task<bool> IsBeingDrawnRunOnFramework()
     {
         return await _dalamudUtil.RunOnFrameworkThread(() =>
         {

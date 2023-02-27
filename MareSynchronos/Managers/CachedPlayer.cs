@@ -390,7 +390,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 }
             }
 
-            while (!_applicationTask?.IsCompleted ?? false)
+            while (!_applicationTask?.IsCompleted ?? false && !downloadToken.IsCancellationRequested)
             {
                 // block until current application is done
                 _logger.LogDebug("Waiting for current data application (Id: {id}) to finish", _applicationId);
@@ -416,15 +416,12 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 _logger.LogDebug("[{applicationId}] Application finished", _applicationId);
             });
 
-        }, downloadToken).ContinueWith(task =>
-            {
-                _downloadCancellationTokenSource = null;
+            _downloadCancellationTokenSource = null;
 
-                if (!task.IsCanceled) return;
+            _logger.LogDebug("Download was cancelled");
+            _apiController.CancelDownload(downloadId);
 
-                _logger.LogDebug("Download was cancelled");
-                _apiController.CancelDownload(downloadId);
-            });
+        }, downloadToken);
     }
 
     private Task? _applicationTask;
