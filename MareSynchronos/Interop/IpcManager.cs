@@ -336,10 +336,10 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         return _heelsGetOffset.InvokeFunc();
     }
 
-    public void HeelsSetOffsetForPlayer(IntPtr character, float offset)
+    public async Task HeelsSetOffsetForPlayer(IntPtr character, float offset)
     {
         if (!CheckHeelsApi()) return;
-        ActionQueue.Enqueue(() =>
+        await _dalamudUtil.RunOnFrameworkThread(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj != null)
@@ -347,13 +347,13 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
                 _logger.LogTrace("Applying Heels data to {chara}", character.ToString("X"));
                 _heelsRegisterPlayer.InvokeAction(gameObj, offset);
             }
-        });
+        }).ConfigureAwait(false);
     }
 
-    public void HeelsRestoreOffsetForPlayer(IntPtr character)
+    public async Task HeelsRestoreOffsetForPlayer(IntPtr character)
     {
         if (!CheckHeelsApi()) return;
-        ActionQueue.Enqueue(() =>
+        await _dalamudUtil.RunOnFrameworkThread(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj != null)
@@ -361,7 +361,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
                 _logger.LogTrace("Restoring Heels data to {chara}", character.ToString("X"));
                 _heelsUnregisterPlayer.InvokeAction(gameObj);
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     public string GetCustomizePlusScale()
@@ -372,10 +372,10 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(scale));
     }
 
-    public void CustomizePlusSetBodyScale(IntPtr character, string scale)
+    public async Task CustomizePlusSetBodyScale(IntPtr character, string scale)
     {
         if (!CheckCustomizePlusApi() || string.IsNullOrEmpty(scale)) return;
-        ActionQueue.Enqueue(() =>
+        await _dalamudUtil.RunOnFrameworkThread(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj is Character c)
@@ -384,13 +384,13 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
                 _logger.LogTrace("CustomizePlus applying for {chara}", c.Address.ToString("X"));
                 _customizePlusSetBodyScaleToCharacter!.InvokeAction(decodedScale, c);
             }
-        });
+        }).ConfigureAwait(false);
     }
 
-    public void CustomizePlusRevert(IntPtr character)
+    public async Task CustomizePlusRevert(IntPtr character)
     {
         if (!CheckCustomizePlusApi()) return;
-        ActionQueue.Enqueue(() =>
+        await _dalamudUtil.RunOnFrameworkThread(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj is Character c)
@@ -398,7 +398,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
                 _logger.LogTrace("CustomizePlus reverting for {chara}", c.Address.ToString("X"));
                 _customizePlusRevert!.InvokeAction(c);
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     private async Task PenumbraRedrawAction(ILogger logger, GameObjectHandler obj, Guid applicationId, Action action, bool fireAndForget, CancellationToken token)
@@ -417,7 +417,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
             await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
 
             if (!combinedToken.IsCancellationRequested)
-                _dalamudUtil.WaitWhileCharacterIsDrawing(logger, obj, applicationId, 30000, combinedToken);
+                await _dalamudUtil.WaitWhileCharacterIsDrawing(logger, obj, applicationId, 30000, combinedToken).ConfigureAwait(false);
 
             _penumbraRedrawRequests[obj.Address] = false;
         }
@@ -608,10 +608,10 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         Mediator.Publish(new PalettePlusMessage(palette));
     }
 
-    public void PalettePlusSetPalette(IntPtr character, string palette)
+    public async Task PalettePlusSetPalette(IntPtr character, string palette)
     {
         if (!CheckPalettePlusApi()) return;
-        ActionQueue.Enqueue(() =>
+        await _dalamudUtil.RunOnFrameworkThread(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj is Character c)
@@ -629,7 +629,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
                     _palettePlusSetCharaPalette!.InvokeAction(c, decodedPalette);
                 }
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     public string PalettePlusBuildPalette()
@@ -640,10 +640,10 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(palette));
     }
 
-    public void PalettePlusRemovePalette(IntPtr character)
+    public async Task PalettePlusRemovePalette(IntPtr character)
     {
         if (!CheckPalettePlusApi()) return;
-        ActionQueue.Enqueue(() =>
+        await _dalamudUtil.RunOnFrameworkThread(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj is Character c)
@@ -651,7 +651,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
                 _logger.LogTrace("PalettePlus removing for {addr}", c.Address.ToString("X"));
                 _palettePlusRemoveCharaPalette!.InvokeAction(c);
             }
-        });
+        }).ConfigureAwait(false);
     }
 
     private void PenumbraDispose()

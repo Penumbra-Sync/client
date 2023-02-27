@@ -254,15 +254,17 @@ public class DalamudUtil : IDisposable
 
     public async Task RunOnFrameworkThread(Action act)
     {
+        _logger.LogTrace("Running Action on framework thread: {act}", act);
         await _framework.RunOnFrameworkThread(act).ConfigureAwait(false);
     }
 
     public async Task<T> RunOnFrameworkThread<T>(Func<T> func)
     {
+        _logger.LogTrace("Running Func on framework thread: {func}", func);
         return await _framework.RunOnFrameworkThread(func).ConfigureAwait(false);
     }
 
-    public unsafe void WaitWhileCharacterIsDrawing(ILogger logger, GameObjectHandler handler, Guid redrawId, int timeOut = 5000, CancellationToken? ct = null)
+    public async Task WaitWhileCharacterIsDrawing(ILogger logger, GameObjectHandler handler, Guid redrawId, int timeOut = 5000, CancellationToken? ct = null)
     {
         if (!_clientState.IsLoggedIn || handler.Address == IntPtr.Zero) return;
 
@@ -275,11 +277,11 @@ public class DalamudUtil : IDisposable
             // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
             while ((!ct?.IsCancellationRequested ?? true)
                    && curWaitTime < timeOut
-                   && handler.IsBeingDrawn) // 0b100000000000 is "still rendering" or something
+                   && await handler.IsBeingDrawnRunOnFramework().ConfigureAwait(true)) // 0b100000000000 is "still rendering" or something
             {
                 logger.LogTrace($"[{redrawId}] Waiting for {handler} to finish drawing");
                 curWaitTime += tick;
-                Thread.Sleep(tick);
+                await Task.Delay(tick).ConfigureAwait(true);
             }
 
             logger.LogTrace($"[{redrawId}] Finished drawing after {curWaitTime}ms");

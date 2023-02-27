@@ -314,20 +314,20 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         }
 
         _logger.LogDebug("[{applicationId}] Applying Customization Data for {handler}", applicationId, handler);
-        _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, handler, applicationId, 30000);
+        await _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, handler, applicationId, 30000).ConfigureAwait(false);
         foreach (var change in changes.Value)
         {
             _logger.LogDebug("[{applicationId}] Processing {change} for {handler}", applicationId, change, handler);
             switch (change)
             {
                 case PlayerChanges.Palette:
-                    _ipcManager.PalettePlusSetPalette(handler.Address, charaData.PalettePlusData);
+                    await _ipcManager.PalettePlusSetPalette(handler.Address, charaData.PalettePlusData).ConfigureAwait(false);
                     break;
                 case PlayerChanges.Customize:
-                    _ipcManager.CustomizePlusSetBodyScale(handler.Address, charaData.CustomizePlusData);
+                    await _ipcManager.CustomizePlusSetBodyScale(handler.Address, charaData.CustomizePlusData).ConfigureAwait(false);
                     break;
                 case PlayerChanges.Heels:
-                    _ipcManager.HeelsSetOffsetForPlayer(handler.Address, charaData.HeelsOffset);
+                    await _ipcManager.HeelsSetOffsetForPlayer(handler.Address, charaData.HeelsOffset).ConfigureAwait(false);
                     break;
                 case PlayerChanges.Mods:
                     if (charaData.GlamourerData.TryGetValue(changes.Key, out var glamourerData))
@@ -393,7 +393,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 }
             }
 
-            while (!_applicationTask?.IsCompleted ?? false)
+            while (!_applicationTask?.IsCompleted ?? false && !downloadToken.IsCancellationRequested)
             {
                 // block until current application is done
                 _logger.LogDebug("Waiting for current data application (Id: {id}) to finish", _applicationId);
@@ -419,15 +419,12 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 _logger.LogDebug("[{applicationId}] Application finished", _applicationId);
             });
 
-        }, downloadToken).ContinueWith(task =>
-            {
-                _downloadCancellationTokenSource = null;
+            _downloadCancellationTokenSource = null;
 
-                if (!task.IsCanceled) return;
+            _logger.LogDebug("Download was cancelled");
+            _transferManager.CancelDownload(downloadId);
 
-                _logger.LogDebug("Download was cancelled");
-                _transferManager.CancelDownload(PlayerName!);
-            });
+        }, downloadToken);
     }
 
     private Task? _applicationTask;
@@ -448,7 +445,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         Task.Run(async () =>
         {
             var applicationId = Guid.NewGuid();
-            _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, _currentOtherChara!, applicationId, ct: token);
+            await _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, _currentOtherChara!, applicationId, ct: token).ConfigureAwait(false);
             _logger.LogDebug("Unauthorized character change detected");
             await ApplyCustomizationData(applicationId, new(ObjectKind.Player,
                 new HashSet<PlayerChanges>(new[] { PlayerChanges.Palette, PlayerChanges.Customize, PlayerChanges.Heels, PlayerChanges.Mods })),
@@ -473,11 +470,11 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             _logger.LogDebug("[{applicationId}] Restoring Equipment for {alias}/{name}: {data}", applicationId, OnlineUser.User.AliasOrUID, name, _lastGlamourerData);
             await _ipcManager.GlamourerApplyOnlyEquipment(_logger, tempHandler, _lastGlamourerData, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
             _logger.LogDebug("[{applicationId}] Restoring Heels for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
-            _ipcManager.HeelsRestoreOffsetForPlayer(address);
+            await _ipcManager.HeelsRestoreOffsetForPlayer(address).ConfigureAwait(false);
             _logger.LogDebug("[{applicationId}] Restoring C+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
-            _ipcManager.CustomizePlusRevert(address);
+            await _ipcManager.CustomizePlusRevert(address).ConfigureAwait(false);
             _logger.LogDebug("[{applicationId}] Restoring Palette+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
-            _ipcManager.PalettePlusRemovePalette(address);
+            await _ipcManager.PalettePlusRemovePalette(address).ConfigureAwait(false);
         }
         else if (objectKind == ObjectKind.MinionOrMount)
         {
