@@ -252,6 +252,11 @@ public class DalamudUtil : IDisposable
         return null;
     }
 
+    public async Task RunOnFrameworkThread(Action act)
+    {
+        await _framework.RunOnFrameworkThread(act).ConfigureAwait(false);
+    }
+
     public async Task<T> RunOnFrameworkThread<T>(Func<T> func)
     {
         return await _framework.RunOnFrameworkThread(func).ConfigureAwait(false);

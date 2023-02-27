@@ -317,13 +317,13 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             switch (change)
             {
                 case PlayerChanges.Palette:
-                    _ipcManager.PalettePlusSetPalette(handler.Address, charaData.PalettePlusData);
+                    await _ipcManager.PalettePlusSetPalette(handler.Address, charaData.PalettePlusData).ConfigureAwait(false);
                     break;
                 case PlayerChanges.Customize:
-                    _ipcManager.CustomizePlusSetBodyScale(handler.Address, charaData.CustomizePlusData);
+                    await _ipcManager.CustomizePlusSetBodyScale(handler.Address, charaData.CustomizePlusData).ConfigureAwait(false);
                     break;
                 case PlayerChanges.Heels:
-                    _ipcManager.HeelsSetOffsetForPlayer(handler.Address, charaData.HeelsOffset);
+                    await _ipcManager.HeelsSetOffsetForPlayer(handler.Address, charaData.HeelsOffset).ConfigureAwait(false);
                     break;
                 case PlayerChanges.Mods:
                     if (charaData.GlamourerData.TryGetValue(changes.Key, out var glamourerData))
@@ -470,10 +470,11 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             _logger.LogDebug("[{applicationId}] Restoring Equipment for {alias}/{name}: {data}", applicationId, OnlineUser.User.AliasOrUID, name, _lastGlamourerData);
             await _ipcManager.GlamourerApplyOnlyEquipment(_logger, tempHandler, _lastGlamourerData, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
             _logger.LogDebug("[{applicationId}] Restoring Heels for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
-            _ipcManager.HeelsRestoreOffsetForPlayer(address);
+            await _ipcManager.HeelsRestoreOffsetForPlayer(address).ConfigureAwait(false);
             _logger.LogDebug("[{applicationId}] Restoring C+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
-            _ipcManager.CustomizePlusRevert(address);
-            _ipcManager.PalettePlusRemovePalette(address);
+            await _ipcManager.CustomizePlusRevert(address).ConfigureAwait(false);
+            _logger.LogDebug("[{applicationId}] Restoring Palette+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
+            await _ipcManager.PalettePlusRemovePalette(address).ConfigureAwait(false);
         }
         else if (objectKind == ObjectKind.MinionOrMount)
         {
