@@ -1,5 +1,4 @@
-﻿using MareSynchronos.Interop;
-using MareSynchronos.MareConfiguration;
+﻿using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;

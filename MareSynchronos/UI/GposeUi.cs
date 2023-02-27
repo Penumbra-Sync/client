@@ -3,9 +3,9 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
-using MareSynchronos.Interop;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Export;
+using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
 

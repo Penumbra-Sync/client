@@ -10,7 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MareSynchronos.Services;
 using MareSynchronos.PlayerData.Services;
-using MareSynchronos.Interop;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.ServerConfiguration;

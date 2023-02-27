@@ -6,13 +6,12 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using MareSynchronos.PlayerData.Handlers;
-using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
-namespace MareSynchronos.Interop;
+namespace MareSynchronos.Services;
 
 public class DalamudUtil : IDisposable
 {
@@ -251,6 +250,11 @@ public class DalamudUtil : IDisposable
         }
 
         return null;
+    }
+
+    public async Task RunOnFrameworkThread(Action act)
+    {
+        await _framework.RunOnFrameworkThread(act).ConfigureAwait(false);
     }
 
     public async Task<T> RunOnFrameworkThread<T>(Func<T> func)

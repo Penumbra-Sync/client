@@ -7,6 +7,7 @@ using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
 using MareSynchronos.PlayerData.Factories;
 using MareSynchronos.PlayerData.Handlers;
+using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Files;
@@ -358,7 +359,6 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         _downloadCancellationTokenSource = new CancellationTokenSource();
         var downloadToken = _downloadCancellationTokenSource.Token;
 
-        var downloadId = _transferManager.GetDownloadId();
         Task.Run(async () =>
         {
             List<FileReplacementData> toDownloadReplacements;
@@ -370,12 +370,12 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 int attempts = 0;
                 while ((toDownloadReplacements = TryCalculateModdedDictionary(charaData, out moddedPaths)).Count > 0 && attempts++ <= 10)
                 {
-                    downloadId = _transferManager.GetDownloadId();
+                    _transferManager.CancelDownload(PlayerName!);
                     _logger.LogDebug("Downloading missing files for player {name}, {kind}", PlayerName, updatedData);
                     if (toDownloadReplacements.Any())
                     {
-                        await _transferManager.DownloadFiles(downloadId, toDownloadReplacements, downloadToken).ConfigureAwait(false);
-                        _transferManager.CancelDownload(downloadId);
+                        await _transferManager.DownloadFiles(PlayerName!, toDownloadReplacements, downloadToken).ConfigureAwait(false);
+                        _transferManager.CancelDownload(PlayerName!);
                     }
 
                     if (downloadToken.IsCancellationRequested)
@@ -426,7 +426,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 if (!task.IsCanceled) return;
 
                 _logger.LogDebug("Download was cancelled");
-                _transferManager.CancelDownload(downloadId);
+                _transferManager.CancelDownload(PlayerName!);
             });
     }
 
@@ -476,6 +476,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             _ipcManager.HeelsRestoreOffsetForPlayer(address);
             _logger.LogDebug("[{applicationId}] Restoring C+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             _ipcManager.CustomizePlusRevert(address);
+            _logger.LogDebug("[{applicationId}] Restoring Palette+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             _ipcManager.PalettePlusRemovePalette(address);
         }
         else if (objectKind == ObjectKind.MinionOrMount)

@@ -24,6 +24,7 @@ using MareSynchronos.PlayerData.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.WebAPI.Files;
+using System.Reflection;
 
 namespace MareSynchronos;
 
@@ -97,7 +98,8 @@ public sealed class Plugin : IDalamudPlugin
         var serviceProvider = collection.BuildServiceProvider(new ServiceProviderOptions() { ValidateOnBuild = true, ValidateScopes = true });
 
         _pluginLogger = serviceProvider.GetRequiredService<ILogger<Plugin>>();
-        _pluginLogger.LogDebug("Launching " + Name);
+        var version = Assembly.GetExecutingAssembly().GetName().Version!;
+        _pluginLogger.LogDebug("Launching {name} {major}.{minor}.{build}", Name, version.Major, version.Minor, version.Build);
 
         serviceProvider.GetRequiredService<Dalamud.Localization>().SetupWithLangCode("en");
         serviceProvider.GetRequiredService<DalamudPluginInterface>().UiBuilder.DisableGposeUiHide = true;
