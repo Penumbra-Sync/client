@@ -752,6 +752,8 @@ namespace MareSynchronos.UI
 
             var soundsDisabled = entry.GroupUserPermissions.IsDisableSounds();
             var animDisabled = entry.GroupUserPermissions.IsDisableAnimations();
+            var individualSoundsDisabled = (pair.UserPair?.OwnPermissions.IsDisableSounds() ?? false) || (pair.UserPair?.OwnPermissions.IsDisableSounds() ?? false);
+            var individualAnimDisabled = (pair.UserPair?.OwnPermissions.IsDisableAnimations() ?? false) || (pair.UserPair?.OwnPermissions.IsDisableAnimations() ?? false);
 
             var textPos = originalY + barButtonSize.Y / 2 - textSize.Y / 2;
             ImGui.SetCursorPosY(textPos);
@@ -908,7 +910,46 @@ namespace MareSynchronos.UI
                 }
             }
 
-            if ((animDisabled || soundsDisabled) && pair.UserPair == null)
+            // todo: check if this works
+            if (individualAnimDisabled || individualSoundsDisabled)
+            {
+                var infoIconPosDist = (plusButtonShown ? plusButtonSize.X + ImGui.GetStyle().ItemSpacing.X : 0)
+                    + ((userIsOwner || (userIsModerator && !entryIsMod && !entryIsOwner)) ? barButtonSize.X + ImGui.GetStyle().ItemSpacing.X : 0);
+                var icon = FontAwesomeIcon.ExclamationTriangle;
+                var iconwidth = UiShared.GetIconSize(icon);
+
+                ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - infoIconPosDist - iconwidth.X);
+                ImGui.SetCursorPosY(originalY);
+
+                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
+                UiShared.FontText(icon.ToIconString(), UiBuilder.IconFont);
+                ImGui.PopStyleColor();
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.BeginTooltip();
+
+                    ImGui.Text("Individual User permissions");
+
+                    if (soundsDisabled)
+                    {
+                        var userSoundsText = "Sound sync disabled with " + pair.UserData.AliasOrUID;
+                        UiShared.FontText(FontAwesomeIcon.VolumeOff.ToIconString(), UiBuilder.IconFont);
+                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                        ImGui.Text(userSoundsText);
+                    }
+
+                    if (animDisabled)
+                    {
+                        var userAnimText = "Animation sync disabled with " + pair.UserData.AliasOrUID;
+                        UiShared.FontText(FontAwesomeIcon.Stop.ToIconString(), UiBuilder.IconFont);
+                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                        ImGui.Text(userAnimText);
+                    }
+
+                    ImGui.EndTooltip();
+                }
+            }
+            else if ((animDisabled || soundsDisabled))
             {
                 var infoIconPosDist = (plusButtonShown ? plusButtonSize.X + ImGui.GetStyle().ItemSpacing.X : 0)
                     + ((userIsOwner || (userIsModerator && !entryIsMod && !entryIsOwner)) ? barButtonSize.X + ImGui.GetStyle().ItemSpacing.X : 0);
@@ -923,8 +964,7 @@ namespace MareSynchronos.UI
                 {
                     ImGui.BeginTooltip();
 
-
-                    ImGui.Text("User permissions");
+                    ImGui.Text("Sycnshell User permissions");
 
                     if (soundsDisabled)
                     {

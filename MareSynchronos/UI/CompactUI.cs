@@ -361,6 +361,9 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
         var windowEndX = ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth();
 
+        var soundsDisabled = entry.UserPair.OwnPermissions.IsDisableSounds() || entry.UserPair.OtherPermissions.IsDisableSounds();
+        var animDisabled = entry.UserPair.OwnPermissions.IsDisableAnimations() || entry.UserPair.OtherPermissions.IsDisableAnimations();
+
         var textPos = originalY + pauseIconSize.Y / 2 - textSize.Y / 2;
         ImGui.SetCursorPosY(textPos);
         FontAwesomeIcon connectionIcon;
@@ -474,6 +477,8 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
             UiShared.AttachToolTip("Hit ENTER to save\nRight click to cancel");
         }
 
+        // todo: add warning icon stuff for when pair individually disabled anims/sounds
+
         // Pause Button
         if (entry.UserPair!.OwnPermissions.IsPaired() && entry.UserPair!.OtherPermissions.IsPaired())
         {
@@ -523,6 +528,26 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
             _selectGroupForPairUi.Open(entry);
         }
         UiShared.AttachToolTip("Choose pair groups for " + entryUID);
+
+        var isDisableSounds = entry.UserPair!.OwnPermissions.IsDisableSounds();
+        string disableSoundsText = isDisableSounds ? "Enable sound sync" : "Disable sound sync";
+        var disableSoundsIcon = isDisableSounds ? FontAwesomeIcon.VolumeUp : FontAwesomeIcon.VolumeMute;
+        if (UiShared.IconTextButton(disableSoundsIcon, disableSoundsText))
+        {
+            var permissions = entry.UserPair.OwnPermissions;
+            permissions.SetDisableSounds(!isDisableSounds);
+            _ = _apiController.UserSetPairPermissions(new UserPermissionsDto(entry.UserData, permissions));
+        }
+
+        var isDisableAnims = entry.UserPair!.OwnPermissions.IsDisableAnimations();
+        string disableAnimsText = isDisableAnims ? "Enable animation sync" : "Disable animation sync";
+        var disableAnimsIcon = isDisableAnims ? FontAwesomeIcon.Running : FontAwesomeIcon.Stop;
+        if (UiShared.IconTextButton(disableAnimsIcon, disableAnimsText))
+        {
+            var permissions = entry.UserPair.OwnPermissions;
+            permissions.SetDisableAnimations(!isDisableAnims);
+            _ = _apiController.UserSetPairPermissions(new UserPermissionsDto(entry.UserData, permissions));
+        }
 
         if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Unpair Permanently"))
         {

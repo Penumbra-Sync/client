@@ -247,8 +247,11 @@ public class PairManager : MediatorSubscriberBase, IDisposable
 
         if (pair.UserPair == null) throw new InvalidOperationException("No direct pair for " + dto);
 
+        var soundsChanged = pair.UserPair.OtherPermissions.IsDisableSounds() != dto.Permissions.IsDisableSounds();
+        var animsChanged = pair.UserPair.OtherPermissions.IsDisableAnimations() != dto.Permissions.IsDisableAnimations();
+
         pair.UserPair.OtherPermissions = dto.Permissions;
-        if (!pair.UserPair.OtherPermissions.IsPaired())
+        if (!pair.UserPair.OtherPermissions.IsPaired() || soundsChanged || animsChanged)
         {
             pair.ApplyLastReceivedData();
         }
@@ -264,6 +267,14 @@ public class PairManager : MediatorSubscriberBase, IDisposable
         if (pair.UserPair == null) throw new InvalidOperationException("No direct pair for " + dto);
 
         pair.UserPair.OwnPermissions = dto.Permissions;
+
+        var soundsChanged = pair.UserPair.OwnPermissions.IsDisableSounds() != dto.Permissions.IsDisableSounds();
+        var animsChanged = pair.UserPair.OwnPermissions.IsDisableAnimations() != dto.Permissions.IsDisableAnimations();
+
+        if (soundsChanged || animsChanged)
+        {
+            pair.ApplyLastReceivedData();
+        }
     }
 
     private void DalamudUtilOnDelayedFrameworkUpdate()

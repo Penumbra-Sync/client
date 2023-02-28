@@ -103,14 +103,25 @@ public class Pair
     private CharacterData? RemoveNotSyncedFiles(CharacterData? data)
     {
         _logger.LogTrace("Removing not synced files");
-        if (data == null || UserPair != null && UserPair.OtherPermissions.IsPaired())
+        if (data == null)
         {
-            _logger.LogTrace("Nothing to remove or user is paired directly");
+            _logger.LogTrace("Nothing to remove");
             return data;
         }
 
-        bool disableAnimations = GroupPair.All(pair => pair.Value.GroupUserPermissions.IsDisableAnimations() || pair.Key.GroupPermissions.IsDisableAnimations() || pair.Key.GroupUserPermissions.IsDisableAnimations());
-        bool disableSounds = GroupPair.All(pair => pair.Value.GroupUserPermissions.IsDisableSounds() || pair.Key.GroupPermissions.IsDisableSounds() || pair.Key.GroupUserPermissions.IsDisableSounds());
+        bool disableIndividualAnimations = UserPair != null && (UserPair.OtherPermissions.IsDisableAnimations() || UserPair.OwnPermissions.IsDisableAnimations());
+        bool disableGroupAnimations = GroupPair.All(pair => pair.Value.GroupUserPermissions.IsDisableAnimations() || pair.Key.GroupPermissions.IsDisableAnimations() || pair.Key.GroupUserPermissions.IsDisableAnimations());
+
+        bool disableAnimations = (UserPair != null && disableIndividualAnimations) || (UserPair == null && disableGroupAnimations);
+
+        bool disableIndividualSounds = UserPair != null && (UserPair.OtherPermissions.IsDisableSounds() || UserPair.OwnPermissions.IsDisableSounds());
+        bool disableGroupSounds = GroupPair.All(pair => pair.Value.GroupUserPermissions.IsDisableSounds() || pair.Key.GroupPermissions.IsDisableSounds() || pair.Key.GroupUserPermissions.IsDisableSounds());
+
+        bool disableSounds = (UserPair != null && disableIndividualSounds) || (UserPair == null && disableGroupSounds);
+
+        _logger.LogTrace("Individual Sounds: {disableIndividualSounds}, Individual Anims: {disableIndividualAnims}; " +
+            "Group Sounds: {disableGroupSounds}, Group Anims: {disableGroupAnims} => Disable Sounds: {disableSounds}, Disable Anims: {disableAnims}",
+            disableIndividualSounds, disableIndividualAnimations, disableGroupSounds, disableGroupAnimations, disableSounds, disableAnimations);
 
         if (disableAnimations || disableSounds)
         {
