@@ -40,7 +40,7 @@ public record NotificationMessage
     (string Title, string Message, NotificationType Type, uint TimeShownOnScreen = 3000) : IMessage;
 public record CreateCacheForObjectMessage(GameObjectHandler ObjectToCreateFor) : IMessage;
 public record ClearCacheForObjectMessage(GameObjectHandler ObjectToCreateFor) : IMessage;
-public record CharacterDataCreatedMessage(CharacterData CharacterData) : IMessage;
+public record CharacterDataCreatedMessage(API.Data.CharacterData CharacterData) : IMessage;
 public record PenumbraStartRedrawMessage(IntPtr Address) : IMessage;
 public record PenumbraEndRedrawMessage(IntPtr Address) : IMessage;
 public record HubReconnectingMessage(Exception? Exception) : IMessage;

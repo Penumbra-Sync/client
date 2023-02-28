@@ -1,31 +1,22 @@
-﻿using Newtonsoft.Json;
-using System.Text;
+﻿using System.Text;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Data;
 
 namespace MareSynchronos.Models;
 
-[JsonObject(MemberSerialization.OptIn)]
 public class CharacterData
 {
-    [JsonProperty]
     public Dictionary<ObjectKind, HashSet<FileReplacement>> FileReplacements { get; set; } = new();
 
-    [JsonProperty]
     public Dictionary<ObjectKind, string> GlamourerString { get; set; } = new();
 
     public bool IsReady => FileReplacements.SelectMany(k => k.Value).All(f => f.Computed);
-
-    [JsonProperty]
     public string ManipulationString { get; set; } = string.Empty;
 
-    [JsonProperty]
     public float HeelsOffset { get; set; } = 0f;
 
-    [JsonProperty]
     public string CustomizePlusScale { get; set; } = string.Empty;
     
-    [JsonProperty]
     public string PalettePlusPalette { get; set; } = string.Empty;
 
     public API.Data.CharacterData ToAPI()

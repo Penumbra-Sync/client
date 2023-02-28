@@ -25,7 +25,6 @@ public class CharacterDataFactory : MediatorSubscriberBase
     private readonly TransientResourceManager _transientResourceManager;
     private readonly FileCacheManager _fileCacheManager;
     private readonly PerformanceCollector _performanceCollector;
-    private readonly ConcurrentQueue<Task<string>> _processingQueue = new();
 
     public CharacterDataFactory(ILogger<CharacterDataFactory> logger, DalamudUtil dalamudUtil, IpcManager ipcManager,
         TransientResourceManager transientResourceManager, FileCacheManager fileReplacementFactory, MareMediator mediator,
@@ -37,13 +36,6 @@ public class CharacterDataFactory : MediatorSubscriberBase
         _transientResourceManager = transientResourceManager;
         _fileCacheManager = fileReplacementFactory;
         _performanceCollector = performanceCollector;
-        Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) =>
-        {
-            while (_processingQueue.TryDequeue(out var result))
-            {
-                result.RunSynchronously();
-            }
-        });
     }
 
     private unsafe bool CheckForNullDrawObject(IntPtr playerPointer)
@@ -51,14 +43,14 @@ public class CharacterDataFactory : MediatorSubscriberBase
         return ((Character*)playerPointer)->GameObject.DrawObject == null;
     }
 
-    public async Task<CharacterData> BuildCharacterData(CharacterData previousData, GameObjectHandler playerRelatedObject, CancellationToken token)
+    public async Task BuildCharacterData(CharacterData previousData, GameObjectHandler playerRelatedObject, CancellationToken token)
     {
         if (!_ipcManager.Initialized)
         {
             throw new InvalidOperationException("Penumbra is not connected");
         }
 
-        if (playerRelatedObject == null) return previousData;
+        if (playerRelatedObject == null) return;
 
         bool pointerIsZero = true;
         try
@@ -84,7 +76,7 @@ public class CharacterDataFactory : MediatorSubscriberBase
             _logger.LogTrace("Pointer was zero for {objectKind}", playerRelatedObject.ObjectKind);
             previousData.FileReplacements.Remove(playerRelatedObject.ObjectKind);
             previousData.GlamourerString.Remove(playerRelatedObject.ObjectKind);
-            return previousData;
+            return;
         }
 
         var previousFileReplacements = previousData.FileReplacements.ToDictionary(d => d.Key, d => d.Value);
@@ -92,15 +84,14 @@ public class CharacterDataFactory : MediatorSubscriberBase
 
         try
         {
-            _processingQueue.Clear();
-            return await _performanceCollector.LogPerformance(this, "CreateCharacterData>" + playerRelatedObject.ObjectKind, async () =>
+            await _performanceCollector.LogPerformance(this, "CreateCharacterData>" + playerRelatedObject.ObjectKind, async () =>
             {
-                return await CreateCharacterData(previousData, playerRelatedObject, token).ConfigureAwait(false);
+                await CreateCharacterData(previousData, playerRelatedObject, token).ConfigureAwait(false);
             }).ConfigureAwait(true);
+            return;
         }
         catch (OperationCanceledException)
         {
-            _processingQueue.Clear();
             _logger.LogDebug("Cancelled creating Character data for {object}", playerRelatedObject);
             throw;
         }
@@ -111,7 +102,7 @@ public class CharacterDataFactory : MediatorSubscriberBase
 
         previousData.FileReplacements = previousFileReplacements;
         previousData.GlamourerString = previousGlamourerData;
-        return previousData;
+        return;
     }
 
     private async Task<CharacterData> CreateCharacterData(CharacterData previousData, GameObjectHandler playerRelatedObject, CancellationToken token)
