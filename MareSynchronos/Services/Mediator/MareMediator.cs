@@ -21,6 +21,7 @@ public class MareMediator : IDisposable
     private readonly ILogger<MareMediator> _logger;
     private readonly PerformanceCollectorService _performanceCollector;
     private readonly object _addRemoveLock = new();
+    private readonly Dictionary<object, DateTime> _lastErrorTime = new();
 
     public MareMediator(ILogger<MareMediator> logger, PerformanceCollectorService performanceCollector)
     {
@@ -68,11 +69,13 @@ public class MareMediator : IDisposable
                     }
                     catch (Exception ex)
                     {
-                        lock (_addRemoveLock)
+                        if (_lastErrorTime.TryGetValue(subscriber, out var lastErrorTime))
                         {
-                            var removed = _subscriberDict[message.GetType()].RemoveWhere(s => s == subscriber);
-                            _logger.LogCritical(ex, "Error executing {type} for subscriber {subscriber}, removed from Mediator: {removeCount}", message.GetType().Name, subscriber.Subscriber.GetType().Name, removed);
+                            if (lastErrorTime.Add(TimeSpan.FromSeconds(10)) > DateTime.UtcNow) continue;
                         }
+
+                        _logger.LogCritical(ex, "Error executing {type} for subscriber {subscriber}", message.GetType().Name, subscriber.Subscriber.GetType().Name);
+                        _lastErrorTime[subscriber] = DateTime.UtcNow;
                     }
                 }
             });

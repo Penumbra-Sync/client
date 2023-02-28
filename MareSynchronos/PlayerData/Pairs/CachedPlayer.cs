@@ -381,6 +381,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     if (downloadToken.IsCancellationRequested)
                     {
                         _logger.LogTrace("Detected cancellation");
+                        _apiController.CancelDownload(downloadId);
                         return;
                     }
 
@@ -418,12 +419,6 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
                 _logger.LogDebug("[{applicationId}] Application finished", _applicationId);
             });
-
-            _downloadCancellationTokenSource = null;
-
-            _logger.LogDebug("Download was cancelled");
-            _transferManager.CancelDownload(downloadId);
-
         }, downloadToken);
     }
 

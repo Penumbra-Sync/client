@@ -13,7 +13,7 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
     private readonly PlayerDataFactory _characterDataFactory;
     private Task? _cacheCreationTask;
     private readonly Dictionary<ObjectKind, GameObjectHandler> _cachesToCreate = new();
-    private readonly CharacterData _lastCreatedData = new();
+    private readonly CharacterData _playerData = new();
     private readonly CancellationTokenSource _cts = new();
     private readonly List<GameObjectHandler> _playerRelatedObjects = new();
     private CancellationTokenSource _palettePlusCts = new();
@@ -42,9 +42,9 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
             Task.Run(() =>
             {
                 var actualMsg = (ClearCacheForObjectMessage)msg;
-                _lastCreatedData.FileReplacements.Remove(actualMsg.ObjectToCreateFor.ObjectKind);
-                _lastCreatedData.GlamourerString.Remove(actualMsg.ObjectToCreateFor.ObjectKind);
-                Mediator.Publish(new CharacterDataCreatedMessage(_lastCreatedData));
+                _playerData.FileReplacements.Remove(actualMsg.ObjectToCreateFor.ObjectKind);
+                _playerData.GlamourerString.Remove(actualMsg.ObjectToCreateFor.ObjectKind);
+                Mediator.Publish(new CharacterDataCreatedMessage(_playerData.ToAPI()));
             });
         });
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (msg) => ProcessCacheCreation());
@@ -56,9 +56,9 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
 
     private void PalettePlusChanged(PalettePlusMessage msg)
     {
-        if (!string.Equals(msg.Data, _lastCreatedData.PalettePlusPalette, StringComparison.Ordinal))
+        if (!string.Equals(msg.Data, _playerData.PalettePlusPalette, StringComparison.Ordinal))
         {
-            _lastCreatedData.PalettePlusPalette = msg.Data ?? string.Empty;
+            _playerData.PalettePlusPalette = msg.Data ?? string.Empty;
 
             _palettePlusCts?.Cancel();
             _palettePlusCts?.Dispose();
@@ -68,26 +68,26 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
             Task.Run(async () =>
             {
                 await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
-                Mediator.Publish(new CharacterDataCreatedMessage(_lastCreatedData));
+                Mediator.Publish(new CharacterDataCreatedMessage(_playerData.ToAPI()));
             }, token);
         }
     }
 
     private void HeelsOffsetChanged(HeelsOffsetMessage msg)
     {
-        if (msg.Offset != _lastCreatedData.HeelsOffset)
+        if (msg.Offset != _playerData.HeelsOffset)
         {
-            _lastCreatedData.HeelsOffset = msg.Offset;
-            Mediator.Publish(new CharacterDataCreatedMessage(_lastCreatedData));
+            _playerData.HeelsOffset = msg.Offset;
+            Mediator.Publish(new CharacterDataCreatedMessage(_playerData.ToAPI()));
         }
     }
 
     private void CustomizePlusChanged(CustomizePlusMessage msg)
     {
-        if (!string.Equals(msg.Data, _lastCreatedData.CustomizePlusScale, StringComparison.Ordinal))
+        if (!string.Equals(msg.Data, _playerData.CustomizePlusScale, StringComparison.Ordinal))
         {
-            _lastCreatedData.CustomizePlusScale = msg.Data ?? string.Empty;
-            Mediator.Publish(new CharacterDataCreatedMessage(_lastCreatedData));
+            _playerData.CustomizePlusScale = msg.Data ?? string.Empty;
+            Mediator.Publish(new CharacterDataCreatedMessage(_playerData.ToAPI()));
         }
     }
 
@@ -103,9 +103,18 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
                 {
                     foreach (var obj in toCreate)
                     {
-                        var data = await _characterDataFactory.BuildCharacterData(_lastCreatedData, obj.Value, _cts.Token).ConfigureAwait(false);
+                        await _characterDataFactory.BuildCharacterData(_playerData, obj.Value, _cts.Token).ConfigureAwait(false);
                     }
-                    Mediator.Publish(new CharacterDataCreatedMessage(_lastCreatedData));
+
+                    int maxWaitingTime = 10000;
+                    while (!_playerData.IsReady && maxWaitingTime > 0)
+                    {
+                        await Task.Delay(100).ConfigureAwait(false);
+                        maxWaitingTime -= 100;
+                        _logger.LogTrace("Waiting for Cache to be ready");
+                    }
+
+                    Mediator.Publish(new CharacterDataCreatedMessage(_playerData.ToAPI()));
                 }
                 catch (Exception ex)
                 {
@@ -114,7 +123,6 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
                 finally
                 {
                     _logger.LogDebug("Cache Creation complete");
-
                 }
             }, _cts.Token);
         }
