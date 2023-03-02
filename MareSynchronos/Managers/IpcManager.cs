@@ -508,15 +508,12 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
     public void PenumbraRemoveTemporaryCollection(ILogger logger, Guid applicationId, string characterName)
     {
         if (!CheckPenumbraApi()) return;
-        ActionQueue.Enqueue(() =>
-        {
-            var collName = "Mare_" + characterName;
-            logger.LogTrace("[{applicationId}] Removing temp collection for {collName}", applicationId, collName);
-            var ret = _penumbraRemoveTemporaryMod.Invoke("MareChara", collName, 0);
-            logger.LogTrace("[{applicationId}] RemoveTemporaryMod: {ret}", applicationId, ret);
-            var ret2 = _penumbraRemoveTemporaryCollection.Invoke(collName);
-            logger.LogTrace("[{applicationId}] RemoveTemporaryCollection: {ret2}", applicationId, ret2);
-        });
+        var collName = "Mare_" + characterName;
+        logger.LogTrace("[{applicationId}] Removing temp collection for {collName}", applicationId, collName);
+        var ret = _penumbraRemoveTemporaryMod.Invoke("MareChara", collName, 0);
+        logger.LogTrace("[{applicationId}] RemoveTemporaryMod: {ret}", applicationId, ret);
+        var ret2 = _penumbraRemoveTemporaryCollection.Invoke(collName);
+        logger.LogTrace("[{applicationId}] RemoveTemporaryCollection: {ret2}", applicationId, ret2);
     }
 
     public string PenumbraResolvePath(string path)
@@ -541,26 +538,23 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
     {
         if (!CheckPenumbraApi()) return;
 
-        ActionQueue.Enqueue(() =>
+        var idx = _dalamudUtil.GetIndexFromObjectTableByName(characterName);
+        if (idx == null)
         {
-            var idx = _dalamudUtil.GetIndexFromObjectTableByName(characterName);
-            if (idx == null)
-            {
-                return;
-            }
-            var collName = "Mare_" + characterName;
-            var ret = _penumbraCreateNamedTemporaryCollection.Invoke(collName);
-            logger.LogTrace("[{applicationId}] Creating Temp Collection {collName}, Success: {ret}", applicationId, collName, ret);
-            var retAssign = _penumbraAssignTemporaryCollection.Invoke(collName, idx.Value, c: true);
-            logger.LogTrace("[{applicationId}] Assigning Temp Collection {collName} to index {idx}", applicationId, collName, idx.Value);
-            foreach (var mod in modPaths)
-            {
-                logger.LogTrace("[{applicationId}] Change: {from} => {to}", applicationId, mod.Key, mod.Value);
-            }
+            return;
+        }
+        var collName = "Mare_" + characterName;
+        var ret = _penumbraCreateNamedTemporaryCollection.Invoke(collName);
+        logger.LogTrace("[{applicationId}] Creating Temp Collection {collName}, Success: {ret}", applicationId, collName, ret);
+        var retAssign = _penumbraAssignTemporaryCollection.Invoke(collName, idx.Value, c: true);
+        logger.LogTrace("[{applicationId}] Assigning Temp Collection {collName} to index {idx}", applicationId, collName, idx.Value);
+        foreach (var mod in modPaths)
+        {
+            logger.LogTrace("[{applicationId}] Change: {from} => {to}", applicationId, mod.Key, mod.Value);
+        }
 
-            var ret2 = _penumbraAddTemporaryMod.Invoke("MareChara", collName, modPaths, manipulationData, 0);
-            logger.LogTrace("[{applicationId}] Setting temp mods for {collName}, Success: {ret2}", applicationId, collName, ret2);
-        });
+        var ret2 = _penumbraAddTemporaryMod.Invoke("MareChara", collName, modPaths, manipulationData, 0);
+        logger.LogTrace("[{applicationId}] Setting temp mods for {collName}, Success: {ret2}", applicationId, collName, ret2);
     }
 
     public (string[] forward, string[][] reverse) PenumbraResolvePaths(string[] forward, string[] reverse)
@@ -589,20 +583,17 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
 
     private void HeelsOffsetChange(float offset)
     {
-        Mediator.Publish(new HeelsOffsetMessage(offset));
+        Mediator.Publish(new HeelsOffsetMessage());
     }
 
     private void OnCustomizePlusScaleChange(string? scale)
     {
-        if (scale != null) scale = Convert.ToBase64String(Encoding.UTF8.GetBytes(scale));
-        Mediator.Publish(new CustomizePlusMessage(scale));
+        Mediator.Publish(new CustomizePlusMessage());
     }
 
     private void OnPalettePlusPaletteChange(Character character, string palette)
     {
-        if (character.Address == 0 || character.Address != _dalamudUtil.PlayerPointer) return;
-        if (palette != null) palette = Convert.ToBase64String(Encoding.UTF8.GetBytes(palette));
-        Mediator.Publish(new PalettePlusMessage(palette));
+        Mediator.Publish(new PalettePlusMessage());
     }
 
     public async Task PalettePlusSetPalette(IntPtr character, string palette)
