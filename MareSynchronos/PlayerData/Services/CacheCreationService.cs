@@ -17,8 +17,9 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
     private readonly CancellationTokenSource _cts = new();
     private readonly List<GameObjectHandler> _playerRelatedObjects = new();
     private CancellationTokenSource _palettePlusCts = new();
+    private SemaphoreSlim _cacheCreateLock = new(1);
 
-    public unsafe CacheCreationService(ILogger<CacheCreationService> logger, MareMediator mediator, GameObjectHandlerFactory gameObjectHandlerFactory,
+    public CacheCreationService(ILogger<CacheCreationService> logger, MareMediator mediator, GameObjectHandlerFactory gameObjectHandlerFactory,
         PlayerDataFactory characterDataFactory, DalamudUtil dalamudUtil) : base(logger, mediator)
     {
         _characterDataFactory = characterDataFactory;
@@ -26,7 +27,9 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
         Mediator.Subscribe<CreateCacheForObjectMessage>(this, (msg) =>
         {
             var actualMsg = (CreateCacheForObjectMessage)msg;
+            _cacheCreateLock.Wait();
             _cachesToCreate[actualMsg.ObjectToCreateFor.ObjectKind] = actualMsg.ObjectToCreateFor;
+            _cacheCreateLock.Release();
         });
 
         _playerRelatedObjects.AddRange(new List<GameObjectHandler>()
@@ -47,56 +50,44 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
                 Mediator.Publish(new CharacterDataCreatedMessage(_playerData.ToAPI()));
             });
         });
+
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (msg) => ProcessCacheCreation());
-        Mediator.Subscribe<CustomizePlusMessage>(this, (msg) => CustomizePlusChanged((CustomizePlusMessage)msg));
-        Mediator.Subscribe<HeelsOffsetMessage>(this, (msg) => HeelsOffsetChanged((HeelsOffsetMessage)msg));
-        Mediator.Subscribe<PalettePlusMessage>(this, (msg) => PalettePlusChanged((PalettePlusMessage)msg));
-        Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, (msg) => _cachesToCreate[ObjectKind.Player] = _playerRelatedObjects.First(p => p.ObjectKind == ObjectKind.Player));
+        Mediator.Subscribe<CustomizePlusMessage>(this, async (_) => await AddPlayerCacheToCreate().ConfigureAwait(false));
+        Mediator.Subscribe<HeelsOffsetMessage>(this, async (_) => await AddPlayerCacheToCreate().ConfigureAwait(false));
+        Mediator.Subscribe<PalettePlusMessage>(this, (_) => PalettePlusChanged());
+        Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, async (msg) => await AddPlayerCacheToCreate().ConfigureAwait(false));
     }
 
-    private void PalettePlusChanged(PalettePlusMessage msg)
+    private async Task AddPlayerCacheToCreate()
     {
-        if (!string.Equals(msg.Data, _playerData.PalettePlusPalette, StringComparison.Ordinal))
-        {
-            _playerData.PalettePlusPalette = msg.Data ?? string.Empty;
-
-            _palettePlusCts?.Cancel();
-            _palettePlusCts?.Dispose();
-            _palettePlusCts = new();
-            var token = _palettePlusCts.Token;
-
-            Task.Run(async () =>
-            {
-                await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
-                Mediator.Publish(new CharacterDataCreatedMessage(_playerData.ToAPI()));
-            }, token);
-        }
+        await _cacheCreateLock.WaitAsync().ConfigureAwait(false);
+        _cachesToCreate[ObjectKind.Player] = _playerRelatedObjects.First(p => p.ObjectKind == ObjectKind.Player);
+        _cacheCreateLock.Release();
     }
 
-    private void HeelsOffsetChanged(HeelsOffsetMessage msg)
+    private void PalettePlusChanged()
     {
-        if (msg.Offset != _playerData.HeelsOffset)
-        {
-            _playerData.HeelsOffset = msg.Offset;
-            Mediator.Publish(new CharacterDataCreatedMessage(_playerData.ToAPI()));
-        }
-    }
+        _palettePlusCts?.Cancel();
+        _palettePlusCts?.Dispose();
+        _palettePlusCts = new();
+        var token = _palettePlusCts.Token;
 
-    private void CustomizePlusChanged(CustomizePlusMessage msg)
-    {
-        if (!string.Equals(msg.Data, _playerData.CustomizePlusScale, StringComparison.Ordinal))
+        Task.Run(async () =>
         {
-            _playerData.CustomizePlusScale = msg.Data ?? string.Empty;
-            Mediator.Publish(new CharacterDataCreatedMessage(_playerData.ToAPI()));
-        }
+            await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
+            await AddPlayerCacheToCreate().ConfigureAwait(false);
+        }, token);
     }
 
     private void ProcessCacheCreation()
     {
         if (_cachesToCreate.Any() && (_cacheCreationTask?.IsCompleted ?? true))
         {
+            _cacheCreateLock.Wait();
             var toCreate = _cachesToCreate.ToList();
             _cachesToCreate.Clear();
+            _cacheCreateLock.Release();
+
             _cacheCreationTask = Task.Run(async () =>
             {
                 try

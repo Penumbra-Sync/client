@@ -119,7 +119,9 @@ public class GameObjectHandler : MediatorSubscriberBase
 
     private unsafe bool IsBeingDrawn(IntPtr drawObj, IntPtr curPtr)
     {
-        return drawObj == IntPtr.Zero || (((CharacterBase*)drawObj)->HasModelInSlotLoaded != 0)
+        _logger.LogTrace("IsBeingDrawn for ptr {curPtr} : {drawObj}", curPtr.ToString("X"), drawObj.ToString("X"));
+        return drawObj == IntPtr.Zero
+                       || (((CharacterBase*)drawObj)->HasModelInSlotLoaded != 0)
                        || (((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0)
                        || (((GameObject*)curPtr)->RenderFlags & 0b100000000000) == 0b100000000000;
     }
