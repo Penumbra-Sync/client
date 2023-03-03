@@ -118,13 +118,13 @@ public class FileTransferManager : MediatorSubscriberBase
 
         _uploadCancellationTokenSource = new CancellationTokenSource();
         var uploadToken = _uploadCancellationTokenSource.Token;
-        _logger.LogDebug($"Sending Character data {data.DataHash.Value} to service {_serverManager.CurrentApiUrl}");
+        _logger.LogDebug("Sending Character data {hash} to service {url}", data.DataHash.Value, _serverManager.CurrentApiUrl);
 
         HashSet<string> unverifiedUploads = VerifyFiles(data);
         if (unverifiedUploads.Any())
         {
             await UploadMissingFiles(unverifiedUploads, uploadToken).ConfigureAwait(false);
-            _logger.LogInformation("Upload complete for " + data.DataHash.Value);
+            _logger.LogInformation("Upload complete for {hash}", data.DataHash.Value);
         }
 
         foreach (var kvp in data.FileReplacements)
@@ -139,14 +139,14 @@ public class FileTransferManager : MediatorSubscriberBase
     {
         var requestId = await GetQueueRequest(fileTransfer, ct).ConfigureAwait(false);
 
-        _logger.LogDebug($"GUID {requestId} for file {fileTransfer.Hash} on server {fileTransfer.DownloadUri}");
+        _logger.LogDebug("GUID {requestId} for file {hash} on server {uri}", requestId, fileTransfer.Hash, fileTransfer.DownloadUri);
 
         await WaitForDownloadReady(fileTransfer, requestId, ct).ConfigureAwait(false);
 
         HttpResponseMessage response = null!;
         var requestUrl = MareFiles.CacheGetFullPath(fileTransfer.DownloadUri, requestId);
 
-        _logger.LogDebug($"Downloading {requestUrl} for file {fileTransfer.Hash}");
+        _logger.LogDebug("Downloading {requestUrl} for file {hash}", requestUrl, fileTransfer.Hash);
         try
         {
             response = await SendRequestAsync(HttpMethod.Get, requestUrl, ct).ConfigureAwait(false);
@@ -154,7 +154,7 @@ public class FileTransferManager : MediatorSubscriberBase
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogWarning(ex, $"Error during download of {requestUrl}, HttpStatusCode: {ex.StatusCode}");
+            _logger.LogWarning(ex, "Error during download of {requestUrl}, HttpStatusCode: {code}", requestUrl, ex.StatusCode);
             if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized)
             {
                 throw new Exception($"Http error {ex.StatusCode} (cancelled: {ct.IsCancellationRequested}): {requestUrl}", ex);
@@ -179,12 +179,12 @@ public class FileTransferManager : MediatorSubscriberBase
                     progress.Report(bytesRead);
                 }
 
-                _logger.LogDebug($"{requestUrl} downloaded to {tempPath}");
+                _logger.LogDebug("{requestUrl} downloaded to {tempPath}", requestUrl, tempPath);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, $"Error during file download of {requestUrl}");
+            _logger.LogWarning(ex, "Error during file download of {requestUrl}", requestUrl);
             try
             {
                 if (!tempPath.IsNullOrEmpty())
@@ -197,12 +197,12 @@ public class FileTransferManager : MediatorSubscriberBase
 
     private async Task DownloadFilesInternal(string currentDownloadId, List<FileReplacementData> fileReplacement, CancellationToken ct)
     {
-        _logger.LogDebug("Downloading files (Download ID " + currentDownloadId + ")");
+        _logger.LogDebug("Downloading files (Download ID {id})", currentDownloadId);
 
         List<DownloadFileDto> downloadFileInfoFromService = new();
         downloadFileInfoFromService.AddRange(await FilesGetSizes(fileReplacement.Select(f => f.Hash).ToList(), ct).ConfigureAwait(false));
 
-        _logger.LogDebug("Files with size 0 or less: " + string.Join(", ", downloadFileInfoFromService.Where(f => f.Size <= 0).Select(f => f.Hash)));
+        _logger.LogDebug("Files with size 0 or less: {files}", string.Join(", ", downloadFileInfoFromService.Where(f => f.Size <= 0).Select(f => f.Hash)));
 
         CurrentDownloads[currentDownloadId] = downloadFileInfoFromService.Distinct().Select(d => new DownloadFileTransfer(d))
             .Where(d => d.CanBeTransferred).ToList();
@@ -244,13 +244,13 @@ public class FileTransferManager : MediatorSubscriberBase
                 catch (OperationCanceledException)
                 {
                     File.Delete(tempPath);
-                    _logger.LogDebug("Detected cancellation, removing " + currentDownloadId);
+                    _logger.LogDebug("Detected cancellation, removing {id}", currentDownloadId);
                     CancelDownload(currentDownloadId);
                     return;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error during download of " + file.Hash);
+                    _logger.LogError(ex, "Error during download of {hash}", file.Hash);
                     return;
                 }
 
@@ -282,7 +282,7 @@ public class FileTransferManager : MediatorSubscriberBase
             }
         }).ConfigureAwait(false);
 
-        _logger.LogDebug("Download complete, removing " + currentDownloadId);
+        _logger.LogDebug("Download complete, removing {id}", currentDownloadId);
         CancelDownload(currentDownloadId);
     }
 
@@ -348,11 +348,11 @@ public class FileTransferManager : MediatorSubscriberBase
         if (requestMessage.Content != null && requestMessage.Content is not StreamContent)
         {
             var content = await ((JsonContent)requestMessage.Content).ReadAsStringAsync().ConfigureAwait(false);
-            _logger.LogDebug("Sending " + requestMessage.Method + " to " + requestMessage.RequestUri + " (Content: " + content + ")");
+            _logger.LogDebug("Sending {method} to {uri} (Content: {content})", requestMessage.Method, requestMessage.RequestUri, content);
         }
         else
         {
-            _logger.LogDebug("Sending " + requestMessage.Method + " to " + requestMessage.RequestUri);
+            _logger.LogDebug("Sending {method} to {uri}", requestMessage.Method, requestMessage.RequestUri);
         }
 
         try
@@ -363,7 +363,7 @@ public class FileTransferManager : MediatorSubscriberBase
         }
         catch (Exception ex)
         {
-            _logger.LogCritical(ex, "Error during SendRequestInternal for " + requestMessage.RequestUri);
+            _logger.LogCritical(ex, "Error during SendRequestInternal for {uri}", requestMessage.RequestUri);
             throw;
         }
     }
@@ -400,7 +400,7 @@ public class FileTransferManager : MediatorSubscriberBase
     {
         unverifiedUploadHashes = unverifiedUploadHashes.Where(h => _fileDbManager.GetFileCacheByHash(h) != null).ToHashSet(StringComparer.Ordinal);
 
-        _logger.LogDebug("Verifying " + unverifiedUploadHashes.Count + " files");
+        _logger.LogDebug("Verifying {count} files", unverifiedUploadHashes.Count);
         var filesToUpload = await FilesSend(unverifiedUploadHashes.ToList(), uploadToken).ConfigureAwait(false);
 
         foreach (var file in filesToUpload.Where(f => !f.IsForbidden))
@@ -414,7 +414,7 @@ public class FileTransferManager : MediatorSubscriberBase
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Tried to request file " + file.Hash + " but file was not present");
+                _logger.LogWarning(ex, "Tried to request file {hash} but file was not present", file.Hash);
             }
         }
 
@@ -436,7 +436,7 @@ public class FileTransferManager : MediatorSubscriberBase
         Task uploadTask = Task.CompletedTask;
         foreach (var file in CurrentUploads.Where(f => f.CanBeTransferred && !f.IsTransferred).ToList())
         {
-            _logger.LogDebug("Compressing " + file);
+            _logger.LogDebug("Compressing {file}", file);
             var data = await GetCompressedFileData(file.Hash, uploadToken).ConfigureAwait(false);
             CurrentUploads.Single(e => string.Equals(e.Hash, data.Item1, StringComparison.Ordinal)).Total = data.Item2.Length;
             await uploadTask.ConfigureAwait(false);
@@ -450,9 +450,7 @@ public class FileTransferManager : MediatorSubscriberBase
             await uploadTask.ConfigureAwait(false);
 
             var compressedSize = CurrentUploads.Sum(c => c.Total);
-            _logger.LogDebug($"Compressed {UiShared.ByteToString(totalSize)} to {UiShared.ByteToString(compressedSize)} ({compressedSize / (double)totalSize:P2})");
-
-            _logger.LogDebug("Upload tasks complete");
+            _logger.LogDebug("Upload complete, compressed {size} to {compressed}", UiShared.ByteToString(totalSize), UiShared.ByteToString(compressedSize));
         }
 
         foreach (var file in unverifiedUploadHashes.Where(c => !CurrentUploads.Any(u => string.Equals(u.Hash, c, StringComparison.Ordinal))))
@@ -475,7 +473,7 @@ public class FileTransferManager : MediatorSubscriberBase
 
             if (verifiedTime < DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(10)))
             {
-                _logger.LogTrace("Verifying " + item + ", last verified: " + verifiedTime);
+                _logger.LogTrace("Verifying {item}, last verified: {date}", item, verifiedTime);
                 unverifiedUploadHashes.Add(item);
             }
         }
@@ -521,7 +519,7 @@ public class FileTransferManager : MediatorSubscriberBase
             localTimeoutCts.Dispose();
             composite.Dispose();
 
-            _logger.LogDebug($"Download {requestId} ready");
+            _logger.LogDebug("Download {requestId} ready", requestId);
         }
         catch (TaskCanceledException)
         {
@@ -547,6 +545,7 @@ public class FileTransferManager : MediatorSubscriberBase
             _downloadReady.Remove(requestId, out _);
         }
     }
+
     private class ProgressableStreamContent : StreamContent
     {
         private const int _defaultBufferSize = 4096;

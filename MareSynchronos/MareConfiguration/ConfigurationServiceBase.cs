@@ -43,7 +43,6 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
             var lastWriteTime = GetConfigLastWriteTime();
             if (lastWriteTime != _configLastWriteTime)
             {
-                //_logger.LogDebug($"Config {ConfigurationName} changed, reloading config");
                 _currentConfigInternal = LazyConfig();
             }
         }
@@ -97,8 +96,6 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
             }
         }
 
-        //_logger.LogDebug("Saving dirty config " + ConfigurationName);
-
         try
         {
             File.Copy(ConfigurationPath, ConfigurationPath + ".bak." + DateTime.Now.ToString("yyyyMMddHHmmss"), overwrite: true);
@@ -119,7 +116,6 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
 
     public void Dispose()
     {
-        //_logger.LogTrace($"Disposing {GetType()}");
         _periodicCheckCts.Cancel();
     }
 }
