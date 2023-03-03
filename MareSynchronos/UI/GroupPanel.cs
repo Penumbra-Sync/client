@@ -752,8 +752,8 @@ namespace MareSynchronos.UI
 
             var soundsDisabled = entry.GroupUserPermissions.IsDisableSounds();
             var animDisabled = entry.GroupUserPermissions.IsDisableAnimations();
-            var individualSoundsDisabled = (pair.UserPair?.OwnPermissions.IsDisableSounds() ?? false) || (pair.UserPair?.OwnPermissions.IsDisableSounds() ?? false);
-            var individualAnimDisabled = (pair.UserPair?.OwnPermissions.IsDisableAnimations() ?? false) || (pair.UserPair?.OwnPermissions.IsDisableAnimations() ?? false);
+            var individualSoundsDisabled = (pair.UserPair?.OwnPermissions.IsDisableSounds() ?? false) || (pair.UserPair?.OtherPermissions.IsDisableSounds() ?? false);
+            var individualAnimDisabled = (pair.UserPair?.OwnPermissions.IsDisableAnimations() ?? false) || (pair.UserPair?.OtherPermissions.IsDisableAnimations() ?? false);
 
             var textPos = originalY + barButtonSize.Y / 2 - textSize.Y / 2;
             ImGui.SetCursorPosY(textPos);
@@ -910,7 +910,6 @@ namespace MareSynchronos.UI
                 }
             }
 
-            // todo: check if this works
             if (individualAnimDisabled || individualSoundsDisabled)
             {
                 var infoIconPosDist = (plusButtonShown ? plusButtonSize.X + ImGui.GetStyle().ItemSpacing.X : 0)
@@ -919,7 +918,6 @@ namespace MareSynchronos.UI
                 var iconwidth = UiShared.GetIconSize(icon);
 
                 ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - infoIconPosDist - iconwidth.X);
-                ImGui.SetCursorPosY(originalY);
 
                 ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
                 UiShared.FontText(icon.ToIconString(), UiBuilder.IconFont);
@@ -930,20 +928,26 @@ namespace MareSynchronos.UI
 
                     ImGui.Text("Individual User permissions");
 
-                    if (soundsDisabled)
+                    if (individualSoundsDisabled)
                     {
                         var userSoundsText = "Sound sync disabled with " + pair.UserData.AliasOrUID;
                         UiShared.FontText(FontAwesomeIcon.VolumeOff.ToIconString(), UiBuilder.IconFont);
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
                         ImGui.Text(userSoundsText);
+                        ImGui.NewLine();
+                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                        ImGui.Text("You: " + (pair.UserPair!.OwnPermissions.IsDisableSounds() ? "Disabled" : "Enabled") + ", They: " + (pair.UserPair!.OtherPermissions.IsDisableSounds() ? "Disabled" : "Enabled"));
                     }
 
-                    if (animDisabled)
+                    if (individualAnimDisabled)
                     {
                         var userAnimText = "Animation sync disabled with " + pair.UserData.AliasOrUID;
                         UiShared.FontText(FontAwesomeIcon.Stop.ToIconString(), UiBuilder.IconFont);
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
                         ImGui.Text(userAnimText);
+                        ImGui.NewLine();
+                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                        ImGui.Text("You: " + (pair.UserPair!.OwnPermissions.IsDisableAnimations() ? "Disabled" : "Enabled") + ", They: " + (pair.UserPair!.OtherPermissions.IsDisableAnimations() ? "Disabled" : "Enabled"));
                     }
 
                     ImGui.EndTooltip();

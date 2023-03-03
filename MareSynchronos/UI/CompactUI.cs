@@ -361,9 +361,6 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
         var windowEndX = ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth();
 
-        var soundsDisabled = entry.UserPair.OwnPermissions.IsDisableSounds() || entry.UserPair.OtherPermissions.IsDisableSounds();
-        var animDisabled = entry.UserPair.OwnPermissions.IsDisableAnimations() || entry.UserPair.OtherPermissions.IsDisableAnimations();
-
         var textPos = originalY + pauseIconSize.Y / 2 - textSize.Y / 2;
         ImGui.SetCursorPosY(textPos);
         FontAwesomeIcon connectionIcon;
@@ -477,11 +474,56 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
             UiShared.AttachToolTip("Hit ENTER to save\nRight click to cancel");
         }
 
-        // todo: add warning icon stuff for when pair individually disabled anims/sounds
-
-        // Pause Button
+        // Pause Button && sound warnings
         if (entry.UserPair!.OwnPermissions.IsPaired() && entry.UserPair!.OtherPermissions.IsPaired())
         {
+            var individualSoundsDisabled = (entry.UserPair?.OwnPermissions.IsDisableSounds() ?? false) || (entry.UserPair?.OtherPermissions.IsDisableSounds() ?? false);
+            var individualAnimDisabled = (entry.UserPair?.OwnPermissions.IsDisableAnimations() ?? false) || (entry.UserPair?.OtherPermissions.IsDisableAnimations() ?? false);
+
+            if (individualAnimDisabled || individualSoundsDisabled)
+            {
+                var infoIconPosDist = windowEndX - barButtonSize.X - spacingX - pauseIconSize.X - spacingX;
+                var icon = FontAwesomeIcon.ExclamationTriangle;
+                var iconwidth = UiShared.GetIconSize(icon);
+
+                ImGui.SameLine(infoIconPosDist - iconwidth.X);
+
+                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
+                UiShared.FontText(icon.ToIconString(), UiBuilder.IconFont);
+                ImGui.PopStyleColor();
+                if (ImGui.IsItemHovered())
+                {
+                    ImGui.BeginTooltip();
+
+                    ImGui.Text("Individual User permissions");
+
+                    if (individualSoundsDisabled)
+                    {
+                        var userSoundsText = "Sound sync disabled with " + entry.UserData.AliasOrUID;
+                        UiShared.FontText(FontAwesomeIcon.VolumeOff.ToIconString(), UiBuilder.IconFont);
+                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                        ImGui.Text(userSoundsText);
+                        ImGui.NewLine();
+                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                        ImGui.Text("You: " + (entry.UserPair!.OwnPermissions.IsDisableSounds() ? "Disabled" : "Enabled") + ", They: " + (entry.UserPair!.OtherPermissions.IsDisableSounds() ? "Disabled" : "Enabled"));
+                    }
+
+                    if (individualAnimDisabled)
+                    {
+                        var userAnimText = "Animation sync disabled with " + entry.UserData.AliasOrUID;
+                        UiShared.FontText(FontAwesomeIcon.Stop.ToIconString(), UiBuilder.IconFont);
+                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                        ImGui.Text(userAnimText);
+                        ImGui.NewLine();
+                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                        ImGui.Text("You: " + (entry.UserPair!.OwnPermissions.IsDisableAnimations() ? "Disabled" : "Enabled") + ", They: " + (entry.UserPair!.OtherPermissions.IsDisableAnimations() ? "Disabled" : "Enabled"));
+                    }
+
+                    ImGui.EndTooltip();
+                }
+            }
+
+
             ImGui.SameLine(windowEndX - barButtonSize.X - spacingX - pauseIconSize.X);
             ImGui.SetCursorPosY(originalY);
             if (ImGuiComponents.IconButton(pauseIcon))

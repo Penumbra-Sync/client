@@ -10,6 +10,7 @@ using Dalamud.Interface.Internal.Notifications;
 using Microsoft.Extensions.Logging;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services.Mediator;
+using MareSynchronos.Services;
 
 namespace MareSynchronos.Interop;
 

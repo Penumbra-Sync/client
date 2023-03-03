@@ -247,14 +247,11 @@ public class PairManager : MediatorSubscriberBase, IDisposable
 
         if (pair.UserPair == null) throw new InvalidOperationException("No direct pair for " + dto);
 
-        var soundsChanged = pair.UserPair.OtherPermissions.IsDisableSounds() != dto.Permissions.IsDisableSounds();
-        var animsChanged = pair.UserPair.OtherPermissions.IsDisableAnimations() != dto.Permissions.IsDisableAnimations();
-
         pair.UserPair.OtherPermissions = dto.Permissions;
-        if (!pair.UserPair.OtherPermissions.IsPaired() || soundsChanged || animsChanged)
-        {
-            pair.ApplyLastReceivedData();
-        }
+
+        _logger.LogTrace("Paired: {synced}, Paused: {paused}, Anims: {anims}, Sounds: {sounds}",
+            pair.UserPair.OwnPermissions.IsPaired(), pair.UserPair.OwnPermissions.IsPaused(), pair.UserPair.OwnPermissions.IsDisableAnimations(), pair.UserPair.OwnPermissions.IsDisableSounds());
+        pair.ApplyLastReceivedData();
     }
 
     public void UpdateSelfPairPermissions(UserPermissionsDto dto)
@@ -268,13 +265,10 @@ public class PairManager : MediatorSubscriberBase, IDisposable
 
         pair.UserPair.OwnPermissions = dto.Permissions;
 
-        var soundsChanged = pair.UserPair.OwnPermissions.IsDisableSounds() != dto.Permissions.IsDisableSounds();
-        var animsChanged = pair.UserPair.OwnPermissions.IsDisableAnimations() != dto.Permissions.IsDisableAnimations();
+        _logger.LogTrace("Paired: {synced}, Paused: {paused}, Anims: {anims}, Sounds: {sounds}",
+            pair.UserPair.OwnPermissions.IsPaired(), pair.UserPair.OwnPermissions.IsPaused(), pair.UserPair.OwnPermissions.IsDisableAnimations(), pair.UserPair.OwnPermissions.IsDisableSounds());
 
-        if (soundsChanged || animsChanged)
-        {
-            pair.ApplyLastReceivedData();
-        }
+        pair.ApplyLastReceivedData();
     }
 
     private void DalamudUtilOnDelayedFrameworkUpdate()
