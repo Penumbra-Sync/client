@@ -1,6 +1,6 @@
 ﻿using MareSynchronos.API.Dto.Files;
 
-namespace MareSynchronos.WebAPI.Files;
+namespace MareSynchronos.WebAPI.Files.Models;
 
 public class DownloadFileTransfer : FileTransfer
 {

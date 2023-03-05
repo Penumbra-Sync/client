@@ -17,25 +17,26 @@ namespace MareSynchronos.PlayerData.Pairs;
 
 public class CachedPlayer : MediatorSubscriberBase, IDisposable
 {
-    private readonly FileTransferManager _transferManager;
+    private readonly FileDownloadManager _downloadManager;
     private readonly DalamudUtil _dalamudUtil;
     private readonly GameObjectHandlerFactory _gameObjectHandlerFactory;
     private readonly IpcManager _ipcManager;
     private readonly FileCacheManager _fileDbManager;
-    private API.Data.CharacterData _cachedData = new();
+    private CharacterData _cachedData = new();
     private GameObjectHandler? _currentOtherChara;
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
     private string _lastGlamourerData = string.Empty;
     private string _originalGlamourerData = string.Empty;
 
-    public CachedPlayer(ILogger<CachedPlayer> logger, OnlineUserIdentDto onlineUser, GameObjectHandlerFactory gameObjectHandlerFactory,
-        IpcManager ipcManager, FileTransferManager transferManager,
+    public CachedPlayer(ILogger<CachedPlayer> logger, OnlineUserIdentDto onlineUser,
+        GameObjectHandlerFactory gameObjectHandlerFactory,
+        IpcManager ipcManager, FileDownloadManager transferManager,
         DalamudUtil dalamudUtil, FileCacheManager fileDbManager, MareMediator mediator) : base(logger, mediator)
     {
         OnlineUser = onlineUser;
         _gameObjectHandlerFactory = gameObjectHandlerFactory;
         _ipcManager = ipcManager;
-        _transferManager = transferManager;
+        _downloadManager = transferManager;
         _dalamudUtil = dalamudUtil;
         _fileDbManager = fileDbManager;
     }
@@ -223,6 +224,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         if (string.IsNullOrEmpty(PlayerName)) return; // already disposed
 
         base.Dispose();
+        _downloadManager.Dispose();
         var name = PlayerName;
         PlayerName = null;
         _logger.LogDebug("Disposing {name} ({user})", name, OnlineUser);
@@ -370,22 +372,22 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 int attempts = 0;
                 while ((toDownloadReplacements = TryCalculateModdedDictionary(charaData, out moddedPaths)).Count > 0 && attempts++ <= 10)
                 {
-                    _transferManager.CancelDownload(PlayerName!);
+                    _downloadManager.CancelDownload();
                     _logger.LogDebug("Downloading missing files for player {name}, {kind}", PlayerName, updatedData);
                     if (toDownloadReplacements.Any())
                     {
-                        await _transferManager.DownloadFiles(PlayerName!, toDownloadReplacements, downloadToken).ConfigureAwait(false);
-                        _transferManager.CancelDownload(PlayerName!);
+                        await _downloadManager.DownloadFiles(toDownloadReplacements, downloadToken).ConfigureAwait(false);
+                        _downloadManager.CancelDownload();
                     }
 
                     if (downloadToken.IsCancellationRequested)
                     {
                         _logger.LogTrace("Detected cancellation");
-                        _transferManager.CancelDownload(PlayerName!);
+                        _downloadManager.CancelDownload();
                         return;
                     }
 
-                    if (TryCalculateModdedDictionary(charaData, out moddedPaths).All(c => _transferManager.ForbiddenTransfers.Any(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
+                    if (TryCalculateModdedDictionary(charaData, out moddedPaths).All(c => _downloadManager.ForbiddenTransfers.Any(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
                     {
                         break;
                     }

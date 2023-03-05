@@ -15,11 +15,11 @@ public class OnlinePlayerManager : MediatorSubscriberBase, IDisposable
     private readonly DalamudUtil _dalamudUtil;
     private readonly FileCacheManager _fileDbManager;
     private readonly PairManager _pairManager;
-    private readonly FileTransferManager _fileTransferManager;
+    private readonly FileUploadManager _fileTransferManager;
     private CharacterData? _lastSentData;
 
     public OnlinePlayerManager(ILogger<OnlinePlayerManager> logger, ApiController apiController, DalamudUtil dalamudUtil,
-        FileCacheManager fileDbManager, PairManager pairManager, MareMediator mediator, FileTransferManager fileTransferManager) : base(logger, mediator)
+        FileCacheManager fileDbManager, PairManager pairManager, MareMediator mediator, FileUploadManager fileTransferManager) : base(logger, mediator)
     {
         _logger.LogTrace("Creating " + nameof(OnlinePlayerManager));
         _apiController = apiController;

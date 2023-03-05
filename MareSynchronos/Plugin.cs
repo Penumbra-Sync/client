@@ -81,7 +81,9 @@ public sealed class Plugin : IDalamudPlugin
         collection.AddSingleton<GameObjectHandlerFactory>();
         collection.AddSingleton<PerformanceCollectorService>();
         collection.AddSingleton<HubFactory>();
-        collection.AddSingleton<FileTransferManager>();
+        collection.AddSingleton<FileUploadManager>();
+        collection.AddSingleton<FileTransferOrchestrator>();
+        collection.AddSingleton<FileDownloadManagerFactory>();
 
         collection.AddSingleton<UiShared>();
         collection.AddSingleton<SettingsUi>();

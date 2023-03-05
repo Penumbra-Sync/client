@@ -17,11 +17,12 @@ public class CachedPlayerFactory
     private readonly GameObjectHandlerFactory _gameObjectHandlerFactory;
     private readonly MareMediator _mediator;
     private readonly ILoggerFactory _loggerFactory;
-    private readonly FileTransferManager _fileTransferManager;
+    private readonly FileDownloadManagerFactory _downloadFactory;
 
     public CachedPlayerFactory(IpcManager ipcManager, DalamudUtil dalamudUtil, FileCacheManager fileCacheManager,
         GameObjectHandlerFactory gameObjectHandlerFactory,
-        MareMediator mediator, ILoggerFactory loggerFactory, FileTransferManager fileTransferManager)
+        MareMediator mediator, ILoggerFactory loggerFactory,
+        FileDownloadManagerFactory fileTransferManager)
     {
         _ipcManager = ipcManager;
         _dalamudUtil = dalamudUtil;
@@ -29,11 +30,11 @@ public class CachedPlayerFactory
         _gameObjectHandlerFactory = gameObjectHandlerFactory;
         _mediator = mediator;
         _loggerFactory = loggerFactory;
-        _fileTransferManager = fileTransferManager;
+        _downloadFactory = fileTransferManager;
     }
 
     public CachedPlayer Create(OnlineUserIdentDto dto)
     {
-        return new CachedPlayer(_loggerFactory.CreateLogger<CachedPlayer>(), dto, _gameObjectHandlerFactory, _ipcManager, _fileTransferManager, _dalamudUtil, _fileCacheManager, _mediator);
+        return new CachedPlayer(_loggerFactory.CreateLogger<CachedPlayer>(), dto, _gameObjectHandlerFactory, _ipcManager, _downloadFactory.Create(dto.User.AliasOrUID), _dalamudUtil, _fileCacheManager, _mediator);
     }
 }

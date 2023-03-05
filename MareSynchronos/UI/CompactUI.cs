@@ -28,7 +28,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
     private readonly ApiController _apiController;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
-    private readonly FileTransferManager _fileTransferManager;
+    private readonly FileUploadManager _fileTransferManager;
     private readonly MareConfigService _configService;
     private readonly TagHandler _tagHandler;
     public readonly Dictionary<string, bool> ShowUidForEntry = new(StringComparer.Ordinal);
@@ -60,7 +60,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
 
     public CompactUi(ILogger<CompactUi> logger, WindowSystem windowSystem,
         UiShared uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
-        ServerConfigurationManager serverManager, MareMediator mediator, FileTransferManager fileTransferManager) : base(logger, mediator, "###MareSynchronosMainUI")
+        ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager) : base(logger, mediator, "###MareSynchronosMainUI")
     {
 
 #if DEBUG

@@ -1,32 +1,33 @@
-﻿using System.Numerics;
+﻿using System.Collections.Concurrent;
+using System.Numerics;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.Services.Mediator;
 using MareSynchronos.WebAPI.Files;
+using MareSynchronos.WebAPI.Files.Models;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
-public class DownloadUi : Window, IDisposable
+public class DownloadUi : WindowMediatorSubscriberBase
 {
-    private readonly ILogger<DownloadUi> _logger;
     private readonly WindowSystem _windowSystem;
     private readonly MareConfigService _configService;
-    private readonly FileTransferManager _fileTransferManager;
+    private readonly FileUploadManager _fileTransferManager;
     private readonly UiShared _uiShared;
     private bool _wasOpen = false;
+    private readonly ConcurrentDictionary<string, Dictionary<string, FileDownloadStatus>> _currentDownloads = new();
 
-    public void Dispose()
+    public override void Dispose()
     {
-        _logger.LogTrace($"Disposing {GetType()}");
+        base.Dispose();
         _windowSystem.RemoveWindow(this);
     }
 
     public DownloadUi(ILogger<DownloadUi> logger, WindowSystem windowSystem, MareConfigService configService,
-        FileTransferManager fileTransferManager, UiShared uiShared) : base("Mare Synchronos Downloads")
+        FileUploadManager fileTransferManager, MareMediator mediator, UiShared uiShared) : base(logger, mediator, "Mare Synchronos Downloads")
     {
-        _logger = logger;
-        _logger.LogTrace("Creating " + nameof(DownloadUi));
         _windowSystem = windowSystem;
         _configService = configService;
         _fileTransferManager = fileTransferManager;
@@ -51,6 +52,14 @@ public class DownloadUi : Window, IDisposable
 
         windowSystem.AddWindow(this);
         IsOpen = true;
+
+        Mediator.Subscribe<DownloadStartedMessage>(this, (msg) =>
+        {
+            var actualMsg = ((DownloadStartedMessage)msg);
+            _currentDownloads[actualMsg.DownloadId] = actualMsg.DownloadStatus;
+        });
+
+        Mediator.Subscribe<DownloadFinishedMessage>(this, (msg) => _currentDownloads.TryRemove(((DownloadFinishedMessage)msg).DownloadId, out _));
     }
 
     public override void PreDraw()
@@ -61,8 +70,8 @@ public class DownloadUi : Window, IDisposable
             IsOpen = false;
         }
 
-
         base.PreDraw();
+
         if (_uiShared.EditTrackerPosition)
         {
             Flags &= ~ImGuiWindowFlags.NoMove;
@@ -77,6 +86,13 @@ public class DownloadUi : Window, IDisposable
             Flags |= ImGuiWindowFlags.NoInputs;
             Flags |= ImGuiWindowFlags.NoResize;
         }
+
+        var maxHeight = ImGui.GetTextLineHeight() * _configService.Current.ParallelDownloads;
+        SizeConstraints = new()
+        {
+            MinimumSize = new Vector2(300, maxHeight),
+            MaximumSize = new Vector2(300, maxHeight),
+        };
     }
 
     public override void Draw()

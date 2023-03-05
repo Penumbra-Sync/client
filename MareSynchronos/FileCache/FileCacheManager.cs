@@ -204,6 +204,11 @@ public class FileCacheManager : IDisposable
         _fileCaches[fileCache.PrefixedFilePath] = fileCache;
     }
 
+    public string GetCacheFilePath(string hash, bool isTemporaryFile)
+    {
+        return Path.Combine(_configService.Current.CacheFolder, hash + (isTemporaryFile ? ".tmp" : string.Empty));
+    }
+
     private FileCacheEntity ReplacePathPrefixes(FileCacheEntity fileCache)
     {
         if (fileCache.PrefixedFilePath.StartsWith(_penumbraPrefix, StringComparison.OrdinalIgnoreCase))

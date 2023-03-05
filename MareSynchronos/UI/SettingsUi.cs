@@ -18,6 +18,7 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Services;
 using MareSynchronos.WebAPI.Files;
+using MareSynchronos.WebAPI.Files.Models;
 
 namespace MareSynchronos.UI;
 
@@ -30,7 +31,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly PerformanceCollectorService _performanceCollector;
-    private readonly FileTransferManager _fileTransferManager;
+    private readonly FileUploadManager _fileTransferManager;
     private readonly UiShared _uiShared;
     public CharacterData? LastCreatedCharacterData { private get; set; }
 
@@ -44,7 +45,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
         MareCharaFileManager mareCharaFileManager, PairManager pairManager,
         ServerConfigurationManager serverConfigurationManager,
         MareMediator mediator, PerformanceCollectorService performanceCollector,
-        FileTransferManager fileTransferManager) : base(logger, mediator, "Mare Synchronos Settings")
+        FileUploadManager fileTransferManager) : base(logger, mediator, "Mare Synchronos Settings")
     {
         _logger.LogTrace("Creating " + nameof(SettingsUi));
 
