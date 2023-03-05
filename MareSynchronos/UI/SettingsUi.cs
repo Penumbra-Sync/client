@@ -32,6 +32,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly PerformanceCollectorService _performanceCollector;
     private readonly FileUploadManager _fileTransferManager;
+    private readonly FileTransferOrchestrator _fileTransferOrchestrator;
     private readonly UiShared _uiShared;
     public CharacterData? LastCreatedCharacterData { private get; set; }
 
@@ -45,7 +46,8 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
         MareCharaFileManager mareCharaFileManager, PairManager pairManager,
         ServerConfigurationManager serverConfigurationManager,
         MareMediator mediator, PerformanceCollectorService performanceCollector,
-        FileUploadManager fileTransferManager) : base(logger, mediator, "Mare Synchronos Settings")
+        FileUploadManager fileTransferManager, 
+        FileTransferOrchestrator fileTransferOrchestrator) : base(logger, mediator, "Mare Synchronos Settings")
     {
         _logger.LogTrace("Creating " + nameof(SettingsUi));
 
@@ -62,6 +64,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
         _serverConfigurationManager = serverConfigurationManager;
         _performanceCollector = performanceCollector;
         _fileTransferManager = fileTransferManager;
+        _fileTransferOrchestrator = fileTransferOrchestrator;
         _uiShared = uiShared;
 
         Mediator.Subscribe<OpenSettingsUiMessage>(this, (_) => Toggle());
@@ -617,7 +620,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
 
             ImGui.TableHeadersRow();
 
-            foreach (var item in _fileTransferManager.ForbiddenTransfers)
+            foreach (var item in _fileTransferOrchestrator.ForbiddenTransfers)
             {
                 ImGui.TableNextColumn();
                 if (item is UploadFileTransfer transfer)
@@ -656,7 +659,8 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
             ImGui.Unindent();
         }
 
-        if (ImGui.BeginTable("TransfersTable", 2))
+        // todo: fix
+        /*if (ImGui.BeginTable("TransfersTable", 2))
         {
             ImGui.TableSetupColumn(
                 $"Uploads ({UiShared.ByteToString(_fileTransferManager.CurrentUploads.Sum(a => a.Transferred))} / {UiShared.ByteToString(_fileTransferManager.CurrentUploads.Sum(a => a.Total))})");
@@ -713,7 +717,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
             }
 
             ImGui.EndTable();
-        }
+        }*/
     }
 
     private bool _readExport = false;

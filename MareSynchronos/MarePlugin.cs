@@ -96,9 +96,8 @@ public class MarePlugin : MediatorSubscriberBase, IDisposable
     {
         base.Dispose();
 
-        _serviceProvider.GetRequiredService<CommandManager>().RemoveHandler(_commandName);
+        DalamudUtilOnLogOut();
 
-        _runtimeServiceScope?.Dispose();
         _serviceProvider.Dispose();
 
         _logger.LogDebug("Shut down");
@@ -164,8 +163,8 @@ public class MarePlugin : MediatorSubscriberBase, IDisposable
 
     private void Draw()
     {
-        _serviceProvider.GetRequiredService<WindowSystem>().Draw();
-        _serviceProvider.GetRequiredService<FileDialogManager>().Draw();
+        _serviceProvider?.GetService<WindowSystem>()?.Draw();
+        _serviceProvider?.GetService<FileDialogManager>()?.Draw();
     }
 
     private void OnCommand(string command, string args)

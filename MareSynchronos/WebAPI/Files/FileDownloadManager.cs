@@ -119,6 +119,7 @@ public partial class FileDownloadManager : MediatorSubscriberBase
                 var hash = file.Hash;
                 Progress<long> progress = new((bytesDownloaded) =>
                 {
+                    _downloadStatus[fileGroup.Key].TransferredBytes += bytesDownloaded;
                     file.Transferred += bytesDownloaded;
                 });
 
@@ -128,11 +129,12 @@ public partial class FileDownloadManager : MediatorSubscriberBase
                     await _orchestrator.WaitForDownloadSlotAsync(token).ConfigureAwait(false);
                     _downloadStatus[fileGroup.Key].DownloadStatus = DownloadStatus.WaitingForQueue;
                     await DownloadFileHttpClient(fileGroup.Key, file, tempPath, progress, token).ConfigureAwait(false);
+                    _downloadStatus[fileGroup.Key].TransferredFiles += 1;
                 }
                 catch (OperationCanceledException)
                 {
                     File.Delete(tempPath);
-                    _logger.LogDebug("Detected cancellation, removing {id}", _downloadId);
+                    _logger.LogDebug("Detected cancellation, removing {id}", aliasOrUid);
                     CancelDownload();
                     return;
                 }

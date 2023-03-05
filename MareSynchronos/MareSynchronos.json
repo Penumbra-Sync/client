@@ -5,6 +5,7 @@
   "Description": "This plugin will synchronize your Penumbra mods and current Glamourer state with other paired clients automatically.",
   "InternalName": "mareSynchronos",
   "ApplicableVersion": "any",
+  "CanUnloadAsync": true,
   "Tags": [
     "customization"
   ],

@@ -402,7 +402,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         }).ConfigureAwait(false);
     }
 
-    private async Task PenumbraRedrawAction(ILogger logger, GameObjectHandler obj, Guid applicationId, Action action, bool fireAndForget, CancellationToken token)
+    private async Task PenumbraRedrawAsync(ILogger logger, GameObjectHandler obj, Guid applicationId, Action action, bool fireAndForget, CancellationToken token)
     {
         Mediator.Publish(new PenumbraStartRedrawMessage(obj.Address));
 
@@ -432,7 +432,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
         if (gameObj is Character c)
         {
-            await PenumbraRedrawAction(logger, handler, applicationId, () => _glamourerApplyAll!.InvokeAction(customization, c), fireAndForget, token).ConfigureAwait(false);
+            await PenumbraRedrawAsync(logger, handler, applicationId, () => _glamourerApplyAll!.InvokeAction(customization, c), fireAndForget, token).ConfigureAwait(false);
         }
     }
 
@@ -442,7 +442,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
         if (gameObj is Character c)
         {
-            await PenumbraRedrawAction(logger, handler, applicationId, () => _glamourerApplyOnlyEquipment!.InvokeAction(customization, c), fireAndForget, token).ConfigureAwait(false);
+            await PenumbraRedrawAsync(logger, handler, applicationId, () => _glamourerApplyOnlyEquipment!.InvokeAction(customization, c), fireAndForget, token).ConfigureAwait(false);
         }
     }
 
@@ -452,7 +452,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
         if (gameObj is Character c)
         {
-            await PenumbraRedrawAction(logger, handler, applicationId, () => _glamourerApplyOnlyCustomization!.InvokeAction(customization, c), fireAndForget, token).ConfigureAwait(false);
+            await PenumbraRedrawAsync(logger, handler, applicationId, () => _glamourerApplyOnlyCustomization!.InvokeAction(customization, c), fireAndForget, token).ConfigureAwait(false);
         }
     }
 
@@ -505,7 +505,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
         if (gameObj is Character c)
         {
-            await PenumbraRedrawAction(logger, handler, applicationId, () => _penumbraRedrawObject!.Invoke(c, RedrawType.Redraw), fireAndForget, token).ConfigureAwait(false);
+            await PenumbraRedrawAsync(logger, handler, applicationId, () => _penumbraRedrawObject!.Invoke(c, RedrawType.Redraw), fireAndForget, token).ConfigureAwait(false);
         }
     }
 

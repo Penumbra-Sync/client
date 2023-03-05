@@ -355,6 +355,38 @@ public partial class UiShared : MediatorSubscriberBase
     public static uint Color(byte r, byte g, byte b, byte a)
     { uint ret = a; ret <<= 8; ret += b; ret <<= 8; ret += g; ret <<= 8; ret += r; return ret; }
 
+    public static void DrawOutlinedFont(string text, Vector4 fontColor, Vector4 outlineColor, int thickness)
+    {
+        var original = ImGui.GetCursorPos();
+
+        ImGui.PushStyleColor(ImGuiCol.Text, outlineColor);
+        ImGui.SetCursorPos(original with { Y = original.Y - thickness });
+        ImGui.TextUnformatted(text);
+        ImGui.SetCursorPos(original with { X = original.X - thickness });
+        ImGui.TextUnformatted(text);
+        ImGui.SetCursorPos(original with { Y = original.Y + thickness });
+        ImGui.TextUnformatted(text);
+        ImGui.SetCursorPos(original with { X = original.X + thickness });
+        ImGui.TextUnformatted(text);
+        ImGui.SetCursorPos(original with { X = original.X - thickness, Y = original.Y - thickness });
+        ImGui.TextUnformatted(text);
+        ImGui.SetCursorPos(original with { X = original.X + thickness, Y = original.Y + thickness });
+        ImGui.TextUnformatted(text);
+        ImGui.SetCursorPos(original with { X = original.X - thickness, Y = original.Y + thickness });
+        ImGui.TextUnformatted(text);
+        ImGui.SetCursorPos(original with { X = original.X + thickness, Y = original.Y - thickness });
+        ImGui.TextUnformatted(text);
+        ImGui.PopStyleColor();
+
+        ImGui.PushStyleColor(ImGuiCol.Text, fontColor);
+        ImGui.SetCursorPos(original);
+        ImGui.TextUnformatted(text);
+        ImGui.SetCursorPos(original);
+        ImGui.TextUnformatted(text);
+        ImGui.PopStyleColor();
+    }
+
+
     public static void DrawOutlinedFont(ImDrawListPtr drawList, string text, Vector2 textPos, uint fontColor, uint outlineColor, int thickness)
     {
         drawList.AddText(textPos with { Y = textPos.Y - thickness },
@@ -378,7 +410,7 @@ public partial class UiShared : MediatorSubscriberBase
         drawList.AddText(textPos, fontColor, text);
     }
 
-    public static string ByteToString(long bytes)
+    public static string ByteToString(long bytes, bool addSuffix = true)
     {
         string[] suffix = { "B", "KiB", "MiB", "GiB", "TiB" };
         int i;
@@ -388,7 +420,7 @@ public partial class UiShared : MediatorSubscriberBase
             dblSByte = bytes / 1024.0;
         }
 
-        return $"{dblSByte:0.00} {suffix[i]}";
+        return addSuffix ? $"{dblSByte:0.00} {suffix[i]}" : $"{dblSByte:0.00}";
     }
 
     private int _serverSelectionIndex = -1;

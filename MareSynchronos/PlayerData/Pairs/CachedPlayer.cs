@@ -243,7 +243,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
             {
                 foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData.FileReplacements)
                 {
-                    Task.Run(async () => await RevertCustomizationData(ptr, item.Key, name, applicationId).ConfigureAwait(false));
+                    RevertCustomizationData(ptr, item.Key, name, applicationId).Wait();
                 }
             }
         }
@@ -376,7 +376,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                     _logger.LogDebug("Downloading missing files for player {name}, {kind}", PlayerName, updatedData);
                     if (toDownloadReplacements.Any())
                     {
-                        await _downloadManager.DownloadFiles(toDownloadReplacements, downloadToken).ConfigureAwait(false);
+                        await _downloadManager.DownloadFiles(OnlineUser.User.AliasOrUID, toDownloadReplacements, downloadToken).ConfigureAwait(false);
                         _downloadManager.CancelDownload();
                     }
 

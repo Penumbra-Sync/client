@@ -732,7 +732,8 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
             ImGui.Text("No uploads in progress");
         }
 
-        var currentDownloads = _fileTransferManager.CurrentDownloads.SelectMany(k => k.Value).ToList();
+        // todo: fix
+        /*var currentDownloads = _fileTransferManager.CurrentDownloads.SelectMany(k => k.Value).ToList();
         ImGui.PushFont(UiBuilder.IconFont);
         ImGui.Text(FontAwesomeIcon.Download.ToIconString());
         ImGui.PopFont();
@@ -755,7 +756,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
         else
         {
             ImGui.Text("No downloads in progress");
-        }
+        }*/
 
         ImGui.SameLine();
     }
