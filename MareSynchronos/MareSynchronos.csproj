@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Authors></Authors>
     <Company></Company>
-    <Version>0.7.41</Version>
+    <Version>0.7.42</Version>
     <Description></Description>
     <Copyright></Copyright>
     <PackageProjectUrl>https://github.com/Penumbra-Sync/client</PackageProjectUrl>
@@ -28,14 +28,14 @@
   <ItemGroup>
     <PackageReference Include="DalamudPackager" Version="2.1.10" />
     <PackageReference Include="lz4net" Version="1.0.15.93" />
-    <PackageReference Include="Meziantou.Analyzer" Version="2.0.13">
+    <PackageReference Include="Meziantou.Analyzer" Version="2.0.19">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="7.0.2" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="7.0.2" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="7.0.3" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="7.0.3" />
     <PackageReference Include="Penumbra.Api" Version="1.0.7" />
-    <PackageReference Include="Penumbra.String" Version="1.0.1" />
+    <PackageReference Include="Penumbra.String" Version="1.0.3" />
   </ItemGroup>
 
   <PropertyGroup>

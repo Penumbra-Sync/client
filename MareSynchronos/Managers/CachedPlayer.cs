@@ -280,10 +280,10 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         return OnlineUser.User.AliasOrUID + ":" + PlayerName + ":" + ((PlayerCharacter != IntPtr.Zero) ? "HasChar" : "NoChar");
     }
 
-    private void ApplyBaseData(Guid applicationId, Dictionary<string, string> moddedPaths, string manipulationData)
+    private async Task ApplyBaseData(Guid applicationId, Dictionary<string, string> moddedPaths, string manipulationData)
     {
-        _ipcManager.PenumbraRemoveTemporaryCollection(_logger, applicationId, PlayerName!);
-        _ipcManager.PenumbraSetTemporaryMods(_logger, applicationId, PlayerName!, moddedPaths, manipulationData);
+        await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.PenumbraRemoveTemporaryCollection(_logger, applicationId, PlayerName!)).ConfigureAwait(false);
+        await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.PenumbraSetTemporaryMods(_logger, applicationId, PlayerName!, moddedPaths, manipulationData)).ConfigureAwait(false);
     }
 
     private async Task ApplyCustomizationData(Guid applicationId, KeyValuePair<ObjectKind, HashSet<PlayerChanges>> changes, API.Data.CharacterData charaData)
@@ -406,7 +406,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
                 if (updateModdedPaths && (moddedPaths.Any() || !string.IsNullOrEmpty(charaData.ManipulationData)))
                 {
-                    ApplyBaseData(_applicationId, moddedPaths, charaData.ManipulationData);
+                    await ApplyBaseData(_applicationId, moddedPaths, charaData.ManipulationData).ConfigureAwait(false);
                 }
 
                 foreach (var kind in updatedData)
