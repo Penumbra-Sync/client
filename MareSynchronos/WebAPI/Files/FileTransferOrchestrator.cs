@@ -13,9 +13,9 @@ public class FileTransferOrchestrator : MediatorSubscriberBase
     private readonly MareConfigService _mareConfig;
     private readonly ServerConfigurationManager _serverManager;
     private readonly HttpClient _httpClient;
-    public Uri? _filesCdnUri { private set; get; }
+    public Uri? FilesCdnUri { private set; get; }
     public List<FileTransfer> ForbiddenTransfers { get; } = new();
-    public bool IsInitialized => _filesCdnUri != null;
+    public bool IsInitialized => FilesCdnUri != null;
     private SemaphoreSlim _downloadSemaphore;
     private int _availableDownloadSlots;
     private readonly object _semaphoreModificationLock = new();
@@ -31,12 +31,12 @@ public class FileTransferOrchestrator : MediatorSubscriberBase
 
         Mediator.Subscribe<ConnectedMessage>(this, (msg) =>
         {
-            _filesCdnUri = ((ConnectedMessage)msg).Connection.ServerInfo.FileServerAddress;
+            FilesCdnUri = ((ConnectedMessage)msg).Connection.ServerInfo.FileServerAddress;
         });
 
         Mediator.Subscribe<DisconnectedMessage>(this, (msg) =>
         {
-            _filesCdnUri = null;
+            FilesCdnUri = null;
         });
     }
 

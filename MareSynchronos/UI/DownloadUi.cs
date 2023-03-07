@@ -13,22 +13,14 @@ namespace MareSynchronos.UI;
 
 public class DownloadUi : WindowMediatorSubscriberBase
 {
-    private readonly WindowSystem _windowSystem;
     private readonly MareConfigService _configService;
     private readonly FileUploadManager _fileTransferManager;
     private readonly UiShared _uiShared;
     private readonly ConcurrentDictionary<string, Dictionary<string, FileDownloadStatus>> _currentDownloads = new(StringComparer.Ordinal);
 
-    public override void Dispose()
-    {
-        base.Dispose();
-        _windowSystem.RemoveWindow(this);
-    }
-
     public DownloadUi(ILogger<DownloadUi> logger, WindowSystem windowSystem, MareConfigService configService,
-        FileUploadManager fileTransferManager, MareMediator mediator, UiShared uiShared) : base(logger, mediator, "Mare Synchronos Downloads")
+        FileUploadManager fileTransferManager, MareMediator mediator, UiShared uiShared) : base(logger, windowSystem, mediator, "Mare Synchronos Downloads")
     {
-        _windowSystem = windowSystem;
         _configService = configService;
         _fileTransferManager = fileTransferManager;
         _uiShared = uiShared;
@@ -50,7 +42,6 @@ public class DownloadUi : WindowMediatorSubscriberBase
 
         ForceMainWindow = true;
 
-        windowSystem.AddWindow(this);
         IsOpen = true;
 
         Mediator.Subscribe<DownloadStartedMessage>(this, (msg) =>
@@ -104,10 +95,6 @@ public class DownloadUi : WindowMediatorSubscriberBase
         if (!_configService.Current.ShowTransferWindow) return;
         if (!_currentDownloads.Any() && !_fileTransferManager.CurrentUploads.Any()) return;
 
-        var drawList = ImGui.GetWindowDrawList();
-
-        var basePosition = ImGui.GetWindowPos() + ImGui.GetWindowContentRegionMin();
-
         try
         {
             if (_fileTransferManager.CurrentUploads.Any())
@@ -122,16 +109,19 @@ public class DownloadUi : WindowMediatorSubscriberBase
                 UiShared.DrawOutlinedFont($"▲", ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
                 ImGui.SameLine();
                 var xDistance = ImGui.GetCursorPosX();
-                UiShared.DrawOutlinedFont("Compressing+Uploading {doneUploads}/{totalUploads}", ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
+                UiShared.DrawOutlinedFont($"Compressing+Uploading {doneUploads}/{totalUploads}", ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
                 ImGui.NewLine();
                 ImGui.SameLine(xDistance);
-                UiShared.DrawOutlinedFont($"{UiShared.ByteToString(totalUploaded, false)}/{UiShared.ByteToString(totalToUpload)}",
+                UiShared.DrawOutlinedFont($"{UiShared.ByteToString(totalUploaded, addSuffix: false)}/{UiShared.ByteToString(totalToUpload)}",
                     ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
 
                 if (_currentDownloads.Any()) ImGui.Separator();
             }
         }
-        catch { }
+        catch
+        {
+            // ignore errors thrown from UI
+        }
 
         try
         {
@@ -153,10 +143,13 @@ public class DownloadUi : WindowMediatorSubscriberBase
                     ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
                 ImGui.NewLine();
                 ImGui.SameLine(xDistance);
-                UiShared.DrawOutlinedFont($"{transferredFiles}/{totalFiles} Files ({UiShared.ByteToString(transferredBytes, false)}/{UiShared.ByteToString(totalBytes)})",
+                UiShared.DrawOutlinedFont($"{transferredFiles}/{totalFiles} Files ({UiShared.ByteToString(transferredBytes, addSuffix: false)}/{UiShared.ByteToString(totalBytes)})",
                     ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
             }
         }
-        catch { }
+        catch
+        {
+            // ignore errors thrown from UI
+        }
     }
 }

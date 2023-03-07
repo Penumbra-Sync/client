@@ -169,12 +169,9 @@ namespace MareSynchronos.UI.Components
             }
             UiShared.AttachToolTip($"Add more users to Group {tag}");
 
-            if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete " + tag))
+            if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete " + tag) && UiShared.CtrlPressed())
             {
-                if (UiShared.CtrlPressed())
-                {
-                    _tagHandler.RemoveTag(tag);
-                }
+                _tagHandler.RemoveTag(tag);
             }
             UiShared.AttachToolTip($"Delete Group {tag} (Will not delete the pairs)" + Environment.NewLine + "Hold CTRL to delete");
         }

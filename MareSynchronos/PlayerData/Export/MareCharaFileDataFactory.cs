@@ -3,7 +3,7 @@ using MareSynchronos.FileCache;
 
 namespace MareSynchronos.PlayerData.Export;
 
-internal class MareCharaFileDataFactory
+internal sealed class MareCharaFileDataFactory
 {
     private readonly FileCacheManager _fileCacheManager;
 

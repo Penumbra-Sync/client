@@ -7,14 +7,13 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.FileCache;
 
-public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
+public class PeriodicFileScanner : MediatorSubscriberBase
 {
     private readonly IpcManager _ipcManager;
     private readonly MareConfigService _configService;
     private readonly FileCacheManager _fileDbManager;
     private readonly PerformanceCollectorService _performanceCollector;
     private CancellationTokenSource? _scanCancellationTokenSource;
-    private Task? _fileScannerTask = null;
     public ConcurrentDictionary<string, int> haltScanLocks = new(StringComparer.Ordinal);
 
     public PeriodicFileScanner(ILogger<PeriodicFileScanner> logger, IpcManager ipcManager, MareConfigService configService,
@@ -76,11 +75,10 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
     private TimeSpan _timeUntilNextScan = TimeSpan.Zero;
     private int TimeBetweenScans => _configService.Current.TimeSpanBetweenScansInSeconds;
 
-    public override void Dispose()
+    public override void Dispose(bool disposing)
     {
-        base.Dispose();
-
         _scanCancellationTokenSource?.Cancel();
+        base.Dispose(disposing);
     }
 
     public void InvokeScan(bool forced = false)
@@ -91,7 +89,7 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
         _scanCancellationTokenSource?.Cancel();
         _scanCancellationTokenSource = new CancellationTokenSource();
         var token = _scanCancellationTokenSource.Token;
-        _fileScannerTask = Task.Run(async () =>
+        Task.Run(async () =>
         {
             while (!token.IsCancellationRequested)
             {
@@ -276,7 +274,7 @@ public class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
         if (ct.IsCancellationRequested) return;
 
         // scan new files
-        foreach (var c in scannedFiles.Where(c => c.Value == false))
+        foreach (var c in scannedFiles.Where(c => !c.Value))
         {
             var idx = Task.WaitAny(dbTasks, ct);
             dbTasks[idx] = Task.Run(() =>

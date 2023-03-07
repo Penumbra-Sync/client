@@ -8,7 +8,7 @@ using System.Text;
 
 namespace MareSynchronos.FileCache;
 
-public class FileCacheManager : IDisposable
+public sealed class FileCacheManager : IDisposable
 {
     private const string _penumbraPrefix = "{penumbra}";
     private const string _cachePrefix = "{cache}";
@@ -119,7 +119,7 @@ public class FileCacheManager : IDisposable
 
         if (entry == null)
         {
-            _logger.LogDebug("Found no entries for " + cleanedPath);
+            _logger.LogDebug("Found no entries for {path}", cleanedPath);
             return CreateFileEntry(path);
         }
 
@@ -130,7 +130,7 @@ public class FileCacheManager : IDisposable
 
     public FileCacheEntity? CreateCacheEntry(string path)
     {
-        _logger.LogTrace("Creating cache entry for " + path);
+        _logger.LogTrace("Creating cache entry for {path}", path);
         FileInfo fi = new(path);
         if (!fi.Exists) return null;
         var fullName = fi.FullName.ToLowerInvariant();
@@ -141,7 +141,7 @@ public class FileCacheManager : IDisposable
 
     public FileCacheEntity? CreateFileEntry(string path)
     {
-        _logger.LogTrace("Creating file entry for " + path);
+        _logger.LogTrace("Creating file entry for {path}", path);
         FileInfo fi = new(path);
         if (!fi.Exists) return null;
         var fullName = fi.FullName.ToLowerInvariant();
@@ -161,7 +161,7 @@ public class FileCacheManager : IDisposable
             File.AppendAllLines(_csvPath, new[] { entity.CsvEntry });
         }
         var result = GetFileCacheByPath(fileInfo.FullName);
-        _logger.LogDebug("Creating file cache for " + fileInfo.FullName + " success: " + (result != null));
+        _logger.LogDebug("Creating file cache for {name} success: {success}", fileInfo.FullName, (result != null));
         return result;
     }
 
@@ -191,13 +191,13 @@ public class FileCacheManager : IDisposable
 
     public void RemoveHash(FileCacheEntity entity)
     {
-        _logger.LogTrace("Removing " + entity.ResolvedFilepath);
+        _logger.LogTrace("Removing {path}", entity.ResolvedFilepath);
         _fileCaches.Remove(entity.PrefixedFilePath, out _);
     }
 
     public void UpdateHash(FileCacheEntity fileCache)
     {
-        _logger.LogTrace("Updating hash for " + fileCache.ResolvedFilepath);
+        _logger.LogTrace("Updating hash for {path}", fileCache.ResolvedFilepath);
         fileCache.Hash = Crypto.GetFileHash(fileCache.ResolvedFilepath);
         fileCache.LastModifiedDateTicks = new FileInfo(fileCache.ResolvedFilepath).LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture);
         _fileCaches.Remove(fileCache.PrefixedFilePath, out _);
@@ -230,7 +230,8 @@ public class FileCacheManager : IDisposable
 
     public void Dispose()
     {
-        _logger.LogTrace($"Disposing {GetType()}");
+        _logger.LogTrace("Disposing {type}", GetType());
         WriteOutFullCsv();
+        GC.SuppressFinalize(this);
     }
 }

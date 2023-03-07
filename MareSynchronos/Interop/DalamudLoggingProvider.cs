@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 namespace MareSynchronos.Interop;
 
 [ProviderAlias("Dalamud")]
-public class DalamudLoggingProvider : ILoggerProvider
+public sealed class DalamudLoggingProvider : ILoggerProvider
 {
     private readonly ConcurrentDictionary<string, DalamudLogger> _loggers =
         new(StringComparer.OrdinalIgnoreCase);
@@ -34,5 +34,6 @@ public class DalamudLoggingProvider : ILoggerProvider
     public void Dispose()
     {
         _loggers.Clear();
+        GC.SuppressFinalize(this);
     }
 }

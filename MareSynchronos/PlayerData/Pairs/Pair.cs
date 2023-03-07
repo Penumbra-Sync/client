@@ -125,7 +125,7 @@ public class Pair
 
         if (disableAnimations || disableSounds)
         {
-            _logger.LogTrace($"Data cleaned up: Animations disabled: {disableAnimations}, Sounds disabled: {disableSounds}");
+            _logger.LogTrace("Data cleaned up: Animations disabled: {disableAnimations}, Sounds disabled: {disableSounds}", disableAnimations, disableSounds);
             foreach (var kvp in data.FileReplacements)
             {
                 if (disableSounds)

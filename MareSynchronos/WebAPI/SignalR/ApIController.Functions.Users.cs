@@ -28,7 +28,7 @@ public partial class ApiController
 
     private async Task PushCharacterDataInternal(CharacterData character, List<UserData> visibleCharacters)
     {
-        _logger.LogInformation("Pushing character data for " + character.DataHash.Value + " to " + string.Join(", ", visibleCharacters.Select(c => c.AliasOrUID)));
+        _logger.LogInformation("Pushing character data for {hash} to {charas}", character.DataHash.Value, string.Join(", ", visibleCharacters.Select(c => c.AliasOrUID)));
         StringBuilder sb = new();
         foreach (var kvp in character.FileReplacements.ToList())
         {
@@ -38,7 +38,7 @@ public partial class ApiController
         {
             sb.AppendLine($"GlamourerData for {item.Key}: {!string.IsNullOrEmpty(item.Value)}");
         }
-        _logger.LogDebug("Chara data contained: " + Environment.NewLine + sb.ToString());
+        _logger.LogDebug("Chara data contained: {nl} {data}", Environment.NewLine, sb.ToString());
         await UserPushData(new(visibleCharacters, character)).ConfigureAwait(false);
     }
 
@@ -71,20 +71,20 @@ public partial class ApiController
         return await _mareHub!.InvokeAsync<List<OnlineUserIdentDto>>(nameof(UserGetOnlinePairs)).ConfigureAwait(false);
     }
 
-    public async Task UserSetPairPermissions(UserPermissionsDto dto)
+    public async Task UserSetPairPermissions(UserPermissionsDto userPermissions)
     {
-        await _mareHub!.SendAsync(nameof(UserSetPairPermissions), dto).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(UserSetPairPermissions), userPermissions).ConfigureAwait(false);
     }
 
-    public async Task UserAddPair(UserDto dto)
+    public async Task UserAddPair(UserDto user)
     {
         if (!IsConnected) return;
-        await _mareHub!.SendAsync(nameof(UserAddPair), dto).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(UserAddPair), user).ConfigureAwait(false);
     }
 
-    public async Task UserRemovePair(UserDto dto)
+    public async Task UserRemovePair(UserDto userDto)
     {
         if (!IsConnected) return;
-        await _mareHub!.SendAsync(nameof(UserRemovePair), dto).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(UserRemovePair), userDto).ConfigureAwait(false);
     }
 }

@@ -481,20 +481,18 @@ public partial class UiShared : MediatorSubscriberBase
             ImGui.InputText("Custom Service URI", ref _customServerUri, 255);
             ImGui.SetNextItemWidth(250);
             ImGui.InputText("Custom Service Name", ref _customServerName, 255);
-            if (UiShared.IconTextButton(FontAwesomeIcon.Plus, "Add Custom Service"))
+            if (UiShared.IconTextButton(FontAwesomeIcon.Plus, "Add Custom Service") 
+                && !string.IsNullOrEmpty(_customServerUri)
+                && !string.IsNullOrEmpty(_customServerName))
             {
-                if (!string.IsNullOrEmpty(_customServerUri)
-                    && !string.IsNullOrEmpty(_customServerName))
+                _serverConfigurationManager.AddServer(new ServerStorage()
                 {
-                    _serverConfigurationManager.AddServer(new ServerStorage()
-                    {
-                        ServerName = _customServerName,
-                        ServerUri = _customServerUri,
-                    });
-                    _customServerName = string.Empty;
-                    _customServerUri = string.Empty;
-                    _configService.Save();
-                }
+                    ServerName = _customServerName,
+                    ServerUri = _customServerUri,
+                });
+                _customServerName = string.Empty;
+                _customServerUri = string.Empty;
+                _configService.Save();
             }
             ImGui.TreePop();
         }
@@ -737,9 +735,9 @@ public partial class UiShared : MediatorSubscriberBase
         return true;
     }
 
-    public override void Dispose()
+    public override void Dispose(bool disposing)
     {
-        base.Dispose();
+        base.Dispose(disposing);
         _pluginInterface.UiBuilder.BuildFonts -= BuildFont;
     }
 

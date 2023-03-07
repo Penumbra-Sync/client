@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.PlayerData.Services;
 
-public class CacheCreationService : MediatorSubscriberBase, IDisposable
+public class CacheCreationService : MediatorSubscriberBase
 {
     private readonly PlayerDataFactory _characterDataFactory;
     private Task? _cacheCreationTask;
@@ -17,7 +17,7 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
     private readonly CancellationTokenSource _cts = new();
     private readonly List<GameObjectHandler> _playerRelatedObjects = new();
     private CancellationTokenSource _palettePlusCts = new();
-    private SemaphoreSlim _cacheCreateLock = new(1);
+    private readonly SemaphoreSlim _cacheCreateLock = new(1);
 
     public CacheCreationService(ILogger<CacheCreationService> logger, MareMediator mediator, GameObjectHandlerFactory gameObjectHandlerFactory,
         PlayerDataFactory characterDataFactory, DalamudUtil dalamudUtil) : base(logger, mediator)
@@ -123,9 +123,9 @@ public class CacheCreationService : MediatorSubscriberBase, IDisposable
         }
     }
 
-    public override void Dispose()
+    public override void Dispose(bool disposing)
     {
-        base.Dispose();
+        base.Dispose(disposing);
         _playerRelatedObjects.ForEach(p => p.Dispose());
         _cts.Dispose();
     }

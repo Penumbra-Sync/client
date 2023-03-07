@@ -44,22 +44,12 @@ public sealed class Plugin : IDalamudPlugin
             o.SetMinimumLevel(LogLevel.Trace);
         });
 
-        // inject dalamud stuff
-        collection.AddSingleton(pluginInterface);
-        collection.AddSingleton(commandManager);
-        collection.AddSingleton(gameData);
-        collection.AddSingleton(framework);
-        collection.AddSingleton(objectTable);
-        collection.AddSingleton(clientState);
-        collection.AddSingleton(condition);
-        collection.AddSingleton(chatGui);
-        collection.AddSingleton(pluginInterface.UiBuilder);
+        // inject dalamud related things
         collection.AddSingleton(new WindowSystem("MareSynchronos"));
         collection.AddSingleton<FileDialogManager>();
-
-        // add mare related stuff
         collection.AddSingleton(new Dalamud.Localization("MareSynchronos.Localization.", "", useEmbedded: true));
 
+        // add mare related singletons
         collection.AddSingleton<ConfigurationMigrator>();
         collection.AddSingleton<MareConfigService>();
         collection.AddSingleton<ServerTagConfigService>();
@@ -67,8 +57,6 @@ public sealed class Plugin : IDalamudPlugin
         collection.AddSingleton<NotesConfigService>();
         collection.AddSingleton<ServerConfigService>();
         collection.AddSingleton<MareMediator>();
-        collection.AddSingleton<DalamudUtil>();
-        collection.AddSingleton<IpcManager>();
         collection.AddSingleton<FileCacheManager>();
         collection.AddSingleton<CachedPlayerFactory>();
         collection.AddSingleton<PairFactory>();
@@ -77,7 +65,6 @@ public sealed class Plugin : IDalamudPlugin
         collection.AddSingleton<ApiController>();
         collection.AddSingleton<PeriodicFileScanner>();
         collection.AddSingleton<MareCharaFileManager>();
-        collection.AddSingleton<NotificationService>();
         collection.AddSingleton<GameObjectHandlerFactory>();
         collection.AddSingleton<PerformanceCollectorService>();
         collection.AddSingleton<HubFactory>();
@@ -85,6 +72,16 @@ public sealed class Plugin : IDalamudPlugin
         collection.AddSingleton<FileTransferOrchestrator>();
         collection.AddSingleton<FileDownloadManagerFactory>();
 
+        // factoried singletons
+        collection.AddSingleton((s) => new DalamudUtil(s.GetRequiredService<ILogger<DalamudUtil>>(),
+            clientState, objectTable, framework, condition, gameData,
+            s.GetRequiredService<MareMediator>(), s.GetRequiredService<PerformanceCollectorService>()));
+        collection.AddSingleton((s) => new IpcManager(s.GetRequiredService<ILogger<IpcManager>>(),
+            pluginInterface, s.GetRequiredService<DalamudUtil>(), s.GetRequiredService<MareMediator>()));
+        collection.AddSingleton((s) => new NotificationService(s.GetRequiredService<ILogger<NotificationService>>(),
+            s.GetRequiredService<MareMediator>(), pluginInterface.UiBuilder, chatGui, s.GetRequiredService<MareConfigService>()));
+
+        // add ui stuff
         collection.AddSingleton<UiShared>();
         collection.AddSingleton<SettingsUi>();
         collection.AddSingleton<CompactUi>();
@@ -92,11 +89,13 @@ public sealed class Plugin : IDalamudPlugin
         collection.AddSingleton<IntroUi>();
         collection.AddSingleton<DownloadUi>();
 
+        // add scoped services
         collection.AddScoped<CacheCreationService>();
         collection.AddScoped<TransientResourceManager>();
         collection.AddScoped<PlayerDataFactory>();
         collection.AddScoped<OnlinePlayerManager>();
 
+        // set up remaining things and launch mareplugin
         var serviceProvider = collection.BuildServiceProvider(new ServiceProviderOptions() { ValidateOnBuild = true, ValidateScopes = true });
 
         _pluginLogger = serviceProvider.GetRequiredService<ILogger<Plugin>>();
@@ -113,7 +112,7 @@ public sealed class Plugin : IDalamudPlugin
 
     public void Dispose()
     {
-        _pluginLogger.LogTrace($"Disposing {GetType()}");
+        _pluginLogger.LogTrace("Disposing {type}", GetType());
         _plugin.Dispose();
     }
 }

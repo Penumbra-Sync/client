@@ -11,9 +11,8 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
-public class GposeUi : WindowMediatorSubscriberBase, IDisposable
+public class GposeUi : WindowMediatorSubscriberBase
 {
-    private readonly WindowSystem _windowSystem;
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly DalamudUtil _dalamudUtil;
     private readonly FileDialogManager _fileDialogManager;
@@ -21,9 +20,8 @@ public class GposeUi : WindowMediatorSubscriberBase, IDisposable
 
     public GposeUi(ILogger<GposeUi> logger, WindowSystem windowSystem, MareCharaFileManager mareCharaFileManager,
         DalamudUtil dalamudUtil, FileDialogManager fileDialogManager, MareConfigService configService,
-        MareMediator mediator) : base(logger, mediator, "Mare Synchronos Gpose Import UI###MareSynchronosGposeUI")
+        MareMediator mediator) : base(logger, windowSystem, mediator, "Mare Synchronos Gpose Import UI###MareSynchronosGposeUI")
     {
-        _windowSystem = windowSystem;
         _mareCharaFileManager = mareCharaFileManager;
         _dalamudUtil = dalamudUtil;
         _fileDialogManager = fileDialogManager;
@@ -32,7 +30,6 @@ public class GposeUi : WindowMediatorSubscriberBase, IDisposable
         Mediator.Subscribe<GposeEndMessage>(this, (_) => EndGpose());
         IsOpen = _dalamudUtil.IsInGpose;
         Flags = ImGuiWindowFlags.AlwaysAutoResize;
-        _windowSystem.AddWindow(this);
     }
 
     private void EndGpose()
@@ -44,12 +41,6 @@ public class GposeUi : WindowMediatorSubscriberBase, IDisposable
     private void StartGpose()
     {
         IsOpen = _configService.Current.OpenGposeImportOnGposeStart;
-    }
-
-    public override void Dispose()
-    {
-        base.Dispose();
-        _windowSystem.RemoveWindow(this);
     }
 
     public override void Draw()

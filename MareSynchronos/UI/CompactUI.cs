@@ -23,17 +23,15 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
-public class CompactUi : WindowMediatorSubscriberBase, IDisposable
+public class CompactUi : WindowMediatorSubscriberBase
 {
     private readonly ApiController _apiController;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
     private readonly FileUploadManager _fileTransferManager;
     private readonly MareConfigService _configService;
-    private readonly TagHandler _tagHandler;
     public readonly Dictionary<string, bool> ShowUidForEntry = new(StringComparer.Ordinal);
     private readonly UiShared _uiShared;
-    private readonly WindowSystem _windowSystem;
     private string _characterOrCommentFilter = string.Empty;
 
     public string EditUserComment = string.Empty;
@@ -60,7 +58,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
 
     public CompactUi(ILogger<CompactUi> logger, WindowSystem windowSystem,
         UiShared uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
-        ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager) : base(logger, mediator, "###MareSynchronosMainUI")
+        ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager) : base(logger, windowSystem, mediator, "###MareSynchronosMainUI")
     {
 
 #if DEBUG
@@ -74,19 +72,18 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
 #endif
         _logger.LogTrace("Creating " + nameof(CompactUi));
 
-        _windowSystem = windowSystem;
         _uiShared = uiShared;
         _configService = configService;
         _apiController = apiController;
         _pairManager = pairManager;
         _serverManager = serverManager;
         _fileTransferManager = fileTransferManager;
-        _tagHandler = new(_serverManager);
+        var tagHandler = new TagHandler(_serverManager);
 
         _groupPanel = new(this, uiShared, _pairManager, _serverManager, _configService);
-        _selectGroupForPairUi = new(_tagHandler);
-        _selectPairsForGroupUi = new(_tagHandler);
-        _pairGroupsUi = new(_tagHandler, DrawPairedClient, apiController, _selectPairsForGroupUi);
+        _selectGroupForPairUi = new(tagHandler);
+        _selectPairsForGroupUi = new(tagHandler);
+        _pairGroupsUi = new(tagHandler, DrawPairedClient, apiController, _selectPairsForGroupUi);
 
         Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = true);
         Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
@@ -98,8 +95,6 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
             MinimumSize = new Vector2(350, 400),
             MaximumSize = new Vector2(350, 2000),
         };
-
-        windowSystem.AddWindow(this);
     }
 
     private void UiShared_GposeEnd()
@@ -111,12 +106,6 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
     {
         _wasOpen = IsOpen;
         IsOpen = false;
-    }
-
-    public override void Dispose()
-    {
-        base.Dispose();
-        _windowSystem.RemoveWindow(this);
     }
 
     public override void Draw()
@@ -322,20 +311,17 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
         {
             _timeout.Reset();
 
-            if (ImGuiComponents.IconButton(button))
+            if (ImGuiComponents.IconButton(button) && UiShared.CtrlPressed())
             {
-                if (UiShared.CtrlPressed())
+                foreach (var entry in users)
                 {
-                    foreach (var entry in users)
-                    {
-                        var perm = entry.UserPair!.OwnPermissions;
-                        perm.SetPaused(!perm.IsPaused());
-                        _ = _apiController.UserSetPairPermissions(new UserPermissionsDto(entry.UserData, perm));
-                    }
-
-                    _timeout.Start();
-                    _buttonState = !_buttonState;
+                    var perm = entry.UserPair!.OwnPermissions;
+                    perm.SetPaused(!perm.IsPaused());
+                    _ = _apiController.UserSetPairPermissions(new UserPermissionsDto(entry.UserData, perm));
                 }
+
+                _timeout.Start();
+                _buttonState = !_buttonState;
             }
             UiShared.AttachToolTip($"Hold Control to {(button == FontAwesomeIcon.Play ? "resume" : "pause")} pairing with {users.Count} out of {userCount} displayed users.");
         }
@@ -591,12 +577,9 @@ public class CompactUi : WindowMediatorSubscriberBase, IDisposable
             _ = _apiController.UserSetPairPermissions(new UserPermissionsDto(entry.UserData, permissions));
         }
 
-        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Unpair Permanently"))
+        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Unpair Permanently") && UiShared.CtrlPressed())
         {
-            if (UiShared.CtrlPressed())
-            {
-                _ = _apiController.UserRemovePair(new(entry.UserData));
-            }
+            _ = _apiController.UserRemovePair(new(entry.UserData));
         }
         UiShared.AttachToolTip("Hold CTRL and click to unpair permanently from " + entryUID);
     }

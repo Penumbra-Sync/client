@@ -13,7 +13,7 @@ using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 namespace MareSynchronos.Services;
 
-public class DalamudUtil : IDisposable
+public sealed class DalamudUtil : IDisposable
 {
     private readonly ILogger<DalamudUtil> _logger;
     private readonly ClientState _clientState;
@@ -268,7 +268,7 @@ public class DalamudUtil : IDisposable
     {
         if (!_clientState.IsLoggedIn || handler.Address == IntPtr.Zero) return;
 
-        logger.LogTrace($"[{redrawId}] Starting wait for {handler} to draw");
+        logger.LogTrace("[{redrawId}] Starting wait for {handler} to draw", redrawId, handler);
 
         const int tick = 250;
         int curWaitTime = 0;
@@ -279,20 +279,20 @@ public class DalamudUtil : IDisposable
                    && curWaitTime < timeOut
                    && await handler.IsBeingDrawnRunOnFramework().ConfigureAwait(true)) // 0b100000000000 is "still rendering" or something
             {
-                logger.LogTrace($"[{redrawId}] Waiting for {handler} to finish drawing");
+                logger.LogTrace("[{redrawId}] Waiting for {handler} to finish drawing", redrawId, handler);
                 curWaitTime += tick;
                 await Task.Delay(tick).ConfigureAwait(true);
             }
 
-            logger.LogTrace($"[{redrawId}] Finished drawing after {curWaitTime}ms");
+            logger.LogTrace("[{redrawId}] Finished drawing after {curWaitTime}ms", redrawId, curWaitTime);
         }
         catch (NullReferenceException ex)
         {
-            logger.LogWarning(ex, "Error accessing " + handler + ", object does not exist anymore?");
+            logger.LogWarning(ex, "Error accessing {handler}, object does not exist anymore?", handler);
         }
         catch (AccessViolationException ex)
         {
-            logger.LogWarning(ex, "Error accessing " + handler + ", object does not exist anymore?");
+            logger.LogWarning(ex, "Error accessing {handler}, object does not exist anymore?", handler);
         }
     }
 
@@ -302,7 +302,7 @@ public class DalamudUtil : IDisposable
         var obj = (GameObject*)characterAddress;
         const int tick = 250;
         int curWaitTime = 0;
-        _logger.LogTrace("RenderFlags:" + obj->RenderFlags.ToString("X"));
+        _logger.LogTrace("RenderFlags: {flags}", obj->RenderFlags.ToString("X"));
         // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
         while (obj->RenderFlags != 0x00 && curWaitTime < timeOut)
         {
@@ -316,7 +316,8 @@ public class DalamudUtil : IDisposable
 
     public void Dispose()
     {
-        _logger.LogTrace($"Disposing {GetType()}");
+        _logger.LogTrace("Disposing {type}", GetType());
         _framework.Update -= FrameworkOnUpdate;
+        GC.SuppressFinalize(this);
     }
 }

@@ -9,50 +9,43 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.PlayerData.Pairs;
 
-public class OnlinePlayerManager : MediatorSubscriberBase, IDisposable
+public class OnlinePlayerManager : MediatorSubscriberBase
 {
     private readonly ApiController _apiController;
     private readonly DalamudUtil _dalamudUtil;
-    private readonly FileCacheManager _fileDbManager;
     private readonly PairManager _pairManager;
     private readonly FileUploadManager _fileTransferManager;
     private CharacterData? _lastSentData;
 
     public OnlinePlayerManager(ILogger<OnlinePlayerManager> logger, ApiController apiController, DalamudUtil dalamudUtil,
-        FileCacheManager fileDbManager, PairManager pairManager, MareMediator mediator, FileUploadManager fileTransferManager) : base(logger, mediator)
+        PairManager pairManager, MareMediator mediator, FileUploadManager fileTransferManager) : base(logger, mediator)
     {
         _logger.LogTrace("Creating " + nameof(OnlinePlayerManager));
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
-        _fileDbManager = fileDbManager;
         _pairManager = pairManager;
         _fileTransferManager = fileTransferManager;
-        Mediator.Subscribe<PlayerChangedMessage>(this, (msg) => PlayerManagerOnPlayerHasChanged((PlayerChangedMessage)msg));
+        Mediator.Subscribe<PlayerChangedMessage>(this, (_) => PlayerManagerOnPlayerHasChanged());
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => FrameworkOnUpdate());
         Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) =>
         {
             var newData = ((CharacterDataCreatedMessage)msg).CharacterData;
-            if (_lastSentData == null || _lastSentData != null && !string.Equals(newData.DataHash.Value, _lastSentData.DataHash.Value, StringComparison.Ordinal))
+            if (_lastSentData == null || (!string.Equals(newData.DataHash.Value, _lastSentData.DataHash.Value, StringComparison.Ordinal)))
             {
                 _logger.LogDebug("Pushing data for visible players");
                 _lastSentData = newData;
-                PushCharacterData(_pairManager.VisibleUsers);
+                PushCharacterData(_pairManager.GetVisibleUsers());
             }
             else
             {
-                _logger.LogDebug("Not sending data for " + newData.DataHash.Value);
+                _logger.LogDebug("Not sending data for {hash}", newData.DataHash.Value);
             }
         });
     }
 
-    private void PlayerManagerOnPlayerHasChanged(PlayerChangedMessage msg)
+    private void PlayerManagerOnPlayerHasChanged()
     {
-        PushCharacterData(_pairManager.VisibleUsers);
-    }
-
-    public override void Dispose()
-    {
-        base.Dispose();
+        PushCharacterData(_pairManager.GetVisibleUsers());
     }
 
     private void FrameworkOnUpdate()

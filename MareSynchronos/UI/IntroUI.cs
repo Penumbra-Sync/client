@@ -14,13 +14,12 @@ using MareSynchronos.Services.ServerConfiguration;
 
 namespace MareSynchronos.UI;
 
-internal class IntroUi : WindowMediatorSubscriberBase, IDisposable
+internal sealed class IntroUi : WindowMediatorSubscriberBase
 {
     private readonly UiShared _uiShared;
     private readonly MareConfigService _configService;
     private readonly PeriodicFileScanner _fileCacheManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
-    private readonly WindowSystem _windowSystem;
     private bool _readFirstPage;
 
     private string[]? _tosParagraphs;
@@ -31,14 +30,8 @@ internal class IntroUi : WindowMediatorSubscriberBase, IDisposable
     private readonly Dictionary<string, string> _languages = new(StringComparer.Ordinal) { { "English", "en" }, { "Deutsch", "de" }, { "Français", "fr" } };
     private int _currentLanguage;
 
-    public override void Dispose()
-    {
-        base.Dispose();
-        _windowSystem.RemoveWindow(this);
-    }
-
     public IntroUi(ILogger<IntroUi> logger, WindowSystem windowSystem, UiShared uiShared, MareConfigService configService,
-        PeriodicFileScanner fileCacheManager, ServerConfigurationManager serverConfigurationManager, MareMediator mareMediator) : base(logger, mareMediator, "Mare Synchronos Setup")
+        PeriodicFileScanner fileCacheManager, ServerConfigurationManager serverConfigurationManager, MareMediator mareMediator) : base(logger, windowSystem, mareMediator, "Mare Synchronos Setup")
     {
         _logger.LogTrace("Creating " + nameof(IntroUi));
 
@@ -46,7 +39,6 @@ internal class IntroUi : WindowMediatorSubscriberBase, IDisposable
         _configService = configService;
         _fileCacheManager = fileCacheManager;
         _serverConfigurationManager = serverConfigurationManager;
-        _windowSystem = windowSystem;
         IsOpen = false;
 
         SizeConstraints = new WindowSizeConstraints()
@@ -59,8 +51,6 @@ internal class IntroUi : WindowMediatorSubscriberBase, IDisposable
 
         Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = false);
         Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = true);
-
-        _windowSystem.AddWindow(this);
     }
 
     public override void Draw()
@@ -149,7 +139,7 @@ internal class IntroUi : WindowMediatorSubscriberBase, IDisposable
         }
         else if (_configService.Current.AcceptedAgreement
                  && (string.IsNullOrEmpty(_configService.Current.CacheFolder)
-                     || _configService.Current.InitialScanComplete == false
+                     || !_configService.Current.InitialScanComplete
                      || !Directory.Exists(_configService.Current.CacheFolder)))
         {
             if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
@@ -206,7 +196,7 @@ internal class IntroUi : WindowMediatorSubscriberBase, IDisposable
 
             UiShared.TextWrapped("Once you have received a secret key you can connect to the service using the tools provided below.");
 
-            var idx = _uiShared.DrawServiceSelection(selectOnChange: true);
+            _ = _uiShared.DrawServiceSelection(selectOnChange: true);
 
             var text = "Enter Secret Key";
             var buttonText = "Save";

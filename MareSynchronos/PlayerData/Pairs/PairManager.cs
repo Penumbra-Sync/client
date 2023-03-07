@@ -11,10 +11,11 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Linq;
 
 namespace MareSynchronos.PlayerData.Pairs;
 
-public class PairManager : MediatorSubscriberBase, IDisposable
+public class PairManager : MediatorSubscriberBase
 {
     private readonly ConcurrentDictionary<UserData, Pair> _allClientPairs = new(UserDataComparer.Instance);
     private readonly ConcurrentDictionary<GroupData, GroupFullInfoDto> _allGroups = new(GroupDataComparer.Instance);
@@ -58,8 +59,8 @@ public class PairManager : MediatorSubscriberBase, IDisposable
         });
     }
 
-    public List<Pair> OnlineUserPairs => _allClientPairs.Where(p => !string.IsNullOrEmpty(p.Value.PlayerNameHash)).Select(p => p.Value).ToList();
-    public List<UserData> VisibleUsers => _allClientPairs.Where(p => p.Value.HasCachedPlayer).Select(p => p.Key).ToList();
+    public List<Pair> GetOnlineUserPairs() => _allClientPairs.Where(p => !string.IsNullOrEmpty(p.Value.PlayerNameHash)).Select(p => p.Value).ToList();
+    public List<UserData> GetVisibleUsers() => _allClientPairs.Where(p => p.Value.HasCachedPlayer).Select(p => p.Key).ToList();
 
     public Pair? LastAddedUser { get; internal set; }
 
@@ -74,20 +75,14 @@ public class PairManager : MediatorSubscriberBase, IDisposable
         _allGroups.TryRemove(data, out _);
         foreach (var item in _allClientPairs.ToList())
         {
-            foreach (var grpPair in item.Value.GroupPair.Select(k => k.Key).ToList())
+            foreach (var grpPair in item.Value.GroupPair.Select(k => k.Key).Where(grpPair => GroupDataComparer.Instance.Equals(grpPair.Group, data)).ToList())
             {
-                if (GroupDataComparer.Instance.Equals(grpPair.Group, data))
-                {
-                    _allClientPairs[item.Key].GroupPair.Remove(grpPair);
-                }
+                _allClientPairs[item.Key].GroupPair.Remove(grpPair);
             }
 
-            if (!_allClientPairs[item.Key].HasAnyConnection())
+            if (!_allClientPairs[item.Key].HasAnyConnection() && _allClientPairs.TryRemove(item.Key, out var pair))
             {
-                if (_allClientPairs.TryRemove(item.Key, out var pair))
-                {
-                    pair.MarkOffline();
-                }
+                pair.MarkOffline();
             }
         }
         RecreateLazy();
@@ -129,9 +124,9 @@ public class PairManager : MediatorSubscriberBase, IDisposable
         RecreateLazy();
     }
 
-    public override void Dispose()
+    public override void Dispose(bool disposing)
     {
-        base.Dispose();
+        base.Dispose(disposing);
         DisposePairs();
     }
 
@@ -152,7 +147,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
     {
         if (pChar == null) return null;
         var hash = pChar.GetHash256();
-        return OnlineUserPairs.Find(p => string.Equals(p.PlayerNameHash, hash, StringComparison.Ordinal));
+        return GetOnlineUserPairs().Find(p => string.Equals(p.PlayerNameHash, hash, StringComparison.Ordinal));
     }
 
     public void MarkPairOffline(UserData user)
@@ -284,7 +279,7 @@ public class PairManager : MediatorSubscriberBase, IDisposable
 
     private void DalamudUtilOnZoneSwitched()
     {
-        DisposePairs(true);
+        DisposePairs(recreate: true);
     }
 
     public void SetGroupInfo(GroupInfoDto dto)

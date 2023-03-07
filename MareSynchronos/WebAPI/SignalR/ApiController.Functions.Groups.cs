@@ -7,7 +7,7 @@ public partial class ApiController
 {
     private void CheckConnection()
     {
-        if (ServerState is not (ServerState.Connected or ServerState.Connecting or ServerState.Reconnecting)) throw new System.Exception("Not connected");
+        if (ServerState is not (ServerState.Connected or ServerState.Connecting or ServerState.Reconnecting)) throw new InvalidDataException("Not connected");
     }
 
     public async Task<List<BannedGroupUserDto>> GroupGetBannedUsers(GroupDto group)
@@ -100,10 +100,10 @@ public partial class ApiController
         await _mareHub!.SendAsync(nameof(GroupUnbanUser), groupPair).ConfigureAwait(false);
     }
 
-    public async Task GroupSetUserInfo(GroupPairUserInfoDto userInfo)
+    public async Task GroupSetUserInfo(GroupPairUserInfoDto groupPair)
     {
         CheckConnection();
-        await _mareHub!.SendAsync(nameof(GroupSetUserInfo), userInfo).ConfigureAwait(false);
+        await _mareHub!.SendAsync(nameof(GroupSetUserInfo), groupPair).ConfigureAwait(false);
     }
 
     public async Task<List<string>> GroupCreateTempInvite(GroupDto group, int amount)

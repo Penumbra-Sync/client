@@ -35,6 +35,6 @@ public class CachedPlayerFactory
 
     public CachedPlayer Create(OnlineUserIdentDto dto)
     {
-        return new CachedPlayer(_loggerFactory.CreateLogger<CachedPlayer>(), dto, _gameObjectHandlerFactory, _ipcManager, _downloadFactory.Create(dto.User.AliasOrUID), _dalamudUtil, _fileCacheManager, _mediator);
+        return new CachedPlayer(_loggerFactory.CreateLogger<CachedPlayer>(), dto, _gameObjectHandlerFactory, _ipcManager, _downloadFactory.Create(), _dalamudUtil, _fileCacheManager, _mediator);
     }
 }

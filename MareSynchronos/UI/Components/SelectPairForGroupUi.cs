@@ -53,8 +53,10 @@ public class SelectPairForGroupUi
         {
             UiShared.FontText($"Select users for group {_tag}", UiBuilder.DefaultFont);
             ImGui.InputTextWithHint("##filter", "Filter", ref _filter, 255, ImGuiInputTextFlags.None);
-            foreach (var item in pairs.OrderBy(p => PairName(showUidForEntry, p), StringComparer.OrdinalIgnoreCase)
-                .Where(p => string.IsNullOrEmpty(_filter) || PairName(showUidForEntry, p).Contains(_filter, StringComparison.OrdinalIgnoreCase)).ToList())
+            foreach (var item in pairs
+                .Where(p => string.IsNullOrEmpty(_filter) || PairName(showUidForEntry, p).Contains(_filter, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(p => PairName(showUidForEntry, p), StringComparer.OrdinalIgnoreCase)
+                .ToList())
             {
                 var isInGroup = _peopleInGroup.Contains(item.UserData.UID);
                 if (ImGui.Checkbox(PairName(showUidForEntry, item), ref isInGroup))
@@ -80,7 +82,7 @@ public class SelectPairForGroupUi
         }
     }
 
-    private string PairName(Dictionary<string, bool> showUidForEntry, Pair pair)
+    private static string PairName(Dictionary<string, bool> showUidForEntry, Pair pair)
     {
         showUidForEntry.TryGetValue(pair.UserData.UID, out var showUidInsteadOfName);
         var playerText = pair.GetNote();

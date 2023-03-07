@@ -18,7 +18,7 @@ using MareSynchronos.Services.ServerConfiguration;
 
 namespace MareSynchronos.UI
 {
-    internal class GroupPanel
+    internal sealed class GroupPanel
     {
         private readonly CompactUi _mainUi;
         private readonly UiShared _uiShared;
@@ -583,12 +583,9 @@ namespace MareSynchronos.UI
 
             if (ImGui.BeginPopup("ShellPopup"))
             {
-                if (UiShared.IconTextButton(FontAwesomeIcon.ArrowCircleLeft, "Leave Syncshell"))
+                if (UiShared.IconTextButton(FontAwesomeIcon.ArrowCircleLeft, "Leave Syncshell") && UiShared.CtrlPressed())
                 {
-                    if (UiShared.CtrlPressed())
-                    {
-                        _ = ApiController.GroupLeave(groupDto);
-                    }
+                    _ = ApiController.GroupLeave(groupDto);
                 }
                 UiShared.AttachToolTip("Hold CTRL and click to leave this Syncshell" + (!string.Equals(groupDto.OwnerUID, ApiController.UID, StringComparison.Ordinal) ? string.Empty : Environment.NewLine
                     + "WARNING: This action is irreversible" + Environment.NewLine + "Leaving an owned Syncshell will transfer the ownership to a random person in the Syncshell."));
@@ -660,13 +657,10 @@ namespace MareSynchronos.UI
                         UiShared.AttachToolTip("Change Syncshell Password");
                     }
 
-                    if (UiShared.IconTextButton(FontAwesomeIcon.Broom, "Clear Syncshell"))
+                    if (UiShared.IconTextButton(FontAwesomeIcon.Broom, "Clear Syncshell") && UiShared.CtrlPressed())
                     {
-                        if (UiShared.CtrlPressed())
-                        {
-                            ImGui.CloseCurrentPopup();
-                            _ = ApiController.GroupClear(groupDto);
-                        }
+                        ImGui.CloseCurrentPopup();
+                        _ = ApiController.GroupClear(groupDto);
                     }
                     UiShared.AttachToolTip("Hold CTRL and click to clear this Syncshell." + Environment.NewLine + "WARNING: this action is irreversible." + Environment.NewLine
                         + "Clearing the Syncshell will remove all not pinned users from it.");
@@ -719,13 +713,10 @@ namespace MareSynchronos.UI
 
                     if (isOwner)
                     {
-                        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Syncshell"))
+                        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Syncshell") && UiShared.CtrlPressed() && UiShared.ShiftPressed())
                         {
-                            if (UiShared.CtrlPressed() && UiShared.ShiftPressed())
-                            {
-                                ImGui.CloseCurrentPopup();
-                                _ = ApiController.GroupDelete(groupDto);
-                            }
+                            ImGui.CloseCurrentPopup();
+                            _ = ApiController.GroupDelete(groupDto);
                         }
                         UiShared.AttachToolTip("Hold CTRL and Shift and click to delete this Syncshell." + Environment.NewLine + "WARNING: this action is irreversible.");
                     }
@@ -745,7 +736,6 @@ namespace MareSynchronos.UI
             var entryIsMod = entry.GroupPairStatusInfo.IsModerator();
             var entryIsOwner = string.Equals(pair.UserData.UID, ownerUid, StringComparison.Ordinal);
             var entryIsPinned = entry.GroupPairStatusInfo.IsPinned();
-            var isPaused = pair.IsPaused;
             var presenceIcon = pair.IsVisible ? FontAwesomeIcon.Eye : (pair.IsOnline ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink);
             var presenceColor = (pair.IsOnline || pair.IsVisible) ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
             var presenceText = entryUID + " is offline";
@@ -1009,13 +999,10 @@ namespace MareSynchronos.UI
                     }
                     UiShared.AttachToolTip("Pin this user to the Syncshell. Pinned users will not be deleted in case of a manually initiated Syncshell clean");
 
-                    if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Remove user"))
+                    if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Remove user") && UiShared.CtrlPressed())
                     {
-                        if (UiShared.CtrlPressed())
-                        {
-                            ImGui.CloseCurrentPopup();
-                            _ = ApiController.GroupRemoveUser(entry);
-                        }
+                        ImGui.CloseCurrentPopup();
+                        _ = ApiController.GroupRemoveUser(entry);
                     }
 
                     UiShared.AttachToolTip("Hold CTRL and click to remove user " + (entry.UserAliasOrUID) + " from Syncshell");
@@ -1030,24 +1017,18 @@ namespace MareSynchronos.UI
                 if (userIsOwner)
                 {
                     string modText = entryIsMod ? "Demod user" : "Mod user";
-                    if (UiShared.IconTextButton(FontAwesomeIcon.UserShield, modText))
+                    if (UiShared.IconTextButton(FontAwesomeIcon.UserShield, modText) && UiShared.CtrlPressed())
                     {
-                        if (UiShared.CtrlPressed())
-                        {
-                            ImGui.CloseCurrentPopup();
-                            var userInfo = entry.GroupPairStatusInfo ^ GroupUserInfo.IsModerator;
-                            _ = ApiController.GroupSetUserInfo(new GroupPairUserInfoDto(entry.Group, entry.User, userInfo));
-                        }
+                        ImGui.CloseCurrentPopup();
+                        var userInfo = entry.GroupPairStatusInfo ^ GroupUserInfo.IsModerator;
+                        _ = ApiController.GroupSetUserInfo(new GroupPairUserInfoDto(entry.Group, entry.User, userInfo));
                     }
                     UiShared.AttachToolTip("Hold CTRL to change the moderator status for " + (entry.UserAliasOrUID) + Environment.NewLine +
                         "Moderators can kick, ban/unban, pin/unpin users and clear the Syncshell.");
-                    if (UiShared.IconTextButton(FontAwesomeIcon.Crown, "Transfer Ownership"))
+                    if (UiShared.IconTextButton(FontAwesomeIcon.Crown, "Transfer Ownership") && UiShared.CtrlPressed() && UiShared.ShiftPressed())
                     {
-                        if (UiShared.CtrlPressed() && UiShared.ShiftPressed())
-                        {
-                            ImGui.CloseCurrentPopup();
-                            _ = ApiController.GroupChangeOwnership(entry);
-                        }
+                        ImGui.CloseCurrentPopup();
+                        _ = ApiController.GroupChangeOwnership(entry);
                     }
                     UiShared.AttachToolTip("Hold CTRL and SHIFT and click to transfer ownership of this Syncshell to " + (entry.UserAliasOrUID) + Environment.NewLine + "WARNING: This action is irreversible.");
                 }

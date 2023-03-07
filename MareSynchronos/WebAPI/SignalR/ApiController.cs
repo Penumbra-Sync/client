@@ -6,7 +6,6 @@ using Microsoft.Extensions.Logging;
 using MareSynchronos.API.Dto;
 using MareSynchronos.API.SignalR;
 using Dalamud.Utility;
-using MareSynchronos.MareConfiguration;
 using System.Reflection;
 using MareSynchronos.WebAPI.SignalR.Utils;
 using MareSynchronos.WebAPI.SignalR;
@@ -16,13 +15,12 @@ using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Services;
 
 namespace MareSynchronos.WebAPI;
-public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareHubClient
+public partial class ApiController : MediatorSubscriberBase, IMareHubClient
 {
     public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
     public const string MainServiceUri = "wss://maresynchronos.com";
 
     private readonly HubFactory _hubFactory;
-    private readonly MareConfigService _configService;
     private readonly DalamudUtil _dalamudUtil;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
@@ -37,13 +35,12 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
     public string AuthFailureMessage { get; private set; } = string.Empty;
     public SystemInfoDto SystemInfoDto { get; private set; } = new();
 
-    public ApiController(ILogger<ApiController> logger, HubFactory hubFactory, MareConfigService configService, DalamudUtil dalamudUtil,
+    public ApiController(ILogger<ApiController> logger, HubFactory hubFactory, DalamudUtil dalamudUtil,
         PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
     {
         _logger.LogTrace("Creating " + nameof(ApiController));
 
         _hubFactory = hubFactory;
-        _configService = configService;
         _dalamudUtil = dalamudUtil;
         _pairManager = pairManager;
         _serverManager = serverManager;
@@ -52,7 +49,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         Mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
         Mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
         Mediator.Subscribe<HubClosedMessage>(this, (msg) => MareHubOnClosed(((HubClosedMessage)msg).Exception));
-        Mediator.Subscribe<HubReconnectedMessage>(this, (msg) => MareHubOnReconnected(((HubReconnectedMessage)msg).Arg));
+        Mediator.Subscribe<HubReconnectedMessage>(this, (msg) => _ = Task.Run(MareHubOnReconnected));
         Mediator.Subscribe<HubReconnectingMessage>(this, (msg) => MareHubOnReconnecting(((HubReconnectingMessage)msg).Exception));
 
         ServerState = ServerState.Offline;
@@ -272,9 +269,8 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         _initialized = true;
     }
 
-    public override void Dispose()
+    public override void Dispose(bool disposing)
     {
-        base.Dispose();
         _healthCheckTokenSource?.Cancel();
         Task.Run(async () => await StopConnection(ServerState.Disconnected).ConfigureAwait(false));
         _connectionCancellationTokenSource?.Cancel();
@@ -305,7 +301,7 @@ public partial class ApiController : MediatorSubscriberBase, IDisposable, IMareH
         _logger.LogWarning(arg, "Connection closed... Reconnecting");
     }
 
-    private async void MareHubOnReconnected(string? arg)
+    private async Task MareHubOnReconnected()
     {
         ServerState = ServerState.Connecting;
         try

@@ -14,7 +14,7 @@ using MareSynchronos.Services;
 
 namespace MareSynchronos.Interop;
 
-public class IpcManager : MediatorSubscriberBase, IDisposable
+public class IpcManager : MediatorSubscriberBase
 {
     private readonly ICallGateSubscriber<int> _glamourerApiVersion;
     private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyAll;
@@ -297,9 +297,9 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         }
     }
 
-    public override void Dispose()
+    public override void Dispose(bool disposing)
     {
-        base.Dispose();
+        base.Dispose(disposing);
 
         _disposalCts.Cancel();
 
@@ -329,6 +329,8 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         _penumbraInit.Dispose();
         _penumbraObjectIsRedrawn.Dispose();
         _heelsOffsetUpdate.Unsubscribe(HeelsOffsetChange);
+        _palettePlusPaletteChanged.Unsubscribe(OnPalettePlusPaletteChange);
+        _customizePlusOnScaleUpdate.Unsubscribe(OnCustomizePlusScaleChange);
     }
 
     public float GetHeelsOffset()
@@ -491,7 +493,7 @@ public class IpcManager : MediatorSubscriberBase, IDisposable
         return _penumbraGetMetaManipulations.Invoke();
     }
 
-    public string? PenumbraModDirectory;
+    public string? PenumbraModDirectory { get; private set; }
 
     public string? GetPenumbraModDirectory()
     {

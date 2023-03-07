@@ -53,10 +53,10 @@ public partial class ApiController
         _mareHub!.On(nameof(Client_GroupSendFullInfo), act);
     }
 
-    public Task Client_GroupSendFullInfo(GroupFullInfoDto dto)
+    public Task Client_GroupSendFullInfo(GroupFullInfoDto groupInfo)
     {
-        _logger.LogTrace("Client_GroupSendFullInfo: " + dto);
-        ExecuteSafely(() => _pairManager.AddGroup(dto));
+        _logger.LogTrace("Client_GroupSendFullInfo: {dto}", groupInfo);
+        ExecuteSafely(() => _pairManager.AddGroup(groupInfo));
         return Task.CompletedTask;
     }
 
@@ -66,10 +66,10 @@ public partial class ApiController
         _mareHub!.On(nameof(Client_GroupSendInfo), act);
     }
 
-    public Task Client_GroupSendInfo(GroupInfoDto dto)
+    public Task Client_GroupSendInfo(GroupInfoDto groupInfo)
     {
-        _logger.LogTrace("Client_GroupSendInfo: " + dto);
-        ExecuteSafely(() => _pairManager.SetGroupInfo(dto));
+        _logger.LogTrace("Client_GroupSendInfo: {dto}", groupInfo);
+        ExecuteSafely(() => _pairManager.SetGroupInfo(groupInfo));
         return Task.CompletedTask;
     }
 
@@ -79,10 +79,10 @@ public partial class ApiController
         _mareHub!.On(nameof(Client_GroupDelete), act);
     }
 
-    public Task Client_GroupDelete(GroupDto dto)
+    public Task Client_GroupDelete(GroupDto groupDto)
     {
-        _logger.LogTrace("Client_GroupDelete: " + dto);
-        ExecuteSafely(() => _pairManager.RemoveGroup(dto.Group));
+        _logger.LogTrace("Client_GroupDelete: {dto}", groupDto);
+        ExecuteSafely(() => _pairManager.RemoveGroup(groupDto.Group));
         return Task.CompletedTask;
     }
 
@@ -92,10 +92,10 @@ public partial class ApiController
         _mareHub!.On(nameof(Client_GroupPairJoined), act);
     }
 
-    public Task Client_GroupPairJoined(GroupPairFullInfoDto dto)
+    public Task Client_GroupPairJoined(GroupPairFullInfoDto groupPairInfoDto)
     {
-        _logger.LogTrace("Client_GroupPairJoined: " + dto);
-        ExecuteSafely(() => _pairManager.AddGroupPair(dto));
+        _logger.LogTrace("Client_GroupPairJoined: {dto}", groupPairInfoDto);
+        ExecuteSafely(() => _pairManager.AddGroupPair(groupPairInfoDto));
         return Task.CompletedTask;
     }
 
@@ -105,10 +105,10 @@ public partial class ApiController
         _mareHub!.On(nameof(Client_GroupPairLeft), act);
     }
 
-    public Task Client_GroupPairLeft(GroupPairDto dto)
+    public Task Client_GroupPairLeft(GroupPairDto groupPairDto)
     {
-        _logger.LogTrace("Client_GroupPairLeft: " + dto);
-        ExecuteSafely(() => _pairManager.RemoveGroupPair(dto));
+        _logger.LogTrace("Client_GroupPairLeft: {dto}", groupPairDto);
+        ExecuteSafely(() => _pairManager.RemoveGroupPair(groupPairDto));
         return Task.CompletedTask;
     }
 
@@ -118,10 +118,10 @@ public partial class ApiController
         _mareHub!.On(nameof(Client_GroupChangePermissions), act);
     }
 
-    public Task Client_GroupChangePermissions(GroupPermissionDto dto)
+    public Task Client_GroupChangePermissions(GroupPermissionDto groupPermission)
     {
-        _logger.LogTrace("Client_GroupChangePermissions: " + dto);
-        ExecuteSafely(() => _pairManager.SetGroupPermissions(dto));
+        _logger.LogTrace("Client_GroupChangePermissions: {perm}", groupPermission);
+        ExecuteSafely(() => _pairManager.SetGroupPermissions(groupPermission));
         return Task.CompletedTask;
     }
 
@@ -131,13 +131,13 @@ public partial class ApiController
         _mareHub!.On(nameof(Client_GroupPairChangePermissions), act);
     }
 
-    public Task Client_GroupPairChangePermissions(GroupPairUserPermissionDto dto)
+    public Task Client_GroupPairChangePermissions(GroupPairUserPermissionDto permissionDto)
     {
-        _logger.LogTrace("Client_GroupPairChangePermissions: " + dto);
+        _logger.LogTrace("Client_GroupPairChangePermissions: {perm}", permissionDto);
         ExecuteSafely(() =>
         {
-            if (string.Equals(dto.UID, UID, StringComparison.Ordinal)) _pairManager.SetGroupUserPermissions(dto);
-            else _pairManager.SetGroupPairUserPermissions(dto);
+            if (string.Equals(permissionDto.UID, UID, StringComparison.Ordinal)) _pairManager.SetGroupUserPermissions(permissionDto);
+            else _pairManager.SetGroupPairUserPermissions(permissionDto);
         });
         return Task.CompletedTask;
     }
@@ -148,21 +148,21 @@ public partial class ApiController
         _mareHub!.On(nameof(Client_GroupPairChangeUserInfo), act);
     }
 
-    public Task Client_GroupPairChangeUserInfo(GroupPairUserInfoDto dto)
+    public Task Client_GroupPairChangeUserInfo(GroupPairUserInfoDto userInfo)
     {
-        _logger.LogTrace("Client_GroupPairChangeUserInfo: " + dto);
+        _logger.LogTrace("Client_GroupPairChangeUserInfo: {dto}", userInfo);
         ExecuteSafely(() =>
         {
-            if (string.Equals(dto.UID, UID, StringComparison.Ordinal)) _pairManager.SetGroupStatusInfo(dto);
-            else _pairManager.SetGroupPairStatusInfo(dto);
+            if (string.Equals(userInfo.UID, UID, StringComparison.Ordinal)) _pairManager.SetGroupStatusInfo(userInfo);
+            else _pairManager.SetGroupPairStatusInfo(userInfo);
         });
         return Task.CompletedTask;
     }
 
-    public Task Client_UserReceiveCharacterData(OnlineUserCharaDataDto dto)
+    public Task Client_UserReceiveCharacterData(OnlineUserCharaDataDto dataDto)
     {
-        _logger.LogTrace("Client_UserReceiveCharacterData: " + dto.User);
-        ExecuteSafely(() => _pairManager.ReceiveCharaData(dto));
+        _logger.LogTrace("Client_UserReceiveCharacterData: {user}", dataDto.User);
+        ExecuteSafely(() => _pairManager.ReceiveCharaData(dataDto));
         return Task.CompletedTask;
     }
 
@@ -174,7 +174,7 @@ public partial class ApiController
 
     public Task Client_UserAddClientPair(UserPairDto dto)
     {
-        _logger.LogDebug($"Client_UserAddClientPair: " + dto);
+        _logger.LogDebug("Client_UserAddClientPair: {dto}", dto);
         ExecuteSafely(() => _pairManager.AddUserPair(dto));
         return Task.CompletedTask;
     }
@@ -187,7 +187,7 @@ public partial class ApiController
 
     public Task Client_UserRemoveClientPair(UserDto dto)
     {
-        _logger.LogDebug($"Client_UserRemoveClientPair: " + dto);
+        _logger.LogDebug("Client_UserRemoveClientPair: {dto}", dto);
         ExecuteSafely(() => _pairManager.RemoveUserPair(dto));
         return Task.CompletedTask;
     }
@@ -200,7 +200,7 @@ public partial class ApiController
 
     public Task Client_UserSendOffline(UserDto dto)
     {
-        _logger.LogDebug($"Client_UserSendOffline: {dto}");
+        _logger.LogDebug("Client_UserSendOffline: {dto}", dto);
         ExecuteSafely(() => _pairManager.MarkPairOffline(dto.User));
         return Task.CompletedTask;
     }
@@ -213,7 +213,7 @@ public partial class ApiController
 
     public Task Client_UserSendOnline(OnlineUserIdentDto dto)
     {
-        _logger.LogDebug($"Client_UserSendOnline: {dto}");
+        _logger.LogDebug("Client_UserSendOnline: {dto}", dto);
         ExecuteSafely(() => _pairManager.MarkPairOnline(dto));
         return Task.CompletedTask;
     }
@@ -226,7 +226,7 @@ public partial class ApiController
 
     public Task Client_UserUpdateOtherPairPermissions(UserPermissionsDto dto)
     {
-        _logger.LogDebug($"Client_UserUpdateOtherPairPermissions: {dto}");
+        _logger.LogDebug("Client_UserUpdateOtherPairPermissions: {dto}", dto);
         ExecuteSafely(() => _pairManager.UpdatePairPermissions(dto));
         return Task.CompletedTask;
     }
@@ -239,7 +239,7 @@ public partial class ApiController
 
     public Task Client_UserUpdateSelfPairPermissions(UserPermissionsDto dto)
     {
-        _logger.LogDebug($"Client_UserUpdateSelfPairPermissions: {dto}");
+        _logger.LogDebug("Client_UserUpdateSelfPairPermissions: {dto}", dto);
         ExecuteSafely(() => _pairManager.UpdateSelfPairPermissions(dto));
         return Task.CompletedTask;
     }
@@ -250,9 +250,9 @@ public partial class ApiController
         return Task.CompletedTask;
     }
 
-    public Task Client_ReceiveServerMessage(MessageSeverity severity, string message)
+    public Task Client_ReceiveServerMessage(MessageSeverity messageSeverity, string message)
     {
-        switch (severity)
+        switch (messageSeverity)
         {
             case MessageSeverity.Error:
                 Mediator.Publish(new NotificationMessage("Warning from " + _serverManager.CurrentServer!.ServerName, message, NotificationType.Error, 7500));
@@ -275,7 +275,7 @@ public partial class ApiController
 
     public Task Client_DownloadReady(Guid requestId)
     {
-        _logger.LogDebug($"Server sent {requestId} ready");
+        _logger.LogDebug("Server sent {requestId} ready", requestId);
         Mediator.Publish(new DownloadReadyMessage(requestId));
         return Task.CompletedTask;
     }

@@ -14,11 +14,9 @@ public class GameObjectHandler : MediatorSubscriberBase
 {
     private readonly Func<IntPtr> _getAddress;
     private readonly bool _isOwnedObject;
-    private readonly MareMediator _mediator;
     private readonly DalamudUtil _dalamudUtil;
     private readonly PerformanceCollectorService _performanceCollector;
     private CancellationTokenSource? _clearCts = new();
-    private Task? _clearTask;
     private Task? _delayedZoningTask;
     private bool _haltProcessing = false;
     private bool _ignoreSendAfterRedraw = false;
@@ -27,7 +25,6 @@ public class GameObjectHandler : MediatorSubscriberBase
         MareMediator mediator, DalamudUtil dalamudUtil, ObjectKind objectKind, Func<IntPtr> getAddress, bool watchedObject = true) : base(logger, mediator)
     {
         _performanceCollector = performanceCollector;
-        _mediator = mediator;
         ObjectKind = objectKind;
         _dalamudUtil = dalamudUtil;
         _getAddress = getAddress;
@@ -95,13 +92,9 @@ public class GameObjectHandler : MediatorSubscriberBase
     private IntPtr DrawObjectAddress { get; set; }
     private byte[] EquipSlotData { get; set; } = new byte[40];
 
-    private byte? HatState { get; set; }
-
-    private byte? VisorWeaponState { get; set; }
-
-    public override void Dispose()
+    public override void Dispose(bool disposing)
     {
-        base.Dispose();
+        base.Dispose(disposing);
         if (_isOwnedObject)
             Mediator.Publish(new RemoveWatchedGameObjectHandler(this));
     }
@@ -137,7 +130,7 @@ public class GameObjectHandler : MediatorSubscriberBase
                 var drawObj = GetDrawObj();
                 return IsBeingDrawn(drawObj, curPtr);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 if (curPtr != IntPtr.Zero)
                 {
@@ -166,7 +159,6 @@ public class GameObjectHandler : MediatorSubscriberBase
         }
         catch (Exception ex)
         {
-            var name = new ByteString(((Character*)curPtr)->GameObject.Name).ToString();
             _logger.LogError(ex, "Error during checking for draw object for {name}", this);
         }
 
@@ -185,27 +177,21 @@ public class GameObjectHandler : MediatorSubscriberBase
             bool nameChange = !string.Equals(name, Name, StringComparison.Ordinal);
             Name = name;
             bool equipDiff = CompareAndUpdateEquipByteData(chara->EquipSlotData);
-            if (equipDiff && !_isOwnedObject) // send the message out immediately and cancel out, no reason to continue if not self
+            if (equipDiff && !_isOwnedObject && !_ignoreSendAfterRedraw) // send the message out immediately and cancel out, no reason to continue if not self
             {
-                if (!_ignoreSendAfterRedraw)
-                {
-                    _logger.LogTrace("[{this}] Changed", this);
-                    Mediator.Publish(new CharacterChangedMessage(this));
-                    return;
-                }
+                _logger.LogTrace("[{this}] Changed", this);
+                Mediator.Publish(new CharacterChangedMessage(this));
+                return;
             }
 
             var customizeDiff = CompareAndUpdateCustomizeData(chara->CustomizeData);
 
-            if (addrDiff || equipDiff || customizeDiff || drawObjDiff || nameChange)
+            if ((addrDiff || equipDiff || customizeDiff || drawObjDiff || nameChange) && _isOwnedObject)
             {
-                if (_isOwnedObject)
-                {
-                    _logger.LogTrace("[{this}] Changed", this);
+                _logger.LogTrace("[{this}] Changed", this);
 
-                    _logger.LogDebug("[{this}] Sending CreateCacheObjectMessage", this);
-                    Mediator.Publish(new CreateCacheForObjectMessage(this));
-                }
+                _logger.LogDebug("[{this}] Sending CreateCacheObjectMessage", this);
+                Mediator.Publish(new CreateCacheForObjectMessage(this));
             }
         }
         else if (Address != IntPtr.Zero || DrawObjectAddress != IntPtr.Zero)
@@ -219,7 +205,7 @@ public class GameObjectHandler : MediatorSubscriberBase
                 _clearCts?.Dispose();
                 _clearCts = new();
                 var token = _clearCts.Token;
-                _clearTask = Task.Run(() => ClearTask(token), token);
+                _ = Task.Run(() => ClearTask(token), token);
             }
         }
     }
@@ -303,7 +289,10 @@ public class GameObjectHandler : MediatorSubscriberBase
             {
                 await Task.Delay(TimeSpan.FromSeconds(120), _zoningCts.Token).ConfigureAwait(false);
             }
-            catch { }
+            catch
+            {
+                // ignore cancelled
+            }
             finally
             {
                 _logger.LogDebug("[{this}] Delay after zoning complete", this);

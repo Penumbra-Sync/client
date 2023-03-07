@@ -3,9 +3,9 @@ using System.Text;
 
 namespace MareSynchronos.Services.Mediator;
 
-public class MareMediator : IDisposable
+public sealed class MareMediator : IDisposable
 {
-    private class SubscriberAction
+    private sealed class SubscriberAction
     {
         public IMediatorSubscriber Subscriber { get; }
         public Action<IMessage> Action { get; }
@@ -69,10 +69,8 @@ public class MareMediator : IDisposable
                     }
                     catch (Exception ex)
                     {
-                        if (_lastErrorTime.TryGetValue(subscriber, out var lastErrorTime))
-                        {
-                            if (lastErrorTime.Add(TimeSpan.FromSeconds(10)) > DateTime.UtcNow) continue;
-                        }
+                        if (_lastErrorTime.TryGetValue(subscriber, out var lastErrorTime) && lastErrorTime.Add(TimeSpan.FromSeconds(10)) > DateTime.UtcNow)
+                            continue;
 
                         _logger.LogCritical(ex, "Error executing {type} for subscriber {subscriber}", message.GetType().Name, subscriber.Subscriber.GetType().Name);
                         _lastErrorTime[subscriber] = DateTime.UtcNow;
@@ -104,8 +102,8 @@ public class MareMediator : IDisposable
 
     public void PrintSubscriberInfo()
     {
-        foreach (var kvp in _subscriberDict.ToList().SelectMany(c => c.Value.Select(v => v))
-            .DistinctBy(p => p.Subscriber).OrderBy(p => p.Subscriber.GetType().FullName, StringComparer.Ordinal))
+        foreach (var kvp in _subscriberDict.SelectMany(c => c.Value.Select(v => v))
+            .DistinctBy(p => p.Subscriber).OrderBy(p => p.Subscriber.GetType().FullName, StringComparer.Ordinal).ToList())
         {
             _logger.LogInformation("Subscriber {type}: {sub}", kvp.Subscriber.GetType().FullName, kvp.Subscriber.ToString());
             StringBuilder sb = new();
@@ -127,5 +125,6 @@ public class MareMediator : IDisposable
     {
         _logger.LogTrace("Disposing {type}", GetType());
         _subscriberDict.Clear();
+        GC.SuppressFinalize(this);
     }
 }

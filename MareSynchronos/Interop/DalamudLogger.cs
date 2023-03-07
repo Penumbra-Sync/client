@@ -5,7 +5,7 @@ using System.Text;
 
 namespace MareSynchronos.Interop;
 
-internal class DalamudLogger : ILogger
+internal sealed class DalamudLogger : ILogger
 {
     private readonly string _name;
     private readonly MareConfigService _mareConfigService;

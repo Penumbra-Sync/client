@@ -15,7 +15,7 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.PlayerData.Pairs;
 
-public class CachedPlayer : MediatorSubscriberBase, IDisposable
+public class CachedPlayer : MediatorSubscriberBase
 {
     private readonly FileDownloadManager _downloadManager;
     private readonly DalamudUtil _dalamudUtil;
@@ -173,30 +173,21 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
     private void NotifyForMissingPlugins(HashSet<PlayerChanges> changes, OptionalPluginWarning warning)
     {
         List<string> missingPluginsForData = new();
-        if (changes.Contains(PlayerChanges.Heels))
+        if (changes.Contains(PlayerChanges.Heels) && !warning.ShownHeelsWarning && !_ipcManager.CheckHeelsApi())
         {
-            if (!warning.ShownHeelsWarning && !_ipcManager.CheckHeelsApi())
-            {
-                missingPluginsForData.Add("Heels");
-                warning.ShownHeelsWarning = true;
-            }
+            missingPluginsForData.Add("Heels");
+            warning.ShownHeelsWarning = true;
         }
-        if (changes.Contains(PlayerChanges.Customize))
+        if (changes.Contains(PlayerChanges.Customize) && !warning.ShownCustomizePlusWarning && !_ipcManager.CheckCustomizePlusApi())
         {
-            if (!warning.ShownCustomizePlusWarning && !_ipcManager.CheckCustomizePlusApi())
-            {
-                missingPluginsForData.Add("Customize+");
-                warning.ShownCustomizePlusWarning = true;
-            }
+            missingPluginsForData.Add("Customize+");
+            warning.ShownCustomizePlusWarning = true;
         }
 
-        if (changes.Contains(PlayerChanges.Palette))
+        if (changes.Contains(PlayerChanges.Palette) && !warning.ShownPalettePlusWarning && !_ipcManager.CheckPalettePlusApi())
         {
-            if (!warning.ShownPalettePlusWarning && !_ipcManager.CheckPalettePlusApi())
-            {
-                missingPluginsForData.Add("Palette+");
-                warning.ShownPalettePlusWarning = true;
-            }
+            missingPluginsForData.Add("Palette+");
+            warning.ShownPalettePlusWarning = true;
         }
 
         if (missingPluginsForData.Any())
@@ -219,11 +210,11 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
         return true;
     }
 
-    public override void Dispose()
+    public override void Dispose(bool disposing)
     {
         if (string.IsNullOrEmpty(PlayerName)) return; // already disposed
 
-        base.Dispose();
+        base.Dispose(disposing);
         _downloadManager.Dispose();
         var name = PlayerName;
         PlayerName = null;
@@ -396,7 +387,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 }
             }
 
-            while (!_applicationTask?.IsCompleted ?? false && !downloadToken.IsCancellationRequested)
+            while ((!_applicationTask?.IsCompleted ?? false) && !downloadToken.IsCancellationRequested)
             {
                 // block until current application is done
                 _logger.LogDebug("Waiting for current data application (Id: {id}) to finish", _applicationId);
@@ -461,7 +452,7 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
 
         if (objectKind == ObjectKind.Player)
         {
-            using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.Player, () => address, false);
+            using GameObjectHandler tempHandler = _gameObjectHandlerFactory.Create(ObjectKind.Player, () => address, isWatched: false);
             _logger.LogDebug("[{applicationId}] Restoring Customization for {alias}/{name}: {data}", applicationId, OnlineUser.User.AliasOrUID, name, _originalGlamourerData);
             await _ipcManager.GlamourerApplyOnlyCustomization(_logger, tempHandler, _originalGlamourerData, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
             _logger.LogDebug("[{applicationId}] Restoring Equipment for {alias}/{name}: {data}", applicationId, OnlineUser.User.AliasOrUID, name, _lastGlamourerData);

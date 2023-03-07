@@ -22,10 +22,9 @@ using MareSynchronos.WebAPI.Files.Models;
 
 namespace MareSynchronos.UI;
 
-public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
+public class SettingsUi : WindowMediatorSubscriberBase
 {
     private readonly MareConfigService _configService;
-    private readonly WindowSystem _windowSystem;
     private ApiController ApiController => _uiShared.ApiController;
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly PairManager _pairManager;
@@ -47,7 +46,7 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
         ServerConfigurationManager serverConfigurationManager,
         MareMediator mediator, PerformanceCollectorService performanceCollector,
         FileUploadManager fileTransferManager, 
-        FileTransferOrchestrator fileTransferOrchestrator) : base(logger, mediator, "Mare Synchronos Settings")
+        FileTransferOrchestrator fileTransferOrchestrator) : base(logger, windowSystem, mediator, "Mare Synchronos Settings")
     {
         _logger.LogTrace("Creating " + nameof(SettingsUi));
 
@@ -58,7 +57,6 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
         };
 
         _configService = configService;
-        _windowSystem = windowSystem;
         _mareCharaFileManager = mareCharaFileManager;
         _pairManager = pairManager;
         _serverConfigurationManager = serverConfigurationManager;
@@ -72,8 +70,6 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
         Mediator.Subscribe<CutsceneStartMessage>(this, (_) => UiShared_GposeStart());
         Mediator.Subscribe<CutsceneEndMessage>(this, (_) => UiShared_GposeEnd());
         Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) => LastCreatedCharacterData = ((CharacterDataCreatedMessage)msg).CharacterData);
-
-        windowSystem.AddWindow(this);
     }
 
     private void UiShared_GposeEnd()
@@ -85,12 +81,6 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
     {
         _wasOpen = IsOpen;
         IsOpen = false;
-    }
-
-    public override void Dispose()
-    {
-        base.Dispose();
-        _windowSystem.RemoveWindow(this);
     }
 
     public override void Draw()
@@ -125,13 +115,10 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
                 ImGui.EndTabItem();
             }
 
-            if (ApiController.ServerState is ServerState.Connected)
+            if (ApiController.ServerState is ServerState.Connected && ImGui.BeginTabItem("Transfers"))
             {
-                if (ImGui.BeginTabItem("Transfers"))
-                {
-                    DrawCurrentTransfers();
-                    ImGui.EndTabItem();
-                }
+                DrawCurrentTransfers();
+                ImGui.EndTabItem();
             }
 
             if (ImGui.BeginTabItem("Blocked Transfers"))
@@ -308,11 +295,8 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
                                     }
                                 }, EqualityComparer<KeyValuePair<int, SecretKey>>.Default.Equals(keys.FirstOrDefault(f => f.Key == item.SecretKeyIdx), default) ? keys.First() : keys.First(f => f.Key == item.SecretKeyIdx));
 
-                            if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Character"))
-                            {
-                                if (UiShared.CtrlPressed())
-                                    _serverConfigurationManager.RemoveCharacterFromServer(idx, item);
-                            }
+                            if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Character") && UiShared.CtrlPressed())
+                                _serverConfigurationManager.RemoveCharacterFromServer(idx, item);
                             UiShared.AttachToolTip("Hold CTRL to delete this entry.");
 
                             ImGui.TreePop();
@@ -360,13 +344,10 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
                             item.Value.Key = key;
                             _serverConfigurationManager.Save();
                         }
-                        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Secret Key"))
+                        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Secret Key") && UiShared.CtrlPressed())
                         {
-                            if (UiShared.CtrlPressed())
-                            {
-                                selectedServer.SecretKeys.Remove(item.Key);
-                                _serverConfigurationManager.Save();
-                            }
+                            selectedServer.SecretKeys.Remove(item.Key);
+                            _serverConfigurationManager.Save();
                         }
                         UiShared.AttachToolTip("Hold CTRL to delete this secret key entry");
                     });
@@ -407,12 +388,9 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
                 }
                 if (!isMain)
                 {
-                    if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Service"))
+                    if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Service") && UiShared.CtrlPressed())
                     {
-                        if (UiShared.CtrlPressed())
-                        {
-                            _serverConfigurationManager.DeleteServer(selectedServer);
-                        }
+                        _serverConfigurationManager.DeleteServer(selectedServer);
                     }
                     UiShared.DrawHelpText("Hold CTRL to delete this service");
                 }
@@ -487,8 +465,6 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
         var onlineNotifs = _configService.Current.ShowOnlineNotifications;
         var onlineNotifsPairsOnly = _configService.Current.ShowOnlineNotificationsOnlyForIndividualPairs;
         var onlineNotifsNamedOnly = _configService.Current.ShowOnlineNotificationsOnlyForNamedPairs;
-        var warnNotifLocation = _configService.Current.WarningNotification;
-        var errorNotifLocation = _configService.Current.ErrorNotification;
         UiShared.FontText("Notifications", _uiShared.UidFont);
 
         _uiShared.DrawCombo("Info Notification Display##settingsUi", (NotificationLocation[])Enum.GetValues(typeof(NotificationLocation)), (i) => i.ToString(),
@@ -803,20 +779,17 @@ public class SettingsUi : WindowMediatorSubscriberBase, IDisposable
             + Environment.NewLine + "- This can make the situation of not getting other players data worse in situations of heavy file server load.");
         if (!_readClearCache)
             ImGui.BeginDisabled();
-        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Clear local storage"))
+        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Clear local storage") && UiShared.CtrlPressed() && _readClearCache)
         {
-            if (UiShared.CtrlPressed() && _readClearCache)
+            Task.Run(() =>
             {
-                Task.Run(() =>
+                foreach (var file in Directory.GetFiles(_configService.Current.CacheFolder))
                 {
-                    foreach (var file in Directory.GetFiles(_configService.Current.CacheFolder))
-                    {
-                        File.Delete(file);
-                    }
+                    File.Delete(file);
+                }
 
-                    _uiShared.RecalculateFileCacheSize();
-                });
-            }
+                _uiShared.RecalculateFileCacheSize();
+            });
         }
         UiShared.AttachToolTip("You normally do not need to do this. THIS IS NOT SOMETHING YOU SHOULD BE DOING TO TRY TO FIX SYNC ISSUES." + Environment.NewLine
             + "This will solely remove all downloaded data from all players and will require you to re-download everything again." + Environment.NewLine

@@ -82,8 +82,6 @@ public class ConfigurationMigrator
         SaveConfig(tagConfig, ConfigurationPath(ServerTagConfigService.ConfigName));
         SaveConfig(notesConfig, ConfigurationPath(NotesConfigService.ConfigName));
     }
-#pragma warning restore CS0618 // ignore Obsolete tag, the point of this migrator is to migrate obsolete configs to new ones
-
     private string ConfigurationPath(string configName) => Path.Combine(_pi.ConfigDirectory.FullName, configName);
 
 

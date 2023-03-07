@@ -9,13 +9,12 @@ using System.Collections.Concurrent;
 
 namespace MareSynchronos.FileCache;
 
-
-public class TransientResourceManager : MediatorSubscriberBase, IDisposable
+public class TransientResourceManager : MediatorSubscriberBase
 {
     private readonly TransientConfigService _configurationService;
     private readonly DalamudUtil _dalamudUtil;
 
-    public HashSet<GameObjectHandler> PlayerRelatedPointers = new();
+    private readonly HashSet<GameObjectHandler> _playerRelatedPointers = new();
     private readonly string[] _fileTypesToHandle = new[] { "tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk" };
     private string PlayerPersistentDataKey => _dalamudUtil.PlayerName + "_" + _dalamudUtil.WorldId;
 
@@ -47,7 +46,7 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
                 }
 
             }
-            _logger.LogDebug("Restored {restored}/{total} semi persistent resources", restored, gamePaths.Count());
+            _logger.LogDebug("Restored {restored}/{total} semi persistent resources", restored, gamePaths.Count);
         }
 
         Mediator.Subscribe<PenumbraResourceLoadMessage>(this, (msg) => Manager_PenumbraResourceLoadEvent((PenumbraResourceLoadMessage)msg));
@@ -57,12 +56,12 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
         Mediator.Subscribe<AddWatchedGameObjectHandler>(this, (msg) =>
         {
             var actualMsg = (AddWatchedGameObjectHandler)msg;
-            PlayerRelatedPointers.Add(actualMsg.Handler);
+            _playerRelatedPointers.Add(actualMsg.Handler);
         });
         Mediator.Subscribe<RemoveWatchedGameObjectHandler>(this, (msg) =>
         {
             var actualMsg = (RemoveWatchedGameObjectHandler)msg;
-            PlayerRelatedPointers.Remove(actualMsg.Handler);
+            _playerRelatedPointers.Remove(actualMsg.Handler);
         });
     }
 
@@ -80,9 +79,9 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
 
     private void DalamudUtil_ClassJobChanged()
     {
-        if (SemiTransientResources.ContainsKey(ObjectKind.Pet))
+        if (SemiTransientResources.TryGetValue(ObjectKind.Pet, out HashSet<string>? value))
         {
-            SemiTransientResources[ObjectKind.Pet].Clear();
+            value?.Clear();
         }
     }
 
@@ -144,7 +143,7 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
         {
             return;
         }
-        if (!PlayerRelatedPointers.Select(p => p.CurrentAddress).Contains(gameObject))
+        if (!_playerRelatedPointers.Select(p => p.CurrentAddress).Contains(gameObject))
         {
             //_logger.LogDebug("Got resource " + gamePath + " for ptr " + gameObject.ToString("X"));
             return;
@@ -205,9 +204,8 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
         TransientResources[gameObject].Clear();
     }
 
-    public override void Dispose()
+    public override void Dispose(bool disposing)
     {
-        base.Dispose();
         TransientResources.Clear();
         SemiTransientResources.Clear();
         if (SemiTransientResources.ContainsKey(ObjectKind.Player))
@@ -215,6 +213,8 @@ public class TransientResourceManager : MediatorSubscriberBase, IDisposable
             _configurationService.Current.PlayerPersistentTransientCache[PlayerPersistentDataKey] = SemiTransientResources[ObjectKind.Player];
             _configurationService.Save();
         }
+
+        base.Dispose(disposing);
     }
 
     internal void AddSemiTransientResource(ObjectKind objectKind, string item)

@@ -39,7 +39,7 @@ public class PlayerDataFactory : MediatorSubscriberBase
         _performanceCollector = performanceCollector;
     }
 
-    private unsafe bool CheckForNullDrawObject(IntPtr playerPointer)
+    private static unsafe bool CheckForNullDrawObject(IntPtr playerPointer)
     {
         return ((Character*)playerPointer)->GameObject.DrawObject == null;
     }
@@ -103,7 +103,6 @@ public class PlayerDataFactory : MediatorSubscriberBase
 
         previousData.FileReplacements = previousFileReplacements;
         previousData.GlamourerString = previousGlamourerData;
-        return;
     }
 
     private async Task<CharacterData> CreateCharacterData(CharacterData previousData, GameObjectHandler playerRelatedObject, CancellationToken token)
@@ -221,13 +220,13 @@ public class PlayerDataFactory : MediatorSubscriberBase
 
         if (objectKind == ObjectKind.Player)
         {
-            AddPlayerSpecificReplacements(objectKind, charaPointer, human, forwardResolve, reverseResolve);
+            AddPlayerSpecificReplacements(human, forwardResolve, reverseResolve);
         }
 
         return (forwardResolve, reverseResolve);
     }
 
-    private unsafe void AddPlayerSpecificReplacements(ObjectKind objectKind, IntPtr charaPointer, Human* human, HashSet<string> forwardResolve, HashSet<string> reverseResolve)
+    private unsafe void AddPlayerSpecificReplacements(Human* human, HashSet<string> forwardResolve, HashSet<string> reverseResolve)
     {
         var weaponObject = (Weapon*)((Object*)human)->ChildObject;
 

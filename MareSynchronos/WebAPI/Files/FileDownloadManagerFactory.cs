@@ -20,8 +20,8 @@ public class FileDownloadManagerFactory
         _fileCacheManager = fileCacheManager;
     }
 
-    public FileDownloadManager Create(string id)
+    public FileDownloadManager Create()
     {
-        return new FileDownloadManager(_loggerFactory.CreateLogger<FileDownloadManager>(), _mediator, _orchestrator, _fileCacheManager, id);
+        return new FileDownloadManager(_loggerFactory.CreateLogger<FileDownloadManager>(), _mediator, _orchestrator, _fileCacheManager);
     }
 }

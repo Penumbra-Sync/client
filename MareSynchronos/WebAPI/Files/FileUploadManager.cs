@@ -58,13 +58,13 @@ public class FileUploadManager : MediatorSubscriberBase
     {
         if (!_orchestrator.IsInitialized) throw new InvalidOperationException("FileTransferManager is not initialized");
 
-        await _orchestrator.SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesDeleteAllFullPath(_orchestrator._filesCdnUri!)).ConfigureAwait(false);
+        await _orchestrator.SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesDeleteAllFullPath(_orchestrator.FilesCdnUri!)).ConfigureAwait(false);
     }
 
-    public override void Dispose()
+    public override void Dispose(bool disposing)
     {
-        base.Dispose();
         Reset();
+        base.Dispose(disposing);
     }
 
     public async Task<CharacterData> UploadFiles(CharacterData data)
@@ -109,7 +109,7 @@ public class FileUploadManager : MediatorSubscriberBase
     private async Task<List<UploadFileDto>> FilesSend(List<string> hashes, CancellationToken ct)
     {
         if (!_orchestrator.IsInitialized) throw new InvalidOperationException("FileTransferManager is not initialized");
-        var response = await _orchestrator.SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesFilesSendFullPath(_orchestrator._filesCdnUri!), hashes, ct).ConfigureAwait(false);
+        var response = await _orchestrator.SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesFilesSendFullPath(_orchestrator.FilesCdnUri!), hashes, ct).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<List<UploadFileDto>>(cancellationToken: ct).ConfigureAwait(false) ?? new List<UploadFileDto>();
     }
 
@@ -130,7 +130,7 @@ public class FileUploadManager : MediatorSubscriberBase
         var streamContent = new ProgressableStreamContent(ms, prog);
         streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
 
-        var response = await _orchestrator.SendRequestStreamAsync(HttpMethod.Post, MareFiles.ServerFilesUploadFullPath(_orchestrator._filesCdnUri!, fileHash), streamContent, uploadToken).ConfigureAwait(false);
+        var response = await _orchestrator.SendRequestStreamAsync(HttpMethod.Post, MareFiles.ServerFilesUploadFullPath(_orchestrator.FilesCdnUri!, fileHash), streamContent, uploadToken).ConfigureAwait(false);
         _logger.LogDebug("Upload Status: {status}", response.StatusCode);
     }
 

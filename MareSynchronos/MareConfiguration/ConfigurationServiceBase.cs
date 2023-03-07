@@ -100,7 +100,10 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
         {
             File.Copy(ConfigurationPath, ConfigurationPath + ".bak." + DateTime.Now.ToString("yyyyMMddHHmmss"), overwrite: true);
         }
-        catch { }
+        catch
+        {
+            // ignore if file cannot be backupped once
+        }
 
         File.WriteAllText(ConfigurationPath, JsonSerializer.Serialize(Current, new JsonSerializerOptions()
         {
@@ -116,6 +119,13 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
 
     public void Dispose()
     {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
         _periodicCheckCts.Cancel();
+        _periodicCheckCts.Dispose();
     }
 }

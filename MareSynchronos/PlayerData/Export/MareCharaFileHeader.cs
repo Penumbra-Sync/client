@@ -23,7 +23,7 @@ public record MareCharaFileHeader(byte Version, MareCharaFileData CharaFileData)
     public static MareCharaFileHeader? FromBinaryReader(string path, BinaryReader reader)
     {
         var chars = new string(reader.ReadChars(4));
-        if (!string.Equals(chars, "MCDF", StringComparison.Ordinal)) throw new Exception("Not a Mare Chara File");
+        if (!string.Equals(chars, "MCDF", StringComparison.Ordinal)) throw new InvalidDataException("Not a Mare Chara File");
 
         MareCharaFileHeader? decoded = null;
 
@@ -41,7 +41,7 @@ public record MareCharaFileHeader(byte Version, MareCharaFileData CharaFileData)
         return decoded;
     }
 
-    public void AdvanceReaderToData(BinaryReader reader)
+    public static void AdvanceReaderToData(BinaryReader reader)
     {
         reader.ReadChars(4);
         var version = reader.ReadByte();

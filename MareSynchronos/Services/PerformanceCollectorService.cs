@@ -8,7 +8,7 @@ using System.Text;
 
 namespace MareSynchronos.Services;
 
-public class PerformanceCollectorService : IDisposable
+public sealed class PerformanceCollectorService : IDisposable
 {
     private readonly ConcurrentDictionary<string, RollingList<Tuple<TimeOnly, long>>> _performanceCounters = new(StringComparer.Ordinal);
     private readonly ILogger<PerformanceCollectorService> _logger;
@@ -27,6 +27,7 @@ public class PerformanceCollectorService : IDisposable
     {
         _logger.LogTrace("Disposing {this}", GetType());
         _periodicLogPruneTask.Cancel();
+        GC.SuppressFinalize(this);
     }
 
     private async Task PeriodicLogPrune()
@@ -39,7 +40,7 @@ public class PerformanceCollectorService : IDisposable
             {
                 try
                 {
-                    var last = entries.Value.ToList()[entries.Value.ToList().Count - 1];
+                    var last = entries.Value.ToList()[^1];
                     if (last.Item1.AddMinutes(10) < TimeOnly.FromDateTime(DateTime.Now))
                     {
                         _performanceCounters.Remove(entries.Key, out _);
@@ -69,10 +70,6 @@ public class PerformanceCollectorService : IDisposable
         {
             return func.Invoke();
         }
-        catch
-        {
-            throw;
-        }
         finally
         {
             st.Stop();
@@ -95,10 +92,6 @@ public class PerformanceCollectorService : IDisposable
         try
         {
             act.Invoke();
-        }
-        catch
-        {
-            throw;
         }
         finally
         {

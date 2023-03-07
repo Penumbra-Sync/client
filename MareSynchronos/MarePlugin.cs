@@ -16,6 +16,7 @@ using MareSynchronos.Services.ServerConfiguration;
 
 namespace MareSynchronos;
 
+#pragma warning disable S125 // Sections of code should not be commented out
 /*
                                                                     (..,,...,,,,,+/,                ,,.....,,+           
                                                               ..,,+++/((###%%%&&%%#(+,,.,,,+++,,,,//,,#&@@@@%+.         
@@ -67,8 +68,9 @@ namespace MareSynchronos;
        ,....,++++++++++++++,,,+++++++,,,,,,,,,,,,,,,,,.,++++++++++++++++++++++++++++++++++++++++++++,,,,,,,,..          
 
 */
+#pragma warning restore S125 // Sections of code should not be commented out
 
-public class MarePlugin : MediatorSubscriberBase, IDisposable
+public class MarePlugin : MediatorSubscriberBase
 {
     private readonly ServiceProvider _serviceProvider;
     private const string _commandName = "/mare";
@@ -92,9 +94,9 @@ public class MarePlugin : MediatorSubscriberBase, IDisposable
         serviceProvider.GetRequiredService<NotificationService>();
     }
 
-    public override void Dispose()
+    public override void Dispose(bool disposing)
     {
-        base.Dispose();
+        base.Dispose(disposing);
 
         DalamudUtilOnLogOut();
 

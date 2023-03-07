@@ -8,8 +8,7 @@ using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI.Components;
 
-public class SelectGroupForPairUi
-{
+public class SelectGroupForPairUi {
     /// <summary>
     /// Should the panel show, yes/no
     /// </summary>
@@ -28,15 +27,13 @@ public class SelectGroupForPairUi
 
     private readonly TagHandler _tagHandler;
 
-    public SelectGroupForPairUi(TagHandler tagHandler)
-    {
+    public SelectGroupForPairUi(TagHandler tagHandler) {
         _show = false;
         _pair = null;
         _tagHandler = tagHandler;
     }
 
-    public void Open(Pair pair)
-    {
+    public void Open(Pair pair) {
         _pair = pair;
         // Using "_show" here to de-couple the opening of the popup
         // The popup name is derived from the name the user currently sees, which is
@@ -46,33 +43,27 @@ public class SelectGroupForPairUi
     }
 
 
-    public void Draw(Dictionary<string, bool> showUidForEntry)
-    {
-        if (_pair == null)
-        {
+    public void Draw(Dictionary<string, bool> showUidForEntry) {
+        if (_pair == null) {
             return;
         }
 
         var name = PairName(showUidForEntry, _pair);
         var popupName = $"Choose Groups for {name}";
         // Is the popup supposed to show but did not open yet? Open it
-        if (_show)
-        {
+        if (_show) {
             ImGui.OpenPopup(popupName);
             _show = false;
         }
 
-        if (ImGui.BeginPopup(popupName))
-        {
+        if (ImGui.BeginPopup(popupName)) {
             var tags = _tagHandler.GetAllTagsSorted();
             var childHeight = tags.Count != 0 ? tags.Count * 25 : 1;
             var childSize = new Vector2(0, childHeight > 100 ? 100 : childHeight) * ImGuiHelpers.GlobalScale;
 
             UiShared.FontText($"Select the groups you want {name} to be in.", UiBuilder.DefaultFont);
-            if (ImGui.BeginChild(name + "##listGroups", childSize))
-            {
-                foreach (var tag in tags)
-                {
+            if (ImGui.BeginChild(name + "##listGroups", childSize)) {
+                foreach (var tag in tags) {
                     UiShared.DrawWithID($"groups-pair-{_pair.UserData.UID}-{tag}", () => DrawGroupName(_pair, tag));
                 }
                 ImGui.EndChild();
@@ -80,62 +71,48 @@ public class SelectGroupForPairUi
 
             ImGui.Separator();
             UiShared.FontText($"Create a new group for {name}.", UiBuilder.DefaultFont);
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
-            {
+            if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus)) {
                 HandleAddTag();
             }
             ImGui.SameLine();
             ImGui.InputTextWithHint("##category_name", "New Group", ref _tagNameToAdd, 40);
-            {
-                if (ImGui.IsKeyDown(ImGuiKey.Enter))
-                {
-                    HandleAddTag();
-                }
+            if (ImGui.IsKeyDown(ImGuiKey.Enter)) {
+                HandleAddTag();
             }
             ImGui.EndPopup();
         }
     }
 
-    private void DrawGroupName(Pair pair, string name)
-    {
+    private void DrawGroupName(Pair pair, string name) {
         var hasTagBefore = _tagHandler.HasTag(pair.UserPair!, name);
         var hasTag = hasTagBefore;
-        if (ImGui.Checkbox(name, ref hasTag))
-        {
-            if (hasTag)
-            {
+        if (ImGui.Checkbox(name, ref hasTag)) {
+            if (hasTag) {
                 _tagHandler.AddTagToPairedUid(pair.UserPair!, name);
             }
-            else
-            {
+            else {
                 _tagHandler.RemoveTagFromPairedUid(pair.UserPair!, name);
             }
         }
     }
 
-    private void HandleAddTag()
-    {
-        if (!_tagNameToAdd.IsNullOrWhitespace() && _tagNameToAdd is not (TagHandler.CustomOfflineTag or TagHandler.CustomOnlineTag or TagHandler.CustomVisibleTag))
-        {
+    private void HandleAddTag() {
+        if (!_tagNameToAdd.IsNullOrWhitespace() && _tagNameToAdd is not (TagHandler.CustomOfflineTag or TagHandler.CustomOnlineTag or TagHandler.CustomVisibleTag)) {
             _tagHandler.AddTag(_tagNameToAdd);
-            if (_pair != null)
-            {
+            if (_pair != null) {
                 _tagHandler.AddTagToPairedUid(_pair.UserPair!, _tagNameToAdd);
             }
             _tagNameToAdd = string.Empty;
         }
-        else
-        {
+        else {
             _tagNameToAdd = string.Empty;
         }
     }
 
-    private string PairName(Dictionary<string, bool> showUidForEntry, Pair pair)
-    {
+    private static string PairName(Dictionary<string, bool> showUidForEntry, Pair pair) {
         showUidForEntry.TryGetValue(pair.UserData.UID, out var showUidInsteadOfName);
         var playerText = pair.GetNote();
-        if (showUidInsteadOfName || string.IsNullOrEmpty(playerText))
-        {
+        if (showUidInsteadOfName || string.IsNullOrEmpty(playerText)) {
             playerText = pair.UserData.AliasOrUID;
         }
         return playerText;

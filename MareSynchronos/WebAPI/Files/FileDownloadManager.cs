@@ -18,7 +18,7 @@ public partial class FileDownloadManager : MediatorSubscriberBase
     private readonly FileTransferOrchestrator _orchestrator;
     private readonly FileCacheManager _fileDbManager;
     private readonly ConcurrentDictionary<Guid, bool> _downloadReady = new();
-    private Dictionary<string, FileDownloadStatus> _downloadStatus;
+    private readonly Dictionary<string, FileDownloadStatus> _downloadStatus;
 
     public List<DownloadFileTransfer> CurrentDownloads { get; private set; } = new();
     public List<FileTransfer> ForbiddenTransfers => _orchestrator.ForbiddenTransfers;
@@ -26,8 +26,7 @@ public partial class FileDownloadManager : MediatorSubscriberBase
 
     public FileDownloadManager(ILogger<FileDownloadManager> logger, MareMediator mediator,
         FileTransferOrchestrator orchestrator,
-        FileCacheManager fileCacheManager,
-        string downloadId) : base(logger, mediator)
+        FileCacheManager fileCacheManager) : base(logger, mediator)
     {
         _downloadStatus = new Dictionary<string, FileDownloadStatus>(StringComparer.Ordinal);
         _orchestrator = orchestrator;
@@ -115,8 +114,7 @@ public partial class FileDownloadManager : MediatorSubscriberBase
 
             foreach (var file in fileGroup)
             {
-                var tempPath = _fileDbManager.GetCacheFilePath(file.Hash, true);
-                var hash = file.Hash;
+                var tempPath = _fileDbManager.GetCacheFilePath(file.Hash, isTemporaryFile: true);
                 Progress<long> progress = new((bytesDownloaded) =>
                 {
                     _downloadStatus[fileGroup.Key].TransferredBytes += bytesDownloaded;
@@ -152,7 +150,7 @@ public partial class FileDownloadManager : MediatorSubscriberBase
                 var tempFileData = await File.ReadAllBytesAsync(tempPath, token).ConfigureAwait(false);
                 var extractedFile = LZ4Codec.Unwrap(tempFileData);
                 File.Delete(tempPath);
-                var filePath = _fileDbManager.GetCacheFilePath(file.Hash, false);
+                var filePath = _fileDbManager.GetCacheFilePath(file.Hash, isTemporaryFile: false);
                 await File.WriteAllBytesAsync(filePath, extractedFile, token).ConfigureAwait(false);
                 var fi = new FileInfo(filePath);
                 Func<DateTime> RandomDayInThePast()
@@ -184,7 +182,7 @@ public partial class FileDownloadManager : MediatorSubscriberBase
     private async Task<List<DownloadFileDto>> FilesGetSizes(List<string> hashes, CancellationToken ct)
     {
         if (!_orchestrator.IsInitialized) throw new InvalidOperationException("FileTransferManager is not initialized");
-        var response = await _orchestrator.SendRequestAsync(HttpMethod.Get, MareFiles.ServerFilesGetSizesFullPath(_orchestrator._filesCdnUri!), hashes, ct).ConfigureAwait(false);
+        var response = await _orchestrator.SendRequestAsync(HttpMethod.Get, MareFiles.ServerFilesGetSizesFullPath(_orchestrator.FilesCdnUri!), hashes, ct).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<List<DownloadFileDto>>(cancellationToken: ct).ConfigureAwait(false) ?? new List<DownloadFileDto>();
     }
 
@@ -220,19 +218,12 @@ public partial class FileDownloadManager : MediatorSubscriberBase
                     if (downloadCt.IsCancellationRequested) throw;
 
                     var req = await _orchestrator.SendRequestAsync(HttpMethod.Get, MareFiles.RequestCheckQueueFullPath(downloadFileTransfer.DownloadUri, requestId, downloadFileTransfer.Hash), downloadCt).ConfigureAwait(false);
-                    try
-                    {
-                        req.EnsureSuccessStatusCode();
-                        localTimeoutCts.Dispose();
-                        composite.Dispose();
-                        localTimeoutCts = new();
-                        localTimeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
-                        composite = CancellationTokenSource.CreateLinkedTokenSource(downloadCt, localTimeoutCts.Token);
-                    }
-                    catch (HttpRequestException)
-                    {
-                        throw;
-                    }
+                    req.EnsureSuccessStatusCode();
+                    localTimeoutCts.Dispose();
+                    composite.Dispose();
+                    localTimeoutCts = new();
+                    localTimeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
+                    composite = CancellationTokenSource.CreateLinkedTokenSource(downloadCt, localTimeoutCts.Token);
                 }
             }
 
@@ -248,7 +239,10 @@ public partial class FileDownloadManager : MediatorSubscriberBase
                 await _orchestrator.SendRequestAsync(HttpMethod.Get, MareFiles.RequestCancelFullPath(downloadFileTransfer.DownloadUri, requestId)).ConfigureAwait(false);
                 alreadyCancelled = true;
             }
-            catch { }
+            catch
+            {
+                // ignore whatever happens here
+            }
 
             throw;
         }
@@ -260,7 +254,10 @@ public partial class FileDownloadManager : MediatorSubscriberBase
                 {
                     await _orchestrator.SendRequestAsync(HttpMethod.Get, MareFiles.RequestCancelFullPath(downloadFileTransfer.DownloadUri, requestId)).ConfigureAwait(false);
                 }
-                catch { }
+                catch
+                {
+                    // ignore whatever happens here
+                }
             }
             _downloadReady.Remove(requestId, out _);
         }
@@ -290,7 +287,7 @@ public partial class FileDownloadManager : MediatorSubscriberBase
             _logger.LogWarning(ex, "Error during download of {requestUrl}, HttpStatusCode: {code}", requestUrl, ex.StatusCode);
             if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized)
             {
-                throw new Exception($"Http error {ex.StatusCode} (cancelled: {ct.IsCancellationRequested}): {requestUrl}", ex);
+                throw new InvalidDataException($"Http error {ex.StatusCode} (cancelled: {ct.IsCancellationRequested}): {requestUrl}", ex);
             }
         }
 
@@ -323,7 +320,10 @@ public partial class FileDownloadManager : MediatorSubscriberBase
                 if (!tempPath.IsNullOrEmpty())
                     File.Delete(tempPath);
             }
-            catch { }
+            catch
+            {
+                // ignore if file deletion fails
+            }
             throw;
         }
     }
