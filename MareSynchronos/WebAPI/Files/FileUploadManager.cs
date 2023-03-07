@@ -61,7 +61,7 @@ public class FileUploadManager : MediatorSubscriberBase
         await _orchestrator.SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesDeleteAllFullPath(_orchestrator.FilesCdnUri!)).ConfigureAwait(false);
     }
 
-    public override void Dispose(bool disposing)
+    protected override void Dispose(bool disposing)
     {
         Reset();
         base.Dispose(disposing);

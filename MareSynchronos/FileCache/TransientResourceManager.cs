@@ -204,7 +204,7 @@ public class TransientResourceManager : MediatorSubscriberBase
         TransientResources[gameObject].Clear();
     }
 
-    public override void Dispose(bool disposing)
+    protected override void Dispose(bool disposing)
     {
         TransientResources.Clear();
         SemiTransientResources.Clear();

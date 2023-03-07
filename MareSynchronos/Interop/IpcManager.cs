@@ -297,7 +297,7 @@ public class IpcManager : MediatorSubscriberBase
         }
     }
 
-    public override void Dispose(bool disposing)
+    protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
 

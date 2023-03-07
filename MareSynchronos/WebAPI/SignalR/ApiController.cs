@@ -269,7 +269,7 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
         _initialized = true;
     }
 
-    public override void Dispose(bool disposing)
+    protected override void Dispose(bool disposing)
     {
         _healthCheckTokenSource?.Cancel();
         Task.Run(async () => await StopConnection(ServerState.Disconnected).ConfigureAwait(false));

@@ -123,7 +123,7 @@ public class CacheCreationService : MediatorSubscriberBase
         }
     }
 
-    public override void Dispose(bool disposing)
+    protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
         _playerRelatedObjects.ForEach(p => p.Dispose());

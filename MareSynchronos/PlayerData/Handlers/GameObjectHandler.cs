@@ -92,7 +92,7 @@ public class GameObjectHandler : MediatorSubscriberBase
     private IntPtr DrawObjectAddress { get; set; }
     private byte[] EquipSlotData { get; set; } = new byte[40];
 
-    public override void Dispose(bool disposing)
+    protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
         if (_isOwnedObject)

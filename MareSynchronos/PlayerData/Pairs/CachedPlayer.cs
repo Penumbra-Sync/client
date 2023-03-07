@@ -210,7 +210,7 @@ public class CachedPlayer : MediatorSubscriberBase
         return true;
     }
 
-    public override void Dispose(bool disposing)
+    protected override void Dispose(bool disposing)
     {
         if (string.IsNullOrEmpty(PlayerName)) return; // already disposed
 

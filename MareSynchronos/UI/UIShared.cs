@@ -735,7 +735,7 @@ public partial class UiShared : MediatorSubscriberBase
         return true;
     }
 
-    public override void Dispose(bool disposing)
+    protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
         _pluginInterface.UiBuilder.BuildFonts -= BuildFont;

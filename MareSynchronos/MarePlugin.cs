@@ -94,7 +94,7 @@ public class MarePlugin : MediatorSubscriberBase
         serviceProvider.GetRequiredService<NotificationService>();
     }
 
-    public override void Dispose(bool disposing)
+    protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
 

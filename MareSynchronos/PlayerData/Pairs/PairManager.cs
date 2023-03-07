@@ -124,7 +124,7 @@ public class PairManager : MediatorSubscriberBase
         RecreateLazy();
     }
 
-    public override void Dispose(bool disposing)
+    protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
         DisposePairs();

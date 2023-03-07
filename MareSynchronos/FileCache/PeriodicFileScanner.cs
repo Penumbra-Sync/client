@@ -75,7 +75,7 @@ public class PeriodicFileScanner : MediatorSubscriberBase
     private TimeSpan _timeUntilNextScan = TimeSpan.Zero;
     private int TimeBetweenScans => _configService.Current.TimeSpanBetweenScansInSeconds;
 
-    public override void Dispose(bool disposing)
+    protected override void Dispose(bool disposing)
     {
         _scanCancellationTokenSource?.Cancel();
         base.Dispose(disposing);

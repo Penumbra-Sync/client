@@ -121,9 +121,4 @@ public class Configuration : IPluginConfiguration
 
         return newConfig;
     }
-
-    public void Migrate()
-    {
-
-    }
 }
