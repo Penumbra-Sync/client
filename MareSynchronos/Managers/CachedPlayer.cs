@@ -396,8 +396,9 @@ public class CachedPlayer : MediatorSubscriberBase, IDisposable
                 // block until current application is done
                 _logger.LogDebug("Waiting for current data application (Id: {id}) to finish", _applicationId);
                 await Task.Delay(250).ConfigureAwait(false);
-                if (downloadToken.IsCancellationRequested) return;
             }
+
+            if (downloadToken.IsCancellationRequested) return;
 
             _applicationTask = Task.Run(async () =>
             {
