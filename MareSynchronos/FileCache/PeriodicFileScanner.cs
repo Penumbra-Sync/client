@@ -7,7 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.FileCache;
 
-public class PeriodicFileScanner : MediatorSubscriberBase
+public sealed class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
 {
     private readonly IpcManager _ipcManager;
     private readonly MareConfigService _configService;
@@ -19,7 +19,6 @@ public class PeriodicFileScanner : MediatorSubscriberBase
     public PeriodicFileScanner(ILogger<PeriodicFileScanner> logger, IpcManager ipcManager, MareConfigService configService,
         FileCacheManager fileDbManager, MareMediator mediator, PerformanceCollectorService performanceCollector) : base(logger, mediator)
     {
-        Logger.LogTrace("Creating " + nameof(PeriodicFileScanner));
         _ipcManager = ipcManager;
         _configService = configService;
         _fileDbManager = fileDbManager;
@@ -75,10 +74,10 @@ public class PeriodicFileScanner : MediatorSubscriberBase
     private TimeSpan _timeUntilNextScan = TimeSpan.Zero;
     private int TimeBetweenScans => _configService.Current.TimeSpanBetweenScansInSeconds;
 
-    protected override void Dispose(bool disposing)
+    public void Dispose()
     {
+        UnsubscribeAll();
         _scanCancellationTokenSource?.Cancel();
-        base.Dispose(disposing);
     }
 
     public void InvokeScan(bool forced = false)
@@ -168,7 +167,7 @@ public class PeriodicFileScanner : MediatorSubscriberBase
             return;
         }
 
-        Logger.LogDebug("Getting files from " + penumbraDir + " and " + _configService.Current.CacheFolder);
+        Logger.LogDebug("Getting files from {penumbra} and {storage}", penumbraDir, _configService.Current.CacheFolder);
         string[] ext = { ".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk" };
 
         var scannedFiles = new ConcurrentDictionary<string, bool>(Directory.EnumerateFiles(penumbraDir!, "*.*", SearchOption.AllDirectories)

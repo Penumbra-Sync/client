@@ -13,7 +13,7 @@ using System.Net.Http.Json;
 
 namespace MareSynchronos.WebAPI.Files;
 
-public class FileUploadManager : MediatorSubscriberBase
+public sealed class FileUploadManager : MediatorSubscriberBase, IDisposable
 {
     private readonly FileTransferOrchestrator _orchestrator;
     private readonly FileCacheManager _fileDbManager;
@@ -61,10 +61,10 @@ public class FileUploadManager : MediatorSubscriberBase
         await _orchestrator.SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesDeleteAllFullPath(_orchestrator.FilesCdnUri!)).ConfigureAwait(false);
     }
 
-    protected override void Dispose(bool disposing)
+    public void Dispose()
     {
         Reset();
-        base.Dispose(disposing);
+        UnsubscribeAll();
     }
 
     public async Task<CharacterData> UploadFiles(CharacterData data)

@@ -5,10 +5,11 @@ using Dalamud.Interface.Internal.Notifications;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.Services.Mediator;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Services;
-public class NotificationService : MediatorSubscriberBase
+public class NotificationService : MediatorSubscriberBase, IHostedService
 {
     private readonly UiBuilder _uiBuilder;
     private readonly ChatGui _chatGui;
@@ -19,12 +20,11 @@ public class NotificationService : MediatorSubscriberBase
         _uiBuilder = uiBuilder;
         _chatGui = chatGui;
         _configurationService = configurationService;
-        mediator.Subscribe<NotificationMessage>(this, (msg) => ShowNotification((NotificationMessage)msg));
     }
 
     private void ShowNotification(NotificationMessage msg)
     {
-        Logger.LogInformation(msg.ToString());
+        Logger.LogInformation("{msg}", msg.ToString());
 
         switch (msg.Type)
         {
@@ -100,5 +100,16 @@ public class NotificationService : MediatorSubscriberBase
     {
         SeStringBuilder se = new SeStringBuilder().AddText("[Mare Synchronos] Error: " + message);
         _chatGui.PrintError(se.BuiltString);
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        Mediator.Subscribe<NotificationMessage>(this, (msg) => ShowNotification((NotificationMessage)msg));
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
     }
 }

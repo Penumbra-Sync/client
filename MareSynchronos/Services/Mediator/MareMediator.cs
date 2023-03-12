@@ -41,7 +41,7 @@ public sealed class MareMediator : IDisposable
                 throw new InvalidOperationException("Already subscribed");
             }
 
-            _logger.LogDebug("Subscriber added for message {message}: {sub}", typeof(T), subscriber);
+            _logger.LogDebug("Subscriber added for message {message}: {sub}", typeof(T).Name, subscriber);
         }
     }
 
@@ -91,10 +91,13 @@ public sealed class MareMediator : IDisposable
                 if (unSubbed > 0)
                 {
                     _logger.LogDebug("{sub} unsubscribed from {msg}", subscriber, kvp.Key.Name);
-                    _logger.LogTrace("Remaining Subscribers:");
-                    foreach (var item in _subscriberDict[kvp.Key])
+                    if (_subscriberDict[kvp.Key].Any())
                     {
-                        _logger.LogTrace("{Key}: {item}", kvp.Key, item.Subscriber);
+                        _logger.LogTrace("Remaining Subscribers:");
+                        foreach (var item in _subscriberDict[kvp.Key])
+                        {
+                            _logger.LogTrace("{Key}: {item}", kvp.Key, item.Subscriber);
+                        }
                     }
                 }
             }

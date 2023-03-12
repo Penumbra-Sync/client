@@ -7,11 +7,12 @@ using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Export;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
-public class GposeUi : WindowMediatorSubscriberBase
+public class GposeUi : WindowMediatorSubscriberBase, IHostedService
 {
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly DalamudUtil _dalamudUtil;
@@ -26,10 +27,6 @@ public class GposeUi : WindowMediatorSubscriberBase
         _dalamudUtil = dalamudUtil;
         _fileDialogManager = fileDialogManager;
         _configService = configService;
-        Mediator.Subscribe<GposeStartMessage>(this, (_) => StartGpose());
-        Mediator.Subscribe<GposeEndMessage>(this, (_) => EndGpose());
-        IsOpen = _dalamudUtil.IsInGpose;
-        Flags = ImGuiWindowFlags.AlwaysAutoResize;
     }
 
     private void EndGpose()
@@ -76,5 +73,16 @@ public class GposeUi : WindowMediatorSubscriberBase
             UiShared.ColorTextWrapped("Loading Character...", ImGuiColors.DalamudYellow);
         }
         UiShared.TextWrapped("Hint: You can disable the automatic loading of this window in the Mare settings and open it manually with /mare gpose");
+    }
+
+    public override Task StartAsync(CancellationToken cancellationToken)
+    {
+        base.StartAsync(cancellationToken);
+
+        Mediator.Subscribe<GposeStartMessage>(this, (_) => StartGpose());
+        Mediator.Subscribe<GposeEndMessage>(this, (_) => EndGpose());
+        IsOpen = _dalamudUtil.IsInGpose;
+        Flags = ImGuiWindowFlags.AlwaysAutoResize;
+        return Task.CompletedTask;
     }
 }

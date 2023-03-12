@@ -10,7 +10,7 @@ using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;
 
 namespace MareSynchronos.PlayerData.Handlers;
 
-public class GameObjectHandler : MediatorSubscriberBase
+public sealed class GameObjectHandler : MediatorSubscriberBase, IDisposable
 {
     private readonly Func<IntPtr> _getAddress;
     private readonly bool _isOwnedObject;
@@ -92,9 +92,9 @@ public class GameObjectHandler : MediatorSubscriberBase
     private IntPtr DrawObjectAddress { get; set; }
     private byte[] EquipSlotData { get; set; } = new byte[40];
 
-    protected override void Dispose(bool disposing)
+    public void Dispose()
     {
-        base.Dispose(disposing);
+        UnsubscribeAll();
         if (_isOwnedObject)
             Mediator.Publish(new RemoveWatchedGameObjectHandler(this));
     }

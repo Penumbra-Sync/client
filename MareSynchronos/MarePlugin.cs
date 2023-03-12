@@ -13,6 +13,8 @@ using MareSynchronos.PlayerData.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.ServerConfiguration;
+using Microsoft.Extensions.Hosting;
+using System.Reflection;
 
 namespace MareSynchronos;
 
@@ -70,61 +72,53 @@ namespace MareSynchronos;
 */
 #pragma warning restore S125 // Sections of code should not be commented out
 
-public class MarePlugin : MediatorSubscriberBase
+public class MarePlugin : MediatorSubscriberBase, IHostedService
 {
-    private readonly ServiceProvider _serviceProvider;
+    private readonly DalamudPluginInterface _dalamudPluginInterface;
+    private readonly PerformanceCollectorService _performanceCollectorService;
+    private readonly CommandManager _commandManager;
+    private readonly MareConfigService _mareConfigService;
+    private readonly ServerConfigurationManager _serverConfigurationManager;
+    private readonly ApiController _apiController;
+    private readonly PeriodicFileScanner _periodicFileScanner;
+    private readonly IServiceProvider _serviceProvider;
     private const string _commandName = "/mare";
     private IServiceScope? _runtimeServiceScope;
 
-    public MarePlugin(ILogger<MarePlugin> logger, ServiceProvider serviceProvider, MareMediator mediator) : base(logger, mediator)
+    public MarePlugin(ILogger<MarePlugin> logger, DalamudPluginInterface dalamudPluginInterface, PerformanceCollectorService performanceCollectorService,
+        CommandManager commandManager, MareConfigService mareConfigService, ServerConfigurationManager serverConfigurationManager,
+        ApiController apiController, PeriodicFileScanner periodicFileScanner,
+        IServiceProvider serviceProvider, MareMediator mediator) : base(logger, mediator)
     {
+        _dalamudPluginInterface = dalamudPluginInterface;
+        _performanceCollectorService = performanceCollectorService;
+        _commandManager = commandManager;
+        _mareConfigService = mareConfigService;
+        _serverConfigurationManager = serverConfigurationManager;
+        _apiController = apiController;
+        _periodicFileScanner = periodicFileScanner;
         _serviceProvider = serviceProvider;
-
-        _serviceProvider.GetRequiredService<ConfigurationMigrator>().Migrate();
-
-        mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => Task.Run(WaitForPlayerAndLaunchCharacterManager));
-        mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
-        mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
-
-        serviceProvider.GetRequiredService<SettingsUi>();
-        serviceProvider.GetRequiredService<CompactUi>();
-        serviceProvider.GetRequiredService<GposeUi>();
-        serviceProvider.GetRequiredService<IntroUi>();
-        serviceProvider.GetRequiredService<DownloadUi>();
-        serviceProvider.GetRequiredService<NotificationService>();
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-
-        DalamudUtilOnLogOut();
-
-        _serviceProvider.Dispose();
-
-        Logger.LogDebug("Shut down");
     }
 
     private void DalamudUtilOnLogIn()
     {
         Logger?.LogDebug("Client login");
 
-        var pi = _serviceProvider.GetRequiredService<DalamudPluginInterface>();
-        pi.UiBuilder.Draw += Draw;
-        pi.UiBuilder.OpenConfigUi += OpenUi;
-        _serviceProvider.GetRequiredService<CommandManager>().AddHandler(_commandName, new CommandInfo(OnCommand)
+        _dalamudPluginInterface.UiBuilder.Draw += Draw;
+        _dalamudPluginInterface.UiBuilder.OpenConfigUi += OpenUi;
+        _commandManager.AddHandler(_commandName, new CommandInfo(OnCommand)
         {
             HelpMessage = "Opens the Mare Synchronos UI",
         });
 
-        if (!_serviceProvider.GetRequiredService<MareConfigService>().Current.HasValidSetup()
-            || !_serviceProvider.GetRequiredService<ServerConfigurationManager>().HasValidConfig())
+        if (!_mareConfigService.Current.HasValidSetup()
+            || !_serverConfigurationManager.HasValidConfig())
         {
-            _serviceProvider.GetRequiredService<MareMediator>().Publish(new SwitchToIntroUiMessage());
+            Mediator.Publish(new SwitchToIntroUiMessage());
             return;
         }
 
-        _serviceProvider.GetRequiredService<PeriodicFileScanner>().StartScan();
+        _periodicFileScanner.StartScan();
         Task.Run(WaitForPlayerAndLaunchCharacterManager);
     }
 
@@ -133,10 +127,9 @@ public class MarePlugin : MediatorSubscriberBase
         Logger?.LogDebug("Client logout");
 
         _runtimeServiceScope?.Dispose();
-        var pi = _serviceProvider.GetRequiredService<DalamudPluginInterface>();
-        pi.UiBuilder.Draw -= Draw;
-        pi.UiBuilder.OpenConfigUi -= OpenUi;
-        _serviceProvider.GetRequiredService<CommandManager>().RemoveHandler(_commandName);
+        _dalamudPluginInterface.UiBuilder.Draw -= Draw;
+        _dalamudPluginInterface.UiBuilder.OpenConfigUi -= OpenUi;
+        _commandManager.RemoveHandler(_commandName);
     }
 
     private async Task WaitForPlayerAndLaunchCharacterManager()
@@ -182,53 +175,78 @@ public class MarePlugin : MediatorSubscriberBase
 
         if (string.Equals(splitArgs[0], "toggle", StringComparison.OrdinalIgnoreCase))
         {
-            var serverConfigurationManager = _serviceProvider.GetRequiredService<ServerConfigurationManager>();
-            if (serverConfigurationManager.CurrentServer == null) return;
+            if (_serverConfigurationManager.CurrentServer == null) return;
             var fullPause = splitArgs.Length > 1 ? splitArgs[1] switch
             {
                 "on" => false,
                 "off" => true,
-                _ => !serverConfigurationManager.CurrentServer.FullPause,
-            } : !serverConfigurationManager.CurrentServer.FullPause;
+                _ => !_serverConfigurationManager.CurrentServer.FullPause,
+            } : !_serverConfigurationManager.CurrentServer.FullPause;
 
-            if (fullPause != serverConfigurationManager.CurrentServer.FullPause)
+            if (fullPause != _serverConfigurationManager.CurrentServer.FullPause)
             {
-                serverConfigurationManager.CurrentServer.FullPause = fullPause;
-                serverConfigurationManager.Save();
-                _ = _serviceProvider.GetRequiredService<ApiController>().CreateConnections();
+                _serverConfigurationManager.CurrentServer.FullPause = fullPause;
+                _serverConfigurationManager.Save();
+                _ = _apiController.CreateConnections();
             }
         }
         else if (string.Equals(splitArgs[0], "gpose", StringComparison.OrdinalIgnoreCase))
         {
-            _serviceProvider.GetRequiredService<GposeUi>().Toggle();
+            Mediator.Publish(new UiToggleMessage(typeof(GposeUi)));
         }
         else if (string.Equals(splitArgs[0], "rescan", StringComparison.OrdinalIgnoreCase))
         {
-            _serviceProvider.GetRequiredService<PeriodicFileScanner>().InvokeScan(forced: true);
+            _periodicFileScanner.InvokeScan(forced: true);
         }
         else if (string.Equals(splitArgs[0], "perf", StringComparison.OrdinalIgnoreCase))
         {
             if (splitArgs.Length > 1 && int.TryParse(splitArgs[1], out var limitBySeconds))
             {
-                _serviceProvider.GetRequiredService<PerformanceCollectorService>().PrintPerformanceStats(limitBySeconds);
+                _performanceCollectorService.PrintPerformanceStats(limitBySeconds);
             }
             else
             {
-                _serviceProvider.GetRequiredService<PerformanceCollectorService>().PrintPerformanceStats();
+                _performanceCollectorService.PrintPerformanceStats();
             }
         }
         else if (string.Equals(splitArgs[0], "medi", StringComparison.OrdinalIgnoreCase))
         {
-            _serviceProvider.GetRequiredService<MareMediator>().PrintSubscriberInfo();
+            Mediator.PrintSubscriberInfo();
         }
     }
 
     private void OpenUi()
     {
-
-        if (_serviceProvider.GetRequiredService<MareConfigService>().Current.HasValidSetup())
-            _serviceProvider.GetRequiredService<CompactUi>().Toggle();
+        if (_mareConfigService.Current.HasValidSetup())
+            Mediator.Publish(new UiToggleMessage(typeof(CompactUi)));
         else
-            _serviceProvider.GetRequiredService<IntroUi>().Toggle();
+            Mediator.Publish(new UiToggleMessage(typeof(IntroUi)));
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        var version = Assembly.GetExecutingAssembly().GetName().Version!;
+        Logger.LogInformation("Launching {name} {major}.{minor}.{build}", "Mare Synchronos", version.Major, version.Minor, version.Build);
+
+        _serviceProvider.GetRequiredService<Dalamud.Localization>().SetupWithLangCode("en");
+
+        _dalamudPluginInterface.UiBuilder.DisableGposeUiHide = true;
+
+        Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => Task.Run(WaitForPlayerAndLaunchCharacterManager));
+        Mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
+        Mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
+
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        UnsubscribeAll();
+
+        DalamudUtilOnLogOut();
+
+        Logger.LogDebug("Shut down");
+
+        return Task.CompletedTask;
     }
 }

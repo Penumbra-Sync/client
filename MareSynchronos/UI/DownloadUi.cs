@@ -7,11 +7,12 @@ using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.Files.Models;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
-public class DownloadUi : WindowMediatorSubscriberBase
+public class DownloadUi : WindowMediatorSubscriberBase, IHostedService
 {
     private readonly MareConfigService _configService;
     private readonly FileUploadManager _fileTransferManager;
@@ -24,43 +25,6 @@ public class DownloadUi : WindowMediatorSubscriberBase
         _configService = configService;
         _fileTransferManager = fileTransferManager;
         _uiShared = uiShared;
-
-        SizeConstraints = new WindowSizeConstraints()
-        {
-            MaximumSize = new Vector2(300, 90),
-            MinimumSize = new Vector2(300, 90),
-        };
-
-        Flags |= ImGuiWindowFlags.NoMove;
-        Flags |= ImGuiWindowFlags.NoBackground;
-        Flags |= ImGuiWindowFlags.NoInputs;
-        Flags |= ImGuiWindowFlags.NoNavFocus;
-        Flags |= ImGuiWindowFlags.NoResize;
-        Flags |= ImGuiWindowFlags.NoScrollbar;
-        Flags |= ImGuiWindowFlags.NoTitleBar;
-        Flags |= ImGuiWindowFlags.NoDecoration;
-
-        ForceMainWindow = true;
-
-        IsOpen = true;
-
-        Mediator.Subscribe<DownloadStartedMessage>(this, (msg) =>
-        {
-            var actualMsg = ((DownloadStartedMessage)msg);
-            _currentDownloads[actualMsg.DownloadId] = actualMsg.DownloadStatus;
-        });
-
-        Mediator.Subscribe<DownloadFinishedMessage>(this, (msg) => _currentDownloads.TryRemove(((DownloadFinishedMessage)msg).DownloadId, out _));
-
-        Mediator.Subscribe<GposeStartMessage>(this, (_) =>
-        {
-            IsOpen = false;
-        });
-
-        Mediator.Subscribe<GposeEndMessage>(this, (_) =>
-        {
-            IsOpen = true;
-        });
     }
 
     public override void PreDraw()
@@ -151,5 +115,55 @@ public class DownloadUi : WindowMediatorSubscriberBase
         {
             // ignore errors thrown from UI
         }
+    }
+
+    public override Task StartAsync(CancellationToken cancellationToken)
+    {
+        base.StartAsync(cancellationToken);
+
+        SizeConstraints = new WindowSizeConstraints()
+        {
+            MaximumSize = new Vector2(300, 90),
+            MinimumSize = new Vector2(300, 90),
+        };
+
+        Flags |= ImGuiWindowFlags.NoMove;
+        Flags |= ImGuiWindowFlags.NoBackground;
+        Flags |= ImGuiWindowFlags.NoInputs;
+        Flags |= ImGuiWindowFlags.NoNavFocus;
+        Flags |= ImGuiWindowFlags.NoResize;
+        Flags |= ImGuiWindowFlags.NoScrollbar;
+        Flags |= ImGuiWindowFlags.NoTitleBar;
+        Flags |= ImGuiWindowFlags.NoDecoration;
+
+        ForceMainWindow = true;
+
+        IsOpen = true;
+
+        Mediator.Subscribe<DownloadStartedMessage>(this, (msg) =>
+        {
+            var actualMsg = ((DownloadStartedMessage)msg);
+            _currentDownloads[actualMsg.DownloadId] = actualMsg.DownloadStatus;
+        });
+
+        Mediator.Subscribe<DownloadFinishedMessage>(this, (msg) => _currentDownloads.TryRemove(((DownloadFinishedMessage)msg).DownloadId, out _));
+
+        Mediator.Subscribe<GposeStartMessage>(this, (_) =>
+        {
+            IsOpen = false;
+        });
+
+        Mediator.Subscribe<GposeEndMessage>(this, (_) =>
+        {
+            IsOpen = true;
+        });
+
+        return Task.CompletedTask;
+    }
+
+    public override Task StopAsync(CancellationToken cancellationToken)
+    {
+        base.StopAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 }

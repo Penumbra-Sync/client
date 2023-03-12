@@ -14,7 +14,7 @@ using MareSynchronos.Services;
 
 namespace MareSynchronos.Interop;
 
-public class IpcManager : MediatorSubscriberBase
+public sealed class IpcManager : MediatorSubscriberBase, IDisposable
 {
     private readonly ICallGateSubscriber<int> _glamourerApiVersion;
     private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyAll;
@@ -78,8 +78,6 @@ public class IpcManager : MediatorSubscriberBase
     public IpcManager(ILogger<IpcManager> logger, DalamudPluginInterface pi, DalamudUtil dalamudUtil, MareMediator mediator) : base(logger, mediator)
     {
         _dalamudUtil = dalamudUtil;
-
-        Logger.LogTrace("Creating " + nameof(IpcManager));
 
         _penumbraInit = Penumbra.Api.Ipc.Initialized.Subscriber(pi, () => PenumbraInit());
         _penumbraDispose = Penumbra.Api.Ipc.Disposed.Subscriber(pi, () => PenumbraDispose());
@@ -297,9 +295,9 @@ public class IpcManager : MediatorSubscriberBase
         }
     }
 
-    protected override void Dispose(bool disposing)
+    public void Dispose()
     {
-        base.Dispose(disposing);
+        UnsubscribeAll();
 
         _disposalCts.Cancel();
 

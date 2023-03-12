@@ -10,7 +10,7 @@ using System.Linq;
 
 namespace MareSynchronos.FileCache;
 
-public class TransientResourceManager : MediatorSubscriberBase
+public sealed class TransientResourceManager : MediatorSubscriberBase, IDisposable
 {
     private readonly TransientConfigService _configurationService;
     private readonly DalamudUtil _dalamudUtil;
@@ -202,8 +202,10 @@ public class TransientResourceManager : MediatorSubscriberBase
         TransientResources[gameObject].Clear();
     }
 
-    protected override void Dispose(bool disposing)
+    public void Dispose()
     {
+        base.UnsubscribeAll();
+
         TransientResources.Clear();
         SemiTransientResources.Clear();
         if (SemiTransientResources.ContainsKey(ObjectKind.Player))
@@ -211,8 +213,6 @@ public class TransientResourceManager : MediatorSubscriberBase
             _configurationService.Current.PlayerPersistentTransientCache[PlayerPersistentDataKey] = SemiTransientResources[ObjectKind.Player];
             _configurationService.Save();
         }
-
-        base.Dispose(disposing);
     }
 
     internal void AddSemiTransientResource(ObjectKind objectKind, string item)

@@ -2,12 +2,13 @@
 using MareSynchronos.MareConfiguration.Configurations;
 using MareSynchronos.MareConfiguration.Configurations.Obsolete;
 using MareSynchronos.MareConfiguration.Models;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
 namespace MareSynchronos.MareConfiguration;
 
-public class ConfigurationMigrator
+public class ConfigurationMigrator : IHostedService
 {
     private readonly ILogger<ConfigurationMigrator> _logger;
     private readonly DalamudPluginInterface _pi;
@@ -88,5 +89,16 @@ public class ConfigurationMigrator
     private static void SaveConfig(IMareConfiguration config, string path)
     {
         File.WriteAllText(path, JsonConvert.SerializeObject(config, Formatting.Indented));
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        Migrate();
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
     }
 }

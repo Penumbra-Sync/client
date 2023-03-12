@@ -19,10 +19,11 @@ using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Services;
 using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.Files.Models;
+using Microsoft.Extensions.Hosting;
 
 namespace MareSynchronos.UI;
 
-public class SettingsUi : WindowMediatorSubscriberBase
+public class SettingsUi : WindowMediatorSubscriberBase, IHostedService
 {
     private readonly MareConfigService _configService;
     private ApiController ApiController => _uiShared.ApiController;
@@ -45,17 +46,9 @@ public class SettingsUi : WindowMediatorSubscriberBase
         MareCharaFileManager mareCharaFileManager, PairManager pairManager,
         ServerConfigurationManager serverConfigurationManager,
         MareMediator mediator, PerformanceCollectorService performanceCollector,
-        FileUploadManager fileTransferManager, 
+        FileUploadManager fileTransferManager,
         FileTransferOrchestrator fileTransferOrchestrator) : base(logger, windowSystem, mediator, "Mare Synchronos Settings")
     {
-        _logger.LogTrace("Creating " + nameof(SettingsUi));
-
-        SizeConstraints = new WindowSizeConstraints()
-        {
-            MinimumSize = new Vector2(800, 400),
-            MaximumSize = new Vector2(800, 2000),
-        };
-
         _configService = configService;
         _mareCharaFileManager = mareCharaFileManager;
         _pairManager = pairManager;
@@ -64,12 +57,6 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _fileTransferManager = fileTransferManager;
         _fileTransferOrchestrator = fileTransferOrchestrator;
         _uiShared = uiShared;
-
-        Mediator.Subscribe<OpenSettingsUiMessage>(this, (_) => Toggle());
-        Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
-        Mediator.Subscribe<CutsceneStartMessage>(this, (_) => UiShared_GposeStart());
-        Mediator.Subscribe<CutsceneEndMessage>(this, (_) => UiShared_GposeEnd());
-        Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) => LastCreatedCharacterData = ((CharacterDataCreatedMessage)msg).CharacterData);
     }
 
     private void UiShared_GposeEnd()
@@ -806,5 +793,24 @@ public class SettingsUi : WindowMediatorSubscriberBase
     {
         _uiShared.EditTrackerPosition = false;
         base.OnClose();
+    }
+
+    public override Task StartAsync(CancellationToken cancellationToken)
+    {
+        base.StartAsync(cancellationToken);
+
+        SizeConstraints = new WindowSizeConstraints()
+        {
+            MinimumSize = new Vector2(800, 400),
+            MaximumSize = new Vector2(800, 2000),
+        };
+
+        Mediator.Subscribe<OpenSettingsUiMessage>(this, (_) => Toggle());
+        Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
+        Mediator.Subscribe<CutsceneStartMessage>(this, (_) => UiShared_GposeStart());
+        Mediator.Subscribe<CutsceneEndMessage>(this, (_) => UiShared_GposeEnd());
+        Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) => LastCreatedCharacterData = ((CharacterDataCreatedMessage)msg).CharacterData);
+
+        return Task.CompletedTask;
     }
 }

@@ -20,7 +20,6 @@ public class OnlinePlayerManager : MediatorSubscriberBase
     public OnlinePlayerManager(ILogger<OnlinePlayerManager> logger, ApiController apiController, DalamudUtil dalamudUtil,
         PairManager pairManager, MareMediator mediator, FileUploadManager fileTransferManager) : base(logger, mediator)
     {
-        Logger.LogTrace("Creating " + nameof(OnlinePlayerManager));
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
         _pairManager = pairManager;

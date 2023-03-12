@@ -9,18 +9,14 @@ public abstract class MediatorSubscriberBase : IMediatorSubscriber
     protected MediatorSubscriberBase(ILogger logger, MareMediator mediator)
     {
         Logger = logger;
+
+        Logger.LogTrace("Creating {type} ({this})", GetType().Name, this);
         Mediator = mediator;
     }
 
-    public void Dispose()
+    protected void UnsubscribeAll()
     {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        Logger.LogTrace("Disposing {type} ({this})", GetType(), this);
+        Logger.LogTrace("Unsubscribing from all for {type} ({this})", GetType().Name, this);
         Mediator.UnsubscribeAll(this);
     }
 }

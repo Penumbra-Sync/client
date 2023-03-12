@@ -15,7 +15,7 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.PlayerData.Pairs;
 
-public class CachedPlayer : MediatorSubscriberBase
+public sealed class CachedPlayer : MediatorSubscriberBase, IDisposable
 {
     private readonly FileDownloadManager _downloadManager;
     private readonly DalamudUtil _dalamudUtil;
@@ -210,11 +210,11 @@ public class CachedPlayer : MediatorSubscriberBase
         return true;
     }
 
-    protected override void Dispose(bool disposing)
+    public void Dispose()
     {
         if (string.IsNullOrEmpty(PlayerName)) return; // already disposed
 
-        base.Dispose(disposing);
+        base.UnsubscribeAll();
         _downloadManager.Dispose();
         var name = PlayerName;
         PlayerName = null;

@@ -15,7 +15,7 @@ using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Services;
 
 namespace MareSynchronos.WebAPI;
-public partial class ApiController : MediatorSubscriberBase, IMareHubClient
+public sealed partial class ApiController : MediatorSubscriberBase, IMareHubClient, IDisposable
 {
     public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
     public const string MainServiceUri = "wss://maresynchronos.com";
@@ -38,8 +38,6 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
     public ApiController(ILogger<ApiController> logger, HubFactory hubFactory, DalamudUtil dalamudUtil,
         PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
     {
-        Logger.LogTrace("Creating " + nameof(ApiController));
-
         _hubFactory = hubFactory;
         _dalamudUtil = dalamudUtil;
         _pairManager = pairManager;
@@ -269,8 +267,9 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
         _initialized = true;
     }
 
-    protected override void Dispose(bool disposing)
+    public void Dispose()
     {
+        UnsubscribeAll();
         _healthCheckTokenSource?.Cancel();
         Task.Run(async () => await StopConnection(ServerState.Disconnected).ConfigureAwait(false));
         _connectionCancellationTokenSource?.Cancel();

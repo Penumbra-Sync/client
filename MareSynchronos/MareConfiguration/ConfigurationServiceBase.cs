@@ -7,19 +7,18 @@ namespace MareSynchronos.MareConfiguration;
 public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareConfiguration
 {
     protected abstract string ConfigurationName { get; }
-    public string ConfigurationDirectory => _pluginInterface.ConfigDirectory.FullName;
+    public string ConfigurationDirectory { get; init; }
     public T Current => _currentConfigInternal.Value;
 
-    protected readonly DalamudPluginInterface _pluginInterface;
     private readonly CancellationTokenSource _periodicCheckCts = new();
     private DateTime _configLastWriteTime;
     private bool _configIsDirty = false;
     private Lazy<T> _currentConfigInternal;
 
     protected string ConfigurationPath => Path.Combine(ConfigurationDirectory, ConfigurationName);
-    protected ConfigurationServiceBase(DalamudPluginInterface pluginInterface)
+    protected ConfigurationServiceBase(string configurationDirectory)
     {
-        _pluginInterface = pluginInterface;
+        ConfigurationDirectory = configurationDirectory;
 
         Task.Run(CheckForConfigUpdatesInternal, _periodicCheckCts.Token);
         Task.Run(CheckForDirtyConfigInternal, _periodicCheckCts.Token);

@@ -24,7 +24,7 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
-public partial class UiShared : MediatorSubscriberBase
+public partial class UiShared : MediatorSubscriberBase, IDisposable
 {
     [LibraryImport("user32")]
     internal static partial short GetKeyState(int nVirtKey);
@@ -481,7 +481,7 @@ public partial class UiShared : MediatorSubscriberBase
             ImGui.InputText("Custom Service URI", ref _customServerUri, 255);
             ImGui.SetNextItemWidth(250);
             ImGui.InputText("Custom Service Name", ref _customServerName, 255);
-            if (UiShared.IconTextButton(FontAwesomeIcon.Plus, "Add Custom Service") 
+            if (UiShared.IconTextButton(FontAwesomeIcon.Plus, "Add Custom Service")
                 && !string.IsNullOrEmpty(_customServerUri)
                 && !string.IsNullOrEmpty(_customServerName))
             {
@@ -735,9 +735,9 @@ public partial class UiShared : MediatorSubscriberBase
         return true;
     }
 
-    protected override void Dispose(bool disposing)
+    public void Dispose()
     {
-        base.Dispose(disposing);
+        UnsubscribeAll();
         _pluginInterface.UiBuilder.BuildFonts -= BuildFont;
     }
 

@@ -11,10 +11,11 @@ using MareSynchronos.MareConfiguration.Models;
 using Microsoft.Extensions.Logging;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
+using Microsoft.Extensions.Hosting;
 
 namespace MareSynchronos.UI;
 
-internal sealed class IntroUi : WindowMediatorSubscriberBase
+internal class IntroUi : WindowMediatorSubscriberBase, IHostedService
 {
     private readonly UiShared _uiShared;
     private readonly MareConfigService _configService;
@@ -33,24 +34,10 @@ internal sealed class IntroUi : WindowMediatorSubscriberBase
     public IntroUi(ILogger<IntroUi> logger, WindowSystem windowSystem, UiShared uiShared, MareConfigService configService,
         PeriodicFileScanner fileCacheManager, ServerConfigurationManager serverConfigurationManager, MareMediator mareMediator) : base(logger, windowSystem, mareMediator, "Mare Synchronos Setup")
     {
-        _logger.LogTrace("Creating " + nameof(IntroUi));
-
         _uiShared = uiShared;
         _configService = configService;
         _fileCacheManager = fileCacheManager;
         _serverConfigurationManager = serverConfigurationManager;
-        IsOpen = false;
-
-        SizeConstraints = new WindowSizeConstraints()
-        {
-            MinimumSize = new Vector2(600, 400),
-            MaximumSize = new Vector2(600, 2000),
-        };
-
-        GetToSLocalization();
-
-        Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = false);
-        Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = true);
     }
 
     public override void Draw()
@@ -245,5 +232,25 @@ internal sealed class IntroUi : WindowMediatorSubscriberBase
         }
 
         _tosParagraphs = new[] { Strings.ToS.Paragraph1, Strings.ToS.Paragraph2, Strings.ToS.Paragraph3, Strings.ToS.Paragraph4, Strings.ToS.Paragraph5, Strings.ToS.Paragraph6 };
+    }
+
+    public override Task StartAsync(CancellationToken cancellationToken)
+    {
+        base.StartAsync(cancellationToken);
+
+        IsOpen = false;
+
+        SizeConstraints = new WindowSizeConstraints()
+        {
+            MinimumSize = new Vector2(600, 400),
+            MaximumSize = new Vector2(600, 2000),
+        };
+
+        GetToSLocalization();
+
+        Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = false);
+        Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = true);
+
+        return Task.CompletedTask;
     }
 }

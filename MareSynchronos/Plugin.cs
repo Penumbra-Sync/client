@@ -24,95 +24,107 @@ using MareSynchronos.PlayerData.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.WebAPI.Files;
-using System.Reflection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting.Internal;
 
 namespace MareSynchronos;
 
 public sealed class Plugin : IDalamudPlugin
 {
-    private readonly MarePlugin _plugin;
     public string Name => "Mare Synchronos";
-    private readonly ILogger<Plugin> _pluginLogger;
+    private readonly CancellationTokenSource _pluginCts = new();
 
     public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager, DataManager gameData,
         Framework framework, ObjectTable objectTable, ClientState clientState, Condition condition, ChatGui chatGui)
     {
-        IServiceCollection collection = new ServiceCollection();
-        collection.AddLogging(o =>
+        new HostBuilder()
+        .UseContentRoot(pluginInterface.ConfigDirectory.FullName)
+        .ConfigureLogging(lb =>
         {
-            o.AddDalamudLogging();
-            o.SetMinimumLevel(LogLevel.Trace);
-        });
+            lb.ClearProviders();
+            lb.AddDalamudLogging();
+            lb.SetMinimumLevel(LogLevel.Trace);
+        })
+        .ConfigureServices(collection =>
+        {
+            collection.AddSingleton(new WindowSystem("MareSynchronos"));
+            collection.AddSingleton<FileDialogManager>();
+            collection.AddSingleton(new Dalamud.Localization("MareSynchronos.Localization.", "", useEmbedded: true));
 
-        // inject dalamud related things
-        collection.AddSingleton(new WindowSystem("MareSynchronos"));
-        collection.AddSingleton<FileDialogManager>();
-        collection.AddSingleton(new Dalamud.Localization("MareSynchronos.Localization.", "", useEmbedded: true));
+            // add mare related singletons
+            collection.AddSingleton<MareMediator>();
+            collection.AddSingleton<FileCacheManager>();
+            collection.AddSingleton<CachedPlayerFactory>();
+            collection.AddSingleton<PairFactory>();
+            collection.AddSingleton<ServerConfigurationManager>();
+            collection.AddSingleton<PairManager>();
+            collection.AddSingleton<ApiController>();
+            collection.AddSingleton<PeriodicFileScanner>();
+            collection.AddSingleton<MareCharaFileManager>();
+            collection.AddSingleton<GameObjectHandlerFactory>();
+            collection.AddSingleton<PerformanceCollectorService>();
+            collection.AddSingleton<HubFactory>();
+            collection.AddSingleton<FileUploadManager>();
+            collection.AddSingleton<FileTransferOrchestrator>();
+            collection.AddSingleton<FileDownloadManagerFactory>();
 
-        // add mare related singletons
-        collection.AddSingleton<ConfigurationMigrator>();
-        collection.AddSingleton<MareConfigService>();
-        collection.AddSingleton<ServerTagConfigService>();
-        collection.AddSingleton<TransientConfigService>();
-        collection.AddSingleton<NotesConfigService>();
-        collection.AddSingleton<ServerConfigService>();
-        collection.AddSingleton<MareMediator>();
-        collection.AddSingleton<FileCacheManager>();
-        collection.AddSingleton<CachedPlayerFactory>();
-        collection.AddSingleton<PairFactory>();
-        collection.AddSingleton<ServerConfigurationManager>();
-        collection.AddSingleton<PairManager>();
-        collection.AddSingleton<ApiController>();
-        collection.AddSingleton<PeriodicFileScanner>();
-        collection.AddSingleton<MareCharaFileManager>();
-        collection.AddSingleton<GameObjectHandlerFactory>();
-        collection.AddSingleton<PerformanceCollectorService>();
-        collection.AddSingleton<HubFactory>();
-        collection.AddSingleton<FileUploadManager>();
-        collection.AddSingleton<FileTransferOrchestrator>();
-        collection.AddSingleton<FileDownloadManagerFactory>();
+            // factoried singletons
+            collection.AddSingleton((s) => new DalamudUtil(s.GetRequiredService<ILogger<DalamudUtil>>(),
+                clientState, objectTable, framework, condition, gameData,
+                s.GetRequiredService<MareMediator>(), s.GetRequiredService<PerformanceCollectorService>()));
+            collection.AddSingleton((s) => new IpcManager(s.GetRequiredService<ILogger<IpcManager>>(),
+                pluginInterface, s.GetRequiredService<DalamudUtil>(), s.GetRequiredService<MareMediator>()));
+            collection.AddSingleton((s) => new NotificationService(s.GetRequiredService<ILogger<NotificationService>>(),
+                s.GetRequiredService<MareMediator>(), pluginInterface.UiBuilder, chatGui, s.GetRequiredService<MareConfigService>()));
+            collection.AddSingleton((s) => new MareConfigService(pluginInterface.ConfigDirectory.FullName));
+            collection.AddSingleton((s) => new ServerConfigService(pluginInterface.ConfigDirectory.FullName));
+            collection.AddSingleton((s) => new NotesConfigService(pluginInterface.ConfigDirectory.FullName));
+            collection.AddSingleton((s) => new ServerTagConfigService(pluginInterface.ConfigDirectory.FullName));
+            collection.AddSingleton((s) => new TransientConfigService(pluginInterface.ConfigDirectory.FullName));
+            collection.AddSingleton((s) => new ConfigurationMigrator(s.GetRequiredService<ILogger<ConfigurationMigrator>>(), pluginInterface));
+            collection.AddSingleton((s) => new UiShared(s.GetRequiredService<ILogger<UiShared>>(), s.GetRequiredService<IpcManager>(), s.GetRequiredService<ApiController>(),
+                s.GetRequiredService<PeriodicFileScanner>(), s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareConfigService>(), s.GetRequiredService<DalamudUtil>(),
+                pluginInterface, s.GetRequiredService<Dalamud.Localization>(), s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<MareMediator>()));
+            collection.AddSingleton((s) => new MarePlugin(s.GetRequiredService<ILogger<MarePlugin>>(),
+                pluginInterface,
+                s.GetRequiredService<PerformanceCollectorService>(),
+                commandManager,
+                s.GetRequiredService<MareConfigService>(),
+                s.GetRequiredService<ServerConfigurationManager>(),
+                s.GetRequiredService<ApiController>(),
+                s.GetRequiredService<PeriodicFileScanner>(),
+                s.GetRequiredService<IServiceProvider>(),
+                s.GetRequiredService<MareMediator>()));
 
-        // factoried singletons
-        collection.AddSingleton((s) => new DalamudUtil(s.GetRequiredService<ILogger<DalamudUtil>>(),
-            clientState, objectTable, framework, condition, gameData,
-            s.GetRequiredService<MareMediator>(), s.GetRequiredService<PerformanceCollectorService>()));
-        collection.AddSingleton((s) => new IpcManager(s.GetRequiredService<ILogger<IpcManager>>(),
-            pluginInterface, s.GetRequiredService<DalamudUtil>(), s.GetRequiredService<MareMediator>()));
-        collection.AddSingleton((s) => new NotificationService(s.GetRequiredService<ILogger<NotificationService>>(),
-            s.GetRequiredService<MareMediator>(), pluginInterface.UiBuilder, chatGui, s.GetRequiredService<MareConfigService>()));
 
-        // add ui stuff
-        collection.AddSingleton<UiShared>();
-        collection.AddSingleton<SettingsUi>();
-        collection.AddSingleton<CompactUi>();
-        collection.AddSingleton<GposeUi>();
-        collection.AddSingleton<IntroUi>();
-        collection.AddSingleton<DownloadUi>();
+            // add ui stuff
+            collection.AddSingleton<SettingsUi>();
+            collection.AddSingleton<CompactUi>();
+            collection.AddSingleton<GposeUi>();
+            collection.AddSingleton<IntroUi>();
+            collection.AddSingleton<DownloadUi>();
 
-        // add scoped services
-        collection.AddScoped<CacheCreationService>();
-        collection.AddScoped<TransientResourceManager>();
-        collection.AddScoped<PlayerDataFactory>();
-        collection.AddScoped<OnlinePlayerManager>();
+            // add scoped services
+            collection.AddScoped<CacheCreationService>();
+            collection.AddScoped<TransientResourceManager>();
+            collection.AddScoped<PlayerDataFactory>();
+            collection.AddScoped<OnlinePlayerManager>();
 
-        // set up remaining things and launch mareplugin
-        var serviceProvider = collection.BuildServiceProvider(new ServiceProviderOptions() { ValidateOnBuild = true, ValidateScopes = true });
-
-        _pluginLogger = serviceProvider.GetRequiredService<ILogger<Plugin>>();
-        var version = Assembly.GetExecutingAssembly().GetName().Version!;
-        _pluginLogger.LogDebug("Launching {name} {major}.{minor}.{build}", Name, version.Major, version.Minor, version.Build);
-
-        serviceProvider.GetRequiredService<Dalamud.Localization>().SetupWithLangCode("en");
-        serviceProvider.GetRequiredService<DalamudPluginInterface>().UiBuilder.DisableGposeUiHide = true;
-
-        var mediator = serviceProvider.GetRequiredService<MareMediator>();
-        var logger = serviceProvider.GetRequiredService<ILogger<MarePlugin>>();
-        _plugin = new MarePlugin(logger, serviceProvider, mediator);
+            collection.AddHostedService(p => p.GetRequiredService<MarePlugin>());
+            collection.AddHostedService(p => p.GetRequiredService<NotificationService>());
+            collection.AddHostedService(p => p.GetRequiredService<DownloadUi>());
+            collection.AddHostedService(p => p.GetRequiredService<GposeUi>());
+            collection.AddHostedService(p => p.GetRequiredService<SettingsUi>());
+            collection.AddHostedService(p => p.GetRequiredService<CompactUi>());
+            collection.AddHostedService(p => p.GetRequiredService<IntroUi>());
+            collection.AddHostedService(p => p.GetRequiredService<ConfigurationMigrator>());
+        })
+        .Build()
+        .RunAsync(_pluginCts.Token);
     }
 
     public void Dispose()
     {
-        _pluginLogger.LogTrace("Disposing {type}", GetType());
-        _plugin.Dispose();
+        _pluginCts.Cancel();
     }
 }

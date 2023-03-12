@@ -13,7 +13,7 @@ using System.Net.Http.Json;
 
 namespace MareSynchronos.WebAPI.Files;
 
-public partial class FileDownloadManager : MediatorSubscriberBase
+public sealed partial class FileDownloadManager : MediatorSubscriberBase, IDisposable
 {
     private readonly FileTransferOrchestrator _orchestrator;
     private readonly FileCacheManager _fileDbManager;
@@ -326,5 +326,10 @@ public partial class FileDownloadManager : MediatorSubscriberBase
             }
             throw;
         }
+    }
+
+    public void Dispose()
+    {
+        base.UnsubscribeAll();
     }
 }

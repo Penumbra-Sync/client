@@ -19,11 +19,12 @@ using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.SignalR.Utils;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
-public class CompactUi : WindowMediatorSubscriberBase
+public class CompactUi : WindowMediatorSubscriberBase, IHostedService
 {
     private readonly ApiController _apiController;
     private readonly PairManager _pairManager;
@@ -60,18 +61,6 @@ public class CompactUi : WindowMediatorSubscriberBase
         UiShared uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
         ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager) : base(logger, windowSystem, mediator, "###MareSynchronosMainUI")
     {
-
-#if DEBUG
-        string dev = "Dev Build";
-        var ver = Assembly.GetExecutingAssembly().GetName().Version!;
-        WindowName = $"Mare Synchronos {dev} ({ver.Major}.{ver.Minor}.{ver.Build})###MareSynchronosMainUI";
-        Toggle();
-#else
-        var ver = Assembly.GetExecutingAssembly().GetName().Version;
-        this.WindowName = "Mare Synchronos " + ver.Major + "." + ver.Minor + "." + ver.Build + "###MareSynchronosMainUI";
-#endif
-        _logger.LogTrace("Creating " + nameof(CompactUi));
-
         _uiShared = uiShared;
         _configService = configService;
         _apiController = apiController;
@@ -84,17 +73,6 @@ public class CompactUi : WindowMediatorSubscriberBase
         _selectGroupForPairUi = new(tagHandler);
         _selectPairsForGroupUi = new(tagHandler);
         _pairGroupsUi = new(tagHandler, DrawPairedClient, apiController, _selectPairsForGroupUi);
-
-        Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = true);
-        Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
-        Mediator.Subscribe<CutsceneStartMessage>(this, (_) => UiShared_GposeStart());
-        Mediator.Subscribe<CutsceneEndMessage>(this, (_) => UiShared_GposeEnd());
-
-        SizeConstraints = new WindowSizeConstraints()
-        {
-            MinimumSize = new Vector2(350, 400),
-            MaximumSize = new Vector2(350, 2000),
-        };
     }
 
     private void UiShared_GposeEnd()
@@ -879,5 +857,31 @@ public class CompactUi : WindowMediatorSubscriberBase
             ServerState.Connected => _apiController.DisplayName,
             _ => string.Empty
         };
+    }
+
+    public override Task StartAsync(CancellationToken cancellationToken)
+    {
+        base.StartAsync(cancellationToken);
+#if DEBUG
+        string dev = "Dev Build";
+        var ver = Assembly.GetExecutingAssembly().GetName().Version!;
+        WindowName = $"Mare Synchronos {dev} ({ver.Major}.{ver.Minor}.{ver.Build})###MareSynchronosMainUI";
+        Toggle();
+#else
+        var ver = Assembly.GetExecutingAssembly().GetName().Version;
+        WindowName = "Mare Synchronos " + ver.Major + "." + ver.Minor + "." + ver.Build + "###MareSynchronosMainUI";
+#endif
+        Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = true);
+        Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
+        Mediator.Subscribe<CutsceneStartMessage>(this, (_) => UiShared_GposeStart());
+        Mediator.Subscribe<CutsceneEndMessage>(this, (_) => UiShared_GposeEnd());
+
+        SizeConstraints = new WindowSizeConstraints()
+        {
+            MinimumSize = new Vector2(350, 400),
+            MaximumSize = new Vector2(350, 2000),
+        };
+
+        return Task.CompletedTask;
     }
 }

@@ -1,6 +1,6 @@
 ﻿namespace MareSynchronos.Services.Mediator;
 
-public interface IMediatorSubscriber : IDisposable
+public interface IMediatorSubscriber
 {
     MareMediator Mediator { get; }
 }

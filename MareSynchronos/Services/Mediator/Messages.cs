@@ -51,4 +51,5 @@ public record HubClosedMessage(Exception? Exception) : IMessage;
 public record DownloadReadyMessage(Guid RequestId) : IMessage;
 public record DownloadStartedMessage(string DownloadId, Dictionary<string, FileDownloadStatus> DownloadStatus) : IMessage;
 public record DownloadFinishedMessage(string DownloadId) : IMessage;
+public record UiToggleMessage(Type UiType) : IMessage;
 #pragma warning restore MA0048 // File name must match type name
