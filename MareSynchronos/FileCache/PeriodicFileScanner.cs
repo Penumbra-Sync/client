@@ -1,20 +1,22 @@
-﻿using System.Collections.Concurrent;
-using MareSynchronos.Interop;
+﻿using MareSynchronos.Interop;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 
 namespace MareSynchronos.FileCache;
 
 public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
 {
-    private readonly IpcManager _ipcManager;
     private readonly MareConfigService _configService;
     private readonly FileCacheManager _fileDbManager;
+    private readonly IpcManager _ipcManager;
     private readonly PerformanceCollectorService _performanceCollector;
+    private long _currentFileProgress = 0;
+    private bool _fileScanWasRunning = false;
     private CancellationTokenSource? _scanCancellationTokenSource;
-    public ConcurrentDictionary<string, int> HaltScanLocks { get; set; } = new(StringComparer.Ordinal);
+    private TimeSpan _timeUntilNextScan = TimeSpan.Zero;
 
     public PeriodicFileScanner(ILogger<PeriodicFileScanner> logger, IpcManager ipcManager, MareConfigService configService,
         FileCacheManager fileDbManager, MareMediator mediator, PerformanceCollectorService performanceCollector) : base(logger, mediator)
@@ -30,24 +32,16 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         Mediator.Subscribe<DalamudLoginMessage>(this, (_) => StartScan());
     }
 
-    public void ResetLocks()
-    {
-        HaltScanLocks.Clear();
-    }
+    public long CurrentFileProgress => _currentFileProgress;
+    public long FileCacheSize { get; set; }
+    public ConcurrentDictionary<string, int> HaltScanLocks { get; set; } = new(StringComparer.Ordinal);
+    public bool IsScanRunning => CurrentFileProgress > 0 || TotalFiles > 0;
 
-    public void ResumeScan(string source)
-    {
-        if (!HaltScanLocks.ContainsKey(source)) HaltScanLocks[source] = 0;
+    public string TimeUntilNextScan => _timeUntilNextScan.ToString(@"mm\:ss");
 
-        HaltScanLocks[source]--;
-        if (HaltScanLocks[source] < 0) HaltScanLocks[source] = 0;
+    public long TotalFiles { get; private set; }
 
-        if (_fileScanWasRunning && HaltScanLocks.All(f => f.Value == 0))
-        {
-            _fileScanWasRunning = false;
-            InvokeScan(forced: true);
-        }
-    }
+    private int TimeBetweenScans => _configService.Current.TimeSpanBetweenScansInSeconds;
 
     public void HaltScan(string source)
     {
@@ -59,26 +53,6 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
             _scanCancellationTokenSource?.Cancel();
             _fileScanWasRunning = true;
         }
-    }
-
-    private bool _fileScanWasRunning = false;
-    private long _currentFileProgress = 0;
-    public long CurrentFileProgress => _currentFileProgress;
-
-    public long FileCacheSize { get; set; }
-
-    public bool IsScanRunning => CurrentFileProgress > 0 || TotalFiles > 0;
-
-    public long TotalFiles { get; private set; }
-
-    public string TimeUntilNextScan => _timeUntilNextScan.ToString(@"mm\:ss");
-    private TimeSpan _timeUntilNextScan = TimeSpan.Zero;
-    private int TimeBetweenScans => _configService.Current.TimeSpanBetweenScansInSeconds;
-
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-        _scanCancellationTokenSource?.Cancel();
     }
 
     public void InvokeScan(bool forced = false)
@@ -145,6 +119,38 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         }
 
         return true;
+    }
+
+    public void ResetLocks()
+    {
+        HaltScanLocks.Clear();
+    }
+
+    public void ResumeScan(string source)
+    {
+        if (!HaltScanLocks.ContainsKey(source)) HaltScanLocks[source] = 0;
+
+        HaltScanLocks[source]--;
+        if (HaltScanLocks[source] < 0) HaltScanLocks[source] = 0;
+
+        if (_fileScanWasRunning && HaltScanLocks.All(f => f.Value == 0))
+        {
+            _fileScanWasRunning = false;
+            InvokeScan(forced: true);
+        }
+    }
+
+    public void StartScan()
+    {
+        if (!_ipcManager.Initialized || !_configService.Current.HasValidSetup()) return;
+        Logger.LogTrace("Penumbra is active, configuration is valid, scan");
+        InvokeScan(forced: true);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        _scanCancellationTokenSource?.Cancel();
     }
 
     private void PeriodicFileScan(CancellationToken ct)
@@ -318,12 +324,5 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
             _configService.Current.InitialScanComplete = true;
             _configService.Save();
         }
-    }
-
-    public void StartScan()
-    {
-        if (!_ipcManager.Initialized || !_configService.Current.HasValidSetup()) return;
-        Logger.LogTrace("Penumbra is active, configuration is valid, scan");
-        InvokeScan(forced: true);
     }
 }

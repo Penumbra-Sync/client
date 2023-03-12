@@ -15,14 +15,10 @@ namespace MareSynchronos.WebAPI.Files;
 
 public partial class FileDownloadManager : DisposableMediatorSubscriberBase
 {
-    private readonly FileTransferOrchestrator _orchestrator;
-    private readonly FileCacheManager _fileDbManager;
     private readonly ConcurrentDictionary<Guid, bool> _downloadReady = new();
     private readonly Dictionary<string, FileDownloadStatus> _downloadStatus;
-
-    public List<DownloadFileTransfer> CurrentDownloads { get; private set; } = new();
-    public List<FileTransfer> ForbiddenTransfers => _orchestrator.ForbiddenTransfers;
-    public bool IsDownloading => !CurrentDownloads.Any();
+    private readonly FileCacheManager _fileDbManager;
+    private readonly FileTransferOrchestrator _orchestrator;
 
     public FileDownloadManager(ILogger<FileDownloadManager> logger, MareMediator mediator,
         FileTransferOrchestrator orchestrator,
@@ -41,10 +37,14 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         });
     }
 
-    protected override void Dispose(bool disposing)
+    public List<DownloadFileTransfer> CurrentDownloads { get; private set; } = new();
+    public List<FileTransfer> ForbiddenTransfers => _orchestrator.ForbiddenTransfers;
+    public bool IsDownloading => !CurrentDownloads.Any();
+
+    public void CancelDownload()
     {
-        CancelDownload();
-        base.Dispose(disposing);
+        CurrentDownloads.Clear();
+        _downloadStatus.Clear();
     }
 
     public async Task DownloadFiles(string aliasOrUid, List<FileReplacementData> fileReplacementDto, CancellationToken ct)
@@ -65,10 +65,75 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         }
     }
 
-    public void CancelDownload()
+    protected override void Dispose(bool disposing)
     {
-        CurrentDownloads.Clear();
-        _downloadStatus.Clear();
+        CancelDownload();
+        base.Dispose(disposing);
+    }
+
+    private async Task DownloadFileHttpClient(string downloadGroup, DownloadFileTransfer fileTransfer, string tempPath, IProgress<long> progress, CancellationToken ct)
+    {
+        var requestId = await GetQueueRequest(fileTransfer, ct).ConfigureAwait(false);
+
+        Logger.LogDebug("GUID {requestId} for file {hash} on server {uri}", requestId, fileTransfer.Hash, fileTransfer.DownloadUri);
+
+        await WaitForDownloadReady(fileTransfer, requestId, ct).ConfigureAwait(false);
+
+        _downloadStatus[downloadGroup].DownloadStatus = DownloadStatus.Downloading;
+
+        HttpResponseMessage response = null!;
+        var requestUrl = MareFiles.CacheGetFullPath(fileTransfer.DownloadUri, requestId);
+
+        Logger.LogDebug("Downloading {requestUrl} for file {hash}", requestUrl, fileTransfer.Hash);
+        try
+        {
+            response = await _orchestrator.SendRequestAsync(HttpMethod.Get, requestUrl, ct).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+        }
+        catch (HttpRequestException ex)
+        {
+            Logger.LogWarning(ex, "Error during download of {requestUrl}, HttpStatusCode: {code}", requestUrl, ex.StatusCode);
+            if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized)
+            {
+                throw new InvalidDataException($"Http error {ex.StatusCode} (cancelled: {ct.IsCancellationRequested}): {requestUrl}", ex);
+            }
+        }
+
+        try
+        {
+            var fileStream = File.Create(tempPath);
+            await using (fileStream.ConfigureAwait(false))
+            {
+                var bufferSize = response.Content.Headers.ContentLength > 1024 * 1024 ? 4096 : 1024;
+                var buffer = new byte[bufferSize];
+
+                var bytesRead = 0;
+                while ((bytesRead = await (await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false)).ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct).ConfigureAwait(false);
+
+                    progress.Report(bytesRead);
+                }
+
+                Logger.LogDebug("{requestUrl} downloaded to {tempPath}", requestUrl, tempPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Error during file download of {requestUrl}", requestUrl);
+            try
+            {
+                if (!tempPath.IsNullOrEmpty())
+                    File.Delete(tempPath);
+            }
+            catch
+            {
+                // ignore if file deletion fails
+            }
+            throw;
+        }
     }
 
     private async Task DownloadFilesInternal(string aliasOrUid, List<FileReplacementData> fileReplacement, CancellationToken ct)
@@ -266,71 +331,6 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                 }
             }
             _downloadReady.Remove(requestId, out _);
-        }
-    }
-
-    private async Task DownloadFileHttpClient(string downloadGroup, DownloadFileTransfer fileTransfer, string tempPath, IProgress<long> progress, CancellationToken ct)
-    {
-        var requestId = await GetQueueRequest(fileTransfer, ct).ConfigureAwait(false);
-
-        Logger.LogDebug("GUID {requestId} for file {hash} on server {uri}", requestId, fileTransfer.Hash, fileTransfer.DownloadUri);
-
-        await WaitForDownloadReady(fileTransfer, requestId, ct).ConfigureAwait(false);
-
-        _downloadStatus[downloadGroup].DownloadStatus = DownloadStatus.Downloading;
-
-        HttpResponseMessage response = null!;
-        var requestUrl = MareFiles.CacheGetFullPath(fileTransfer.DownloadUri, requestId);
-
-        Logger.LogDebug("Downloading {requestUrl} for file {hash}", requestUrl, fileTransfer.Hash);
-        try
-        {
-            response = await _orchestrator.SendRequestAsync(HttpMethod.Get, requestUrl, ct).ConfigureAwait(false);
-            response.EnsureSuccessStatusCode();
-        }
-        catch (HttpRequestException ex)
-        {
-            Logger.LogWarning(ex, "Error during download of {requestUrl}, HttpStatusCode: {code}", requestUrl, ex.StatusCode);
-            if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized)
-            {
-                throw new InvalidDataException($"Http error {ex.StatusCode} (cancelled: {ct.IsCancellationRequested}): {requestUrl}", ex);
-            }
-        }
-
-        try
-        {
-            var fileStream = File.Create(tempPath);
-            await using (fileStream.ConfigureAwait(false))
-            {
-                var bufferSize = response.Content.Headers.ContentLength > 1024 * 1024 ? 4096 : 1024;
-                var buffer = new byte[bufferSize];
-
-                var bytesRead = 0;
-                while ((bytesRead = await (await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false)).ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
-                {
-                    ct.ThrowIfCancellationRequested();
-
-                    await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct).ConfigureAwait(false);
-
-                    progress.Report(bytesRead);
-                }
-
-                Logger.LogDebug("{requestUrl} downloaded to {tempPath}", requestUrl, tempPath);
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "Error during file download of {requestUrl}", requestUrl);
-            try
-            {
-                if (!tempPath.IsNullOrEmpty())
-                    File.Delete(tempPath);
-            }
-            catch
-            {
-                // ignore if file deletion fails
-            }
-            throw;
         }
     }
 }

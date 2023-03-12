@@ -45,6 +45,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     public List<Pair> DirectPairs => _directPairsInternal.Value;
 
     private Lazy<List<Pair>> DirectPairsLazy() => new(() => _allClientPairs.Select(k => k.Value).Where(k => k.UserPair != null).ToList());
+
     private Lazy<Dictionary<GroupFullInfoDto, List<Pair>>> GroupPairsLazy()
     {
         return new Lazy<Dictionary<GroupFullInfoDto, List<Pair>>>(() =>
@@ -59,6 +60,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     }
 
     public List<Pair> GetOnlineUserPairs() => _allClientPairs.Where(p => !string.IsNullOrEmpty(p.Value.PlayerNameHash)).Select(p => p.Value).ToList();
+
     public List<UserData> GetVisibleUsers() => _allClientPairs.Where(p => p.Value.HasCachedPlayer).Select(p => p.Key).ToList();
 
     public Pair? LastAddedUser { get; internal set; }

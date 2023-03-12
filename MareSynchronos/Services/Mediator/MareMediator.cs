@@ -1,28 +1,19 @@
-﻿using Lumina.Excel.GeneratedSheets;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using System.Text;
 
 namespace MareSynchronos.Services.Mediator;
 
 public sealed class MareMediator : IDisposable
 {
-    private sealed class SubscriberAction
-    {
-        public IMediatorSubscriber Subscriber { get; }
-        public object Action { get; }
+    private readonly object _addRemoveLock = new();
 
-        public SubscriberAction(IMediatorSubscriber subscriber, object action)
-        {
-            Subscriber = subscriber;
-            Action = action;
-        }
-    }
+    private readonly Dictionary<object, DateTime> _lastErrorTime = new();
+
+    private readonly ILogger<MareMediator> _logger;
+
+    private readonly PerformanceCollectorService _performanceCollector;
 
     private readonly Dictionary<Type, HashSet<SubscriberAction>> _subscriberDict = new();
-    private readonly ILogger<MareMediator> _logger;
-    private readonly PerformanceCollectorService _performanceCollector;
-    private readonly object _addRemoveLock = new();
-    private readonly Dictionary<object, DateTime> _lastErrorTime = new();
 
     public MareMediator(ILogger<MareMediator> logger, PerformanceCollectorService performanceCollector)
     {
@@ -30,29 +21,29 @@ public sealed class MareMediator : IDisposable
         _performanceCollector = performanceCollector;
     }
 
-    public void Subscribe<T>(IMediatorSubscriber subscriber, Action<T> action) where T : IMessage
+    public void Dispose()
     {
-        lock (_addRemoveLock)
-        {
-            _subscriberDict.TryAdd(typeof(T), new HashSet<SubscriberAction>());
-
-            if (!_subscriberDict[typeof(T)].Add(new(subscriber, action)))
-            {
-                throw new InvalidOperationException("Already subscribed");
-            }
-
-            _logger.LogDebug("Subscriber added for message {message}: {sub}", typeof(T).Name, subscriber.GetType().Name);
-        }
+        _logger.LogTrace("Disposing {type}", GetType());
+        _subscriberDict.Clear();
+        GC.SuppressFinalize(this);
     }
 
-    public void Unsubscribe<T>(IMediatorSubscriber subscriber) where T : IMessage
+    public void PrintSubscriberInfo()
     {
-        lock (_addRemoveLock)
+        foreach (var kvp in _subscriberDict.SelectMany(c => c.Value.Select(v => v))
+            .DistinctBy(p => p.Subscriber).OrderBy(p => p.Subscriber.GetType().FullName, StringComparer.Ordinal).ToList())
         {
-            if (_subscriberDict.ContainsKey(typeof(T)))
+            _logger.LogInformation("Subscriber {type}: {sub}", kvp.Subscriber.GetType().Name, kvp.Subscriber.ToString());
+            StringBuilder sb = new();
+            sb.Append("=> ");
+            foreach (var item in _subscriberDict.Where(item => item.Value.Any(v => v.Subscriber == kvp.Subscriber)).ToList())
             {
-                _subscriberDict[typeof(T)].RemoveWhere(p => p.Subscriber == subscriber);
+                sb.Append(item.Key.Name).Append(", ");
             }
+
+            if (!string.Equals(sb.ToString(), "=> ", StringComparison.Ordinal))
+                _logger.LogInformation("{sb}", sb.ToString());
+            _logger.LogInformation("---");
         }
     }
 
@@ -81,6 +72,32 @@ public sealed class MareMediator : IDisposable
         }
     }
 
+    public void Subscribe<T>(IMediatorSubscriber subscriber, Action<T> action) where T : IMessage
+    {
+        lock (_addRemoveLock)
+        {
+            _subscriberDict.TryAdd(typeof(T), new HashSet<SubscriberAction>());
+
+            if (!_subscriberDict[typeof(T)].Add(new(subscriber, action)))
+            {
+                throw new InvalidOperationException("Already subscribed");
+            }
+
+            _logger.LogDebug("Subscriber added for message {message}: {sub}", typeof(T).Name, subscriber.GetType().Name);
+        }
+    }
+
+    public void Unsubscribe<T>(IMediatorSubscriber subscriber) where T : IMessage
+    {
+        lock (_addRemoveLock)
+        {
+            if (_subscriberDict.ContainsKey(typeof(T)))
+            {
+                _subscriberDict[typeof(T)].RemoveWhere(p => p.Subscriber == subscriber);
+            }
+        }
+    }
+
     internal void UnsubscribeAll(IMediatorSubscriber subscriber)
     {
         lock (_addRemoveLock)
@@ -100,29 +117,15 @@ public sealed class MareMediator : IDisposable
         }
     }
 
-    public void PrintSubscriberInfo()
+    private sealed class SubscriberAction
     {
-        foreach (var kvp in _subscriberDict.SelectMany(c => c.Value.Select(v => v))
-            .DistinctBy(p => p.Subscriber).OrderBy(p => p.Subscriber.GetType().FullName, StringComparer.Ordinal).ToList())
+        public SubscriberAction(IMediatorSubscriber subscriber, object action)
         {
-            _logger.LogInformation("Subscriber {type}: {sub}", kvp.Subscriber.GetType().Name, kvp.Subscriber.ToString());
-            StringBuilder sb = new();
-            sb.Append("=> ");
-            foreach (var item in _subscriberDict.Where(item => item.Value.Any(v => v.Subscriber == kvp.Subscriber)).ToList())
-            {
-                sb.Append(item.Key.Name).Append(", ");
-            }
-
-            if (!string.Equals(sb.ToString(), "=> ", StringComparison.Ordinal))
-                _logger.LogInformation("{sb}", sb.ToString());
-            _logger.LogInformation("---");
+            Subscriber = subscriber;
+            Action = action;
         }
-    }
 
-    public void Dispose()
-    {
-        _logger.LogTrace("Disposing {type}", GetType());
-        _subscriberDict.Clear();
-        GC.SuppressFinalize(this);
+        public object Action { get; }
+        public IMediatorSubscriber Subscriber { get; }
     }
 }

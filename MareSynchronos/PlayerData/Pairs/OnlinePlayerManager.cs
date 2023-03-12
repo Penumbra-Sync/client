@@ -12,8 +12,8 @@ public class OnlinePlayerManager : DisposableMediatorSubscriberBase
 {
     private readonly ApiController _apiController;
     private readonly DalamudUtilService _dalamudUtil;
-    private readonly PairManager _pairManager;
     private readonly FileUploadManager _fileTransferManager;
+    private readonly PairManager _pairManager;
     private CharacterData? _lastSentData;
 
     public OnlinePlayerManager(ILogger<OnlinePlayerManager> logger, ApiController apiController, DalamudUtilService dalamudUtil,
@@ -41,11 +41,6 @@ public class OnlinePlayerManager : DisposableMediatorSubscriberBase
         });
     }
 
-    private void PlayerManagerOnPlayerHasChanged()
-    {
-        PushCharacterData(_pairManager.GetVisibleUsers());
-    }
-
     private void FrameworkOnUpdate()
     {
         if (!_dalamudUtil.IsPlayerPresent || !_apiController.IsConnected) return;
@@ -68,6 +63,11 @@ public class OnlinePlayerManager : DisposableMediatorSubscriberBase
             Logger.LogTrace("Has new visible players, pushing character data");
             PushCharacterData(newVisiblePlayers);
         }
+    }
+
+    private void PlayerManagerOnPlayerHasChanged()
+    {
+        PushCharacterData(_pairManager.GetVisibleUsers());
     }
 
     private void PushCharacterData(List<UserData> visiblePlayers)

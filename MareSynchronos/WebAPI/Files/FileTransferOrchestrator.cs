@@ -10,15 +10,12 @@ namespace MareSynchronos.WebAPI.Files;
 
 public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
 {
-    private readonly MareConfigService _mareConfig;
-    private readonly ServerConfigurationManager _serverManager;
     private readonly HttpClient _httpClient;
-    public Uri? FilesCdnUri { private set; get; }
-    public List<FileTransfer> ForbiddenTransfers { get; } = new();
-    public bool IsInitialized => FilesCdnUri != null;
-    private SemaphoreSlim _downloadSemaphore;
-    private int _availableDownloadSlots;
+    private readonly MareConfigService _mareConfig;
     private readonly object _semaphoreModificationLock = new();
+    private readonly ServerConfigurationManager _serverManager;
+    private int _availableDownloadSlots;
+    private SemaphoreSlim _downloadSemaphore;
 
     public FileTransferOrchestrator(ILogger<FileTransferOrchestrator> logger, MareConfigService mareConfig, ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
     {
@@ -40,19 +37,9 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         });
     }
 
-    public async Task WaitForDownloadSlotAsync(CancellationToken token)
-    {
-        lock (_semaphoreModificationLock)
-        {
-            if (_availableDownloadSlots != _mareConfig.Current.ParallelDownloads && _availableDownloadSlots == _downloadSemaphore.CurrentCount)
-            {
-                _availableDownloadSlots = _mareConfig.Current.ParallelDownloads;
-                _downloadSemaphore = new(_availableDownloadSlots);
-            }
-        }
-
-        await _downloadSemaphore.WaitAsync(token).ConfigureAwait(false);
-    }
+    public Uri? FilesCdnUri { private set; get; }
+    public List<FileTransfer> ForbiddenTransfers { get; } = new();
+    public bool IsInitialized => FilesCdnUri != null;
 
     public void ReleaseDownloadSlot()
     {
@@ -77,6 +64,20 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         using var requestMessage = new HttpRequestMessage(method, uri);
         requestMessage.Content = content;
         return await SendRequestInternalAsync(requestMessage, ct).ConfigureAwait(false);
+    }
+
+    public async Task WaitForDownloadSlotAsync(CancellationToken token)
+    {
+        lock (_semaphoreModificationLock)
+        {
+            if (_availableDownloadSlots != _mareConfig.Current.ParallelDownloads && _availableDownloadSlots == _downloadSemaphore.CurrentCount)
+            {
+                _availableDownloadSlots = _mareConfig.Current.ParallelDownloads;
+                _downloadSemaphore = new(_availableDownloadSlots);
+            }
+        }
+
+        await _downloadSemaphore.WaitAsync(token).ConfigureAwait(false);
     }
 
     private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage, CancellationToken? ct = null)

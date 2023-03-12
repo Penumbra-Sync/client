@@ -15,8 +15,8 @@ namespace MareSynchronos.WebAPI.Files;
 
 public sealed class FileUploadManager : DisposableMediatorSubscriberBase
 {
-    private readonly FileTransferOrchestrator _orchestrator;
     private readonly FileCacheManager _fileDbManager;
+    private readonly FileTransferOrchestrator _orchestrator;
     private readonly ServerConfigurationManager _serverManager;
     private readonly Dictionary<string, DateTime> _verifiedUploadedHashes = new(StringComparer.Ordinal);
     private CancellationTokenSource? _uploadCancellationTokenSource = new();
@@ -61,12 +61,6 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
         await _orchestrator.SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesDeleteAllFullPath(_orchestrator.FilesCdnUri!)).ConfigureAwait(false);
     }
 
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-        Reset();
-    }
-
     public async Task<CharacterData> UploadFiles(CharacterData data)
     {
         CancelUpload();
@@ -90,6 +84,19 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
         return data;
     }
 
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        Reset();
+    }
+
+    private async Task<List<UploadFileDto>> FilesSend(List<string> hashes, CancellationToken ct)
+    {
+        if (!_orchestrator.IsInitialized) throw new InvalidOperationException("FileTransferManager is not initialized");
+        var response = await _orchestrator.SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesFilesSendFullPath(_orchestrator.FilesCdnUri!), hashes, ct).ConfigureAwait(false);
+        return await response.Content.ReadFromJsonAsync<List<UploadFileDto>>(cancellationToken: ct).ConfigureAwait(false) ?? new List<UploadFileDto>();
+    }
+
     private async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)
     {
         var fileCache = _fileDbManager.GetFileCacheByHash(fileHash)!.ResolvedFilepath;
@@ -104,13 +111,6 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
         _uploadCancellationTokenSource = null;
         CurrentUploads.Clear();
         _verifiedUploadedHashes.Clear();
-    }
-
-    private async Task<List<UploadFileDto>> FilesSend(List<string> hashes, CancellationToken ct)
-    {
-        if (!_orchestrator.IsInitialized) throw new InvalidOperationException("FileTransferManager is not initialized");
-        var response = await _orchestrator.SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesFilesSendFullPath(_orchestrator.FilesCdnUri!), hashes, ct).ConfigureAwait(false);
-        return await response.Content.ReadFromJsonAsync<List<UploadFileDto>>(cancellationToken: ct).ConfigureAwait(false) ?? new List<UploadFileDto>();
     }
 
     private async Task UploadFile(byte[] compressedFile, string fileHash, CancellationToken uploadToken)

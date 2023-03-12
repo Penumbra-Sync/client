@@ -10,14 +10,14 @@ namespace MareSynchronos.PlayerData.Services;
 
 public sealed class CacheCreationService : DisposableMediatorSubscriberBase
 {
-    private readonly PlayerDataFactory _characterDataFactory;
-    private Task? _cacheCreationTask;
-    private readonly Dictionary<ObjectKind, GameObjectHandler> _cachesToCreate = new();
-    private readonly CharacterData _playerData = new();
-    private readonly CancellationTokenSource _cts = new();
-    private readonly List<GameObjectHandler> _playerRelatedObjects = new();
-    private CancellationTokenSource _palettePlusCts = new();
     private readonly SemaphoreSlim _cacheCreateLock = new(1);
+    private readonly Dictionary<ObjectKind, GameObjectHandler> _cachesToCreate = new();
+    private readonly PlayerDataFactory _characterDataFactory;
+    private readonly CancellationTokenSource _cts = new();
+    private readonly CharacterData _playerData = new();
+    private readonly List<GameObjectHandler> _playerRelatedObjects = new();
+    private Task? _cacheCreationTask;
+    private CancellationTokenSource _palettePlusCts = new();
 
     public CacheCreationService(ILogger<CacheCreationService> logger, MareMediator mediator, Func<ObjectKind, Func<IntPtr>, bool, GameObjectHandler> gameObjectHandlerFactory,
         PlayerDataFactory characterDataFactory, DalamudUtilService dalamudUtil) : base(logger, mediator)
@@ -54,6 +54,14 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         Mediator.Subscribe<HeelsOffsetMessage>(this, async (_) => await AddPlayerCacheToCreate().ConfigureAwait(false));
         Mediator.Subscribe<PalettePlusMessage>(this, (_) => PalettePlusChanged());
         Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, async (msg) => await AddPlayerCacheToCreate().ConfigureAwait(false));
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+
+        _playerRelatedObjects.ForEach(p => p.Dispose());
+        _cts.Dispose();
     }
 
     private async Task AddPlayerCacheToCreate()
@@ -119,13 +127,5 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         {
             Logger.LogDebug("Cache Creation stored until previous creation finished");
         }
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-
-        _playerRelatedObjects.ForEach(p => p.Dispose());
-        _cts.Dispose();
     }
 }

@@ -8,26 +8,12 @@ namespace MareSynchronos.Services.ServerConfiguration;
 
 public class ServerConfigurationManager
 {
-    private readonly Dictionary<JwtCache, string> _tokenDictionary = new();
-    private readonly ILogger<ServerConfigurationManager> _logger;
     private readonly ServerConfigService _configService;
-    private readonly ServerTagConfigService _serverTagConfig;
-    private readonly NotesConfigService _notesConfig;
     private readonly DalamudUtilService _dalamudUtil;
-
-    public string CurrentApiUrl => string.IsNullOrEmpty(_configService.Current.CurrentServer) ? ApiController.MainServiceUri : _configService.Current.CurrentServer;
-    public ServerStorage? CurrentServer => _configService.Current.ServerStorage.TryGetValue(CurrentApiUrl, out ServerStorage? value) ? value : null;
-    private ServerTagStorage CurrentServerTagStorage()
-    {
-        TryCreateCurrentServerTagStorage();
-        return _serverTagConfig.Current.ServerTagStorage[CurrentApiUrl];
-    }
-
-    private ServerNotesStorage CurrentNotesStorage()
-    {
-        TryCreateCurrentNotesStorage();
-        return _notesConfig.Current.ServerNotes[CurrentApiUrl];
-    }
+    private readonly ILogger<ServerConfigurationManager> _logger;
+    private readonly NotesConfigService _notesConfig;
+    private readonly ServerTagConfigService _serverTagConfig;
+    private readonly Dictionary<JwtCache, string> _tokenDictionary = new();
 
     public ServerConfigurationManager(ILogger<ServerConfigurationManager> logger, ServerConfigService configService,
         ServerTagConfigService serverTagConfig, NotesConfigService notesConfig, DalamudUtilService dalamudUtil)
@@ -39,56 +25,12 @@ public class ServerConfigurationManager
         _dalamudUtil = dalamudUtil;
     }
 
-    public bool HasValidConfig()
-    {
-        return CurrentServer != null;
-    }
-
-    public string[] GetServerApiUrls()
-    {
-        return _configService.Current.ServerStorage.Keys.ToArray();
-    }
-
-    public string[] GetServerNames()
-    {
-        return _configService.Current.ServerStorage.Values.Select(v => v.ServerName).ToArray();
-    }
-
-    public ServerStorage GetServerByIndex(int idx)
-    {
-        try
-        {
-            return _configService.Current.ServerStorage.ElementAt(idx).Value;
-        }
-        catch
-        {
-            _configService.Current.CurrentServer = ApiController.MainServiceUri;
-            if (!_configService.Current.ServerStorage.ContainsKey(ApiController.MainServer))
-            {
-                _configService.Current.ServerStorage.Add(_configService.Current.CurrentServer, new ServerStorage() { ServerUri = ApiController.MainServiceUri, ServerName = ApiController.MainServer });
-            }
-            Save();
-            return CurrentServer!;
-        }
-    }
+    public string CurrentApiUrl => string.IsNullOrEmpty(_configService.Current.CurrentServer) ? ApiController.MainServiceUri : _configService.Current.CurrentServer;
+    public ServerStorage? CurrentServer => _configService.Current.ServerStorage.TryGetValue(CurrentApiUrl, out ServerStorage? value) ? value : null;
 
     public int GetCurrentServerIndex()
     {
         return Array.IndexOf(_configService.Current.ServerStorage.Keys.ToArray(), CurrentApiUrl);
-    }
-
-    public void Save()
-    {
-        var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
-        _logger.LogDebug(caller + " Calling config save");
-        _configService.Save();
-    }
-
-    public void SelectServer(int idx)
-    {
-        _configService.Current.CurrentServer = GetServerByIndex(idx).ServerUri;
-        CurrentServer!.FullPause = false;
-        Save();
     }
 
     public string? GetSecretKey(int serverIdx = -1)
@@ -126,6 +68,34 @@ public class ServerConfigurationManager
         return null;
     }
 
+    public string[] GetServerApiUrls()
+    {
+        return _configService.Current.ServerStorage.Keys.ToArray();
+    }
+
+    public ServerStorage GetServerByIndex(int idx)
+    {
+        try
+        {
+            return _configService.Current.ServerStorage.ElementAt(idx).Value;
+        }
+        catch
+        {
+            _configService.Current.CurrentServer = ApiController.MainServiceUri;
+            if (!_configService.Current.ServerStorage.ContainsKey(ApiController.MainServer))
+            {
+                _configService.Current.ServerStorage.Add(_configService.Current.CurrentServer, new ServerStorage() { ServerUri = ApiController.MainServiceUri, ServerName = ApiController.MainServer });
+            }
+            Save();
+            return CurrentServer!;
+        }
+    }
+
+    public string[] GetServerNames()
+    {
+        return _configService.Current.ServerStorage.Values.Select(v => v.ServerName).ToArray();
+    }
+
     public string? GetToken()
     {
         var charaName = _dalamudUtil.PlayerName;
@@ -140,6 +110,18 @@ public class ServerConfigurationManager
         return null;
     }
 
+    public bool HasValidConfig()
+    {
+        return CurrentServer != null;
+    }
+
+    public void Save()
+    {
+        var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
+        _logger.LogDebug(caller + " Calling config save");
+        _configService.Save();
+    }
+
     public void SaveToken(string token)
     {
         var charaName = _dalamudUtil.PlayerName;
@@ -147,6 +129,13 @@ public class ServerConfigurationManager
         var secretKey = GetSecretKey();
         if (string.IsNullOrEmpty(secretKey)) throw new InvalidOperationException("No secret key set");
         _tokenDictionary[new JwtCache(CurrentApiUrl, charaName, worldId, secretKey)] = token;
+    }
+
+    public void SelectServer(int idx)
+    {
+        _configService.Current.CurrentServer = GetServerByIndex(idx).ServerUri;
+        CurrentServer!.FullPause = false;
+        Save();
     }
 
     internal void AddCurrentCharacterToServer(int serverSelectionIndex = -1, bool addLastSecretKey = false)
@@ -169,11 +158,10 @@ public class ServerConfigurationManager
         Save();
     }
 
-    internal void RemoveCharacterFromServer(int serverSelectionIndex, Authentication item)
+    internal void AddOpenPairTag(string tag)
     {
-        var server = GetServerByIndex(serverSelectionIndex);
-        server.Authentications.Remove(item);
-        Save();
+        CurrentServerTagStorage().OpenPairTags.Add(tag);
+        _serverTagConfig.Save();
     }
 
     internal void AddServer(ServerStorage serverStorage)
@@ -182,69 +170,10 @@ public class ServerConfigurationManager
         Save();
     }
 
-    internal void DeleteServer(ServerStorage selectedServer)
-    {
-        _configService.Current.ServerStorage.Remove(selectedServer.ServerUri);
-        Save();
-    }
-
-    internal void AddOpenPairTag(string tag)
-    {
-        CurrentServerTagStorage().OpenPairTags.Add(tag);
-        _serverTagConfig.Save();
-    }
-
-    internal void RemoveOpenPairTag(string tag)
-    {
-        CurrentServerTagStorage().OpenPairTags.Remove(tag);
-        _serverTagConfig.Save();
-    }
-
-    internal bool ContainsOpenPairTag(string tag)
-    {
-        return CurrentServerTagStorage().OpenPairTags.Contains(tag);
-    }
-
-    internal Dictionary<string, List<string>> GetUidServerPairedUserTags()
-    {
-        return CurrentServerTagStorage().UidServerPairedUserTags;
-    }
-
-    internal HashSet<string> GetServerAvailablePairTags()
-    {
-        return CurrentServerTagStorage().ServerAvailablePairTags;
-    }
-
     internal void AddTag(string tag)
     {
         CurrentServerTagStorage().ServerAvailablePairTags.Add(tag);
         _serverTagConfig.Save();
-    }
-
-    internal void RemoveTag(string tag)
-    {
-        CurrentServerTagStorage().ServerAvailablePairTags.Remove(tag);
-        foreach (var uid in GetUidsForTag(tag))
-        {
-            RemoveTagForUid(uid, tag, save: false);
-        }
-        _serverTagConfig.Save();
-    }
-
-    private void TryCreateCurrentServerTagStorage()
-    {
-        if (!_serverTagConfig.Current.ServerTagStorage.ContainsKey(CurrentApiUrl))
-        {
-            _serverTagConfig.Current.ServerTagStorage[CurrentApiUrl] = new();
-        }
-    }
-
-    private void TryCreateCurrentNotesStorage()
-    {
-        if (!_notesConfig.Current.ServerNotes.ContainsKey(CurrentApiUrl))
-        {
-            _notesConfig.Current.ServerNotes[CurrentApiUrl] = new();
-        }
     }
 
     internal void AddTagForUid(string uid, string tagName)
@@ -261,14 +190,9 @@ public class ServerConfigurationManager
         _serverTagConfig.Save();
     }
 
-    internal void RemoveTagForUid(string uid, string tagName, bool save = true)
+    internal bool ContainsOpenPairTag(string tag)
     {
-        if (CurrentServerTagStorage().UidServerPairedUserTags.TryGetValue(uid, out var tags))
-        {
-            tags.Remove(tagName);
-            if (save)
-                _serverTagConfig.Save();
-        }
+        return CurrentServerTagStorage().OpenPairTags.Contains(tag);
     }
 
     internal bool ContainsTag(string uid, string tag)
@@ -281,41 +205,10 @@ public class ServerConfigurationManager
         return false;
     }
 
-    internal bool HasTags(string uid)
+    internal void DeleteServer(ServerStorage selectedServer)
     {
-        if (CurrentServerTagStorage().UidServerPairedUserTags.TryGetValue(uid, out var tags))
-        {
-            return tags.Any();
-        }
-
-        return false;
-    }
-
-    internal HashSet<string> GetUidsForTag(string tag)
-    {
-        return CurrentServerTagStorage().UidServerPairedUserTags.Where(p => p.Value.Contains(tag, StringComparer.Ordinal)).Select(p => p.Key).ToHashSet(StringComparer.Ordinal);
-    }
-
-    internal string? GetNoteForUid(string uid)
-    {
-        if (CurrentNotesStorage().UidServerComments.TryGetValue(uid, out var note))
-        {
-            if (string.IsNullOrEmpty(note)) return null;
-            return note;
-        }
-        return null;
-    }
-
-    internal void SetNoteForUid(string uid, string note, bool save = true)
-    {
-        CurrentNotesStorage().UidServerComments[uid] = note;
-        if (save)
-            _notesConfig.Save();
-    }
-
-    internal void SaveNotes()
-    {
-        _notesConfig.Save();
+        _configService.Current.ServerStorage.Remove(selectedServer.ServerUri);
+        Save();
     }
 
     internal string? GetNoteForGid(string gID)
@@ -329,10 +222,118 @@ public class ServerConfigurationManager
         return null;
     }
 
+    internal string? GetNoteForUid(string uid)
+    {
+        if (CurrentNotesStorage().UidServerComments.TryGetValue(uid, out var note))
+        {
+            if (string.IsNullOrEmpty(note)) return null;
+            return note;
+        }
+        return null;
+    }
+
+    internal HashSet<string> GetServerAvailablePairTags()
+    {
+        return CurrentServerTagStorage().ServerAvailablePairTags;
+    }
+
+    internal Dictionary<string, List<string>> GetUidServerPairedUserTags()
+    {
+        return CurrentServerTagStorage().UidServerPairedUserTags;
+    }
+
+    internal HashSet<string> GetUidsForTag(string tag)
+    {
+        return CurrentServerTagStorage().UidServerPairedUserTags.Where(p => p.Value.Contains(tag, StringComparer.Ordinal)).Select(p => p.Key).ToHashSet(StringComparer.Ordinal);
+    }
+
+    internal bool HasTags(string uid)
+    {
+        if (CurrentServerTagStorage().UidServerPairedUserTags.TryGetValue(uid, out var tags))
+        {
+            return tags.Any();
+        }
+
+        return false;
+    }
+
+    internal void RemoveCharacterFromServer(int serverSelectionIndex, Authentication item)
+    {
+        var server = GetServerByIndex(serverSelectionIndex);
+        server.Authentications.Remove(item);
+        Save();
+    }
+
+    internal void RemoveOpenPairTag(string tag)
+    {
+        CurrentServerTagStorage().OpenPairTags.Remove(tag);
+        _serverTagConfig.Save();
+    }
+
+    internal void RemoveTag(string tag)
+    {
+        CurrentServerTagStorage().ServerAvailablePairTags.Remove(tag);
+        foreach (var uid in GetUidsForTag(tag))
+        {
+            RemoveTagForUid(uid, tag, save: false);
+        }
+        _serverTagConfig.Save();
+    }
+
+    internal void RemoveTagForUid(string uid, string tagName, bool save = true)
+    {
+        if (CurrentServerTagStorage().UidServerPairedUserTags.TryGetValue(uid, out var tags))
+        {
+            tags.Remove(tagName);
+            if (save)
+                _serverTagConfig.Save();
+        }
+    }
+
+    internal void SaveNotes()
+    {
+        _notesConfig.Save();
+    }
+
     internal void SetNoteForGid(string gid, string note, bool save = true)
     {
         CurrentNotesStorage().GidServerComments[gid] = note;
         if (save)
             _notesConfig.Save();
+    }
+
+    internal void SetNoteForUid(string uid, string note, bool save = true)
+    {
+        CurrentNotesStorage().UidServerComments[uid] = note;
+        if (save)
+            _notesConfig.Save();
+    }
+
+    private ServerNotesStorage CurrentNotesStorage()
+    {
+        TryCreateCurrentNotesStorage();
+        return _notesConfig.Current.ServerNotes[CurrentApiUrl];
+    }
+
+    private ServerTagStorage CurrentServerTagStorage()
+    {
+        TryCreateCurrentServerTagStorage();
+        return _serverTagConfig.Current.ServerTagStorage[CurrentApiUrl];
+    }
+
+    private void TryCreateCurrentNotesStorage()
+    {
+        if (!_notesConfig.Current.ServerNotes.ContainsKey(CurrentApiUrl))
+        {
+            _notesConfig.Current.ServerNotes[CurrentApiUrl] = new();
+        }
+    }
+
+    private void TryCreateCurrentServerTagStorage()
+    {
+        if (!_serverTagConfig.Current.ServerTagStorage.ContainsKey(CurrentApiUrl))
+        {
+            _serverTagConfig.Current.ServerTagStorage[CurrentApiUrl] = new();
+        }
     }
 }

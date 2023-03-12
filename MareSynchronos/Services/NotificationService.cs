@@ -8,11 +8,12 @@ using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Services;
+
 public class NotificationService : DisposableMediatorSubscriberBase
 {
-    private readonly UiBuilder _uiBuilder;
     private readonly ChatGui _chatGui;
     private readonly MareConfigService _configurationService;
+    private readonly UiBuilder _uiBuilder;
 
     public NotificationService(ILogger<NotificationService> logger, MareMediator mediator, UiBuilder uiBuilder, ChatGui chatGui, MareConfigService configurationService) : base(logger, mediator)
     {
@@ -23,66 +24,10 @@ public class NotificationService : DisposableMediatorSubscriberBase
         Mediator.Subscribe<NotificationMessage>(this, ShowNotification);
     }
 
-    private void ShowNotification(NotificationMessage msg)
+    private void PrintErrorChat(string? message)
     {
-        Logger.LogInformation("{msg}", msg.ToString());
-
-        switch (msg.Type)
-        {
-            case NotificationType.Info:
-            case NotificationType.Success:
-            case NotificationType.None:
-                ShowNotificationLocationBased(msg, _configurationService.Current.InfoNotification);
-                break;
-            case NotificationType.Warning:
-                ShowNotificationLocationBased(msg, _configurationService.Current.WarningNotification);
-                break;
-            case NotificationType.Error:
-                ShowNotificationLocationBased(msg, _configurationService.Current.ErrorNotification);
-                break;
-        }
-    }
-
-    private void ShowNotificationLocationBased(NotificationMessage msg, NotificationLocation location)
-    {
-        switch (location)
-        {
-            case NotificationLocation.Toast:
-                ShowToast(msg);
-                break;
-            case NotificationLocation.Chat:
-                ShowChat(msg);
-                break;
-            case NotificationLocation.Both:
-                ShowToast(msg);
-                ShowChat(msg);
-                break;
-            case NotificationLocation.Nowhere:
-                break;
-        }
-    }
-
-    private void ShowToast(NotificationMessage msg)
-    {
-        _uiBuilder.AddNotification(msg.Message ?? string.Empty, "[Mare Synchronos] " + msg.Title, msg.Type, msg.TimeShownOnScreen);
-    }
-
-    private void ShowChat(NotificationMessage msg)
-    {
-        switch (msg.Type)
-        {
-            case NotificationType.Info:
-            case NotificationType.Success:
-            case NotificationType.None:
-                PrintInfoChat(msg.Message);
-                break;
-            case NotificationType.Warning:
-                PrintWarnChat(msg.Message);
-                break;
-            case NotificationType.Error:
-                PrintErrorChat(msg.Message);
-                break;
-        }
+        SeStringBuilder se = new SeStringBuilder().AddText("[Mare Synchronos] Error: " + message);
+        _chatGui.PrintError(se.BuiltString);
     }
 
     private void PrintInfoChat(string? message)
@@ -97,9 +42,72 @@ public class NotificationService : DisposableMediatorSubscriberBase
         _chatGui.Print(se.BuiltString);
     }
 
-    private void PrintErrorChat(string? message)
+    private void ShowChat(NotificationMessage msg)
     {
-        SeStringBuilder se = new SeStringBuilder().AddText("[Mare Synchronos] Error: " + message);
-        _chatGui.PrintError(se.BuiltString);
+        switch (msg.Type)
+        {
+            case NotificationType.Info:
+            case NotificationType.Success:
+            case NotificationType.None:
+                PrintInfoChat(msg.Message);
+                break;
+
+            case NotificationType.Warning:
+                PrintWarnChat(msg.Message);
+                break;
+
+            case NotificationType.Error:
+                PrintErrorChat(msg.Message);
+                break;
+        }
+    }
+
+    private void ShowNotification(NotificationMessage msg)
+    {
+        Logger.LogInformation("{msg}", msg.ToString());
+
+        switch (msg.Type)
+        {
+            case NotificationType.Info:
+            case NotificationType.Success:
+            case NotificationType.None:
+                ShowNotificationLocationBased(msg, _configurationService.Current.InfoNotification);
+                break;
+
+            case NotificationType.Warning:
+                ShowNotificationLocationBased(msg, _configurationService.Current.WarningNotification);
+                break;
+
+            case NotificationType.Error:
+                ShowNotificationLocationBased(msg, _configurationService.Current.ErrorNotification);
+                break;
+        }
+    }
+
+    private void ShowNotificationLocationBased(NotificationMessage msg, NotificationLocation location)
+    {
+        switch (location)
+        {
+            case NotificationLocation.Toast:
+                ShowToast(msg);
+                break;
+
+            case NotificationLocation.Chat:
+                ShowChat(msg);
+                break;
+
+            case NotificationLocation.Both:
+                ShowToast(msg);
+                ShowChat(msg);
+                break;
+
+            case NotificationLocation.Nowhere:
+                break;
+        }
+    }
+
+    private void ShowToast(NotificationMessage msg)
+    {
+        _uiBuilder.AddNotification(msg.Message ?? string.Empty, "[Mare Synchronos] " + msg.Title, msg.Type, msg.TimeShownOnScreen);
     }
 }

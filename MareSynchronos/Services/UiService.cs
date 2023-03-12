@@ -7,14 +7,15 @@ using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Services;
+
 public sealed class UiService : IDisposable
 {
-    private readonly ILogger<UiService> _logger;
     private readonly DalamudPluginInterface _dalamudPluginInterface;
-    private readonly MareConfigService _mareConfigService;
-    private readonly WindowSystem _windowSystem;
     private readonly FileDialogManager _fileDialogManager;
+    private readonly ILogger<UiService> _logger;
+    private readonly MareConfigService _mareConfigService;
     private readonly MareMediator _mareMediator;
+    private readonly WindowSystem _windowSystem;
 
     public UiService(ILogger<UiService> logger, DalamudPluginInterface dalamudPluginInterface,
         MareConfigService mareConfigService, WindowSystem windowSystem,
@@ -39,6 +40,16 @@ public sealed class UiService : IDisposable
         }
     }
 
+    public void Dispose()
+    {
+        _logger.LogTrace("Disposing {type}", GetType().Name);
+
+        _windowSystem.RemoveAllWindows();
+
+        _dalamudPluginInterface.UiBuilder.Draw -= Draw;
+        _dalamudPluginInterface.UiBuilder.OpenConfigUi -= ToggleUi;
+    }
+
     public void ToggleUi()
     {
         if (_mareConfigService.Current.HasValidSetup())
@@ -51,15 +62,5 @@ public sealed class UiService : IDisposable
     {
         _windowSystem.Draw();
         _fileDialogManager.Draw();
-    }
-
-    public void Dispose()
-    {
-        _logger.LogTrace("Disposing {type}", GetType().Name);
-
-        _windowSystem.RemoveAllWindows();
-
-        _dalamudPluginInterface.UiBuilder.Draw -= Draw;
-        _dalamudPluginInterface.UiBuilder.OpenConfigUi -= ToggleUi;
     }
 }

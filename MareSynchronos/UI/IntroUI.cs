@@ -1,16 +1,16 @@
-﻿using System.Numerics;
+﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
-using ImGuiNET;
-using MareSynchronos.Localization;
 using Dalamud.Utility;
+using ImGuiNET;
 using MareSynchronos.FileCache;
-using Dalamud.Interface;
+using MareSynchronos.Localization;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Models;
-using Microsoft.Extensions.Logging;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
+using Microsoft.Extensions.Logging;
+using System.Numerics;
 
 namespace MareSynchronos.UI;
 
@@ -113,7 +113,6 @@ public class IntroUi : WindowMediatorSubscriberBase
             UiSharedService.ColorText(readThis, ImGuiColors.DalamudRed);
             ImGui.SetWindowFontScale(1.0f);
             ImGui.Separator();
-
 
             UiSharedService.TextWrapped(_tosParagraphs![0]);
             UiSharedService.TextWrapped(_tosParagraphs![1]);

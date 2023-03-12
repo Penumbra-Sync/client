@@ -15,25 +15,23 @@ using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Services;
 
 namespace MareSynchronos.WebAPI;
+
 public sealed partial class ApiController : DisposableMediatorSubscriberBase, IMareHubClient
 {
     public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
     public const string MainServiceUri = "wss://maresynchronos.com";
 
-    private readonly HubFactory _hubFactory;
     private readonly DalamudUtilService _dalamudUtil;
+    private readonly HubFactory _hubFactory;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
     private CancellationTokenSource _connectionCancellationTokenSource;
-    private HubConnection? _mareHub;
-
-    private CancellationTokenSource? _healthCheckTokenSource = new();
-    private bool _doNotNotifyOnNextInfo = false;
-
     private ConnectionDto? _connectionDto;
-    public ServerInfo ServerInfo => _connectionDto?.ServerInfo ?? new ServerInfo();
-    public string AuthFailureMessage { get; private set; } = string.Empty;
-    public SystemInfoDto SystemInfoDto { get; private set; } = new();
+    private bool _doNotNotifyOnNextInfo = false;
+    private CancellationTokenSource? _healthCheckTokenSource = new();
+    private bool _initialized;
+    private HubConnection? _mareHub;
+    private ServerState _serverState;
 
     public ApiController(ILogger<ApiController> logger, HubFactory hubFactory, DalamudUtilService dalamudUtil,
         PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
@@ -58,27 +56,14 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         }
     }
 
-    private void DalamudUtilOnLogOut()
-    {
-        Task.Run(async () => await StopConnection(ServerState.Disconnected).ConfigureAwait(false));
-        ServerState = ServerState.Offline;
-    }
-
-    private void DalamudUtilOnLogIn()
-    {
-        Task.Run(() => CreateConnections(forceGetToken: true));
-    }
-
-    public bool IsConnected => ServerState == ServerState.Connected;
-    public bool ServerAlive => ServerState is ServerState.Connected or ServerState.RateLimited or ServerState.Unauthorized or ServerState.Disconnected;
-    public bool IsCurrentVersion => (Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0)) >= (_connectionDto?.CurrentClientVersion ?? new Version(0, 0, 0, 0));
+    public string AuthFailureMessage { get; private set; } = string.Empty;
     public Version CurrentClientVersion => _connectionDto?.CurrentClientVersion ?? new Version(0, 0, 0);
-    public string UID => _connectionDto?.User.UID ?? string.Empty;
     public string DisplayName => _connectionDto?.User.AliasOrUID ?? string.Empty;
+    public bool IsConnected => ServerState == ServerState.Connected;
+    public bool IsCurrentVersion => (Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0)) >= (_connectionDto?.CurrentClientVersion ?? new Version(0, 0, 0, 0));
     public int OnlineUsers => SystemInfoDto.OnlineUsers;
-
-    private ServerState _serverState;
-    private bool _initialized;
+    public bool ServerAlive => ServerState is ServerState.Connected or ServerState.RateLimited or ServerState.Unauthorized or ServerState.Disconnected;
+    public ServerInfo ServerInfo => _connectionDto?.ServerInfo ?? new ServerInfo();
 
     public ServerState ServerState
     {
@@ -88,6 +73,14 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
             Logger.LogDebug("New ServerState: {value}, prev ServerState: {_serverState}", value, _serverState);
             _serverState = value;
         }
+    }
+
+    public SystemInfoDto SystemInfoDto { get; private set; } = new();
+    public string UID => _connectionDto?.User.UID ?? string.Empty;
+
+    public async Task<bool> CheckClientHealth()
+    {
+        return await _mareHub!.InvokeAsync<bool>(nameof(CheckClientHealth)).ConfigureAwait(false);
     }
 
     public async Task CreateConnections(bool forceGetToken = false)
@@ -198,6 +191,22 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         }
     }
 
+    public async Task<ConnectionDto> GetConnectionDto()
+    {
+        var dto = await _mareHub!.InvokeAsync<ConnectionDto>(nameof(GetConnectionDto)).ConfigureAwait(false);
+        Mediator.Publish(new ConnectedMessage(dto));
+        return dto;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+
+        _healthCheckTokenSource?.Cancel();
+        Task.Run(async () => await StopConnection(ServerState.Disconnected).ConfigureAwait(false));
+        _connectionCancellationTokenSource?.Cancel();
+    }
+
     private async Task ClientHealthCheck(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested && _mareHub != null)
@@ -206,6 +215,17 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
             _ = await CheckClientHealth().ConfigureAwait(false);
             Logger.LogDebug("Checked Client Health State");
         }
+    }
+
+    private void DalamudUtilOnLogIn()
+    {
+        Task.Run(() => CreateConnections(forceGetToken: true));
+    }
+
+    private void DalamudUtilOnLogOut()
+    {
+        Task.Run(async () => await StopConnection(ServerState.Disconnected).ConfigureAwait(false));
+        ServerState = ServerState.Offline;
     }
 
     private async Task InitializeData()
@@ -267,15 +287,6 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         _initialized = true;
     }
 
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-
-        _healthCheckTokenSource?.Cancel();
-        Task.Run(async () => await StopConnection(ServerState.Disconnected).ConfigureAwait(false));
-        _connectionCancellationTokenSource?.Cancel();
-    }
-
     private void MareHubOnClosed(Exception? arg)
     {
         _healthCheckTokenSource?.Cancel();
@@ -290,15 +301,6 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         {
             Logger.LogInformation("Connection closed");
         }
-    }
-
-    private void MareHubOnReconnecting(Exception? arg)
-    {
-        _doNotNotifyOnNextInfo = true;
-        _healthCheckTokenSource?.Cancel();
-        ServerState = ServerState.Reconnecting;
-        Mediator.Publish(new NotificationMessage("Connection lost", "Connection lost to " + _serverManager.CurrentServer!.ServerName, NotificationType.Warning, 5000));
-        Logger.LogWarning(arg, "Connection closed... Reconnecting");
     }
 
     private async Task MareHubOnReconnected()
@@ -320,7 +322,15 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
             Logger.LogCritical(ex, "Failure to obtain data after reconnection");
             await StopConnection(ServerState.Disconnected).ConfigureAwait(false);
         }
+    }
 
+    private void MareHubOnReconnecting(Exception? arg)
+    {
+        _doNotNotifyOnNextInfo = true;
+        _healthCheckTokenSource?.Cancel();
+        ServerState = ServerState.Reconnecting;
+        Mediator.Publish(new NotificationMessage("Connection lost", "Connection lost to " + _serverManager.CurrentServer!.ServerName, NotificationType.Warning, 5000));
+        Logger.LogWarning(arg, "Connection closed... Reconnecting");
     }
 
     private async Task StopConnection(ServerState state)
@@ -337,17 +347,5 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
             _mareHub = null;
             _connectionDto = null;
         }
-    }
-
-    public async Task<ConnectionDto> GetConnectionDto()
-    {
-        var dto = await _mareHub!.InvokeAsync<ConnectionDto>(nameof(GetConnectionDto)).ConfigureAwait(false);
-        Mediator.Publish(new ConnectedMessage(dto));
-        return dto;
-    }
-
-    public async Task<bool> CheckClientHealth()
-    {
-        return await _mareHub!.InvokeAsync<bool>(nameof(CheckClientHealth)).ConfigureAwait(false);
     }
 }

@@ -17,14 +17,14 @@ using MareSynchronos.Services;
 
 namespace MareSynchronos.PlayerData.Factories;
 
-public class PlayerDataFactory 
+public class PlayerDataFactory
 {
-    private readonly ILogger<PlayerDataFactory> _logger;
     private readonly DalamudUtilService _dalamudUtil;
-    private readonly IpcManager _ipcManager;
-    private readonly TransientResourceManager _transientResourceManager;
     private readonly FileCacheManager _fileCacheManager;
+    private readonly IpcManager _ipcManager;
+    private readonly ILogger<PlayerDataFactory> _logger;
     private readonly PerformanceCollectorService _performanceCollector;
+    private readonly TransientResourceManager _transientResourceManager;
 
     public PlayerDataFactory(ILogger<PlayerDataFactory> logger, DalamudUtilService dalamudUtil, IpcManager ipcManager,
         TransientResourceManager transientResourceManager, FileCacheManager fileReplacementFactory,
@@ -38,11 +38,6 @@ public class PlayerDataFactory
         _performanceCollector = performanceCollector;
 
         _logger.LogTrace("Creating " + nameof(PlayerDataFactory));
-    }
-
-    private static unsafe bool CheckForNullDrawObject(IntPtr playerPointer)
-    {
-        return ((Character*)playerPointer)->GameObject.DrawObject == null;
     }
 
     public async Task BuildCharacterData(CharacterData previousData, GameObjectHandler playerRelatedObject, CancellationToken token)
@@ -106,6 +101,197 @@ public class PlayerDataFactory
         previousData.GlamourerString = previousGlamourerData;
     }
 
+    private static unsafe bool CheckForNullDrawObject(IntPtr playerPointer)
+    {
+        return ((Character*)playerPointer)->GameObject.DrawObject == null;
+    }
+
+    private unsafe void AddPlayerSpecificReplacements(Human* human, HashSet<string> forwardResolve, HashSet<string> reverseResolve)
+    {
+        var weaponObject = (Weapon*)((Object*)human)->ChildObject;
+
+        if ((IntPtr)weaponObject != IntPtr.Zero)
+        {
+            var mainHandWeapon = weaponObject->WeaponRenderModel->RenderModel;
+
+            AddReplacementsFromRenderModel(mainHandWeapon, forwardResolve, reverseResolve);
+
+            foreach (var item in _transientResourceManager.GetTransientResources((IntPtr)weaponObject))
+            {
+                _logger.LogTrace("Found transient weapon resource: {item}", item);
+                forwardResolve.Add(item);
+            }
+
+            if (weaponObject->NextSibling != (IntPtr)weaponObject)
+            {
+                var offHandWeapon = ((Weapon*)weaponObject->NextSibling)->WeaponRenderModel->RenderModel;
+
+                AddReplacementsFromRenderModel(offHandWeapon, forwardResolve, reverseResolve);
+
+                foreach (var item in _transientResourceManager.GetTransientResources((IntPtr)offHandWeapon))
+                {
+                    _logger.LogTrace("Found transient offhand weapon resource: {item}", item);
+                    forwardResolve.Add(item);
+                }
+            }
+        }
+
+        AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId, forwardResolve);
+        try
+        {
+            AddReplacementsFromTexture(new ByteString(((HumanExt*)human)->Decal->FileName()).ToString(), forwardResolve, reverseResolve, doNotReverseResolve: false);
+        }
+        catch
+        {
+            _logger.LogWarning("Could not get Decal data");
+        }
+        try
+        {
+            AddReplacementsFromTexture(new ByteString(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), forwardResolve, reverseResolve, doNotReverseResolve: false);
+        }
+        catch
+        {
+            _logger.LogWarning("Could not get Legacy Body Decal Data");
+        }
+    }
+
+    private unsafe void AddReplacementsFromMaterial(Material* mtrl, HashSet<string> forwardResolve, HashSet<string> reverseResolve)
+    {
+        string fileName;
+        try
+        {
+            fileName = new ByteString(mtrl->ResourceHandle->FileName()).ToString();
+        }
+        catch
+        {
+            _logger.LogWarning("Could not get material data");
+            return;
+        }
+
+        _logger.LogTrace("Checking File Replacement for Material {file}", fileName);
+        var mtrlPath = fileName.Split("|")[2];
+
+        reverseResolve.Add(mtrlPath);
+
+        var mtrlResourceHandle = (MtrlResource*)mtrl->ResourceHandle;
+        for (var resIdx = 0; resIdx < mtrlResourceHandle->NumTex; resIdx++)
+        {
+            string? texPath = null;
+            try
+            {
+                texPath = new ByteString(mtrlResourceHandle->TexString(resIdx)).ToString();
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning(e, "Could not get Texture data for Material {file}", fileName);
+            }
+
+            if (string.IsNullOrEmpty(texPath)) continue;
+
+            _logger.LogTrace("Checking File Replacement for Texture {file}", texPath);
+
+            AddReplacementsFromTexture(texPath, forwardResolve, reverseResolve);
+        }
+
+        try
+        {
+            var shpkPath = "shader/sm5/shpk/" + new ByteString(mtrlResourceHandle->ShpkString).ToString();
+            _logger.LogTrace("Checking File Replacement for Shader {path}", shpkPath);
+            forwardResolve.Add(shpkPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not find shpk for Material {path}", fileName);
+        }
+    }
+
+    private unsafe void AddReplacementsFromRenderModel(RenderModel* mdl, HashSet<string> forwardResolve, HashSet<string> reverseResolve)
+    {
+        if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
+        {
+            return;
+        }
+
+        string mdlPath;
+        try
+        {
+            mdlPath = new ByteString(mdl->ResourceHandle->FileName()).ToString();
+        }
+        catch
+        {
+            _logger.LogWarning("Could not get model data");
+            return;
+        }
+        _logger.LogTrace("Checking File Replacement for Model {path}", mdlPath);
+
+        reverseResolve.Add(mdlPath);
+
+        for (var mtrlIdx = 0; mtrlIdx < mdl->MaterialCount; mtrlIdx++)
+        {
+            var mtrl = (Material*)mdl->Materials[mtrlIdx];
+            if (mtrl == null) continue;
+
+            AddReplacementsFromMaterial(mtrl, forwardResolve, reverseResolve);
+        }
+    }
+
+    private void AddReplacementsFromTexture(string texPath, HashSet<string> forwardResolve, HashSet<string> reverseResolve, bool doNotReverseResolve = true)
+    {
+        if (string.IsNullOrEmpty(texPath)) return;
+
+        _logger.LogTrace("Checking file Replacement for texture {path}", texPath);
+
+        if (doNotReverseResolve)
+            forwardResolve.Add(texPath);
+        else
+            reverseResolve.Add(texPath);
+
+        if (texPath.Contains("/--", StringComparison.Ordinal)) return;
+
+        var dx11Path = texPath.Insert(texPath.LastIndexOf('/') + 1, "--");
+        if (doNotReverseResolve)
+            forwardResolve.Add(dx11Path);
+        else
+            reverseResolve.Add(dx11Path);
+    }
+
+    private void AddReplacementSkeleton(ushort raceSexId, HashSet<string> forwardResolve)
+    {
+        string raceSexIdString = raceSexId.ToString("0000", CultureInfo.InvariantCulture);
+
+        string skeletonPath = $"chara/human/c{raceSexIdString}/skeleton/base/b0001/skl_c{raceSexIdString}b0001.sklb";
+
+        _logger.LogTrace("Checking skeleton {path}", skeletonPath);
+
+        forwardResolve.Add(skeletonPath);
+    }
+
+    private unsafe (HashSet<string> forwardResolve, HashSet<string> reverseResolve) BuildDataFromModel(ObjectKind objectKind, nint charaPointer, CancellationToken token)
+    {
+        HashSet<string> forwardResolve = new(StringComparer.Ordinal);
+        HashSet<string> reverseResolve = new(StringComparer.Ordinal);
+        var human = (Human*)((Character*)charaPointer)->GameObject.GetDrawObject();
+        for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)
+        {
+            var mdl = (RenderModel*)human->CharacterBase.ModelArray[mdlIdx];
+            if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
+            {
+                continue;
+            }
+
+            token.ThrowIfCancellationRequested();
+
+            AddReplacementsFromRenderModel(mdl, forwardResolve, reverseResolve);
+        }
+
+        if (objectKind == ObjectKind.Player)
+        {
+            AddPlayerSpecificReplacements(human, forwardResolve, reverseResolve);
+        }
+
+        return (forwardResolve, reverseResolve);
+    }
+
     private async Task<CharacterData> CreateCharacterData(CharacterData previousData, GameObjectHandler playerRelatedObject, CancellationToken token)
     {
         var objectKind = playerRelatedObject.ObjectKind;
@@ -160,7 +346,7 @@ public class PlayerDataFactory
             _logger.LogDebug("=> {repl}", replacement);
         }
 
-        // if it's pet then it's summoner, if it's summoner we actually want to keep all filereplacements alive at all times 
+        // if it's pet then it's summoner, if it's summoner we actually want to keep all filereplacements alive at all times
         // or we get into redraw city for every change and nothing works properly
         if (objectKind == ObjectKind.Pet)
         {
@@ -201,207 +387,6 @@ public class PlayerDataFactory
         return previousData;
     }
 
-    private unsafe (HashSet<string> forwardResolve, HashSet<string> reverseResolve) BuildDataFromModel(ObjectKind objectKind, nint charaPointer, CancellationToken token)
-    {
-        HashSet<string> forwardResolve = new(StringComparer.Ordinal);
-        HashSet<string> reverseResolve = new(StringComparer.Ordinal);
-        var human = (Human*)((Character*)charaPointer)->GameObject.GetDrawObject();
-        for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)
-        {
-            var mdl = (RenderModel*)human->CharacterBase.ModelArray[mdlIdx];
-            if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
-            {
-                continue;
-            }
-
-            token.ThrowIfCancellationRequested();
-
-            AddReplacementsFromRenderModel(mdl, forwardResolve, reverseResolve);
-        }
-
-        if (objectKind == ObjectKind.Player)
-        {
-            AddPlayerSpecificReplacements(human, forwardResolve, reverseResolve);
-        }
-
-        return (forwardResolve, reverseResolve);
-    }
-
-    private unsafe void AddPlayerSpecificReplacements(Human* human, HashSet<string> forwardResolve, HashSet<string> reverseResolve)
-    {
-        var weaponObject = (Weapon*)((Object*)human)->ChildObject;
-
-        if ((IntPtr)weaponObject != IntPtr.Zero)
-        {
-            var mainHandWeapon = weaponObject->WeaponRenderModel->RenderModel;
-
-            AddReplacementsFromRenderModel(mainHandWeapon, forwardResolve, reverseResolve);
-
-            foreach (var item in _transientResourceManager.GetTransientResources((IntPtr)weaponObject))
-            {
-                _logger.LogTrace("Found transient weapon resource: {item}", item);
-                forwardResolve.Add(item);
-            }
-
-            if (weaponObject->NextSibling != (IntPtr)weaponObject)
-            {
-                var offHandWeapon = ((Weapon*)weaponObject->NextSibling)->WeaponRenderModel->RenderModel;
-
-                AddReplacementsFromRenderModel(offHandWeapon, forwardResolve, reverseResolve);
-
-                foreach (var item in _transientResourceManager.GetTransientResources((IntPtr)offHandWeapon))
-                {
-                    _logger.LogTrace("Found transient offhand weapon resource: {item}", item);
-                    forwardResolve.Add(item);
-                }
-            }
-        }
-
-        AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId, forwardResolve);
-        try
-        {
-            AddReplacementsFromTexture(new ByteString(((HumanExt*)human)->Decal->FileName()).ToString(), forwardResolve, reverseResolve, doNotReverseResolve: false);
-        }
-        catch
-        {
-            _logger.LogWarning("Could not get Decal data");
-        }
-        try
-        {
-            AddReplacementsFromTexture(new ByteString(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), forwardResolve, reverseResolve, doNotReverseResolve: false);
-        }
-        catch
-        {
-            _logger.LogWarning("Could not get Legacy Body Decal Data");
-        }
-    }
-
-
-    private unsafe void AddReplacementsFromRenderModel(RenderModel* mdl, HashSet<string> forwardResolve, HashSet<string> reverseResolve)
-    {
-        if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
-        {
-            return;
-        }
-
-        string mdlPath;
-        try
-        {
-            mdlPath = new ByteString(mdl->ResourceHandle->FileName()).ToString();
-        }
-        catch
-        {
-            _logger.LogWarning("Could not get model data");
-            return;
-        }
-        _logger.LogTrace("Checking File Replacement for Model {path}", mdlPath);
-
-        reverseResolve.Add(mdlPath);
-
-        for (var mtrlIdx = 0; mtrlIdx < mdl->MaterialCount; mtrlIdx++)
-        {
-            var mtrl = (Material*)mdl->Materials[mtrlIdx];
-            if (mtrl == null) continue;
-
-            AddReplacementsFromMaterial(mtrl, forwardResolve, reverseResolve);
-        }
-    }
-
-    private unsafe void AddReplacementsFromMaterial(Material* mtrl, HashSet<string> forwardResolve, HashSet<string> reverseResolve)
-    {
-        string fileName;
-        try
-        {
-            fileName = new ByteString(mtrl->ResourceHandle->FileName()).ToString();
-
-        }
-        catch
-        {
-            _logger.LogWarning("Could not get material data");
-            return;
-        }
-
-        _logger.LogTrace("Checking File Replacement for Material {file}", fileName);
-        var mtrlPath = fileName.Split("|")[2];
-
-        reverseResolve.Add(mtrlPath);
-
-        var mtrlResourceHandle = (MtrlResource*)mtrl->ResourceHandle;
-        for (var resIdx = 0; resIdx < mtrlResourceHandle->NumTex; resIdx++)
-        {
-            string? texPath = null;
-            try
-            {
-                texPath = new ByteString(mtrlResourceHandle->TexString(resIdx)).ToString();
-            }
-            catch (Exception e)
-            {
-                _logger.LogWarning(e, "Could not get Texture data for Material {file}", fileName);
-            }
-
-            if (string.IsNullOrEmpty(texPath)) continue;
-
-            _logger.LogTrace("Checking File Replacement for Texture {file}", texPath);
-
-            AddReplacementsFromTexture(texPath, forwardResolve, reverseResolve);
-        }
-
-        try
-        {
-            var shpkPath = "shader/sm5/shpk/" + new ByteString(mtrlResourceHandle->ShpkString).ToString();
-            _logger.LogTrace("Checking File Replacement for Shader {path}", shpkPath);
-            forwardResolve.Add(shpkPath);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Could not find shpk for Material {path}", fileName);
-        }
-    }
-
-    private void AddReplacementsFromTexture(string texPath, HashSet<string> forwardResolve, HashSet<string> reverseResolve, bool doNotReverseResolve = true)
-    {
-        if (string.IsNullOrEmpty(texPath)) return;
-
-        _logger.LogTrace("Checking file Replacement for texture {path}", texPath);
-
-        if (doNotReverseResolve)
-            forwardResolve.Add(texPath);
-        else
-            reverseResolve.Add(texPath);
-
-        if (texPath.Contains("/--", StringComparison.Ordinal)) return;
-
-        var dx11Path = texPath.Insert(texPath.LastIndexOf('/') + 1, "--");
-        if (doNotReverseResolve)
-            forwardResolve.Add(dx11Path);
-        else
-            reverseResolve.Add(dx11Path);
-    }
-
-    private void AddReplacementSkeleton(ushort raceSexId, HashSet<string> forwardResolve)
-    {
-        string raceSexIdString = raceSexId.ToString("0000", CultureInfo.InvariantCulture);
-
-        string skeletonPath = $"chara/human/c{raceSexIdString}/skeleton/base/b0001/skl_c{raceSexIdString}b0001.sklb";
-
-        _logger.LogTrace("Checking skeleton {path}", skeletonPath);
-
-        forwardResolve.Add(skeletonPath);
-    }
-
-    private HashSet<string> ManageSemiTransientData(ObjectKind objectKind, IntPtr charaPointer)
-    {
-        _transientResourceManager.PersistTransientResources(charaPointer, objectKind);
-
-        HashSet<string> pathsToResolve = new(StringComparer.Ordinal);
-        foreach (var path in _transientResourceManager.GetSemiTransientResources(objectKind).Where(path => !string.IsNullOrEmpty(path)))
-        {
-            pathsToResolve.Add(path);
-        }
-
-        return pathsToResolve;
-    }
-
     private Dictionary<string, List<string>> GetFileReplacementsFromPaths(HashSet<string> forwardResolve, HashSet<string> reverseResolve)
     {
         var forwardPaths = forwardResolve.ToArray();
@@ -435,5 +420,18 @@ public class PlayerDataFactory
         }
 
         return resolvedPaths;
+    }
+
+    private HashSet<string> ManageSemiTransientData(ObjectKind objectKind, IntPtr charaPointer)
+    {
+        _transientResourceManager.PersistTransientResources(charaPointer, objectKind);
+
+        HashSet<string> pathsToResolve = new(StringComparer.Ordinal);
+        foreach (var path in _transientResourceManager.GetSemiTransientResources(objectKind).Where(path => !string.IsNullOrEmpty(path)))
+        {
+            pathsToResolve.Add(path);
+        }
+
+        return pathsToResolve;
     }
 }

@@ -1,6 +1,4 @@
-﻿using System.Collections.Concurrent;
-using System.Numerics;
-using Dalamud.Interface.Colors;
+﻿using Dalamud.Interface.Colors;
 using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using MareSynchronos.MareConfiguration;
@@ -8,6 +6,8 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.Files.Models;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
+using System.Numerics;
 
 namespace MareSynchronos.UI;
 

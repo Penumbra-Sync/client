@@ -14,12 +14,9 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
     private readonly TransientConfigService _configurationService;
     private readonly DalamudUtilService _dalamudUtil;
 
-    private readonly HashSet<GameObjectHandler> _playerRelatedPointers = new();
     private readonly string[] _fileTypesToHandle = new[] { "tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk" };
-    private string PlayerPersistentDataKey => _dalamudUtil.PlayerName + "_" + _dalamudUtil.WorldId;
+    private readonly HashSet<GameObjectHandler> _playerRelatedPointers = new();
 
-    private ConcurrentDictionary<IntPtr, HashSet<string>> TransientResources { get; } = new();
-    private ConcurrentDictionary<ObjectKind, HashSet<string>> SemiTransientResources { get; } = new();
     public TransientResourceManager(ILogger<TransientResourceManager> logger, TransientConfigService configurationService,
         DalamudUtilService dalamudUtil, MareMediator mediator) : base(logger, mediator)
     {
@@ -44,7 +41,6 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
                 {
                     Logger.LogWarning(ex, "Error during loading persistent transient resource {path}", gamePath);
                 }
-
             }
             Logger.LogDebug("Restored {restored}/{total} semi persistent resources", restored, gamePaths.Count);
         }
@@ -63,16 +59,104 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         });
     }
 
-    private void Manager_PenumbraModSettingChanged()
+    private string PlayerPersistentDataKey => _dalamudUtil.PlayerName + "_" + _dalamudUtil.WorldId;
+
+    private ConcurrentDictionary<ObjectKind, HashSet<string>> SemiTransientResources { get; } = new();
+    private ConcurrentDictionary<IntPtr, HashSet<string>> TransientResources { get; } = new();
+
+    public void CleanUpSemiTransientResources(ObjectKind objectKind, List<FileReplacement>? fileReplacement = null)
     {
-        Task.Run(() =>
+        if (SemiTransientResources.ContainsKey(objectKind))
         {
-            Logger.LogDebug("Penumbra Mod Settings changed, verifying SemiTransientResources");
-            foreach (var item in SemiTransientResources)
+            if (fileReplacement == null)
             {
-                Mediator.Publish(new TransientResourceChangedMessage(_dalamudUtil.PlayerPointer));
+                SemiTransientResources[objectKind].Clear();
+                return;
             }
-        });
+
+            foreach (var replacement in fileReplacement.Where(p => !p.HasFileReplacement).SelectMany(p => p.GamePaths).ToList())
+            {
+                SemiTransientResources[objectKind].RemoveWhere(p => string.Equals(p, replacement, StringComparison.OrdinalIgnoreCase));
+            }
+        }
+    }
+
+    public HashSet<string> GetSemiTransientResources(ObjectKind objectKind)
+    {
+        if (SemiTransientResources.TryGetValue(objectKind, out var result))
+        {
+            return result ?? new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        return new HashSet<string>(StringComparer.Ordinal);
+    }
+
+    public List<string> GetTransientResources(IntPtr gameObject)
+    {
+        if (TransientResources.TryGetValue(gameObject, out var result))
+        {
+            return result.ToList();
+        }
+
+        return new List<string>();
+    }
+
+    public void PersistTransientResources(IntPtr gameObject, ObjectKind objectKind)
+    {
+        if (!SemiTransientResources.ContainsKey(objectKind))
+        {
+            SemiTransientResources[objectKind] = new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        if (!TransientResources.TryGetValue(gameObject, out var resources))
+        {
+            return;
+        }
+
+        var transientResources = resources.ToList();
+        Logger.LogDebug("Persisting {count} transient resources", transientResources.Count);
+        foreach (var gamePath in transientResources)
+        {
+            SemiTransientResources[objectKind].Add(gamePath);
+        }
+
+        if (objectKind == ObjectKind.Player && SemiTransientResources.TryGetValue(ObjectKind.Player, out var fileReplacements))
+        {
+            _configurationService.Current.PlayerPersistentTransientCache[PlayerPersistentDataKey] = fileReplacements.Where(f => !string.IsNullOrEmpty(f)).ToHashSet(StringComparer.Ordinal);
+            _configurationService.Save();
+        }
+        TransientResources[gameObject].Clear();
+    }
+
+    internal void AddSemiTransientResource(ObjectKind objectKind, string item)
+    {
+        if (!SemiTransientResources.ContainsKey(objectKind))
+        {
+            SemiTransientResources[objectKind] = new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        SemiTransientResources[objectKind].Add(item.ToLowerInvariant());
+    }
+
+    internal void ClearTransientPaths(IntPtr ptr, List<string> list)
+    {
+        if (TransientResources.TryGetValue(ptr, out var set))
+        {
+            set.RemoveWhere(p => list.Contains(p, StringComparer.OrdinalIgnoreCase));
+        }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+
+        TransientResources.Clear();
+        SemiTransientResources.Clear();
+        if (SemiTransientResources.ContainsKey(ObjectKind.Player))
+        {
+            _configurationService.Current.PlayerPersistentTransientCache[PlayerPersistentDataKey] = SemiTransientResources[ObjectKind.Player];
+            _configurationService.Save();
+        }
     }
 
     private void DalamudUtil_ClassJobChanged()
@@ -92,41 +176,16 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         }
     }
 
-    public void CleanUpSemiTransientResources(ObjectKind objectKind, List<FileReplacement>? fileReplacement = null)
+    private void Manager_PenumbraModSettingChanged()
     {
-        if (SemiTransientResources.ContainsKey(objectKind))
+        Task.Run(() =>
         {
-            if (fileReplacement == null)
+            Logger.LogDebug("Penumbra Mod Settings changed, verifying SemiTransientResources");
+            foreach (var item in SemiTransientResources)
             {
-                SemiTransientResources[objectKind].Clear();
-                return;
+                Mediator.Publish(new TransientResourceChangedMessage(_dalamudUtil.PlayerPointer));
             }
-
-            foreach (var replacement in fileReplacement.Where(p => !p.HasFileReplacement).SelectMany(p => p.GamePaths).ToList())
-            {
-                SemiTransientResources[objectKind].RemoveWhere(p => string.Equals(p, replacement, StringComparison.OrdinalIgnoreCase));
-            }
-        }
-    }
-
-    public List<string> GetTransientResources(IntPtr gameObject)
-    {
-        if (TransientResources.TryGetValue(gameObject, out var result))
-        {
-            return result.ToList();
-        }
-
-        return new List<string>();
-    }
-
-    public HashSet<string> GetSemiTransientResources(ObjectKind objectKind)
-    {
-        if (SemiTransientResources.TryGetValue(objectKind, out var result))
-        {
-            return result ?? new HashSet<string>(StringComparer.Ordinal);
-        }
-
-        return new HashSet<string>(StringComparer.Ordinal);
+        });
     }
 
     private void Manager_PenumbraResourceLoadEvent(PenumbraResourceLoadMessage msg)
@@ -169,64 +228,6 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             TransientResources[gameObject].Add(replacedGamePath);
             Logger.LogDebug("Adding {replacedGamePath} for {gameObject} ({filePath})", replacedGamePath, gameObject.ToString("X"), filePath);
             Mediator.Publish(new TransientResourceChangedMessage(gameObject));
-        }
-    }
-
-    public void PersistTransientResources(IntPtr gameObject, ObjectKind objectKind)
-    {
-        if (!SemiTransientResources.ContainsKey(objectKind))
-        {
-            SemiTransientResources[objectKind] = new HashSet<string>(StringComparer.Ordinal);
-        }
-
-        if (!TransientResources.TryGetValue(gameObject, out var resources))
-        {
-            return;
-        }
-
-        var transientResources = resources.ToList();
-        Logger.LogDebug("Persisting {count} transient resources", transientResources.Count);
-        foreach (var gamePath in transientResources)
-        {
-            SemiTransientResources[objectKind].Add(gamePath);
-        }
-
-        if (objectKind == ObjectKind.Player && SemiTransientResources.TryGetValue(ObjectKind.Player, out var fileReplacements))
-        {
-            _configurationService.Current.PlayerPersistentTransientCache[PlayerPersistentDataKey] = fileReplacements.Where(f => !string.IsNullOrEmpty(f)).ToHashSet(StringComparer.Ordinal);
-            _configurationService.Save();
-        }
-        TransientResources[gameObject].Clear();
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-
-        TransientResources.Clear();
-        SemiTransientResources.Clear();
-        if (SemiTransientResources.ContainsKey(ObjectKind.Player))
-        {
-            _configurationService.Current.PlayerPersistentTransientCache[PlayerPersistentDataKey] = SemiTransientResources[ObjectKind.Player];
-            _configurationService.Save();
-        }
-    }
-
-    internal void AddSemiTransientResource(ObjectKind objectKind, string item)
-    {
-        if (!SemiTransientResources.ContainsKey(objectKind))
-        {
-            SemiTransientResources[objectKind] = new HashSet<string>(StringComparer.Ordinal);
-        }
-
-        SemiTransientResources[objectKind].Add(item.ToLowerInvariant());
-    }
-
-    internal void ClearTransientPaths(IntPtr ptr, List<string> list)
-    {
-        if (TransientResources.TryGetValue(ptr, out var set))
-        {
-            set.RemoveWhere(p => list.Contains(p, StringComparer.OrdinalIgnoreCase));
         }
     }
 }

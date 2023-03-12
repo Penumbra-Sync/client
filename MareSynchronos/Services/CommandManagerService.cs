@@ -1,9 +1,9 @@
 ﻿using Dalamud.Game.Command;
-using MareSynchronos.WebAPI;
-using MareSynchronos.UI;
+using MareSynchronos.FileCache;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
-using MareSynchronos.FileCache;
+using MareSynchronos.UI;
+using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.Services;
 
@@ -11,13 +11,13 @@ public sealed class CommandManagerService : IDisposable
 {
     private const string _commandName = "/mare";
 
-    private readonly CommandManager _commandManager;
-    private readonly PerformanceCollectorService _performanceCollectorService;
-    private readonly UiService _uiService;
-    private readonly ServerConfigurationManager _serverConfigurationManager;
-    private readonly PeriodicFileScanner _periodicFileScanner;
     private readonly ApiController _apiController;
+    private readonly CommandManager _commandManager;
     private readonly MareMediator _mediator;
+    private readonly PerformanceCollectorService _performanceCollectorService;
+    private readonly PeriodicFileScanner _periodicFileScanner;
+    private readonly ServerConfigurationManager _serverConfigurationManager;
+    private readonly UiService _uiService;
 
     public CommandManagerService(CommandManager commandManager, PerformanceCollectorService performanceCollectorService,
         UiService uiService, ServerConfigurationManager serverConfigurationManager, PeriodicFileScanner periodicFileScanner,

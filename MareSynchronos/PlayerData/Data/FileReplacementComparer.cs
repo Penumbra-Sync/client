@@ -2,9 +2,13 @@
 
 public class FileReplacementComparer : IEqualityComparer<FileReplacement>
 {
-    public static FileReplacementComparer Instance => _instance;
     private static readonly FileReplacementComparer _instance = new();
-    private FileReplacementComparer() { }
+
+    private FileReplacementComparer()
+    { }
+
+    public static FileReplacementComparer Instance => _instance;
+
     public bool Equals(FileReplacement? x, FileReplacement? y)
     {
         if (x == null || y == null) return false;
@@ -14,17 +18,6 @@ public class FileReplacementComparer : IEqualityComparer<FileReplacement>
     public int GetHashCode(FileReplacement obj)
     {
         return HashCode.Combine(obj.ResolvedPath.GetHashCode(StringComparison.OrdinalIgnoreCase), GetOrderIndependentHashCode(obj.GamePaths));
-    }
-
-    private static int GetOrderIndependentHashCode<T>(IEnumerable<T> source)
-    {
-        int hash = 0;
-        foreach (T element in source)
-        {
-            hash = unchecked(hash +
-                EqualityComparer<T>.Default.GetHashCode(element));
-        }
-        return hash;
     }
 
     private static bool CompareLists(HashSet<string> list1, HashSet<string> list2)
@@ -39,5 +32,16 @@ public class FileReplacementComparer : IEqualityComparer<FileReplacement>
         }
 
         return true;
+    }
+
+    private static int GetOrderIndependentHashCode<T>(IEnumerable<T> source)
+    {
+        int hash = 0;
+        foreach (T element in source)
+        {
+            hash = unchecked(hash +
+                EqualityComparer<T>.Default.GetHashCode(element));
+        }
+        return hash;
     }
 }

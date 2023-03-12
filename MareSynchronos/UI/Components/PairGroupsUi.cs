@@ -6,208 +6,206 @@ using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
 
-namespace MareSynchronos.UI.Components
+namespace MareSynchronos.UI.Components;
+
+public class PairGroupsUi
 {
-    public class PairGroupsUi
+    private readonly ApiController _apiController;
+    private readonly Action<Pair> _clientRenderFn;
+    private readonly SelectPairForGroupUi _selectGroupForPairUi;
+    private readonly TagHandler _tagHandler;
+
+    public PairGroupsUi(TagHandler tagHandler, Action<Pair> clientRenderFn, ApiController apiController, SelectPairForGroupUi selectGroupForPairUi)
     {
-        private readonly Action<Pair> _clientRenderFn;
-        private readonly TagHandler _tagHandler;
-        private readonly ApiController _apiController;
-        private readonly SelectPairForGroupUi _selectGroupForPairUi;
+        _clientRenderFn = clientRenderFn;
+        _tagHandler = tagHandler;
+        _apiController = apiController;
+        _selectGroupForPairUi = selectGroupForPairUi;
+    }
 
-        public PairGroupsUi(TagHandler tagHandler, Action<Pair> clientRenderFn, ApiController apiController, SelectPairForGroupUi selectGroupForPairUi)
+    public void Draw(List<Pair> visibleUsers, List<Pair> onlineUsers, List<Pair> offlineUsers)
+    {
+        // Only render those tags that actually have pairs in them, otherwise
+        // we can end up with a bunch of useless pair groups
+        var tagsWithPairsInThem = _tagHandler.GetAllTagsSorted();
+        var allUsers = visibleUsers.Concat(onlineUsers).Concat(offlineUsers).ToList();
+        UiSharedService.DrawWithID("$group-VisibleCustomTag", () => DrawCategory(TagHandler.CustomVisibleTag, visibleUsers, allUsers));
+        foreach (var tag in tagsWithPairsInThem)
         {
-            _clientRenderFn = clientRenderFn;
-            _tagHandler = tagHandler;
-            _apiController = apiController;
-            _selectGroupForPairUi = selectGroupForPairUi;
+            UiSharedService.DrawWithID($"group-{tag}", () => DrawCategory(tag, onlineUsers, allUsers, visibleUsers));
         }
+        UiSharedService.DrawWithID($"group-OnlineCustomTag", () => DrawCategory(TagHandler.CustomOnlineTag, onlineUsers.Where(u => !_tagHandler.HasAnyTag(u.UserPair!)).ToList(), allUsers));
+        UiSharedService.DrawWithID($"group-OfflineCustomTag", () => DrawCategory(TagHandler.CustomOfflineTag, offlineUsers, allUsers));
+    }
 
-        public void Draw(List<Pair> visibleUsers, List<Pair> onlineUsers, List<Pair> offlineUsers)
+    private void DrawButtons(string tag, List<Pair> availablePairsInThisTag)
+    {
+        var allArePaused = availablePairsInThisTag.All(pair => pair.UserPair!.OwnPermissions.IsPaused());
+        var pauseButton = allArePaused ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
+        var flyoutMenuX = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars).X;
+        var pauseButtonX = UiSharedService.GetIconButtonSize(pauseButton).X;
+        var windowX = ImGui.GetWindowContentRegionMin().X;
+        var windowWidth = UiSharedService.GetWindowContentRegionWidth();
+        var spacingX = ImGui.GetStyle().ItemSpacing.X;
+
+        var buttonPauseOffset = windowX + windowWidth - flyoutMenuX - spacingX - pauseButtonX;
+        ImGui.SameLine(buttonPauseOffset);
+        if (ImGuiComponents.IconButton(pauseButton))
         {
-            // Only render those tags that actually have pairs in them, otherwise
-            // we can end up with a bunch of useless pair groups
-            var tagsWithPairsInThem = _tagHandler.GetAllTagsSorted();
-            var allUsers = visibleUsers.Concat(onlineUsers).Concat(offlineUsers).ToList();
-            UiSharedService.DrawWithID("$group-VisibleCustomTag", () => DrawCategory(TagHandler.CustomVisibleTag, visibleUsers, allUsers));
-            foreach (var tag in tagsWithPairsInThem)
-            {
-                UiSharedService.DrawWithID($"group-{tag}", () => DrawCategory(tag, onlineUsers, allUsers, visibleUsers));
-            }
-            UiSharedService.DrawWithID($"group-OnlineCustomTag", () => DrawCategory(TagHandler.CustomOnlineTag, onlineUsers.Where(u => !_tagHandler.HasAnyTag(u.UserPair!)).ToList(), allUsers));
-            UiSharedService.DrawWithID($"group-OfflineCustomTag", () => DrawCategory(TagHandler.CustomOfflineTag, offlineUsers, allUsers));
-        }
-
-        private void DrawCategory(string tag, List<Pair> onlineUsers, List<Pair> allUsers, List<Pair>? visibleUsers = null)
-        {
-            List<Pair> usersInThisTag;
-            HashSet<string>? otherUidsTaggedWithTag = null;
-            bool isSpecialTag = false;
-            int visibleInThisTag = 0;
-            if (tag is TagHandler.CustomOfflineTag or TagHandler.CustomOnlineTag or TagHandler.CustomVisibleTag)
-            {
-                usersInThisTag = onlineUsers;
-                isSpecialTag = true;
-            }
-            else
-            {
-                otherUidsTaggedWithTag = _tagHandler.GetOtherUidsForTag(tag);
-                usersInThisTag = onlineUsers
-                    .Where(pair => otherUidsTaggedWithTag.Contains(pair.UserData.UID))
-                    .ToList();
-                visibleInThisTag = visibleUsers?.Count(p => otherUidsTaggedWithTag.Contains(p.UserData.UID)) ?? 0;
-            }
-
-            if (isSpecialTag && !usersInThisTag.Any()) return;
-
-            DrawName(tag, isSpecialTag, visibleInThisTag, usersInThisTag.Count, otherUidsTaggedWithTag?.Count);
-            if (!isSpecialTag)
-                UiSharedService.DrawWithID($"group-{tag}-buttons", () => DrawButtons(tag, allUsers.Where(p => otherUidsTaggedWithTag!.Contains(p.UserData.UID)).ToList()));
-
-            if (!_tagHandler.IsTagOpen(tag)) return;
-
-            ImGui.Indent(20);
-            DrawPairs(tag, usersInThisTag);
-            ImGui.Unindent(20);
-        }
-
-        private void DrawName(string tag, bool isSpecialTag, int visible, int online, int? total)
-        {
-            string displayedName = tag switch
-            {
-                TagHandler.CustomOfflineTag => "Offline/Unpaired",
-                TagHandler.CustomOnlineTag => "Online/Paused",
-                TagHandler.CustomVisibleTag => "Visible",
-                _ => tag
-            };
-
-            string resultFolderName = !isSpecialTag ? $"{displayedName} ({visible}/{online}/{total} Pairs)" : $"{displayedName} ({online} Pairs)";
-
-            //  FontAwesomeIcon.CaretSquareDown : FontAwesomeIcon.CaretSquareRight
-            var icon = _tagHandler.IsTagOpen(tag) ? FontAwesomeIcon.CaretSquareDown : FontAwesomeIcon.CaretSquareRight;
-            UiSharedService.FontText(icon.ToIconString(), UiBuilder.IconFont);
-            if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
-            {
-                ToggleTagOpen(tag);
-            }
-            ImGui.SameLine();
-            UiSharedService.FontText(resultFolderName, UiBuilder.DefaultFont);
-            if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
-            {
-                ToggleTagOpen(tag);
-            }
-
-            if (!isSpecialTag && ImGui.IsItemHovered())
-            {
-                ImGui.BeginTooltip();
-                ImGui.TextUnformatted($"Group {tag}");
-                ImGui.Separator();
-                ImGui.TextUnformatted($"{visible} Pairs visible");
-                ImGui.TextUnformatted($"{online} Pairs online/paused");
-                ImGui.TextUnformatted($"{total} Pairs total");
-                ImGui.EndTooltip();
-            }
-        }
-
-        private void DrawButtons(string tag, List<Pair> availablePairsInThisTag)
-        {
-            var allArePaused = availablePairsInThisTag.All(pair => pair.UserPair!.OwnPermissions.IsPaused());
-            var pauseButton = allArePaused ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
-            var flyoutMenuX = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars).X;
-            var pauseButtonX = UiSharedService.GetIconButtonSize(pauseButton).X;
-            var windowX = ImGui.GetWindowContentRegionMin().X;
-            var windowWidth = UiSharedService.GetWindowContentRegionWidth();
-            var spacingX = ImGui.GetStyle().ItemSpacing.X;
-
-            var buttonPauseOffset = windowX + windowWidth - flyoutMenuX - spacingX - pauseButtonX;
-            ImGui.SameLine(buttonPauseOffset);
-            if (ImGuiComponents.IconButton(pauseButton))
-            {
-                // If all of the currently visible pairs (after applying filters to the pairs)
-                // are paused we display a resume button to resume all currently visible (after filters)
-                // pairs. Otherwise, we just pause all the remaining pairs.
-                if (allArePaused)
-                {
-                    // If all are paused => resume all
-                    ResumeAllPairs(availablePairsInThisTag);
-                }
-                else
-                {
-                    // otherwise pause all remaining
-                    PauseRemainingPairs(availablePairsInThisTag);
-                }
-            }
+            // If all of the currently visible pairs (after applying filters to the pairs)
+            // are paused we display a resume button to resume all currently visible (after filters)
+            // pairs. Otherwise, we just pause all the remaining pairs.
             if (allArePaused)
             {
-                UiSharedService.AttachToolTip($"Resume pairing with all pairs in {tag}");
+                // If all are paused => resume all
+                ResumeAllPairs(availablePairsInThisTag);
             }
             else
             {
-                UiSharedService.AttachToolTip($"Pause pairing with all pairs in {tag}");
-            }
-
-            var buttonDeleteOffset = windowX + windowWidth - flyoutMenuX;
-            ImGui.SameLine(buttonDeleteOffset);
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
-            {
-                ImGui.OpenPopup("Group Flyout Menu");
-
-            }
-
-            if (ImGui.BeginPopup("Group Flyout Menu"))
-            {
-                UiSharedService.DrawWithID($"buttons-{tag}", () => DrawGroupMenu(tag));
-                ImGui.EndPopup();
+                // otherwise pause all remaining
+                PauseRemainingPairs(availablePairsInThisTag);
             }
         }
-
-        private void DrawGroupMenu(string tag)
+        if (allArePaused)
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Users, "Add people to " + tag))
-            {
-                _selectGroupForPairUi.Open(tag);
-            }
-            UiSharedService.AttachToolTip($"Add more users to Group {tag}");
-
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete " + tag) && UiSharedService.CtrlPressed())
-            {
-                _tagHandler.RemoveTag(tag);
-            }
-            UiSharedService.AttachToolTip($"Delete Group {tag} (Will not delete the pairs)" + Environment.NewLine + "Hold CTRL to delete");
+            UiSharedService.AttachToolTip($"Resume pairing with all pairs in {tag}");
+        }
+        else
+        {
+            UiSharedService.AttachToolTip($"Pause pairing with all pairs in {tag}");
         }
 
-        private void DrawPairs(string tag, List<Pair> availablePairsInThisCategory)
+        var buttonDeleteOffset = windowX + windowWidth - flyoutMenuX;
+        ImGui.SameLine(buttonDeleteOffset);
+        if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
         {
-            // These are all the OtherUIDs that are tagged with this tag
-            availablePairsInThisCategory
-                .ForEach(pair => UiSharedService.DrawWithID($"tag-{tag}-pair-${pair.UserData.UID}", () => _clientRenderFn(pair)));
+            ImGui.OpenPopup("Group Flyout Menu");
+        }
+
+        if (ImGui.BeginPopup("Group Flyout Menu"))
+        {
+            UiSharedService.DrawWithID($"buttons-{tag}", () => DrawGroupMenu(tag));
+            ImGui.EndPopup();
+        }
+    }
+
+    private void DrawCategory(string tag, List<Pair> onlineUsers, List<Pair> allUsers, List<Pair>? visibleUsers = null)
+    {
+        List<Pair> usersInThisTag;
+        HashSet<string>? otherUidsTaggedWithTag = null;
+        bool isSpecialTag = false;
+        int visibleInThisTag = 0;
+        if (tag is TagHandler.CustomOfflineTag or TagHandler.CustomOnlineTag or TagHandler.CustomVisibleTag)
+        {
+            usersInThisTag = onlineUsers;
+            isSpecialTag = true;
+        }
+        else
+        {
+            otherUidsTaggedWithTag = _tagHandler.GetOtherUidsForTag(tag);
+            usersInThisTag = onlineUsers
+                .Where(pair => otherUidsTaggedWithTag.Contains(pair.UserData.UID))
+                .ToList();
+            visibleInThisTag = visibleUsers?.Count(p => otherUidsTaggedWithTag.Contains(p.UserData.UID)) ?? 0;
+        }
+
+        if (isSpecialTag && !usersInThisTag.Any()) return;
+
+        DrawName(tag, isSpecialTag, visibleInThisTag, usersInThisTag.Count, otherUidsTaggedWithTag?.Count);
+        if (!isSpecialTag)
+            UiSharedService.DrawWithID($"group-{tag}-buttons", () => DrawButtons(tag, allUsers.Where(p => otherUidsTaggedWithTag!.Contains(p.UserData.UID)).ToList()));
+
+        if (!_tagHandler.IsTagOpen(tag)) return;
+
+        ImGui.Indent(20);
+        DrawPairs(tag, usersInThisTag);
+        ImGui.Unindent(20);
+    }
+
+    private void DrawGroupMenu(string tag)
+    {
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.Users, "Add people to " + tag))
+        {
+            _selectGroupForPairUi.Open(tag);
+        }
+        UiSharedService.AttachToolTip($"Add more users to Group {tag}");
+
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete " + tag) && UiSharedService.CtrlPressed())
+        {
+            _tagHandler.RemoveTag(tag);
+        }
+        UiSharedService.AttachToolTip($"Delete Group {tag} (Will not delete the pairs)" + Environment.NewLine + "Hold CTRL to delete");
+    }
+
+    private void DrawName(string tag, bool isSpecialTag, int visible, int online, int? total)
+    {
+        string displayedName = tag switch
+        {
+            TagHandler.CustomOfflineTag => "Offline/Unpaired",
+            TagHandler.CustomOnlineTag => "Online/Paused",
+            TagHandler.CustomVisibleTag => "Visible",
+            _ => tag
+        };
+
+        string resultFolderName = !isSpecialTag ? $"{displayedName} ({visible}/{online}/{total} Pairs)" : $"{displayedName} ({online} Pairs)";
+
+        //  FontAwesomeIcon.CaretSquareDown : FontAwesomeIcon.CaretSquareRight
+        var icon = _tagHandler.IsTagOpen(tag) ? FontAwesomeIcon.CaretSquareDown : FontAwesomeIcon.CaretSquareRight;
+        UiSharedService.FontText(icon.ToIconString(), UiBuilder.IconFont);
+        if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
+        {
+            ToggleTagOpen(tag);
+        }
+        ImGui.SameLine();
+        UiSharedService.FontText(resultFolderName, UiBuilder.DefaultFont);
+        if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
+        {
+            ToggleTagOpen(tag);
+        }
+
+        if (!isSpecialTag && ImGui.IsItemHovered())
+        {
+            ImGui.BeginTooltip();
+            ImGui.TextUnformatted($"Group {tag}");
             ImGui.Separator();
+            ImGui.TextUnformatted($"{visible} Pairs visible");
+            ImGui.TextUnformatted($"{online} Pairs online/paused");
+            ImGui.TextUnformatted($"{total} Pairs total");
+            ImGui.EndTooltip();
         }
+    }
 
-        private void ToggleTagOpen(string tag)
-        {
-            bool open = !_tagHandler.IsTagOpen(tag);
-            _tagHandler.SetTagOpen(tag, open);
-        }
+    private void DrawPairs(string tag, List<Pair> availablePairsInThisCategory)
+    {
+        // These are all the OtherUIDs that are tagged with this tag
+        availablePairsInThisCategory
+            .ForEach(pair => UiSharedService.DrawWithID($"tag-{tag}-pair-${pair.UserData.UID}", () => _clientRenderFn(pair)));
+        ImGui.Separator();
+    }
 
-        private void PauseRemainingPairs(List<Pair> availablePairs)
+    private void PauseRemainingPairs(List<Pair> availablePairs)
+    {
+        foreach (var pairToPause in availablePairs.Where(pair => !pair.UserPair!.OwnPermissions.IsPaused()))
         {
-            foreach (var pairToPause in availablePairs.Where(pair => !pair.UserPair!.OwnPermissions.IsPaused()))
-            {
-                var perm = pairToPause.UserPair!.OwnPermissions;
-                perm.SetPaused(paused: true);
-                _ = _apiController.UserSetPairPermissions(new(pairToPause.UserData, perm));
-            }
+            var perm = pairToPause.UserPair!.OwnPermissions;
+            perm.SetPaused(paused: true);
+            _ = _apiController.UserSetPairPermissions(new(pairToPause.UserData, perm));
         }
+    }
 
-        private void ResumeAllPairs(List<Pair> availablePairs)
+    private void ResumeAllPairs(List<Pair> availablePairs)
+    {
+        foreach (var pairToPause in availablePairs)
         {
-            foreach (var pairToPause in availablePairs)
-            {
-                var perm = pairToPause.UserPair!.OwnPermissions;
-                perm.SetPaused(paused: false);
-                _ = _apiController.UserSetPairPermissions(new(pairToPause.UserData, perm));
-            }
+            var perm = pairToPause.UserPair!.OwnPermissions;
+            perm.SetPaused(paused: false);
+            _ = _apiController.UserSetPairPermissions(new(pairToPause.UserData, perm));
         }
+    }
+
+    private void ToggleTagOpen(string tag)
+    {
+        bool open = !_tagHandler.IsTagOpen(tag);
+        _tagHandler.SetTagOpen(tag, open);
     }
 }

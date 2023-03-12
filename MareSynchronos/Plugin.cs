@@ -1,39 +1,38 @@
-﻿using Dalamud.Game.Command;
-using Dalamud.Plugin;
+﻿using Dalamud.Data;
 using Dalamud.Game;
-using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState;
-using Dalamud.Interface.ImGuiFileDialog;
-using MareSynchronos.WebAPI;
-using Dalamud.Interface.Windowing;
-using MareSynchronos.UI;
 using Dalamud.Game.ClientState.Conditions;
-using MareSynchronos.FileCache;
+using Dalamud.Game.ClientState.Objects;
+using Dalamud.Game.Command;
 using Dalamud.Game.Gui;
-using Dalamud.Data;
-using MareSynchronos.MareConfiguration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using MareSynchronos.WebAPI.SignalR;
-using MareSynchronos.PlayerData.Pairs;
-using MareSynchronos.Services;
-using MareSynchronos.Interop;
-using MareSynchronos.PlayerData.Factories;
-using MareSynchronos.PlayerData.Export;
-using MareSynchronos.PlayerData.Services;
-using MareSynchronos.Services.Mediator;
-using MareSynchronos.Services.ServerConfiguration;
-using MareSynchronos.WebAPI.Files;
-using Microsoft.Extensions.Hosting;
-using MareSynchronos.PlayerData.Handlers;
+using Dalamud.Interface.ImGuiFileDialog;
+using Dalamud.Interface.Windowing;
+using Dalamud.Plugin;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Dto.User;
+using MareSynchronos.FileCache;
+using MareSynchronos.Interop;
+using MareSynchronos.MareConfiguration;
+using MareSynchronos.PlayerData.Export;
+using MareSynchronos.PlayerData.Factories;
+using MareSynchronos.PlayerData.Handlers;
+using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.PlayerData.Services;
+using MareSynchronos.Services;
+using MareSynchronos.Services.Mediator;
+using MareSynchronos.Services.ServerConfiguration;
+using MareSynchronos.UI;
+using MareSynchronos.WebAPI;
+using MareSynchronos.WebAPI.Files;
+using MareSynchronos.WebAPI.SignalR;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos;
 
 public sealed class Plugin : IDalamudPlugin
 {
-    public string Name => "Mare Synchronos";
     private readonly CancellationTokenSource _pluginCts = new();
 
     public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager, DataManager gameData,
@@ -139,6 +138,8 @@ public sealed class Plugin : IDalamudPlugin
         .Build()
         .RunAsync(_pluginCts.Token);
     }
+
+    public string Name => "Mare Synchronos";
 
     public void Dispose()
     {

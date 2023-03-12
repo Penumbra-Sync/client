@@ -8,23 +8,16 @@ namespace MareSynchronos.UI.Components;
 
 public class SelectPairForGroupUi
 {
-    private bool _show = false;
-    private bool _opened = false;
-    private HashSet<string> _peopleInGroup = new(StringComparer.Ordinal);
-    private string _tag = string.Empty;
     private readonly TagHandler _tagHandler;
     private string _filter = string.Empty;
+    private bool _opened = false;
+    private HashSet<string> _peopleInGroup = new(StringComparer.Ordinal);
+    private bool _show = false;
+    private string _tag = string.Empty;
 
     public SelectPairForGroupUi(TagHandler tagHandler)
     {
         _tagHandler = tagHandler;
-    }
-
-    public void Open(string tag)
-    {
-        _peopleInGroup = _tagHandler.GetOtherUidsForTag(tag);
-        _tag = tag;
-        _show = true;
     }
 
     public void Draw(List<Pair> pairs, Dictionary<string, bool> showUidForEntry)
@@ -32,7 +25,7 @@ public class SelectPairForGroupUi
         var workHeight = ImGui.GetMainViewport().WorkSize.Y / ImGuiHelpers.GlobalScale;
         var minSize = new Vector2(300, workHeight < 400 ? workHeight : 400) * ImGuiHelpers.GlobalScale;
         var maxSize = new Vector2(300, 1000) * ImGuiHelpers.GlobalScale;
-        
+
         var popupName = $"Choose Users for Group {_tag}";
 
         if (!_show)
@@ -80,6 +73,13 @@ public class SelectPairForGroupUi
             _filter = string.Empty;
             _show = false;
         }
+    }
+
+    public void Open(string tag)
+    {
+        _peopleInGroup = _tagHandler.GetOtherUidsForTag(tag);
+        _tag = tag;
+        _show = true;
     }
 
     private static string PairName(Dictionary<string, bool> showUidForEntry, Pair pair)

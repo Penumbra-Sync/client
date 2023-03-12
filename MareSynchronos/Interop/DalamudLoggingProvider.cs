@@ -9,6 +9,7 @@ public sealed class DalamudLoggingProvider : ILoggerProvider
 {
     private readonly ConcurrentDictionary<string, DalamudLogger> _loggers =
         new(StringComparer.OrdinalIgnoreCase);
+
     private readonly MareConfigService _mareConfigService;
 
     public DalamudLoggingProvider(MareConfigService mareConfigService)

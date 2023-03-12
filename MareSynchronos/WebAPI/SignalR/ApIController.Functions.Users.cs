@@ -26,20 +26,10 @@ public partial class ApiController
         }
     }
 
-    private async Task PushCharacterDataInternal(CharacterData character, List<UserData> visibleCharacters)
+    public async Task UserAddPair(UserDto user)
     {
-        Logger.LogInformation("Pushing character data for {hash} to {charas}", character.DataHash.Value, string.Join(", ", visibleCharacters.Select(c => c.AliasOrUID)));
-        StringBuilder sb = new();
-        foreach (var kvp in character.FileReplacements.ToList())
-        {
-            sb.AppendLine($"FileReplacements for {kvp.Key}: {kvp.Value.Count}");
-        }
-        foreach (var item in character.GlamourerData)
-        {
-            sb.AppendLine($"GlamourerData for {item.Key}: {!string.IsNullOrEmpty(item.Value)}");
-        }
-        Logger.LogDebug("Chara data contained: {nl} {data}", Environment.NewLine, sb.ToString());
-        await UserPushData(new(visibleCharacters, character)).ConfigureAwait(false);
+        if (!IsConnected) return;
+        await _mareHub!.SendAsync(nameof(UserAddPair), user).ConfigureAwait(false);
     }
 
     public async Task UserDelete()
@@ -47,6 +37,16 @@ public partial class ApiController
         CheckConnection();
         await _mareHub!.SendAsync(nameof(UserDelete)).ConfigureAwait(false);
         await CreateConnections().ConfigureAwait(false);
+    }
+
+    public async Task<List<OnlineUserIdentDto>> UserGetOnlinePairs()
+    {
+        return await _mareHub!.InvokeAsync<List<OnlineUserIdentDto>>(nameof(UserGetOnlinePairs)).ConfigureAwait(false);
+    }
+
+    public async Task<List<UserPairDto>> UserGetPairedClients()
+    {
+        return await _mareHub!.InvokeAsync<List<UserPairDto>>(nameof(UserGetPairedClients)).ConfigureAwait(false);
     }
 
     public async Task UserPushData(UserCharaDataMessageDto dto)
@@ -61,14 +61,10 @@ public partial class ApiController
         }
     }
 
-    public async Task<List<UserPairDto>> UserGetPairedClients()
+    public async Task UserRemovePair(UserDto userDto)
     {
-        return await _mareHub!.InvokeAsync<List<UserPairDto>>(nameof(UserGetPairedClients)).ConfigureAwait(false);
-    }
-
-    public async Task<List<OnlineUserIdentDto>> UserGetOnlinePairs()
-    {
-        return await _mareHub!.InvokeAsync<List<OnlineUserIdentDto>>(nameof(UserGetOnlinePairs)).ConfigureAwait(false);
+        if (!IsConnected) return;
+        await _mareHub!.SendAsync(nameof(UserRemovePair), userDto).ConfigureAwait(false);
     }
 
     public async Task UserSetPairPermissions(UserPermissionsDto userPermissions)
@@ -76,15 +72,19 @@ public partial class ApiController
         await _mareHub!.SendAsync(nameof(UserSetPairPermissions), userPermissions).ConfigureAwait(false);
     }
 
-    public async Task UserAddPair(UserDto user)
+    private async Task PushCharacterDataInternal(CharacterData character, List<UserData> visibleCharacters)
     {
-        if (!IsConnected) return;
-        await _mareHub!.SendAsync(nameof(UserAddPair), user).ConfigureAwait(false);
-    }
-
-    public async Task UserRemovePair(UserDto userDto)
-    {
-        if (!IsConnected) return;
-        await _mareHub!.SendAsync(nameof(UserRemovePair), userDto).ConfigureAwait(false);
+        Logger.LogInformation("Pushing character data for {hash} to {charas}", character.DataHash.Value, string.Join(", ", visibleCharacters.Select(c => c.AliasOrUID)));
+        StringBuilder sb = new();
+        foreach (var kvp in character.FileReplacements.ToList())
+        {
+            sb.AppendLine($"FileReplacements for {kvp.Key}: {kvp.Value.Count}");
+        }
+        foreach (var item in character.GlamourerData)
+        {
+            sb.AppendLine($"GlamourerData for {item.Key}: {!string.IsNullOrEmpty(item.Value)}");
+        }
+        Logger.LogDebug("Chara data contained: {nl} {data}", Environment.NewLine, sb.ToString());
+        await UserPushData(new(visibleCharacters, character)).ConfigureAwait(false);
     }
 }

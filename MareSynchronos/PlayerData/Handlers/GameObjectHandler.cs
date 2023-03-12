@@ -12,15 +12,16 @@ namespace MareSynchronos.PlayerData.Handlers;
 
 public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 {
+    private readonly DalamudUtilService _dalamudUtil;
     private readonly Func<IntPtr> _getAddress;
     private readonly bool _isOwnedObject;
-    private readonly DalamudUtilService _dalamudUtil;
     private readonly PerformanceCollectorService _performanceCollector;
     private CancellationTokenSource? _clearCts = new();
     private Task? _delayedZoningTask;
     private bool _haltProcessing = false;
     private bool _ignoreSendAfterRedraw = false;
     private CancellationTokenSource _zoningCts = new();
+
     public GameObjectHandler(ILogger<GameObjectHandler> logger, PerformanceCollectorService performanceCollector,
         MareMediator mediator, DalamudUtilService dalamudUtil, ObjectKind objectKind, Func<IntPtr> getAddress, bool watchedObject = true) : base(logger, mediator)
     {
@@ -91,34 +92,6 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
     private IntPtr DrawObjectAddress { get; set; }
     private byte[] EquipSlotData { get; set; } = new byte[40];
 
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-
-        if (_isOwnedObject)
-            Mediator.Publish(new RemoveWatchedGameObjectHandler(this));
-    }
-
-    public override string ToString()
-    {
-        var owned = _isOwnedObject ? "Self" : "Other";
-        return $"{owned}/{ObjectKind}:{Name} ({Address:X},{DrawObjectAddress:X})";
-    }
-
-    private unsafe IntPtr GetDrawObj()
-    {
-        return (IntPtr)((GameObject*)_getAddress.Invoke())->GetDrawObject();
-    }
-
-    private unsafe bool IsBeingDrawn(IntPtr drawObj, IntPtr curPtr)
-    {
-        Logger.LogTrace("IsBeingDrawn for ptr {curPtr} : {drawObj}", curPtr.ToString("X"), drawObj.ToString("X"));
-        return drawObj == IntPtr.Zero
-                       || (((CharacterBase*)drawObj)->HasModelInSlotLoaded != 0)
-                       || (((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0)
-                       || (((GameObject*)curPtr)->RenderFlags & 0b100000000000) == 0b100000000000;
-    }
-
     public async Task<bool> IsBeingDrawnRunOnFramework()
     {
         return await _dalamudUtil.RunOnFrameworkThread(() =>
@@ -140,6 +113,20 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
                 return false;
             }
         }).ConfigureAwait(false);
+    }
+
+    public override string ToString()
+    {
+        var owned = _isOwnedObject ? "Self" : "Other";
+        return $"{owned}/{ObjectKind}:{Name} ({Address:X},{DrawObjectAddress:X})";
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+
+        if (_isOwnedObject)
+            Mediator.Publish(new RemoveWatchedGameObjectHandler(this));
     }
 
     private unsafe void CheckAndUpdateObject()
@@ -265,6 +252,20 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         {
             Logger.LogWarning(ex, "Error during FrameworkUpdate of {this}", this);
         }
+    }
+
+    private unsafe IntPtr GetDrawObj()
+    {
+        return (IntPtr)((GameObject*)_getAddress.Invoke())->GetDrawObject();
+    }
+
+    private unsafe bool IsBeingDrawn(IntPtr drawObj, IntPtr curPtr)
+    {
+        Logger.LogTrace("IsBeingDrawn for ptr {curPtr} : {drawObj}", curPtr.ToString("X"), drawObj.ToString("X"));
+        return drawObj == IntPtr.Zero
+                       || (((CharacterBase*)drawObj)->HasModelInSlotLoaded != 0)
+                       || (((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0)
+                       || (((GameObject*)curPtr)->RenderFlags & 0b100000000000) == 0b100000000000;
     }
 
     private void ZoneSwitchEnd()

@@ -6,6 +6,8 @@ namespace MareSynchronos.PlayerData.Data;
 
 public partial class FileReplacement
 {
+    private readonly Lazy<string> _hashLazy;
+
     public FileReplacement(List<string> gamePaths, string filePath, FileCacheManager fileDbManager)
     {
         GamePaths = gamePaths.Select(g => g.Replace('\\', '/')).ToHashSet(StringComparer.Ordinal);
@@ -19,12 +21,8 @@ public partial class FileReplacement
 
     public bool HasFileReplacement => GamePaths.Count >= 1 && GamePaths.Any(p => !string.Equals(p, ResolvedPath, StringComparison.Ordinal));
 
-    public bool IsFileSwap => !LocalPathRegex().IsMatch(ResolvedPath) && !string.Equals(GamePaths.First(), ResolvedPath, StringComparison.Ordinal);
-
     public string Hash => _hashLazy.Value;
-
-    private readonly Lazy<string> _hashLazy;
-
+    public bool IsFileSwap => !LocalPathRegex().IsMatch(ResolvedPath) && !string.Equals(GamePaths.First(), ResolvedPath, StringComparison.Ordinal);
     public string ResolvedPath { get; init; }
 
     public FileReplacementData ToFileReplacementDto()

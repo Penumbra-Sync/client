@@ -4,8 +4,8 @@ namespace MareSynchronos.Utils;
 
 public class RollingList<T> : IEnumerable<T>
 {
-    private readonly LinkedList<T> _list = new();
     private readonly object _addLock = new();
+    private readonly LinkedList<T> _list = new();
 
     public RollingList(int maximumCount)
     {
@@ -15,8 +15,19 @@ public class RollingList<T> : IEnumerable<T>
         MaximumCount = maximumCount;
     }
 
-    public int MaximumCount { get; }
     public int Count => _list.Count;
+    public int MaximumCount { get; }
+
+    public T this[int index]
+    {
+        get
+        {
+            if (index < 0 || index >= Count)
+                throw new ArgumentOutOfRangeException(nameof(index));
+
+            return _list.Skip(index).First();
+        }
+    }
 
     public void Add(T value)
     {
@@ -30,17 +41,7 @@ public class RollingList<T> : IEnumerable<T>
         }
     }
 
-    public T this[int index]
-    {
-        get
-        {
-            if (index < 0 || index >= Count)
-                throw new ArgumentOutOfRangeException(nameof(index));
-
-            return _list.Skip(index).First();
-        }
-    }
-
     public IEnumerator<T> GetEnumerator() => _list.GetEnumerator();
+
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }

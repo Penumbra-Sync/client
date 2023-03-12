@@ -5,16 +5,11 @@ namespace MareSynchronos.MareConfiguration;
 
 public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareConfiguration
 {
-    protected abstract string ConfigurationName { get; }
-    public string ConfigurationDirectory { get; init; }
-    public T Current => _currentConfigInternal.Value;
-
     private readonly CancellationTokenSource _periodicCheckCts = new();
-    private DateTime _configLastWriteTime;
     private bool _configIsDirty = false;
+    private DateTime _configLastWriteTime;
     private Lazy<T> _currentConfigInternal;
 
-    protected string ConfigurationPath => Path.Combine(ConfigurationDirectory, ConfigurationName);
     protected ConfigurationServiceBase(string configurationDirectory)
     {
         ConfigurationDirectory = configurationDirectory;
@@ -25,38 +20,26 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
         _currentConfigInternal = LazyConfig();
     }
 
-    private Lazy<T> LazyConfig()
-    {
-        _configLastWriteTime = GetConfigLastWriteTime();
-        return new Lazy<T>(LoadConfig);
-    }
-    private DateTime GetConfigLastWriteTime() => new FileInfo(ConfigurationPath).LastWriteTimeUtc;
+    public string ConfigurationDirectory { get; init; }
+    public T Current => _currentConfigInternal.Value;
+    protected abstract string ConfigurationName { get; }
+    protected string ConfigurationPath => Path.Combine(ConfigurationDirectory, ConfigurationName);
 
-    private async Task CheckForConfigUpdatesInternal()
+    public void Dispose()
     {
-        while (!_periodicCheckCts.IsCancellationRequested)
-        {
-            await Task.Delay(TimeSpan.FromSeconds(5), _periodicCheckCts.Token).ConfigureAwait(false);
-
-            var lastWriteTime = GetConfigLastWriteTime();
-            if (lastWriteTime != _configLastWriteTime)
-            {
-                _currentConfigInternal = LazyConfig();
-            }
-        }
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
     }
 
-    private async Task CheckForDirtyConfigInternal()
+    public void Save()
     {
-        while (!_periodicCheckCts.IsCancellationRequested)
-        {
-            if (_configIsDirty)
-            {
-                SaveDirtyConfig();
-            }
+        _configIsDirty = true;
+    }
 
-            await Task.Delay(TimeSpan.FromSeconds(1), _periodicCheckCts.Token).ConfigureAwait(false);
-        }
+    protected virtual void Dispose(bool disposing)
+    {
+        _periodicCheckCts.Cancel();
+        _periodicCheckCts.Dispose();
     }
 
     protected T LoadConfig()
@@ -110,20 +93,38 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
         _configLastWriteTime = new FileInfo(ConfigurationPath).LastWriteTimeUtc;
     }
 
-    public void Save()
+    private async Task CheckForConfigUpdatesInternal()
     {
-        _configIsDirty = true;
+        while (!_periodicCheckCts.IsCancellationRequested)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5), _periodicCheckCts.Token).ConfigureAwait(false);
+
+            var lastWriteTime = GetConfigLastWriteTime();
+            if (lastWriteTime != _configLastWriteTime)
+            {
+                _currentConfigInternal = LazyConfig();
+            }
+        }
     }
 
-    public void Dispose()
+    private async Task CheckForDirtyConfigInternal()
     {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
+        while (!_periodicCheckCts.IsCancellationRequested)
+        {
+            if (_configIsDirty)
+            {
+                SaveDirtyConfig();
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1), _periodicCheckCts.Token).ConfigureAwait(false);
+        }
     }
 
-    protected virtual void Dispose(bool disposing)
+    private DateTime GetConfigLastWriteTime() => new FileInfo(ConfigurationPath).LastWriteTimeUtc;
+
+    private Lazy<T> LazyConfig()
     {
-        _periodicCheckCts.Cancel();
-        _periodicCheckCts.Dispose();
+        _configLastWriteTime = GetConfigLastWriteTime();
+        return new Lazy<T>(LoadConfig);
     }
 }

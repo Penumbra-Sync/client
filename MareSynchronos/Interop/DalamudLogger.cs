@@ -7,13 +7,20 @@ namespace MareSynchronos.Interop;
 
 internal sealed class DalamudLogger : ILogger
 {
-    private readonly string _name;
     private readonly MareConfigService _mareConfigService;
+    private readonly string _name;
 
     public DalamudLogger(string name, MareConfigService mareConfigService)
     {
         _name = name;
         _mareConfigService = mareConfigService;
+    }
+
+    public IDisposable BeginScope<TState>(TState state) => default!;
+
+    public bool IsEnabled(LogLevel logLevel)
+    {
+        return (int)_mareConfigService.Current.LogLevel <= (int)logLevel;
     }
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
@@ -35,11 +42,4 @@ internal sealed class DalamudLogger : ILogger
                 PluginLog.Fatal(sb.ToString());
         }
     }
-
-    public bool IsEnabled(LogLevel logLevel)
-    {
-        return (int)_mareConfigService.Current.LogLevel <= (int)logLevel;
-    }
-
-    public IDisposable BeginScope<TState>(TState state) => default!;
 }

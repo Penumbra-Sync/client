@@ -11,40 +11,16 @@ namespace MareSynchronos.Services;
 
 public sealed class PerformanceCollectorService : IHostedService
 {
-    private readonly ConcurrentDictionary<string, RollingList<Tuple<TimeOnly, long>>> _performanceCounters = new(StringComparer.Ordinal);
+    private const string _counterSplit = "=>";
     private readonly ILogger<PerformanceCollectorService> _logger;
     private readonly MareConfigService _mareConfigService;
-    private const string _counterSplit = "=>";
+    private readonly ConcurrentDictionary<string, RollingList<Tuple<TimeOnly, long>>> _performanceCounters = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource _periodicLogPruneTask = new();
 
     public PerformanceCollectorService(ILogger<PerformanceCollectorService> logger, MareConfigService mareConfigService)
     {
         _logger = logger;
         _mareConfigService = mareConfigService;
-    }
-
-    private async Task PeriodicLogPrune()
-    {
-        while (!_periodicLogPruneTask.Token.IsCancellationRequested)
-        {
-            await Task.Delay(TimeSpan.FromMinutes(10), _periodicLogPruneTask.Token).ConfigureAwait(false);
-
-            foreach (var entries in _performanceCounters.ToList())
-            {
-                try
-                {
-                    var last = entries.Value.ToList()[^1];
-                    if (last.Item1.AddMinutes(10) < TimeOnly.FromDateTime(DateTime.Now))
-                    {
-                        _performanceCounters.Remove(entries.Key, out _);
-                    }
-                }
-                catch (Exception e)
-                {
-                    _logger.LogDebug(e, "Error removing performance counter {counter}", entries.Key);
-                }
-            }
-        }
     }
 
     public T LogPerformance<T>(object sender, string counterName, Func<T> func)
@@ -91,7 +67,18 @@ public sealed class PerformanceCollectorService : IHostedService
             st.Stop();
             list.Add(new(TimeOnly.FromDateTime(DateTime.Now), st.ElapsedTicks));
         }
+    }
 
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        _ = Task.Run(PeriodicLogPrune, _periodicLogPruneTask.Token);
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        _periodicLogPruneTask.Cancel();
+        return Task.CompletedTask;
     }
 
     internal void PrintPerformanceStats(int limitBySeconds = 0)
@@ -184,15 +171,27 @@ public sealed class PerformanceCollectorService : IHostedService
         sb.AppendLine();
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    private async Task PeriodicLogPrune()
     {
-        _ = Task.Run(PeriodicLogPrune, _periodicLogPruneTask.Token);
-        return Task.CompletedTask;
-    }
+        while (!_periodicLogPruneTask.Token.IsCancellationRequested)
+        {
+            await Task.Delay(TimeSpan.FromMinutes(10), _periodicLogPruneTask.Token).ConfigureAwait(false);
 
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        _periodicLogPruneTask.Cancel();
-        return Task.CompletedTask;
+            foreach (var entries in _performanceCounters.ToList())
+            {
+                try
+                {
+                    var last = entries.Value.ToList()[^1];
+                    if (last.Item1.AddMinutes(10) < TimeOnly.FromDateTime(DateTime.Now))
+                    {
+                        _performanceCounters.Remove(entries.Key, out _);
+                    }
+                }
+                catch (Exception e)
+                {
+                    _logger.LogDebug(e, "Error removing performance counter {counter}", entries.Key);
+                }
+            }
+        }
     }
 }
