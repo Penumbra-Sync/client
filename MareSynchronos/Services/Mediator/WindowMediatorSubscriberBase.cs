@@ -24,8 +24,6 @@ public abstract class WindowMediatorSubscriberBase : Window, IMediatorSubscriber
                 Toggle();
             }
         });
-
-        _windowSystem.AddWindow(this);
     }
 
     public virtual Task StopAsync(CancellationToken cancellationToken)
@@ -44,7 +42,6 @@ public abstract class WindowMediatorSubscriberBase : Window, IMediatorSubscriber
     {
         _logger.LogTrace("Disposing {type}", GetType());
 
-        _windowSystem.RemoveWindow(this);
         Mediator.UnsubscribeAll(this);
     }
 }

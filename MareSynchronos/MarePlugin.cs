@@ -119,6 +119,7 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
                 Mediator.Publish(new SwitchToIntroUiMessage());
                 return;
             }
+            _runtimeServiceScope.ServiceProvider.GetRequiredService<PeriodicFileScanner>().StartScan();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<CacheCreationService>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<TransientResourceManager>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<OnlinePlayerManager>();
@@ -133,6 +134,7 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
+
         var version = Assembly.GetExecutingAssembly().GetName().Version!;
         Logger.LogInformation("Launching {name} {major}.{minor}.{build}", "Mare Synchronos", version.Major, version.Minor, version.Build);
 

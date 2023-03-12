@@ -14,7 +14,7 @@ using MareSynchronos.Services.ServerConfiguration;
 
 namespace MareSynchronos.UI;
 
-internal class IntroUi : WindowMediatorSubscriberBase
+public class IntroUi : WindowMediatorSubscriberBase
 {
     private readonly UiSharedService _uiShared;
     private readonly MareConfigService _configService;

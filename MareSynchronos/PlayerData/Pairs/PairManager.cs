@@ -18,10 +18,10 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
 {
     private readonly ConcurrentDictionary<UserData, Pair> _allClientPairs = new(UserDataComparer.Instance);
     private readonly ConcurrentDictionary<GroupData, GroupFullInfoDto> _allGroups = new(GroupDataComparer.Instance);
-    private readonly PairFactory _pairFactory;
+    private readonly Func<Pair> _pairFactory;
     private readonly MareConfigService _configurationService;
 
-    public PairManager(ILogger<PairManager> logger, PairFactory pairFactory,
+    public PairManager(ILogger<PairManager> logger, Func<Pair> pairFactory,
         MareConfigService configurationService, MareMediator mediator) : base(logger, mediator)
     {
         _pairFactory = pairFactory;
@@ -89,7 +89,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
 
     public void AddGroupPair(GroupPairFullInfoDto dto)
     {
-        if (!_allClientPairs.ContainsKey(dto.User)) _allClientPairs[dto.User] = _pairFactory.Create();
+        if (!_allClientPairs.ContainsKey(dto.User)) _allClientPairs[dto.User] = _pairFactory.Invoke();
 
         var group = _allGroups[dto.Group];
         _allClientPairs[dto.User].GroupPair[group] = dto;
@@ -100,7 +100,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     {
         if (!_allClientPairs.ContainsKey(dto.User))
         {
-            _allClientPairs[dto.User] = _pairFactory.Create();
+            _allClientPairs[dto.User] = _pairFactory.Invoke();
         }
         else
         {

@@ -4,7 +4,6 @@ using Dalamud.Interface.Windowing;
 using MareSynchronos.UI;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Services;
@@ -16,11 +15,10 @@ public sealed class UiService : IDisposable
     private readonly WindowSystem _windowSystem;
     private readonly FileDialogManager _fileDialogManager;
     private readonly MareMediator _mareMediator;
-    private readonly IServiceScope _uiServiceScope;
 
     public UiService(ILogger<UiService> logger, DalamudPluginInterface dalamudPluginInterface,
         MareConfigService mareConfigService, WindowSystem windowSystem,
-        IServiceScopeFactory serviceScopeFactory,
+        IEnumerable<WindowMediatorSubscriberBase> windows,
         FileDialogManager fileDialogManager, MareMediator mareMediator)
     {
         _logger = logger;
@@ -35,12 +33,10 @@ public sealed class UiService : IDisposable
         _dalamudPluginInterface.UiBuilder.Draw += Draw;
         _dalamudPluginInterface.UiBuilder.OpenConfigUi += ToggleUi;
 
-        _uiServiceScope = serviceScopeFactory.CreateScope();
-        _uiServiceScope.ServiceProvider.GetRequiredService<IntroUi>();
-        _uiServiceScope.ServiceProvider.GetRequiredService<GposeUi>();
-        _uiServiceScope.ServiceProvider.GetRequiredService<DownloadUi>();
-        _uiServiceScope.ServiceProvider.GetRequiredService<SettingsUi>();
-        _uiServiceScope.ServiceProvider.GetRequiredService<CompactUi>();
+        foreach (var window in windows)
+        {
+            _windowSystem.AddWindow(window);
+        }
     }
 
     public void ToggleUi()
@@ -61,7 +57,8 @@ public sealed class UiService : IDisposable
     {
         _logger.LogTrace("Disposing {type}", GetType().Name);
 
-        _uiServiceScope.Dispose();
+        _windowSystem.RemoveAllWindows();
+
         _dalamudPluginInterface.UiBuilder.Draw -= Draw;
         _dalamudPluginInterface.UiBuilder.OpenConfigUi -= ToggleUi;
     }

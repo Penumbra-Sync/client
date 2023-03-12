@@ -19,7 +19,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
     private CancellationTokenSource _palettePlusCts = new();
     private readonly SemaphoreSlim _cacheCreateLock = new(1);
 
-    public CacheCreationService(ILogger<CacheCreationService> logger, MareMediator mediator, GameObjectHandlerFactory gameObjectHandlerFactory,
+    public CacheCreationService(ILogger<CacheCreationService> logger, MareMediator mediator, Func<ObjectKind, Func<IntPtr>, bool, GameObjectHandler> gameObjectHandlerFactory,
         PlayerDataFactory characterDataFactory, DalamudUtilService dalamudUtil) : base(logger, mediator)
     {
         _characterDataFactory = characterDataFactory;
@@ -34,10 +34,10 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
 
         _playerRelatedObjects.AddRange(new List<GameObjectHandler>()
         {
-            gameObjectHandlerFactory.Create(ObjectKind.Player, () => dalamudUtil.PlayerPointer, isWatched: true),
-            gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => dalamudUtil.GetMinionOrMount(), isWatched: true),
-            gameObjectHandlerFactory.Create(ObjectKind.Pet, () => dalamudUtil.GetPet(), isWatched: true),
-            gameObjectHandlerFactory.Create(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), isWatched: true),
+            gameObjectHandlerFactory(ObjectKind.Player, () => dalamudUtil.PlayerPointer, true),
+            gameObjectHandlerFactory(ObjectKind.MinionOrMount, () => dalamudUtil.GetMinionOrMount(), true),
+            gameObjectHandlerFactory(ObjectKind.Pet, () => dalamudUtil.GetPet(), true),
+            gameObjectHandlerFactory(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), true),
         });
 
         Mediator.Subscribe<ClearCacheForObjectMessage>(this, (msg) =>

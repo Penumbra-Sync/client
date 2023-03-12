@@ -14,12 +14,12 @@ namespace MareSynchronos.PlayerData.Pairs;
 public class Pair
 {
     private readonly ILogger<Pair> _logger;
-    private readonly CachedPlayerFactory _cachedPlayerFactory;
+    private readonly Func<OnlineUserIdentDto, CachedPlayer> _cachedPlayerFactory;
     private readonly MareConfigService _configService;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private OptionalPluginWarning? _pluginWarnings;
 
-    public Pair(ILogger<Pair> logger, CachedPlayerFactory cachedPlayerFactory, MareConfigService configService, ServerConfigurationManager serverConfigurationManager)
+    public Pair(ILogger<Pair> logger, Func<OnlineUserIdentDto, CachedPlayer> cachedPlayerFactory, MareConfigService configService, ServerConfigurationManager serverConfigurationManager)
     {
         _logger = logger;
         _cachedPlayerFactory = cachedPlayerFactory;
@@ -155,7 +155,7 @@ public class Pair
         }
         CachedPlayer?.Dispose();
         CachedPlayer = null;
-        CachedPlayer = _cachedPlayerFactory.Create(_onlineUserIdentDto!);
+        CachedPlayer = _cachedPlayerFactory(_onlineUserIdentDto!);
     }
 
     public void MarkOffline()

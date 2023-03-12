@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using Lumina.Excel.GeneratedSheets;
+using Microsoft.Extensions.Logging;
 using System.Text;
 
 namespace MareSynchronos.Services.Mediator;
@@ -40,7 +41,7 @@ public sealed class MareMediator : IDisposable
                 throw new InvalidOperationException("Already subscribed");
             }
 
-            _logger.LogDebug("Subscriber added for message {message}: {sub}", typeof(T).Name, subscriber);
+            _logger.LogDebug("Subscriber added for message {message}: {sub}", typeof(T).Name, subscriber.GetType().Name);
         }
     }
 
@@ -89,14 +90,10 @@ public sealed class MareMediator : IDisposable
                 int unSubbed = _subscriberDict[kvp.Key]?.RemoveWhere(p => p.Subscriber == subscriber) ?? 0;
                 if (unSubbed > 0)
                 {
-                    _logger.LogDebug("{sub} unsubscribed from {msg}", subscriber, kvp.Key.Name);
+                    _logger.LogDebug("{sub} unsubscribed from {msg}", subscriber.GetType().Name, kvp.Key.Name);
                     if (_subscriberDict[kvp.Key].Any())
                     {
-                        _logger.LogTrace("Remaining Subscribers:");
-                        foreach (var item in _subscriberDict[kvp.Key])
-                        {
-                            _logger.LogTrace("{Key}: {item}", kvp.Key, item.Subscriber);
-                        }
+                        _logger.LogTrace("Remaining Subscribers: {item}", string.Join(", ", _subscriberDict[kvp.Key].Select(k => k.Subscriber.GetType().Name)));
                     }
                 }
             }
@@ -108,7 +105,7 @@ public sealed class MareMediator : IDisposable
         foreach (var kvp in _subscriberDict.SelectMany(c => c.Value.Select(v => v))
             .DistinctBy(p => p.Subscriber).OrderBy(p => p.Subscriber.GetType().FullName, StringComparer.Ordinal).ToList())
         {
-            _logger.LogInformation("Subscriber {type}: {sub}", kvp.Subscriber.GetType().FullName, kvp.Subscriber.ToString());
+            _logger.LogInformation("Subscriber {type}: {sub}", kvp.Subscriber.GetType().Name, kvp.Subscriber.ToString());
             StringBuilder sb = new();
             sb.Append("=> ");
             foreach (var item in _subscriberDict.Where(item => item.Value.Any(v => v.Subscriber == kvp.Subscriber)).ToList())
