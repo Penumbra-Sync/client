@@ -7,14 +7,14 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.FileCache;
 
-public sealed class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
+public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
 {
     private readonly IpcManager _ipcManager;
     private readonly MareConfigService _configService;
     private readonly FileCacheManager _fileDbManager;
     private readonly PerformanceCollectorService _performanceCollector;
     private CancellationTokenSource? _scanCancellationTokenSource;
-    public ConcurrentDictionary<string, int> haltScanLocks = new(StringComparer.Ordinal);
+    public ConcurrentDictionary<string, int> HaltScanLocks { get; set; } = new(StringComparer.Ordinal);
 
     public PeriodicFileScanner(ILogger<PeriodicFileScanner> logger, IpcManager ipcManager, MareConfigService configService,
         FileCacheManager fileDbManager, MareMediator mediator, PerformanceCollectorService performanceCollector) : base(logger, mediator)
@@ -27,21 +27,22 @@ public sealed class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
         Mediator.Subscribe<HaltScanMessage>(this, (msg) => HaltScan(((HaltScanMessage)msg).Source));
         Mediator.Subscribe<ResumeScanMessage>(this, (msg) => ResumeScan(((ResumeScanMessage)msg).Source));
         Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => StartScan());
+        Mediator.Subscribe<DalamudLoginMessage>(this, (_) => StartScan());
     }
 
     public void ResetLocks()
     {
-        haltScanLocks.Clear();
+        HaltScanLocks.Clear();
     }
 
     public void ResumeScan(string source)
     {
-        if (!haltScanLocks.ContainsKey(source)) haltScanLocks[source] = 0;
+        if (!HaltScanLocks.ContainsKey(source)) HaltScanLocks[source] = 0;
 
-        haltScanLocks[source]--;
-        if (haltScanLocks[source] < 0) haltScanLocks[source] = 0;
+        HaltScanLocks[source]--;
+        if (HaltScanLocks[source] < 0) HaltScanLocks[source] = 0;
 
-        if (_fileScanWasRunning && haltScanLocks.All(f => f.Value == 0))
+        if (_fileScanWasRunning && HaltScanLocks.All(f => f.Value == 0))
         {
             _fileScanWasRunning = false;
             InvokeScan(forced: true);
@@ -50,10 +51,10 @@ public sealed class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
 
     public void HaltScan(string source)
     {
-        if (!haltScanLocks.ContainsKey(source)) haltScanLocks[source] = 0;
-        haltScanLocks[source]++;
+        if (!HaltScanLocks.ContainsKey(source)) HaltScanLocks[source] = 0;
+        HaltScanLocks[source]++;
 
-        if (IsScanRunning && haltScanLocks.Any(f => f.Value > 0))
+        if (IsScanRunning && HaltScanLocks.Any(f => f.Value > 0))
         {
             _scanCancellationTokenSource?.Cancel();
             _fileScanWasRunning = true;
@@ -74,9 +75,9 @@ public sealed class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
     private TimeSpan _timeUntilNextScan = TimeSpan.Zero;
     private int TimeBetweenScans => _configService.Current.TimeSpanBetweenScansInSeconds;
 
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        UnsubscribeAll();
+        base.Dispose(disposing);
         _scanCancellationTokenSource?.Cancel();
     }
 
@@ -92,7 +93,7 @@ public sealed class PeriodicFileScanner : MediatorSubscriberBase, IDisposable
         {
             while (!token.IsCancellationRequested)
             {
-                while (haltScanLocks.Any(f => f.Value > 0) || !_ipcManager.CheckPenumbraApi())
+                while (HaltScanLocks.Any(f => f.Value > 0) || !_ipcManager.CheckPenumbraApi())
                 {
                     await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                 }

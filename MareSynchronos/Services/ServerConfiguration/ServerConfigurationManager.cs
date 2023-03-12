@@ -13,7 +13,7 @@ public class ServerConfigurationManager
     private readonly ServerConfigService _configService;
     private readonly ServerTagConfigService _serverTagConfig;
     private readonly NotesConfigService _notesConfig;
-    private readonly DalamudUtil _dalamudUtil;
+    private readonly DalamudUtilService _dalamudUtil;
 
     public string CurrentApiUrl => string.IsNullOrEmpty(_configService.Current.CurrentServer) ? ApiController.MainServiceUri : _configService.Current.CurrentServer;
     public ServerStorage? CurrentServer => _configService.Current.ServerStorage.TryGetValue(CurrentApiUrl, out ServerStorage? value) ? value : null;
@@ -30,7 +30,7 @@ public class ServerConfigurationManager
     }
 
     public ServerConfigurationManager(ILogger<ServerConfigurationManager> logger, ServerConfigService configService,
-        ServerTagConfigService serverTagConfig, NotesConfigService notesConfig, DalamudUtil dalamudUtil)
+        ServerTagConfigService serverTagConfig, NotesConfigService notesConfig, DalamudUtilService dalamudUtil)
     {
         _logger = logger;
         _configService = configService;

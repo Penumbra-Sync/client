@@ -1,5 +1,4 @@
-﻿using Dalamud.Plugin;
-using MareSynchronos.MareConfiguration.Configurations;
+﻿using MareSynchronos.MareConfiguration.Configurations;
 using System.Text.Json;
 
 namespace MareSynchronos.MareConfiguration;

@@ -61,16 +61,16 @@ public class SelectGroupForPairUi {
             var childHeight = tags.Count != 0 ? tags.Count * 25 : 1;
             var childSize = new Vector2(0, childHeight > 100 ? 100 : childHeight) * ImGuiHelpers.GlobalScale;
 
-            UiShared.FontText($"Select the groups you want {name} to be in.", UiBuilder.DefaultFont);
+            UiSharedService.FontText($"Select the groups you want {name} to be in.", UiBuilder.DefaultFont);
             if (ImGui.BeginChild(name + "##listGroups", childSize)) {
                 foreach (var tag in tags) {
-                    UiShared.DrawWithID($"groups-pair-{_pair.UserData.UID}-{tag}", () => DrawGroupName(_pair, tag));
+                    UiSharedService.DrawWithID($"groups-pair-{_pair.UserData.UID}-{tag}", () => DrawGroupName(_pair, tag));
                 }
                 ImGui.EndChild();
             }
 
             ImGui.Separator();
-            UiShared.FontText($"Create a new group for {name}.", UiBuilder.DefaultFont);
+            UiSharedService.FontText($"Create a new group for {name}.", UiBuilder.DefaultFont);
             if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus)) {
                 HandleAddTag();
             }

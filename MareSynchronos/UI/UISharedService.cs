@@ -24,7 +24,7 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
-public partial class UiShared : MediatorSubscriberBase, IDisposable
+public partial class UiSharedService : DisposableMediatorSubscriberBase
 {
     [LibraryImport("user32")]
     internal static partial short GetKeyState(int nVirtKey);
@@ -34,7 +34,7 @@ public partial class UiShared : MediatorSubscriberBase, IDisposable
     private readonly PeriodicFileScanner _cacheScanner;
     public readonly FileDialogManager FileDialogManager;
     private readonly MareConfigService _configService;
-    private readonly DalamudUtil _dalamudUtil;
+    private readonly DalamudUtilService _dalamudUtil;
     private readonly DalamudPluginInterface _pluginInterface;
     private readonly Dalamud.Localization _localization;
     private readonly ServerConfigurationManager _serverConfigurationManager;
@@ -63,8 +63,8 @@ public partial class UiShared : MediatorSubscriberBase, IDisposable
     private bool _heelsExists = false;
     private bool _palettePlusExists = false;
 
-    public UiShared(ILogger<UiShared> logger, IpcManager ipcManager, ApiController apiController, PeriodicFileScanner cacheScanner, FileDialogManager fileDialogManager,
-        MareConfigService configService, DalamudUtil dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization,
+    public UiSharedService(ILogger<UiSharedService> logger, IpcManager ipcManager, ApiController apiController, PeriodicFileScanner cacheScanner, FileDialogManager fileDialogManager,
+        MareConfigService configService, DalamudUtilService dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization,
         ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
     {
         _ipcManager = ipcManager;
@@ -76,6 +76,9 @@ public partial class UiShared : MediatorSubscriberBase, IDisposable
         _pluginInterface = pluginInterface;
         _localization = localization;
         _serverConfigurationManager = serverManager;
+
+        _localization.SetupWithLangCode("en");
+
         _isDirectoryWritable = IsDirectoryWritable(_configService.Current.CacheFolder);
 
         _pluginInterface.UiBuilder.BuildFonts += BuildFont;
@@ -84,11 +87,18 @@ public partial class UiShared : MediatorSubscriberBase, IDisposable
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) =>
         {
             _penumbraExists = _ipcManager.CheckPenumbraApi();
-            _glamourerExists = ipcManager.CheckGlamourerApi();
+            _glamourerExists = _ipcManager.CheckGlamourerApi();
             _customizePlusExists = _ipcManager.CheckCustomizePlusApi();
             _heelsExists = _ipcManager.CheckHeelsApi();
             _palettePlusExists = _ipcManager.CheckPalettePlusApi();
         });
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+
+        _pluginInterface.UiBuilder.BuildFonts -= BuildFont;
     }
 
     public static float GetWindowContentRegionWidth()
@@ -277,9 +287,9 @@ public partial class UiShared : MediatorSubscriberBase, IDisposable
                 _cacheScanner.InvokeScan(forced: true);
             }
         }
-        else if (_cacheScanner.haltScanLocks.Any(f => f.Value > 0))
+        else if (_cacheScanner.HaltScanLocks.Any(f => f.Value > 0))
         {
-            ImGui.Text("Halted (" + string.Join(", ", _cacheScanner.haltScanLocks.Where(f => f.Value > 0).Select(locker => locker.Key + ": " + locker.Value + " halt requests")) + ")");
+            ImGui.Text("Halted (" + string.Join(", ", _cacheScanner.HaltScanLocks.Where(f => f.Value > 0).Select(locker => locker.Key + ": " + locker.Value + " halt requests")) + ")");
             ImGui.SameLine();
             if (ImGui.Button("Reset halt requests##clearlocks"))
             {
@@ -481,7 +491,7 @@ public partial class UiShared : MediatorSubscriberBase, IDisposable
             ImGui.InputText("Custom Service URI", ref _customServerUri, 255);
             ImGui.SetNextItemWidth(250);
             ImGui.InputText("Custom Service Name", ref _customServerName, 255);
-            if (UiShared.IconTextButton(FontAwesomeIcon.Plus, "Add Custom Service")
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add Custom Service")
                 && !string.IsNullOrEmpty(_customServerUri)
                 && !string.IsNullOrEmpty(_customServerName))
             {
@@ -733,12 +743,6 @@ public partial class UiShared : MediatorSubscriberBase, IDisposable
         _serverConfigurationManager.SaveNotes();
 
         return true;
-    }
-
-    public void Dispose()
-    {
-        UnsubscribeAll();
-        _pluginInterface.UiBuilder.BuildFonts -= BuildFont;
     }
 
     [GeneratedRegex(@"^(?:[a-zA-Z]:\\[\w\s\-\\]+?|\/(?:[\w\s\-\/])+?)$", RegexOptions.ECMAScript)]

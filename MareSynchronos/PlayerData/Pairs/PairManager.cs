@@ -11,11 +11,10 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
-using System.Linq;
 
 namespace MareSynchronos.PlayerData.Pairs;
 
-public class PairManager : MediatorSubscriberBase
+public sealed class PairManager : DisposableMediatorSubscriberBase
 {
     private readonly ConcurrentDictionary<UserData, Pair> _allClientPairs = new(UserDataComparer.Instance);
     private readonly ConcurrentDictionary<GroupData, GroupFullInfoDto> _allGroups = new(GroupDataComparer.Instance);
@@ -124,9 +123,10 @@ public class PairManager : MediatorSubscriberBase
         RecreateLazy();
     }
 
-    protected void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        UnsubscribeAll();
+        base.Dispose(disposing);
+
         DisposePairs();
     }
 

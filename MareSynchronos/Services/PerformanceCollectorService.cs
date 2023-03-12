@@ -1,5 +1,6 @@
 ﻿using MareSynchronos.MareConfiguration;
 using MareSynchronos.Utils;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -8,7 +9,7 @@ using System.Text;
 
 namespace MareSynchronos.Services;
 
-public sealed class PerformanceCollectorService : IDisposable
+public sealed class PerformanceCollectorService : IHostedService
 {
     private readonly ConcurrentDictionary<string, RollingList<Tuple<TimeOnly, long>>> _performanceCounters = new(StringComparer.Ordinal);
     private readonly ILogger<PerformanceCollectorService> _logger;
@@ -20,14 +21,6 @@ public sealed class PerformanceCollectorService : IDisposable
     {
         _logger = logger;
         _mareConfigService = mareConfigService;
-        _ = Task.Run(PeriodicLogPrune, _periodicLogPruneTask.Token);
-    }
-
-    public void Dispose()
-    {
-        _logger.LogTrace("Disposing {this}", GetType());
-        _periodicLogPruneTask.Cancel();
-        GC.SuppressFinalize(this);
     }
 
     private async Task PeriodicLogPrune()
@@ -189,5 +182,17 @@ public sealed class PerformanceCollectorService : IDisposable
         sb.Append('+');
         sb.Append("".PadRight(longestCounterName, '-'));
         sb.AppendLine();
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        _ = Task.Run(PeriodicLogPrune, _periodicLogPruneTask.Token);
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        _periodicLogPruneTask.Cancel();
+        return Task.CompletedTask;
     }
 }

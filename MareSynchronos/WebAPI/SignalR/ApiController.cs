@@ -15,13 +15,13 @@ using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Services;
 
 namespace MareSynchronos.WebAPI;
-public sealed partial class ApiController : MediatorSubscriberBase, IMareHubClient, IDisposable
+public sealed partial class ApiController : DisposableMediatorSubscriberBase, IMareHubClient
 {
     public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
     public const string MainServiceUri = "wss://maresynchronos.com";
 
     private readonly HubFactory _hubFactory;
-    private readonly DalamudUtil _dalamudUtil;
+    private readonly DalamudUtilService _dalamudUtil;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
     private CancellationTokenSource _connectionCancellationTokenSource;
@@ -35,7 +35,7 @@ public sealed partial class ApiController : MediatorSubscriberBase, IMareHubClie
     public string AuthFailureMessage { get; private set; } = string.Empty;
     public SystemInfoDto SystemInfoDto { get; private set; } = new();
 
-    public ApiController(ILogger<ApiController> logger, HubFactory hubFactory, DalamudUtil dalamudUtil,
+    public ApiController(ILogger<ApiController> logger, HubFactory hubFactory, DalamudUtilService dalamudUtil,
         PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
     {
         _hubFactory = hubFactory;
@@ -267,9 +267,10 @@ public sealed partial class ApiController : MediatorSubscriberBase, IMareHubClie
         _initialized = true;
     }
 
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        UnsubscribeAll();
+        base.Dispose(disposing);
+
         _healthCheckTokenSource?.Cancel();
         Task.Run(async () => await StopConnection(ServerState.Disconnected).ConfigureAwait(false));
         _connectionCancellationTokenSource?.Cancel();

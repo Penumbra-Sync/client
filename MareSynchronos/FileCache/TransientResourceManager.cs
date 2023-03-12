@@ -6,14 +6,13 @@ using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
-using System.Linq;
 
 namespace MareSynchronos.FileCache;
 
-public sealed class TransientResourceManager : MediatorSubscriberBase, IDisposable
+public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
 {
     private readonly TransientConfigService _configurationService;
-    private readonly DalamudUtil _dalamudUtil;
+    private readonly DalamudUtilService _dalamudUtil;
 
     private readonly HashSet<GameObjectHandler> _playerRelatedPointers = new();
     private readonly string[] _fileTypesToHandle = new[] { "tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk" };
@@ -22,7 +21,7 @@ public sealed class TransientResourceManager : MediatorSubscriberBase, IDisposab
     private ConcurrentDictionary<IntPtr, HashSet<string>> TransientResources { get; } = new();
     private ConcurrentDictionary<ObjectKind, HashSet<string>> SemiTransientResources { get; } = new();
     public TransientResourceManager(ILogger<TransientResourceManager> logger, TransientConfigService configurationService,
-        DalamudUtil dalamudUtil, MareMediator mediator) : base(logger, mediator)
+        DalamudUtilService dalamudUtil, MareMediator mediator) : base(logger, mediator)
     {
         _configurationService = configurationService;
         _dalamudUtil = dalamudUtil;
@@ -202,9 +201,9 @@ public sealed class TransientResourceManager : MediatorSubscriberBase, IDisposab
         TransientResources[gameObject].Clear();
     }
 
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        base.UnsubscribeAll();
+        base.Dispose(disposing);
 
         TransientResources.Clear();
         SemiTransientResources.Clear();

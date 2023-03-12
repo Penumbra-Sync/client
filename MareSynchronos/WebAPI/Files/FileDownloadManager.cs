@@ -13,7 +13,7 @@ using System.Net.Http.Json;
 
 namespace MareSynchronos.WebAPI.Files;
 
-public sealed partial class FileDownloadManager : MediatorSubscriberBase, IDisposable
+public partial class FileDownloadManager : DisposableMediatorSubscriberBase
 {
     private readonly FileTransferOrchestrator _orchestrator;
     private readonly FileCacheManager _fileDbManager;
@@ -39,6 +39,12 @@ public sealed partial class FileDownloadManager : MediatorSubscriberBase, IDispo
                 _downloadReady[((DownloadReadyMessage)msg).RequestId] = true;
             }
         });
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        CancelDownload();
+        base.Dispose(disposing);
     }
 
     public async Task DownloadFiles(string aliasOrUid, List<FileReplacementData> fileReplacementDto, CancellationToken ct)
@@ -326,10 +332,5 @@ public sealed partial class FileDownloadManager : MediatorSubscriberBase, IDispo
             }
             throw;
         }
-    }
-
-    public void Dispose()
-    {
-        base.UnsubscribeAll();
     }
 }

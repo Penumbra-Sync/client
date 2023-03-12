@@ -11,9 +11,9 @@ public class GameObjectHandlerFactory
     private readonly ILoggerFactory _loggerFactory;
     private readonly MareMediator _mediator;
     private readonly PerformanceCollectorService _performanceCollector;
-    private readonly DalamudUtil _dalamudUtil;
+    private readonly DalamudUtilService _dalamudUtil;
 
-    public GameObjectHandlerFactory(ILoggerFactory loggerFactory, MareMediator mediator, PerformanceCollectorService performanceCollector, DalamudUtil dalamudUtil)
+    public GameObjectHandlerFactory(ILoggerFactory loggerFactory, MareMediator mediator, PerformanceCollectorService performanceCollector, DalamudUtilService dalamudUtil)
     {
         _loggerFactory = loggerFactory;
         _mediator = mediator;

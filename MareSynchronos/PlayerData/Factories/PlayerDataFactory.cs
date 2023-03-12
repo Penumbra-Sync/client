@@ -8,35 +8,36 @@ using Object = FFXIVClientStructs.FFXIV.Client.Graphics.Scene.Object;
 using Penumbra.String;
 using Weapon = MareSynchronos.Interop.FFXIV.Weapon;
 using MareSynchronos.FileCache;
-using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
 using MareSynchronos.PlayerData.Data;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Interop.FFXIV;
-using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services;
 
 namespace MareSynchronos.PlayerData.Factories;
 
-public class PlayerDataFactory : MediatorSubscriberBase
+public class PlayerDataFactory 
 {
-    private readonly DalamudUtil _dalamudUtil;
+    private readonly ILogger<PlayerDataFactory> _logger;
+    private readonly DalamudUtilService _dalamudUtil;
     private readonly IpcManager _ipcManager;
     private readonly TransientResourceManager _transientResourceManager;
     private readonly FileCacheManager _fileCacheManager;
     private readonly PerformanceCollectorService _performanceCollector;
 
-    public PlayerDataFactory(ILogger<PlayerDataFactory> logger, DalamudUtil dalamudUtil, IpcManager ipcManager,
-        TransientResourceManager transientResourceManager, FileCacheManager fileReplacementFactory, MareMediator mediator,
-        PerformanceCollectorService performanceCollector) : base(logger, mediator)
+    public PlayerDataFactory(ILogger<PlayerDataFactory> logger, DalamudUtilService dalamudUtil, IpcManager ipcManager,
+        TransientResourceManager transientResourceManager, FileCacheManager fileReplacementFactory,
+        PerformanceCollectorService performanceCollector)
     {
-        Logger.LogTrace("Creating " + nameof(PlayerDataFactory));
+        _logger = logger;
         _dalamudUtil = dalamudUtil;
         _ipcManager = ipcManager;
         _transientResourceManager = transientResourceManager;
         _fileCacheManager = fileReplacementFactory;
         _performanceCollector = performanceCollector;
+
+        _logger.LogTrace("Creating " + nameof(PlayerDataFactory));
     }
 
     private static unsafe bool CheckForNullDrawObject(IntPtr playerPointer)
@@ -64,17 +65,17 @@ public class PlayerDataFactory : MediatorSubscriberBase
             catch
             {
                 pointerIsZero = true;
-                Logger.LogDebug("NullRef for {object}", playerRelatedObject);
+                _logger.LogDebug("NullRef for {object}", playerRelatedObject);
             }
         }
         catch (Exception ex)
         {
-            Logger.LogWarning(ex, "Could not create data for {object}", playerRelatedObject);
+            _logger.LogWarning(ex, "Could not create data for {object}", playerRelatedObject);
         }
 
         if (pointerIsZero)
         {
-            Logger.LogTrace("Pointer was zero for {objectKind}", playerRelatedObject.ObjectKind);
+            _logger.LogTrace("Pointer was zero for {objectKind}", playerRelatedObject.ObjectKind);
             previousData.FileReplacements.Remove(playerRelatedObject.ObjectKind);
             previousData.GlamourerString.Remove(playerRelatedObject.ObjectKind);
             return;
@@ -93,12 +94,12 @@ public class PlayerDataFactory : MediatorSubscriberBase
         }
         catch (OperationCanceledException)
         {
-            Logger.LogDebug("Cancelled creating Character data for {object}", playerRelatedObject);
+            _logger.LogDebug("Cancelled creating Character data for {object}", playerRelatedObject);
             throw;
         }
         catch (Exception e)
         {
-            Logger.LogWarning(e, "Failed to create {object} data", playerRelatedObject);
+            _logger.LogWarning(e, "Failed to create {object} data", playerRelatedObject);
         }
 
         previousData.FileReplacements = previousFileReplacements;
@@ -110,7 +111,7 @@ public class PlayerDataFactory : MediatorSubscriberBase
         var objectKind = playerRelatedObject.ObjectKind;
         var charaPointer = playerRelatedObject.Address;
 
-        Logger.LogDebug("Building character data for {obj}", playerRelatedObject);
+        _logger.LogDebug("Building character data for {obj}", playerRelatedObject);
 
         if (!previousData.FileReplacements.ContainsKey(objectKind))
         {
@@ -122,11 +123,11 @@ public class PlayerDataFactory : MediatorSubscriberBase
         }
 
         // wait until chara is not drawing and present so nothing spontaneously explodes
-        await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, playerRelatedObject, Guid.NewGuid(), 30000, ct: token).ConfigureAwait(false);
+        await _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, playerRelatedObject, Guid.NewGuid(), 30000, ct: token).ConfigureAwait(false);
         int totalWaitTime = 10000;
-        while (!DalamudUtil.IsObjectPresent(_dalamudUtil.CreateGameObject(charaPointer)) && totalWaitTime > 0)
+        while (!DalamudUtilService.IsObjectPresent(_dalamudUtil.CreateGameObject(charaPointer)) && totalWaitTime > 0)
         {
-            Logger.LogTrace("Character is null but it shouldn't be, waiting");
+            _logger.LogTrace("Character is null but it shouldn't be, waiting");
             await Task.Delay(50, token).ConfigureAwait(false);
             totalWaitTime -= 50;
         }
@@ -140,11 +141,11 @@ public class PlayerDataFactory : MediatorSubscriberBase
         Task<string> getCustomizeData = Task.Run(() => _ipcManager.GetCustomizePlusScale());
         Task<string> getPalettePlusData = Task.Run(() => _ipcManager.PalettePlusBuildPalette());
         previousData.GlamourerString[playerRelatedObject.ObjectKind] = await getGlamourerData.ConfigureAwait(false);
-        Logger.LogDebug("Glamourer is now: {data}", previousData.GlamourerString[playerRelatedObject.ObjectKind]);
+        _logger.LogDebug("Glamourer is now: {data}", previousData.GlamourerString[playerRelatedObject.ObjectKind]);
         previousData.CustomizePlusScale = await getCustomizeData.ConfigureAwait(false);
-        Logger.LogDebug("Customize is now: {data}", previousData.CustomizePlusScale);
+        _logger.LogDebug("Customize is now: {data}", previousData.CustomizePlusScale);
         previousData.PalettePlusPalette = await getPalettePlusData.ConfigureAwait(false);
-        Logger.LogDebug("Palette is now: {data}", previousData.PalettePlusPalette);
+        _logger.LogDebug("Palette is now: {data}", previousData.PalettePlusPalette);
 
         // gather static replacements from render model
         var (forwardResolve, reverseResolve) = BuildDataFromModel(objectKind, charaPointer, token);
@@ -153,10 +154,10 @@ public class PlayerDataFactory : MediatorSubscriberBase
                 new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)), FileReplacementComparer.Instance)
                 .Where(p => p.HasFileReplacement).ToHashSet();
 
-        Logger.LogDebug("== Static Replacements ==");
+        _logger.LogDebug("== Static Replacements ==");
         foreach (var replacement in previousData.FileReplacements[objectKind].Where(i => i.HasFileReplacement).OrderBy(i => i.GamePaths.First(), StringComparer.OrdinalIgnoreCase))
         {
-            Logger.LogDebug("=> {repl}", replacement);
+            _logger.LogDebug("=> {repl}", replacement);
         }
 
         // if it's pet then it's summoner, if it's summoner we actually want to keep all filereplacements alive at all times 
@@ -169,7 +170,7 @@ public class PlayerDataFactory : MediatorSubscriberBase
             }
         }
 
-        Logger.LogDebug("Handling transient update for {obj}", playerRelatedObject);
+        _logger.LogDebug("Handling transient update for {obj}", playerRelatedObject);
 
         // remove all potentially gathered paths from the transient resource manager that are resolved through static resolving
         _transientResourceManager.ClearTransientPaths(charaPointer, previousData.FileReplacements[objectKind].SelectMany(c => c.GamePaths).ToList());
@@ -178,10 +179,10 @@ public class PlayerDataFactory : MediatorSubscriberBase
         var transientPaths = ManageSemiTransientData(objectKind, charaPointer);
         var resolvedTransientPaths = GetFileReplacementsFromPaths(transientPaths, new HashSet<string>(StringComparer.Ordinal));
 
-        Logger.LogDebug("== Transient Replacements ==");
+        _logger.LogDebug("== Transient Replacements ==");
         foreach (var replacement in resolvedTransientPaths.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)).OrderBy(f => f.ResolvedPath, StringComparer.Ordinal))
         {
-            Logger.LogDebug("=> {repl}", replacement);
+            _logger.LogDebug("=> {repl}", replacement);
             previousData.FileReplacements[objectKind].Add(replacement);
         }
 
@@ -195,7 +196,7 @@ public class PlayerDataFactory : MediatorSubscriberBase
         }
 
         st.Stop();
-        Logger.LogInformation("Building character data for {obj} took {time}ms", objectKind, TimeSpan.FromTicks(st.ElapsedTicks).TotalMilliseconds);
+        _logger.LogInformation("Building character data for {obj} took {time}ms", objectKind, TimeSpan.FromTicks(st.ElapsedTicks).TotalMilliseconds);
 
         return previousData;
     }
@@ -238,7 +239,7 @@ public class PlayerDataFactory : MediatorSubscriberBase
 
             foreach (var item in _transientResourceManager.GetTransientResources((IntPtr)weaponObject))
             {
-                Logger.LogTrace("Found transient weapon resource: {item}", item);
+                _logger.LogTrace("Found transient weapon resource: {item}", item);
                 forwardResolve.Add(item);
             }
 
@@ -250,7 +251,7 @@ public class PlayerDataFactory : MediatorSubscriberBase
 
                 foreach (var item in _transientResourceManager.GetTransientResources((IntPtr)offHandWeapon))
                 {
-                    Logger.LogTrace("Found transient offhand weapon resource: {item}", item);
+                    _logger.LogTrace("Found transient offhand weapon resource: {item}", item);
                     forwardResolve.Add(item);
                 }
             }
@@ -263,7 +264,7 @@ public class PlayerDataFactory : MediatorSubscriberBase
         }
         catch
         {
-            Logger.LogWarning("Could not get Decal data");
+            _logger.LogWarning("Could not get Decal data");
         }
         try
         {
@@ -271,7 +272,7 @@ public class PlayerDataFactory : MediatorSubscriberBase
         }
         catch
         {
-            Logger.LogWarning("Could not get Legacy Body Decal Data");
+            _logger.LogWarning("Could not get Legacy Body Decal Data");
         }
     }
 
@@ -290,10 +291,10 @@ public class PlayerDataFactory : MediatorSubscriberBase
         }
         catch
         {
-            Logger.LogWarning("Could not get model data");
+            _logger.LogWarning("Could not get model data");
             return;
         }
-        Logger.LogTrace("Checking File Replacement for Model {path}", mdlPath);
+        _logger.LogTrace("Checking File Replacement for Model {path}", mdlPath);
 
         reverseResolve.Add(mdlPath);
 
@@ -316,11 +317,11 @@ public class PlayerDataFactory : MediatorSubscriberBase
         }
         catch
         {
-            Logger.LogWarning("Could not get material data");
+            _logger.LogWarning("Could not get material data");
             return;
         }
 
-        Logger.LogTrace("Checking File Replacement for Material {file}", fileName);
+        _logger.LogTrace("Checking File Replacement for Material {file}", fileName);
         var mtrlPath = fileName.Split("|")[2];
 
         reverseResolve.Add(mtrlPath);
@@ -335,12 +336,12 @@ public class PlayerDataFactory : MediatorSubscriberBase
             }
             catch (Exception e)
             {
-                Logger.LogWarning(e, "Could not get Texture data for Material {file}", fileName);
+                _logger.LogWarning(e, "Could not get Texture data for Material {file}", fileName);
             }
 
             if (string.IsNullOrEmpty(texPath)) continue;
 
-            Logger.LogTrace("Checking File Replacement for Texture {file}", texPath);
+            _logger.LogTrace("Checking File Replacement for Texture {file}", texPath);
 
             AddReplacementsFromTexture(texPath, forwardResolve, reverseResolve);
         }
@@ -348,12 +349,12 @@ public class PlayerDataFactory : MediatorSubscriberBase
         try
         {
             var shpkPath = "shader/sm5/shpk/" + new ByteString(mtrlResourceHandle->ShpkString).ToString();
-            Logger.LogTrace("Checking File Replacement for Shader {path}", shpkPath);
+            _logger.LogTrace("Checking File Replacement for Shader {path}", shpkPath);
             forwardResolve.Add(shpkPath);
         }
         catch (Exception ex)
         {
-            Logger.LogWarning(ex, "Could not find shpk for Material {path}", fileName);
+            _logger.LogWarning(ex, "Could not find shpk for Material {path}", fileName);
         }
     }
 
@@ -361,7 +362,7 @@ public class PlayerDataFactory : MediatorSubscriberBase
     {
         if (string.IsNullOrEmpty(texPath)) return;
 
-        Logger.LogTrace("Checking file Replacement for texture {path}", texPath);
+        _logger.LogTrace("Checking file Replacement for texture {path}", texPath);
 
         if (doNotReverseResolve)
             forwardResolve.Add(texPath);
@@ -383,7 +384,7 @@ public class PlayerDataFactory : MediatorSubscriberBase
 
         string skeletonPath = $"chara/human/c{raceSexIdString}/skeleton/base/b0001/skl_c{raceSexIdString}b0001.sklb";
 
-        Logger.LogTrace("Checking skeleton {path}", skeletonPath);
+        _logger.LogTrace("Checking skeleton {path}", skeletonPath);
 
         forwardResolve.Add(skeletonPath);
     }

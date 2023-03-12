@@ -1,10 +1,9 @@
 ﻿using Dalamud.Interface.Windowing;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Services.Mediator;
 
-public abstract class WindowMediatorSubscriberBase : Window, IMediatorSubscriber, IHostedService
+public abstract class WindowMediatorSubscriberBase : Window, IMediatorSubscriber, IDisposable
 {
     protected readonly ILogger _logger;
     private readonly WindowSystem _windowSystem;
@@ -15,11 +14,8 @@ public abstract class WindowMediatorSubscriberBase : Window, IMediatorSubscriber
         _logger = logger;
         _windowSystem = windowSystem;
         Mediator = mediator;
-    }
 
-    public virtual Task StartAsync(CancellationToken cancellationToken)
-    {
-        _logger.LogTrace("[Host] Starting {type}", GetType());
+        _logger.LogTrace("Creating {type}", GetType());
 
         Mediator.Subscribe<UiToggleMessage>(this, (msg) =>
         {
@@ -30,15 +26,25 @@ public abstract class WindowMediatorSubscriberBase : Window, IMediatorSubscriber
         });
 
         _windowSystem.AddWindow(this);
-
-        return Task.CompletedTask;
     }
 
     public virtual Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger.LogTrace("[Host] Stopping {type}", GetType());
+
+        return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        _logger.LogTrace("Disposing {type}", GetType());
+
         _windowSystem.RemoveWindow(this);
         Mediator.UnsubscribeAll(this);
-        return Task.CompletedTask;
     }
 }

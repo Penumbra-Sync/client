@@ -25,7 +25,6 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.WebAPI.Files;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Hosting.Internal;
 
 namespace MareSynchronos;
 
@@ -67,57 +66,44 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<FileUploadManager>();
             collection.AddSingleton<FileTransferOrchestrator>();
             collection.AddSingleton<FileDownloadManagerFactory>();
-
-            // factoried singletons
-            collection.AddSingleton((s) => new DalamudUtil(s.GetRequiredService<ILogger<DalamudUtil>>(),
+            collection.AddSingleton<MarePlugin>();
+            collection.AddSingleton((s) => new DalamudUtilService(s.GetRequiredService<ILogger<DalamudUtilService>>(),
                 clientState, objectTable, framework, condition, gameData,
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<PerformanceCollectorService>()));
             collection.AddSingleton((s) => new IpcManager(s.GetRequiredService<ILogger<IpcManager>>(),
-                pluginInterface, s.GetRequiredService<DalamudUtil>(), s.GetRequiredService<MareMediator>()));
-            collection.AddSingleton((s) => new NotificationService(s.GetRequiredService<ILogger<NotificationService>>(),
-                s.GetRequiredService<MareMediator>(), pluginInterface.UiBuilder, chatGui, s.GetRequiredService<MareConfigService>()));
+                pluginInterface, s.GetRequiredService<DalamudUtilService>(), s.GetRequiredService<MareMediator>()));
+
             collection.AddSingleton((s) => new MareConfigService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new ServerConfigService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new NotesConfigService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new ServerTagConfigService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new TransientConfigService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new ConfigurationMigrator(s.GetRequiredService<ILogger<ConfigurationMigrator>>(), pluginInterface));
-            collection.AddSingleton((s) => new UiShared(s.GetRequiredService<ILogger<UiShared>>(), s.GetRequiredService<IpcManager>(), s.GetRequiredService<ApiController>(),
-                s.GetRequiredService<PeriodicFileScanner>(), s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareConfigService>(), s.GetRequiredService<DalamudUtil>(),
-                pluginInterface, s.GetRequiredService<Dalamud.Localization>(), s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<MareMediator>()));
-            collection.AddSingleton((s) => new MarePlugin(s.GetRequiredService<ILogger<MarePlugin>>(),
-                pluginInterface,
-                s.GetRequiredService<PerformanceCollectorService>(),
-                commandManager,
-                s.GetRequiredService<MareConfigService>(),
-                s.GetRequiredService<ServerConfigurationManager>(),
-                s.GetRequiredService<ApiController>(),
-                s.GetRequiredService<PeriodicFileScanner>(),
-                s.GetRequiredService<IServiceProvider>(),
-                s.GetRequiredService<MareMediator>()));
-
-
-            // add ui stuff
-            collection.AddSingleton<SettingsUi>();
-            collection.AddSingleton<CompactUi>();
-            collection.AddSingleton<GposeUi>();
-            collection.AddSingleton<IntroUi>();
-            collection.AddSingleton<DownloadUi>();
 
             // add scoped services
+            collection.AddScoped<SettingsUi>();
+            collection.AddScoped<CompactUi>();
+            collection.AddScoped<GposeUi>();
+            collection.AddScoped<IntroUi>();
+            collection.AddScoped<DownloadUi>();
             collection.AddScoped<CacheCreationService>();
             collection.AddScoped<TransientResourceManager>();
             collection.AddScoped<PlayerDataFactory>();
             collection.AddScoped<OnlinePlayerManager>();
+            collection.AddScoped((s) => new UiService(s.GetRequiredService<ILogger<UiService>>(), pluginInterface, s.GetRequiredService<MareConfigService>(),
+                s.GetRequiredService<WindowSystem>(), s.GetRequiredService<IServiceScopeFactory>(), s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareMediator>()));
+            collection.AddScoped((s) => new CommandManagerService(commandManager, s.GetRequiredService<PerformanceCollectorService>(), s.GetRequiredService<UiService>(),
+                s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<PeriodicFileScanner>(), s.GetRequiredService<ApiController>(), s.GetRequiredService<MareMediator>()));
+            collection.AddScoped((s) => new NotificationService(s.GetRequiredService<ILogger<NotificationService>>(),
+                s.GetRequiredService<MareMediator>(), pluginInterface.UiBuilder, chatGui, s.GetRequiredService<MareConfigService>()));
+            collection.AddScoped((s) => new UiSharedService(s.GetRequiredService<ILogger<UiSharedService>>(), s.GetRequiredService<IpcManager>(), s.GetRequiredService<ApiController>(),
+                s.GetRequiredService<PeriodicFileScanner>(), s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareConfigService>(), s.GetRequiredService<DalamudUtilService>(),
+                pluginInterface, s.GetRequiredService<Dalamud.Localization>(), s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<MareMediator>()));
 
             collection.AddHostedService(p => p.GetRequiredService<MarePlugin>());
-            collection.AddHostedService(p => p.GetRequiredService<NotificationService>());
-            collection.AddHostedService(p => p.GetRequiredService<DownloadUi>());
-            collection.AddHostedService(p => p.GetRequiredService<GposeUi>());
-            collection.AddHostedService(p => p.GetRequiredService<SettingsUi>());
-            collection.AddHostedService(p => p.GetRequiredService<CompactUi>());
-            collection.AddHostedService(p => p.GetRequiredService<IntroUi>());
             collection.AddHostedService(p => p.GetRequiredService<ConfigurationMigrator>());
+            collection.AddHostedService(p => p.GetRequiredService<DalamudUtilService>());
+            collection.AddHostedService(p => p.GetRequiredService<PerformanceCollectorService>());
         })
         .Build()
         .RunAsync(_pluginCts.Token);
@@ -126,5 +112,6 @@ public sealed class Plugin : IDalamudPlugin
     public void Dispose()
     {
         _pluginCts.Cancel();
+        _pluginCts.Dispose();
     }
 }

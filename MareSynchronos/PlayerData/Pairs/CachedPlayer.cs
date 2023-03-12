@@ -15,10 +15,10 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.PlayerData.Pairs;
 
-public sealed class CachedPlayer : MediatorSubscriberBase, IDisposable
+public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 {
     private readonly FileDownloadManager _downloadManager;
-    private readonly DalamudUtil _dalamudUtil;
+    private readonly DalamudUtilService _dalamudUtil;
     private readonly GameObjectHandlerFactory _gameObjectHandlerFactory;
     private readonly IpcManager _ipcManager;
     private readonly FileCacheManager _fileDbManager;
@@ -31,7 +31,7 @@ public sealed class CachedPlayer : MediatorSubscriberBase, IDisposable
     public CachedPlayer(ILogger<CachedPlayer> logger, OnlineUserIdentDto onlineUser,
         GameObjectHandlerFactory gameObjectHandlerFactory,
         IpcManager ipcManager, FileDownloadManager transferManager,
-        DalamudUtil dalamudUtil, FileCacheManager fileDbManager, MareMediator mediator) : base(logger, mediator)
+        DalamudUtilService dalamudUtil, FileCacheManager fileDbManager, MareMediator mediator) : base(logger, mediator)
     {
         OnlineUser = onlineUser;
         _gameObjectHandlerFactory = gameObjectHandlerFactory;
@@ -210,11 +210,12 @@ public sealed class CachedPlayer : MediatorSubscriberBase, IDisposable
         return true;
     }
 
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
         if (string.IsNullOrEmpty(PlayerName)) return; // already disposed
 
-        base.UnsubscribeAll();
+        base.Dispose(disposing);
+
         _downloadManager.Dispose();
         var name = PlayerName;
         PlayerName = null;

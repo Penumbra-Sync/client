@@ -10,11 +10,11 @@ using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;
 
 namespace MareSynchronos.PlayerData.Handlers;
 
-public sealed class GameObjectHandler : MediatorSubscriberBase, IDisposable
+public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 {
     private readonly Func<IntPtr> _getAddress;
     private readonly bool _isOwnedObject;
-    private readonly DalamudUtil _dalamudUtil;
+    private readonly DalamudUtilService _dalamudUtil;
     private readonly PerformanceCollectorService _performanceCollector;
     private CancellationTokenSource? _clearCts = new();
     private Task? _delayedZoningTask;
@@ -22,7 +22,7 @@ public sealed class GameObjectHandler : MediatorSubscriberBase, IDisposable
     private bool _ignoreSendAfterRedraw = false;
     private CancellationTokenSource _zoningCts = new();
     public GameObjectHandler(ILogger<GameObjectHandler> logger, PerformanceCollectorService performanceCollector,
-        MareMediator mediator, DalamudUtil dalamudUtil, ObjectKind objectKind, Func<IntPtr> getAddress, bool watchedObject = true) : base(logger, mediator)
+        MareMediator mediator, DalamudUtilService dalamudUtil, ObjectKind objectKind, Func<IntPtr> getAddress, bool watchedObject = true) : base(logger, mediator)
     {
         _performanceCollector = performanceCollector;
         ObjectKind = objectKind;
@@ -92,9 +92,10 @@ public sealed class GameObjectHandler : MediatorSubscriberBase, IDisposable
     private IntPtr DrawObjectAddress { get; set; }
     private byte[] EquipSlotData { get; set; } = new byte[40];
 
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        UnsubscribeAll();
+        base.Dispose(disposing);
+
         if (_isOwnedObject)
             Mediator.Publish(new RemoveWatchedGameObjectHandler(this));
     }

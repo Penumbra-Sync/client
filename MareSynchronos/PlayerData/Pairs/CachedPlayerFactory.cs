@@ -12,14 +12,14 @@ namespace MareSynchronos.PlayerData.Pairs;
 public class CachedPlayerFactory
 {
     private readonly IpcManager _ipcManager;
-    private readonly DalamudUtil _dalamudUtil;
+    private readonly DalamudUtilService _dalamudUtil;
     private readonly FileCacheManager _fileCacheManager;
     private readonly GameObjectHandlerFactory _gameObjectHandlerFactory;
     private readonly MareMediator _mediator;
     private readonly ILoggerFactory _loggerFactory;
     private readonly FileDownloadManagerFactory _downloadFactory;
 
-    public CachedPlayerFactory(IpcManager ipcManager, DalamudUtil dalamudUtil, FileCacheManager fileCacheManager,
+    public CachedPlayerFactory(IpcManager ipcManager, DalamudUtilService dalamudUtil, FileCacheManager fileCacheManager,
         GameObjectHandlerFactory gameObjectHandlerFactory,
         MareMediator mediator, ILoggerFactory loggerFactory,
         FileDownloadManagerFactory fileTransferManager)

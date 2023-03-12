@@ -7,26 +7,30 @@ using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Export;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
-public class GposeUi : WindowMediatorSubscriberBase, IHostedService
+public class GposeUi : WindowMediatorSubscriberBase
 {
     private readonly MareCharaFileManager _mareCharaFileManager;
-    private readonly DalamudUtil _dalamudUtil;
+    private readonly DalamudUtilService _dalamudUtil;
     private readonly FileDialogManager _fileDialogManager;
     private readonly MareConfigService _configService;
 
     public GposeUi(ILogger<GposeUi> logger, WindowSystem windowSystem, MareCharaFileManager mareCharaFileManager,
-        DalamudUtil dalamudUtil, FileDialogManager fileDialogManager, MareConfigService configService,
+        DalamudUtilService dalamudUtil, FileDialogManager fileDialogManager, MareConfigService configService,
         MareMediator mediator) : base(logger, windowSystem, mediator, "Mare Synchronos Gpose Import UI###MareSynchronosGposeUI")
     {
         _mareCharaFileManager = mareCharaFileManager;
         _dalamudUtil = dalamudUtil;
         _fileDialogManager = fileDialogManager;
         _configService = configService;
+
+        Mediator.Subscribe<GposeStartMessage>(this, (_) => StartGpose());
+        Mediator.Subscribe<GposeEndMessage>(this, (_) => EndGpose());
+        IsOpen = _dalamudUtil.IsInGpose;
+        Flags = ImGuiWindowFlags.AlwaysAutoResize;
     }
 
     private void EndGpose()
@@ -46,7 +50,7 @@ public class GposeUi : WindowMediatorSubscriberBase, IHostedService
 
         if (!_mareCharaFileManager.CurrentlyWorking)
         {
-            if (UiShared.IconTextButton(FontAwesomeIcon.FolderOpen, "Load MCDF"))
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.FolderOpen, "Load MCDF"))
             {
                 _fileDialogManager.OpenFileDialog("Pick MCDF file", ".mcdf", (success, path) =>
                 {
@@ -55,34 +59,23 @@ public class GposeUi : WindowMediatorSubscriberBase, IHostedService
                     Task.Run(() => _mareCharaFileManager.LoadMareCharaFile(path));
                 });
             }
-            UiShared.AttachToolTip("Applies it to the currently selected GPose actor");
+            UiSharedService.AttachToolTip("Applies it to the currently selected GPose actor");
             if (_mareCharaFileManager.LoadedCharaFile != null)
             {
-                UiShared.TextWrapped("Loaded file: " + _mareCharaFileManager.LoadedCharaFile.FilePath);
-                UiShared.TextWrapped("File Description: " + _mareCharaFileManager.LoadedCharaFile.CharaFileData.Description);
-                if (UiShared.IconTextButton(FontAwesomeIcon.Check, "Apply loaded MCDF"))
+                UiSharedService.TextWrapped("Loaded file: " + _mareCharaFileManager.LoadedCharaFile.FilePath);
+                UiSharedService.TextWrapped("File Description: " + _mareCharaFileManager.LoadedCharaFile.CharaFileData.Description);
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.Check, "Apply loaded MCDF"))
                 {
                     Task.Run(async () => await _mareCharaFileManager.ApplyMareCharaFile(_dalamudUtil.GposeTargetGameObject).ConfigureAwait(false));
                 }
-                UiShared.AttachToolTip("Applies it to the currently selected GPose actor");
-                UiShared.ColorTextWrapped("Warning: redrawing or changing the character will revert all applied mods.", ImGuiColors.DalamudYellow);
+                UiSharedService.AttachToolTip("Applies it to the currently selected GPose actor");
+                UiSharedService.ColorTextWrapped("Warning: redrawing or changing the character will revert all applied mods.", ImGuiColors.DalamudYellow);
             }
         }
         else
         {
-            UiShared.ColorTextWrapped("Loading Character...", ImGuiColors.DalamudYellow);
+            UiSharedService.ColorTextWrapped("Loading Character...", ImGuiColors.DalamudYellow);
         }
-        UiShared.TextWrapped("Hint: You can disable the automatic loading of this window in the Mare settings and open it manually with /mare gpose");
-    }
-
-    public override Task StartAsync(CancellationToken cancellationToken)
-    {
-        base.StartAsync(cancellationToken);
-
-        Mediator.Subscribe<GposeStartMessage>(this, (_) => StartGpose());
-        Mediator.Subscribe<GposeEndMessage>(this, (_) => EndGpose());
-        IsOpen = _dalamudUtil.IsInGpose;
-        Flags = ImGuiWindowFlags.AlwaysAutoResize;
-        return Task.CompletedTask;
+        UiSharedService.TextWrapped("Hint: You can disable the automatic loading of this window in the Mare settings and open it manually with /mare gpose");
     }
 }

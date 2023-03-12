@@ -1,5 +1,4 @@
 ﻿using MareSynchronos.API.Data;
-using MareSynchronos.FileCache;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
@@ -9,15 +8,15 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.PlayerData.Pairs;
 
-public class OnlinePlayerManager : MediatorSubscriberBase
+public class OnlinePlayerManager : DisposableMediatorSubscriberBase
 {
     private readonly ApiController _apiController;
-    private readonly DalamudUtil _dalamudUtil;
+    private readonly DalamudUtilService _dalamudUtil;
     private readonly PairManager _pairManager;
     private readonly FileUploadManager _fileTransferManager;
     private CharacterData? _lastSentData;
 
-    public OnlinePlayerManager(ILogger<OnlinePlayerManager> logger, ApiController apiController, DalamudUtil dalamudUtil,
+    public OnlinePlayerManager(ILogger<OnlinePlayerManager> logger, ApiController apiController, DalamudUtilService dalamudUtil,
         PairManager pairManager, MareMediator mediator, FileUploadManager fileTransferManager) : base(logger, mediator)
     {
         _apiController = apiController;

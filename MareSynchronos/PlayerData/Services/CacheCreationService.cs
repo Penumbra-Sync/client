@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.PlayerData.Services;
 
-public sealed class CacheCreationService : MediatorSubscriberBase, IDisposable
+public sealed class CacheCreationService : DisposableMediatorSubscriberBase
 {
     private readonly PlayerDataFactory _characterDataFactory;
     private Task? _cacheCreationTask;
@@ -20,7 +20,7 @@ public sealed class CacheCreationService : MediatorSubscriberBase, IDisposable
     private readonly SemaphoreSlim _cacheCreateLock = new(1);
 
     public CacheCreationService(ILogger<CacheCreationService> logger, MareMediator mediator, GameObjectHandlerFactory gameObjectHandlerFactory,
-        PlayerDataFactory characterDataFactory, DalamudUtil dalamudUtil) : base(logger, mediator)
+        PlayerDataFactory characterDataFactory, DalamudUtilService dalamudUtil) : base(logger, mediator)
     {
         _characterDataFactory = characterDataFactory;
 
@@ -123,9 +123,10 @@ public sealed class CacheCreationService : MediatorSubscriberBase, IDisposable
         }
     }
 
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        UnsubscribeAll();
+        base.Dispose(disposing);
+
         _playerRelatedObjects.ForEach(p => p.Dispose());
         _cts.Dispose();
     }

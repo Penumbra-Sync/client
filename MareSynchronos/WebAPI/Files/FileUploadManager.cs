@@ -13,7 +13,7 @@ using System.Net.Http.Json;
 
 namespace MareSynchronos.WebAPI.Files;
 
-public sealed class FileUploadManager : MediatorSubscriberBase, IDisposable
+public sealed class FileUploadManager : DisposableMediatorSubscriberBase
 {
     private readonly FileTransferOrchestrator _orchestrator;
     private readonly FileCacheManager _fileDbManager;
@@ -61,10 +61,10 @@ public sealed class FileUploadManager : MediatorSubscriberBase, IDisposable
         await _orchestrator.SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesDeleteAllFullPath(_orchestrator.FilesCdnUri!)).ConfigureAwait(false);
     }
 
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
+        base.Dispose(disposing);
         Reset();
-        UnsubscribeAll();
     }
 
     public async Task<CharacterData> UploadFiles(CharacterData data)
@@ -117,7 +117,7 @@ public sealed class FileUploadManager : MediatorSubscriberBase, IDisposable
     {
         if (!_orchestrator.IsInitialized) throw new InvalidOperationException("FileTransferManager is not initialized");
 
-        Logger.LogInformation("Uploading {file}, {size}", fileHash, UiShared.ByteToString(compressedFile.Length));
+        Logger.LogInformation("Uploading {file}, {size}", fileHash, UiSharedService.ByteToString(compressedFile.Length));
 
         if (uploadToken.IsCancellationRequested) return;
 
@@ -188,7 +188,7 @@ public sealed class FileUploadManager : MediatorSubscriberBase, IDisposable
             await uploadTask.ConfigureAwait(false);
 
             var compressedSize = CurrentUploads.Sum(c => c.Total);
-            Logger.LogDebug("Upload complete, compressed {size} to {compressed}", UiShared.ByteToString(totalSize), UiShared.ByteToString(compressedSize));
+            Logger.LogDebug("Upload complete, compressed {size} to {compressed}", UiSharedService.ByteToString(totalSize), UiSharedService.ByteToString(compressedSize));
         }
 
         foreach (var file in unverifiedUploadHashes.Where(c => !CurrentUploads.Any(u => string.Equals(u.Hash, c, StringComparison.Ordinal))))

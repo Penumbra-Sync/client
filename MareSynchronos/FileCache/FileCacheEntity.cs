@@ -1,8 +1,6 @@
 ﻿#nullable disable
 
 
-using System.Globalization;
-
 namespace MareSynchronos.FileCache;
 
 public class FileCacheEntity

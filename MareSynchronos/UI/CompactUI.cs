@@ -19,12 +19,11 @@ using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.SignalR.Utils;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
-public class CompactUi : WindowMediatorSubscriberBase, IHostedService
+public class CompactUi : WindowMediatorSubscriberBase
 {
     private readonly ApiController _apiController;
     private readonly PairManager _pairManager;
@@ -32,7 +31,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
     private readonly FileUploadManager _fileTransferManager;
     private readonly MareConfigService _configService;
     public readonly Dictionary<string, bool> ShowUidForEntry = new(StringComparer.Ordinal);
-    private readonly UiShared _uiShared;
+    private readonly UiSharedService _uiShared;
     private string _characterOrCommentFilter = string.Empty;
 
     public string EditUserComment = string.Empty;
@@ -58,7 +57,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
     private readonly PairGroupsUi _pairGroupsUi;
 
     public CompactUi(ILogger<CompactUi> logger, WindowSystem windowSystem,
-        UiShared uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
+        UiSharedService uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
         ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager) : base(logger, windowSystem, mediator, "###MareSynchronosMainUI")
     {
         _uiShared = uiShared;
@@ -73,14 +72,34 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
         _selectGroupForPairUi = new(tagHandler);
         _selectPairsForGroupUi = new(tagHandler);
         _pairGroupsUi = new(tagHandler, DrawPairedClient, apiController, _selectPairsForGroupUi);
+
+#if DEBUG
+        string dev = "Dev Build";
+        var ver = Assembly.GetExecutingAssembly().GetName().Version!;
+        WindowName = $"Mare Synchronos {dev} ({ver.Major}.{ver.Minor}.{ver.Build})###MareSynchronosMainUI";
+        Toggle();
+#else
+        var ver = Assembly.GetExecutingAssembly().GetName().Version;
+        WindowName = "Mare Synchronos " + ver.Major + "." + ver.Minor + "." + ver.Build + "###MareSynchronosMainUI";
+#endif
+        Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = true);
+        Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
+        Mediator.Subscribe<CutsceneStartMessage>(this, (_) => UiSharedService_GposeStart());
+        Mediator.Subscribe<CutsceneEndMessage>(this, (_) => UiSharedService_GposeEnd());
+
+        SizeConstraints = new WindowSizeConstraints()
+        {
+            MinimumSize = new Vector2(350, 400),
+            MaximumSize = new Vector2(350, 2000),
+        };
     }
 
-    private void UiShared_GposeEnd()
+    private void UiSharedService_GposeEnd()
     {
         IsOpen = _wasOpen;
     }
 
-    private void UiShared_GposeStart()
+    private void UiSharedService_GposeStart()
     {
         _wasOpen = IsOpen;
         IsOpen = false;
@@ -88,7 +107,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
 
     public override void Draw()
     {
-        WindowContentWidth = UiShared.GetWindowContentRegionWidth();
+        WindowContentWidth = UiSharedService.GetWindowContentRegionWidth();
         if (!_apiController.IsCurrentVersion)
         {
             var ver = _apiController.CurrentClientVersion;
@@ -98,13 +117,13 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
             ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMax().X + ImGui.GetWindowContentRegionMin().X) / 2 - uidTextSize.X / 2);
             ImGui.TextColored(ImGuiColors.DalamudRed, unsupported);
             if (_uiShared.UidFontBuilt) ImGui.PopFont();
-            UiShared.ColorTextWrapped($"Your Mare Synchronos installation is out of date, the current version is {ver.Major}.{ver.Minor}.{ver.Build}. " +
+            UiSharedService.ColorTextWrapped($"Your Mare Synchronos installation is out of date, the current version is {ver.Major}.{ver.Minor}.{ver.Build}. " +
                 $"It is highly recommended to keep Mare Synchronos up to date. Open /xlplugins and update the plugin.", ImGuiColors.DalamudRed);
         }
 
-        UiShared.DrawWithID("header", DrawUIDHeader);
+        UiSharedService.DrawWithID("header", DrawUIDHeader);
         ImGui.Separator();
-        UiShared.DrawWithID("serverstatus", DrawServerStatus);
+        UiSharedService.DrawWithID("serverstatus", DrawServerStatus);
 
         if (_apiController.ServerState is ServerState.Connected)
         {
@@ -115,7 +134,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
             {
                 ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonHovered]);
             }
-            if (ImGui.Button(FontAwesomeIcon.User.ToIconString(), new Vector2((UiShared.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X) / 2, 30 * ImGuiHelpers.GlobalScale)))
+            if (ImGui.Button(FontAwesomeIcon.User.ToIconString(), new Vector2((UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X) / 2, 30 * ImGuiHelpers.GlobalScale)))
             {
                 _showSyncShells = false;
             }
@@ -124,7 +143,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
                 ImGui.PopStyleColor();
             }
             ImGui.PopFont();
-            UiShared.AttachToolTip("Individual pairs");
+            UiSharedService.AttachToolTip("Individual pairs");
 
             ImGui.SameLine();
 
@@ -133,7 +152,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
             {
                 ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonHovered]);
             }
-            if (ImGui.Button(FontAwesomeIcon.UserFriends.ToIconString(), new Vector2((UiShared.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X) / 2, 30 * ImGuiHelpers.GlobalScale)))
+            if (ImGui.Button(FontAwesomeIcon.UserFriends.ToIconString(), new Vector2((UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X) / 2, 30 * ImGuiHelpers.GlobalScale)))
             {
                 _showSyncShells = true;
             }
@@ -143,23 +162,23 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
             }
             ImGui.PopFont();
 
-            UiShared.AttachToolTip("Syncshells");
+            UiSharedService.AttachToolTip("Syncshells");
 
             ImGui.Separator();
             if (!hasShownSyncShells)
             {
-                UiShared.DrawWithID("pairlist", DrawPairList);
+                UiSharedService.DrawWithID("pairlist", DrawPairList);
             }
             else
             {
-                UiShared.DrawWithID("syncshells", _groupPanel.DrawSyncshells);
+                UiSharedService.DrawWithID("syncshells", _groupPanel.DrawSyncshells);
 
             }
             ImGui.Separator();
-            UiShared.DrawWithID("transfers", DrawTransfers);
+            UiSharedService.DrawWithID("transfers", DrawTransfers);
             TransferPartHeight = ImGui.GetCursorPosY() - TransferPartHeight;
-            UiShared.DrawWithID("group-user-popup", () => _selectPairsForGroupUi.Draw(_pairManager.DirectPairs, ShowUidForEntry));
-            UiShared.DrawWithID("grouping-popup", () => _selectGroupForPairUi.Draw(ShowUidForEntry));
+            UiSharedService.DrawWithID("group-user-popup", () => _selectPairsForGroupUi.Draw(_pairManager.DirectPairs, ShowUidForEntry));
+            UiSharedService.DrawWithID("grouping-popup", () => _selectGroupForPairUi.Draw(ShowUidForEntry));
         }
 
         if (_configService.Current.OpenPopupOnAdd && _pairManager.LastAddedUser != null)
@@ -171,7 +190,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
             _lastAddedUserComment = string.Empty;
         }
 
-        if (ImGui.BeginPopupModal("Set Notes for New User", ref _showModalForUserAddition, UiShared.PopupWindowFlags))
+        if (ImGui.BeginPopupModal("Set Notes for New User", ref _showModalForUserAddition, UiSharedService.PopupWindowFlags))
         {
             if (_lastAddedUser == null)
             {
@@ -179,9 +198,9 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
             }
             else
             {
-                UiShared.TextWrapped($"You have successfully added {_lastAddedUser.UserData.AliasOrUID}. Set a local note for the user in the field below:");
+                UiSharedService.TextWrapped($"You have successfully added {_lastAddedUser.UserData.AliasOrUID}. Set a local note for the user in the field below:");
                 ImGui.InputTextWithHint("##noteforuser", $"Note for {_lastAddedUser.UserData.AliasOrUID}", ref _lastAddedUserComment, 100);
-                if (UiShared.IconTextButton(FontAwesomeIcon.Save, "Save Note"))
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.Save, "Save Note"))
                 {
                     _serverManager.SetNoteForUid(_lastAddedUser.UserData.UID, _lastAddedUserComment);
                     _lastAddedUser = null;
@@ -189,7 +208,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
                     _showModalForUserAddition = false;
                 }
             }
-            UiShared.SetScaledWindowSize(275);
+            UiSharedService.SetScaledWindowSize(275);
             ImGui.EndPopup();
         }
     }
@@ -203,10 +222,10 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
 
     private void DrawAddPair()
     {
-        var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Plus);
-        ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonSize.X);
+        var buttonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Plus);
+        ImGui.SetNextItemWidth(UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonSize.X);
         ImGui.InputTextWithHint("##otheruid", "Other players UID/Alias", ref _pairToAdd, 20);
-        ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
+        ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - buttonSize.X);
         var canAdd = !_pairManager.DirectPairs.Any(p => string.Equals(p.UserData.UID, _pairToAdd, StringComparison.Ordinal) || string.Equals(p.UserData.Alias, _pairToAdd, StringComparison.Ordinal));
         if (!canAdd)
         {
@@ -219,7 +238,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
                 _ = _apiController.UserAddPair(new(new(_pairToAdd)));
                 _pairToAdd = string.Empty;
             }
-            UiShared.AttachToolTip("Pair with " + (_pairToAdd.IsNullOrEmpty() ? "other user" : _pairToAdd));
+            UiSharedService.AttachToolTip("Pair with " + (_pairToAdd.IsNullOrEmpty() ? "other user" : _pairToAdd));
         }
 
         ImGuiHelpers.ScaledDummy(2);
@@ -227,8 +246,8 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
 
     private void DrawFilter()
     {
-        var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.ArrowUp);
-        var playButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Play);
+        var buttonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.ArrowUp);
+        var playButtonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Play);
         if (!_configService.Current.ReverseUserSort)
         {
             if (ImGuiComponents.IconButton(FontAwesomeIcon.ArrowDown))
@@ -236,7 +255,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
                 _configService.Current.ReverseUserSort = true;
                 _configService.Save();
             }
-            UiShared.AttachToolTip("Sort by name descending");
+            UiSharedService.AttachToolTip("Sort by name descending");
         }
         else
         {
@@ -245,7 +264,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
                 _configService.Current.ReverseUserSort = false;
                 _configService.Save();
             }
-            UiShared.AttachToolTip("Sort by name ascending");
+            UiSharedService.AttachToolTip("Sort by name ascending");
         }
         ImGui.SameLine();
 
@@ -289,7 +308,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
         {
             _timeout.Reset();
 
-            if (ImGuiComponents.IconButton(button) && UiShared.CtrlPressed())
+            if (ImGuiComponents.IconButton(button) && UiSharedService.CtrlPressed())
             {
                 foreach (var entry in users)
                 {
@@ -301,13 +320,13 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
                 _timeout.Start();
                 _buttonState = !_buttonState;
             }
-            UiShared.AttachToolTip($"Hold Control to {(button == FontAwesomeIcon.Play ? "resume" : "pause")} pairing with {users.Count} out of {userCount} displayed users.");
+            UiSharedService.AttachToolTip($"Hold Control to {(button == FontAwesomeIcon.Play ? "resume" : "pause")} pairing with {users.Count} out of {userCount} displayed users.");
         }
         else
         {
             var availableAt = (15000 - _timeout.ElapsedMilliseconds) / 1000;
             ImGuiComponents.DisabledButton(button);
-            UiShared.AttachToolTip($"Next execution is available at {availableAt} seconds");
+            UiSharedService.AttachToolTip($"Next execution is available at {availableAt} seconds");
         }
     }
 
@@ -316,14 +335,14 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
         if (entry.UserPair == null) return;
 
         var pauseIcon = entry.UserPair!.OwnPermissions.IsPaused() ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
-        var pauseIconSize = UiShared.GetIconButtonSize(pauseIcon);
-        var barButtonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Bars);
+        var pauseIconSize = UiSharedService.GetIconButtonSize(pauseIcon);
+        var barButtonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars);
         var entryUID = entry.UserData.AliasOrUID;
         var textSize = ImGui.CalcTextSize(entryUID);
         var originalY = ImGui.GetCursorPosY();
         var buttonSizes = pauseIconSize.Y + barButtonSize.Y;
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
-        var windowEndX = ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth();
+        var windowEndX = ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth();
 
         var textPos = originalY + pauseIconSize.Y / 2 - textSize.Y / 2;
         ImGui.SetCursorPosY(textPos);
@@ -350,17 +369,17 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
         }
 
         ImGui.PushFont(UiBuilder.IconFont);
-        UiShared.ColorText(connectionIcon.ToIconString(), connectionColor);
+        UiSharedService.ColorText(connectionIcon.ToIconString(), connectionColor);
         ImGui.PopFont();
-        UiShared.AttachToolTip(connectionText);
+        UiSharedService.AttachToolTip(connectionText);
         ImGui.SameLine();
         ImGui.SetCursorPosY(textPos);
         if (entry is { IsOnline: true, IsVisible: true })
         {
             ImGui.PushFont(UiBuilder.IconFont);
-            UiShared.ColorText(FontAwesomeIcon.Eye.ToIconString(), ImGuiColors.ParsedGreen);
+            UiSharedService.ColorText(FontAwesomeIcon.Eye.ToIconString(), ImGuiColors.ParsedGreen);
             ImGui.PopFont();
-            UiShared.AttachToolTip(entryUID + " is visible: " + entry.PlayerName!);
+            UiSharedService.AttachToolTip(entryUID + " is visible: " + entry.PlayerName!);
         }
 
         var textIsUid = true;
@@ -395,7 +414,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
             if (textIsUid) ImGui.PushFont(UiBuilder.MonoFont);
             ImGui.TextUnformatted(playerText);
             if (textIsUid) ImGui.PopFont();
-            UiShared.AttachToolTip("Left click to switch between UID display and nick" + Environment.NewLine +
+            UiSharedService.AttachToolTip("Left click to switch between UID display and nick" + Environment.NewLine +
                           "Right click to change nick for " + entryUID);
             if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
             {
@@ -424,7 +443,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
         {
             ImGui.SetCursorPosY(originalY);
 
-            ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * 2);
+            ImGui.SetNextItemWidth(UiSharedService.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * 2);
             if (ImGui.InputTextWithHint("", "Nick/Notes", ref EditUserComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
             {
                 _serverManager.SetNoteForUid(entry.UserPair!.User.UID, EditUserComment);
@@ -435,7 +454,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
             {
                 EditNickEntry = string.Empty;
             }
-            UiShared.AttachToolTip("Hit ENTER to save\nRight click to cancel");
+            UiSharedService.AttachToolTip("Hit ENTER to save\nRight click to cancel");
         }
 
         // Pause Button && sound warnings
@@ -448,12 +467,12 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
             {
                 var infoIconPosDist = windowEndX - barButtonSize.X - spacingX - pauseIconSize.X - spacingX;
                 var icon = FontAwesomeIcon.ExclamationTriangle;
-                var iconwidth = UiShared.GetIconSize(icon);
+                var iconwidth = UiSharedService.GetIconSize(icon);
 
                 ImGui.SameLine(infoIconPosDist - iconwidth.X);
 
                 ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
-                UiShared.FontText(icon.ToIconString(), UiBuilder.IconFont);
+                UiSharedService.FontText(icon.ToIconString(), UiBuilder.IconFont);
                 ImGui.PopStyleColor();
                 if (ImGui.IsItemHovered())
                 {
@@ -464,7 +483,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
                     if (individualSoundsDisabled)
                     {
                         var userSoundsText = "Sound sync disabled with " + entry.UserData.AliasOrUID;
-                        UiShared.FontText(FontAwesomeIcon.VolumeOff.ToIconString(), UiBuilder.IconFont);
+                        UiSharedService.FontText(FontAwesomeIcon.VolumeOff.ToIconString(), UiBuilder.IconFont);
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
                         ImGui.Text(userSoundsText);
                         ImGui.NewLine();
@@ -475,7 +494,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
                     if (individualAnimDisabled)
                     {
                         var userAnimText = "Animation sync disabled with " + entry.UserData.AliasOrUID;
-                        UiShared.FontText(FontAwesomeIcon.Stop.ToIconString(), UiBuilder.IconFont);
+                        UiSharedService.FontText(FontAwesomeIcon.Stop.ToIconString(), UiBuilder.IconFont);
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
                         ImGui.Text(userAnimText);
                         ImGui.NewLine();
@@ -496,7 +515,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
                 perm.SetPaused(!perm.IsPaused());
                 _ = _apiController.UserSetPairPermissions(new(entry.UserData, perm));
             }
-            UiShared.AttachToolTip(!entry.UserPair!.OwnPermissions.IsPaused()
+            UiSharedService.AttachToolTip(!entry.UserPair!.OwnPermissions.IsPaused()
                 ? "Pause pairing with " + entryUID
                 : "Resume pairing with " + entryUID);
         }
@@ -511,7 +530,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
         }
         if (ImGui.BeginPopup("User Flyout Menu"))
         {
-            UiShared.DrawWithID($"buttons-{entry.UserPair!.User.UID}", () => DrawPairedClientMenu(entry));
+            UiSharedService.DrawWithID($"buttons-{entry.UserPair!.User.UID}", () => DrawPairedClientMenu(entry));
             ImGui.EndPopup();
         }
     }
@@ -520,25 +539,25 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
     {
         if (entry.IsVisible)
         {
-            if (UiShared.IconTextButton(FontAwesomeIcon.Sync, "Reload last data"))
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.Sync, "Reload last data"))
             {
                 entry.ApplyLastReceivedData(forced: true);
                 ImGui.CloseCurrentPopup();
             }
-            UiShared.AttachToolTip("This reapplies the last received character data to this character");
+            UiSharedService.AttachToolTip("This reapplies the last received character data to this character");
         }
 
         var entryUID = entry.UserData.AliasOrUID;
-        if (UiShared.IconTextButton(FontAwesomeIcon.Folder, "Pair Groups"))
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.Folder, "Pair Groups"))
         {
             _selectGroupForPairUi.Open(entry);
         }
-        UiShared.AttachToolTip("Choose pair groups for " + entryUID);
+        UiSharedService.AttachToolTip("Choose pair groups for " + entryUID);
 
         var isDisableSounds = entry.UserPair!.OwnPermissions.IsDisableSounds();
         string disableSoundsText = isDisableSounds ? "Enable sound sync" : "Disable sound sync";
         var disableSoundsIcon = isDisableSounds ? FontAwesomeIcon.VolumeUp : FontAwesomeIcon.VolumeMute;
-        if (UiShared.IconTextButton(disableSoundsIcon, disableSoundsText))
+        if (UiSharedService.IconTextButton(disableSoundsIcon, disableSoundsText))
         {
             var permissions = entry.UserPair.OwnPermissions;
             permissions.SetDisableSounds(!isDisableSounds);
@@ -548,26 +567,26 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
         var isDisableAnims = entry.UserPair!.OwnPermissions.IsDisableAnimations();
         string disableAnimsText = isDisableAnims ? "Enable animation sync" : "Disable animation sync";
         var disableAnimsIcon = isDisableAnims ? FontAwesomeIcon.Running : FontAwesomeIcon.Stop;
-        if (UiShared.IconTextButton(disableAnimsIcon, disableAnimsText))
+        if (UiSharedService.IconTextButton(disableAnimsIcon, disableAnimsText))
         {
             var permissions = entry.UserPair.OwnPermissions;
             permissions.SetDisableAnimations(!isDisableAnims);
             _ = _apiController.UserSetPairPermissions(new UserPermissionsDto(entry.UserData, permissions));
         }
 
-        if (UiShared.IconTextButton(FontAwesomeIcon.Trash, "Unpair Permanently") && UiShared.CtrlPressed())
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Unpair Permanently") && UiSharedService.CtrlPressed())
         {
             _ = _apiController.UserRemovePair(new(entry.UserData));
         }
-        UiShared.AttachToolTip("Hold CTRL and click to unpair permanently from " + entryUID);
+        UiSharedService.AttachToolTip("Hold CTRL and click to unpair permanently from " + entryUID);
     }
 
     private void DrawPairList()
     {
-        UiShared.DrawWithID("addpair", DrawAddPair);
-        UiShared.DrawWithID("pairs", DrawPairs);
+        UiSharedService.DrawWithID("addpair", DrawAddPair);
+        UiSharedService.DrawWithID("pairs", DrawPairs);
         TransferPartHeight = ImGui.GetCursorPosY();
-        UiShared.DrawWithID("filter", DrawFilter);
+        UiSharedService.DrawWithID("filter", DrawFilter);
     }
 
     private void DrawPairs()
@@ -610,7 +629,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
 
     private void DrawServerStatus()
     {
-        var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Link);
+        var buttonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Link);
         var userCount = _apiController.OnlineUsers.ToString(CultureInfo.InvariantCulture);
         var userSize = ImGui.CalcTextSize(userCount);
         var textSize = ImGui.CalcTextSize("Users Online");
@@ -624,7 +643,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
 
         if (_apiController.ServerState is ServerState.Connected)
         {
-            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X) / 2 - (userSize.X + textSize.X) / 2 - ImGui.GetStyle().ItemSpacing.X / 2);
+            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - buttonSize.X) / 2 - (userSize.X + textSize.X) / 2 - ImGui.GetStyle().ItemSpacing.X / 2);
             if (!printShard) ImGui.AlignTextToFramePadding();
             ImGui.TextColored(ImGuiColors.ParsedGreen, userCount);
             ImGui.SameLine();
@@ -640,16 +659,16 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
         if (printShard)
         {
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImGui.GetStyle().ItemSpacing.Y);
-            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X) / 2 - shardTextSize.X / 2);
+            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - buttonSize.X) / 2 - shardTextSize.X / 2);
             ImGui.TextUnformatted(shardConnection);
         }
 
-        ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
+        ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - buttonSize.X);
         if (printShard)
         {
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ((userSize.Y + textSize.Y) / 2 + shardTextSize.Y) / 2 - ImGui.GetStyle().ItemSpacing.Y + buttonSize.Y / 2);
         }
-        var color = UiShared.GetBoolColor(!_serverManager.CurrentServer!.FullPause);
+        var color = UiSharedService.GetBoolColor(!_serverManager.CurrentServer!.FullPause);
         var connectedIcon = !_serverManager.CurrentServer.FullPause ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
 
         if (_apiController.ServerState != ServerState.Reconnecting)
@@ -662,7 +681,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
                 _ = _apiController.CreateConnections();
             }
             ImGui.PopStyleColor();
-            UiShared.AttachToolTip(!_serverManager.CurrentServer.FullPause ? "Disconnect from " + _serverManager.CurrentServer.ServerName : "Connect to " + _serverManager.CurrentServer.ServerName);
+            UiSharedService.AttachToolTip(!_serverManager.CurrentServer.FullPause ? "Disconnect from " + _serverManager.CurrentServer.ServerName : "Connect to " + _serverManager.CurrentServer.ServerName);
         }
     }
 
@@ -683,7 +702,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
             var totalToUpload = currentUploads.Sum(c => c.Total);
 
             ImGui.Text($"{doneUploads}/{totalUploads}");
-            var uploadText = $"({UiShared.ByteToString(totalUploaded)}/{UiShared.ByteToString(totalToUpload)})";
+            var uploadText = $"({UiSharedService.ByteToString(totalUploaded)}/{UiSharedService.ByteToString(totalToUpload)})";
             var textSize = ImGui.CalcTextSize(uploadText);
             ImGui.SameLine(WindowContentWidth - textSize.X);
             ImGui.Text(uploadText);
@@ -709,7 +728,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
 
             ImGui.Text($"{doneDownloads}/{totalDownloads}");
             var downloadText =
-                $"({UiShared.ByteToString(totalDownloaded)}/{UiShared.ByteToString(totalToDownload)})";
+                $"({UiSharedService.ByteToString(totalDownloaded)}/{UiSharedService.ByteToString(totalToDownload)})";
             var textSize = ImGui.CalcTextSize(downloadText);
             ImGui.SameLine(WindowContentWidth - textSize.X);
             ImGui.Text(downloadText);
@@ -733,28 +752,28 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
 
         var originalPos = ImGui.GetCursorPos();
         ImGui.SetWindowFontScale(1.5f);
-        var buttonSize = UiShared.GetIconButtonSize(FontAwesomeIcon.Cog);
+        var buttonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Cog);
         buttonSizeX -= buttonSize.X - ImGui.GetStyle().ItemSpacing.X * 2;
-        ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiShared.GetWindowContentRegionWidth() - buttonSize.X);
+        ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - buttonSize.X);
         ImGui.SetCursorPosY(originalPos.Y + uidTextSize.Y / 2 - buttonSize.Y / 2);
         if (ImGuiComponents.IconButton(FontAwesomeIcon.Cog))
         {
             Mediator.Publish(new OpenSettingsUiMessage());
         }
-        UiShared.AttachToolTip("Open the Mare Synchronos Settings");
+        UiSharedService.AttachToolTip("Open the Mare Synchronos Settings");
 
         ImGui.SameLine(); //Important to draw the uidText consistently
         ImGui.SetCursorPos(originalPos);
 
         if (_apiController.ServerState is ServerState.Connected)
         {
-            buttonSizeX += UiShared.GetIconButtonSize(FontAwesomeIcon.Copy).X - ImGui.GetStyle().ItemSpacing.X * 2;
+            buttonSizeX += UiSharedService.GetIconButtonSize(FontAwesomeIcon.Copy).X - ImGui.GetStyle().ItemSpacing.X * 2;
             ImGui.SetCursorPosY(originalPos.Y + uidTextSize.Y / 2 - buttonSize.Y / 2);
             if (ImGuiComponents.IconButton(FontAwesomeIcon.Copy))
             {
                 ImGui.SetClipboardText(_apiController.DisplayName);
             }
-            UiShared.AttachToolTip("Copy your UID to clipboard");
+            UiSharedService.AttachToolTip("Copy your UID to clipboard");
             ImGui.SameLine();
         }
         ImGui.SetWindowFontScale(1f);
@@ -767,7 +786,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
 
         if (_apiController.ServerState is not ServerState.Connected)
         {
-            UiShared.ColorTextWrapped(GetServerError(), GetUidColor());
+            UiSharedService.ColorTextWrapped(GetServerError(), GetUidColor());
             if (_apiController.ServerState is ServerState.NoSecretKey)
             {
                 DrawAddCharacter();
@@ -783,7 +802,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
         {
             var friendlyName = secretKey.FriendlyName;
 
-            if (UiShared.IconTextButton(FontAwesomeIcon.Plus, "Add current character with secret key"))
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add current character with secret key"))
             {
                 _serverManager.CurrentServer!.Authentications.Add(new MareConfiguration.Models.Authentication()
                 {
@@ -801,7 +820,7 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
         }
         else
         {
-            UiShared.ColorTextWrapped("No secret keys are configured for the current server.", ImGuiColors.DalamudYellow);
+            UiSharedService.ColorTextWrapped("No secret keys are configured for the current server.", ImGuiColors.DalamudYellow);
         }
     }
 
@@ -857,31 +876,5 @@ public class CompactUi : WindowMediatorSubscriberBase, IHostedService
             ServerState.Connected => _apiController.DisplayName,
             _ => string.Empty
         };
-    }
-
-    public override Task StartAsync(CancellationToken cancellationToken)
-    {
-        base.StartAsync(cancellationToken);
-#if DEBUG
-        string dev = "Dev Build";
-        var ver = Assembly.GetExecutingAssembly().GetName().Version!;
-        WindowName = $"Mare Synchronos {dev} ({ver.Major}.{ver.Minor}.{ver.Build})###MareSynchronosMainUI";
-        Toggle();
-#else
-        var ver = Assembly.GetExecutingAssembly().GetName().Version;
-        WindowName = "Mare Synchronos " + ver.Major + "." + ver.Minor + "." + ver.Build + "###MareSynchronosMainUI";
-#endif
-        Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = true);
-        Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
-        Mediator.Subscribe<CutsceneStartMessage>(this, (_) => UiShared_GposeStart());
-        Mediator.Subscribe<CutsceneEndMessage>(this, (_) => UiShared_GposeEnd());
-
-        SizeConstraints = new WindowSizeConstraints()
-        {
-            MinimumSize = new Vector2(350, 400),
-            MaximumSize = new Vector2(350, 2000),
-        };
-
-        return Task.CompletedTask;
     }
 }

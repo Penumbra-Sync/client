@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
 using System.Text;
-using System.Linq;
 
 namespace MareSynchronos.Services.Mediator;
 

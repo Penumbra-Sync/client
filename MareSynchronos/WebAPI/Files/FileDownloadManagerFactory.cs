@@ -1,5 +1,4 @@
 ﻿using MareSynchronos.FileCache;
-using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
 

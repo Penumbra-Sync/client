@@ -8,14 +8,15 @@ using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 namespace MareSynchronos.Services;
 
-public sealed class DalamudUtil : IDisposable
+public class DalamudUtilService : IHostedService
 {
-    private readonly ILogger<DalamudUtil> _logger;
+    private readonly ILogger<DalamudUtilService> _logger;
     private readonly ClientState _clientState;
     private readonly ObjectTable _objectTable;
     private readonly Framework _framework;
@@ -42,7 +43,7 @@ public sealed class DalamudUtil : IDisposable
         return false;
     }
 
-    public DalamudUtil(ILogger<DalamudUtil> logger, ClientState clientState, ObjectTable objectTable, Framework framework,
+    public DalamudUtilService(ILogger<DalamudUtilService> logger, ClientState clientState, ObjectTable objectTable, Framework framework,
         Condition condition, Dalamud.Data.DataManager gameData, MareMediator mediator, PerformanceCollectorService performanceCollector)
     {
         _logger = logger;
@@ -52,11 +53,6 @@ public sealed class DalamudUtil : IDisposable
         _condition = condition;
         _mediator = mediator;
         _performanceCollector = performanceCollector;
-        _framework.Update += FrameworkOnUpdate;
-        if (IsLoggedIn)
-        {
-            _classJobId = _clientState.LocalPlayer!.ClassJob.Id;
-        }
         WorldData = new(() =>
         {
             return gameData.GetExcelSheet<Lumina.Excel.GeneratedSheets.World>(Dalamud.ClientLanguage.English)!
@@ -314,10 +310,22 @@ public sealed class DalamudUtil : IDisposable
         Thread.Sleep(tick * 2);
     }
 
-    public void Dispose()
+    public Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.LogTrace("Disposing {type}", GetType());
+        _framework.Update += FrameworkOnUpdate;
+        if (IsLoggedIn)
+        {
+            _classJobId = _clientState.LocalPlayer!.ClassJob.Id;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        _logger.LogTrace("Stopping {type}", GetType());
+
         _framework.Update -= FrameworkOnUpdate;
-        GC.SuppressFinalize(this);
+        return Task.CompletedTask;
     }
 }

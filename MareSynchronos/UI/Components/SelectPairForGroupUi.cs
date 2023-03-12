@@ -43,7 +43,7 @@ public class SelectPairForGroupUi
         if (_show && !_opened)
         {
             ImGui.SetNextWindowSize(minSize);
-            UiShared.CenterNextWindow(minSize.X, minSize.Y, ImGuiCond.Always);
+            UiSharedService.CenterNextWindow(minSize.X, minSize.Y, ImGuiCond.Always);
             ImGui.OpenPopup(popupName);
             _opened = true;
         }
@@ -51,7 +51,7 @@ public class SelectPairForGroupUi
         ImGui.SetNextWindowSizeConstraints(minSize, maxSize);
         if (ImGui.BeginPopupModal(popupName, ref _show, ImGuiWindowFlags.Popup | ImGuiWindowFlags.Modal))
         {
-            UiShared.FontText($"Select users for group {_tag}", UiBuilder.DefaultFont);
+            UiSharedService.FontText($"Select users for group {_tag}", UiBuilder.DefaultFont);
             ImGui.InputTextWithHint("##filter", "Filter", ref _filter, 255, ImGuiInputTextFlags.None);
             foreach (var item in pairs
                 .Where(p => string.IsNullOrEmpty(_filter) || PairName(showUidForEntry, p).Contains(_filter, StringComparison.OrdinalIgnoreCase))

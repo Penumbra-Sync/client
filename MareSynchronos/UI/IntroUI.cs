@@ -11,13 +11,12 @@ using MareSynchronos.MareConfiguration.Models;
 using Microsoft.Extensions.Logging;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
-using Microsoft.Extensions.Hosting;
 
 namespace MareSynchronos.UI;
 
-internal class IntroUi : WindowMediatorSubscriberBase, IHostedService
+internal class IntroUi : WindowMediatorSubscriberBase
 {
-    private readonly UiShared _uiShared;
+    private readonly UiSharedService _uiShared;
     private readonly MareConfigService _configService;
     private readonly PeriodicFileScanner _fileCacheManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
@@ -31,13 +30,26 @@ internal class IntroUi : WindowMediatorSubscriberBase, IHostedService
     private readonly Dictionary<string, string> _languages = new(StringComparer.Ordinal) { { "English", "en" }, { "Deutsch", "de" }, { "Français", "fr" } };
     private int _currentLanguage;
 
-    public IntroUi(ILogger<IntroUi> logger, WindowSystem windowSystem, UiShared uiShared, MareConfigService configService,
+    public IntroUi(ILogger<IntroUi> logger, WindowSystem windowSystem, UiSharedService uiShared, MareConfigService configService,
         PeriodicFileScanner fileCacheManager, ServerConfigurationManager serverConfigurationManager, MareMediator mareMediator) : base(logger, windowSystem, mareMediator, "Mare Synchronos Setup")
     {
         _uiShared = uiShared;
         _configService = configService;
         _fileCacheManager = fileCacheManager;
         _serverConfigurationManager = serverConfigurationManager;
+
+        IsOpen = false;
+
+        SizeConstraints = new WindowSizeConstraints()
+        {
+            MinimumSize = new Vector2(600, 400),
+            MaximumSize = new Vector2(600, 2000),
+        };
+
+        GetToSLocalization();
+
+        Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = false);
+        Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = true);
     }
 
     public override void Draw()
@@ -50,11 +62,11 @@ internal class IntroUi : WindowMediatorSubscriberBase, IHostedService
             ImGui.TextUnformatted("Welcome to Mare Synchronos");
             if (_uiShared.UidFontBuilt) ImGui.PopFont();
             ImGui.Separator();
-            UiShared.TextWrapped("Mare Synchronos is a plugin that will replicate your full current character state including all Penumbra mods to other paired Mare Synchronos users. " +
+            UiSharedService.TextWrapped("Mare Synchronos is a plugin that will replicate your full current character state including all Penumbra mods to other paired Mare Synchronos users. " +
                               "Note that you will have to have Penumbra as well as Glamourer installed to use this plugin.");
-            UiShared.TextWrapped("We will have to setup a few things first before you can start using this plugin. Click on next to continue.");
+            UiSharedService.TextWrapped("We will have to setup a few things first before you can start using this plugin. Click on next to continue.");
 
-            UiShared.ColorTextWrapped("Note: Any modifications you have applied through anything but Penumbra cannot be shared and your character state on other clients " +
+            UiSharedService.ColorTextWrapped("Note: Any modifications you have applied through anything but Penumbra cannot be shared and your character state on other clients " +
                                  "might look broken because of this or others players mods might not apply on your end altogether. " +
                                  "If you want to use this plugin you will have to move your mods to Penumbra.", ImGuiColors.DalamudYellow);
             if (!_uiShared.DrawOtherPluginState()) return;
@@ -98,17 +110,17 @@ internal class IntroUi : WindowMediatorSubscriberBase, IHostedService
             string readThis = Strings.ToS.ReadLabel;
             textSize = ImGui.CalcTextSize(readThis);
             ImGui.SetCursorPosX(ImGui.GetWindowSize().X / 2 - textSize.X / 2);
-            UiShared.ColorText(readThis, ImGuiColors.DalamudRed);
+            UiSharedService.ColorText(readThis, ImGuiColors.DalamudRed);
             ImGui.SetWindowFontScale(1.0f);
             ImGui.Separator();
 
 
-            UiShared.TextWrapped(_tosParagraphs![0]);
-            UiShared.TextWrapped(_tosParagraphs![1]);
-            UiShared.TextWrapped(_tosParagraphs![2]);
-            UiShared.TextWrapped(_tosParagraphs![3]);
-            UiShared.TextWrapped(_tosParagraphs![4]);
-            UiShared.TextWrapped(_tosParagraphs![5]);
+            UiSharedService.TextWrapped(_tosParagraphs![0]);
+            UiSharedService.TextWrapped(_tosParagraphs![1]);
+            UiSharedService.TextWrapped(_tosParagraphs![2]);
+            UiSharedService.TextWrapped(_tosParagraphs![3]);
+            UiSharedService.TextWrapped(_tosParagraphs![4]);
+            UiSharedService.TextWrapped(_tosParagraphs![5]);
 
             ImGui.Separator();
             if (_timeoutTask?.IsCompleted ?? true)
@@ -121,7 +133,7 @@ internal class IntroUi : WindowMediatorSubscriberBase, IHostedService
             }
             else
             {
-                UiShared.TextWrapped(_timeoutLabel);
+                UiSharedService.TextWrapped(_timeoutLabel);
             }
         }
         else if (_configService.Current.AcceptedAgreement
@@ -136,17 +148,17 @@ internal class IntroUi : WindowMediatorSubscriberBase, IHostedService
 
             if (!_uiShared.HasValidPenumbraModPath)
             {
-                UiShared.ColorTextWrapped("You do not have a valid Penumbra path set. Open Penumbra and set up a valid path for the mod directory.", ImGuiColors.DalamudRed);
+                UiSharedService.ColorTextWrapped("You do not have a valid Penumbra path set. Open Penumbra and set up a valid path for the mod directory.", ImGuiColors.DalamudRed);
             }
             else
             {
-                UiShared.TextWrapped("To not unnecessary download files already present on your computer, Mare Synchronos will have to scan your Penumbra mod directory. " +
+                UiSharedService.TextWrapped("To not unnecessary download files already present on your computer, Mare Synchronos will have to scan your Penumbra mod directory. " +
                                      "Additionally, a local storage folder must be set where Mare Synchronos will download other character files to. " +
                                      "Once the storage folder is set and the scan complete, this page will automatically forward to registration at a service.");
-                UiShared.TextWrapped("Note: The initial scan, depending on the amount of mods you have, might take a while. Please wait until it is completed.");
-                UiShared.ColorTextWrapped("Warning: once past this step you should not delete the FileCache.csv of Mare Synchronos in the Plugin Configurations folder of Dalamud. " +
+                UiSharedService.TextWrapped("Note: The initial scan, depending on the amount of mods you have, might take a while. Please wait until it is completed.");
+                UiSharedService.ColorTextWrapped("Warning: once past this step you should not delete the FileCache.csv of Mare Synchronos in the Plugin Configurations folder of Dalamud. " +
                                           "Otherwise on the next launch a full re-scan of the file cache database will be initiated.", ImGuiColors.DalamudYellow);
-                UiShared.ColorTextWrapped("Warning: if the scan is hanging and does nothing for a long time, chances are high your Penumbra folder is not set up properly.", ImGuiColors.DalamudYellow);
+                UiSharedService.ColorTextWrapped("Warning: if the scan is hanging and does nothing for a long time, chances are high your Penumbra folder is not set up properly.", ImGuiColors.DalamudYellow);
                 _uiShared.DrawCacheDirectorySetting();
             }
 
@@ -168,20 +180,20 @@ internal class IntroUi : WindowMediatorSubscriberBase, IHostedService
             ImGui.TextUnformatted("Service Registration");
             if (_uiShared.UidFontBuilt) ImGui.PopFont();
             ImGui.Separator();
-            UiShared.TextWrapped("To be able to use Mare Synchronos you will have to register an account.");
-            UiShared.TextWrapped("For the official Mare Synchronos Servers the account creation will be handled on the official Mare Synchronos Discord. Due to security risks for the server, there is no way to handle this senisibly otherwise.");
-            UiShared.TextWrapped("If you want to register at the main server \"" + WebAPI.ApiController.MainServer + "\" join the Discord and follow the instructions as described in #mare-commands.");
+            UiSharedService.TextWrapped("To be able to use Mare Synchronos you will have to register an account.");
+            UiSharedService.TextWrapped("For the official Mare Synchronos Servers the account creation will be handled on the official Mare Synchronos Discord. Due to security risks for the server, there is no way to handle this senisibly otherwise.");
+            UiSharedService.TextWrapped("If you want to register at the main server \"" + WebAPI.ApiController.MainServer + "\" join the Discord and follow the instructions as described in #mare-commands.");
 
             if (ImGui.Button("Join the Mare Synchronos Discord"))
             {
                 Util.OpenLink("https://discord.gg/mpNdkrTRjW");
             }
 
-            UiShared.TextWrapped("For all other non official services you will have to contact the appropriate service provider how to obtain a secret key.");
+            UiSharedService.TextWrapped("For all other non official services you will have to contact the appropriate service provider how to obtain a secret key.");
 
             ImGui.Separator();
 
-            UiShared.TextWrapped("Once you have received a secret key you can connect to the service using the tools provided below.");
+            UiSharedService.TextWrapped("Once you have received a secret key you can connect to the service using the tools provided below.");
 
             _ = _uiShared.DrawServiceSelection(selectOnChange: true);
 
@@ -192,11 +204,11 @@ internal class IntroUi : WindowMediatorSubscriberBase, IHostedService
             ImGui.AlignTextToFramePadding();
             ImGui.Text(text);
             ImGui.SameLine();
-            ImGui.SetNextItemWidth(UiShared.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonWidth - textSize.X);
+            ImGui.SetNextItemWidth(UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonWidth - textSize.X);
             ImGui.InputText("", ref _secretKey, 64);
             if (_secretKey.Length > 0 && _secretKey.Length != 64)
             {
-                UiShared.ColorTextWrapped("Your secret key must be exactly 64 characters long. Don't enter your Lodestone auth here.", ImGuiColors.DalamudRed);
+                UiSharedService.ColorTextWrapped("Your secret key must be exactly 64 characters long. Don't enter your Lodestone auth here.", ImGuiColors.DalamudRed);
             }
             else if (_secretKey.Length == 64)
             {
@@ -232,25 +244,5 @@ internal class IntroUi : WindowMediatorSubscriberBase, IHostedService
         }
 
         _tosParagraphs = new[] { Strings.ToS.Paragraph1, Strings.ToS.Paragraph2, Strings.ToS.Paragraph3, Strings.ToS.Paragraph4, Strings.ToS.Paragraph5, Strings.ToS.Paragraph6 };
-    }
-
-    public override Task StartAsync(CancellationToken cancellationToken)
-    {
-        base.StartAsync(cancellationToken);
-
-        IsOpen = false;
-
-        SizeConstraints = new WindowSizeConstraints()
-        {
-            MinimumSize = new Vector2(600, 400),
-            MaximumSize = new Vector2(600, 2000),
-        };
-
-        GetToSLocalization();
-
-        Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = false);
-        Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = true);
-
-        return Task.CompletedTask;
     }
 }

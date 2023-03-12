@@ -14,7 +14,7 @@ using MareSynchronos.Services;
 
 namespace MareSynchronos.Interop;
 
-public sealed class IpcManager : MediatorSubscriberBase, IDisposable
+public sealed class IpcManager : DisposableMediatorSubscriberBase
 {
     private readonly ICallGateSubscriber<int> _glamourerApiVersion;
     private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyAll;
@@ -60,7 +60,7 @@ public sealed class IpcManager : MediatorSubscriberBase, IDisposable
     private readonly ICallGateSubscriber<Character, string, object> _palettePlusSetCharaPalette;
     private readonly ICallGateSubscriber<Character, object> _palettePlusRemoveCharaPalette;
     private readonly ICallGateSubscriber<Character, string, object> _palettePlusPaletteChanged;
-    private readonly DalamudUtil _dalamudUtil;
+    private readonly DalamudUtilService _dalamudUtil;
     private bool _inGposeQueueMode = false;
     private ConcurrentQueue<Action> ActionQueue => _inGposeQueueMode ? _gposeActionQueue : _normalQueue;
     private readonly ConcurrentQueue<Action> _normalQueue = new();
@@ -75,7 +75,7 @@ public sealed class IpcManager : MediatorSubscriberBase, IDisposable
     private bool _heelsAvailable = false;
     private bool _palettePlusAvailable = false;
 
-    public IpcManager(ILogger<IpcManager> logger, DalamudPluginInterface pi, DalamudUtil dalamudUtil, MareMediator mediator) : base(logger, mediator)
+    public IpcManager(ILogger<IpcManager> logger, DalamudPluginInterface pi, DalamudUtilService dalamudUtil, MareMediator mediator) : base(logger, mediator)
     {
         _dalamudUtil = dalamudUtil;
 
@@ -295,9 +295,9 @@ public sealed class IpcManager : MediatorSubscriberBase, IDisposable
         }
     }
 
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        UnsubscribeAll();
+        base.Dispose(disposing);
 
         _disposalCts.Cancel();
 

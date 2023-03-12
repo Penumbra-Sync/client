@@ -8,7 +8,7 @@ using System.Net.Http.Json;
 
 namespace MareSynchronos.WebAPI.Files;
 
-public class FileTransferOrchestrator : MediatorSubscriberBase
+public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
 {
     private readonly MareConfigService _mareConfig;
     private readonly ServerConfigurationManager _serverManager;
