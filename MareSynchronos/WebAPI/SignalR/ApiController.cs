@@ -46,9 +46,9 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
         Mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
         Mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
-        Mediator.Subscribe<HubClosedMessage>(this, (msg) => MareHubOnClosed(((HubClosedMessage)msg).Exception));
+        Mediator.Subscribe<HubClosedMessage>(this, (msg) => MareHubOnClosed(msg.Exception));
         Mediator.Subscribe<HubReconnectedMessage>(this, (msg) => _ = Task.Run(MareHubOnReconnected));
-        Mediator.Subscribe<HubReconnectingMessage>(this, (msg) => MareHubOnReconnecting(((HubReconnectingMessage)msg).Exception));
+        Mediator.Subscribe<HubReconnectingMessage>(this, (msg) => MareHubOnReconnecting(msg.Exception));
 
         ServerState = ServerState.Offline;
 

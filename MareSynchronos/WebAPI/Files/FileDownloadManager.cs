@@ -34,9 +34,9 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
 
         Mediator.Subscribe<DownloadReadyMessage>(this, (msg) =>
         {
-            if (_downloadReady.ContainsKey(((DownloadReadyMessage)msg).RequestId))
+            if (_downloadReady.ContainsKey(msg.RequestId))
             {
-                _downloadReady[((DownloadReadyMessage)msg).RequestId] = true;
+                _downloadReady[msg.RequestId] = true;
             }
         });
     }

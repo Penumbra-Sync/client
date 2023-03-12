@@ -153,8 +153,8 @@ public class Pair
         {
             _onlineUserIdentDto = dto;
         }
+
         CachedPlayer?.Dispose();
-        CachedPlayer = null;
         CachedPlayer = _cachedPlayerFactory(_onlineUserIdentDto!);
     }
 

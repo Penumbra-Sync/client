@@ -24,8 +24,8 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         _fileDbManager = fileDbManager;
         _performanceCollector = performanceCollector;
         Mediator.Subscribe<PenumbraInitializedMessage>(this, (_) => StartScan());
-        Mediator.Subscribe<HaltScanMessage>(this, (msg) => HaltScan(((HaltScanMessage)msg).Source));
-        Mediator.Subscribe<ResumeScanMessage>(this, (msg) => ResumeScan(((ResumeScanMessage)msg).Source));
+        Mediator.Subscribe<HaltScanMessage>(this, (msg) => HaltScan(msg.Source));
+        Mediator.Subscribe<ResumeScanMessage>(this, (msg) => ResumeScan(msg.Source));
         Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => StartScan());
         Mediator.Subscribe<DalamudLoginMessage>(this, (_) => StartScan());
     }

@@ -26,9 +26,8 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
 
         Mediator.Subscribe<CreateCacheForObjectMessage>(this, (msg) =>
         {
-            var actualMsg = (CreateCacheForObjectMessage)msg;
             _cacheCreateLock.Wait();
-            _cachesToCreate[actualMsg.ObjectToCreateFor.ObjectKind] = actualMsg.ObjectToCreateFor;
+            _cachesToCreate[msg.ObjectToCreateFor.ObjectKind] = msg.ObjectToCreateFor;
             _cacheCreateLock.Release();
         });
 
@@ -44,9 +43,8 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         {
             Task.Run(() =>
             {
-                var actualMsg = (ClearCacheForObjectMessage)msg;
-                _playerData.FileReplacements.Remove(actualMsg.ObjectToCreateFor.ObjectKind);
-                _playerData.GlamourerString.Remove(actualMsg.ObjectToCreateFor.ObjectKind);
+                _playerData.FileReplacements.Remove(msg.ObjectToCreateFor.ObjectKind);
+                _playerData.GlamourerString.Remove(msg.ObjectToCreateFor.ObjectKind);
                 Mediator.Publish(new CharacterDataCreatedMessage(_playerData.ToAPI()));
             });
         });

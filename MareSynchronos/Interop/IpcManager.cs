@@ -79,15 +79,15 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     {
         _dalamudUtil = dalamudUtil;
 
-        _penumbraInit = Penumbra.Api.Ipc.Initialized.Subscriber(pi, () => PenumbraInit());
-        _penumbraDispose = Penumbra.Api.Ipc.Disposed.Subscriber(pi, () => PenumbraDispose());
+        _penumbraInit = Penumbra.Api.Ipc.Initialized.Subscriber(pi, PenumbraInit);
+        _penumbraDispose = Penumbra.Api.Ipc.Disposed.Subscriber(pi, PenumbraDispose);
         _penumbraResolvePlayer = Penumbra.Api.Ipc.ResolvePlayerPath.Subscriber(pi);
         _penumbraResolveModDir = Penumbra.Api.Ipc.GetModDirectory.Subscriber(pi);
         _penumbraRedraw = Penumbra.Api.Ipc.RedrawObjectByName.Subscriber(pi);
         _penumbraRedrawObject = Penumbra.Api.Ipc.RedrawObject.Subscriber(pi);
         _reverseResolvePlayer = Penumbra.Api.Ipc.ReverseResolvePlayerPath.Subscriber(pi);
         _penumbraApiVersion = Penumbra.Api.Ipc.ApiVersions.Subscriber(pi);
-        _penumbraObjectIsRedrawn = Penumbra.Api.Ipc.GameObjectRedrawn.Subscriber(pi, (ptr, idx) => RedrawEvent(ptr, idx));
+        _penumbraObjectIsRedrawn = Penumbra.Api.Ipc.GameObjectRedrawn.Subscriber(pi, RedrawEvent);
         _penumbraGetMetaManipulations = Penumbra.Api.Ipc.GetPlayerMetaManipulations.Subscriber(pi);
         _penumbraAddTemporaryMod = Penumbra.Api.Ipc.AddTemporaryMod.Subscriber(pi);
         _penumbraCreateNamedTemporaryCollection = Penumbra.Api.Ipc.CreateNamedTemporaryCollection.Subscriber(pi);
@@ -102,7 +102,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
                 Mediator.Publish(new PenumbraModSettingChangedMessage());
         });
 
-        _penumbraGameObjectResourcePathResolved = Penumbra.Api.Ipc.GameObjectResourcePathResolved.Subscriber(pi, (ptr, arg1, arg2) => ResourceLoaded(ptr, arg1, arg2));
+        _penumbraGameObjectResourcePathResolved = Penumbra.Api.Ipc.GameObjectResourcePathResolved.Subscriber(pi, ResourceLoaded);
 
         _glamourerApiVersion = pi.GetIpcSubscriber<int>("Glamourer.ApiVersion");
         _glamourerGetAllCustomization = pi.GetIpcSubscriber<GameObject?, string>("Glamourer.GetAllCustomizationFromCharacter");

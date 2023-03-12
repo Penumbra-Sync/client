@@ -28,7 +28,7 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
     private Lazy<T> LazyConfig()
     {
         _configLastWriteTime = GetConfigLastWriteTime();
-        return new Lazy<T>(() => LoadConfig());
+        return new Lazy<T>(LoadConfig);
     }
     private DateTime GetConfigLastWriteTime() => new FileInfo(ConfigurationPath).LastWriteTimeUtc;
 

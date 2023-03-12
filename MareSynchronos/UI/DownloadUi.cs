@@ -46,11 +46,10 @@ public class DownloadUi : WindowMediatorSubscriberBase
 
         Mediator.Subscribe<DownloadStartedMessage>(this, (msg) =>
         {
-            var actualMsg = ((DownloadStartedMessage)msg);
-            _currentDownloads[actualMsg.DownloadId] = actualMsg.DownloadStatus;
+            _currentDownloads[msg.DownloadId] = msg.DownloadStatus;
         });
 
-        Mediator.Subscribe<DownloadFinishedMessage>(this, (msg) => _currentDownloads.TryRemove(((DownloadFinishedMessage)msg).DownloadId, out _));
+        Mediator.Subscribe<DownloadFinishedMessage>(this, (msg) => _currentDownloads.TryRemove(msg.DownloadId, out _));
 
         Mediator.Subscribe<GposeStartMessage>(this, (_) =>
         {

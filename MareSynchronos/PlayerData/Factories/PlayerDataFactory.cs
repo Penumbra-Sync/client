@@ -138,8 +138,8 @@ public class PlayerDataFactory
         previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
         previousData.HeelsOffset = _ipcManager.GetHeelsOffset();
         Task<string> getGlamourerData = Task.Run(() => _ipcManager.GlamourerGetCharacterCustomization(playerRelatedObject.Address));
-        Task<string> getCustomizeData = Task.Run(() => _ipcManager.GetCustomizePlusScale());
-        Task<string> getPalettePlusData = Task.Run(() => _ipcManager.PalettePlusBuildPalette());
+        Task<string> getCustomizeData = Task.Run(_ipcManager.GetCustomizePlusScale);
+        Task<string> getPalettePlusData = Task.Run(_ipcManager.PalettePlusBuildPalette);
         previousData.GlamourerString[playerRelatedObject.ObjectKind] = await getGlamourerData.ConfigureAwait(false);
         _logger.LogDebug("Glamourer is now: {data}", previousData.GlamourerString[playerRelatedObject.ObjectKind]);
         previousData.CustomizePlusScale = await getCustomizeData.ConfigureAwait(false);

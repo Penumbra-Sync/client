@@ -20,7 +20,7 @@ public class NotificationService : DisposableMediatorSubscriberBase
         _chatGui = chatGui;
         _configurationService = configurationService;
 
-        Mediator.Subscribe<NotificationMessage>(this, (msg) => ShowNotification((NotificationMessage)msg));
+        Mediator.Subscribe<NotificationMessage>(this, ShowNotification);
     }
 
     private void ShowNotification(NotificationMessage msg)

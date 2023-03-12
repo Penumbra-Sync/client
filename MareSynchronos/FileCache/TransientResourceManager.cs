@@ -49,19 +49,17 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             Logger.LogDebug("Restored {restored}/{total} semi persistent resources", restored, gamePaths.Count);
         }
 
-        Mediator.Subscribe<PenumbraResourceLoadMessage>(this, (msg) => Manager_PenumbraResourceLoadEvent((PenumbraResourceLoadMessage)msg));
+        Mediator.Subscribe<PenumbraResourceLoadMessage>(this, Manager_PenumbraResourceLoadEvent);
         Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, (_) => Manager_PenumbraModSettingChanged());
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => DalamudUtil_FrameworkUpdate());
         Mediator.Subscribe<ClassJobChangedMessage>(this, (_) => DalamudUtil_ClassJobChanged());
         Mediator.Subscribe<AddWatchedGameObjectHandler>(this, (msg) =>
         {
-            var actualMsg = (AddWatchedGameObjectHandler)msg;
-            _playerRelatedPointers.Add(actualMsg.Handler);
+            _playerRelatedPointers.Add(msg.Handler);
         });
         Mediator.Subscribe<RemoveWatchedGameObjectHandler>(this, (msg) =>
         {
-            var actualMsg = (RemoveWatchedGameObjectHandler)msg;
-            _playerRelatedPointers.Remove(actualMsg.Handler);
+            _playerRelatedPointers.Remove(msg.Handler);
         });
     }
 

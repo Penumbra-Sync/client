@@ -31,7 +31,7 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
 
         Mediator.Subscribe<ConnectedMessage>(this, (msg) =>
         {
-            FilesCdnUri = ((ConnectedMessage)msg).Connection.ServerInfo.FileServerAddress;
+            FilesCdnUri = msg.Connection.ServerInfo.FileServerAddress;
         });
 
         Mediator.Subscribe<DisconnectedMessage>(this, (msg) =>

@@ -27,7 +27,7 @@ public class OnlinePlayerManager : DisposableMediatorSubscriberBase
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => FrameworkOnUpdate());
         Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) =>
         {
-            var newData = ((CharacterDataCreatedMessage)msg).CharacterData;
+            var newData = msg.CharacterData;
             if (_lastSentData == null || (!string.Equals(newData.DataHash.Value, _lastSentData.DataHash.Value, StringComparison.Ordinal)))
             {
                 Logger.LogDebug("Pushing data for visible players");

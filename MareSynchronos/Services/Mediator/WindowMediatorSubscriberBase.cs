@@ -19,7 +19,7 @@ public abstract class WindowMediatorSubscriberBase : Window, IMediatorSubscriber
 
         Mediator.Subscribe<UiToggleMessage>(this, (msg) =>
         {
-            if (((UiToggleMessage)msg).UiType == GetType())
+            if (msg.UiType == GetType())
             {
                 Toggle();
             }

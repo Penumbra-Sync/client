@@ -24,7 +24,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     private readonly IpcManager _ipcManager;
     private readonly FileCacheManager _fileDbManager;
     private CharacterData _cachedData = new();
-    private GameObjectHandler? _currentOtherChara;
+    private GameObjectHandler? _charaHandler;
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
     private string _lastGlamourerData = string.Empty;
     private string _originalGlamourerData = string.Empty;
@@ -44,7 +44,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     }
 
     private OnlineUserIdentDto OnlineUser { get; set; }
-    private IntPtr PlayerCharacter => _currentOtherChara?.Address ?? IntPtr.Zero;
+    private IntPtr PlayerCharacter => _charaHandler?.Address ?? IntPtr.Zero;
     public string? PlayerName { get; private set; }
     public string PlayerNameHash => OnlineUser.Ident;
 
@@ -202,9 +202,9 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
     public bool CheckExistence()
     {
-        if (PlayerName == null || _currentOtherChara == null
-            || !string.Equals(PlayerName, _currentOtherChara.Name, StringComparison.Ordinal)
-            || _currentOtherChara.CurrentAddress == IntPtr.Zero)
+        if (PlayerName == null || _charaHandler == null
+            || !string.Equals(PlayerName, _charaHandler.Name, StringComparison.Ordinal)
+            || _charaHandler.CurrentAddress == IntPtr.Zero)
         {
             return false;
         }
@@ -220,7 +220,6 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
         _downloadManager.Dispose();
         var name = PlayerName;
-        PlayerName = null;
         Logger.LogDebug("Disposing {name} ({user})", name, OnlineUser);
         try
         {
@@ -229,11 +228,12 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             _downloadCancellationTokenSource?.Dispose();
             _downloadCancellationTokenSource = null;
             nint ptr = PlayerCharacter;
+            _charaHandler?.Dispose();
+            _charaHandler = null;
             if (!_lifetime.ApplicationStopping.IsCancellationRequested && ptr != IntPtr.Zero && !_dalamudUtil.IsZoning)
             {
                 Logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser);
                 _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name);
-                _currentOtherChara?.Dispose();
 
                 foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData.FileReplacements)
                 {
@@ -247,25 +247,23 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
         finally
         {
-            _currentOtherChara = null;
+            PlayerName = null;
             _cachedData = new();
             Logger.LogDebug("Disposing {name} complete", name);
-            PlayerName = null;
         }
     }
 
     public void Initialize(string name)
     {
         PlayerName = name;
-        _currentOtherChara = _gameObjectHandlerFactory(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName)?.Address ?? IntPtr.Zero, false);
+        _charaHandler = _gameObjectHandlerFactory(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName)?.Address ?? IntPtr.Zero, false);
 
         _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
         _lastGlamourerData = _originalGlamourerData;
-        Mediator.Subscribe<PenumbraRedrawMessage>(this, (msg) => IpcManagerOnPenumbraRedrawEvent((PenumbraRedrawMessage)msg));
+        Mediator.Subscribe<PenumbraRedrawMessage>(this, IpcManagerOnPenumbraRedrawEvent);
         Mediator.Subscribe<CharacterChangedMessage>(this, (msg) =>
         {
-            var actualMsg = (CharacterChangedMessage)msg;
-            if (actualMsg.GameObjectHandler == _currentOtherChara && (_applicationTask?.IsCompleted ?? true))
+            if (msg.GameObjectHandler == _charaHandler && (_applicationTask?.IsCompleted ?? true))
             {
                 Logger.LogTrace("Saving new Glamourer Data for {this}", this);
                 _lastGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
@@ -294,7 +292,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         var ptr = PlayerCharacter;
         var handler = changes.Key switch
         {
-            ObjectKind.Player => _currentOtherChara!,
+            ObjectKind.Player => _charaHandler!,
             ObjectKind.Companion => _gameObjectHandlerFactory(changes.Key, () => _dalamudUtil.GetCompanion(ptr), false),
             ObjectKind.MinionOrMount => _gameObjectHandlerFactory(changes.Key, () => _dalamudUtil.GetMinionOrMount(ptr), false),
             ObjectKind.Pet => _gameObjectHandlerFactory(changes.Key, () => _dalamudUtil.GetPet(ptr), false),
@@ -307,7 +305,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
         if (handler.Address == IntPtr.Zero)
         {
-            if (handler != _currentOtherChara) handler.Dispose();
+            if (handler != _charaHandler) handler.Dispose();
             return;
         }
 
@@ -340,7 +338,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             }
         }
 
-        if (handler != _currentOtherChara) handler.Dispose();
+        if (handler != _charaHandler) handler.Dispose();
     }
 
     private void DownloadAndApplyCharacter(CharacterData charaData, Dictionary<ObjectKind, HashSet<PlayerChanges>> updatedData)
@@ -439,7 +437,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         Task.Run(async () =>
         {
             var applicationId = Guid.NewGuid();
-            await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, _currentOtherChara!, applicationId, ct: token).ConfigureAwait(false);
+            await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, _charaHandler!, applicationId, ct: token).ConfigureAwait(false);
             Logger.LogDebug("Unauthorized character change detected");
             await ApplyCustomizationData(applicationId, new(ObjectKind.Player,
                 new HashSet<PlayerChanges>(new[] { PlayerChanges.Palette, PlayerChanges.Customize, PlayerChanges.Heels, PlayerChanges.Mods })),

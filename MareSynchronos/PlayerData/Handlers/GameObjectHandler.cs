@@ -37,8 +37,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             {
                 if (_delayedZoningTask?.IsCompleted ?? true)
                 {
-                    var actualMsg = (TransientResourceChangedMessage)msg;
-                    if (actualMsg.Address != Address) return;
+                    if (msg.Address != Address) return;
                     Mediator.Publish(new CreateCacheForObjectMessage(this));
                 }
             });
@@ -60,14 +59,14 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         });
         Mediator.Subscribe<PenumbraStartRedrawMessage>(this, (msg) =>
         {
-            if (((PenumbraStartRedrawMessage)msg).Address == Address)
+            if (msg.Address == Address)
             {
                 _haltProcessing = true;
             }
         });
         Mediator.Subscribe<PenumbraEndRedrawMessage>(this, (msg) =>
         {
-            if (((PenumbraEndRedrawMessage)msg).Address == Address)
+            if (msg.Address == Address)
             {
                 _haltProcessing = false;
                 Task.Run(async () =>

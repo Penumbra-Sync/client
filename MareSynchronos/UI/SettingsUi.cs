@@ -67,7 +67,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
         Mediator.Subscribe<CutsceneStartMessage>(this, (_) => UiSharedService_GposeStart());
         Mediator.Subscribe<CutsceneEndMessage>(this, (_) => UiSharedService_GposeEnd());
-        Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) => LastCreatedCharacterData = ((CharacterDataCreatedMessage)msg).CharacterData);
+        Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) => LastCreatedCharacterData = msg.CharacterData);
     }
 
     private void UiSharedService_GposeEnd()
@@ -169,7 +169,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
                 if (ImGui.Button("Delete everything", new Vector2(buttonSize, 0)))
                 {
-                    Task.Run(() => _fileTransferManager.DeleteAllFiles());
+                    Task.Run(_fileTransferManager.DeleteAllFiles);
                     _deleteFilesPopupModalShown = false;
                 }
 
@@ -206,7 +206,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
                 if (ImGui.Button("Delete account", new Vector2(buttonSize, 0)))
                 {
-                    Task.Run(() => ApiController.UserDelete());
+                    Task.Run(ApiController.UserDelete);
                     _deleteAccountPopupModalShown = false;
                     Mediator.Publish(new SwitchToIntroUiMessage());
                 }

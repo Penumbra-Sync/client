@@ -9,9 +9,9 @@ public sealed class MareMediator : IDisposable
     private sealed class SubscriberAction
     {
         public IMediatorSubscriber Subscriber { get; }
-        public Action<IMessage> Action { get; }
+        public object Action { get; }
 
-        public SubscriberAction(IMediatorSubscriber subscriber, Action<IMessage> action)
+        public SubscriberAction(IMediatorSubscriber subscriber, object action)
         {
             Subscriber = subscriber;
             Action = action;
@@ -30,7 +30,7 @@ public sealed class MareMediator : IDisposable
         _performanceCollector = performanceCollector;
     }
 
-    public void Subscribe<T>(IMediatorSubscriber subscriber, Action<IMessage> action) where T : IMessage
+    public void Subscribe<T>(IMediatorSubscriber subscriber, Action<T> action) where T : IMessage
     {
         lock (_addRemoveLock)
         {
@@ -56,7 +56,7 @@ public sealed class MareMediator : IDisposable
         }
     }
 
-    public void Publish(IMessage message)
+    public void Publish<T>(T message) where T : IMessage
     {
         if (_subscriberDict.TryGetValue(message.GetType(), out HashSet<SubscriberAction>? subscribers) && subscribers != null && subscribers.Any())
         {
@@ -66,7 +66,7 @@ public sealed class MareMediator : IDisposable
                 {
                     try
                     {
-                        _performanceCollector.LogPerformance(this, $"Publish>{message.GetType().Name}+{subscriber.Subscriber.GetType().Name}", () => subscriber.Action.Invoke(message));
+                        _performanceCollector.LogPerformance(this, $"Publish>{message.GetType().Name}+{subscriber.Subscriber.GetType().Name}", () => ((Action<T>)subscriber.Action).Invoke(message));
                     }
                     catch (Exception ex)
                     {
