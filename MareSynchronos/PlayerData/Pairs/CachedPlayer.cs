@@ -277,10 +277,10 @@ public class CachedPlayer : MediatorSubscriberBase
         return OnlineUser.User.AliasOrUID + ":" + PlayerName + ":" + (PlayerCharacter != IntPtr.Zero ? "HasChar" : "NoChar");
     }
 
-    private void ApplyBaseData(Guid applicationId, Dictionary<string, string> moddedPaths, string manipulationData)
+    private async Task ApplyBaseData(Guid applicationId, Dictionary<string, string> moddedPaths, string manipulationData)
     {
-        _ipcManager.PenumbraRemoveTemporaryCollection(_logger, applicationId, PlayerName!);
-        _ipcManager.PenumbraSetTemporaryMods(_logger, applicationId, PlayerName!, moddedPaths, manipulationData);
+        await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.PenumbraRemoveTemporaryCollection(_logger, applicationId, PlayerName!)).ConfigureAwait(false);
+        await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.PenumbraSetTemporaryMods(_logger, applicationId, PlayerName!, moddedPaths, manipulationData)).ConfigureAwait(false);
     }
 
     private async Task ApplyCustomizationData(Guid applicationId, KeyValuePair<ObjectKind, HashSet<PlayerChanges>> changes, API.Data.CharacterData charaData)
@@ -392,8 +392,9 @@ public class CachedPlayer : MediatorSubscriberBase
                 // block until current application is done
                 _logger.LogDebug("Waiting for current data application (Id: {id}) to finish", _applicationId);
                 await Task.Delay(250).ConfigureAwait(false);
-                if (downloadToken.IsCancellationRequested) return;
             }
+
+            if (downloadToken.IsCancellationRequested) return;
 
             _applicationTask = Task.Run(async () =>
             {
@@ -402,7 +403,7 @@ public class CachedPlayer : MediatorSubscriberBase
 
                 if (updateModdedPaths && (moddedPaths.Any() || !string.IsNullOrEmpty(charaData.ManipulationData)))
                 {
-                    ApplyBaseData(_applicationId, moddedPaths, charaData.ManipulationData);
+                    await ApplyBaseData(_applicationId, moddedPaths, charaData.ManipulationData).ConfigureAwait(false);
                 }
 
                 foreach (var kind in updatedData)
