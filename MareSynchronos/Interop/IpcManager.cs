@@ -79,7 +79,7 @@ public class IpcManager : MediatorSubscriberBase
     {
         _dalamudUtil = dalamudUtil;
 
-        _logger.LogTrace("Creating " + nameof(IpcManager));
+        Logger.LogTrace("Creating " + nameof(IpcManager));
 
         _penumbraInit = Penumbra.Api.Ipc.Initialized.Subscriber(pi, () => PenumbraInit());
         _penumbraDispose = Penumbra.Api.Ipc.Disposed.Subscriber(pi, () => PenumbraDispose());
@@ -163,7 +163,7 @@ public class IpcManager : MediatorSubscriberBase
         if (_gposeActionQueue.TryDequeue(out var action))
         {
             if (action == null) return;
-            _logger.LogDebug("Execution action in gpose queue: {method}", action.Method);
+            Logger.LogDebug("Execution action in gpose queue: {method}", action.Method);
             action();
         }
     }
@@ -195,7 +195,7 @@ public class IpcManager : MediatorSubscriberBase
         if (ActionQueue.TryDequeue(out var action))
         {
             if (action == null) return;
-            _logger.LogDebug("Execution action in queue: {method}", action.Method);
+            Logger.LogDebug("Execution action in queue: {method}", action.Method);
             action();
         }
     }
@@ -306,7 +306,7 @@ public class IpcManager : MediatorSubscriberBase
         int totalSleepTime = 0;
         while (!ActionQueue.IsEmpty && totalSleepTime < 2000)
         {
-            _logger.LogTrace("Waiting for actionqueue to clear...");
+            Logger.LogTrace("Waiting for actionqueue to clear...");
             PeriodicApiStateCheck();
             if (CheckPenumbraApi())
             {
@@ -318,7 +318,7 @@ public class IpcManager : MediatorSubscriberBase
 
         if (totalSleepTime >= 2000)
         {
-            _logger.LogTrace("Action queue clear or not, disposing");
+            Logger.LogTrace("Action queue clear or not, disposing");
         }
 
         ActionQueue.Clear();
@@ -347,7 +347,7 @@ public class IpcManager : MediatorSubscriberBase
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj != null)
             {
-                _logger.LogTrace("Applying Heels data to {chara}", character.ToString("X"));
+                Logger.LogTrace("Applying Heels data to {chara}", character.ToString("X"));
                 _heelsRegisterPlayer.InvokeAction(gameObj, offset);
             }
         }).ConfigureAwait(false);
@@ -361,7 +361,7 @@ public class IpcManager : MediatorSubscriberBase
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj != null)
             {
-                _logger.LogTrace("Restoring Heels data to {chara}", character.ToString("X"));
+                Logger.LogTrace("Restoring Heels data to {chara}", character.ToString("X"));
                 _heelsUnregisterPlayer.InvokeAction(gameObj);
             }
         }).ConfigureAwait(false);
@@ -384,7 +384,7 @@ public class IpcManager : MediatorSubscriberBase
             if (gameObj is Character c)
             {
                 string decodedScale = Encoding.UTF8.GetString(Convert.FromBase64String(scale));
-                _logger.LogTrace("CustomizePlus applying for {chara}", c.Address.ToString("X"));
+                Logger.LogTrace("CustomizePlus applying for {chara}", c.Address.ToString("X"));
                 _customizePlusSetBodyScaleToCharacter!.InvokeAction(decodedScale, c);
             }
         }).ConfigureAwait(false);
@@ -398,7 +398,7 @@ public class IpcManager : MediatorSubscriberBase
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj is Character c)
             {
-                _logger.LogTrace("CustomizePlus reverting for {chara}", c.Address.ToString("X"));
+                Logger.LogTrace("CustomizePlus reverting for {chara}", c.Address.ToString("X"));
                 _customizePlusRevert!.InvokeAction(c);
             }
         }).ConfigureAwait(false);
@@ -614,12 +614,12 @@ public class IpcManager : MediatorSubscriberBase
 
                 if (string.IsNullOrEmpty(decodedPalette))
                 {
-                    _logger.LogTrace("PalettePlus removing for {addr}", c.Address.ToString("X"));
+                    Logger.LogTrace("PalettePlus removing for {addr}", c.Address.ToString("X"));
                     _palettePlusRemoveCharaPalette!.InvokeAction(c);
                 }
                 else
                 {
-                    _logger.LogTrace("PalettePlus applying for {addr}", c.Address.ToString("X"));
+                    Logger.LogTrace("PalettePlus applying for {addr}", c.Address.ToString("X"));
                     _palettePlusSetCharaPalette!.InvokeAction(c, decodedPalette);
                 }
             }
@@ -642,7 +642,7 @@ public class IpcManager : MediatorSubscriberBase
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj is Character c)
             {
-                _logger.LogTrace("PalettePlus removing for {addr}", c.Address.ToString("X"));
+                Logger.LogTrace("PalettePlus removing for {addr}", c.Address.ToString("X"));
                 _palettePlusRemoveCharaPalette!.InvokeAction(c);
             }
         }).ConfigureAwait(false);

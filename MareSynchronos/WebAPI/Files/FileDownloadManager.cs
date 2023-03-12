@@ -67,12 +67,12 @@ public partial class FileDownloadManager : MediatorSubscriberBase
 
     private async Task DownloadFilesInternal(string aliasOrUid, List<FileReplacementData> fileReplacement, CancellationToken ct)
     {
-        _logger.LogDebug("Downloading files for {id}", aliasOrUid);
+        Logger.LogDebug("Downloading files for {id}", aliasOrUid);
 
         List<DownloadFileDto> downloadFileInfoFromService = new();
         downloadFileInfoFromService.AddRange(await FilesGetSizes(fileReplacement.Select(f => f.Hash).ToList(), ct).ConfigureAwait(false));
 
-        _logger.LogDebug("Files with size 0 or less: {files}", string.Join(", ", downloadFileInfoFromService.Where(f => f.Size <= 0).Select(f => f.Hash)));
+        Logger.LogDebug("Files with size 0 or less: {files}", string.Join(", ", downloadFileInfoFromService.Where(f => f.Size <= 0).Select(f => f.Hash)));
 
         CurrentDownloads = downloadFileInfoFromService.Distinct().Select(d => new DownloadFileTransfer(d))
             .Where(d => d.CanBeTransferred).ToList();
@@ -132,13 +132,13 @@ public partial class FileDownloadManager : MediatorSubscriberBase
                 catch (OperationCanceledException)
                 {
                     File.Delete(tempPath);
-                    _logger.LogDebug("Detected cancellation, removing {id}", aliasOrUid);
+                    Logger.LogDebug("Detected cancellation, removing {id}", aliasOrUid);
                     CancelDownload();
                     return;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error during download of {hash}", file.Hash);
+                    Logger.LogError(ex, "Error during download of {hash}", file.Hash);
                     continue;
                 }
                 finally
@@ -170,12 +170,12 @@ public partial class FileDownloadManager : MediatorSubscriberBase
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Issue creating cache entry");
+                    Logger.LogWarning(ex, "Issue creating cache entry");
                 }
             }
         }).ConfigureAwait(false);
 
-        _logger.LogDebug("Download for {id} complete", aliasOrUid);
+        Logger.LogDebug("Download for {id} complete", aliasOrUid);
         CancelDownload();
     }
 
@@ -230,7 +230,7 @@ public partial class FileDownloadManager : MediatorSubscriberBase
             localTimeoutCts.Dispose();
             composite.Dispose();
 
-            _logger.LogDebug("Download {requestId} ready", requestId);
+            Logger.LogDebug("Download {requestId} ready", requestId);
         }
         catch (TaskCanceledException)
         {
@@ -267,7 +267,7 @@ public partial class FileDownloadManager : MediatorSubscriberBase
     {
         var requestId = await GetQueueRequest(fileTransfer, ct).ConfigureAwait(false);
 
-        _logger.LogDebug("GUID {requestId} for file {hash} on server {uri}", requestId, fileTransfer.Hash, fileTransfer.DownloadUri);
+        Logger.LogDebug("GUID {requestId} for file {hash} on server {uri}", requestId, fileTransfer.Hash, fileTransfer.DownloadUri);
 
         await WaitForDownloadReady(fileTransfer, requestId, ct).ConfigureAwait(false);
 
@@ -276,7 +276,7 @@ public partial class FileDownloadManager : MediatorSubscriberBase
         HttpResponseMessage response = null!;
         var requestUrl = MareFiles.CacheGetFullPath(fileTransfer.DownloadUri, requestId);
 
-        _logger.LogDebug("Downloading {requestUrl} for file {hash}", requestUrl, fileTransfer.Hash);
+        Logger.LogDebug("Downloading {requestUrl} for file {hash}", requestUrl, fileTransfer.Hash);
         try
         {
             response = await _orchestrator.SendRequestAsync(HttpMethod.Get, requestUrl, ct).ConfigureAwait(false);
@@ -284,7 +284,7 @@ public partial class FileDownloadManager : MediatorSubscriberBase
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogWarning(ex, "Error during download of {requestUrl}, HttpStatusCode: {code}", requestUrl, ex.StatusCode);
+            Logger.LogWarning(ex, "Error during download of {requestUrl}, HttpStatusCode: {code}", requestUrl, ex.StatusCode);
             if (ex.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.Unauthorized)
             {
                 throw new InvalidDataException($"Http error {ex.StatusCode} (cancelled: {ct.IsCancellationRequested}): {requestUrl}", ex);
@@ -309,12 +309,12 @@ public partial class FileDownloadManager : MediatorSubscriberBase
                     progress.Report(bytesRead);
                 }
 
-                _logger.LogDebug("{requestUrl} downloaded to {tempPath}", requestUrl, tempPath);
+                Logger.LogDebug("{requestUrl} downloaded to {tempPath}", requestUrl, tempPath);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Error during file download of {requestUrl}", requestUrl);
+            Logger.LogWarning(ex, "Error during file download of {requestUrl}", requestUrl);
             try
             {
                 if (!tempPath.IsNullOrEmpty())

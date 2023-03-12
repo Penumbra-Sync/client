@@ -86,11 +86,11 @@ public class FileTransferOrchestrator : MediatorSubscriberBase
         if (requestMessage.Content != null && requestMessage.Content is not StreamContent)
         {
             var content = await ((JsonContent)requestMessage.Content).ReadAsStringAsync().ConfigureAwait(false);
-            _logger.LogDebug("Sending {method} to {uri} (Content: {content})", requestMessage.Method, requestMessage.RequestUri, content);
+            Logger.LogDebug("Sending {method} to {uri} (Content: {content})", requestMessage.Method, requestMessage.RequestUri, content);
         }
         else
         {
-            _logger.LogDebug("Sending {method} to {uri}", requestMessage.Method, requestMessage.RequestUri);
+            Logger.LogDebug("Sending {method} to {uri}", requestMessage.Method, requestMessage.RequestUri);
         }
 
         try
@@ -101,7 +101,7 @@ public class FileTransferOrchestrator : MediatorSubscriberBase
         }
         catch (Exception ex)
         {
-            _logger.LogCritical(ex, "Error during SendRequestInternal for {uri}", requestMessage.RequestUri);
+            Logger.LogCritical(ex, "Error during SendRequestInternal for {uri}", requestMessage.RequestUri);
             throw;
         }
     }

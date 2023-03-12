@@ -24,7 +24,7 @@ public class NotificationService : MediatorSubscriberBase
 
     private void ShowNotification(NotificationMessage msg)
     {
-        _logger.LogInformation(msg.ToString());
+        Logger.LogInformation(msg.ToString());
 
         switch (msg.Type)
         {

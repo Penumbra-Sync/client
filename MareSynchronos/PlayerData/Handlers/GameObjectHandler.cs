@@ -112,7 +112,7 @@ public class GameObjectHandler : MediatorSubscriberBase
 
     private unsafe bool IsBeingDrawn(IntPtr drawObj, IntPtr curPtr)
     {
-        _logger.LogTrace("IsBeingDrawn for ptr {curPtr} : {drawObj}", curPtr.ToString("X"), drawObj.ToString("X"));
+        Logger.LogTrace("IsBeingDrawn for ptr {curPtr} : {drawObj}", curPtr.ToString("X"), drawObj.ToString("X"));
         return drawObj == IntPtr.Zero
                        || (((CharacterBase*)drawObj)->HasModelInSlotLoaded != 0)
                        || (((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0)
@@ -159,14 +159,14 @@ public class GameObjectHandler : MediatorSubscriberBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during checking for draw object for {name}", this);
+            Logger.LogError(ex, "Error during checking for draw object for {name}", this);
         }
 
         if (curPtr != IntPtr.Zero && DrawObjectAddress != IntPtr.Zero)
         {
             if (_clearCts != null)
             {
-                _logger.LogDebug("[{this}] Cancelling Clear Task", this);
+                Logger.LogDebug("[{this}] Cancelling Clear Task", this);
                 _clearCts?.Cancel();
                 _clearCts = null;
             }
@@ -179,7 +179,7 @@ public class GameObjectHandler : MediatorSubscriberBase
             bool equipDiff = CompareAndUpdateEquipByteData(chara->EquipSlotData);
             if (equipDiff && !_isOwnedObject && !_ignoreSendAfterRedraw) // send the message out immediately and cancel out, no reason to continue if not self
             {
-                _logger.LogTrace("[{this}] Changed", this);
+                Logger.LogTrace("[{this}] Changed", this);
                 Mediator.Publish(new CharacterChangedMessage(this));
                 return;
             }
@@ -188,9 +188,9 @@ public class GameObjectHandler : MediatorSubscriberBase
 
             if ((addrDiff || equipDiff || customizeDiff || drawObjDiff || nameChange) && _isOwnedObject)
             {
-                _logger.LogTrace("[{this}] Changed", this);
+                Logger.LogTrace("[{this}] Changed", this);
 
-                _logger.LogDebug("[{this}] Sending CreateCacheObjectMessage", this);
+                Logger.LogDebug("[{this}] Sending CreateCacheObjectMessage", this);
                 Mediator.Publish(new CreateCacheForObjectMessage(this));
             }
         }
@@ -198,7 +198,7 @@ public class GameObjectHandler : MediatorSubscriberBase
         {
             Address = IntPtr.Zero;
             DrawObjectAddress = IntPtr.Zero;
-            _logger.LogTrace("[{this}] Changed -> Null", this);
+            Logger.LogTrace("[{this}] Changed -> Null", this);
             if (_isOwnedObject && ObjectKind != ObjectKind.Player)
             {
                 _clearCts?.Cancel();
@@ -212,9 +212,9 @@ public class GameObjectHandler : MediatorSubscriberBase
 
     private async Task ClearTask(CancellationToken token)
     {
-        _logger.LogDebug("[{this}] Running Clear Task", this);
+        Logger.LogDebug("[{this}] Running Clear Task", this);
         await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
-        _logger.LogDebug("[{this}] Sending ClearCachedForObjectMessage", this);
+        Logger.LogDebug("[{this}] Sending ClearCachedForObjectMessage", this);
         Mediator.Publish(new ClearCacheForObjectMessage(this));
         _clearCts = null;
     }
@@ -263,7 +263,7 @@ public class GameObjectHandler : MediatorSubscriberBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Error during FrameworkUpdate of {this}", this);
+            Logger.LogWarning(ex, "Error during FrameworkUpdate of {this}", this);
         }
     }
 
@@ -282,7 +282,7 @@ public class GameObjectHandler : MediatorSubscriberBase
         if (!_isOwnedObject || _haltProcessing) return;
 
         _zoningCts = new();
-        _logger.LogDebug("[{obj}] Starting Delay After Zoning", this);
+        Logger.LogDebug("[{obj}] Starting Delay After Zoning", this);
         _delayedZoningTask = Task.Run(async () =>
         {
             try
@@ -295,7 +295,7 @@ public class GameObjectHandler : MediatorSubscriberBase
             }
             finally
             {
-                _logger.LogDebug("[{this}] Delay after zoning complete", this);
+                Logger.LogDebug("[{this}] Delay after zoning complete", this);
                 _zoningCts.Dispose();
             }
         });

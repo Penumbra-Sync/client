@@ -4,11 +4,11 @@ namespace MareSynchronos.Services.Mediator;
 
 public abstract class MediatorSubscriberBase : IMediatorSubscriber
 {
-    protected ILogger _logger { get; }
+    protected ILogger Logger { get; }
     public MareMediator Mediator { get; }
     protected MediatorSubscriberBase(ILogger logger, MareMediator mediator)
     {
-        _logger = logger;
+        Logger = logger;
         Mediator = mediator;
     }
 
@@ -20,7 +20,7 @@ public abstract class MediatorSubscriberBase : IMediatorSubscriber
 
     protected virtual void Dispose(bool disposing)
     {
-        _logger.LogTrace("Disposing {type} ({this})", GetType(), this);
+        Logger.LogTrace("Disposing {type} ({this})", GetType(), this);
         Mediator.UnsubscribeAll(this);
     }
 }

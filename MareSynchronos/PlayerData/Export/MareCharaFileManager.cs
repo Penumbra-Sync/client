@@ -22,7 +22,7 @@ public class MareCharaFileManager
     private readonly MareCharaFileDataFactory _factory;
     public MareCharaFileHeader? LoadedCharaFile { get; private set; }
     public bool CurrentlyWorking { get; private set; } = false;
-    private static int _globalFileCounter = 0;
+    private int _globalFileCounter = 0;
 
     public MareCharaFileManager(ILogger<MareCharaFileManager> logger, GameObjectHandlerFactory gameObjectHandlerFactory,
         FileCacheManager manager, IpcManager ipcManager, MareConfigService configService, DalamudUtil dalamudUtil)

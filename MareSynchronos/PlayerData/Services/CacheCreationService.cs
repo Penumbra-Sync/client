@@ -102,24 +102,24 @@ public class CacheCreationService : MediatorSubscriberBase
                     {
                         await Task.Delay(100).ConfigureAwait(false);
                         maxWaitingTime -= 100;
-                        _logger.LogTrace("Waiting for Cache to be ready");
+                        Logger.LogTrace("Waiting for Cache to be ready");
                     }
 
                     Mediator.Publish(new CharacterDataCreatedMessage(_playerData.ToAPI()));
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogCritical(ex, "Error during Cache Creation Processing");
+                    Logger.LogCritical(ex, "Error during Cache Creation Processing");
                 }
                 finally
                 {
-                    _logger.LogDebug("Cache Creation complete");
+                    Logger.LogDebug("Cache Creation complete");
                 }
             }, _cts.Token);
         }
         else if (_cachesToCreate.Any())
         {
-            _logger.LogDebug("Cache Creation stored until previous creation finished");
+            Logger.LogDebug("Cache Creation stored until previous creation finished");
         }
     }
 

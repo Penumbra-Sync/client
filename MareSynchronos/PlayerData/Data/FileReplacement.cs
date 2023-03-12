@@ -15,7 +15,7 @@ public partial class FileReplacement
 
     public bool Computed => IsFileSwap || !HasFileReplacement || !string.IsNullOrEmpty(Hash);
 
-    public HashSet<string> GamePaths { get; init; } = new(StringComparer.Ordinal);
+    public HashSet<string> GamePaths { get; init; }
 
     public bool HasFileReplacement => GamePaths.Count >= 1 && GamePaths.Any(p => !string.Equals(p, ResolvedPath, StringComparison.Ordinal));
 
@@ -25,7 +25,7 @@ public partial class FileReplacement
 
     private readonly Lazy<string> _hashLazy;
 
-    public string ResolvedPath { get; init; } = string.Empty;
+    public string ResolvedPath { get; init; }
 
     public FileReplacementData ToFileReplacementDto()
     {

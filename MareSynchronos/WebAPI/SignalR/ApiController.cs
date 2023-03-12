@@ -38,7 +38,7 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
     public ApiController(ILogger<ApiController> logger, HubFactory hubFactory, DalamudUtil dalamudUtil,
         PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
     {
-        _logger.LogTrace("Creating " + nameof(ApiController));
+        Logger.LogTrace("Creating " + nameof(ApiController));
 
         _hubFactory = hubFactory;
         _dalamudUtil = dalamudUtil;
@@ -87,18 +87,18 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
         get => _serverState;
         private set
         {
-            _logger.LogDebug("New ServerState: {value}, prev ServerState: {_serverState}", value, _serverState);
+            Logger.LogDebug("New ServerState: {value}, prev ServerState: {_serverState}", value, _serverState);
             _serverState = value;
         }
     }
 
     public async Task CreateConnections(bool forceGetToken = false)
     {
-        _logger.LogDebug("CreateConnections called");
+        Logger.LogDebug("CreateConnections called");
 
         if (_serverManager.CurrentServer?.FullPause ?? true)
         {
-            _logger.LogInformation("Not recreating Connection, paused");
+            Logger.LogInformation("Not recreating Connection, paused");
             _connectionDto = null;
             await StopConnection(ServerState.Disconnected).ConfigureAwait(false);
             _connectionCancellationTokenSource.Cancel();
@@ -108,7 +108,7 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
         var secretKey = _serverManager.GetSecretKey();
         if (secretKey.IsNullOrEmpty())
         {
-            _logger.LogWarning("No secret key set for current character");
+            Logger.LogWarning("No secret key set for current character");
             _connectionDto = null;
             await StopConnection(ServerState.NoSecretKey).ConfigureAwait(false);
             _connectionCancellationTokenSource.Cancel();
@@ -117,7 +117,7 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
 
         await StopConnection(ServerState.Disconnected).ConfigureAwait(false);
 
-        _logger.LogInformation("Recreating Connection");
+        Logger.LogInformation("Recreating Connection");
 
         _connectionCancellationTokenSource.Cancel();
         _connectionCancellationTokenSource = new CancellationTokenSource();
@@ -131,11 +131,11 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
 
             try
             {
-                _logger.LogDebug("Building connection");
+                Logger.LogDebug("Building connection");
 
                 if (_serverManager.GetToken() == null || forceGetToken)
                 {
-                    _logger.LogDebug("Requesting new JWT");
+                    Logger.LogDebug("Requesting new JWT");
                     using HttpClient httpClient = new();
                     var postUri = MareAuth.AuthFullPath(new Uri(_serverManager.CurrentApiUrl
                         .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
@@ -149,12 +149,12 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
                     AuthFailureMessage = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
                     result.EnsureSuccessStatusCode();
                     _serverManager.SaveToken(await result.Content.ReadAsStringAsync().ConfigureAwait(false));
-                    _logger.LogDebug("JWT Success");
+                    Logger.LogDebug("JWT Success");
                 }
 
                 while (!_dalamudUtil.IsPlayerPresent && !token.IsCancellationRequested)
                 {
-                    _logger.LogDebug("Player not loaded in yet, waiting");
+                    Logger.LogDebug("Player not loaded in yet, waiting");
                     await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
                 }
 
@@ -178,7 +178,7 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
             }
             catch (HttpRequestException ex)
             {
-                _logger.LogWarning(ex, "HttpRequestException on Connection");
+                Logger.LogWarning(ex, "HttpRequestException on Connection");
 
                 if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
@@ -187,14 +187,14 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
                 }
 
                 ServerState = ServerState.Reconnecting;
-                _logger.LogInformation("Failed to establish connection, retrying");
+                Logger.LogInformation("Failed to establish connection, retrying");
                 await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Exception on Connection");
+                Logger.LogWarning(ex, "Exception on Connection");
 
-                _logger.LogInformation("Failed to establish connection, retrying");
+                Logger.LogInformation("Failed to establish connection, retrying");
                 await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token).ConfigureAwait(false);
             }
         }
@@ -206,7 +206,7 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
         {
             await Task.Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
             _ = await CheckClientHealth().ConfigureAwait(false);
-            _logger.LogDebug("Checked Client Health State");
+            Logger.LogDebug("Checked Client Health State");
         }
     }
 
@@ -214,7 +214,7 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
     {
         if (_mareHub == null) return;
 
-        _logger.LogDebug("Initializing data");
+        Logger.LogDebug("Initializing data");
         OnDownloadReady((guid) => Client_DownloadReady(guid));
         OnReceiveServerMessage((sev, msg) => Client_ReceiveServerMessage(sev, msg));
         OnUpdateSystemInfo((dto) => Client_UpdateSystemInfo(dto));
@@ -238,12 +238,12 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
 
         foreach (var userPair in await UserGetPairedClients().ConfigureAwait(false))
         {
-            _logger.LogDebug("Individual Pair: {userPair}", userPair);
+            Logger.LogDebug("Individual Pair: {userPair}", userPair);
             _pairManager.AddUserPair(userPair, addToLastAddedUser: false);
         }
         foreach (var entry in await GroupsGetAll().ConfigureAwait(false))
         {
-            _logger.LogDebug("Group: {entry}", entry);
+            Logger.LogDebug("Group: {entry}", entry);
             _pairManager.AddGroup(entry);
         }
         foreach (var group in _pairManager.GroupPairs.Keys)
@@ -251,7 +251,7 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
             var users = await GroupsGetUsersInGroup(group).ConfigureAwait(false);
             foreach (var user in users)
             {
-                _logger.LogDebug("Group Pair: {user}", user);
+                Logger.LogDebug("Group Pair: {user}", user);
                 _pairManager.AddGroupPair(user);
             }
         }
@@ -284,11 +284,11 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
         ServerState = ServerState.Offline;
         if (arg != null)
         {
-            _logger.LogWarning(arg, "Connection closed");
+            Logger.LogWarning(arg, "Connection closed");
         }
         else
         {
-            _logger.LogInformation("Connection closed");
+            Logger.LogInformation("Connection closed");
         }
     }
 
@@ -298,7 +298,7 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
         _healthCheckTokenSource?.Cancel();
         ServerState = ServerState.Reconnecting;
         Mediator.Publish(new NotificationMessage("Connection lost", "Connection lost to " + _serverManager.CurrentServer!.ServerName, NotificationType.Warning, 5000));
-        _logger.LogWarning(arg, "Connection closed... Reconnecting");
+        Logger.LogWarning(arg, "Connection closed... Reconnecting");
     }
 
     private async Task MareHubOnReconnected()
@@ -317,7 +317,7 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
         }
         catch (Exception ex)
         {
-            _logger.LogCritical(ex, "Failure to obtain data after reconnection");
+            Logger.LogCritical(ex, "Failure to obtain data after reconnection");
             await StopConnection(ServerState.Disconnected).ConfigureAwait(false);
         }
 
@@ -331,7 +331,7 @@ public partial class ApiController : MediatorSubscriberBase, IMareHubClient
         {
             _initialized = false;
             _healthCheckTokenSource?.Cancel();
-            _logger.LogInformation("Stopping existing connection");
+            Logger.LogInformation("Stopping existing connection");
             await _hubFactory.DisposeHubAsync().ConfigureAwait(false);
             Mediator.Publish(new DisconnectedMessage());
             _mareHub = null;

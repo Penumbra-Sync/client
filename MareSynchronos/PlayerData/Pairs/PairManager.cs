@@ -117,7 +117,7 @@ public class PairManager : MediatorSubscriberBase
 
     public void ClearPairs()
     {
-        _logger.LogDebug("Clearing all Pairs");
+        Logger.LogDebug("Clearing all Pairs");
         DisposePairs();
         _allClientPairs.Clear();
         _allGroups.Clear();
@@ -132,7 +132,7 @@ public class PairManager : MediatorSubscriberBase
 
     private void DisposePairs(bool recreate = false)
     {
-        _logger.LogDebug("Disposing all Pairs");
+        Logger.LogDebug("Disposing all Pairs");
         foreach (var item in _allClientPairs)
         {
             if (recreate)
@@ -244,7 +244,7 @@ public class PairManager : MediatorSubscriberBase
 
         pair.UserPair.OtherPermissions = dto.Permissions;
 
-        _logger.LogTrace("Paired: {synced}, Paused: {paused}, Anims: {anims}, Sounds: {sounds}",
+        Logger.LogTrace("Paired: {synced}, Paused: {paused}, Anims: {anims}, Sounds: {sounds}",
             pair.UserPair.OwnPermissions.IsPaired(), pair.UserPair.OwnPermissions.IsPaused(), pair.UserPair.OwnPermissions.IsDisableAnimations(), pair.UserPair.OwnPermissions.IsDisableSounds());
         pair.ApplyLastReceivedData();
     }
@@ -260,7 +260,7 @@ public class PairManager : MediatorSubscriberBase
 
         pair.UserPair.OwnPermissions = dto.Permissions;
 
-        _logger.LogTrace("Paired: {synced}, Paused: {paused}, Anims: {anims}, Sounds: {sounds}",
+        Logger.LogTrace("Paired: {synced}, Paused: {paused}, Anims: {anims}, Sounds: {sounds}",
             pair.UserPair.OwnPermissions.IsPaired(), pair.UserPair.OwnPermissions.IsPaused(), pair.UserPair.OwnPermissions.IsDisableAnimations(), pair.UserPair.OwnPermissions.IsDisableSounds());
 
         pair.ApplyLastReceivedData();

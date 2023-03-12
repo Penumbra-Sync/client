@@ -19,7 +19,7 @@ public partial class ApiController
         }
         catch (Exception ex)
         {
-            _logger.LogCritical(ex, "Error on executing safely");
+            Logger.LogCritical(ex, "Error on executing safely");
         }
     }
 
@@ -55,7 +55,7 @@ public partial class ApiController
 
     public Task Client_GroupSendFullInfo(GroupFullInfoDto groupInfo)
     {
-        _logger.LogTrace("Client_GroupSendFullInfo: {dto}", groupInfo);
+        Logger.LogTrace("Client_GroupSendFullInfo: {dto}", groupInfo);
         ExecuteSafely(() => _pairManager.AddGroup(groupInfo));
         return Task.CompletedTask;
     }
@@ -68,7 +68,7 @@ public partial class ApiController
 
     public Task Client_GroupSendInfo(GroupInfoDto groupInfo)
     {
-        _logger.LogTrace("Client_GroupSendInfo: {dto}", groupInfo);
+        Logger.LogTrace("Client_GroupSendInfo: {dto}", groupInfo);
         ExecuteSafely(() => _pairManager.SetGroupInfo(groupInfo));
         return Task.CompletedTask;
     }
@@ -81,7 +81,7 @@ public partial class ApiController
 
     public Task Client_GroupDelete(GroupDto groupDto)
     {
-        _logger.LogTrace("Client_GroupDelete: {dto}", groupDto);
+        Logger.LogTrace("Client_GroupDelete: {dto}", groupDto);
         ExecuteSafely(() => _pairManager.RemoveGroup(groupDto.Group));
         return Task.CompletedTask;
     }
@@ -94,7 +94,7 @@ public partial class ApiController
 
     public Task Client_GroupPairJoined(GroupPairFullInfoDto groupPairInfoDto)
     {
-        _logger.LogTrace("Client_GroupPairJoined: {dto}", groupPairInfoDto);
+        Logger.LogTrace("Client_GroupPairJoined: {dto}", groupPairInfoDto);
         ExecuteSafely(() => _pairManager.AddGroupPair(groupPairInfoDto));
         return Task.CompletedTask;
     }
@@ -107,7 +107,7 @@ public partial class ApiController
 
     public Task Client_GroupPairLeft(GroupPairDto groupPairDto)
     {
-        _logger.LogTrace("Client_GroupPairLeft: {dto}", groupPairDto);
+        Logger.LogTrace("Client_GroupPairLeft: {dto}", groupPairDto);
         ExecuteSafely(() => _pairManager.RemoveGroupPair(groupPairDto));
         return Task.CompletedTask;
     }
@@ -120,7 +120,7 @@ public partial class ApiController
 
     public Task Client_GroupChangePermissions(GroupPermissionDto groupPermission)
     {
-        _logger.LogTrace("Client_GroupChangePermissions: {perm}", groupPermission);
+        Logger.LogTrace("Client_GroupChangePermissions: {perm}", groupPermission);
         ExecuteSafely(() => _pairManager.SetGroupPermissions(groupPermission));
         return Task.CompletedTask;
     }
@@ -133,7 +133,7 @@ public partial class ApiController
 
     public Task Client_GroupPairChangePermissions(GroupPairUserPermissionDto permissionDto)
     {
-        _logger.LogTrace("Client_GroupPairChangePermissions: {perm}", permissionDto);
+        Logger.LogTrace("Client_GroupPairChangePermissions: {perm}", permissionDto);
         ExecuteSafely(() =>
         {
             if (string.Equals(permissionDto.UID, UID, StringComparison.Ordinal)) _pairManager.SetGroupUserPermissions(permissionDto);
@@ -150,7 +150,7 @@ public partial class ApiController
 
     public Task Client_GroupPairChangeUserInfo(GroupPairUserInfoDto userInfo)
     {
-        _logger.LogTrace("Client_GroupPairChangeUserInfo: {dto}", userInfo);
+        Logger.LogTrace("Client_GroupPairChangeUserInfo: {dto}", userInfo);
         ExecuteSafely(() =>
         {
             if (string.Equals(userInfo.UID, UID, StringComparison.Ordinal)) _pairManager.SetGroupStatusInfo(userInfo);
@@ -161,7 +161,7 @@ public partial class ApiController
 
     public Task Client_UserReceiveCharacterData(OnlineUserCharaDataDto dataDto)
     {
-        _logger.LogTrace("Client_UserReceiveCharacterData: {user}", dataDto.User);
+        Logger.LogTrace("Client_UserReceiveCharacterData: {user}", dataDto.User);
         ExecuteSafely(() => _pairManager.ReceiveCharaData(dataDto));
         return Task.CompletedTask;
     }
@@ -174,7 +174,7 @@ public partial class ApiController
 
     public Task Client_UserAddClientPair(UserPairDto dto)
     {
-        _logger.LogDebug("Client_UserAddClientPair: {dto}", dto);
+        Logger.LogDebug("Client_UserAddClientPair: {dto}", dto);
         ExecuteSafely(() => _pairManager.AddUserPair(dto));
         return Task.CompletedTask;
     }
@@ -187,7 +187,7 @@ public partial class ApiController
 
     public Task Client_UserRemoveClientPair(UserDto dto)
     {
-        _logger.LogDebug("Client_UserRemoveClientPair: {dto}", dto);
+        Logger.LogDebug("Client_UserRemoveClientPair: {dto}", dto);
         ExecuteSafely(() => _pairManager.RemoveUserPair(dto));
         return Task.CompletedTask;
     }
@@ -200,7 +200,7 @@ public partial class ApiController
 
     public Task Client_UserSendOffline(UserDto dto)
     {
-        _logger.LogDebug("Client_UserSendOffline: {dto}", dto);
+        Logger.LogDebug("Client_UserSendOffline: {dto}", dto);
         ExecuteSafely(() => _pairManager.MarkPairOffline(dto.User));
         return Task.CompletedTask;
     }
@@ -213,7 +213,7 @@ public partial class ApiController
 
     public Task Client_UserSendOnline(OnlineUserIdentDto dto)
     {
-        _logger.LogDebug("Client_UserSendOnline: {dto}", dto);
+        Logger.LogDebug("Client_UserSendOnline: {dto}", dto);
         ExecuteSafely(() => _pairManager.MarkPairOnline(dto));
         return Task.CompletedTask;
     }
@@ -226,7 +226,7 @@ public partial class ApiController
 
     public Task Client_UserUpdateOtherPairPermissions(UserPermissionsDto dto)
     {
-        _logger.LogDebug("Client_UserUpdateOtherPairPermissions: {dto}", dto);
+        Logger.LogDebug("Client_UserUpdateOtherPairPermissions: {dto}", dto);
         ExecuteSafely(() => _pairManager.UpdatePairPermissions(dto));
         return Task.CompletedTask;
     }
@@ -239,7 +239,7 @@ public partial class ApiController
 
     public Task Client_UserUpdateSelfPairPermissions(UserPermissionsDto dto)
     {
-        _logger.LogDebug("Client_UserUpdateSelfPairPermissions: {dto}", dto);
+        Logger.LogDebug("Client_UserUpdateSelfPairPermissions: {dto}", dto);
         ExecuteSafely(() => _pairManager.UpdateSelfPairPermissions(dto));
         return Task.CompletedTask;
     }
@@ -275,7 +275,7 @@ public partial class ApiController
 
     public Task Client_DownloadReady(Guid requestId)
     {
-        _logger.LogDebug("Server sent {requestId} ready", requestId);
+        Logger.LogDebug("Server sent {requestId} ready", requestId);
         Mediator.Publish(new DownloadReadyMessage(requestId));
         return Task.CompletedTask;
     }

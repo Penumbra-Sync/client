@@ -18,17 +18,17 @@ public partial class ApiController
         }
         catch (OperationCanceledException)
         {
-            _logger.LogDebug("Upload operation was cancelled");
+            Logger.LogDebug("Upload operation was cancelled");
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Error during upload of files");
+            Logger.LogWarning(ex, "Error during upload of files");
         }
     }
 
     private async Task PushCharacterDataInternal(CharacterData character, List<UserData> visibleCharacters)
     {
-        _logger.LogInformation("Pushing character data for {hash} to {charas}", character.DataHash.Value, string.Join(", ", visibleCharacters.Select(c => c.AliasOrUID)));
+        Logger.LogInformation("Pushing character data for {hash} to {charas}", character.DataHash.Value, string.Join(", ", visibleCharacters.Select(c => c.AliasOrUID)));
         StringBuilder sb = new();
         foreach (var kvp in character.FileReplacements.ToList())
         {
@@ -38,7 +38,7 @@ public partial class ApiController
         {
             sb.AppendLine($"GlamourerData for {item.Key}: {!string.IsNullOrEmpty(item.Value)}");
         }
-        _logger.LogDebug("Chara data contained: {nl} {data}", Environment.NewLine, sb.ToString());
+        Logger.LogDebug("Chara data contained: {nl} {data}", Environment.NewLine, sb.ToString());
         await UserPushData(new(visibleCharacters, character)).ConfigureAwait(false);
     }
 
@@ -57,7 +57,7 @@ public partial class ApiController
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to Push character data");
+            Logger.LogWarning(ex, "Failed to Push character data");
         }
     }
 

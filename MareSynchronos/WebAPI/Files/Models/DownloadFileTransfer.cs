@@ -9,7 +9,10 @@ public class DownloadFileTransfer : FileTransfer
     public Uri DownloadUri => new(Dto.Url);
     public override long Total
     {
-        set { }
+        set
+        {
+            // nothing to set
+        }
         get => Dto.Size;
     }
 

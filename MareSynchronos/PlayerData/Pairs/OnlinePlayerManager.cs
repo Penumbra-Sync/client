@@ -20,7 +20,7 @@ public class OnlinePlayerManager : MediatorSubscriberBase
     public OnlinePlayerManager(ILogger<OnlinePlayerManager> logger, ApiController apiController, DalamudUtil dalamudUtil,
         PairManager pairManager, MareMediator mediator, FileUploadManager fileTransferManager) : base(logger, mediator)
     {
-        _logger.LogTrace("Creating " + nameof(OnlinePlayerManager));
+        Logger.LogTrace("Creating " + nameof(OnlinePlayerManager));
         _apiController = apiController;
         _dalamudUtil = dalamudUtil;
         _pairManager = pairManager;
@@ -32,13 +32,13 @@ public class OnlinePlayerManager : MediatorSubscriberBase
             var newData = ((CharacterDataCreatedMessage)msg).CharacterData;
             if (_lastSentData == null || (!string.Equals(newData.DataHash.Value, _lastSentData.DataHash.Value, StringComparison.Ordinal)))
             {
-                _logger.LogDebug("Pushing data for visible players");
+                Logger.LogDebug("Pushing data for visible players");
                 _lastSentData = newData;
                 PushCharacterData(_pairManager.GetVisibleUsers());
             }
             else
             {
-                _logger.LogDebug("Not sending data for {hash}", newData.DataHash.Value);
+                Logger.LogDebug("Not sending data for {hash}", newData.DataHash.Value);
             }
         });
     }
@@ -67,7 +67,7 @@ public class OnlinePlayerManager : MediatorSubscriberBase
 
         if (newVisiblePlayers.Any())
         {
-            _logger.LogTrace("Has new visible players, pushing character data");
+            Logger.LogTrace("Has new visible players, pushing character data");
             PushCharacterData(newVisiblePlayers);
         }
     }

@@ -6,6 +6,7 @@ using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Linq;
 
 namespace MareSynchronos.FileCache;
 
@@ -36,17 +37,17 @@ public class TransientResourceManager : MediatorSubscriberBase
 
                 try
                 {
-                    _logger.LogDebug("Loaded persistent transient resource {path}", gamePath);
+                    Logger.LogDebug("Loaded persistent transient resource {path}", gamePath);
                     SemiTransientResources[ObjectKind.Player].Add(gamePath);
                     restored++;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Error during loading persistent transient resource {path}", gamePath);
+                    Logger.LogWarning(ex, "Error during loading persistent transient resource {path}", gamePath);
                 }
 
             }
-            _logger.LogDebug("Restored {restored}/{total} semi persistent resources", restored, gamePaths.Count);
+            Logger.LogDebug("Restored {restored}/{total} semi persistent resources", restored, gamePaths.Count);
         }
 
         Mediator.Subscribe<PenumbraResourceLoadMessage>(this, (msg) => Manager_PenumbraResourceLoadEvent((PenumbraResourceLoadMessage)msg));
@@ -69,7 +70,7 @@ public class TransientResourceManager : MediatorSubscriberBase
     {
         Task.Run(() =>
         {
-            _logger.LogDebug("Penumbra Mod Settings changed, verifying SemiTransientResources");
+            Logger.LogDebug("Penumbra Mod Settings changed, verifying SemiTransientResources");
             foreach (var item in SemiTransientResources)
             {
                 Mediator.Publish(new TransientResourceChangedMessage(_dalamudUtil.PlayerPointer));
@@ -87,13 +88,10 @@ public class TransientResourceManager : MediatorSubscriberBase
 
     private void DalamudUtil_FrameworkUpdate()
     {
-        foreach (var item in TransientResources.ToList())
+        foreach (var item in TransientResources.Where(item => !_dalamudUtil.IsGameObjectPresent(item.Key)).Select(i => i.Key).ToList())
         {
-            if (!_dalamudUtil.IsGameObjectPresent(item.Key))
-            {
-                _logger.LogDebug("Object not present anymore: " + item.Key.ToString("X"));
-                TransientResources.TryRemove(item.Key, out _);
-            }
+            Logger.LogDebug("Object not present anymore: {addr}", item.ToString("X"));
+            TransientResources.TryRemove(item, out _);
         }
     }
 
@@ -167,12 +165,12 @@ public class TransientResourceManager : MediatorSubscriberBase
         if (TransientResources[gameObject].Contains(replacedGamePath) ||
             SemiTransientResources.Any(r => r.Value.Any(f => string.Equals(f, gamePath, StringComparison.OrdinalIgnoreCase))))
         {
-            _logger.LogTrace("Not adding {replacedPath} : {filePath}", replacedGamePath, filePath);
+            Logger.LogTrace("Not adding {replacedPath} : {filePath}", replacedGamePath, filePath);
         }
         else
         {
             TransientResources[gameObject].Add(replacedGamePath);
-            _logger.LogDebug("Adding {replacedGamePath} for {gameObject} ({filePath})", replacedGamePath, gameObject.ToString("X"), filePath);
+            Logger.LogDebug("Adding {replacedGamePath} for {gameObject} ({filePath})", replacedGamePath, gameObject.ToString("X"), filePath);
             Mediator.Publish(new TransientResourceChangedMessage(gameObject));
         }
     }
@@ -190,7 +188,7 @@ public class TransientResourceManager : MediatorSubscriberBase
         }
 
         var transientResources = resources.ToList();
-        _logger.LogDebug("Persisting " + transientResources.Count + " transient resources");
+        Logger.LogDebug("Persisting {count} transient resources", transientResources.Count);
         foreach (var gamePath in transientResources)
         {
             SemiTransientResources[objectKind].Add(gamePath);

@@ -102,12 +102,12 @@ public class MarePlugin : MediatorSubscriberBase
 
         _serviceProvider.Dispose();
 
-        _logger.LogDebug("Shut down");
+        Logger.LogDebug("Shut down");
     }
 
     private void DalamudUtilOnLogIn()
     {
-        _logger?.LogDebug("Client login");
+        Logger?.LogDebug("Client login");
 
         var pi = _serviceProvider.GetRequiredService<DalamudPluginInterface>();
         pi.UiBuilder.Draw += Draw;
@@ -130,7 +130,7 @@ public class MarePlugin : MediatorSubscriberBase
 
     private void DalamudUtilOnLogOut()
     {
-        _logger?.LogDebug("Client logout");
+        Logger?.LogDebug("Client logout");
 
         _runtimeServiceScope?.Dispose();
         var pi = _serviceProvider.GetRequiredService<DalamudPluginInterface>();
@@ -149,7 +149,7 @@ public class MarePlugin : MediatorSubscriberBase
 
         try
         {
-            _logger?.LogDebug("Launching Managers");
+            Logger?.LogDebug("Launching Managers");
 
             _runtimeServiceScope?.Dispose();
             _runtimeServiceScope = _serviceProvider.CreateScope();
@@ -159,7 +159,7 @@ public class MarePlugin : MediatorSubscriberBase
         }
         catch (Exception ex)
         {
-            _logger?.LogCritical(ex, "Error during launch of managers");
+            Logger?.LogCritical(ex, "Error during launch of managers");
         }
     }
 

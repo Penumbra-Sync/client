@@ -28,7 +28,7 @@ public class HubFactory : MediatorSubscriberBase
 
     private HubConnection BuildHubConnection()
     {
-        _logger.LogDebug("Building new HubConnection");
+        Logger.LogDebug("Building new HubConnection");
 
         _instance = new HubConnectionBuilder()
             .WithUrl(_serverConfigurationManager.CurrentApiUrl + IMareHub.Path, options =>
@@ -101,7 +101,7 @@ public class HubFactory : MediatorSubscriberBase
     {
         if (_instance == null || _isDisposed) return;
 
-        _logger.LogDebug("Disposing current HubConnection");
+        Logger.LogDebug("Disposing current HubConnection");
 
         _isDisposed = true;
 

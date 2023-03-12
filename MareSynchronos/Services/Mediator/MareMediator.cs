@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using System.Text;
+using System.Linq;
 
 namespace MareSynchronos.Services.Mediator;
 
@@ -108,13 +109,11 @@ public sealed class MareMediator : IDisposable
             _logger.LogInformation("Subscriber {type}: {sub}", kvp.Subscriber.GetType().FullName, kvp.Subscriber.ToString());
             StringBuilder sb = new();
             sb.Append("=> ");
-            foreach (var item in _subscriberDict.ToList())
+            foreach (var item in _subscriberDict.Where(item => item.Value.Any(v => v.Subscriber == kvp.Subscriber)).ToList())
             {
-                if (item.Value.Any(v => v.Subscriber == kvp.Subscriber))
-                {
-                    sb.Append(item.Key.Name + ", ");
-                }
+                sb.Append(item.Key.Name).Append(", ");
             }
+
             if (!string.Equals(sb.ToString(), "=> ", StringComparison.Ordinal))
                 _logger.LogInformation("{sb}", sb.ToString());
             _logger.LogInformation("---");

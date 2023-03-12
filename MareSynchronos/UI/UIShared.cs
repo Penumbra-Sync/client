@@ -158,12 +158,12 @@ public partial class UiShared : MediatorSubscriberBase
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Font failed to load. {fontFile}", fontFile);
+                Logger.LogWarning(ex, "Font failed to load. {fontFile}", fontFile);
             }
         }
         else
         {
-            _logger.LogDebug("Font doesn't exist. {fontFile}", fontFile);
+            Logger.LogDebug("Font doesn't exist. {fontFile}", fontFile);
         }
     }
 
@@ -726,7 +726,7 @@ public partial class UiShared : MediatorSubscriberBase
             }
             catch
             {
-                _logger.LogWarning("Could not parse {note}", note);
+                Logger.LogWarning("Could not parse {note}", note);
             }
         }
 
