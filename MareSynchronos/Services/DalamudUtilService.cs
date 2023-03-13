@@ -3,6 +3,7 @@ using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
+using Dalamud.Game.Gui;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using MareSynchronos.PlayerData.Handlers;
@@ -10,6 +11,7 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Numerics;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 namespace MareSynchronos.Services;
@@ -19,6 +21,7 @@ public class DalamudUtilService : IHostedService
     private readonly ClientState _clientState;
     private readonly Condition _condition;
     private readonly Framework _framework;
+    private readonly GameGui _gameGui;
     private readonly ILogger<DalamudUtilService> _logger;
     private readonly MareMediator _mediator;
     private readonly ObjectTable _objectTable;
@@ -28,12 +31,13 @@ public class DalamudUtilService : IHostedService
     private bool _sentBetweenAreas = false;
 
     public DalamudUtilService(ILogger<DalamudUtilService> logger, ClientState clientState, ObjectTable objectTable, Framework framework,
-        Condition condition, Dalamud.Data.DataManager gameData, MareMediator mediator, PerformanceCollectorService performanceCollector)
+        GameGui gameGui, Condition condition, Dalamud.Data.DataManager gameData, MareMediator mediator, PerformanceCollectorService performanceCollector)
     {
         _logger = logger;
         _clientState = clientState;
         _objectTable = objectTable;
         _framework = framework;
+        _gameGui = gameGui;
         _condition = condition;
         _mediator = mediator;
         _performanceCollector = performanceCollector;
@@ -180,6 +184,12 @@ public class DalamudUtilService : IHostedService
 
         _framework.Update -= FrameworkOnUpdate;
         return Task.CompletedTask;
+    }
+
+    public Vector2 WorldToScreen(Dalamud.Game.ClientState.Objects.Types.GameObject? obj)
+    {
+        if (obj == null) return Vector2.Zero;
+        return _gameGui.WorldToScreen(obj.Position, out var screenPos) ? screenPos : Vector2.Zero;
     }
 
     public async Task WaitWhileCharacterIsDrawing(ILogger logger, GameObjectHandler handler, Guid redrawId, int timeOut = 5000, CancellationToken? ct = null)

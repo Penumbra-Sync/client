@@ -616,7 +616,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
     {
         _lastTab = "Transfers";
         bool showTransferWindow = _configService.Current.ShowTransferWindow;
-        if (ImGui.Checkbox("Show separate Transfer window while transfers are active", ref showTransferWindow))
+        if (ImGui.Checkbox("Show separate transfer window", ref showTransferWindow))
         {
             _configService.Current.ShowTransferWindow = showTransferWindow;
             _configService.Save();
@@ -631,6 +631,13 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 _uiShared.EditTrackerPosition = editTransferWindowPosition;
             }
             ImGui.Unindent();
+        }
+
+        bool showTransferBars = _configService.Current.ShowTransferBars;
+        if (ImGui.Checkbox("Show transfer bars rendered on players", ref showTransferBars))
+        {
+            _configService.Current.ShowTransferBars = showTransferBars;
+            _configService.Save();
         }
 
         // todo: fix

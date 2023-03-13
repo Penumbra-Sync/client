@@ -4,6 +4,7 @@ using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.Files;
 using MareSynchronos.API.Routes;
 using MareSynchronos.FileCache;
+using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.WebAPI.Files.Models;
 using Microsoft.Extensions.Logging;
@@ -47,12 +48,12 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         _downloadStatus.Clear();
     }
 
-    public async Task DownloadFiles(string aliasOrUid, List<FileReplacementData> fileReplacementDto, CancellationToken ct)
+    public async Task DownloadFiles(GameObjectHandler gameObject, List<FileReplacementData> fileReplacementDto, CancellationToken ct)
     {
         Mediator.Publish(new HaltScanMessage("Download"));
         try
         {
-            await DownloadFilesInternal(aliasOrUid, fileReplacementDto, ct).ConfigureAwait(false);
+            await DownloadFilesInternal(gameObject, fileReplacementDto, ct).ConfigureAwait(false);
         }
         catch
         {
@@ -60,7 +61,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         }
         finally
         {
-            Mediator.Publish(new DownloadFinishedMessage(aliasOrUid));
+            Mediator.Publish(new DownloadFinishedMessage(gameObject));
             Mediator.Publish(new ResumeScanMessage("Download"));
         }
     }
@@ -136,9 +137,12 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         }
     }
 
-    private async Task DownloadFilesInternal(string aliasOrUid, List<FileReplacementData> fileReplacement, CancellationToken ct)
+    private async Task DownloadFilesInternal(GameObjectHandler gameObjectHandler, List<FileReplacementData> fileReplacement, CancellationToken ct)
     {
-        Logger.LogDebug("Downloading files for {id}", aliasOrUid);
+        Logger.LogDebug("Downloading files for {id}", gameObjectHandler.Name);
+
+        // force create lazy
+        _ = gameObjectHandler.GameObjectLazy.Value;
 
         List<DownloadFileDto> downloadFileInfoFromService = new();
         downloadFileInfoFromService.AddRange(await FilesGetSizes(fileReplacement.Select(f => f.Hash).ToList(), ct).ConfigureAwait(false));
@@ -170,7 +174,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
             };
         }
 
-        Mediator.Publish(new DownloadStartedMessage(aliasOrUid, _downloadStatus));
+        Mediator.Publish(new DownloadStartedMessage(gameObjectHandler, _downloadStatus));
 
         await Parallel.ForEachAsync(downloadGroups, new ParallelOptions()
         {
@@ -203,7 +207,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                 catch (OperationCanceledException)
                 {
                     File.Delete(tempPath);
-                    Logger.LogDebug("Detected cancellation, removing {id}", aliasOrUid);
+                    Logger.LogDebug("Detected cancellation, removing {id}", gameObjectHandler);
                     CancelDownload();
                     return;
                 }
@@ -246,7 +250,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
             }
         }).ConfigureAwait(false);
 
-        Logger.LogDebug("Download for {id} complete", aliasOrUid);
+        Logger.LogDebug("Download for {id} complete", gameObjectHandler);
         CancelDownload();
     }
 

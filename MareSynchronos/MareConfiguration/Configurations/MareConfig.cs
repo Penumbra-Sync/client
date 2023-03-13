@@ -16,7 +16,8 @@ public class MareConfig : IMareConfiguration
     public bool InitialScanComplete { get; set; } = false;
     public bool DisableOptionalPluginWarnings { get; set; } = false;
     public bool OpenGposeImportOnGposeStart { get; set; } = false;
-    public bool ShowTransferWindow { get; set; } = true;
+    public bool ShowTransferWindow { get; set; } = false;
+    public bool ShowTransferBars { get; set; } = true;
     public bool OpenPopupOnAdd { get; set; } = true;
     public bool ShowOnlineNotifications { get; set; } = false;
     public bool ShowOnlineNotificationsOnlyForIndividualPairs { get; set; } = true;

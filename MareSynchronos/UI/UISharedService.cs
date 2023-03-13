@@ -159,6 +159,18 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     public static uint Color(byte r, byte g, byte b, byte a)
     { uint ret = a; ret <<= 8; ret += b; ret <<= 8; ret += g; ret <<= 8; ret += r; return ret; }
 
+    public static uint Color(Vector4 color)
+    {
+        uint ret = (byte)(color.W * 255);
+        ret <<= 8;
+        ret += (byte)(color.X * 255);
+        ret <<= 8;
+        ret += (byte)(color.Y * 255);
+        ret <<= 8;
+        ret += (byte)(color.Z * 255);
+        return ret;
+    }
+
     public static void ColorText(string text, Vector4 color)
     {
         ImGui.PushStyleColor(ImGuiCol.Text, color);

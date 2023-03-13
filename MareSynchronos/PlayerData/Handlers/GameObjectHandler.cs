@@ -5,6 +5,7 @@ using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
 using Penumbra.String;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;
 
@@ -84,7 +85,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
     public IntPtr Address { get; set; }
     public unsafe Character* Character => (Character*)Address;
-
+    public Lazy<Dalamud.Game.ClientState.Objects.Types.GameObject?> GameObjectLazy { get; private set; }
     public IntPtr CurrentAddress => _getAddress.Invoke();
     public string Name { get; private set; }
     public ObjectKind ObjectKind { get; }
@@ -159,6 +160,10 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             }
             bool addrDiff = Address != curPtr;
             Address = curPtr;
+            if (addrDiff)
+            {
+                GameObjectLazy = new(() => _dalamudUtil.CreateGameObject(curPtr));
+            }
             var chara = (Character*)curPtr;
             var name = new ByteString(chara->GameObject.Name).ToString();
             bool nameChange = !string.Equals(name, Name, StringComparison.Ordinal);

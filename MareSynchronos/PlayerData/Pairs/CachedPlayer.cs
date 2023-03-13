@@ -348,7 +348,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                     Logger.LogDebug("Downloading missing files for player {name}, {kind}", PlayerName, updatedData);
                     if (toDownloadReplacements.Any())
                     {
-                        await _downloadManager.DownloadFiles(OnlineUser.User.AliasOrUID, toDownloadReplacements, downloadToken).ConfigureAwait(false);
+                        await _downloadManager.DownloadFiles(_charaHandler, toDownloadReplacements, downloadToken).ConfigureAwait(false);
                         _downloadManager.CancelDownload();
                     }
 
