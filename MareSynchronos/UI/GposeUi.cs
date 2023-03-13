@@ -30,7 +30,12 @@ public class GposeUi : WindowMediatorSubscriberBase
         Mediator.Subscribe<GposeStartMessage>(this, (_) => StartGpose());
         Mediator.Subscribe<GposeEndMessage>(this, (_) => EndGpose());
         IsOpen = _dalamudUtil.IsInGpose;
-        Flags = ImGuiWindowFlags.AlwaysAutoResize;
+        //Flags = ImGuiWindowFlags.AlwaysAutoResize;
+        this.SizeConstraints = new()
+        {
+            MinimumSize = new(200, 200),
+            MaximumSize = new(400, 400)
+        };
     }
 
     public override void Draw()
