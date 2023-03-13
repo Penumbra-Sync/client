@@ -408,6 +408,23 @@ public class SettingsUi : WindowMediatorSubscriberBase
         UiSharedService.FontText("UI", _uiShared.UidFont);
         var showNameInsteadOfNotes = _configService.Current.ShowCharacterNameInsteadOfNotesForVisible;
         var reverseUserSort = _configService.Current.ReverseUserSort;
+        var showVisibleSeparate = _configService.Current.ShowVisibleUsersSeparately;
+        var showOfflineSeparate = _configService.Current.ShowOfflineUsersSeparately;
+
+        if (ImGui.Checkbox("Show separate Visible group", ref showVisibleSeparate))
+        {
+            _configService.Current.ShowVisibleUsersSeparately = showVisibleSeparate;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("This will show all currently visible users in a special 'Visible' group in the main UI.");
+
+        if (ImGui.Checkbox("Show separate Offline group", ref showOfflineSeparate))
+        {
+            _configService.Current.ShowOfflineUsersSeparately = showOfflineSeparate;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("This will show all currently offline users in a special 'Offline' group in the main UI.");
+
         if (ImGui.Checkbox("Show player name instead of note for visible players", ref showNameInsteadOfNotes))
         {
             _configService.Current.ShowCharacterNameInsteadOfNotesForVisible = showNameInsteadOfNotes;

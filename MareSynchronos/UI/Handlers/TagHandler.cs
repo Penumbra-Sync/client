@@ -7,6 +7,7 @@ public class TagHandler
 {
     public const string CustomOfflineTag = "Mare_Offline";
     public const string CustomOnlineTag = "Mare_Online";
+    public const string CustomUnpairedTag = "Mare_Unpaired";
     public const string CustomVisibleTag = "Mare_Visible";
     private readonly ServerConfigurationManager _serverConfigurationManager;
 
