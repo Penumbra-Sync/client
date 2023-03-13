@@ -70,6 +70,7 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
 {
     private readonly DalamudUtilService _dalamudUtil;
     private readonly MareConfigService _mareConfigService;
+    private readonly NotificationService _notificationService;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private IServiceScope? _runtimeServiceScope;
@@ -77,11 +78,13 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
     public MarePlugin(ILogger<MarePlugin> logger, MareConfigService mareConfigService,
         ServerConfigurationManager serverConfigurationManager,
         DalamudUtilService dalamudUtil,
+        NotificationService notificationService,
         IServiceScopeFactory serviceScopeFactory, MareMediator mediator) : base(logger, mediator)
     {
         _mareConfigService = mareConfigService;
         _serverConfigurationManager = serverConfigurationManager;
         _dalamudUtil = dalamudUtil;
+        _notificationService = notificationService;
         _serviceScopeFactory = serviceScopeFactory;
     }
 
@@ -93,6 +96,15 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
         Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => Task.Run(WaitForPlayerAndLaunchCharacterManager));
         Mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
         Mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
+
+#if !DEBUG
+        if (_mareConfigService.Current.LogLevel != LogLevel.Information)
+        {
+            Mediator.Publish(new NotificationMessage("Abnormal Log Level",
+                $"Your log level is set to {_mareConfigService.Current.LogLevel} which is not recommended for normal usage. Set it to {LogLevel.Information} in \"Mare Settings -> Debug\" unless instructed otherwise.",
+                Dalamud.Interface.Internal.Notifications.NotificationType.Error, 15000));
+        }
+#endif
 
         return Task.CompletedTask;
     }
