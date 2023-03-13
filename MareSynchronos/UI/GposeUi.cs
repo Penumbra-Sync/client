@@ -1,8 +1,6 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.ImGuiFileDialog;
-using Dalamud.Interface.Windowing;
-using ImGuiNET;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Export;
 using MareSynchronos.Services;
@@ -30,7 +28,6 @@ public class GposeUi : WindowMediatorSubscriberBase
         Mediator.Subscribe<GposeStartMessage>(this, (_) => StartGpose());
         Mediator.Subscribe<GposeEndMessage>(this, (_) => EndGpose());
         IsOpen = _dalamudUtil.IsInGpose;
-        //Flags = ImGuiWindowFlags.AlwaysAutoResize;
         this.SizeConstraints = new()
         {
             MinimumSize = new(200, 200),

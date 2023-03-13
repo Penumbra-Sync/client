@@ -1,6 +1,5 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
-using Dalamud.Interface.Windowing;
 using ImGuiNET;
 using MareSynchronos.WebAPI;
 using System.Numerics;

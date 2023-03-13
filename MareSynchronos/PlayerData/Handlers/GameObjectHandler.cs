@@ -5,7 +5,6 @@ using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
 using Penumbra.String;
-using System.Numerics;
 using System.Runtime.InteropServices;
 using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;
 
