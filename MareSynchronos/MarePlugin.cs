@@ -70,7 +70,6 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
 {
     private readonly DalamudUtilService _dalamudUtil;
     private readonly MareConfigService _mareConfigService;
-    private readonly NotificationService _notificationService;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private IServiceScope? _runtimeServiceScope;
@@ -78,13 +77,11 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
     public MarePlugin(ILogger<MarePlugin> logger, MareConfigService mareConfigService,
         ServerConfigurationManager serverConfigurationManager,
         DalamudUtilService dalamudUtil,
-        NotificationService notificationService,
         IServiceScopeFactory serviceScopeFactory, MareMediator mediator) : base(logger, mediator)
     {
         _mareConfigService = mareConfigService;
         _serverConfigurationManager = serverConfigurationManager;
         _dalamudUtil = dalamudUtil;
-        _notificationService = notificationService;
         _serviceScopeFactory = serviceScopeFactory;
     }
 
