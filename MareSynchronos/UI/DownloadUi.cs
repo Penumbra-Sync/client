@@ -1,8 +1,5 @@
-﻿using Dalamud.Game.Gui;
-using Dalamud.Interface.Colors;
-using Dalamud.Interface.Windowing;
+﻿using Dalamud.Interface.Colors;
 using ImGuiNET;
-using Lumina.Excel.GeneratedSheets;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services;
@@ -17,14 +14,14 @@ namespace MareSynchronos.UI;
 
 public class DownloadUi : WindowMediatorSubscriberBase
 {
-    private readonly DalamudUtilService _dalamudUtilService;
     private readonly MareConfigService _configService;
+    private readonly ConcurrentDictionary<GameObjectHandler, Dictionary<string, FileDownloadStatus>> _currentDownloads = new();
+    private readonly DalamudUtilService _dalamudUtilService;
     private readonly FileUploadManager _fileTransferManager;
     private readonly UiSharedService _uiShared;
-    private readonly ConcurrentDictionary<GameObjectHandler, Dictionary<string, FileDownloadStatus>> _currentDownloads = new();
 
-    public DownloadUi(ILogger<DownloadUi> logger, WindowSystem windowSystem, DalamudUtilService dalamudUtilService, MareConfigService configService,
-        FileUploadManager fileTransferManager, MareMediator mediator, UiSharedService uiShared) : base(logger, windowSystem, mediator, "Mare Synchronos Downloads")
+    public DownloadUi(ILogger<DownloadUi> logger, DalamudUtilService dalamudUtilService, MareConfigService configService,
+        FileUploadManager fileTransferManager, MareMediator mediator, UiSharedService uiShared) : base(logger, mediator, "Mare Synchronos Downloads")
     {
         _dalamudUtilService = dalamudUtilService;
         _configService = configService;
@@ -33,8 +30,8 @@ public class DownloadUi : WindowMediatorSubscriberBase
 
         SizeConstraints = new WindowSizeConstraints()
         {
-            MaximumSize = new Vector2(300, 90),
-            MinimumSize = new Vector2(300, 90),
+            MaximumSize = new Vector2(400, 90),
+            MinimumSize = new Vector2(400, 90),
         };
 
         Flags |= ImGuiWindowFlags.NoMove;
@@ -66,33 +63,6 @@ public class DownloadUi : WindowMediatorSubscriberBase
         {
             IsOpen = true;
         });
-    }
-
-    public override void PreDraw()
-    {
-        base.PreDraw();
-
-        if (_uiShared.EditTrackerPosition)
-        {
-            Flags &= ~ImGuiWindowFlags.NoMove;
-            Flags &= ~ImGuiWindowFlags.NoBackground;
-            Flags &= ~ImGuiWindowFlags.NoInputs;
-            Flags &= ~ImGuiWindowFlags.NoResize;
-        }
-        else
-        {
-            Flags |= ImGuiWindowFlags.NoMove;
-            Flags |= ImGuiWindowFlags.NoBackground;
-            Flags |= ImGuiWindowFlags.NoInputs;
-            Flags |= ImGuiWindowFlags.NoResize;
-        }
-
-        var maxHeight = ImGui.GetTextLineHeight() * (_configService.Current.ParallelDownloads + 3);
-        SizeConstraints = new()
-        {
-            MinimumSize = new Vector2(300, maxHeight),
-            MaximumSize = new Vector2(300, maxHeight),
-        };
     }
 
     public override void Draw()
@@ -135,7 +105,7 @@ public class DownloadUi : WindowMediatorSubscriberBase
 
             try
             {
-                foreach (var item in _currentDownloads)
+                foreach (var item in _currentDownloads.ToList())
                 {
                     var dlSlot = item.Value.Count(c => c.Value.DownloadStatus == DownloadStatus.WaitingForSlot);
                     var dlQueue = item.Value.Count(c => c.Value.DownloadStatus == DownloadStatus.WaitingForQueue);
@@ -165,45 +135,73 @@ public class DownloadUi : WindowMediatorSubscriberBase
 
         if (_configService.Current.ShowTransferBars)
         {
-
-            foreach (var transfer in _currentDownloads)
+            foreach (var transfer in _currentDownloads.ToList())
             {
                 var screenPos = _dalamudUtilService.WorldToScreen(transfer.Key.GameObjectLazy.Value);
                 if (screenPos == Vector2.Zero) continue;
 
-                const int dlBarWidth = 100;
                 const int dlBarBorder = 3;
+                const int transparency = 100;
 
                 var totalBytes = transfer.Value.Sum(c => c.Value.TotalBytes);
                 var transferredBytes = transfer.Value.Sum(c => c.Value.TransferredBytes);
 
                 var downloadText =
                     $"{UiSharedService.ByteToString(transferredBytes, addSuffix: false)}/{UiSharedService.ByteToString(totalBytes)}";
-                var textSize = ImGui.CalcTextSize(downloadText);
+                var maxDlText = $"{UiSharedService.ByteToString(transferredBytes, addSuffix: false)}/{UiSharedService.ByteToString(totalBytes)}";
+                var textSize = ImGui.CalcTextSize(maxDlText);
 
-                int dlBarHeight = (int)textSize.Y + 25;
+                int dlBarHeight = (int)textSize.Y + 8;
+                int dlBarWidth = (int)textSize.X + 150;
 
                 var dlBarStart = new Vector2(screenPos.X - dlBarWidth / 2f, screenPos.Y - dlBarHeight / 2f);
                 var dlBarEnd = new Vector2(screenPos.X + dlBarWidth / 2f, screenPos.Y + dlBarHeight / 2f);
-                var drawList = ImGui.GetWindowDrawList();
+                var drawList = ImGui.GetBackgroundDrawList();
                 drawList.AddRectFilled(
                     dlBarStart with { X = dlBarStart.X - dlBarBorder - 1, Y = dlBarStart.Y - dlBarBorder - 1 },
                     dlBarEnd with { X = dlBarEnd.X + dlBarBorder + 1, Y = dlBarEnd.Y + dlBarBorder + 1 },
-                    UiSharedService.Color(new Vector4(0, 0, 0, 255)), 1);
+                    UiSharedService.Color(0, 0, 0, transparency), 1);
                 drawList.AddRectFilled(dlBarStart with { X = dlBarStart.X - dlBarBorder, Y = dlBarStart.Y - dlBarBorder },
                     dlBarEnd with { X = dlBarEnd.X + dlBarBorder, Y = dlBarEnd.Y + dlBarBorder },
-                    UiSharedService.Color(new Vector4(33, 33, 33, 255)), 1);
+                    UiSharedService.Color(220, 220, 220, transparency), 1);
                 drawList.AddRectFilled(dlBarStart, dlBarEnd,
-                    UiSharedService.Color(new Vector4(0, 0, 0, 255)), 1);
+                    UiSharedService.Color(0, 0, 0, transparency), 1);
                 var dlProgressPercent = transferredBytes / (double)totalBytes;
                 drawList.AddRectFilled(dlBarStart,
                     dlBarEnd with { X = dlBarStart.X + (float)(dlProgressPercent * dlBarWidth) },
-                    UiSharedService.Color(50, 205, 50, 255), 1);
+                    UiSharedService.Color(50, 205, 50, transparency), 1);
                 UiSharedService.DrawOutlinedFont(drawList, downloadText,
                     screenPos with { X = screenPos.X - textSize.X / 2f - 1, Y = screenPos.Y - textSize.Y / 2f - 1 },
-                    UiSharedService.Color(new Vector4(255, 255, 255, 255)),
-                    UiSharedService.Color(new Vector4(0, 0, 0, 255)), 1);
+                    UiSharedService.Color(255, 255, 255, transparency),
+                    UiSharedService.Color(0, 0, 0, transparency), 1);
             }
         }
+    }
+
+    public override void PreDraw()
+    {
+        base.PreDraw();
+
+        if (_uiShared.EditTrackerPosition)
+        {
+            Flags &= ~ImGuiWindowFlags.NoMove;
+            Flags &= ~ImGuiWindowFlags.NoBackground;
+            Flags &= ~ImGuiWindowFlags.NoInputs;
+            Flags &= ~ImGuiWindowFlags.NoResize;
+        }
+        else
+        {
+            Flags |= ImGuiWindowFlags.NoMove;
+            Flags |= ImGuiWindowFlags.NoBackground;
+            Flags |= ImGuiWindowFlags.NoInputs;
+            Flags |= ImGuiWindowFlags.NoResize;
+        }
+
+        var maxHeight = ImGui.GetTextLineHeight() * (_configService.Current.ParallelDownloads + 3);
+        SizeConstraints = new()
+        {
+            MinimumSize = new Vector2(300, maxHeight),
+            MaximumSize = new Vector2(300, maxHeight),
+        };
     }
 }

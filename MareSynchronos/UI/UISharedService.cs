@@ -161,13 +161,13 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public static uint Color(Vector4 color)
     {
-        uint ret = (byte)(color.W * 255);
+        uint ret = (byte)(color.W);
         ret <<= 8;
-        ret += (byte)(color.X * 255);
+        ret += (byte)(color.X);
         ret <<= 8;
-        ret += (byte)(color.Y * 255);
+        ret += (byte)(color.Y);
         ret <<= 8;
-        ret += (byte)(color.Z * 255);
+        ret += (byte)(color.Z);
         return ret;
     }
 

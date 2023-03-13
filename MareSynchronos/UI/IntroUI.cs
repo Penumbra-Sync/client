@@ -16,22 +16,21 @@ namespace MareSynchronos.UI;
 
 public class IntroUi : WindowMediatorSubscriberBase
 {
-    private readonly UiSharedService _uiShared;
     private readonly MareConfigService _configService;
     private readonly PeriodicFileScanner _fileCacheManager;
+    private readonly Dictionary<string, string> _languages = new(StringComparer.Ordinal) { { "English", "en" }, { "Deutsch", "de" }, { "Français", "fr" } };
     private readonly ServerConfigurationManager _serverConfigurationManager;
+    private readonly UiSharedService _uiShared;
+    private int _currentLanguage;
     private bool _readFirstPage;
 
+    private string _secretKey = string.Empty;
+    private string _timeoutLabel = string.Empty;
+    private Task? _timeoutTask;
     private string[]? _tosParagraphs;
 
-    private Task? _timeoutTask;
-    private string _timeoutLabel = string.Empty;
-
-    private readonly Dictionary<string, string> _languages = new(StringComparer.Ordinal) { { "English", "en" }, { "Deutsch", "de" }, { "Français", "fr" } };
-    private int _currentLanguage;
-
-    public IntroUi(ILogger<IntroUi> logger, WindowSystem windowSystem, UiSharedService uiShared, MareConfigService configService,
-        PeriodicFileScanner fileCacheManager, ServerConfigurationManager serverConfigurationManager, MareMediator mareMediator) : base(logger, windowSystem, mareMediator, "Mare Synchronos Setup")
+    public IntroUi(ILogger<IntroUi> logger, UiSharedService uiShared, MareConfigService configService,
+        PeriodicFileScanner fileCacheManager, ServerConfigurationManager serverConfigurationManager, MareMediator mareMediator) : base(logger, mareMediator, "Mare Synchronos Setup")
     {
         _uiShared = uiShared;
         _configService = configService;
@@ -232,8 +231,6 @@ public class IntroUi : WindowMediatorSubscriberBase
             IsOpen = false;
         }
     }
-
-    private string _secretKey = string.Empty;
 
     private void GetToSLocalization(int changeLanguageTo = -1)
     {

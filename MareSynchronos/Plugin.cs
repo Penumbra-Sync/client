@@ -36,7 +36,8 @@ public sealed class Plugin : IDalamudPlugin
     private readonly CancellationTokenSource _pluginCts = new();
 
     public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager, DataManager gameData,
-        Framework framework, ObjectTable objectTable, ClientState clientState, Condition condition, ChatGui chatGui)
+        Framework framework, ObjectTable objectTable, ClientState clientState, Condition condition, ChatGui chatGui,
+        GameGui gameGui)
     {
         new HostBuilder()
         .UseContentRoot(pluginInterface.ConfigDirectory.FullName)
@@ -65,7 +66,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<FileTransferOrchestrator>();
             collection.AddSingleton<MarePlugin>();
             collection.AddSingleton((s) => new DalamudUtilService(s.GetRequiredService<ILogger<DalamudUtilService>>(),
-                clientState, objectTable, framework, condition, gameData,
+                clientState, objectTable, framework, gameGui, condition, gameData,
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<PerformanceCollectorService>()));
             collection.AddSingleton((s) => new IpcManager(s.GetRequiredService<ILogger<IpcManager>>(),
                 pluginInterface, s.GetRequiredService<DalamudUtilService>(), s.GetRequiredService<MareMediator>()));

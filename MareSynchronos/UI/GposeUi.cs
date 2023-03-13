@@ -13,14 +13,14 @@ namespace MareSynchronos.UI;
 
 public class GposeUi : WindowMediatorSubscriberBase
 {
-    private readonly MareCharaFileManager _mareCharaFileManager;
+    private readonly MareConfigService _configService;
     private readonly DalamudUtilService _dalamudUtil;
     private readonly FileDialogManager _fileDialogManager;
-    private readonly MareConfigService _configService;
+    private readonly MareCharaFileManager _mareCharaFileManager;
 
-    public GposeUi(ILogger<GposeUi> logger, WindowSystem windowSystem, MareCharaFileManager mareCharaFileManager,
+    public GposeUi(ILogger<GposeUi> logger, MareCharaFileManager mareCharaFileManager,
         DalamudUtilService dalamudUtil, FileDialogManager fileDialogManager, MareConfigService configService,
-        MareMediator mediator) : base(logger, windowSystem, mediator, "Mare Synchronos Gpose Import UI###MareSynchronosGposeUI")
+        MareMediator mediator) : base(logger, mediator, "Mare Synchronos Gpose Import UI###MareSynchronosGposeUI")
     {
         _mareCharaFileManager = mareCharaFileManager;
         _dalamudUtil = dalamudUtil;
@@ -31,17 +31,6 @@ public class GposeUi : WindowMediatorSubscriberBase
         Mediator.Subscribe<GposeEndMessage>(this, (_) => EndGpose());
         IsOpen = _dalamudUtil.IsInGpose;
         Flags = ImGuiWindowFlags.AlwaysAutoResize;
-    }
-
-    private void EndGpose()
-    {
-        IsOpen = false;
-        _mareCharaFileManager.ClearMareCharaFile();
-    }
-
-    private void StartGpose()
-    {
-        IsOpen = _configService.Current.OpenGposeImportOnGposeStart;
     }
 
     public override void Draw()
@@ -77,5 +66,16 @@ public class GposeUi : WindowMediatorSubscriberBase
             UiSharedService.ColorTextWrapped("Loading Character...", ImGuiColors.DalamudYellow);
         }
         UiSharedService.TextWrapped("Hint: You can disable the automatic loading of this window in the Mare settings and open it manually with /mare gpose");
+    }
+
+    private void EndGpose()
+    {
+        IsOpen = false;
+        _mareCharaFileManager.ClearMareCharaFile();
+    }
+
+    private void StartGpose()
+    {
+        IsOpen = _configService.Current.OpenGposeImportOnGposeStart;
     }
 }

@@ -25,28 +25,30 @@ namespace MareSynchronos.UI;
 public class SettingsUi : WindowMediatorSubscriberBase
 {
     private readonly MareConfigService _configService;
-    private ApiController ApiController => _uiShared.ApiController;
-    private readonly MareCharaFileManager _mareCharaFileManager;
-    private readonly PairManager _pairManager;
-    private readonly ServerConfigurationManager _serverConfigurationManager;
-    private readonly PerformanceCollectorService _performanceCollector;
     private readonly FileUploadManager _fileTransferManager;
     private readonly FileTransferOrchestrator _fileTransferOrchestrator;
+    private readonly MareCharaFileManager _mareCharaFileManager;
+    private readonly PairManager _pairManager;
+    private readonly PerformanceCollectorService _performanceCollector;
+    private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly UiSharedService _uiShared;
-    public CharacterData? LastCreatedCharacterData { private get; set; }
-
-    private bool _overwriteExistingLabels = false;
-    private bool? _notesSuccessfullyApplied = null;
+    private bool _deleteAccountPopupModalShown = false;
+    private bool _deleteFilesPopupModalShown = false;
+    private string _exportDescription = string.Empty;
     private string _lastTab = string.Empty;
+    private bool? _notesSuccessfullyApplied = null;
+    private bool _overwriteExistingLabels = false;
+    private bool _readClearCache = false;
+    private bool _readExport = false;
     private bool _wasOpen = false;
 
-    public SettingsUi(ILogger<SettingsUi> logger, WindowSystem windowSystem,
+    public SettingsUi(ILogger<SettingsUi> logger,
         UiSharedService uiShared, MareConfigService configService,
         MareCharaFileManager mareCharaFileManager, PairManager pairManager,
         ServerConfigurationManager serverConfigurationManager,
         MareMediator mediator, PerformanceCollectorService performanceCollector,
         FileUploadManager fileTransferManager,
-        FileTransferOrchestrator fileTransferOrchestrator) : base(logger, windowSystem, mediator, "Mare Synchronos Settings")
+        FileTransferOrchestrator fileTransferOrchestrator) : base(logger, mediator, "Mare Synchronos Settings")
     {
         _configService = configService;
         _mareCharaFileManager = mareCharaFileManager;
@@ -70,16 +72,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
         Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) => LastCreatedCharacterData = msg.CharacterData);
     }
 
-    private void UiSharedService_GposeEnd()
-    {
-        IsOpen = _wasOpen;
-    }
-
-    private void UiSharedService_GposeStart()
-    {
-        _wasOpen = IsOpen;
-        IsOpen = false;
-    }
+    public CharacterData? LastCreatedCharacterData { private get; set; }
+    private ApiController ApiController => _uiShared.ApiController;
 
     public override void Draw()
     {
@@ -88,314 +82,286 @@ public class SettingsUi : WindowMediatorSubscriberBase
         DrawSettingsContent();
     }
 
-    private void DrawSettingsContent()
+    public override void OnClose()
     {
-        _uiShared.PrintServerState();
-        ImGui.AlignTextToFramePadding();
-        ImGui.Text("Community and Support:");
-        ImGui.SameLine();
-        if (ImGui.Button("Mare Synchronos Discord"))
+        _uiShared.EditTrackerPosition = false;
+        base.OnClose();
+    }
+
+    private void DrawBlockedTransfers()
+    {
+        _lastTab = "BlockedTransfers";
+        UiSharedService.ColorTextWrapped("Files that you attempted to upload or download that were forbidden to be transferred by their creators will appear here. " +
+                             "If you see file paths from your drive here, then those files were not allowed to be uploaded. If you see hashes, those files were not allowed to be downloaded. " +
+                             "Ask your paired friend to send you the mod in question through other means, acquire the mod yourself or pester the mod creator to allow it to be sent over Mare.",
+            ImGuiColors.DalamudGrey);
+
+        if (ImGui.BeginTable("TransfersTable", 2, ImGuiTableFlags.SizingStretchProp))
         {
-            Util.OpenLink("https://discord.gg/mpNdkrTRjW");
-        }
-        ImGui.Separator();
-        if (ImGui.BeginTabBar("mainTabBar"))
-        {
-            if (ImGui.BeginTabItem("General"))
-            {
-                DrawGeneral();
-                ImGui.EndTabItem();
-            }
+            ImGui.TableSetupColumn(
+                $"Hash/Filename");
+            ImGui.TableSetupColumn($"Forbidden by");
 
-            if (ImGui.BeginTabItem("Export & Storage"))
-            {
-                DrawFileStorageSettings();
-                ImGui.EndTabItem();
-            }
+            ImGui.TableHeadersRow();
 
-            if (ApiController.ServerState is ServerState.Connected && ImGui.BeginTabItem("Transfers"))
+            foreach (var item in _fileTransferOrchestrator.ForbiddenTransfers)
             {
-                DrawCurrentTransfers();
-                ImGui.EndTabItem();
+                ImGui.TableNextColumn();
+                if (item is UploadFileTransfer transfer)
+                {
+                    ImGui.Text(transfer.LocalFile);
+                }
+                else
+                {
+                    ImGui.Text(item.Hash);
+                }
+                ImGui.TableNextColumn();
+                ImGui.Text(item.ForbiddenBy);
             }
-
-            if (ImGui.BeginTabItem("Blocked Transfers"))
-            {
-                DrawBlockedTransfers();
-                ImGui.EndTabItem();
-            }
-
-            if (ImGui.BeginTabItem("Service Settings"))
-            {
-                DrawServerConfiguration();
-                ImGui.EndTabItem();
-            }
-
-            if (ImGui.BeginTabItem("Debug"))
-            {
-                DrawDebug();
-                ImGui.EndTabItem();
-            }
-
-            ImGui.EndTabBar();
+            ImGui.EndTable();
         }
     }
 
-    private void DrawServerConfiguration()
+    private void DrawCurrentTransfers()
     {
-        _lastTab = "Service Settings";
-        if (ApiController.ServerAlive)
+        _lastTab = "Transfers";
+        int maxParallelDownloads = _configService.Current.ParallelDownloads;
+        if (ImGui.SliderInt("Maximum Parallel Downloads", ref maxParallelDownloads, 1, 10))
         {
-            UiSharedService.FontText("Service Actions", _uiShared.UidFont);
-
-            if (ImGui.Button("Delete all my files"))
-            {
-                _deleteFilesPopupModalShown = true;
-                ImGui.OpenPopup("Delete all your files?");
-            }
-
-            UiSharedService.DrawHelpText("Completely deletes all your uploaded files on the service.");
-
-            if (ImGui.BeginPopupModal("Delete all your files?", ref _deleteFilesPopupModalShown, UiSharedService.PopupWindowFlags))
-            {
-                UiSharedService.TextWrapped(
-                    "All your own uploaded files on the service will be deleted.\nThis operation cannot be undone.");
-                ImGui.Text("Are you sure you want to continue?");
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                var buttonSize = (ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X -
-                                 ImGui.GetStyle().ItemSpacing.X) / 2;
-
-                if (ImGui.Button("Delete everything", new Vector2(buttonSize, 0)))
-                {
-                    Task.Run(_fileTransferManager.DeleteAllFiles);
-                    _deleteFilesPopupModalShown = false;
-                }
-
-                ImGui.SameLine();
-
-                if (ImGui.Button("Cancel##cancelDelete", new Vector2(buttonSize, 0)))
-                {
-                    _deleteFilesPopupModalShown = false;
-                }
-
-                UiSharedService.SetScaledWindowSize(325);
-                ImGui.EndPopup();
-            }
-            ImGui.SameLine();
-            if (ImGui.Button("Delete account"))
-            {
-                _deleteAccountPopupModalShown = true;
-                ImGui.OpenPopup("Delete your account?");
-            }
-
-            UiSharedService.DrawHelpText("Completely deletes your account and all uploaded files to the service.");
-
-            if (ImGui.BeginPopupModal("Delete your account?", ref _deleteAccountPopupModalShown, UiSharedService.PopupWindowFlags))
-            {
-                UiSharedService.TextWrapped(
-                    "Your account and all associated files and data on the service will be deleted.");
-                UiSharedService.TextWrapped("Your UID will be removed from all pairing lists.");
-                ImGui.Text("Are you sure you want to continue?");
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                var buttonSize = (ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X -
-                                  ImGui.GetStyle().ItemSpacing.X) / 2;
-
-                if (ImGui.Button("Delete account", new Vector2(buttonSize, 0)))
-                {
-                    Task.Run(ApiController.UserDelete);
-                    _deleteAccountPopupModalShown = false;
-                    Mediator.Publish(new SwitchToIntroUiMessage());
-                }
-
-                ImGui.SameLine();
-
-                if (ImGui.Button("Cancel##cancelDelete", new Vector2(buttonSize, 0)))
-                {
-                    _deleteAccountPopupModalShown = false;
-                }
-
-                UiSharedService.SetScaledWindowSize(325);
-                ImGui.EndPopup();
-            }
-            ImGui.Separator();
-
+            _configService.Current.ParallelDownloads = maxParallelDownloads;
+            _configService.Save();
         }
 
-        UiSharedService.FontText("Service & Character Settings", _uiShared.UidFont);
-
-        var idx = _uiShared.DrawServiceSelection();
-
-        ImGui.Dummy(new Vector2(10, 10));
-
-        var selectedServer = _serverConfigurationManager.GetServerByIndex(idx);
-        if (selectedServer == _serverConfigurationManager.CurrentServer)
+        bool showTransferWindow = _configService.Current.ShowTransferWindow;
+        if (ImGui.Checkbox("Show separate transfer window", ref showTransferWindow))
         {
-            UiSharedService.ColorTextWrapped("For any changes to be applied to the current service you need to reconnect to the service.", ImGuiColors.DalamudYellow);
+            _configService.Current.ShowTransferWindow = showTransferWindow;
+            _configService.Save();
         }
 
-
-        if (ImGui.BeginTabBar("serverTabBar"))
+        if (_configService.Current.ShowTransferWindow)
         {
-            if (ImGui.BeginTabItem("Character Management"))
+            ImGui.Indent();
+            bool editTransferWindowPosition = _uiShared.EditTrackerPosition;
+            if (ImGui.Checkbox("Edit Transfer Window position", ref editTransferWindowPosition))
             {
-                UiSharedService.ColorTextWrapped("Characters listed here will automatically connect to the selected Mare service with the settings as provided below." +
-                    " Make sure to enter the character names correctly or use the 'Add current character' button at the bottom.", ImGuiColors.DalamudYellow);
-                int i = 0;
-                foreach (var item in selectedServer.Authentications.ToList())
+                _uiShared.EditTrackerPosition = editTransferWindowPosition;
+            }
+            ImGui.Unindent();
+        }
+
+        bool showTransferBars = _configService.Current.ShowTransferBars;
+        if (ImGui.Checkbox("Show transfer bars rendered below players", ref showTransferBars))
+        {
+            _configService.Current.ShowTransferBars = showTransferBars;
+            _configService.Save();
+        }
+
+        // todo: fix
+        /*if (ImGui.BeginTable("TransfersTable", 2))
+        {
+            ImGui.TableSetupColumn(
+                $"Uploads ({UiSharedService.ByteToString(_fileTransferManager.CurrentUploads.Sum(a => a.Transferred))} / {UiSharedService.ByteToString(_fileTransferManager.CurrentUploads.Sum(a => a.Total))})");
+            ImGui.TableSetupColumn($"Downloads ({UiSharedService.ByteToString(_fileTransferManager.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Transferred))} / {UiSharedService.ByteToString(_fileTransferManager.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Total))})");
+
+            ImGui.TableHeadersRow();
+
+            ImGui.TableNextColumn();
+            if (ImGui.BeginTable("UploadsTable", 3))
+            {
+                ImGui.TableSetupColumn("File");
+                ImGui.TableSetupColumn("Uploaded");
+                ImGui.TableSetupColumn("Size");
+                ImGui.TableHeadersRow();
+                foreach (var transfer in _fileTransferManager.CurrentUploads.ToArray())
                 {
-                    UiSharedService.DrawWithID("selectedChara" + i, () =>
+                    var color = UiSharedService.UploadColor((transfer.Transferred, transfer.Total));
+                    ImGui.PushStyleColor(ImGuiCol.Text, color);
+                    ImGui.TableNextColumn();
+                    ImGui.Text(transfer.Hash);
+                    ImGui.TableNextColumn();
+                    ImGui.Text(UiSharedService.ByteToString(transfer.Transferred));
+                    ImGui.TableNextColumn();
+                    ImGui.Text(UiSharedService.ByteToString(transfer.Total));
+                    ImGui.PopStyleColor();
+                    ImGui.TableNextRow();
+                }
+
+                ImGui.EndTable();
+            }
+
+            ImGui.TableNextColumn();
+            if (ImGui.BeginTable("DownloadsTable", 3))
+            {
+                ImGui.TableSetupColumn("File");
+                ImGui.TableSetupColumn("Downloaded");
+                ImGui.TableSetupColumn("Size");
+                ImGui.TableHeadersRow();
+                foreach (var transfer in _fileTransferManager.CurrentDownloads.SelectMany(k => k.Value).ToArray())
+                {
+                    var color = UiSharedService.UploadColor((transfer.Transferred, transfer.Total));
+                    ImGui.PushStyleColor(ImGuiCol.Text, color);
+                    ImGui.TableNextColumn();
+                    ImGui.Text(transfer.Hash);
+                    ImGui.TableNextColumn();
+                    ImGui.Text(UiSharedService.ByteToString(transfer.Transferred));
+                    ImGui.TableNextColumn();
+                    ImGui.Text(UiSharedService.ByteToString(transfer.Total));
+                    ImGui.PopStyleColor();
+                    ImGui.TableNextRow();
+                }
+
+                ImGui.EndTable();
+            }
+
+            ImGui.EndTable();
+        }*/
+    }
+
+    private void DrawDebug()
+    {
+        _lastTab = "Debug";
+
+        UiSharedService.FontText("Debug", _uiShared.UidFont);
+
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.Copy, "[DEBUG] Copy Last created Character Data to clipboard"))
+        {
+            if (LastCreatedCharacterData != null)
+            {
+                ImGui.SetClipboardText(JsonSerializer.Serialize(LastCreatedCharacterData, new JsonSerializerOptions() { WriteIndented = true }));
+            }
+            else
+            {
+                ImGui.SetClipboardText("ERROR: No created character data, cannot copy.");
+            }
+        }
+        UiSharedService.AttachToolTip("Use this when reporting mods being rejected from the server.");
+
+        _uiShared.DrawCombo("Log Level", Enum.GetValues<LogLevel>(), (l) => l.ToString(), (l) =>
+        {
+            _configService.Current.LogLevel = l;
+            _configService.Save();
+        }, _configService.Current.LogLevel);
+
+        bool logPerformance = _configService.Current.LogPerformance;
+        if (ImGui.Checkbox("Log Performance Counters", ref logPerformance))
+        {
+            _configService.Current.LogPerformance = logPerformance;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("Enabling this can incur a (slight) performance impact. Enabling this for extended periods of time is not recommended.");
+
+        if (!logPerformance) ImGui.BeginDisabled();
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.StickyNote, "Print Performance Stats to /xllog"))
+        {
+            _performanceCollector.PrintPerformanceStats();
+        }
+        ImGui.SameLine();
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.StickyNote, "Print Performance Stats (last 60s) to /xllog"))
+        {
+            _performanceCollector.PrintPerformanceStats(60);
+        }
+        if (!logPerformance) ImGui.EndDisabled();
+    }
+
+    private void DrawFileStorageSettings()
+    {
+        _lastTab = "FileCache";
+
+        UiSharedService.FontText("Export MCDF", _uiShared.UidFont);
+
+        UiSharedService.TextWrapped("This feature allows you to pack your character into a MCDF file and manually send it to other people. MCDF files can officially only be imported during GPose through Mare. " +
+            "Be aware that the possibility exists that people write unoffocial custom exporters to extract the containing data.");
+
+        ImGui.Checkbox("##readExport", ref _readExport);
+        ImGui.SameLine();
+        UiSharedService.TextWrapped("I understand that by exporting my character data and sending it to other people I am giving away my current character appearance irrevocably. People I am sharing my data with have the ability to share it with other people without limitations.");
+
+        if (_readExport)
+        {
+            ImGui.Indent();
+
+            if (!_mareCharaFileManager.CurrentlyWorking)
+            {
+                ImGui.InputTextWithHint("Export Descriptor", "This description will be shown on loading the data", ref _exportDescription, 255);
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.Save, "Export Character as MCDF"))
+                {
+                    _uiShared.FileDialogManager.SaveFileDialog("Export Character to file", ".mcdf", "export.mcdf", ".mcdf", (success, path) =>
                     {
-                        var worldIdx = (ushort)item.WorldId;
-                        var data = _uiShared.WorldData.OrderBy(u => u.Value, StringComparer.Ordinal).ToDictionary(k => k.Key, k => k.Value);
-                        if (!data.TryGetValue(worldIdx, out string? worldPreview))
-                        {
-                            worldPreview = data.First().Value;
-                        }
+                        if (!success) return;
 
-                        var secretKeyIdx = item.SecretKeyIdx;
-                        var keys = selectedServer.SecretKeys;
-                        if (!keys.TryGetValue(secretKeyIdx, out var secretKey))
+                        Task.Run(() =>
                         {
-                            secretKey = new();
-                        }
-                        var friendlyName = secretKey.FriendlyName;
-
-                        if (ImGui.TreeNode($"chara", $"Character: {item.CharacterName}, World: {worldPreview}, Secret Key: {friendlyName}"))
-                        {
-                            var charaName = item.CharacterName;
-                            if (ImGui.InputText("Character Name", ref charaName, 64))
+                            try
                             {
-                                item.CharacterName = charaName;
-                                _serverConfigurationManager.Save();
+                                _mareCharaFileManager.SaveMareCharaFile(LastCreatedCharacterData, _exportDescription, path);
+                                _exportDescription = string.Empty;
                             }
-
-                            _uiShared.DrawCombo("World##" + item.CharacterName + i, data, (w) => w.Value,
-                                (w) =>
-                                {
-                                    if (item.WorldId != w.Key)
-                                    {
-                                        item.WorldId = w.Key;
-                                        _serverConfigurationManager.Save();
-                                    }
-                                }, EqualityComparer<KeyValuePair<ushort, string>>.Default.Equals(data.FirstOrDefault(f => f.Key == worldIdx), default) ? data.First() : data.First(f => f.Key == worldIdx));
-
-                            _uiShared.DrawCombo("Secret Key##" + item.CharacterName + i, keys, (w) => w.Value.FriendlyName,
-                                (w) =>
-                                {
-                                    if (w.Key != item.SecretKeyIdx)
-                                    {
-                                        item.SecretKeyIdx = w.Key;
-                                        _serverConfigurationManager.Save();
-                                    }
-                                }, EqualityComparer<KeyValuePair<int, SecretKey>>.Default.Equals(keys.FirstOrDefault(f => f.Key == item.SecretKeyIdx), default) ? keys.First() : keys.First(f => f.Key == item.SecretKeyIdx));
-
-                            if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Character") && UiSharedService.CtrlPressed())
-                                _serverConfigurationManager.RemoveCharacterFromServer(idx, item);
-                            UiSharedService.AttachToolTip("Hold CTRL to delete this entry.");
-
-                            ImGui.TreePop();
-                        }
+                            catch (Exception ex)
+                            {
+                                _logger.LogCritical(ex, "Error saving data");
+                            }
+                        });
                     });
-
-                    i++;
-
                 }
-
-                ImGui.Separator();
-                if (!selectedServer.Authentications.Any(c => string.Equals(c.CharacterName, _uiShared.PlayerName, StringComparison.Ordinal)
-                    && c.WorldId == _uiShared.WorldId))
-                {
-                    if (UiSharedService.IconTextButton(FontAwesomeIcon.User, "Add current character"))
-                    {
-                        _serverConfigurationManager.AddCurrentCharacterToServer(idx);
-                    }
-                    ImGui.SameLine();
-                }
-
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add new character"))
-                {
-                    _serverConfigurationManager.AddEmptyCharacterToServer(idx);
-                }
-
-                ImGui.EndTabItem();
+                UiSharedService.ColorTextWrapped("Note: For best results make sure you have everything you want to be shared as well as the correct character appearance" +
+                    " equipped and redraw your character before exporting.", ImGuiColors.DalamudYellow);
             }
-
-            if (ImGui.BeginTabItem("Secret Key Management"))
+            else
             {
-                foreach (var item in selectedServer.SecretKeys.ToList())
-                {
-                    UiSharedService.DrawWithID("key" + item.Key, () =>
-                    {
-                        var friendlyName = item.Value.FriendlyName;
-                        if (ImGui.InputText("Secret Key Display Name", ref friendlyName, 255))
-                        {
-                            item.Value.FriendlyName = friendlyName;
-                            _serverConfigurationManager.Save();
-                        }
-                        var key = item.Value.Key;
-                        if (ImGui.InputText("Secret Key", ref key, 64))
-                        {
-                            item.Value.Key = key;
-                            _serverConfigurationManager.Save();
-                        }
-                        if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Secret Key") && UiSharedService.CtrlPressed())
-                        {
-                            selectedServer.SecretKeys.Remove(item.Key);
-                            _serverConfigurationManager.Save();
-                        }
-                        UiSharedService.AttachToolTip("Hold CTRL to delete this secret key entry");
-                    });
-
-                    if (item.Key != selectedServer.SecretKeys.Keys.LastOrDefault())
-                        ImGui.Separator();
-                }
-
-                ImGui.Separator();
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add new Secret Key"))
-                {
-                    selectedServer.SecretKeys.Add(selectedServer.SecretKeys.LastOrDefault().Key + 1, new SecretKey()
-                    {
-                        FriendlyName = "New Secret Key",
-                    });
-                    _serverConfigurationManager.Save();
-                }
-
-                ImGui.EndTabItem();
+                UiSharedService.ColorTextWrapped("Export in progress", ImGuiColors.DalamudYellow);
             }
 
-            if (ImGui.BeginTabItem("Service Settings"))
-            {
-                var serverUri = selectedServer.ServerUri;
-                ImGui.InputText("Service URI", ref serverUri, 255, ImGuiInputTextFlags.ReadOnly);
-                UiSharedService.DrawHelpText("You cannot edit the service URI. Add a new service if you need to edit the URI.");
-                var serverName = selectedServer.ServerName;
-                var isMain = string.Equals(serverName, ApiController.MainServer, StringComparison.OrdinalIgnoreCase);
-                var flags = isMain ? ImGuiInputTextFlags.ReadOnly : ImGuiInputTextFlags.None;
-                if (ImGui.InputText("Service Name", ref serverName, 255, flags))
-                {
-                    selectedServer.ServerName = serverName;
-                    _serverConfigurationManager.Save();
-                }
-                if (isMain)
-                {
-                    UiSharedService.DrawHelpText("You cannot edit the name of the main service.");
-                }
-                if (!isMain)
-                {
-                    if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Service") && UiSharedService.CtrlPressed())
-                    {
-                        _serverConfigurationManager.DeleteServer(selectedServer);
-                    }
-                    UiSharedService.DrawHelpText("Hold CTRL to delete this service");
-                }
-                ImGui.EndTabItem();
-            }
-            ImGui.EndTabBar();
+            ImGui.Unindent();
         }
+        bool openInGpose = _configService.Current.OpenGposeImportOnGposeStart;
+        if (ImGui.Checkbox("Open MCDF import window when GPose loads", ref openInGpose))
+        {
+            _configService.Current.OpenGposeImportOnGposeStart = openInGpose;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("This will automatically open the import menu when loading into Gpose. If unchecked you can open the menu manually with /mare gpose");
+
+        ImGui.Separator();
+
+        UiSharedService.FontText("Storage", _uiShared.UidFont);
+
+        UiSharedService.TextWrapped("Mare stores downloaded files from paired people permanently. This is to improve loading performance and requiring less downloads. " +
+            "The storage governs itself by clearing data beyond the set storage size. Please set the storage size accordingly. It is not necessary to manually clear the storage.");
+
+        _uiShared.DrawFileScanState();
+        _uiShared.DrawTimeSpanBetweenScansSetting();
+        _uiShared.DrawCacheDirectorySetting();
+        ImGui.Text($"Currently utilized local storage: {UiSharedService.ByteToString(_uiShared.FileCacheSize)}");
+        ImGui.Dummy(new Vector2(10, 10));
+        ImGui.Text("To clear the local storage accept the following disclaimer");
+        ImGui.Indent();
+        ImGui.Checkbox("##readClearCache", ref _readClearCache);
+        ImGui.SameLine();
+        UiSharedService.TextWrapped("I understand that: " + Environment.NewLine + "- By clearing the local storage I put the file servers of my connected service under extra strain by having to redownload all data."
+            + Environment.NewLine + "- This is not a step to try to fix sync issues."
+            + Environment.NewLine + "- This can make the situation of not getting other players data worse in situations of heavy file server load.");
+        if (!_readClearCache)
+            ImGui.BeginDisabled();
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Clear local storage") && UiSharedService.CtrlPressed() && _readClearCache)
+        {
+            Task.Run(() =>
+            {
+                foreach (var file in Directory.GetFiles(_configService.Current.CacheFolder))
+                {
+                    File.Delete(file);
+                }
+
+                _uiShared.RecalculateFileCacheSize();
+            });
+        }
+        UiSharedService.AttachToolTip("You normally do not need to do this. THIS IS NOT SOMETHING YOU SHOULD BE DOING TO TRY TO FIX SYNC ISSUES." + Environment.NewLine
+            + "This will solely remove all downloaded data from all players and will require you to re-download everything again." + Environment.NewLine
+            + "Mares storage is self-clearing and will not surpass the limit you have set it to." + Environment.NewLine
+            + "If you still think you need to do this hold CTRL while pressing the button.");
+        if (!_readClearCache)
+            ImGui.EndDisabled();
+        ImGui.Unindent();
     }
 
     private void DrawGeneral()
@@ -530,286 +496,321 @@ public class SettingsUi : WindowMediatorSubscriberBase
         if (!onlineNotifs) ImGui.EndDisabled();
     }
 
-    private bool _deleteFilesPopupModalShown = false;
-    private bool _deleteAccountPopupModalShown = false;
-    private void DrawDebug()
+    private void DrawServerConfiguration()
     {
-        _lastTab = "Debug";
-
-        UiSharedService.FontText("Debug", _uiShared.UidFont);
-
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Copy, "[DEBUG] Copy Last created Character Data to clipboard"))
+        _lastTab = "Service Settings";
+        if (ApiController.ServerAlive)
         {
-            if (LastCreatedCharacterData != null)
+            UiSharedService.FontText("Service Actions", _uiShared.UidFont);
+
+            if (ImGui.Button("Delete all my files"))
             {
-                ImGui.SetClipboardText(JsonSerializer.Serialize(LastCreatedCharacterData, new JsonSerializerOptions() { WriteIndented = true }));
+                _deleteFilesPopupModalShown = true;
+                ImGui.OpenPopup("Delete all your files?");
             }
-            else
+
+            UiSharedService.DrawHelpText("Completely deletes all your uploaded files on the service.");
+
+            if (ImGui.BeginPopupModal("Delete all your files?", ref _deleteFilesPopupModalShown, UiSharedService.PopupWindowFlags))
             {
-                ImGui.SetClipboardText("ERROR: No created character data, cannot copy.");
-            }
-        }
-        UiSharedService.AttachToolTip("Use this when reporting mods being rejected from the server.");
+                UiSharedService.TextWrapped(
+                    "All your own uploaded files on the service will be deleted.\nThis operation cannot be undone.");
+                ImGui.Text("Are you sure you want to continue?");
+                ImGui.Separator();
+                ImGui.Spacing();
 
-        _uiShared.DrawCombo("Log Level", Enum.GetValues<LogLevel>(), (l) => l.ToString(), (l) =>
-        {
-            _configService.Current.LogLevel = l;
-            _configService.Save();
-        }, _configService.Current.LogLevel);
+                var buttonSize = (ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X -
+                                 ImGui.GetStyle().ItemSpacing.X) / 2;
 
-        bool logPerformance = _configService.Current.LogPerformance;
-        if (ImGui.Checkbox("Log Performance Counters", ref logPerformance))
-        {
-            _configService.Current.LogPerformance = logPerformance;
-            _configService.Save();
-        }
-        UiSharedService.DrawHelpText("Enabling this can incur a (slight) performance impact. Enabling this for extended periods of time is not recommended.");
-
-        if (!logPerformance) ImGui.BeginDisabled();
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.StickyNote, "Print Performance Stats to /xllog"))
-        {
-            _performanceCollector.PrintPerformanceStats();
-        }
-        ImGui.SameLine();
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.StickyNote, "Print Performance Stats (last 60s) to /xllog"))
-        {
-            _performanceCollector.PrintPerformanceStats(60);
-        }
-        if (!logPerformance) ImGui.EndDisabled();
-    }
-
-    private void DrawBlockedTransfers()
-    {
-        _lastTab = "BlockedTransfers";
-        UiSharedService.ColorTextWrapped("Files that you attempted to upload or download that were forbidden to be transferred by their creators will appear here. " +
-                             "If you see file paths from your drive here, then those files were not allowed to be uploaded. If you see hashes, those files were not allowed to be downloaded. " +
-                             "Ask your paired friend to send you the mod in question through other means, acquire the mod yourself or pester the mod creator to allow it to be sent over Mare.",
-            ImGuiColors.DalamudGrey);
-
-        if (ImGui.BeginTable("TransfersTable", 2, ImGuiTableFlags.SizingStretchProp))
-        {
-            ImGui.TableSetupColumn(
-                $"Hash/Filename");
-            ImGui.TableSetupColumn($"Forbidden by");
-
-            ImGui.TableHeadersRow();
-
-            foreach (var item in _fileTransferOrchestrator.ForbiddenTransfers)
-            {
-                ImGui.TableNextColumn();
-                if (item is UploadFileTransfer transfer)
+                if (ImGui.Button("Delete everything", new Vector2(buttonSize, 0)))
                 {
-                    ImGui.Text(transfer.LocalFile);
-                }
-                else
-                {
-                    ImGui.Text(item.Hash);
-                }
-                ImGui.TableNextColumn();
-                ImGui.Text(item.ForbiddenBy);
-            }
-            ImGui.EndTable();
-        }
-    }
-
-    private void DrawCurrentTransfers()
-    {
-        _lastTab = "Transfers";
-        bool showTransferWindow = _configService.Current.ShowTransferWindow;
-        if (ImGui.Checkbox("Show separate transfer window", ref showTransferWindow))
-        {
-            _configService.Current.ShowTransferWindow = showTransferWindow;
-            _configService.Save();
-        }
-
-        if (_configService.Current.ShowTransferWindow)
-        {
-            ImGui.Indent();
-            bool editTransferWindowPosition = _uiShared.EditTrackerPosition;
-            if (ImGui.Checkbox("Edit Transfer Window position", ref editTransferWindowPosition))
-            {
-                _uiShared.EditTrackerPosition = editTransferWindowPosition;
-            }
-            ImGui.Unindent();
-        }
-
-        bool showTransferBars = _configService.Current.ShowTransferBars;
-        if (ImGui.Checkbox("Show transfer bars rendered on players", ref showTransferBars))
-        {
-            _configService.Current.ShowTransferBars = showTransferBars;
-            _configService.Save();
-        }
-
-        // todo: fix
-        /*if (ImGui.BeginTable("TransfersTable", 2))
-        {
-            ImGui.TableSetupColumn(
-                $"Uploads ({UiSharedService.ByteToString(_fileTransferManager.CurrentUploads.Sum(a => a.Transferred))} / {UiSharedService.ByteToString(_fileTransferManager.CurrentUploads.Sum(a => a.Total))})");
-            ImGui.TableSetupColumn($"Downloads ({UiSharedService.ByteToString(_fileTransferManager.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Transferred))} / {UiSharedService.ByteToString(_fileTransferManager.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Total))})");
-
-            ImGui.TableHeadersRow();
-
-            ImGui.TableNextColumn();
-            if (ImGui.BeginTable("UploadsTable", 3))
-            {
-                ImGui.TableSetupColumn("File");
-                ImGui.TableSetupColumn("Uploaded");
-                ImGui.TableSetupColumn("Size");
-                ImGui.TableHeadersRow();
-                foreach (var transfer in _fileTransferManager.CurrentUploads.ToArray())
-                {
-                    var color = UiSharedService.UploadColor((transfer.Transferred, transfer.Total));
-                    ImGui.PushStyleColor(ImGuiCol.Text, color);
-                    ImGui.TableNextColumn();
-                    ImGui.Text(transfer.Hash);
-                    ImGui.TableNextColumn();
-                    ImGui.Text(UiSharedService.ByteToString(transfer.Transferred));
-                    ImGui.TableNextColumn();
-                    ImGui.Text(UiSharedService.ByteToString(transfer.Total));
-                    ImGui.PopStyleColor();
-                    ImGui.TableNextRow();
+                    Task.Run(_fileTransferManager.DeleteAllFiles);
+                    _deleteFilesPopupModalShown = false;
                 }
 
-                ImGui.EndTable();
-            }
+                ImGui.SameLine();
 
-            ImGui.TableNextColumn();
-            if (ImGui.BeginTable("DownloadsTable", 3))
-            {
-                ImGui.TableSetupColumn("File");
-                ImGui.TableSetupColumn("Downloaded");
-                ImGui.TableSetupColumn("Size");
-                ImGui.TableHeadersRow();
-                foreach (var transfer in _fileTransferManager.CurrentDownloads.SelectMany(k => k.Value).ToArray())
+                if (ImGui.Button("Cancel##cancelDelete", new Vector2(buttonSize, 0)))
                 {
-                    var color = UiSharedService.UploadColor((transfer.Transferred, transfer.Total));
-                    ImGui.PushStyleColor(ImGuiCol.Text, color);
-                    ImGui.TableNextColumn();
-                    ImGui.Text(transfer.Hash);
-                    ImGui.TableNextColumn();
-                    ImGui.Text(UiSharedService.ByteToString(transfer.Transferred));
-                    ImGui.TableNextColumn();
-                    ImGui.Text(UiSharedService.ByteToString(transfer.Total));
-                    ImGui.PopStyleColor();
-                    ImGui.TableNextRow();
+                    _deleteFilesPopupModalShown = false;
                 }
 
-                ImGui.EndTable();
+                UiSharedService.SetScaledWindowSize(325);
+                ImGui.EndPopup();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Delete account"))
+            {
+                _deleteAccountPopupModalShown = true;
+                ImGui.OpenPopup("Delete your account?");
             }
 
-            ImGui.EndTable();
-        }*/
-    }
+            UiSharedService.DrawHelpText("Completely deletes your account and all uploaded files to the service.");
 
-    private bool _readExport = false;
-    private string _exportDescription = string.Empty;
-
-    private void DrawFileStorageSettings()
-    {
-        _lastTab = "FileCache";
-
-        UiSharedService.FontText("Export MCDF", _uiShared.UidFont);
-
-        UiSharedService.TextWrapped("This feature allows you to pack your character into a MCDF file and manually send it to other people. MCDF files can officially only be imported during GPose through Mare. " +
-            "Be aware that the possibility exists that people write unoffocial custom exporters to extract the containing data.");
-
-        ImGui.Checkbox("##readExport", ref _readExport);
-        ImGui.SameLine();
-        UiSharedService.TextWrapped("I understand that by exporting my character data and sending it to other people I am giving away my current character appearance irrevocably. People I am sharing my data with have the ability to share it with other people without limitations.");
-
-        if (_readExport)
-        {
-            ImGui.Indent();
-
-            if (!_mareCharaFileManager.CurrentlyWorking)
+            if (ImGui.BeginPopupModal("Delete your account?", ref _deleteAccountPopupModalShown, UiSharedService.PopupWindowFlags))
             {
-                ImGui.InputTextWithHint("Export Descriptor", "This description will be shown on loading the data", ref _exportDescription, 255);
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.Save, "Export Character as MCDF"))
+                UiSharedService.TextWrapped(
+                    "Your account and all associated files and data on the service will be deleted.");
+                UiSharedService.TextWrapped("Your UID will be removed from all pairing lists.");
+                ImGui.Text("Are you sure you want to continue?");
+                ImGui.Separator();
+                ImGui.Spacing();
+
+                var buttonSize = (ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X -
+                                  ImGui.GetStyle().ItemSpacing.X) / 2;
+
+                if (ImGui.Button("Delete account", new Vector2(buttonSize, 0)))
                 {
-                    _uiShared.FileDialogManager.SaveFileDialog("Export Character to file", ".mcdf", "export.mcdf", ".mcdf", (success, path) =>
-                    {
-                        if (!success) return;
-
-                        Task.Run(() =>
-                        {
-                            try
-                            {
-                                _mareCharaFileManager.SaveMareCharaFile(LastCreatedCharacterData, _exportDescription, path);
-                                _exportDescription = string.Empty;
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogCritical(ex, "Error saving data");
-                            }
-                        });
-                    });
+                    Task.Run(ApiController.UserDelete);
+                    _deleteAccountPopupModalShown = false;
+                    Mediator.Publish(new SwitchToIntroUiMessage());
                 }
-                UiSharedService.ColorTextWrapped("Note: For best results make sure you have everything you want to be shared as well as the correct character appearance" +
-                    " equipped and redraw your character before exporting.", ImGuiColors.DalamudYellow);
+
+                ImGui.SameLine();
+
+                if (ImGui.Button("Cancel##cancelDelete", new Vector2(buttonSize, 0)))
+                {
+                    _deleteAccountPopupModalShown = false;
+                }
+
+                UiSharedService.SetScaledWindowSize(325);
+                ImGui.EndPopup();
             }
-            else
-            {
-                UiSharedService.ColorTextWrapped("Export in progress", ImGuiColors.DalamudYellow);
-            }
-
-            ImGui.Unindent();
+            ImGui.Separator();
         }
-        bool openInGpose = _configService.Current.OpenGposeImportOnGposeStart;
-        if (ImGui.Checkbox("Open MCDF import window when GPose loads", ref openInGpose))
-        {
-            _configService.Current.OpenGposeImportOnGposeStart = openInGpose;
-            _configService.Save();
-        }
-        UiSharedService.DrawHelpText("This will automatically open the import menu when loading into Gpose. If unchecked you can open the menu manually with /mare gpose");
 
+        UiSharedService.FontText("Service & Character Settings", _uiShared.UidFont);
 
-        ImGui.Separator();
+        var idx = _uiShared.DrawServiceSelection();
 
-        UiSharedService.FontText("Storage", _uiShared.UidFont);
-
-        UiSharedService.TextWrapped("Mare stores downloaded files from paired people permanently. This is to improve loading performance and requiring less downloads. " +
-            "The storage governs itself by clearing data beyond the set storage size. Please set the storage size accordingly. It is not necessary to manually clear the storage.");
-
-        _uiShared.DrawFileScanState();
-        _uiShared.DrawTimeSpanBetweenScansSetting();
-        _uiShared.DrawCacheDirectorySetting();
-        ImGui.Text($"Currently utilized local storage: {UiSharedService.ByteToString(_uiShared.FileCacheSize)}");
         ImGui.Dummy(new Vector2(10, 10));
-        ImGui.Text("To clear the local storage accept the following disclaimer");
-        ImGui.Indent();
-        ImGui.Checkbox("##readClearCache", ref _readClearCache);
-        ImGui.SameLine();
-        UiSharedService.TextWrapped("I understand that: " + Environment.NewLine + "- By clearing the local storage I put the file servers of my connected service under extra strain by having to redownload all data."
-            + Environment.NewLine + "- This is not a step to try to fix sync issues."
-            + Environment.NewLine + "- This can make the situation of not getting other players data worse in situations of heavy file server load.");
-        if (!_readClearCache)
-            ImGui.BeginDisabled();
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Clear local storage") && UiSharedService.CtrlPressed() && _readClearCache)
+
+        var selectedServer = _serverConfigurationManager.GetServerByIndex(idx);
+        if (selectedServer == _serverConfigurationManager.CurrentServer)
         {
-            Task.Run(() =>
+            UiSharedService.ColorTextWrapped("For any changes to be applied to the current service you need to reconnect to the service.", ImGuiColors.DalamudYellow);
+        }
+
+        if (ImGui.BeginTabBar("serverTabBar"))
+        {
+            if (ImGui.BeginTabItem("Character Management"))
             {
-                foreach (var file in Directory.GetFiles(_configService.Current.CacheFolder))
+                UiSharedService.ColorTextWrapped("Characters listed here will automatically connect to the selected Mare service with the settings as provided below." +
+                    " Make sure to enter the character names correctly or use the 'Add current character' button at the bottom.", ImGuiColors.DalamudYellow);
+                int i = 0;
+                foreach (var item in selectedServer.Authentications.ToList())
                 {
-                    File.Delete(file);
+                    UiSharedService.DrawWithID("selectedChara" + i, () =>
+                    {
+                        var worldIdx = (ushort)item.WorldId;
+                        var data = _uiShared.WorldData.OrderBy(u => u.Value, StringComparer.Ordinal).ToDictionary(k => k.Key, k => k.Value);
+                        if (!data.TryGetValue(worldIdx, out string? worldPreview))
+                        {
+                            worldPreview = data.First().Value;
+                        }
+
+                        var secretKeyIdx = item.SecretKeyIdx;
+                        var keys = selectedServer.SecretKeys;
+                        if (!keys.TryGetValue(secretKeyIdx, out var secretKey))
+                        {
+                            secretKey = new();
+                        }
+                        var friendlyName = secretKey.FriendlyName;
+
+                        if (ImGui.TreeNode($"chara", $"Character: {item.CharacterName}, World: {worldPreview}, Secret Key: {friendlyName}"))
+                        {
+                            var charaName = item.CharacterName;
+                            if (ImGui.InputText("Character Name", ref charaName, 64))
+                            {
+                                item.CharacterName = charaName;
+                                _serverConfigurationManager.Save();
+                            }
+
+                            _uiShared.DrawCombo("World##" + item.CharacterName + i, data, (w) => w.Value,
+                                (w) =>
+                                {
+                                    if (item.WorldId != w.Key)
+                                    {
+                                        item.WorldId = w.Key;
+                                        _serverConfigurationManager.Save();
+                                    }
+                                }, EqualityComparer<KeyValuePair<ushort, string>>.Default.Equals(data.FirstOrDefault(f => f.Key == worldIdx), default) ? data.First() : data.First(f => f.Key == worldIdx));
+
+                            _uiShared.DrawCombo("Secret Key##" + item.CharacterName + i, keys, (w) => w.Value.FriendlyName,
+                                (w) =>
+                                {
+                                    if (w.Key != item.SecretKeyIdx)
+                                    {
+                                        item.SecretKeyIdx = w.Key;
+                                        _serverConfigurationManager.Save();
+                                    }
+                                }, EqualityComparer<KeyValuePair<int, SecretKey>>.Default.Equals(keys.FirstOrDefault(f => f.Key == item.SecretKeyIdx), default) ? keys.First() : keys.First(f => f.Key == item.SecretKeyIdx));
+
+                            if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Character") && UiSharedService.CtrlPressed())
+                                _serverConfigurationManager.RemoveCharacterFromServer(idx, item);
+                            UiSharedService.AttachToolTip("Hold CTRL to delete this entry.");
+
+                            ImGui.TreePop();
+                        }
+                    });
+
+                    i++;
                 }
 
-                _uiShared.RecalculateFileCacheSize();
-            });
+                ImGui.Separator();
+                if (!selectedServer.Authentications.Any(c => string.Equals(c.CharacterName, _uiShared.PlayerName, StringComparison.Ordinal)
+                    && c.WorldId == _uiShared.WorldId))
+                {
+                    if (UiSharedService.IconTextButton(FontAwesomeIcon.User, "Add current character"))
+                    {
+                        _serverConfigurationManager.AddCurrentCharacterToServer(idx);
+                    }
+                    ImGui.SameLine();
+                }
+
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add new character"))
+                {
+                    _serverConfigurationManager.AddEmptyCharacterToServer(idx);
+                }
+
+                ImGui.EndTabItem();
+            }
+
+            if (ImGui.BeginTabItem("Secret Key Management"))
+            {
+                foreach (var item in selectedServer.SecretKeys.ToList())
+                {
+                    UiSharedService.DrawWithID("key" + item.Key, () =>
+                    {
+                        var friendlyName = item.Value.FriendlyName;
+                        if (ImGui.InputText("Secret Key Display Name", ref friendlyName, 255))
+                        {
+                            item.Value.FriendlyName = friendlyName;
+                            _serverConfigurationManager.Save();
+                        }
+                        var key = item.Value.Key;
+                        if (ImGui.InputText("Secret Key", ref key, 64))
+                        {
+                            item.Value.Key = key;
+                            _serverConfigurationManager.Save();
+                        }
+                        if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Secret Key") && UiSharedService.CtrlPressed())
+                        {
+                            selectedServer.SecretKeys.Remove(item.Key);
+                            _serverConfigurationManager.Save();
+                        }
+                        UiSharedService.AttachToolTip("Hold CTRL to delete this secret key entry");
+                    });
+
+                    if (item.Key != selectedServer.SecretKeys.Keys.LastOrDefault())
+                        ImGui.Separator();
+                }
+
+                ImGui.Separator();
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add new Secret Key"))
+                {
+                    selectedServer.SecretKeys.Add(selectedServer.SecretKeys.LastOrDefault().Key + 1, new SecretKey()
+                    {
+                        FriendlyName = "New Secret Key",
+                    });
+                    _serverConfigurationManager.Save();
+                }
+
+                ImGui.EndTabItem();
+            }
+
+            if (ImGui.BeginTabItem("Service Settings"))
+            {
+                var serverUri = selectedServer.ServerUri;
+                ImGui.InputText("Service URI", ref serverUri, 255, ImGuiInputTextFlags.ReadOnly);
+                UiSharedService.DrawHelpText("You cannot edit the service URI. Add a new service if you need to edit the URI.");
+                var serverName = selectedServer.ServerName;
+                var isMain = string.Equals(serverName, ApiController.MainServer, StringComparison.OrdinalIgnoreCase);
+                var flags = isMain ? ImGuiInputTextFlags.ReadOnly : ImGuiInputTextFlags.None;
+                if (ImGui.InputText("Service Name", ref serverName, 255, flags))
+                {
+                    selectedServer.ServerName = serverName;
+                    _serverConfigurationManager.Save();
+                }
+                if (isMain)
+                {
+                    UiSharedService.DrawHelpText("You cannot edit the name of the main service.");
+                }
+                if (!isMain)
+                {
+                    if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Service") && UiSharedService.CtrlPressed())
+                    {
+                        _serverConfigurationManager.DeleteServer(selectedServer);
+                    }
+                    UiSharedService.DrawHelpText("Hold CTRL to delete this service");
+                }
+                ImGui.EndTabItem();
+            }
+            ImGui.EndTabBar();
         }
-        UiSharedService.AttachToolTip("You normally do not need to do this. THIS IS NOT SOMETHING YOU SHOULD BE DOING TO TRY TO FIX SYNC ISSUES." + Environment.NewLine
-            + "This will solely remove all downloaded data from all players and will require you to re-download everything again." + Environment.NewLine
-            + "Mares storage is self-clearing and will not surpass the limit you have set it to." + Environment.NewLine
-            + "If you still think you need to do this hold CTRL while pressing the button.");
-        if (!_readClearCache)
-            ImGui.EndDisabled();
-        ImGui.Unindent();
     }
 
-    private bool _readClearCache = false;
-
-    public override void OnClose()
+    private void DrawSettingsContent()
     {
-        _uiShared.EditTrackerPosition = false;
-        base.OnClose();
+        _uiShared.PrintServerState();
+        ImGui.AlignTextToFramePadding();
+        ImGui.Text("Community and Support:");
+        ImGui.SameLine();
+        if (ImGui.Button("Mare Synchronos Discord"))
+        {
+            Util.OpenLink("https://discord.gg/mpNdkrTRjW");
+        }
+        ImGui.Separator();
+        if (ImGui.BeginTabBar("mainTabBar"))
+        {
+            if (ImGui.BeginTabItem("General"))
+            {
+                DrawGeneral();
+                ImGui.EndTabItem();
+            }
+
+            if (ImGui.BeginTabItem("Export & Storage"))
+            {
+                DrawFileStorageSettings();
+                ImGui.EndTabItem();
+            }
+
+            if (ApiController.ServerState is ServerState.Connected && ImGui.BeginTabItem("Transfers"))
+            {
+                DrawCurrentTransfers();
+                ImGui.EndTabItem();
+            }
+
+            if (ImGui.BeginTabItem("Blocked Transfers"))
+            {
+                DrawBlockedTransfers();
+                ImGui.EndTabItem();
+            }
+
+            if (ImGui.BeginTabItem("Service Settings"))
+            {
+                DrawServerConfiguration();
+                ImGui.EndTabItem();
+            }
+
+            if (ImGui.BeginTabItem("Debug"))
+            {
+                DrawDebug();
+                ImGui.EndTabItem();
+            }
+
+            ImGui.EndTabBar();
+        }
+    }
+
+    private void UiSharedService_GposeEnd()
+    {
+        IsOpen = _wasOpen;
+    }
+
+    private void UiSharedService_GposeStart()
+    {
+        _wasOpen = IsOpen;
+        IsOpen = false;
     }
 }

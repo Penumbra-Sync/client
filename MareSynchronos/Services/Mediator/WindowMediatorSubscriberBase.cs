@@ -6,13 +6,10 @@ namespace MareSynchronos.Services.Mediator;
 public abstract class WindowMediatorSubscriberBase : Window, IMediatorSubscriber, IDisposable
 {
     protected readonly ILogger _logger;
-    private readonly WindowSystem _windowSystem;
 
-    public MareMediator Mediator { get; }
-    protected WindowMediatorSubscriberBase(ILogger logger, WindowSystem windowSystem, MareMediator mediator, string name) : base(name)
+    protected WindowMediatorSubscriberBase(ILogger logger, MareMediator mediator, string name) : base(name)
     {
         _logger = logger;
-        _windowSystem = windowSystem;
         Mediator = mediator;
 
         _logger.LogTrace("Creating {type}", GetType());
@@ -26,16 +23,17 @@ public abstract class WindowMediatorSubscriberBase : Window, IMediatorSubscriber
         });
     }
 
-    public virtual Task StopAsync(CancellationToken cancellationToken)
-    {
-
-        return Task.CompletedTask;
-    }
+    public MareMediator Mediator { get; }
 
     public void Dispose()
     {
         Dispose(true);
         GC.SuppressFinalize(this);
+    }
+
+    public virtual Task StopAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
     }
 
     protected virtual void Dispose(bool disposing)

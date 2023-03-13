@@ -192,6 +192,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                 var tempPath = _fileDbManager.GetCacheFilePath(file.Hash, isTemporaryFile: true);
                 Progress<long> progress = new((bytesDownloaded) =>
                 {
+                    if (!_downloadStatus.ContainsKey(fileGroup.Key)) return;
                     _downloadStatus[fileGroup.Key].TransferredBytes += bytesDownloaded;
                     file.Transferred += bytesDownloaded;
                 });

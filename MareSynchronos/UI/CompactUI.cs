@@ -25,40 +25,34 @@ namespace MareSynchronos.UI;
 
 public class CompactUi : WindowMediatorSubscriberBase
 {
-    private readonly ApiController _apiController;
-    private readonly PairManager _pairManager;
-    private readonly ServerConfigurationManager _serverManager;
-    private readonly FileUploadManager _fileTransferManager;
-    private readonly MareConfigService _configService;
     public readonly Dictionary<string, bool> ShowUidForEntry = new(StringComparer.Ordinal);
-    private readonly UiSharedService _uiShared;
-    private string _characterOrCommentFilter = string.Empty;
-
-    public string EditUserComment = string.Empty;
     public string EditNickEntry = string.Empty;
-
-    private string _pairToAdd = string.Empty;
-
-    private readonly Stopwatch _timeout = new();
-    private bool _buttonState;
-
+    public string EditUserComment = string.Empty;
     public float TransferPartHeight;
     public float WindowContentWidth;
-    private bool _showModalForUserAddition;
-    private bool _wasOpen;
-
-    private bool _showSyncShells;
+    private readonly ApiController _apiController;
+    private readonly MareConfigService _configService;
+    private readonly FileUploadManager _fileTransferManager;
     private readonly GroupPanel _groupPanel;
-    private Pair? _lastAddedUser;
-    private string _lastAddedUserComment = string.Empty;
-
+    private readonly PairGroupsUi _pairGroupsUi;
+    private readonly PairManager _pairManager;
     private readonly SelectGroupForPairUi _selectGroupForPairUi;
     private readonly SelectPairForGroupUi _selectPairsForGroupUi;
-    private readonly PairGroupsUi _pairGroupsUi;
+    private readonly ServerConfigurationManager _serverManager;
+    private readonly Stopwatch _timeout = new();
+    private readonly UiSharedService _uiShared;
+    private bool _buttonState;
+    private string _characterOrCommentFilter = string.Empty;
+    private Pair? _lastAddedUser;
+    private string _lastAddedUserComment = string.Empty;
+    private string _pairToAdd = string.Empty;
+    private int _secretKeyIdx = 0;
+    private bool _showModalForUserAddition;
+    private bool _showSyncShells;
+    private bool _wasOpen;
 
-    public CompactUi(ILogger<CompactUi> logger, WindowSystem windowSystem,
-        UiSharedService uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
-        ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager) : base(logger, windowSystem, mediator, "###MareSynchronosMainUI")
+    public CompactUi(ILogger<CompactUi> logger, UiSharedService uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
+        ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager) : base(logger, mediator, "###MareSynchronosMainUI")
     {
         _uiShared = uiShared;
         _configService = configService;
@@ -92,17 +86,6 @@ public class CompactUi : WindowMediatorSubscriberBase
             MinimumSize = new Vector2(350, 400),
             MaximumSize = new Vector2(350, 2000),
         };
-    }
-
-    private void UiSharedService_GposeEnd()
-    {
-        IsOpen = _wasOpen;
-    }
-
-    private void UiSharedService_GposeStart()
-    {
-        _wasOpen = IsOpen;
-        IsOpen = false;
     }
 
     public override void Draw()
@@ -172,7 +155,6 @@ public class CompactUi : WindowMediatorSubscriberBase
             else
             {
                 UiSharedService.DrawWithID("syncshells", _groupPanel.DrawSyncshells);
-
             }
             ImGui.Separator();
             UiSharedService.DrawWithID("transfers", DrawTransfers);
@@ -218,6 +200,36 @@ public class CompactUi : WindowMediatorSubscriberBase
         EditNickEntry = string.Empty;
         EditUserComment = string.Empty;
         base.OnClose();
+    }
+
+    private void DrawAddCharacter()
+    {
+        ImGui.Dummy(new(10));
+        var keys = _serverManager.CurrentServer!.SecretKeys;
+        if (keys.TryGetValue(_secretKeyIdx, out var secretKey))
+        {
+            var friendlyName = secretKey.FriendlyName;
+
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add current character with secret key"))
+            {
+                _serverManager.CurrentServer!.Authentications.Add(new MareConfiguration.Models.Authentication()
+                {
+                    CharacterName = _uiShared.PlayerName,
+                    WorldId = _uiShared.WorldId,
+                    SecretKeyIdx = _secretKeyIdx
+                });
+
+                _serverManager.Save();
+
+                _ = _apiController.CreateConnections(forceGetToken: true);
+            }
+
+            _uiShared.DrawCombo("Secret Key##addCharacterSecretKey", keys, (f) => f.Value.FriendlyName, (f) => _secretKeyIdx = f.Key);
+        }
+        else
+        {
+            UiSharedService.ColorTextWrapped("No secret keys are configured for the current server.", ImGuiColors.DalamudYellow);
+        }
     }
 
     private void DrawAddPair()
@@ -291,12 +303,15 @@ public class CompactUi : WindowMediatorSubscriberBase
             case true when !pausedUsers.Any():
                 _buttonState = false;
                 break;
+
             case false when !resumedUsers.Any():
                 _buttonState = true;
                 break;
+
             case true:
                 users = pausedUsers;
                 break;
+
             case false:
                 users = resumedUsers;
                 break;
@@ -506,7 +521,6 @@ public class CompactUi : WindowMediatorSubscriberBase
                 }
             }
 
-
             ImGui.SameLine(windowEndX - barButtonSize.X - spacingX - pauseIconSize.X);
             ImGui.SetCursorPosY(originalY);
             if (ImGuiComponents.IconButton(pauseIcon))
@@ -614,17 +628,6 @@ public class CompactUi : WindowMediatorSubscriberBase
         _pairGroupsUi.Draw(visibleUsers, onlineUsers, offlineUsers);
 
         ImGui.EndChild();
-    }
-
-    private List<Pair> GetFilteredUsers()
-    {
-        return _pairManager.DirectPairs.Where(p =>
-        {
-            if (_characterOrCommentFilter.IsNullOrEmpty()) return true;
-            return p.UserData.AliasOrUID.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ||
-                   (p.GetNote()?.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                   (p.PlayerName?.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false);
-        }).ToList();
     }
 
     private void DrawServerStatus()
@@ -794,37 +797,16 @@ public class CompactUi : WindowMediatorSubscriberBase
         }
     }
 
-    private void DrawAddCharacter()
+    private List<Pair> GetFilteredUsers()
     {
-        ImGui.Dummy(new(10));
-        var keys = _serverManager.CurrentServer!.SecretKeys;
-        if (keys.TryGetValue(_secretKeyIdx, out var secretKey))
+        return _pairManager.DirectPairs.Where(p =>
         {
-            var friendlyName = secretKey.FriendlyName;
-
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add current character with secret key"))
-            {
-                _serverManager.CurrentServer!.Authentications.Add(new MareConfiguration.Models.Authentication()
-                {
-                    CharacterName = _uiShared.PlayerName,
-                    WorldId = _uiShared.WorldId,
-                    SecretKeyIdx = _secretKeyIdx
-                });
-
-                _serverManager.Save();
-
-                _ = _apiController.CreateConnections(forceGetToken: true);
-            }
-
-            _uiShared.DrawCombo("Secret Key##addCharacterSecretKey", keys, (f) => f.Value.FriendlyName, (f) => _secretKeyIdx = f.Key);
-        }
-        else
-        {
-            UiSharedService.ColorTextWrapped("No secret keys are configured for the current server.", ImGuiColors.DalamudYellow);
-        }
+            if (_characterOrCommentFilter.IsNullOrEmpty()) return true;
+            return p.UserData.AliasOrUID.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ||
+                   (p.GetNote()?.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                   (p.PlayerName?.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false);
+        }).ToList();
     }
-
-    private int _secretKeyIdx = 0;
 
     private string GetServerError()
     {
@@ -876,5 +858,16 @@ public class CompactUi : WindowMediatorSubscriberBase
             ServerState.Connected => _apiController.DisplayName,
             _ => string.Empty
         };
+    }
+
+    private void UiSharedService_GposeEnd()
+    {
+        IsOpen = _wasOpen;
+    }
+
+    private void UiSharedService_GposeStart()
+    {
+        _wasOpen = IsOpen;
+        IsOpen = false;
     }
 }
