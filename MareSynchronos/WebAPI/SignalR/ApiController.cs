@@ -1,5 +1,4 @@
-﻿using Dalamud.Interface.Internal.Notifications;
-using MareSynchronos.API.Routes;
+﻿using MareSynchronos.API.Routes;
 using MareSynchronos.Utils;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
@@ -329,7 +328,6 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         _doNotNotifyOnNextInfo = true;
         _healthCheckTokenSource?.Cancel();
         ServerState = ServerState.Reconnecting;
-        Mediator.Publish(new NotificationMessage("Connection lost", "Connection lost to " + _serverManager.CurrentServer!.ServerName, NotificationType.Warning, 5000));
         Logger.LogWarning(arg, "Connection closed... Reconnecting");
     }
 

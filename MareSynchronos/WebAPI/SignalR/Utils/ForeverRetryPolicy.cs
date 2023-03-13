@@ -1,4 +1,5 @@
-﻿using MareSynchronos.Services.Mediator;
+﻿using Dalamud.Interface.Internal.Notifications;
+using MareSynchronos.Services.Mediator;
 using Microsoft.AspNetCore.SignalR.Client;
 
 namespace MareSynchronos.WebAPI.SignalR.Utils;
@@ -19,14 +20,17 @@ public class ForeverRetryPolicy : IRetryPolicy
         if (retryContext.PreviousRetryCount == 0)
         {
             _sentDisconnected = false;
-            timeToWait = TimeSpan.FromSeconds(1);
+            timeToWait = TimeSpan.FromSeconds(3);
         }
-        else if (retryContext.PreviousRetryCount == 1) timeToWait = TimeSpan.FromSeconds(2);
-        else if (retryContext.PreviousRetryCount == 2) timeToWait = TimeSpan.FromSeconds(3);
+        else if (retryContext.PreviousRetryCount == 1) timeToWait = TimeSpan.FromSeconds(5);
+        else if (retryContext.PreviousRetryCount == 2) timeToWait = TimeSpan.FromSeconds(10);
         else
         {
             if (!_sentDisconnected)
+            {
+                _mediator.Publish(new NotificationMessage("Connection lost", "Connection lost to server", NotificationType.Warning, 5000));
                 _mediator.Publish(new DisconnectedMessage());
+            }
             _sentDisconnected = true;
         }
 
