@@ -150,7 +150,7 @@ public class DownloadUi : WindowMediatorSubscriberBase
 
                 var downloadText =
                     $"{UiSharedService.ByteToString(transferredBytes, addSuffix: false)}/{UiSharedService.ByteToString(totalBytes)}";
-                var maxDlText = $"{UiSharedService.ByteToString(transferredBytes, addSuffix: false)}/{UiSharedService.ByteToString(totalBytes)}";
+                var maxDlText = $"{UiSharedService.ByteToString(totalBytes, addSuffix: false)}/{UiSharedService.ByteToString(totalBytes)}";
                 var textSize = ImGui.CalcTextSize(maxDlText);
 
                 int dlBarHeight = (int)textSize.Y + 8;
