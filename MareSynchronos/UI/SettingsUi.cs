@@ -72,11 +72,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         Mediator.Subscribe<CutsceneStartMessage>(this, (_) => UiSharedService_GposeStart());
         Mediator.Subscribe<CutsceneEndMessage>(this, (_) => UiSharedService_GposeEnd());
         Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) => LastCreatedCharacterData = msg.CharacterData);
-        Mediator.Subscribe<DownloadStartedMessage>(this, (msg) =>
-        {
-            _currentDownloads[msg.DownloadId] = msg.DownloadStatus;
-        });
-
+        Mediator.Subscribe<DownloadStartedMessage>(this, (msg) => _currentDownloads[msg.DownloadId] = msg.DownloadStatus);
         Mediator.Subscribe<DownloadFinishedMessage>(this, (msg) => _currentDownloads.TryRemove(msg.DownloadId, out _));
     }
 

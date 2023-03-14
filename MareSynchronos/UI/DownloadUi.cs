@@ -1,5 +1,4 @@
-﻿using Dalamud.Interface;
-using Dalamud.Interface.Colors;
+﻿using Dalamud.Interface.Colors;
 using ImGuiNET;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Handlers;
@@ -49,26 +48,12 @@ public class DownloadUi : WindowMediatorSubscriberBase
 
         IsOpen = true;
 
-        Mediator.Subscribe<DownloadStartedMessage>(this, (msg) =>
-        {
-            _currentDownloads[msg.DownloadId] = msg.DownloadStatus;
-        });
-
+        Mediator.Subscribe<DownloadStartedMessage>(this, (msg) => _currentDownloads[msg.DownloadId] = msg.DownloadStatus);
         Mediator.Subscribe<DownloadFinishedMessage>(this, (msg) => _currentDownloads.TryRemove(msg.DownloadId, out _));
-
-        Mediator.Subscribe<GposeStartMessage>(this, (_) =>
-        {
-            IsOpen = false;
-        });
-
-        Mediator.Subscribe<GposeEndMessage>(this, (_) =>
-        {
-            IsOpen = true;
-        });
-
+        Mediator.Subscribe<GposeStartMessage>(this, (_) => IsOpen = false);
+        Mediator.Subscribe<GposeEndMessage>(this, (_) => IsOpen = true);
         Mediator.Subscribe<PlayerUploadingMessage>(this, (msg) =>
         {
-            _logger.LogTrace("Received uploading message for {handler}: {val}", msg.Handler, msg.IsUploading);
             if (msg.IsUploading)
             {
                 _uploadingPlayers[msg.Handler] = true;

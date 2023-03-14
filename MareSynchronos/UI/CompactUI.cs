@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Reflection;
@@ -10,6 +11,7 @@ using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
@@ -17,6 +19,7 @@ using MareSynchronos.UI.Components;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files;
+using MareSynchronos.WebAPI.Files.Models;
 using MareSynchronos.WebAPI.SignalR.Utils;
 using Microsoft.Extensions.Logging;
 
@@ -31,6 +34,7 @@ public class CompactUi : WindowMediatorSubscriberBase
     public float WindowContentWidth;
     private readonly ApiController _apiController;
     private readonly MareConfigService _configService;
+    private readonly ConcurrentDictionary<GameObjectHandler, Dictionary<string, FileDownloadStatus>> _currentDownloads = new();
     private readonly FileUploadManager _fileTransferManager;
     private readonly GroupPanel _groupPanel;
     private readonly PairGroupsUi _pairGroupsUi;
@@ -79,6 +83,8 @@ public class CompactUi : WindowMediatorSubscriberBase
         Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = false);
         Mediator.Subscribe<CutsceneStartMessage>(this, (_) => UiSharedService_GposeStart());
         Mediator.Subscribe<CutsceneEndMessage>(this, (_) => UiSharedService_GposeEnd());
+        Mediator.Subscribe<DownloadStartedMessage>(this, (msg) => _currentDownloads[msg.DownloadId] = msg.DownloadStatus);
+        Mediator.Subscribe<DownloadFinishedMessage>(this, (msg) => _currentDownloads.TryRemove(msg.DownloadId, out _));
 
         SizeConstraints = new WindowSizeConstraints()
         {
@@ -714,8 +720,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             ImGui.Text("No uploads in progress");
         }
 
-        // todo: fix
-        /*var currentDownloads = _fileTransferManager.CurrentDownloads.SelectMany(k => k.Value).ToList();
+        var currentDownloads = _currentDownloads.SelectMany(d => d.Value.Values).ToList();
         ImGui.PushFont(UiBuilder.IconFont);
         ImGui.Text(FontAwesomeIcon.Download.ToIconString());
         ImGui.PopFont();
@@ -723,10 +728,10 @@ public class CompactUi : WindowMediatorSubscriberBase
 
         if (currentDownloads.Any())
         {
-            var totalDownloads = currentDownloads.Count;
-            var doneDownloads = currentDownloads.Count(c => c.IsTransferred);
-            var totalDownloaded = currentDownloads.Sum(c => c.Transferred);
-            var totalToDownload = currentDownloads.Sum(c => c.Total);
+            var totalDownloads = currentDownloads.Sum(c => c.TotalFiles);
+            var doneDownloads = currentDownloads.Sum(c => c.TransferredFiles);
+            var totalDownloaded = currentDownloads.Sum(c => c.TransferredBytes);
+            var totalToDownload = currentDownloads.Sum(c => c.TotalBytes);
 
             ImGui.Text($"{doneDownloads}/{totalDownloads}");
             var downloadText =
@@ -738,7 +743,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         else
         {
             ImGui.Text("No downloads in progress");
-        }*/
+        }
 
         ImGui.SameLine();
     }
