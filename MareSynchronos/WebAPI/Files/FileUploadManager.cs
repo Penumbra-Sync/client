@@ -61,7 +61,7 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
         await _orchestrator.SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesDeleteAllFullPath(_orchestrator.FilesCdnUri!)).ConfigureAwait(false);
     }
 
-    public async Task<CharacterData> UploadFiles(CharacterData data)
+    public async Task<CharacterData> UploadFiles(CharacterData data, List<UserData> visiblePlayers)
     {
         CancelUpload();
 
@@ -72,7 +72,7 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
         HashSet<string> unverifiedUploads = VerifyFiles(data);
         if (unverifiedUploads.Any())
         {
-            await UploadMissingFiles(unverifiedUploads, uploadToken).ConfigureAwait(false);
+            await UploadMissingFiles(unverifiedUploads, visiblePlayers, uploadToken).ConfigureAwait(false);
             Logger.LogInformation("Upload complete for {hash}", data.DataHash.Value);
         }
 
@@ -90,10 +90,15 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
         Reset();
     }
 
-    private async Task<List<UploadFileDto>> FilesSend(List<string> hashes, CancellationToken ct)
+    private async Task<List<UploadFileDto>> FilesSend(List<string> hashes, List<string> uids, CancellationToken ct)
     {
         if (!_orchestrator.IsInitialized) throw new InvalidOperationException("FileTransferManager is not initialized");
-        var response = await _orchestrator.SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesFilesSendFullPath(_orchestrator.FilesCdnUri!), hashes, ct).ConfigureAwait(false);
+        FilesSendDto filesSendDto = new()
+        {
+            FileHashes = hashes,
+            UIDs = uids
+        };
+        var response = await _orchestrator.SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesFilesSendFullPath(_orchestrator.FilesCdnUri!), filesSendDto, ct).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<List<UploadFileDto>>(cancellationToken: ct).ConfigureAwait(false) ?? new List<UploadFileDto>();
     }
 
@@ -134,12 +139,12 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
         Logger.LogDebug("Upload Status: {status}", response.StatusCode);
     }
 
-    private async Task UploadMissingFiles(HashSet<string> unverifiedUploadHashes, CancellationToken uploadToken)
+    private async Task UploadMissingFiles(HashSet<string> unverifiedUploadHashes, List<UserData> visiblePlayers, CancellationToken uploadToken)
     {
         unverifiedUploadHashes = unverifiedUploadHashes.Where(h => _fileDbManager.GetFileCacheByHash(h) != null).ToHashSet(StringComparer.Ordinal);
 
         Logger.LogDebug("Verifying {count} files", unverifiedUploadHashes.Count);
-        var filesToUpload = await FilesSend(unverifiedUploadHashes.ToList(), uploadToken).ConfigureAwait(false);
+        var filesToUpload = await FilesSend(unverifiedUploadHashes.ToList(), visiblePlayers.Select(p => p.UID).ToList(), uploadToken).ConfigureAwait(false);
 
         foreach (var file in filesToUpload.Where(f => !f.IsForbidden))
         {

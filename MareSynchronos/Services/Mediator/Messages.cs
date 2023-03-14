@@ -52,4 +52,6 @@ public record DownloadReadyMessage(Guid RequestId) : IMessage;
 public record DownloadStartedMessage(GameObjectHandler DownloadId, Dictionary<string, FileDownloadStatus> DownloadStatus) : IMessage;
 public record DownloadFinishedMessage(GameObjectHandler DownloadId) : IMessage;
 public record UiToggleMessage(Type UiType) : IMessage;
+public record PlayerUploadingMessage(GameObjectHandler Handler, bool IsUploading) : IMessage;
+
 #pragma warning restore MA0048 // File name must match type name

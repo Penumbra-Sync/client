@@ -160,7 +160,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
             }
         }
 
-        var downloadGroups = CurrentDownloads.Where(f => f.CanBeTransferred).GroupBy(f => f.DownloadUri.Host + f.DownloadUri.Port, StringComparer.Ordinal);
+        var downloadGroups = CurrentDownloads.Where(f => f.CanBeTransferred).GroupBy(f => f.DownloadUri.Host + ":" + f.DownloadUri.Port, StringComparer.Ordinal);
 
         foreach (var downloadGroup in downloadGroups)
         {

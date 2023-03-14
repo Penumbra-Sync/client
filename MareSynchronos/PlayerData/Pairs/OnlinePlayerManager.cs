@@ -76,7 +76,7 @@ public class OnlinePlayerManager : DisposableMediatorSubscriberBase
         {
             Task.Run(async () =>
             {
-                var dataToSend = await _fileTransferManager.UploadFiles(_lastSentData.DeepClone()).ConfigureAwait(false);
+                var dataToSend = await _fileTransferManager.UploadFiles(_lastSentData.DeepClone(), visiblePlayers).ConfigureAwait(false);
                 await _apiController.PushCharacterData(dataToSend, visiblePlayers).ConfigureAwait(false);
             });
         }

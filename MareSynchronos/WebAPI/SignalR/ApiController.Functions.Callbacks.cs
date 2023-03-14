@@ -127,6 +127,13 @@ public partial class ApiController
         return Task.CompletedTask;
     }
 
+    public Task Client_UserReceiveUploadStatus(UserDto dto)
+    {
+        Logger.LogTrace("Client_UserReceiveUploadStatus: {dto}", dto);
+        ExecuteSafely(() => _pairManager.ReceiveUploadStatus(dto));
+        return Task.CompletedTask;
+    }
+
     public Task Client_UserRemoveClientPair(UserDto dto)
     {
         Logger.LogDebug("Client_UserRemoveClientPair: {dto}", dto);
@@ -238,6 +245,12 @@ public partial class ApiController
     {
         if (_initialized) return;
         _mareHub!.On(nameof(Client_UserReceiveCharacterData), act);
+    }
+
+    public void OnUserReceiveUploadStatus(Action<UserDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_UserReceiveUploadStatus), act);
     }
 
     public void OnUserRemoveClientPair(Action<UserDto> act)

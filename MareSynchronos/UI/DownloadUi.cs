@@ -1,4 +1,5 @@
-﻿using Dalamud.Interface.Colors;
+﻿using Dalamud.Interface;
+using Dalamud.Interface.Colors;
 using ImGuiNET;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Handlers;
@@ -19,6 +20,7 @@ public class DownloadUi : WindowMediatorSubscriberBase
     private readonly DalamudUtilService _dalamudUtilService;
     private readonly FileUploadManager _fileTransferManager;
     private readonly UiSharedService _uiShared;
+    private readonly ConcurrentDictionary<GameObjectHandler, bool> _uploadingPlayers = new();
 
     public DownloadUi(ILogger<DownloadUi> logger, DalamudUtilService dalamudUtilService, MareConfigService configService,
         FileUploadManager fileTransferManager, MareMediator mediator, UiSharedService uiShared) : base(logger, mediator, "Mare Synchronos Downloads")
@@ -30,8 +32,8 @@ public class DownloadUi : WindowMediatorSubscriberBase
 
         SizeConstraints = new WindowSizeConstraints()
         {
-            MaximumSize = new Vector2(400, 90),
-            MinimumSize = new Vector2(400, 90),
+            MaximumSize = new Vector2(500, 90),
+            MinimumSize = new Vector2(500, 90),
         };
 
         Flags |= ImGuiWindowFlags.NoMove;
@@ -63,12 +65,25 @@ public class DownloadUi : WindowMediatorSubscriberBase
         {
             IsOpen = true;
         });
+
+        Mediator.Subscribe<PlayerUploadingMessage>(this, (msg) =>
+        {
+            _logger.LogTrace("Received uploading message for {handler}: {val}", msg.Handler, msg.IsUploading);
+            if (msg.IsUploading)
+            {
+                _uploadingPlayers[msg.Handler] = true;
+            }
+            else
+            {
+                _uploadingPlayers.TryRemove(msg.Handler, out _);
+            }
+        });
     }
 
     public override void Draw()
     {
         if (!_configService.Current.ShowTransferWindow && !_configService.Current.ShowTransferBars) return;
-        if (!_currentDownloads.Any() && !_fileTransferManager.CurrentUploads.Any()) return;
+        if (!_currentDownloads.Any() && !_fileTransferManager.CurrentUploads.Any() && !_uploadingPlayers.Any()) return;
         if (!IsOpen) return;
 
         if (_configService.Current.ShowTransferWindow)
@@ -118,10 +133,12 @@ public class DownloadUi : WindowMediatorSubscriberBase
 
                     UiSharedService.DrawOutlinedFont($"▼", ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
                     ImGui.SameLine();
+                    var xDistance = ImGui.GetCursorPosX();
                     UiSharedService.DrawOutlinedFont(
                         $"{item.Key.Name} [W:{dlSlot}/Q:{dlQueue}/P:{dlProg}/D:{dlDecomp}]",
                         ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
-                    ImGui.SameLine();
+                    ImGui.NewLine();
+                    ImGui.SameLine(xDistance);
                     UiSharedService.DrawOutlinedFont(
                         $"{transferredFiles}/{totalFiles} ({UiSharedService.ByteToString(transferredBytes, addSuffix: false)}/{UiSharedService.ByteToString(totalBytes)})",
                         ImGuiColors.DalamudWhite, new Vector4(0, 0, 0, 255), 1);
@@ -135,13 +152,13 @@ public class DownloadUi : WindowMediatorSubscriberBase
 
         if (_configService.Current.ShowTransferBars)
         {
+            const int transparency = 100;
+            const int dlBarBorder = 3;
+
             foreach (var transfer in _currentDownloads.ToList())
             {
                 var screenPos = _dalamudUtilService.WorldToScreen(transfer.Key.GameObjectLazy.Value);
                 if (screenPos == Vector2.Zero) continue;
-
-                const int dlBarBorder = 3;
-                const int transparency = 100;
 
                 var totalBytes = transfer.Value.Sum(c => c.Value.TotalBytes);
                 var transferredBytes = transfer.Value.Sum(c => c.Value.TransferredBytes);
@@ -174,6 +191,37 @@ public class DownloadUi : WindowMediatorSubscriberBase
                     screenPos with { X = screenPos.X - textSize.X / 2f - 1, Y = screenPos.Y - textSize.Y / 2f - 1 },
                     UiSharedService.Color(255, 255, 255, transparency),
                     UiSharedService.Color(0, 0, 0, transparency), 1);
+            }
+
+            if (_configService.Current.ShowUploading)
+            {
+                foreach (var player in _uploadingPlayers.Select(p => p.Key).ToList())
+                {
+                    var screenPos = _dalamudUtilService.WorldToScreen(player.GameObjectLazy.Value);
+                    if (screenPos == Vector2.Zero) continue;
+
+                    try
+                    {
+                        if (_uiShared.UidFontBuilt && _configService.Current.ShowUploadingBigText) ImGui.PushFont(_uiShared.UidFont);
+                        var uploadText = "Syncing";
+
+                        var textSize = ImGui.CalcTextSize(uploadText);
+
+                        var drawList = ImGui.GetBackgroundDrawList();
+                        UiSharedService.DrawOutlinedFont(drawList, uploadText,
+                            screenPos with { X = screenPos.X - textSize.X / 2f - 1, Y = screenPos.Y - textSize.Y / 2f - 1 },
+                            UiSharedService.Color(255, 255, 0, transparency),
+                            UiSharedService.Color(0, 0, 0, transparency), 2);
+                    }
+                    catch
+                    {
+                        // ignore errors thrown on UI
+                    }
+                    finally
+                    {
+                        if (_uiShared.UidFontBuilt && _configService.Current.ShowUploadingBigText) ImGui.PopFont();
+                    }
+                }
             }
         }
     }

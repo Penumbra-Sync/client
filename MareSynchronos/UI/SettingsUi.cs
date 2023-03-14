@@ -18,12 +18,15 @@ using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Services;
 using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.Files.Models;
+using MareSynchronos.PlayerData.Handlers;
+using System.Collections.Concurrent;
 
 namespace MareSynchronos.UI;
 
 public class SettingsUi : WindowMediatorSubscriberBase
 {
     private readonly MareConfigService _configService;
+    private readonly ConcurrentDictionary<GameObjectHandler, Dictionary<string, FileDownloadStatus>> _currentDownloads = new();
     private readonly FileUploadManager _fileTransferManager;
     private readonly FileTransferOrchestrator _fileTransferOrchestrator;
     private readonly MareCharaFileManager _mareCharaFileManager;
@@ -69,6 +72,12 @@ public class SettingsUi : WindowMediatorSubscriberBase
         Mediator.Subscribe<CutsceneStartMessage>(this, (_) => UiSharedService_GposeStart());
         Mediator.Subscribe<CutsceneEndMessage>(this, (_) => UiSharedService_GposeEnd());
         Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) => LastCreatedCharacterData = msg.CharacterData);
+        Mediator.Subscribe<DownloadStartedMessage>(this, (msg) =>
+        {
+            _currentDownloads[msg.DownloadId] = msg.DownloadStatus;
+        });
+
+        Mediator.Subscribe<DownloadFinishedMessage>(this, (msg) => _currentDownloads.TryRemove(msg.DownloadId, out _));
     }
 
     public CharacterData? LastCreatedCharacterData { private get; set; }
@@ -124,12 +133,17 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private void DrawCurrentTransfers()
     {
         _lastTab = "Transfers";
+        UiSharedService.FontText("Transfer Settings", _uiShared.UidFont);
+
         int maxParallelDownloads = _configService.Current.ParallelDownloads;
         if (ImGui.SliderInt("Maximum Parallel Downloads", ref maxParallelDownloads, 1, 10))
         {
             _configService.Current.ParallelDownloads = maxParallelDownloads;
             _configService.Save();
         }
+
+        ImGui.Separator();
+        UiSharedService.FontText("Transfer UI", _uiShared.UidFont);
 
         bool showTransferWindow = _configService.Current.ShowTransferWindow;
         if (ImGui.Checkbox("Show separate transfer window", ref showTransferWindow))
@@ -138,16 +152,15 @@ public class SettingsUi : WindowMediatorSubscriberBase
             _configService.Save();
         }
 
-        if (_configService.Current.ShowTransferWindow)
+        if (!_configService.Current.ShowTransferWindow) ImGui.BeginDisabled();
+        ImGui.Indent();
+        bool editTransferWindowPosition = _uiShared.EditTrackerPosition;
+        if (ImGui.Checkbox("Edit Transfer Window position", ref editTransferWindowPosition))
         {
-            ImGui.Indent();
-            bool editTransferWindowPosition = _uiShared.EditTrackerPosition;
-            if (ImGui.Checkbox("Edit Transfer Window position", ref editTransferWindowPosition))
-            {
-                _uiShared.EditTrackerPosition = editTransferWindowPosition;
-            }
-            ImGui.Unindent();
+            _uiShared.EditTrackerPosition = editTransferWindowPosition;
         }
+        ImGui.Unindent();
+        if (!_configService.Current.ShowTransferWindow) ImGui.EndDisabled();
 
         bool showTransferBars = _configService.Current.ShowTransferBars;
         if (ImGui.Checkbox("Show transfer bars rendered below players", ref showTransferBars))
@@ -155,66 +168,109 @@ public class SettingsUi : WindowMediatorSubscriberBase
             _configService.Current.ShowTransferBars = showTransferBars;
             _configService.Save();
         }
+        UiSharedService.DrawHelpText("This will render a progress bar during the download at the feet of the player you are downloading from.");
 
-        // todo: fix
-        /*if (ImGui.BeginTable("TransfersTable", 2))
+        if (!showTransferBars) ImGui.BeginDisabled();
+        ImGui.Indent();
+        bool showUploading = _configService.Current.ShowUploading;
+        if (ImGui.Checkbox("Show 'Uploading' text below players that are currently uploading", ref showUploading))
         {
-            ImGui.TableSetupColumn(
-                $"Uploads ({UiSharedService.ByteToString(_fileTransferManager.CurrentUploads.Sum(a => a.Transferred))} / {UiSharedService.ByteToString(_fileTransferManager.CurrentUploads.Sum(a => a.Total))})");
-            ImGui.TableSetupColumn($"Downloads ({UiSharedService.ByteToString(_fileTransferManager.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Transferred))} / {UiSharedService.ByteToString(_fileTransferManager.CurrentDownloads.SelectMany(k => k.Value).ToList().Sum(a => a.Total))})");
+            _configService.Current.ShowUploading = showUploading;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("This will render an 'Uploading' text at the feet of the player that is in progress of uploading data.");
 
-            ImGui.TableHeadersRow();
+        ImGui.Unindent();
+        if (!showUploading) ImGui.BeginDisabled();
+        ImGui.Indent();
+        bool showUploadingBigText = _configService.Current.ShowUploadingBigText;
+        if (ImGui.Checkbox("Large font for 'Uploading' text", ref showUploadingBigText))
+        {
+            _configService.Current.ShowUploadingBigText = showUploadingBigText;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("This will render an 'Uploading' text in a larger font.");
 
-            ImGui.TableNextColumn();
-            if (ImGui.BeginTable("UploadsTable", 3))
+        ImGui.Unindent();
+
+        if (!showUploading) ImGui.EndDisabled();
+        if (!showTransferBars) ImGui.EndDisabled();
+
+        ImGui.Separator();
+        UiSharedService.FontText("Current Transfers", _uiShared.UidFont);
+
+        if (ImGui.BeginTabBar("TransfersTabBar"))
+        {
+            if (ApiController.ServerState is ServerState.Connected && ImGui.BeginTabItem("Transfers"))
             {
-                ImGui.TableSetupColumn("File");
-                ImGui.TableSetupColumn("Uploaded");
-                ImGui.TableSetupColumn("Size");
-                ImGui.TableHeadersRow();
-                foreach (var transfer in _fileTransferManager.CurrentUploads.ToArray())
+                ImGui.TextUnformatted("Uploads");
+                if (ImGui.BeginTable("UploadsTable", 3))
                 {
-                    var color = UiSharedService.UploadColor((transfer.Transferred, transfer.Total));
-                    ImGui.PushStyleColor(ImGuiCol.Text, color);
-                    ImGui.TableNextColumn();
-                    ImGui.Text(transfer.Hash);
-                    ImGui.TableNextColumn();
-                    ImGui.Text(UiSharedService.ByteToString(transfer.Transferred));
-                    ImGui.TableNextColumn();
-                    ImGui.Text(UiSharedService.ByteToString(transfer.Total));
-                    ImGui.PopStyleColor();
-                    ImGui.TableNextRow();
+                    ImGui.TableSetupColumn("File");
+                    ImGui.TableSetupColumn("Uploaded");
+                    ImGui.TableSetupColumn("Size");
+                    ImGui.TableHeadersRow();
+                    foreach (var transfer in _fileTransferManager.CurrentUploads.ToArray())
+                    {
+                        var color = UiSharedService.UploadColor((transfer.Transferred, transfer.Total));
+                        ImGui.PushStyleColor(ImGuiCol.Text, color);
+                        ImGui.TableNextColumn();
+                        ImGui.Text(transfer.Hash);
+                        ImGui.TableNextColumn();
+                        ImGui.Text(UiSharedService.ByteToString(transfer.Transferred));
+                        ImGui.TableNextColumn();
+                        ImGui.Text(UiSharedService.ByteToString(transfer.Total));
+                        ImGui.PopStyleColor();
+                        ImGui.TableNextRow();
+                    }
+
+                    ImGui.EndTable();
+                }
+                ImGui.Separator();
+                ImGui.TextUnformatted("Downloads");
+                if (ImGui.BeginTable("DownloadsTable", 4))
+                {
+                    ImGui.TableSetupColumn("User");
+                    ImGui.TableSetupColumn("Server");
+                    ImGui.TableSetupColumn("Files");
+                    ImGui.TableSetupColumn("Download");
+                    ImGui.TableHeadersRow();
+
+                    foreach (var transfer in _currentDownloads.ToArray())
+                    {
+                        var userName = transfer.Key.Name;
+                        foreach (var entry in transfer.Value)
+                        {
+                            var color = UiSharedService.UploadColor((entry.Value.TransferredBytes, entry.Value.TotalBytes));
+                            ImGui.TableNextColumn();
+                            ImGui.Text(userName);
+                            ImGui.TableNextColumn();
+                            ImGui.Text(entry.Key);
+                            ImGui.PushStyleColor(ImGuiCol.Text, color);
+                            ImGui.TableNextColumn();
+                            ImGui.Text(entry.Value.TransferredFiles + "/" + entry.Value.TotalFiles);
+                            ImGui.TableNextColumn();
+                            ImGui.Text(UiSharedService.ByteToString(entry.Value.TransferredBytes) + "/" + UiSharedService.ByteToString(entry.Value.TotalBytes));
+                            ImGui.TableNextColumn();
+                            ImGui.PopStyleColor();
+                            ImGui.TableNextRow();
+                        }
+                    }
+
+                    ImGui.EndTable();
                 }
 
-                ImGui.EndTable();
+                ImGui.EndTabItem();
             }
 
-            ImGui.TableNextColumn();
-            if (ImGui.BeginTable("DownloadsTable", 3))
+            if (ImGui.BeginTabItem("Blocked Transfers"))
             {
-                ImGui.TableSetupColumn("File");
-                ImGui.TableSetupColumn("Downloaded");
-                ImGui.TableSetupColumn("Size");
-                ImGui.TableHeadersRow();
-                foreach (var transfer in _fileTransferManager.CurrentDownloads.SelectMany(k => k.Value).ToArray())
-                {
-                    var color = UiSharedService.UploadColor((transfer.Transferred, transfer.Total));
-                    ImGui.PushStyleColor(ImGuiCol.Text, color);
-                    ImGui.TableNextColumn();
-                    ImGui.Text(transfer.Hash);
-                    ImGui.TableNextColumn();
-                    ImGui.Text(UiSharedService.ByteToString(transfer.Transferred));
-                    ImGui.TableNextColumn();
-                    ImGui.Text(UiSharedService.ByteToString(transfer.Total));
-                    ImGui.PopStyleColor();
-                    ImGui.TableNextRow();
-                }
-
-                ImGui.EndTable();
+                DrawBlockedTransfers();
+                ImGui.EndTabItem();
             }
 
-            ImGui.EndTable();
-        }*/
+            ImGui.EndTabBar();
+        }
     }
 
     private void DrawDebug()
@@ -791,15 +847,9 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 ImGui.EndTabItem();
             }
 
-            if (ApiController.ServerState is ServerState.Connected && ImGui.BeginTabItem("Transfers"))
+            if (ImGui.BeginTabItem("Transfers"))
             {
                 DrawCurrentTransfers();
-                ImGui.EndTabItem();
-            }
-
-            if (ImGui.BeginTabItem("Blocked Transfers"))
-            {
-                DrawBlockedTransfers();
                 ImGui.EndTabItem();
             }
 

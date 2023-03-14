@@ -243,6 +243,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         OnUserSendOnline(dto => Client_UserSendOnline(dto));
         OnUserUpdateOtherPairPermissions(dto => Client_UserUpdateOtherPairPermissions(dto));
         OnUserUpdateSelfPairPermissions(dto => Client_UserUpdateSelfPairPermissions(dto));
+        OnUserReceiveUploadStatus(dto => Client_UserReceiveUploadStatus(dto));
 
         OnGroupChangePermissions((dto) => Client_GroupChangePermissions(dto));
         OnGroupDelete((dto) => Client_GroupDelete(dto));

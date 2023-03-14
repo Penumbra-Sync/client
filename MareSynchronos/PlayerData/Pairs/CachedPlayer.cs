@@ -60,8 +60,10 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     private OnlineUserIdentDto OnlineUser { get; set; }
     private IntPtr PlayerCharacter => _charaHandler?.Address ?? IntPtr.Zero;
 
-    public void ApplyCharacterData(API.Data.CharacterData characterData, OptionalPluginWarning warning, bool forced = false)
+    public void ApplyCharacterData(CharacterData characterData, OptionalPluginWarning warning, bool forced = false)
     {
+        SetUploading(false);
+
         Logger.LogDebug("Received data for {player}", this);
 
         Logger.LogDebug("Checking for files to download for player {name}", this);
@@ -125,12 +127,22 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             : (OnlineUser.User.AliasOrUID + ":" + PlayerName + ":" + (PlayerCharacter != IntPtr.Zero ? "HasChar" : "NoChar"));
     }
 
+    internal void SetUploading(bool isUploading = true)
+    {
+        Logger.LogTrace("Setting {this} uploading {uploading}", this, isUploading);
+        if (_charaHandler != null)
+        {
+            Mediator.Publish(new PlayerUploadingMessage(_charaHandler, isUploading));
+        }
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (string.IsNullOrEmpty(PlayerName)) return; // already disposed
 
         base.Dispose(disposing);
 
+        SetUploading(false);
         _downloadManager.Dispose();
         var name = PlayerName;
         Logger.LogDebug("Disposing {name} ({user})", name, OnlineUser);
@@ -229,7 +241,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         if (handler != _charaHandler) handler.Dispose();
     }
 
-    private Dictionary<ObjectKind, HashSet<PlayerChanges>> CheckUpdatedData(API.Data.CharacterData oldData, API.Data.CharacterData newData, bool forced)
+    private Dictionary<ObjectKind, HashSet<PlayerChanges>> CheckUpdatedData(CharacterData oldData, CharacterData newData, bool forced)
     {
         var charaDataToUpdate = new Dictionary<ObjectKind, HashSet<PlayerChanges>>();
         foreach (ObjectKind objectKind in Enum.GetValues<ObjectKind>())

@@ -27,6 +27,8 @@ public class MareConfig : IMareConfiguration
     public bool ShowOnlineNotificationsOnlyForNamedPairs { get; set; } = false;
     public bool ShowTransferBars { get; set; } = true;
     public bool ShowTransferWindow { get; set; } = false;
+    public bool ShowUploading { get; set; } = true;
+    public bool ShowUploadingBigText { get; set; } = true;
     public bool ShowVisibleUsersSeparately { get; set; } = true;
     public int TimeSpanBetweenScansInSeconds { get; set; } = 30;
     public int Version { get; set; } = 1;
