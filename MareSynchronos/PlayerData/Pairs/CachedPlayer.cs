@@ -193,6 +193,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     {
         if (PlayerCharacter == IntPtr.Zero) return;
         var ptr = PlayerCharacter;
+
         var handler = changes.Key switch
         {
             ObjectKind.Player => _charaHandler!,
@@ -202,45 +203,51 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             _ => throw new NotSupportedException("ObjectKind not supported: " + changes.Key)
         };
 
-        if (handler.Address == IntPtr.Zero)
+        try
         {
-            if (handler != _charaHandler) handler.Dispose();
-            return;
-        }
-
-        Logger.LogDebug("[{applicationId}] Applying Customization Data for {handler}", applicationId, handler);
-        await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, handler, applicationId, 30000).ConfigureAwait(false);
-        foreach (var change in changes.Value)
-        {
-            Logger.LogDebug("[{applicationId}] Processing {change} for {handler}", applicationId, change, handler);
-            switch (change)
+            if (handler.Address == IntPtr.Zero)
             {
-                case PlayerChanges.Palette:
-                    await _ipcManager.PalettePlusSetPalette(handler.Address, charaData.PalettePlusData).ConfigureAwait(false);
-                    break;
+                return;
+            }
 
-                case PlayerChanges.Customize:
-                    await _ipcManager.CustomizePlusSetBodyScale(handler.Address, charaData.CustomizePlusData).ConfigureAwait(false);
-                    break;
+            Logger.LogDebug("[{applicationId}] Applying Customization Data for {handler}", applicationId, handler);
+            await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, handler, applicationId, 30000, token).ConfigureAwait(false);
+            token.ThrowIfCancellationRequested();
+            foreach (var change in changes.Value)
+            {
+                Logger.LogDebug("[{applicationId}] Processing {change} for {handler}", applicationId, change, handler);
+                switch (change)
+                {
+                    case PlayerChanges.Palette:
+                        await _ipcManager.PalettePlusSetPalette(handler.Address, charaData.PalettePlusData).ConfigureAwait(false);
+                        break;
 
-                case PlayerChanges.Heels:
-                    await _ipcManager.HeelsSetOffsetForPlayer(handler.Address, charaData.HeelsOffset).ConfigureAwait(false);
-                    break;
+                    case PlayerChanges.Customize:
+                        await _ipcManager.CustomizePlusSetBodyScale(handler.Address, charaData.CustomizePlusData).ConfigureAwait(false);
+                        break;
 
-                case PlayerChanges.Mods:
-                    if (charaData.GlamourerData.TryGetValue(changes.Key, out var glamourerData))
-                    {
-                        await _ipcManager.GlamourerApplyAll(Logger, handler, glamourerData, applicationId, token).ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        await _ipcManager.PenumbraRedraw(Logger, handler, applicationId, token).ConfigureAwait(false);
-                    }
-                    break;
+                    case PlayerChanges.Heels:
+                        await _ipcManager.HeelsSetOffsetForPlayer(handler.Address, charaData.HeelsOffset).ConfigureAwait(false);
+                        break;
+
+                    case PlayerChanges.Mods:
+                        if (charaData.GlamourerData.TryGetValue(changes.Key, out var glamourerData))
+                        {
+                            await _ipcManager.GlamourerApplyAll(Logger, handler, glamourerData, applicationId, token).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            await _ipcManager.PenumbraRedraw(Logger, handler, applicationId, token).ConfigureAwait(false);
+                        }
+                        break;
+                }
+                token.ThrowIfCancellationRequested();
             }
         }
-
-        if (handler != _charaHandler) handler.Dispose();
+        finally
+        {
+            if (handler != _charaHandler) handler.Dispose();
+        }
     }
 
     private Dictionary<ObjectKind, HashSet<PlayerChanges>> CheckUpdatedData(CharacterData oldData, CharacterData newData, bool forced)
@@ -382,14 +389,14 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                 }
             }
 
-            while ((!_applicationTask?.IsCompleted ?? false) && !downloadToken.IsCancellationRequested)
+            while ((!_applicationTask?.IsCompleted ?? false) && !downloadToken.IsCancellationRequested && !_applicationCancellationTokenSource.IsCancellationRequested)
             {
                 // block until current application is done
                 Logger.LogDebug("Waiting for current data application (Id: {id}) to finish", _applicationId);
                 await Task.Delay(250).ConfigureAwait(false);
             }
 
-            if (downloadToken.IsCancellationRequested) return;
+            if (downloadToken.IsCancellationRequested || _applicationCancellationTokenSource.IsCancellationRequested) return;
 
             _applicationCancellationTokenSource?.Dispose();
             _applicationCancellationTokenSource = new();

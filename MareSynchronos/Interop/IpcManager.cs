@@ -607,18 +607,24 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
         ActionQueue.Enqueue(action);
 
-        if (!fireAndForget)
+        try
         {
-            var disposeToken = _disposalCts.Token;
-            var combinedToken = CancellationTokenSource.CreateLinkedTokenSource(disposeToken, token).Token;
+            if (!fireAndForget)
+            {
+                var disposeToken = _disposalCts.Token;
+                var combinedToken = CancellationTokenSource.CreateLinkedTokenSource(disposeToken, token).Token;
 
-            await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
+                await Task.Delay(TimeSpan.FromSeconds(1), combinedToken).ConfigureAwait(false);
 
-            if (!combinedToken.IsCancellationRequested)
-                await _dalamudUtil.WaitWhileCharacterIsDrawing(logger, obj, applicationId, 30000, combinedToken).ConfigureAwait(false);
-
+                if (!combinedToken.IsCancellationRequested)
+                    await _dalamudUtil.WaitWhileCharacterIsDrawing(logger, obj, applicationId, 30000, combinedToken).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
             _penumbraRedrawRequests[obj.Address] = false;
         }
+
         Mediator.Publish(new PenumbraEndRedrawMessage(obj.Address));
     }
 
