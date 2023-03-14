@@ -2,12 +2,14 @@
 using MareSynchronos.MareConfiguration.Configurations;
 using MareSynchronos.MareConfiguration.Configurations.Obsolete;
 using MareSynchronos.MareConfiguration.Models;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
 namespace MareSynchronos.MareConfiguration;
+#pragma warning disable CS0618 // ignore Obsolete tag, the point of this migrator is to migrate obsolete configs to new ones
 
-public class ConfigurationMigrator
+public class ConfigurationMigrator : IHostedService
 {
     private readonly ILogger<ConfigurationMigrator> _logger;
     private readonly DalamudPluginInterface _pi;
@@ -20,7 +22,6 @@ public class ConfigurationMigrator
 
     public void Migrate()
     {
-#pragma warning disable CS0618 // ignore Obsolete tag, the point of this migrator is to migrate obsolete configs to new ones
         if (_pi.GetPluginConfig() is Configuration oldConfig)
         {
             _logger.LogInformation("Migrating Configuration from old config style to 1");
@@ -40,6 +41,24 @@ public class ConfigurationMigrator
             }
         }
     }
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        Migrate();
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    private static void SaveConfig(IMareConfiguration config, string path)
+    {
+        File.WriteAllText(path, JsonConvert.SerializeObject(config, Formatting.Indented));
+    }
+
+    private string ConfigurationPath(string configName) => Path.Combine(_pi.ConfigDirectory.FullName, configName);
 
     private void MigrateMareConfigV0ToV1(MareConfigV0 mareConfigV0)
     {
@@ -82,13 +101,6 @@ public class ConfigurationMigrator
         SaveConfig(tagConfig, ConfigurationPath(ServerTagConfigService.ConfigName));
         SaveConfig(notesConfig, ConfigurationPath(NotesConfigService.ConfigName));
     }
-#pragma warning restore CS0618 // ignore Obsolete tag, the point of this migrator is to migrate obsolete configs to new ones
-
-    private string ConfigurationPath(string configName) => Path.Combine(_pi.ConfigDirectory.FullName, configName);
-
-
-    private void SaveConfig(IMareConfiguration config, string path)
-    {
-        File.WriteAllText(path, JsonConvert.SerializeObject(config, Formatting.Indented));
-    }
 }
+
+#pragma warning restore CS0618 // ignore Obsolete tag, the point of this migrator is to migrate obsolete configs to new ones

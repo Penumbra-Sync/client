@@ -3,17 +3,14 @@ using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Utility;
 using ImGuiNET;
-using MareSynchronos.Models;
+using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI.Components;
 
 public class SelectGroupForPairUi
 {
-    /// <summary>
-    /// Should the panel show, yes/no
-    /// </summary>
-    private bool _show;
+    private readonly TagHandler _tagHandler;
 
     /// <summary>
     /// The group UI is always open for a specific pair. This defines which pair the UI is open for.
@@ -22,11 +19,14 @@ public class SelectGroupForPairUi
     private Pair? _pair;
 
     /// <summary>
+    /// Should the panel show, yes/no
+    /// </summary>
+    private bool _show;
+
+    /// <summary>
     /// For the add category option, this stores the currently typed in tag name
     /// </summary>
     private string _tagNameToAdd = "";
-
-    private readonly TagHandler _tagHandler;
 
     public SelectGroupForPairUi(TagHandler tagHandler)
     {
@@ -34,17 +34,6 @@ public class SelectGroupForPairUi
         _pair = null;
         _tagHandler = tagHandler;
     }
-
-    public void Open(Pair pair)
-    {
-        _pair = pair;
-        // Using "_show" here to de-couple the opening of the popup
-        // The popup name is derived from the name the user currently sees, which is
-        // based on the showUidForEntry dictionary.
-        // We'd have to derive the name here to open it popup modal here, when the Open() is called
-        _show = true;
-    }
-
 
     public void Draw(Dictionary<string, bool> showUidForEntry)
     {
@@ -68,32 +57,51 @@ public class SelectGroupForPairUi
             var childHeight = tags.Count != 0 ? tags.Count * 25 : 1;
             var childSize = new Vector2(0, childHeight > 100 ? 100 : childHeight) * ImGuiHelpers.GlobalScale;
 
-            UiShared.FontText($"Select the groups you want {name} to be in.", UiBuilder.DefaultFont);
+            UiSharedService.FontText($"Select the groups you want {name} to be in.", UiBuilder.DefaultFont);
             if (ImGui.BeginChild(name + "##listGroups", childSize))
             {
                 foreach (var tag in tags)
                 {
-                    UiShared.DrawWithID($"groups-pair-{_pair.UserData.UID}-{tag}", () => DrawGroupName(_pair, tag));
+                    UiSharedService.DrawWithID($"groups-pair-{_pair.UserData.UID}-{tag}", () => DrawGroupName(_pair, tag));
                 }
                 ImGui.EndChild();
             }
 
             ImGui.Separator();
-            UiShared.FontText($"Create a new group for {name}.", UiBuilder.DefaultFont);
+            UiSharedService.FontText($"Create a new group for {name}.", UiBuilder.DefaultFont);
             if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
             {
                 HandleAddTag();
             }
             ImGui.SameLine();
             ImGui.InputTextWithHint("##category_name", "New Group", ref _tagNameToAdd, 40);
+            if (ImGui.IsKeyDown(ImGuiKey.Enter))
             {
-                if (ImGui.IsKeyDown(ImGuiKey.Enter))
-                {
-                    HandleAddTag();
-                }
+                HandleAddTag();
             }
             ImGui.EndPopup();
         }
+    }
+
+    public void Open(Pair pair)
+    {
+        _pair = pair;
+        // Using "_show" here to de-couple the opening of the popup
+        // The popup name is derived from the name the user currently sees, which is
+        // based on the showUidForEntry dictionary.
+        // We'd have to derive the name here to open it popup modal here, when the Open() is called
+        _show = true;
+    }
+
+    private static string PairName(Dictionary<string, bool> showUidForEntry, Pair pair)
+    {
+        showUidForEntry.TryGetValue(pair.UserData.UID, out var showUidInsteadOfName);
+        var playerText = pair.GetNote();
+        if (showUidInsteadOfName || string.IsNullOrEmpty(playerText))
+        {
+            playerText = pair.UserData.AliasOrUID;
+        }
+        return playerText;
     }
 
     private void DrawGroupName(Pair pair, string name)
@@ -128,16 +136,5 @@ public class SelectGroupForPairUi
         {
             _tagNameToAdd = string.Empty;
         }
-    }
-
-    private string PairName(Dictionary<string, bool> showUidForEntry, Pair pair)
-    {
-        showUidForEntry.TryGetValue(pair.UserData.UID, out var showUidInsteadOfName);
-        var playerText = pair.GetNote();
-        if (showUidInsteadOfName || string.IsNullOrEmpty(playerText))
-        {
-            playerText = pair.UserData.AliasOrUID;
-        }
-        return playerText;
     }
 }

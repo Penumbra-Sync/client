@@ -1,4 +1,5 @@
 ﻿using MareSynchronos.MareConfiguration.Models;
+using MareSynchronos.MareConfiguration.Models.Obsolete;
 
 namespace MareSynchronos.MareConfiguration.Configurations.Obsolete;
 

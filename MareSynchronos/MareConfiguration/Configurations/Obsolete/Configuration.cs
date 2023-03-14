@@ -1,6 +1,6 @@
 ﻿using Dalamud.Configuration;
-using Dalamud.Plugin;
 using MareSynchronos.MareConfiguration.Models;
+using MareSynchronos.MareConfiguration.Models.Obsolete;
 using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;
 
@@ -46,12 +46,12 @@ public class Configuration : IPluginConfiguration
     /// The dictionary first maps a server URL to a dictionary, and that
     /// dictionary maps the OtherUID of the <see cref="ClientPairDto"/> to a list of tags.
     /// </summary>
-    public Dictionary<string, Dictionary<string, List<string>>> UidServerPairedUserTags = new(StringComparer.Ordinal);
+    public Dictionary<string, Dictionary<string, List<string>>> UidServerPairedUserTags { get; set; } = new(StringComparer.Ordinal);
     /// <summary>
     /// A dictionary that maps a server URL to the tags the user has added for that server.
     /// </summary>
-    public Dictionary<string, HashSet<string>> ServerAvailablePairTags = new(StringComparer.Ordinal);
-    public HashSet<string> OpenPairTags = new(StringComparer.Ordinal);
+    public Dictionary<string, HashSet<string>> ServerAvailablePairTags { get; set; } = new(StringComparer.Ordinal);
+    public HashSet<string> OpenPairTags { get; set; } = new(StringComparer.Ordinal);
 
     public MareConfigV0 ToMareConfig(ILogger logger)
     {
@@ -75,7 +75,7 @@ public class Configuration : IPluginConfiguration
         // create all server storage based on current clientsecret
         foreach (var secret in ClientSecret)
         {
-            logger.LogDebug("Migrating " + secret.Key);
+            logger.LogDebug("Migrating {key}", secret.Key);
             var apiuri = secret.Key;
             var secretkey = secret.Value;
             ServerStorageV0 toAdd = new();
@@ -120,10 +120,5 @@ public class Configuration : IPluginConfiguration
         }
 
         return newConfig;
-    }
-
-    public void Migrate()
-    {
-
     }
 }

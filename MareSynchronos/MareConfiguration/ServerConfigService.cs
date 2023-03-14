@@ -1,12 +1,14 @@
-﻿using Dalamud.Plugin;
-using MareSynchronos.MareConfiguration.Configurations;
-using Microsoft.Extensions.Logging;
+﻿using MareSynchronos.MareConfiguration.Configurations;
 
 namespace MareSynchronos.MareConfiguration;
 
 public class ServerConfigService : ConfigurationServiceBase<ServerConfig>
 {
     public const string ConfigName = "server.json";
+
+    public ServerConfigService(string configDir) : base(configDir)
+    {
+    }
+
     protected override string ConfigurationName => ConfigName;
-    public ServerConfigService(DalamudPluginInterface pluginInterface) : base(pluginInterface) { }
 }
