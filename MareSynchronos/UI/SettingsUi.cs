@@ -808,7 +808,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 {
                     UiSharedService.DrawHelpText("You cannot edit the name of the main service.");
                 }
-                if (!isMain)
+                if (!isMain && selectedServer != _serverConfigurationManager.CurrentServer)
                 {
                     if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Service") && UiSharedService.CtrlPressed())
                     {

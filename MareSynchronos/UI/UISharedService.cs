@@ -633,6 +633,10 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
         if (_serverSelectionIndex == -1)
             _serverSelectionIndex = Array.IndexOf(_serverConfigurationManager.GetServerApiUrls(), _serverConfigurationManager.CurrentApiUrl);
+        if (_serverSelectionIndex == -1)
+        {
+            _serverSelectionIndex = 0;
+        }
         for (int i = 0; i < comboEntries.Length; i++)
         {
             if (string.Equals(_serverConfigurationManager.CurrentServer?.ServerName, comboEntries[i], StringComparison.OrdinalIgnoreCase))
