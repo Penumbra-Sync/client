@@ -69,10 +69,10 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
         var uploadToken = _uploadCancellationTokenSource.Token;
         Logger.LogDebug("Sending Character data {hash} to service {url}", data.DataHash.Value, _serverManager.CurrentApiUrl);
 
-        HashSet<string> unverifiedUploads = VerifyFiles(data);
+        HashSet<string> unverifiedUploads = GetUnverifiedFiles(data);
         if (unverifiedUploads.Any())
         {
-            await UploadMissingFiles(unverifiedUploads, visiblePlayers, uploadToken).ConfigureAwait(false);
+            await UploadUnverifiedFiles(unverifiedUploads, visiblePlayers, uploadToken).ConfigureAwait(false);
             Logger.LogInformation("Upload complete for {hash}", data.DataHash.Value);
         }
 
@@ -109,6 +109,26 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
             (int)new FileInfo(fileCache).Length));
     }
 
+    private HashSet<string> GetUnverifiedFiles(CharacterData data)
+    {
+        HashSet<string> unverifiedUploadHashes = new(StringComparer.Ordinal);
+        foreach (var item in data.FileReplacements.SelectMany(c => c.Value.Where(f => string.IsNullOrEmpty(f.FileSwapPath)).Select(v => v.Hash).Distinct(StringComparer.Ordinal)).Distinct(StringComparer.Ordinal).ToList())
+        {
+            if (!_verifiedUploadedHashes.TryGetValue(item, out var verifiedTime))
+            {
+                verifiedTime = DateTime.MinValue;
+            }
+
+            if (verifiedTime < DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(10)))
+            {
+                Logger.LogTrace("Verifying {item}, last verified: {date}", item, verifiedTime);
+                unverifiedUploadHashes.Add(item);
+            }
+        }
+
+        return unverifiedUploadHashes;
+    }
+
     private void Reset()
     {
         _uploadCancellationTokenSource?.Cancel();
@@ -139,7 +159,7 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
         Logger.LogDebug("Upload Status: {status}", response.StatusCode);
     }
 
-    private async Task UploadMissingFiles(HashSet<string> unverifiedUploadHashes, List<UserData> visiblePlayers, CancellationToken uploadToken)
+    private async Task UploadUnverifiedFiles(HashSet<string> unverifiedUploadHashes, List<UserData> visiblePlayers, CancellationToken uploadToken)
     {
         unverifiedUploadHashes = unverifiedUploadHashes.Where(h => _fileDbManager.GetFileCacheByHash(h) != null).ToHashSet(StringComparer.Ordinal);
 
@@ -184,8 +204,8 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
             CurrentUploads.Single(e => string.Equals(e.Hash, data.Item1, StringComparison.Ordinal)).Total = data.Item2.Length;
             await uploadTask.ConfigureAwait(false);
             uploadTask = UploadFile(data.Item2, file.Hash, uploadToken);
-            _verifiedUploadedHashes[file.Hash] = DateTime.UtcNow;
             uploadToken.ThrowIfCancellationRequested();
+            _verifiedUploadedHashes[file.Hash] = DateTime.UtcNow;
         }
 
         if (CurrentUploads.Any())
@@ -202,25 +222,5 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
         }
 
         CurrentUploads.Clear();
-    }
-
-    private HashSet<string> VerifyFiles(CharacterData data)
-    {
-        HashSet<string> unverifiedUploadHashes = new(StringComparer.Ordinal);
-        foreach (var item in data.FileReplacements.SelectMany(c => c.Value.Where(f => string.IsNullOrEmpty(f.FileSwapPath)).Select(v => v.Hash).Distinct(StringComparer.Ordinal)).Distinct(StringComparer.Ordinal).ToList())
-        {
-            if (!_verifiedUploadedHashes.TryGetValue(item, out var verifiedTime))
-            {
-                verifiedTime = DateTime.MinValue;
-            }
-
-            if (verifiedTime < DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(10)))
-            {
-                Logger.LogTrace("Verifying {item}, last verified: {date}", item, verifiedTime);
-                unverifiedUploadHashes.Add(item);
-            }
-        }
-
-        return unverifiedUploadHashes;
     }
 }

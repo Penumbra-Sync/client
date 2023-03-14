@@ -220,9 +220,9 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                 finally
                 {
                     _orchestrator.ReleaseDownloadSlot();
-                    _downloadStatus[fileGroup.Key].DownloadStatus = DownloadStatus.Decompressing;
                 }
 
+                _downloadStatus[fileGroup.Key].DownloadStatus = DownloadStatus.Decompressing;
                 var tempFileData = await File.ReadAllBytesAsync(tempPath, token).ConfigureAwait(false);
                 var extractedFile = LZ4Codec.Unwrap(tempFileData);
                 File.Delete(tempPath);
