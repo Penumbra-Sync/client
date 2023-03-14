@@ -186,12 +186,6 @@ public class DalamudUtilService : IHostedService
         return Task.CompletedTask;
     }
 
-    public Vector2 WorldToScreen(Dalamud.Game.ClientState.Objects.Types.GameObject? obj)
-    {
-        if (obj == null) return Vector2.Zero;
-        return _gameGui.WorldToScreen(obj.Position, out var screenPos) ? screenPos : Vector2.Zero;
-    }
-
     public async Task WaitWhileCharacterIsDrawing(ILogger logger, GameObjectHandler handler, Guid redrawId, int timeOut = 5000, CancellationToken? ct = null)
     {
         if (!_clientState.IsLoggedIn || handler.Address == IntPtr.Zero) return;
@@ -202,7 +196,6 @@ public class DalamudUtilService : IHostedService
         int curWaitTime = 0;
         try
         {
-            // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
             while ((!ct?.IsCancellationRequested ?? true)
                    && curWaitTime < timeOut
                    && await handler.IsBeingDrawnRunOnFramework().ConfigureAwait(true)) // 0b100000000000 is "still rendering" or something
@@ -240,6 +233,12 @@ public class DalamudUtilService : IHostedService
         }
 
         Thread.Sleep(tick * 2);
+    }
+
+    public Vector2 WorldToScreen(Dalamud.Game.ClientState.Objects.Types.GameObject? obj)
+    {
+        if (obj == null) return Vector2.Zero;
+        return _gameGui.WorldToScreen(obj.Position, out var screenPos) ? screenPos : Vector2.Zero;
     }
 
     private void FrameworkOnUpdate(Framework framework)

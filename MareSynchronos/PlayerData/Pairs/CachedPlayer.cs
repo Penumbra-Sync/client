@@ -23,6 +23,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     private readonly Func<ObjectKind, Func<nint>, bool, GameObjectHandler> _gameObjectHandlerFactory;
     private readonly IpcManager _ipcManager;
     private readonly IHostApplicationLifetime _lifetime;
+    private CancellationTokenSource _applicationCancellationTokenSource = new();
     private Guid _applicationId;
     private Task? _applicationTask;
     private CharacterData _cachedData = new();
@@ -149,6 +150,8 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         try
         {
             Guid applicationId = Guid.NewGuid();
+            _applicationCancellationTokenSource.Cancel();
+            _applicationCancellationTokenSource.Dispose();
             _downloadCancellationTokenSource?.Cancel();
             _downloadCancellationTokenSource?.Dispose();
             _downloadCancellationTokenSource = null;
@@ -178,13 +181,15 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
     }
 
-    private async Task ApplyBaseData(Guid applicationId, Dictionary<string, string> moddedPaths, string manipulationData)
+    private async Task ApplyBaseData(Guid applicationId, Dictionary<string, string> moddedPaths, string manipulationData, CancellationToken token)
     {
         await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, PlayerName!)).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
         await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.PenumbraSetTemporaryMods(Logger, applicationId, PlayerName!, moddedPaths, manipulationData)).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
     }
 
-    private async Task ApplyCustomizationData(Guid applicationId, KeyValuePair<ObjectKind, HashSet<PlayerChanges>> changes, API.Data.CharacterData charaData)
+    private async Task ApplyCustomizationData(Guid applicationId, KeyValuePair<ObjectKind, HashSet<PlayerChanges>> changes, CharacterData charaData, CancellationToken token)
     {
         if (PlayerCharacter == IntPtr.Zero) return;
         var ptr = PlayerCharacter;
@@ -196,9 +201,6 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             ObjectKind.Pet => _gameObjectHandlerFactory(changes.Key, () => _dalamudUtil.GetPet(ptr), false),
             _ => throw new NotSupportedException("ObjectKind not supported: " + changes.Key)
         };
-
-        CancellationTokenSource applicationTokenSource = new();
-        applicationTokenSource.CancelAfter(TimeSpan.FromSeconds(30));
 
         if (handler.Address == IntPtr.Zero)
         {
@@ -228,11 +230,11 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                 case PlayerChanges.Mods:
                     if (charaData.GlamourerData.TryGetValue(changes.Key, out var glamourerData))
                     {
-                        await _ipcManager.GlamourerApplyAll(Logger, handler, glamourerData, applicationId, applicationTokenSource.Token).ConfigureAwait(false);
+                        await _ipcManager.GlamourerApplyAll(Logger, handler, glamourerData, applicationId, token).ConfigureAwait(false);
                     }
                     else
                     {
-                        await _ipcManager.PenumbraRedraw(Logger, handler, applicationId, applicationTokenSource.Token).ConfigureAwait(false);
+                        await _ipcManager.PenumbraRedraw(Logger, handler, applicationId, token).ConfigureAwait(false);
                     }
                     break;
             }
@@ -389,6 +391,9 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
             if (downloadToken.IsCancellationRequested) return;
 
+            _applicationCancellationTokenSource?.Dispose();
+            _applicationCancellationTokenSource = new();
+            var token = _applicationCancellationTokenSource.Token;
             _applicationTask = Task.Run(async () =>
             {
                 _applicationId = Guid.NewGuid();
@@ -396,16 +401,18 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
                 if (updateModdedPaths && (moddedPaths.Any() || !string.IsNullOrEmpty(charaData.ManipulationData)))
                 {
-                    await ApplyBaseData(_applicationId, moddedPaths, charaData.ManipulationData).ConfigureAwait(false);
+                    await ApplyBaseData(_applicationId, moddedPaths, charaData.ManipulationData, token).ConfigureAwait(false);
                 }
+
+                token.ThrowIfCancellationRequested();
 
                 foreach (var kind in updatedData)
                 {
-                    await ApplyCustomizationData(_applicationId, kind, charaData).ConfigureAwait(false);
+                    await ApplyCustomizationData(_applicationId, kind, charaData, token).ConfigureAwait(false);
                 }
 
                 Logger.LogDebug("[{applicationId}] Application finished", _applicationId);
-            });
+            }, token);
         }, downloadToken);
     }
 
@@ -426,7 +433,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             Logger.LogDebug("Unauthorized character change detected");
             await ApplyCustomizationData(applicationId, new(ObjectKind.Player,
                 new HashSet<PlayerChanges>(new[] { PlayerChanges.Palette, PlayerChanges.Customize, PlayerChanges.Heels, PlayerChanges.Mods })),
-                _cachedData).ConfigureAwait(false);
+                _cachedData, _applicationCancellationTokenSource.Token).ConfigureAwait(false);
         }, token);
     }
 

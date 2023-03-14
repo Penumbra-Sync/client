@@ -679,7 +679,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         var color = UiSharedService.GetBoolColor(!_serverManager.CurrentServer!.FullPause);
         var connectedIcon = !_serverManager.CurrentServer.FullPause ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
 
-        if (_apiController.ServerState != ServerState.Reconnecting)
+        if (_apiController.ServerState is not (ServerState.Reconnecting or ServerState.Disconnecting))
         {
             ImGui.PushStyleColor(ImGuiCol.Text, color);
             if (ImGuiComponents.IconButton(connectedIcon))
@@ -819,6 +819,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             ServerState.Connecting => "Attempting to connect to the server.",
             ServerState.Reconnecting => "Connection to server interrupted, attempting to reconnect to the server.",
             ServerState.Disconnected => "You are currently disconnected from the Mare Synchronos server.",
+            ServerState.Disconnecting => "Disconnecting from the server",
             ServerState.Unauthorized => "Server Response: " + _apiController.AuthFailureMessage,
             ServerState.Offline => "Your selected Mare Synchronos server is currently offline.",
             ServerState.VersionMisMatch =>
@@ -838,6 +839,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             ServerState.Reconnecting => ImGuiColors.DalamudRed,
             ServerState.Connected => ImGuiColors.ParsedGreen,
             ServerState.Disconnected => ImGuiColors.DalamudYellow,
+            ServerState.Disconnecting => ImGuiColors.DalamudYellow,
             ServerState.Unauthorized => ImGuiColors.DalamudRed,
             ServerState.VersionMisMatch => ImGuiColors.DalamudRed,
             ServerState.Offline => ImGuiColors.DalamudRed,
@@ -854,6 +856,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             ServerState.Reconnecting => "Reconnecting",
             ServerState.Connecting => "Connecting",
             ServerState.Disconnected => "Disconnected",
+            ServerState.Disconnecting => "Disconnecting",
             ServerState.Unauthorized => "Unauthorized",
             ServerState.VersionMisMatch => "Version mismatch",
             ServerState.Offline => "Unavailable",

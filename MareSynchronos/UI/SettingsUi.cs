@@ -147,7 +147,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
             _configService.Current.ShowTransferWindow = showTransferWindow;
             _configService.Save();
         }
-
+        UiSharedService.DrawHelpText($"The download window will show the current progress of outstanding downloads.{Environment.NewLine}{Environment.NewLine}" +
+            $"What do W/Q/P/D stand for?{Environment.NewLine}W = Waiting for Slot (see Maximum Parallel Downloads){Environment.NewLine}" +
+            $"Q = Queued on Server, waiting for queue ready signal{Environment.NewLine}" +
+            $"P = Processing download (aka downloading){Environment.NewLine}" +
+            $"D = Decompressing download");
         if (!_configService.Current.ShowTransferWindow) ImGui.BeginDisabled();
         ImGui.Indent();
         bool editTransferWindowPosition = _uiShared.EditTrackerPosition;

@@ -334,7 +334,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
     private async Task StopConnection(ServerState state)
     {
-        ServerState = state;
+        ServerState = ServerState.Disconnecting;
 
         if (_mareHub is not null)
         {
@@ -346,5 +346,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
             _mareHub = null;
             _connectionDto = null;
         }
+
+        ServerState = state;
     }
 }

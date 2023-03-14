@@ -5,6 +5,7 @@ public enum ServerState
     Offline,
     Connecting,
     Reconnecting,
+    Disconnecting,
     Disconnected,
     Connected,
     Unauthorized,
