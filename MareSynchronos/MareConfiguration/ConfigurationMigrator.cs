@@ -33,11 +33,18 @@ public class ConfigurationMigrator : IHostedService
 
         if (File.Exists(ConfigurationPath(MareConfigService.ConfigName)))
         {
-            var mareConfig = JsonConvert.DeserializeObject<MareConfigV0>(File.ReadAllText(ConfigurationPath(MareConfigService.ConfigName)))!;
-
-            if (mareConfig.Version == 0)
+            try
             {
-                MigrateMareConfigV0ToV1(mareConfig);
+                var mareConfig = JsonConvert.DeserializeObject<MareConfigV0>(File.ReadAllText(ConfigurationPath(MareConfigService.ConfigName)))!;
+
+                if (mareConfig.Version == 0)
+                {
+                    MigrateMareConfigV0ToV1(mareConfig);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Failed to migrate, skipping", ex);
             }
         }
     }
