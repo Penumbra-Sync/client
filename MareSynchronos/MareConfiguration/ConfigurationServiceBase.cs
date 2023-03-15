@@ -52,7 +52,15 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
         }
         else
         {
-            config = JsonSerializer.Deserialize<T>(File.ReadAllText(ConfigurationPath));
+            try
+            {
+                config = JsonSerializer.Deserialize<T>(File.ReadAllText(ConfigurationPath));
+            }
+            catch
+            {
+                // config failed to load for some reason
+                config = default;
+            }
             if (config == null)
             {
                 config = (T)Activator.CreateInstance(typeof(T))!;
