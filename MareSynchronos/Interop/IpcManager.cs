@@ -581,7 +581,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
     private void OnPalettePlusPaletteChange(Character character, string palette)
     {
-        Mediator.Publish(new PalettePlusMessage());
+        Mediator.Publish(new PalettePlusMessage(character));
     }
 
     private void PenumbraDispose()
