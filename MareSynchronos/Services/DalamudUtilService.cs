@@ -157,14 +157,20 @@ public class DalamudUtilService : IHostedService
 
     public async Task RunOnFrameworkThread(Action act)
     {
-        _logger.LogTrace("Running Action on framework thread: {act}", act);
-        await _framework.RunOnFrameworkThread(act).ConfigureAwait(false);
+        _logger.LogTrace("Running Action on framework thread (FrameworkContext: {ctx}): {act}", _framework.IsInFrameworkUpdateThread, act);
+        if (!_framework.IsInFrameworkUpdateThread)
+            await _framework.RunOnFrameworkThread(act).ConfigureAwait(false);
+        else
+            act();
     }
 
     public async Task<T> RunOnFrameworkThread<T>(Func<T> func)
     {
-        _logger.LogTrace("Running Func on framework thread: {func}", func);
-        return await _framework.RunOnFrameworkThread(func).ConfigureAwait(false);
+        _logger.LogTrace("Running Func on framework thread (FrameworkContext: {ctx}): {act}", _framework.IsInFrameworkUpdateThread, func);
+        if (!_framework.IsInFrameworkUpdateThread)
+            return await _framework.RunOnFrameworkThread(func).ConfigureAwait(false);
+        else
+            return func.Invoke();
     }
 
     public Task StartAsync(CancellationToken cancellationToken)

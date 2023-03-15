@@ -1,4 +1,5 @@
-﻿using Dalamud.Interface.Internal.Notifications;
+﻿using Dalamud.Game.ClientState.Objects.Types;
+using Dalamud.Interface.Internal.Notifications;
 using MareSynchronos.API.Dto;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.WebAPI.Files.Models;
@@ -30,7 +31,7 @@ public record PenumbraRedrawMessage(IntPtr Address, int ObjTblIdx, bool WasReque
 public record HeelsOffsetMessage : IMessage;
 public record PenumbraResourceLoadMessage(IntPtr GameObject, string GamePath, string FilePath) : IMessage;
 public record CustomizePlusMessage : IMessage;
-public record PalettePlusMessage : IMessage;
+public record PalettePlusMessage(Character Character) : IMessage;
 public record PlayerChangedMessage(API.Data.CharacterData Data) : IMessage;
 public record CharacterChangedMessage(GameObjectHandler GameObjectHandler) : IMessage;
 public record TransientResourceChangedMessage(IntPtr Address) : IMessage;

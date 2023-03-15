@@ -15,7 +15,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
     private readonly PlayerDataFactory _characterDataFactory;
     private readonly CancellationTokenSource _cts = new();
     private readonly CharacterData _playerData = new();
-    private readonly List<GameObjectHandler> _playerRelatedObjects = new();
+    private readonly Dictionary<ObjectKind, GameObjectHandler> _playerRelatedObjects = new();
     private Task? _cacheCreationTask;
     private CancellationTokenSource _palettePlusCts = new();
 
@@ -24,19 +24,21 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
     {
         _characterDataFactory = characterDataFactory;
 
+        _playerRelatedObjects[ObjectKind.Player] =
+            gameObjectHandlerFactory(ObjectKind.Player, () => dalamudUtil.PlayerPointer, true);
+        _playerRelatedObjects[ObjectKind.MinionOrMount] =
+            gameObjectHandlerFactory(ObjectKind.Player, () => dalamudUtil.GetMinionOrMount(), true);
+        _playerRelatedObjects[ObjectKind.Pet] =
+            gameObjectHandlerFactory(ObjectKind.Pet, () => dalamudUtil.GetPet(), true);
+        _playerRelatedObjects[ObjectKind.Companion] =
+            gameObjectHandlerFactory(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), true);
+
         Mediator.Subscribe<CreateCacheForObjectMessage>(this, (msg) =>
         {
+            Logger.LogDebug("Received CreateCacheForObject for {handler}, updating player", msg.ObjectToCreateFor);
             _cacheCreateLock.Wait();
             _cachesToCreate[msg.ObjectToCreateFor.ObjectKind] = msg.ObjectToCreateFor;
             _cacheCreateLock.Release();
-        });
-
-        _playerRelatedObjects.AddRange(new List<GameObjectHandler>()
-        {
-            gameObjectHandlerFactory(ObjectKind.Player, () => dalamudUtil.PlayerPointer, true),
-            gameObjectHandlerFactory(ObjectKind.MinionOrMount, () => dalamudUtil.GetMinionOrMount(), true),
-            gameObjectHandlerFactory(ObjectKind.Pet, () => dalamudUtil.GetPet(), true),
-            gameObjectHandlerFactory(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), true),
         });
 
         Mediator.Subscribe<ClearCacheForObjectMessage>(this, (msg) =>
@@ -50,24 +52,43 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         });
 
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (msg) => ProcessCacheCreation());
-        Mediator.Subscribe<CustomizePlusMessage>(this, async (_) => await AddPlayerCacheToCreate().ConfigureAwait(false));
-        Mediator.Subscribe<HeelsOffsetMessage>(this, async (_) => await AddPlayerCacheToCreate().ConfigureAwait(false));
-        Mediator.Subscribe<PalettePlusMessage>(this, (_) => PalettePlusChanged());
-        Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, async (msg) => await AddPlayerCacheToCreate().ConfigureAwait(false));
+        Mediator.Subscribe<CustomizePlusMessage>(this, async (_) =>
+        {
+            Logger.LogDebug("Received CustomizePlus change, updating player");
+            await AddPlayerCacheToCreate().ConfigureAwait(false);
+        });
+        Mediator.Subscribe<HeelsOffsetMessage>(this, async (_) =>
+        {
+            Logger.LogDebug("Received Heels Offset change, updating player");
+            await AddPlayerCacheToCreate().ConfigureAwait(false);
+        });
+        Mediator.Subscribe<PalettePlusMessage>(this, (msg) =>
+        {
+            if (msg.Character.Address == _playerRelatedObjects[ObjectKind.Player].Address)
+            {
+                Logger.LogDebug("Received PalettePlus change, updating player");
+                PalettePlusChanged();
+            }
+        });
+        Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, async (msg) =>
+        {
+            Logger.LogDebug("Received Penumbra Mod settings change, updating player");
+            await AddPlayerCacheToCreate().ConfigureAwait(false);
+        });
     }
 
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
 
-        _playerRelatedObjects.ForEach(p => p.Dispose());
+        _playerRelatedObjects.Values.ToList().ForEach(p => p.Dispose());
         _cts.Dispose();
     }
 
     private async Task AddPlayerCacheToCreate()
     {
         await _cacheCreateLock.WaitAsync().ConfigureAwait(false);
-        _cachesToCreate[ObjectKind.Player] = _playerRelatedObjects.First(p => p.ObjectKind == ObjectKind.Player);
+        _cachesToCreate[ObjectKind.Player] = _playerRelatedObjects[ObjectKind.Player];
         _cacheCreateLock.Release();
     }
 
