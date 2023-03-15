@@ -155,17 +155,25 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             _downloadCancellationTokenSource?.Cancel();
             _downloadCancellationTokenSource?.Dispose();
             _downloadCancellationTokenSource = null;
-            nint ptr = PlayerCharacter;
             _charaHandler?.Dispose();
             _charaHandler = null;
-            if (!_lifetime.ApplicationStopping.IsCancellationRequested && ptr != IntPtr.Zero && !_dalamudUtil.IsZoning)
+
+            if (!_lifetime.ApplicationStopping.IsCancellationRequested && !_dalamudUtil.IsZoning)
             {
                 Logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser);
                 _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name);
 
                 foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData.FileReplacements)
                 {
-                    RevertCustomizationData(ptr, item.Key, name, applicationId).GetAwaiter().GetResult();
+                    try
+                    {
+                        RevertCustomizationData(item.Key, name, applicationId).GetAwaiter().GetResult();
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        Logger.LogWarning("Failed disposing player (not present anymore?)", ex);
+                        break;
+                    }
                 }
             }
         }
@@ -472,8 +480,17 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
     }
 
-    private async Task RevertCustomizationData(IntPtr address, ObjectKind objectKind, string name, Guid applicationId)
+    private void CheckForNameAndThrow(GameObjectHandler handler, string name)
     {
+        if (!string.Equals(handler.Name, name, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Player name not equal to requested name, pointer invalid");
+        }
+    }
+
+    private async Task RevertCustomizationData(ObjectKind objectKind, string name, Guid applicationId)
+    {
+        nint address = _dalamudUtil.GetPlayerCharacterFromObjectTableByName(name)?.Address ?? IntPtr.Zero;
         if (address == IntPtr.Zero) return;
 
         var cancelToken = new CancellationTokenSource();
@@ -484,14 +501,19 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         if (objectKind == ObjectKind.Player)
         {
             using GameObjectHandler tempHandler = _gameObjectHandlerFactory(ObjectKind.Player, () => address, false);
+            CheckForNameAndThrow(tempHandler, name);
             Logger.LogDebug("[{applicationId}] Restoring Customization for {alias}/{name}: {data}", applicationId, OnlineUser.User.AliasOrUID, name, _originalGlamourerData);
             await _ipcManager.GlamourerApplyOnlyCustomization(Logger, tempHandler, _originalGlamourerData, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
+            CheckForNameAndThrow(tempHandler, name);
             Logger.LogDebug("[{applicationId}] Restoring Equipment for {alias}/{name}: {data}", applicationId, OnlineUser.User.AliasOrUID, name, _lastGlamourerData);
             await _ipcManager.GlamourerApplyOnlyEquipment(Logger, tempHandler, _lastGlamourerData, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
+            CheckForNameAndThrow(tempHandler, name);
             Logger.LogDebug("[{applicationId}] Restoring Heels for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             await _ipcManager.HeelsRestoreOffsetForPlayer(address).ConfigureAwait(false);
+            CheckForNameAndThrow(tempHandler, name);
             Logger.LogDebug("[{applicationId}] Restoring C+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             await _ipcManager.CustomizePlusRevert(address).ConfigureAwait(false);
+            CheckForNameAndThrow(tempHandler, name);
             Logger.LogDebug("[{applicationId}] Restoring Palette+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             await _ipcManager.PalettePlusRemovePalette(address).ConfigureAwait(false);
         }

@@ -96,11 +96,12 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
     {
         return await _dalamudUtil.RunOnFrameworkThread(() =>
         {
-            var curPtr = _getAddress.Invoke();
-
+            nint curPtr = IntPtr.Zero;
             try
             {
-                var drawObj = GetDrawObj();
+                curPtr = _getAddress.Invoke();
+
+                var drawObj = GetDrawObj(curPtr);
                 return IsBeingDrawn(drawObj, curPtr);
             }
             catch (Exception)
@@ -258,9 +259,9 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         }
     }
 
-    private unsafe IntPtr GetDrawObj()
+    private unsafe IntPtr GetDrawObj(nint curPtr)
     {
-        return (IntPtr)((GameObject*)_getAddress.Invoke())->GetDrawObject();
+        return (IntPtr)((GameObject*)curPtr)->GetDrawObject();
     }
 
     private unsafe bool IsBeingDrawn(IntPtr drawObj, IntPtr curPtr)
