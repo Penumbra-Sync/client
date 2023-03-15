@@ -70,7 +70,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         _playerRelatedObjects[ObjectKind.Player] =
             gameObjectHandlerFactory(ObjectKind.Player, () => dalamudUtil.PlayerPointer, true);
         _playerRelatedObjects[ObjectKind.MinionOrMount] =
-            gameObjectHandlerFactory(ObjectKind.Player, () => dalamudUtil.GetMinionOrMount(), true);
+            gameObjectHandlerFactory(ObjectKind.MinionOrMount, () => dalamudUtil.GetMinionOrMount(), true);
         _playerRelatedObjects[ObjectKind.Pet] =
             gameObjectHandlerFactory(ObjectKind.Pet, () => dalamudUtil.GetPet(), true);
         _playerRelatedObjects[ObjectKind.Companion] =
