@@ -24,15 +24,6 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
     {
         _characterDataFactory = characterDataFactory;
 
-        _playerRelatedObjects[ObjectKind.Player] =
-            gameObjectHandlerFactory(ObjectKind.Player, () => dalamudUtil.PlayerPointer, true);
-        _playerRelatedObjects[ObjectKind.MinionOrMount] =
-            gameObjectHandlerFactory(ObjectKind.Player, () => dalamudUtil.GetMinionOrMount(), true);
-        _playerRelatedObjects[ObjectKind.Pet] =
-            gameObjectHandlerFactory(ObjectKind.Pet, () => dalamudUtil.GetPet(), true);
-        _playerRelatedObjects[ObjectKind.Companion] =
-            gameObjectHandlerFactory(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), true);
-
         Mediator.Subscribe<CreateCacheForObjectMessage>(this, (msg) =>
         {
             Logger.LogDebug("Received CreateCacheForObject for {handler}, updating player", msg.ObjectToCreateFor);
@@ -75,6 +66,15 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
             Logger.LogDebug("Received Penumbra Mod settings change, updating player");
             await AddPlayerCacheToCreate().ConfigureAwait(false);
         });
+
+        _playerRelatedObjects[ObjectKind.Player] =
+            gameObjectHandlerFactory(ObjectKind.Player, () => dalamudUtil.PlayerPointer, true);
+        _playerRelatedObjects[ObjectKind.MinionOrMount] =
+            gameObjectHandlerFactory(ObjectKind.Player, () => dalamudUtil.GetMinionOrMount(), true);
+        _playerRelatedObjects[ObjectKind.Pet] =
+            gameObjectHandlerFactory(ObjectKind.Pet, () => dalamudUtil.GetPet(), true);
+        _playerRelatedObjects[ObjectKind.Companion] =
+            gameObjectHandlerFactory(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), true);
     }
 
     protected override void Dispose(bool disposing)
