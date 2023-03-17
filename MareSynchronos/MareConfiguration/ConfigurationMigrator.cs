@@ -138,6 +138,8 @@ public class ConfigurationMigrator : IHostedService
         var currentServer = serverConfigV0.CurrentServer;
         var currentServerIdx = Array.IndexOf(serverConfigV0.ServerStorage.Keys.ToArray(), currentServer);
 
+        if (currentServerIdx == -1) currentServerIdx = 0;
+
         migrated.CurrentServer = currentServerIdx;
         migrated.ServerStorage = new();
 
