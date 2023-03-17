@@ -23,6 +23,12 @@ public class ServerConfigurationManager
         _serverTagConfig = serverTagConfig;
         _notesConfig = notesConfig;
         _dalamudUtil = dalamudUtil;
+
+        if (_configService.Current.CurrentServer < 0)
+        {
+            _configService.Current.CurrentServer = 0;
+            _configService.Save();
+        }
     }
 
     public string CurrentApiUrl => CurrentServer.ServerUri;
