@@ -158,7 +158,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             _charaHandler?.Dispose();
             _charaHandler = null;
 
-            if (!_lifetime.ApplicationStopping.IsCancellationRequested && !_dalamudUtil.IsZoning)
+            if (!_lifetime.ApplicationStopping.IsCancellationRequested && !_dalamudUtil.IsZoning && !_dalamudUtil.IsInCutscene)
             {
                 Logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser);
                 _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name);
@@ -255,6 +255,14 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         finally
         {
             if (handler != _charaHandler) handler.Dispose();
+        }
+    }
+
+    private void CheckForNameAndThrow(GameObjectHandler handler, string name)
+    {
+        if (!string.Equals(handler.Name, name, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Player name not equal to requested name, pointer invalid");
         }
     }
 
@@ -477,14 +485,6 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             Mediator.Publish(new NotificationMessage("Missing plugins for " + PlayerName,
                 $"Received data for {PlayerName} that contained information for plugins you have not installed. Install {string.Join(", ", missingPluginsForData)} to experience their character fully.",
                 NotificationType.Warning, 10000));
-        }
-    }
-
-    private void CheckForNameAndThrow(GameObjectHandler handler, string name)
-    {
-        if (!string.Equals(handler.Name, name, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("Player name not equal to requested name, pointer invalid");
         }
     }
 

@@ -172,6 +172,27 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
         if (!showTransferBars) ImGui.BeginDisabled();
         ImGui.Indent();
+        bool transferBarShowText = _configService.Current.TransferBarsShowText;
+        if (ImGui.Checkbox("Show Download Text", ref transferBarShowText))
+        {
+            _configService.Current.TransferBarsShowText = transferBarShowText;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("Shows download text (amount of MiB downloaded) in the transfer bars");
+        int transferBarWidth = _configService.Current.TransferBarsWidth;
+        if (ImGui.SliderInt("Transfer Bar Width", ref transferBarWidth, 10, 500))
+        {
+            _configService.Current.TransferBarsWidth = transferBarWidth;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("Width of the displayed transfer bars (will never be less wide than the displayed text)");
+        int transferBarHeight = _configService.Current.TransferBarsHeight;
+        if (ImGui.SliderInt("Transfer Bar Height", ref transferBarHeight, 2, 50))
+        {
+            _configService.Current.TransferBarsHeight = transferBarHeight;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("Height of the displayed transfer bars (will never be less tall than the displayed text)");
         bool showUploading = _configService.Current.ShowUploading;
         if (ImGui.Checkbox("Show 'Uploading' text below players that are currently uploading", ref showUploading))
         {
@@ -793,12 +814,20 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
             if (ImGui.BeginTabItem("Service Settings"))
             {
-                var serverUri = selectedServer.ServerUri;
-                ImGui.InputText("Service URI", ref serverUri, 255, ImGuiInputTextFlags.ReadOnly);
-                UiSharedService.DrawHelpText("You cannot edit the service URI. Add a new service if you need to edit the URI.");
                 var serverName = selectedServer.ServerName;
+                var serverUri = selectedServer.ServerUri;
                 var isMain = string.Equals(serverName, ApiController.MainServer, StringComparison.OrdinalIgnoreCase);
                 var flags = isMain ? ImGuiInputTextFlags.ReadOnly : ImGuiInputTextFlags.None;
+
+                if (ImGui.InputText("Service URI", ref serverUri, 255, flags))
+                {
+                    selectedServer.ServerUri = serverUri;
+                }
+                if (isMain)
+                {
+                    UiSharedService.DrawHelpText("You cannot edit the URI of the main service.");
+                }
+
                 if (ImGui.InputText("Service Name", ref serverName, 255, flags))
                 {
                     selectedServer.ServerName = serverName;
@@ -808,6 +837,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 {
                     UiSharedService.DrawHelpText("You cannot edit the name of the main service.");
                 }
+
                 if (!isMain && selectedServer != _serverConfigurationManager.CurrentServer)
                 {
                     if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Service") && UiSharedService.CtrlPressed())

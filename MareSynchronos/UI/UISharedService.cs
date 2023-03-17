@@ -632,8 +632,10 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         string[] comboEntries = _serverConfigurationManager.GetServerNames();
 
         if (_serverSelectionIndex == -1)
+        {
             _serverSelectionIndex = Array.IndexOf(_serverConfigurationManager.GetServerApiUrls(), _serverConfigurationManager.CurrentApiUrl);
-        if (_serverSelectionIndex == -1)
+        }
+        if (_serverSelectionIndex == -1 || _serverSelectionIndex >= comboEntries.Length)
         {
             _serverSelectionIndex = 0;
         }
@@ -669,7 +671,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         {
             ImGui.SameLine();
             var text = "Connect";
-            if (_serverSelectionIndex == _serverConfigurationManager.GetCurrentServerIndex()) text = "Reconnect";
+            if (_serverSelectionIndex == _serverConfigurationManager.CurrentServerIndex) text = "Reconnect";
             if (IconTextButton(FontAwesomeIcon.Link, text))
             {
                 _serverConfigurationManager.SelectServer(_serverSelectionIndex);

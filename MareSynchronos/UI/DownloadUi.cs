@@ -148,13 +148,11 @@ public class DownloadUi : WindowMediatorSubscriberBase
                 var totalBytes = transfer.Value.Sum(c => c.Value.TotalBytes);
                 var transferredBytes = transfer.Value.Sum(c => c.Value.TransferredBytes);
 
-                var downloadText =
-                    $"{UiSharedService.ByteToString(transferredBytes, addSuffix: false)}/{UiSharedService.ByteToString(totalBytes)}";
                 var maxDlText = $"{UiSharedService.ByteToString(totalBytes, addSuffix: false)}/{UiSharedService.ByteToString(totalBytes)}";
-                var textSize = ImGui.CalcTextSize(maxDlText);
+                var textSize = _configService.Current.TransferBarsShowText ? ImGui.CalcTextSize(maxDlText) : new Vector2(10, 10);
 
-                int dlBarHeight = (int)textSize.Y + 8;
-                int dlBarWidth = (int)textSize.X + 150;
+                int dlBarHeight = _configService.Current.TransferBarsHeight > ((int)textSize.Y + 5) ? _configService.Current.TransferBarsHeight : (int)textSize.Y + 5;
+                int dlBarWidth = _configService.Current.TransferBarsWidth > ((int)textSize.X + 10) ? _configService.Current.TransferBarsWidth : (int)textSize.X + 10;
 
                 var dlBarStart = new Vector2(screenPos.X - dlBarWidth / 2f, screenPos.Y - dlBarHeight / 2f);
                 var dlBarEnd = new Vector2(screenPos.X + dlBarWidth / 2f, screenPos.Y + dlBarHeight / 2f);
@@ -172,10 +170,15 @@ public class DownloadUi : WindowMediatorSubscriberBase
                 drawList.AddRectFilled(dlBarStart,
                     dlBarEnd with { X = dlBarStart.X + (float)(dlProgressPercent * dlBarWidth) },
                     UiSharedService.Color(50, 205, 50, transparency), 1);
-                UiSharedService.DrawOutlinedFont(drawList, downloadText,
-                    screenPos with { X = screenPos.X - textSize.X / 2f - 1, Y = screenPos.Y - textSize.Y / 2f - 1 },
-                    UiSharedService.Color(255, 255, 255, transparency),
-                    UiSharedService.Color(0, 0, 0, transparency), 1);
+
+                if (_configService.Current.TransferBarsShowText)
+                {
+                    var downloadText = $"{UiSharedService.ByteToString(transferredBytes, addSuffix: false)}/{UiSharedService.ByteToString(totalBytes)}";
+                    UiSharedService.DrawOutlinedFont(drawList, downloadText,
+                        screenPos with { X = screenPos.X - textSize.X / 2f - 1, Y = screenPos.Y - textSize.Y / 2f - 1 },
+                        UiSharedService.Color(255, 255, 255, transparency),
+                        UiSharedService.Color(0, 0, 0, transparency), 1);
+                }
             }
 
             if (_configService.Current.ShowUploading)

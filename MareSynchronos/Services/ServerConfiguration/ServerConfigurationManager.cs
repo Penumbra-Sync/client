@@ -25,13 +25,9 @@ public class ServerConfigurationManager
         _dalamudUtil = dalamudUtil;
     }
 
-    public string CurrentApiUrl => string.IsNullOrEmpty(_configService.Current.CurrentServer) ? ApiController.MainServiceUri : _configService.Current.CurrentServer;
-    public ServerStorage? CurrentServer => _configService.Current.ServerStorage.TryGetValue(CurrentApiUrl, out ServerStorage? value) ? value : null;
-
-    public int GetCurrentServerIndex()
-    {
-        return Array.IndexOf(_configService.Current.ServerStorage.Keys.ToArray(), CurrentApiUrl);
-    }
+    public string CurrentApiUrl => CurrentServer.ServerUri;
+    public ServerStorage CurrentServer => _configService.Current.ServerStorage[CurrentServerIndex];
+    public int CurrentServerIndex => _configService.Current.CurrentServer;
 
     public string? GetSecretKey(int serverIdx = -1)
     {
@@ -70,21 +66,21 @@ public class ServerConfigurationManager
 
     public string[] GetServerApiUrls()
     {
-        return _configService.Current.ServerStorage.Keys.ToArray();
+        return _configService.Current.ServerStorage.Select(v => v.ServerUri).ToArray();
     }
 
     public ServerStorage GetServerByIndex(int idx)
     {
         try
         {
-            return _configService.Current.ServerStorage.ElementAt(idx).Value;
+            return _configService.Current.ServerStorage.ElementAt(idx);
         }
         catch
         {
-            _configService.Current.CurrentServer = ApiController.MainServiceUri;
-            if (!_configService.Current.ServerStorage.ContainsKey(ApiController.MainServer))
+            _configService.Current.CurrentServer = 0;
+            if (!string.Equals(_configService.Current.ServerStorage[0].ServerUri, ApiController.MainServer, StringComparison.OrdinalIgnoreCase))
             {
-                _configService.Current.ServerStorage.Add(_configService.Current.CurrentServer, new ServerStorage() { ServerUri = ApiController.MainServiceUri, ServerName = ApiController.MainServer });
+                _configService.Current.ServerStorage.Insert(0, new ServerStorage() { ServerUri = ApiController.MainServiceUri, ServerName = ApiController.MainServer });
             }
             Save();
             return CurrentServer!;
@@ -93,7 +89,7 @@ public class ServerConfigurationManager
 
     public string[] GetServerNames()
     {
-        return _configService.Current.ServerStorage.Values.Select(v => v.ServerName).ToArray();
+        return _configService.Current.ServerStorage.Select(v => v.ServerName).ToArray();
     }
 
     public string? GetToken()
@@ -133,14 +129,14 @@ public class ServerConfigurationManager
 
     public void SelectServer(int idx)
     {
-        _configService.Current.CurrentServer = GetServerByIndex(idx).ServerUri;
+        _configService.Current.CurrentServer = idx;
         CurrentServer!.FullPause = false;
         Save();
     }
 
     internal void AddCurrentCharacterToServer(int serverSelectionIndex = -1, bool addLastSecretKey = false)
     {
-        if (serverSelectionIndex == -1) serverSelectionIndex = GetCurrentServerIndex();
+        if (serverSelectionIndex == -1) serverSelectionIndex = CurrentServerIndex;
         var server = GetServerByIndex(serverSelectionIndex);
         server.Authentications.Add(new Authentication()
         {
@@ -166,7 +162,7 @@ public class ServerConfigurationManager
 
     internal void AddServer(ServerStorage serverStorage)
     {
-        _configService.Current.ServerStorage[serverStorage.ServerUri] = serverStorage;
+        _configService.Current.ServerStorage.Add(serverStorage);
         Save();
     }
 
@@ -207,7 +203,7 @@ public class ServerConfigurationManager
 
     internal void DeleteServer(ServerStorage selectedServer)
     {
-        _configService.Current.ServerStorage.Remove(selectedServer.ServerUri);
+        _configService.Current.ServerStorage.Remove(selectedServer);
         Save();
     }
 

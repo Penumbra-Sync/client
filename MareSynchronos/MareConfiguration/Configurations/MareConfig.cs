@@ -31,6 +31,9 @@ public class MareConfig : IMareConfiguration
     public bool ShowUploadingBigText { get; set; } = true;
     public bool ShowVisibleUsersSeparately { get; set; } = true;
     public int TimeSpanBetweenScansInSeconds { get; set; } = 30;
+    public int TransferBarsHeight { get; set; } = 12;
+    public bool TransferBarsShowText { get; set; } = true;
+    public int TransferBarsWidth { get; set; } = 250;
     public int Version { get; set; } = 1;
     public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;
 }

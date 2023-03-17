@@ -77,6 +77,7 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
     public MarePlugin(ILogger<MarePlugin> logger, MareConfigService mareConfigService,
         ServerConfigurationManager serverConfigurationManager,
         DalamudUtilService dalamudUtil,
+        ConfigurationMigrator configurationMigrator,
         IServiceScopeFactory serviceScopeFactory, MareMediator mediator) : base(logger, mediator)
     {
         _mareConfigService = mareConfigService;

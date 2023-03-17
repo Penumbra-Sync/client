@@ -6,11 +6,12 @@ namespace MareSynchronos.MareConfiguration.Configurations;
 [Serializable]
 public class ServerConfig : IMareConfiguration
 {
-    public int Version { get; set; } = 0;
+    public int CurrentServer { get; set; } = 0;
 
-    public Dictionary<string, ServerStorage> ServerStorage { get; set; } = new(StringComparer.OrdinalIgnoreCase)
+    public List<ServerStorage> ServerStorage { get; set; } = new()
     {
-        { ApiController.MainServiceUri, new ServerStorage() { ServerName = ApiController.MainServer, ServerUri = ApiController.MainServiceUri } },
+        { new ServerStorage() { ServerName = ApiController.MainServer, ServerUri = ApiController.MainServiceUri } },
     };
-    public string CurrentServer { get; set; } = string.Empty;
+
+    public int Version { get; set; } = 1;
 }

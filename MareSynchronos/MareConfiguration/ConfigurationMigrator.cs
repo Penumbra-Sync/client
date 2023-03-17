@@ -47,6 +47,23 @@ public class ConfigurationMigrator : IHostedService
                 _logger.LogWarning("Failed to migrate, skipping", ex);
             }
         }
+
+        if (File.Exists(ConfigurationPath(ServerConfigService.ConfigName)))
+        {
+            try
+            {
+                var serverConfig = JsonConvert.DeserializeObject<ServerConfigV0>(File.ReadAllText(ConfigurationPath(ServerConfigService.ConfigName)))!;
+
+                if (serverConfig.Version == 0)
+                {
+                    MigrateServerConfigV0toV1(serverConfig);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Failed to migrate ServerConfig", ex);
+            }
+        }
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -75,11 +92,12 @@ public class ConfigurationMigrator : IHostedService
 
         MareConfig mareConfigV1 = mareConfigV0.ToV1();
 
+        int i = 0;
         var serverConfig = new ServerConfig()
         {
-            CurrentServer = mareConfigV0.CurrentServer,
-            ServerStorage = mareConfigV0.ServerStorage.ToDictionary(p => p.Key, p => p.Value.ToV1(), StringComparer.Ordinal)
+            ServerStorage = mareConfigV0.ServerStorage.Select(p => p.Value.ToV1()).ToList()
         };
+        serverConfig.CurrentServer = Array.IndexOf(serverConfig.ServerStorage.Select(s => s.ServerUri).ToArray(), mareConfigV0.CurrentServer);
         var transientConfig = new TransientConfig()
         {
             PlayerPersistentTransientCache = mareConfigV0.PlayerPersistentTransientCache
@@ -107,6 +125,28 @@ public class ConfigurationMigrator : IHostedService
         SaveConfig(transientConfig, ConfigurationPath(TransientConfigService.ConfigName));
         SaveConfig(tagConfig, ConfigurationPath(ServerTagConfigService.ConfigName));
         SaveConfig(notesConfig, ConfigurationPath(NotesConfigService.ConfigName));
+    }
+
+    private void MigrateServerConfigV0toV1(ServerConfigV0 serverConfigV0)
+    {
+        _logger.LogInformation("Migration Server Configuration from version 0 to 1");
+        if (File.Exists(ConfigurationPath(ServerConfigService.ConfigName)))
+            File.Copy(ConfigurationPath(ServerConfigService.ConfigName), ConfigurationPath(ServerConfigService.ConfigName) + ".migrated." + serverConfigV0.Version + ".bak", overwrite: true);
+
+        ServerConfig migrated = new();
+
+        var currentServer = serverConfigV0.CurrentServer;
+        var currentServerIdx = Array.IndexOf(serverConfigV0.ServerStorage.Keys.ToArray(), currentServer);
+
+        migrated.CurrentServer = currentServerIdx;
+        migrated.ServerStorage = new();
+
+        foreach (var server in serverConfigV0.ServerStorage)
+        {
+            migrated.ServerStorage.Add(server.Value);
+        }
+
+        SaveConfig(migrated, ConfigurationPath(ServerConfigService.ConfigName));
     }
 }
 
