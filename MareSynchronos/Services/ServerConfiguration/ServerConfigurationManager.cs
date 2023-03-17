@@ -27,7 +27,25 @@ public class ServerConfigurationManager
 
     public string CurrentApiUrl => CurrentServer.ServerUri;
     public ServerStorage CurrentServer => _configService.Current.ServerStorage[CurrentServerIndex];
-    public int CurrentServerIndex => _configService.Current.CurrentServer;
+
+    public int CurrentServerIndex
+    {
+        set
+        {
+            _configService.Current.CurrentServer = value;
+            _configService.Save();
+        }
+        get
+        {
+            if (_configService.Current.CurrentServer < 0)
+            {
+                _configService.Current.CurrentServer = 0;
+                _configService.Save();
+            }
+
+            return _configService.Current.CurrentServer;
+        }
+    }
 
     public string? GetSecretKey(int serverIdx = -1)
     {
