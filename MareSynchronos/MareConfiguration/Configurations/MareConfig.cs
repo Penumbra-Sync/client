@@ -33,4 +33,5 @@ public class MareConfig : IMareConfiguration
     public int TimeSpanBetweenScansInSeconds { get; set; } = 30;
     public int Version { get; set; } = 1;
     public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;
+    public string ExportFolder { get; set; } = string.Empty;
 }

@@ -43,12 +43,16 @@ public class GposeUi : WindowMediatorSubscriberBase
         {
             if (UiSharedService.IconTextButton(FontAwesomeIcon.FolderOpen, "Load MCDF"))
             {
-                _fileDialogManager.OpenFileDialog("Pick MCDF file", ".mcdf", (success, path) =>
+                _fileDialogManager.OpenFileDialog("Pick MCDF file", ".mcdf", (success, paths) =>
                 {
                     if (!success) return;
+                    if (paths.FirstOrDefault() is not { } path) return;
+
+                    _configService.Current.ExportFolder = Path.GetDirectoryName(path) ?? string.Empty;
+                    _configService.Save();
 
                     Task.Run(() => _mareCharaFileManager.LoadMareCharaFile(path));
-                });
+                }, 1, Directory.Exists(_configService.Current.ExportFolder) ? _configService.Current.ExportFolder : null);
             }
             UiSharedService.AttachToolTip("Applies it to the currently selected GPose actor");
             if (_mareCharaFileManager.LoadedCharaFile != null)

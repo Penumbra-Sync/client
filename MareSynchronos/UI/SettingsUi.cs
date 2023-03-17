@@ -345,6 +345,9 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     {
                         if (!success) return;
 
+                        _configService.Current.ExportFolder = Path.GetDirectoryName(path) ?? string.Empty;
+                        _configService.Save();
+
                         Task.Run(() =>
                         {
                             try
@@ -357,7 +360,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                                 _logger.LogCritical(ex, "Error saving data");
                             }
                         });
-                    });
+                    }, Directory.Exists(_configService.Current.ExportFolder) ? _configService.Current.ExportFolder : null);
                 }
                 UiSharedService.ColorTextWrapped("Note: For best results make sure you have everything you want to be shared as well as the correct character appearance" +
                     " equipped and redraw your character before exporting.", ImGuiColors.DalamudYellow);
