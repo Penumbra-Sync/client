@@ -341,7 +341,10 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 ImGui.InputTextWithHint("Export Descriptor", "This description will be shown on loading the data", ref _exportDescription, 255);
                 if (UiSharedService.IconTextButton(FontAwesomeIcon.Save, "Export Character as MCDF"))
                 {
-                    _uiShared.FileDialogManager.SaveFileDialog("Export Character to file", ".mcdf", "export.mcdf", ".mcdf", (success, path) =>
+                    string defaultFileName = string.IsNullOrEmpty(_exportDescription) 
+                        ? "export.mcdf" 
+                        : string.Join('_', $"{_exportDescription}.mcdf".Split(Path.GetInvalidFileNameChars()));
+                    _uiShared.FileDialogManager.SaveFileDialog("Export Character to file", ".mcdf", defaultFileName, ".mcdf", (success, path) =>
                     {
                         if (!success) return;
 
