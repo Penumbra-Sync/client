@@ -158,21 +158,29 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             _charaHandler?.Dispose();
             _charaHandler = null;
 
-            if (!_lifetime.ApplicationStopping.IsCancellationRequested && !_dalamudUtil.IsZoning && !_dalamudUtil.IsInCutscene)
+            if (!_lifetime.ApplicationStopping.IsCancellationRequested)
             {
-                Logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser);
-                _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name);
-
-                foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData.FileReplacements)
+                if (_dalamudUtil.IsZoning)
                 {
-                    try
+                    Logger.LogTrace("[{applicationId}] Removing temp collection for {name} ({OnlineUser})", applicationId, name, OnlineUser);
+                    _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name);
+                }
+                else if (!_dalamudUtil.IsZoning && !_dalamudUtil.IsInCutscene)
+                {
+                    Logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser);
+                    _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name);
+
+                    foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData.FileReplacements)
                     {
-                        RevertCustomizationData(item.Key, name, applicationId).GetAwaiter().GetResult();
-                    }
-                    catch (InvalidOperationException ex)
-                    {
-                        Logger.LogWarning("Failed disposing player (not present anymore?)", ex);
-                        break;
+                        try
+                        {
+                            RevertCustomizationData(item.Key, name, applicationId).GetAwaiter().GetResult();
+                        }
+                        catch (InvalidOperationException ex)
+                        {
+                            Logger.LogWarning("Failed disposing player (not present anymore?)", ex);
+                            break;
+                        }
                     }
                 }
             }
@@ -408,7 +416,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             while ((!_applicationTask?.IsCompleted ?? false) && !downloadToken.IsCancellationRequested && !_applicationCancellationTokenSource.IsCancellationRequested)
             {
                 // block until current application is done
-                Logger.LogDebug("Waiting for current data application (Id: {id}) to finish", _applicationId);
+                Logger.LogDebug("Waiting for current data application (Id: {id}) for player ({handler}) to finish", _applicationId, PlayerName);
                 await Task.Delay(250).ConfigureAwait(false);
             }
 
@@ -419,22 +427,34 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             var token = _applicationCancellationTokenSource.Token;
             _applicationTask = Task.Run(async () =>
             {
-                _applicationId = Guid.NewGuid();
-                Logger.LogDebug("[{applicationId}] Starting application task", _applicationId);
-
-                if (updateModdedPaths && (moddedPaths.Any() || !string.IsNullOrEmpty(charaData.ManipulationData)))
+                try
                 {
-                    await ApplyBaseData(_applicationId, moddedPaths, charaData.ManipulationData, token).ConfigureAwait(false);
+                    _applicationId = Guid.NewGuid();
+                    Logger.LogDebug("[{applicationId}] Starting application task", _applicationId);
+
+                    Logger.LogDebug("[{applicationId}] Waiting for initial draw for for {handler}", _applicationId, _charaHandler);
+                    await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, _charaHandler, _applicationId, 30000, token).ConfigureAwait(false);
+
+                    token.ThrowIfCancellationRequested();
+
+                    if (updateModdedPaths && (moddedPaths.Any() || !string.IsNullOrEmpty(charaData.ManipulationData)))
+                    {
+                        await ApplyBaseData(_applicationId, moddedPaths, charaData.ManipulationData, token).ConfigureAwait(false);
+                    }
+
+                    token.ThrowIfCancellationRequested();
+
+                    foreach (var kind in updatedData)
+                    {
+                        await ApplyCustomizationData(_applicationId, kind, charaData, token).ConfigureAwait(false);
+                    }
+
+                    Logger.LogDebug("[{applicationId}] Application finished", _applicationId);
                 }
-
-                token.ThrowIfCancellationRequested();
-
-                foreach (var kind in updatedData)
+                catch (Exception ex)
                 {
-                    await ApplyCustomizationData(_applicationId, kind, charaData, token).ConfigureAwait(false);
+                    Logger.LogInformation("[{applicationId}] Cancelled, reason: {msg}", _applicationId, ex.Message);
                 }
-
-                Logger.LogDebug("[{applicationId}] Application finished", _applicationId);
             }, token);
         }, downloadToken);
     }
