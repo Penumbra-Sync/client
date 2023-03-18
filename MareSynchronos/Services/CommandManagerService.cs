@@ -55,6 +55,12 @@ public sealed class CommandManagerService : IDisposable
 
         if (string.Equals(splitArgs[0], "toggle", StringComparison.OrdinalIgnoreCase))
         {
+            if (_apiController.ServerState == WebAPI.SignalR.Utils.ServerState.Disconnecting)
+            {
+                _mediator.Publish(new NotificationMessage("Mare disconnecting", "Cannot use /toggle while Mare Synchronos is still disconnecting",
+                    Dalamud.Interface.Internal.Notifications.NotificationType.Error));
+            }
+
             if (_serverConfigurationManager.CurrentServer == null) return;
             var fullPause = splitArgs.Length > 1 ? splitArgs[1] switch
             {

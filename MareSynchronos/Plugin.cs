@@ -22,6 +22,7 @@ using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.UI;
+using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.SignalR;
@@ -65,6 +66,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<FileUploadManager>();
             collection.AddSingleton<FileTransferOrchestrator>();
             collection.AddSingleton<MarePlugin>();
+            collection.AddSingleton<UidDisplayHandler>();
             collection.AddSingleton((s) => new DalamudUtilService(s.GetRequiredService<ILogger<DalamudUtilService>>(),
                 clientState, objectTable, framework, gameGui, condition, gameData,
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<PerformanceCollectorService>()));

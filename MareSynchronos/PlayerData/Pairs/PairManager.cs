@@ -326,13 +326,14 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     private void DisposePairs(bool recreate = false)
     {
         Logger.LogDebug("Disposing all Pairs");
-        foreach (var item in _allClientPairs)
+        Parallel.ForEach(_allClientPairs, item =>
         {
             if (recreate)
                 item.Value.RecreateCachedPlayer();
             else
                 item.Value.MarkOffline();
-        }
+        });
+
         RecreateLazy();
     }
 

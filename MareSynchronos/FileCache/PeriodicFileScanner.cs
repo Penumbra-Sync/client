@@ -15,7 +15,7 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
     private readonly PerformanceCollectorService _performanceCollector;
     private long _currentFileProgress = 0;
     private bool _fileScanWasRunning = false;
-    private CancellationTokenSource? _scanCancellationTokenSource;
+    private CancellationTokenSource _scanCancellationTokenSource = new();
     private TimeSpan _timeUntilNextScan = TimeSpan.Zero;
 
     public PeriodicFileScanner(ILogger<PeriodicFileScanner> logger, IpcManager ipcManager, MareConfigService configService,
@@ -246,7 +246,7 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
             Logger.LogWarning(ex, "Error during enumerating FileCaches");
         }
 
-        Task.WaitAll(dbTasks);
+        Task.WaitAll(dbTasks, _scanCancellationTokenSource.Token);
 
         if (!_ipcManager.CheckPenumbraApi())
         {
@@ -308,7 +308,7 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
             if (ct.IsCancellationRequested) return;
         }
 
-        Task.WaitAll(dbTasks);
+        Task.WaitAll(dbTasks, _scanCancellationTokenSource.Token);
 
         Logger.LogTrace("Scanner added new files to db");
 

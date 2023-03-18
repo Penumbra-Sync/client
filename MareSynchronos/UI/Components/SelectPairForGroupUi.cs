@@ -9,18 +9,20 @@ namespace MareSynchronos.UI.Components;
 public class SelectPairForGroupUi
 {
     private readonly TagHandler _tagHandler;
+    private readonly UidDisplayHandler _uidDisplayHandler;
     private string _filter = string.Empty;
     private bool _opened = false;
     private HashSet<string> _peopleInGroup = new(StringComparer.Ordinal);
     private bool _show = false;
     private string _tag = string.Empty;
 
-    public SelectPairForGroupUi(TagHandler tagHandler)
+    public SelectPairForGroupUi(TagHandler tagHandler, UidDisplayHandler uidDisplayHandler)
     {
         _tagHandler = tagHandler;
+        _uidDisplayHandler = uidDisplayHandler;
     }
 
-    public void Draw(List<Pair> pairs, Dictionary<string, bool> showUidForEntry)
+    public void Draw(List<Pair> pairs)
     {
         var workHeight = ImGui.GetMainViewport().WorkSize.Y / ImGuiHelpers.GlobalScale;
         var minSize = new Vector2(300, workHeight < 400 ? workHeight : 400) * ImGuiHelpers.GlobalScale;
@@ -47,21 +49,21 @@ public class SelectPairForGroupUi
             UiSharedService.FontText($"Select users for group {_tag}", UiBuilder.DefaultFont);
             ImGui.InputTextWithHint("##filter", "Filter", ref _filter, 255, ImGuiInputTextFlags.None);
             foreach (var item in pairs
-                .Where(p => string.IsNullOrEmpty(_filter) || PairName(showUidForEntry, p).Contains(_filter, StringComparison.OrdinalIgnoreCase))
-                .OrderBy(p => PairName(showUidForEntry, p), StringComparer.OrdinalIgnoreCase)
+                .Where(p => string.IsNullOrEmpty(_filter) || PairName(p).Contains(_filter, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(p => PairName(p), StringComparer.OrdinalIgnoreCase)
                 .ToList())
             {
                 var isInGroup = _peopleInGroup.Contains(item.UserData.UID);
-                if (ImGui.Checkbox(PairName(showUidForEntry, item), ref isInGroup))
+                if (ImGui.Checkbox(PairName(item), ref isInGroup))
                 {
                     if (isInGroup)
                     {
-                        _tagHandler.AddTagToPairedUid(item.UserPair!, _tag);
+                        _tagHandler.AddTagToPairedUid(item.UserData.UID, _tag);
                         _peopleInGroup.Add(item.UserData.UID);
                     }
                     else
                     {
-                        _tagHandler.RemoveTagFromPairedUid(item.UserPair!, _tag);
+                        _tagHandler.RemoveTagFromPairedUid(item.UserData.UID, _tag);
                         _peopleInGroup.Remove(item.UserData.UID);
                     }
                 }
@@ -82,14 +84,8 @@ public class SelectPairForGroupUi
         _show = true;
     }
 
-    private static string PairName(Dictionary<string, bool> showUidForEntry, Pair pair)
+    private string PairName(Pair pair)
     {
-        showUidForEntry.TryGetValue(pair.UserData.UID, out var showUidInsteadOfName);
-        var playerText = pair.GetNote();
-        if (showUidInsteadOfName || string.IsNullOrEmpty(playerText))
-        {
-            playerText = pair.UserData.AliasOrUID;
-        }
-        return playerText;
+        return _uidDisplayHandler.GetPlayerText(pair).text;
     }
 }

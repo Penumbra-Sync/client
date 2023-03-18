@@ -122,10 +122,13 @@ public sealed class FileCacheManager : IDisposable
         return validatedCacheEntry;
     }
 
-    public void RemoveHash(FileCacheEntity entity)
+    public void RemoveHash(FileCacheEntity? entity)
     {
-        _logger.LogTrace("Removing {path}", entity.ResolvedFilepath);
-        _fileCaches.Remove(entity.PrefixedFilePath, out _);
+        if (entity != null)
+        {
+            _logger.LogTrace("Removing {path}", entity.ResolvedFilepath);
+            _fileCaches.Remove(entity.PrefixedFilePath, out _);
+        }
     }
 
     public string ResolveFileReplacement(string gamePath)

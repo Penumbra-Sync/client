@@ -1,5 +1,4 @@
-﻿using Dalamud.Interface.Colors;
-using Dalamud.Interface.Components;
+﻿using Dalamud.Interface.Components;
 using Dalamud.Interface;
 using Dalamud.Utility;
 using ImGuiNET;
@@ -8,28 +7,26 @@ using System.Numerics;
 using System.Globalization;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.Group;
-using MareSynchronos.API.Dto.User;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Data.Comparer;
-using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.ServerConfiguration;
+using MareSynchronos.UI.Components;
+using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI;
 
 internal sealed class GroupPanel
 {
-    private readonly MareConfigService _configService;
     private readonly Dictionary<string, bool> _expandedGroupState = new(StringComparer.Ordinal);
     private readonly CompactUi _mainUi;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly Dictionary<string, bool> _showGidForEntry = new(StringComparer.Ordinal);
+    private readonly UidDisplayHandler _uidDisplayHandler;
     private readonly UiSharedService _uiShared;
     private List<BannedGroupUserDto> _bannedUsers = new();
-    private string _banReason = string.Empty;
-    private bool _banUserPopupOpen;
     private int _bulkInviteCount = 10;
     private List<string> _bulkOneTimeInvites = new();
     private string _editGroupComment = string.Empty;
@@ -43,7 +40,6 @@ internal sealed class GroupPanel
     private bool _modalChangePwOpened;
     private string _newSyncShellPassword = string.Empty;
     private bool _showModalBanList = false;
-    private bool _showModalBanUser;
     private bool _showModalBulkOneTimeInvites = false;
     private bool _showModalChangePassword;
     private bool _showModalCreateGroup;
@@ -51,13 +47,13 @@ internal sealed class GroupPanel
     private string _syncShellPassword = string.Empty;
     private string _syncShellToJoin = string.Empty;
 
-    public GroupPanel(CompactUi mainUi, UiSharedService uiShared, PairManager pairManager, ServerConfigurationManager serverConfigurationManager, MareConfigService configurationService)
+    public GroupPanel(CompactUi mainUi, UiSharedService uiShared, PairManager pairManager, UidDisplayHandler uidDisplayHandler, ServerConfigurationManager serverConfigurationManager)
     {
         _mainUi = mainUi;
         _uiShared = uiShared;
         _pairManager = pairManager;
+        _uidDisplayHandler = uidDisplayHandler;
         _serverConfigurationManager = serverConfigurationManager;
-        _configService = configurationService;
     }
 
     private ApiController ApiController => _uiShared.ApiController;
@@ -406,18 +402,24 @@ internal sealed class GroupPanel
                 .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsModerator())
                 .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsPinned())
                 .ThenBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase)
+                .Select(c => new DrawGroupPair(c, ApiController, groupDto, c.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
+                    _uidDisplayHandler))
                 .ToList();
             var onlineUsers = pairsInGroup.Where(u => u.IsOnline && !u.IsVisible)
                 .OrderByDescending(u => string.Equals(u.UserData.UID, groupDto.OwnerUID, StringComparison.Ordinal))
                 .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsModerator())
                 .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsPinned())
                 .ThenBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase)
+                .Select(c => new DrawGroupPair(c, ApiController, groupDto, c.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
+                    _uidDisplayHandler))
                 .ToList();
             var offlineUsers = pairsInGroup.Where(u => !u.IsOnline && !u.IsVisible)
                 .OrderByDescending(u => string.Equals(u.UserData.UID, groupDto.OwnerUID, StringComparison.Ordinal))
                 .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsModerator())
                 .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsPinned())
                 .ThenBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase)
+                .Select(c => new DrawGroupPair(c, ApiController, groupDto, c.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
+                    _uidDisplayHandler))
                 .ToList();
 
             if (visibleUsers.Any())
@@ -426,12 +428,7 @@ internal sealed class GroupPanel
                 ImGui.Separator();
                 foreach (var entry in visibleUsers)
                 {
-                    UiSharedService.DrawWithID(groupDto.GID + entry.UserData.UID, () => DrawSyncshellPairedClient(
-                        entry,
-                        entry.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
-                        groupDto.OwnerUID,
-                        string.Equals(groupDto.OwnerUID, ApiController.UID, StringComparison.Ordinal),
-                        groupDto.GroupUserInfo.IsModerator()));
+                    UiSharedService.DrawWithID(groupDto.GID + entry.UID, () => entry.DrawPairedClient());
                 }
             }
 
@@ -441,12 +438,7 @@ internal sealed class GroupPanel
                 ImGui.Separator();
                 foreach (var entry in onlineUsers)
                 {
-                    UiSharedService.DrawWithID(groupDto.GID + entry.UserData.UID, () => DrawSyncshellPairedClient(
-                        entry,
-                        entry.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
-                        groupDto.OwnerUID,
-                        string.Equals(groupDto.OwnerUID, ApiController.UID, StringComparison.Ordinal),
-                        groupDto.GroupUserInfo.IsModerator()));
+                    UiSharedService.DrawWithID(groupDto.GID + entry.UID, () => entry.DrawPairedClient());
                 }
             }
 
@@ -456,12 +448,7 @@ internal sealed class GroupPanel
                 ImGui.Separator();
                 foreach (var entry in offlineUsers)
                 {
-                    UiSharedService.DrawWithID(groupDto.GID + entry.UserData.UID, () => DrawSyncshellPairedClient(
-                        entry,
-                        entry.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
-                        groupDto.OwnerUID,
-                        string.Equals(groupDto.OwnerUID, ApiController.UID, StringComparison.Ordinal),
-                        groupDto.GroupUserInfo.IsModerator()));
+                    UiSharedService.DrawWithID(groupDto.GID + entry.UID, () => entry.DrawPairedClient());
                 }
             }
 
@@ -723,338 +710,5 @@ internal sealed class GroupPanel
             UiSharedService.DrawWithID(entry.Key.Group.GID, () => DrawSyncshell(entry.Key, entry.Value));
         }
         ImGui.EndChild();
-    }
-
-    private void DrawSyncshellPairedClient(Pair pair, GroupPairFullInfoDto entry, string ownerUid, bool userIsOwner, bool userIsModerator)
-    {
-        var plusButtonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Plus);
-        var barButtonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars);
-        var entryUID = entry.UserAliasOrUID;
-        var textSize = ImGui.CalcTextSize(entryUID);
-        var originalY = ImGui.GetCursorPosY();
-        var entryIsMod = entry.GroupPairStatusInfo.IsModerator();
-        var entryIsOwner = string.Equals(pair.UserData.UID, ownerUid, StringComparison.Ordinal);
-        var entryIsPinned = entry.GroupPairStatusInfo.IsPinned();
-        var presenceIcon = pair.IsVisible ? FontAwesomeIcon.Eye : (pair.IsOnline ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink);
-        var presenceColor = (pair.IsOnline || pair.IsVisible) ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
-        var presenceText = entryUID + " is offline";
-
-        var soundsDisabled = entry.GroupUserPermissions.IsDisableSounds();
-        var animDisabled = entry.GroupUserPermissions.IsDisableAnimations();
-        var individualSoundsDisabled = (pair.UserPair?.OwnPermissions.IsDisableSounds() ?? false) || (pair.UserPair?.OtherPermissions.IsDisableSounds() ?? false);
-        var individualAnimDisabled = (pair.UserPair?.OwnPermissions.IsDisableAnimations() ?? false) || (pair.UserPair?.OtherPermissions.IsDisableAnimations() ?? false);
-
-        var textPos = originalY + barButtonSize.Y / 2 - textSize.Y / 2;
-        ImGui.SetCursorPosY(textPos);
-        if (pair.IsPaused)
-        {
-            presenceIcon = FontAwesomeIcon.Question;
-            presenceColor = ImGuiColors.DalamudGrey;
-            presenceText = entryUID + " online status is unknown (paused)";
-
-            ImGui.PushFont(UiBuilder.IconFont);
-            UiSharedService.ColorText(FontAwesomeIcon.PauseCircle.ToIconString(), ImGuiColors.DalamudYellow);
-            ImGui.PopFont();
-
-            UiSharedService.AttachToolTip("Pairing status with " + entryUID + " is paused");
-        }
-        else
-        {
-            ImGui.PushFont(UiBuilder.IconFont);
-            UiSharedService.ColorText(FontAwesomeIcon.Check.ToIconString(), ImGuiColors.ParsedGreen);
-            ImGui.PopFont();
-
-            UiSharedService.AttachToolTip("You are paired with " + entryUID);
-        }
-
-        if (pair.IsOnline && !pair.IsVisible) presenceText = entryUID + " is online";
-        else if (pair.IsOnline && pair.IsVisible) presenceText = entryUID + " is visible: " + pair.PlayerName;
-
-        ImGui.SameLine();
-        ImGui.SetCursorPosY(textPos);
-        ImGui.PushFont(UiBuilder.IconFont);
-        UiSharedService.ColorText(presenceIcon.ToIconString(), presenceColor);
-        ImGui.PopFont();
-        UiSharedService.AttachToolTip(presenceText);
-
-        if (entryIsOwner)
-        {
-            ImGui.SameLine();
-            ImGui.SetCursorPosY(textPos);
-            ImGui.PushFont(UiBuilder.IconFont);
-            ImGui.TextUnformatted(FontAwesomeIcon.Crown.ToIconString());
-            ImGui.PopFont();
-            UiSharedService.AttachToolTip("User is owner of this Syncshell");
-        }
-        else if (entryIsMod)
-        {
-            ImGui.SameLine();
-            ImGui.SetCursorPosY(textPos);
-            ImGui.PushFont(UiBuilder.IconFont);
-            ImGui.TextUnformatted(FontAwesomeIcon.UserShield.ToIconString());
-            ImGui.PopFont();
-            UiSharedService.AttachToolTip("User is moderator of this Syncshell");
-        }
-        else if (entryIsPinned)
-        {
-            ImGui.SameLine();
-            ImGui.SetCursorPosY(textPos);
-            ImGui.PushFont(UiBuilder.IconFont);
-            ImGui.TextUnformatted(FontAwesomeIcon.Thumbtack.ToIconString());
-            ImGui.PopFont();
-            UiSharedService.AttachToolTip("User is pinned in this Syncshell");
-        }
-
-        var textIsUid = true;
-        _mainUi.ShowUidForEntry.TryGetValue(entry.UID, out var showUidInsteadOfName);
-        var playerText = _serverConfigurationManager.GetNoteForUid(entry.UID);
-        if (showUidInsteadOfName || string.IsNullOrEmpty(playerText))
-        {
-            playerText = entryUID;
-        }
-        else
-        {
-            textIsUid = false;
-        }
-
-        if (_configService.Current.ShowCharacterNameInsteadOfNotesForVisible && pair.IsVisible && !showUidInsteadOfName)
-        {
-            playerText = pair.PlayerName;
-            textIsUid = false;
-        }
-
-        bool plusButtonShown = !_pairManager.DirectPairs.Any(p => string.Equals(p.UserData.UID, entry.UID, StringComparison.Ordinal));
-
-        ImGui.SameLine();
-        if (!string.Equals(_mainUi.EditNickEntry, entry.UID, StringComparison.Ordinal))
-        {
-            ImGui.SetCursorPosY(textPos);
-            if (textIsUid) ImGui.PushFont(UiBuilder.MonoFont);
-            ImGui.TextUnformatted(playerText);
-            if (textIsUid) ImGui.PopFont();
-            UiSharedService.AttachToolTip("Left click to switch between UID display and nick" + Environment.NewLine +
-                          "Right click to change nick for " + entryUID);
-            if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
-            {
-                var prevState = textIsUid;
-                if (_mainUi.ShowUidForEntry.ContainsKey(entry.UID))
-                {
-                    prevState = _mainUi.ShowUidForEntry[entry.UID];
-                }
-
-                _mainUi.ShowUidForEntry[entry.UID] = !prevState;
-            }
-
-            if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-            {
-                _serverConfigurationManager.SetNoteForUid(_mainUi.EditNickEntry, _mainUi.EditUserComment);
-                _mainUi.EditUserComment = _serverConfigurationManager.GetNoteForUid(entry.UID) ?? string.Empty;
-                _mainUi.EditNickEntry = entry.UID;
-            }
-        }
-        else
-        {
-            ImGui.SetCursorPosY(originalY);
-            var buttonSizes = (plusButtonShown ? plusButtonSize.X : 0) + barButtonSize.X;
-            var buttons = plusButtonShown ? 2 : 1;
-
-            ImGui.SetNextItemWidth(UiSharedService.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * buttons);
-            if (ImGui.InputTextWithHint("", "Nick/Notes", ref _mainUi.EditUserComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
-            {
-                _serverConfigurationManager.SetNoteForUid(entry.UID, _mainUi.EditUserComment);
-                _mainUi.EditNickEntry = string.Empty;
-            }
-
-            if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-            {
-                _mainUi.EditNickEntry = string.Empty;
-            }
-            UiSharedService.AttachToolTip("Hit ENTER to save\nRight click to cancel");
-        }
-
-        if (plusButtonShown)
-        {
-            var barWidth = userIsOwner || (userIsModerator && !entryIsMod && !entryIsOwner)
-                ? barButtonSize.X + ImGui.GetStyle().ItemSpacing.X
-                : 0;
-            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - plusButtonSize.X - barWidth);
-            ImGui.SetCursorPosY(originalY);
-
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
-            {
-                _ = ApiController.UserAddPair(new UserDto(entry.User));
-            }
-            UiSharedService.AttachToolTip("Pair with " + entryUID + " individually");
-        }
-
-        if (userIsOwner || (userIsModerator && !entryIsMod && !entryIsOwner))
-        {
-            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - barButtonSize.X);
-            ImGui.SetCursorPosY(originalY);
-
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
-            {
-                ImGui.OpenPopup("Popup");
-            }
-        }
-
-        if (individualAnimDisabled || individualSoundsDisabled)
-        {
-            var infoIconPosDist = (plusButtonShown ? plusButtonSize.X + ImGui.GetStyle().ItemSpacing.X : 0)
-                + ((userIsOwner || (userIsModerator && !entryIsMod && !entryIsOwner)) ? barButtonSize.X + ImGui.GetStyle().ItemSpacing.X : 0);
-            var icon = FontAwesomeIcon.ExclamationTriangle;
-            var iconwidth = UiSharedService.GetIconSize(icon);
-
-            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - infoIconPosDist - iconwidth.X);
-
-            ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
-            UiSharedService.FontText(icon.ToIconString(), UiBuilder.IconFont);
-            ImGui.PopStyleColor();
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.BeginTooltip();
-
-                ImGui.Text("Individual User permissions");
-
-                if (individualSoundsDisabled)
-                {
-                    var userSoundsText = "Sound sync disabled with " + pair.UserData.AliasOrUID;
-                    UiSharedService.FontText(FontAwesomeIcon.VolumeOff.ToIconString(), UiBuilder.IconFont);
-                    ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                    ImGui.Text(userSoundsText);
-                    ImGui.NewLine();
-                    ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                    ImGui.Text("You: " + (pair.UserPair!.OwnPermissions.IsDisableSounds() ? "Disabled" : "Enabled") + ", They: " + (pair.UserPair!.OtherPermissions.IsDisableSounds() ? "Disabled" : "Enabled"));
-                }
-
-                if (individualAnimDisabled)
-                {
-                    var userAnimText = "Animation sync disabled with " + pair.UserData.AliasOrUID;
-                    UiSharedService.FontText(FontAwesomeIcon.Stop.ToIconString(), UiBuilder.IconFont);
-                    ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                    ImGui.Text(userAnimText);
-                    ImGui.NewLine();
-                    ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                    ImGui.Text("You: " + (pair.UserPair!.OwnPermissions.IsDisableAnimations() ? "Disabled" : "Enabled") + ", They: " + (pair.UserPair!.OtherPermissions.IsDisableAnimations() ? "Disabled" : "Enabled"));
-                }
-
-                ImGui.EndTooltip();
-            }
-        }
-        else if ((animDisabled || soundsDisabled))
-        {
-            var infoIconPosDist = (plusButtonShown ? plusButtonSize.X + ImGui.GetStyle().ItemSpacing.X : 0)
-                + ((userIsOwner || (userIsModerator && !entryIsMod && !entryIsOwner)) ? barButtonSize.X + ImGui.GetStyle().ItemSpacing.X : 0);
-            var icon = FontAwesomeIcon.InfoCircle;
-            var iconwidth = UiSharedService.GetIconSize(icon);
-
-            ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - infoIconPosDist - iconwidth.X);
-            ImGui.SetCursorPosY(originalY);
-
-            UiSharedService.FontText(icon.ToIconString(), UiBuilder.IconFont);
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.BeginTooltip();
-
-                ImGui.Text("Sycnshell User permissions");
-
-                if (soundsDisabled)
-                {
-                    var userSoundsText = "Sound sync disabled by " + pair.UserData.AliasOrUID;
-                    UiSharedService.FontText(FontAwesomeIcon.VolumeOff.ToIconString(), UiBuilder.IconFont);
-                    ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                    ImGui.Text(userSoundsText);
-                }
-
-                if (animDisabled)
-                {
-                    var userAnimText = "Animation sync disabled by " + pair.UserData.AliasOrUID;
-                    UiSharedService.FontText(FontAwesomeIcon.Stop.ToIconString(), UiBuilder.IconFont);
-                    ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                    ImGui.Text(userAnimText);
-                }
-
-                ImGui.EndTooltip();
-            }
-        }
-
-        if (!plusButtonShown && !(userIsOwner || (userIsModerator && !entryIsMod && !entryIsOwner)))
-        {
-            ImGui.SameLine();
-            ImGui.Dummy(barButtonSize with { X = 0 });
-        }
-
-        if (ImGui.BeginPopup("Popup"))
-        {
-            if ((userIsModerator || userIsOwner) && !(entryIsMod || entryIsOwner))
-            {
-                var pinText = entryIsPinned ? "Unpin user" : "Pin user";
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.Thumbtack, pinText))
-                {
-                    ImGui.CloseCurrentPopup();
-                    var userInfo = entry.GroupPairStatusInfo ^ GroupUserInfo.IsPinned;
-                    _ = ApiController.GroupSetUserInfo(new GroupPairUserInfoDto(entry.Group, entry.User, userInfo));
-                }
-                UiSharedService.AttachToolTip("Pin this user to the Syncshell. Pinned users will not be deleted in case of a manually initiated Syncshell clean");
-
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Remove user") && UiSharedService.CtrlPressed())
-                {
-                    ImGui.CloseCurrentPopup();
-                    _ = ApiController.GroupRemoveUser(entry);
-                }
-
-                UiSharedService.AttachToolTip("Hold CTRL and click to remove user " + (entry.UserAliasOrUID) + " from Syncshell");
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.UserSlash, "Ban User"))
-                {
-                    _showModalBanUser = true;
-                    ImGui.CloseCurrentPopup();
-                }
-                UiSharedService.AttachToolTip("Ban user from this Syncshell");
-            }
-
-            if (userIsOwner)
-            {
-                string modText = entryIsMod ? "Demod user" : "Mod user";
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.UserShield, modText) && UiSharedService.CtrlPressed())
-                {
-                    ImGui.CloseCurrentPopup();
-                    var userInfo = entry.GroupPairStatusInfo ^ GroupUserInfo.IsModerator;
-                    _ = ApiController.GroupSetUserInfo(new GroupPairUserInfoDto(entry.Group, entry.User, userInfo));
-                }
-                UiSharedService.AttachToolTip("Hold CTRL to change the moderator status for " + (entry.UserAliasOrUID) + Environment.NewLine +
-                    "Moderators can kick, ban/unban, pin/unpin users and clear the Syncshell.");
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.Crown, "Transfer Ownership") && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())
-                {
-                    ImGui.CloseCurrentPopup();
-                    _ = ApiController.GroupChangeOwnership(entry);
-                }
-                UiSharedService.AttachToolTip("Hold CTRL and SHIFT and click to transfer ownership of this Syncshell to " + (entry.UserAliasOrUID) + Environment.NewLine + "WARNING: This action is irreversible.");
-            }
-            ImGui.EndPopup();
-        }
-
-        if (_showModalBanUser && !_banUserPopupOpen)
-        {
-            ImGui.OpenPopup("Ban User");
-            _banUserPopupOpen = true;
-        }
-
-        if (!_showModalBanUser) _banUserPopupOpen = false;
-
-        if (ImGui.BeginPopupModal("Ban User", ref _showModalBanUser, UiSharedService.PopupWindowFlags))
-        {
-            UiSharedService.TextWrapped("User " + (entry.UserAliasOrUID) + " will be banned and removed from this Syncshell.");
-            ImGui.InputTextWithHint("##banreason", "Ban Reason", ref _banReason, 255);
-            if (ImGui.Button("Ban User"))
-            {
-                ImGui.CloseCurrentPopup();
-                var reason = _banReason;
-                _ = ApiController.GroupBanUser(entry, reason);
-                _banReason = string.Empty;
-            }
-            UiSharedService.TextWrapped("The reason will be displayed in the banlist. The current server-side alias if present (Vanity ID) will automatically be attached to the reason.");
-            UiSharedService.SetScaledWindowSize(300);
-            ImGui.EndPopup();
-        }
     }
 }

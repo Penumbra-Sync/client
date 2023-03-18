@@ -46,7 +46,7 @@ public class GposeUi : WindowMediatorSubscriberBase
                 _fileDialogManager.OpenFileDialog("Pick MCDF file", ".mcdf", (success, paths) =>
                 {
                     if (!success) return;
-                    if (paths.FirstOrDefault() is not { } path) return;
+                    if (paths.FirstOrDefault() is not string path) return;
 
                     _configService.Current.ExportFolder = Path.GetDirectoryName(path) ?? string.Empty;
                     _configService.Save();

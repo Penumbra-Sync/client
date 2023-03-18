@@ -27,9 +27,6 @@ namespace MareSynchronos.UI;
 
 public class CompactUi : WindowMediatorSubscriberBase
 {
-    public readonly Dictionary<string, bool> ShowUidForEntry = new(StringComparer.Ordinal);
-    public string EditNickEntry = string.Empty;
-    public string EditUserComment = string.Empty;
     public float TransferPartHeight;
     public float WindowContentWidth;
     private readonly ApiController _apiController;
@@ -43,6 +40,7 @@ public class CompactUi : WindowMediatorSubscriberBase
     private readonly SelectPairForGroupUi _selectPairsForGroupUi;
     private readonly ServerConfigurationManager _serverManager;
     private readonly Stopwatch _timeout = new();
+    private readonly UidDisplayHandler _uidDisplayHandler;
     private readonly UiSharedService _uiShared;
     private bool _buttonState;
     private string _characterOrCommentFilter = string.Empty;
@@ -55,7 +53,7 @@ public class CompactUi : WindowMediatorSubscriberBase
     private bool _wasOpen;
 
     public CompactUi(ILogger<CompactUi> logger, UiSharedService uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
-        ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager) : base(logger, mediator, "###MareSynchronosMainUI")
+        ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager, UidDisplayHandler uidDisplayHandler) : base(logger, mediator, "###MareSynchronosMainUI")
     {
         _uiShared = uiShared;
         _configService = configService;
@@ -63,12 +61,13 @@ public class CompactUi : WindowMediatorSubscriberBase
         _pairManager = pairManager;
         _serverManager = serverManager;
         _fileTransferManager = fileTransferManager;
+        _uidDisplayHandler = uidDisplayHandler;
         var tagHandler = new TagHandler(_serverManager);
 
-        _groupPanel = new(this, uiShared, _pairManager, _serverManager, _configService);
-        _selectGroupForPairUi = new(tagHandler);
-        _selectPairsForGroupUi = new(tagHandler);
-        _pairGroupsUi = new(configService, tagHandler, DrawPairedClient, apiController, _selectPairsForGroupUi);
+        _groupPanel = new(this, uiShared, _pairManager, uidDisplayHandler, _serverManager);
+        _selectGroupForPairUi = new(tagHandler, uidDisplayHandler);
+        _selectPairsForGroupUi = new(tagHandler, uidDisplayHandler);
+        _pairGroupsUi = new(configService, tagHandler, apiController, _selectPairsForGroupUi);
 
 #if DEBUG
         string dev = "Dev Build";
@@ -164,8 +163,8 @@ public class CompactUi : WindowMediatorSubscriberBase
             ImGui.Separator();
             UiSharedService.DrawWithID("transfers", DrawTransfers);
             TransferPartHeight = ImGui.GetCursorPosY() - TransferPartHeight;
-            UiSharedService.DrawWithID("group-user-popup", () => _selectPairsForGroupUi.Draw(_pairManager.DirectPairs, ShowUidForEntry));
-            UiSharedService.DrawWithID("grouping-popup", () => _selectGroupForPairUi.Draw(ShowUidForEntry));
+            UiSharedService.DrawWithID("group-user-popup", () => _selectPairsForGroupUi.Draw(_pairManager.DirectPairs));
+            UiSharedService.DrawWithID("grouping-popup", () => _selectGroupForPairUi.Draw());
         }
 
         if (_configService.Current.OpenPopupOnAdd && _pairManager.LastAddedUser != null)
@@ -202,8 +201,7 @@ public class CompactUi : WindowMediatorSubscriberBase
 
     public override void OnClose()
     {
-        EditNickEntry = string.Empty;
-        EditUserComment = string.Empty;
+        _uidDisplayHandler.Clear();
         base.OnClose();
     }
 
@@ -213,8 +211,6 @@ public class CompactUi : WindowMediatorSubscriberBase
         var keys = _serverManager.CurrentServer!.SecretKeys;
         if (keys.TryGetValue(_secretKeyIdx, out var secretKey))
         {
-            var friendlyName = secretKey.FriendlyName;
-
             if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add current character with secret key"))
             {
                 _serverManager.CurrentServer!.Authentications.Add(new MareConfiguration.Models.Authentication()
@@ -350,210 +346,6 @@ public class CompactUi : WindowMediatorSubscriberBase
         }
     }
 
-    private void DrawPairedClient(Pair entry)
-    {
-        if (entry.UserPair == null) return;
-
-        var pauseIcon = entry.UserPair!.OwnPermissions.IsPaused() ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
-        var pauseIconSize = UiSharedService.GetIconButtonSize(pauseIcon);
-        var barButtonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars);
-        var entryUID = entry.UserData.AliasOrUID;
-        var textSize = ImGui.CalcTextSize(entryUID);
-        var originalY = ImGui.GetCursorPosY();
-        var buttonSizes = pauseIconSize.Y + barButtonSize.Y;
-        var spacingX = ImGui.GetStyle().ItemSpacing.X;
-        var windowEndX = ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth();
-
-        var textPos = originalY + pauseIconSize.Y / 2 - textSize.Y / 2;
-        ImGui.SetCursorPosY(textPos);
-        FontAwesomeIcon connectionIcon;
-        string connectionText = string.Empty;
-        Vector4 connectionColor;
-        if (!(entry.UserPair!.OwnPermissions.IsPaired() && entry.UserPair!.OtherPermissions.IsPaired()))
-        {
-            connectionIcon = FontAwesomeIcon.ArrowUp;
-            connectionText = entryUID + " has not added you back";
-            connectionColor = ImGuiColors.DalamudRed;
-        }
-        else if (entry.UserPair!.OwnPermissions.IsPaused() || entry.UserPair!.OtherPermissions.IsPaused())
-        {
-            connectionIcon = FontAwesomeIcon.PauseCircle;
-            connectionText = "Pairing status with " + entryUID + " is paused";
-            connectionColor = ImGuiColors.DalamudYellow;
-        }
-        else
-        {
-            connectionIcon = FontAwesomeIcon.Check;
-            connectionText = "You are paired with " + entryUID;
-            connectionColor = ImGuiColors.ParsedGreen;
-        }
-
-        ImGui.PushFont(UiBuilder.IconFont);
-        UiSharedService.ColorText(connectionIcon.ToIconString(), connectionColor);
-        ImGui.PopFont();
-        UiSharedService.AttachToolTip(connectionText);
-        ImGui.SameLine();
-        ImGui.SetCursorPosY(textPos);
-        if (entry is { IsOnline: true, IsVisible: true })
-        {
-            ImGui.PushFont(UiBuilder.IconFont);
-            UiSharedService.ColorText(FontAwesomeIcon.Eye.ToIconString(), ImGuiColors.ParsedGreen);
-            ImGui.PopFont();
-            UiSharedService.AttachToolTip(entryUID + " is visible: " + entry.PlayerName!);
-        }
-
-        var textIsUid = true;
-        ShowUidForEntry.TryGetValue(entry.UserPair!.User.UID, out var showUidInsteadOfName);
-        string? playerText = _serverManager.GetNoteForUid(entry.UserPair!.User.UID);
-        if (!showUidInsteadOfName && playerText != null)
-        {
-            if (string.IsNullOrEmpty(playerText))
-            {
-                playerText = entryUID;
-            }
-            else
-            {
-                textIsUid = false;
-            }
-        }
-        else
-        {
-            playerText = entryUID;
-        }
-
-        if (_configService.Current.ShowCharacterNameInsteadOfNotesForVisible && entry.IsVisible && !showUidInsteadOfName)
-        {
-            playerText = entry.PlayerName;
-            textIsUid = false;
-        }
-
-        ImGui.SameLine();
-        if (!string.Equals(EditNickEntry, entry.UserData.UID, StringComparison.Ordinal))
-        {
-            ImGui.SetCursorPosY(textPos);
-            if (textIsUid) ImGui.PushFont(UiBuilder.MonoFont);
-            ImGui.TextUnformatted(playerText);
-            if (textIsUid) ImGui.PopFont();
-            UiSharedService.AttachToolTip("Left click to switch between UID display and nick" + Environment.NewLine +
-                          "Right click to change nick for " + entryUID);
-            if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
-            {
-                var prevState = textIsUid;
-                if (ShowUidForEntry.ContainsKey(entry.UserPair!.User.UID))
-                {
-                    prevState = ShowUidForEntry[entry.UserPair!.User.UID];
-                }
-
-                ShowUidForEntry[entry.UserPair!.User.UID] = !prevState;
-            }
-
-            if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-            {
-                var pair = _pairManager.DirectPairs.Find(p => string.Equals(p.UserData.UID, EditNickEntry, StringComparison.Ordinal));
-                if (pair != null)
-                {
-                    pair.SetNote(EditUserComment);
-                    _configService.Save();
-                }
-                EditUserComment = entry.GetNote() ?? string.Empty;
-                EditNickEntry = entry.UserPair!.User.UID;
-            }
-        }
-        else
-        {
-            ImGui.SetCursorPosY(originalY);
-
-            ImGui.SetNextItemWidth(UiSharedService.GetWindowContentRegionWidth() - ImGui.GetCursorPosX() - buttonSizes - ImGui.GetStyle().ItemSpacing.X * 2);
-            if (ImGui.InputTextWithHint("", "Nick/Notes", ref EditUserComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
-            {
-                _serverManager.SetNoteForUid(entry.UserPair!.User.UID, EditUserComment);
-                EditNickEntry = string.Empty;
-            }
-
-            if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
-            {
-                EditNickEntry = string.Empty;
-            }
-            UiSharedService.AttachToolTip("Hit ENTER to save\nRight click to cancel");
-        }
-
-        // Pause Button && sound warnings
-        if (entry.UserPair!.OwnPermissions.IsPaired() && entry.UserPair!.OtherPermissions.IsPaired())
-        {
-            var individualSoundsDisabled = (entry.UserPair?.OwnPermissions.IsDisableSounds() ?? false) || (entry.UserPair?.OtherPermissions.IsDisableSounds() ?? false);
-            var individualAnimDisabled = (entry.UserPair?.OwnPermissions.IsDisableAnimations() ?? false) || (entry.UserPair?.OtherPermissions.IsDisableAnimations() ?? false);
-
-            if (individualAnimDisabled || individualSoundsDisabled)
-            {
-                var infoIconPosDist = windowEndX - barButtonSize.X - spacingX - pauseIconSize.X - spacingX;
-                var icon = FontAwesomeIcon.ExclamationTriangle;
-                var iconwidth = UiSharedService.GetIconSize(icon);
-
-                ImGui.SameLine(infoIconPosDist - iconwidth.X);
-
-                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
-                UiSharedService.FontText(icon.ToIconString(), UiBuilder.IconFont);
-                ImGui.PopStyleColor();
-                if (ImGui.IsItemHovered())
-                {
-                    ImGui.BeginTooltip();
-
-                    ImGui.Text("Individual User permissions");
-
-                    if (individualSoundsDisabled)
-                    {
-                        var userSoundsText = "Sound sync disabled with " + entry.UserData.AliasOrUID;
-                        UiSharedService.FontText(FontAwesomeIcon.VolumeOff.ToIconString(), UiBuilder.IconFont);
-                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text(userSoundsText);
-                        ImGui.NewLine();
-                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text("You: " + (entry.UserPair!.OwnPermissions.IsDisableSounds() ? "Disabled" : "Enabled") + ", They: " + (entry.UserPair!.OtherPermissions.IsDisableSounds() ? "Disabled" : "Enabled"));
-                    }
-
-                    if (individualAnimDisabled)
-                    {
-                        var userAnimText = "Animation sync disabled with " + entry.UserData.AliasOrUID;
-                        UiSharedService.FontText(FontAwesomeIcon.Stop.ToIconString(), UiBuilder.IconFont);
-                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text(userAnimText);
-                        ImGui.NewLine();
-                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text("You: " + (entry.UserPair!.OwnPermissions.IsDisableAnimations() ? "Disabled" : "Enabled") + ", They: " + (entry.UserPair!.OtherPermissions.IsDisableAnimations() ? "Disabled" : "Enabled"));
-                    }
-
-                    ImGui.EndTooltip();
-                }
-            }
-
-            ImGui.SameLine(windowEndX - barButtonSize.X - spacingX - pauseIconSize.X);
-            ImGui.SetCursorPosY(originalY);
-            if (ImGuiComponents.IconButton(pauseIcon))
-            {
-                var perm = entry.UserPair!.OwnPermissions;
-                perm.SetPaused(!perm.IsPaused());
-                _ = _apiController.UserSetPairPermissions(new(entry.UserData, perm));
-            }
-            UiSharedService.AttachToolTip(!entry.UserPair!.OwnPermissions.IsPaused()
-                ? "Pause pairing with " + entryUID
-                : "Resume pairing with " + entryUID);
-        }
-
-        // Flyout Menu
-        ImGui.SameLine(windowEndX - barButtonSize.X);
-        ImGui.SetCursorPosY(originalY);
-
-        if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
-        {
-            ImGui.OpenPopup("User Flyout Menu");
-        }
-        if (ImGui.BeginPopup("User Flyout Menu"))
-        {
-            UiSharedService.DrawWithID($"buttons-{entry.UserPair!.User.UID}", () => DrawPairedClientMenu(entry));
-            ImGui.EndPopup();
-        }
-    }
-
     private void DrawPairedClientMenu(Pair entry)
     {
         if (entry.IsVisible)
@@ -617,14 +409,15 @@ public class CompactUi : WindowMediatorSubscriberBase
             .OrderBy(
                 u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
                     ? u.PlayerName
-                    : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase).ToList();
+                    : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
+            .Select(c => new DrawUserPair(c, _uidDisplayHandler, _apiController, _selectGroupForPairUi)).ToList();
 
         if (_configService.Current.ReverseUserSort)
         {
             users.Reverse();
         }
 
-        var onlineUsers = users.Where(u => u.IsOnline || u.UserPair.OwnPermissions.IsPaused()).ToList();
+        var onlineUsers = users.Where(u => u.IsOnline || u.UserPair!.OwnPermissions.IsPaused()).ToList();
         var visibleUsers = onlineUsers.Where(u => u.IsVisible).ToList();
         var offlineUsers = users.Except(onlineUsers).ToList();
 
