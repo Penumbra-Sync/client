@@ -36,4 +36,5 @@ public class MareConfig : IMareConfiguration
     public int TransferBarsWidth { get; set; } = 250;
     public int Version { get; set; } = 1;
     public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;
+    public string ExportFolder { get; set; } = string.Empty;
 }

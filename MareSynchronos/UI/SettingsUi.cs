@@ -362,9 +362,15 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 ImGui.InputTextWithHint("Export Descriptor", "This description will be shown on loading the data", ref _exportDescription, 255);
                 if (UiSharedService.IconTextButton(FontAwesomeIcon.Save, "Export Character as MCDF"))
                 {
-                    _uiShared.FileDialogManager.SaveFileDialog("Export Character to file", ".mcdf", "export.mcdf", ".mcdf", (success, path) =>
+                    string defaultFileName = string.IsNullOrEmpty(_exportDescription) 
+                        ? "export.mcdf" 
+                        : string.Join('_', $"{_exportDescription}.mcdf".Split(Path.GetInvalidFileNameChars()));
+                    _uiShared.FileDialogManager.SaveFileDialog("Export Character to file", ".mcdf", defaultFileName, ".mcdf", (success, path) =>
                     {
                         if (!success) return;
+
+                        _configService.Current.ExportFolder = Path.GetDirectoryName(path) ?? string.Empty;
+                        _configService.Save();
 
                         Task.Run(() =>
                         {
@@ -378,7 +384,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                                 _logger.LogCritical(ex, "Error saving data");
                             }
                         });
-                    });
+                    }, Directory.Exists(_configService.Current.ExportFolder) ? _configService.Current.ExportFolder : null);
                 }
                 UiSharedService.ColorTextWrapped("Note: For best results make sure you have everything you want to be shared as well as the correct character appearance" +
                     " equipped and redraw your character before exporting.", ImGuiColors.DalamudYellow);
