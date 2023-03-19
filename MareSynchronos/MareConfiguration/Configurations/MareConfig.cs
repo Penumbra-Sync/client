@@ -10,6 +10,7 @@ public class MareConfig : IMareConfiguration
     public string CacheFolder { get; set; } = string.Empty;
     public bool DisableOptionalPluginWarnings { get; set; } = false;
     public NotificationLocation ErrorNotification { get; set; } = NotificationLocation.Both;
+    public string ExportFolder { get; set; } = string.Empty;
     public bool FileScanPaused { get; set; } = false;
     public NotificationLocation InfoNotification { get; set; } = NotificationLocation.Toast;
     public bool InitialScanComplete { get; set; } = false;
@@ -19,6 +20,9 @@ public class MareConfig : IMareConfiguration
     public bool OpenGposeImportOnGposeStart { get; set; } = false;
     public bool OpenPopupOnAdd { get; set; } = true;
     public int ParallelDownloads { get; set; } = 10;
+    public float ProfileDelay { get; set; } = 2;
+    public bool ProfilesAllowNsfw { get; set; } = false;
+    public bool ProfilesShow { get; set; } = true;
     public bool ReverseUserSort { get; set; } = false;
     public bool ShowCharacterNameInsteadOfNotesForVisible { get; set; } = false;
     public bool ShowOfflineUsersSeparately { get; set; } = true;
@@ -36,5 +40,4 @@ public class MareConfig : IMareConfiguration
     public int TransferBarsWidth { get; set; } = 250;
     public int Version { get; set; } = 1;
     public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;
-    public string ExportFolder { get; set; } = string.Empty;
 }

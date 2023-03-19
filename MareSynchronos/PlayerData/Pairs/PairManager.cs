@@ -99,6 +99,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     {
         if (_allClientPairs.TryGetValue(user, out var pair))
         {
+            Mediator.Publish(new ClearProfileDataMessage(pair.UserData));
             pair.MarkOffline();
             RecreateLazy();
         }
@@ -107,6 +108,9 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     public void MarkPairOnline(OnlineUserIdentDto dto, bool sendNotif = true)
     {
         if (!_allClientPairs.ContainsKey(dto.User)) throw new InvalidOperationException("No user found for " + dto);
+
+        Mediator.Publish(new ClearProfileDataMessage(dto.User));
+
         var pair = _allClientPairs[dto.User];
         if (pair.HasCachedPlayer) return;
 
@@ -213,6 +217,12 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
 
         if (pair.UserPair == null) throw new InvalidOperationException("No direct pair for " + dto);
 
+        if (pair.UserPair.OtherPermissions.IsPaused() != dto.Permissions.IsPaused()
+            || pair.UserPair.OtherPermissions.IsPaired() != dto.Permissions.IsPaired())
+        {
+            Mediator.Publish(new ClearProfileDataMessage(dto.User));
+        }
+
         pair.UserPair.OtherPermissions = dto.Permissions;
 
         Logger.LogTrace("Paired: {synced}, Paused: {paused}, Anims: {anims}, Sounds: {sounds}",
@@ -228,6 +238,12 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         }
 
         if (pair.UserPair == null) throw new InvalidOperationException("No direct pair for " + dto);
+
+        if (pair.UserPair.OwnPermissions.IsPaused() != dto.Permissions.IsPaused()
+            || pair.UserPair.OwnPermissions.IsPaired() != dto.Permissions.IsPaired())
+        {
+            Mediator.Publish(new ClearProfileDataMessage(dto.User));
+        }
 
         pair.UserPair.OwnPermissions = dto.Permissions;
 

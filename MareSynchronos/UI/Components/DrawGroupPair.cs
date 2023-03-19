@@ -14,16 +14,14 @@ namespace MareSynchronos.UI.Components;
 
 public class DrawGroupPair : DrawPairBase
 {
-    private readonly ApiController _apiController;
     private readonly GroupPairFullInfoDto _fullInfoDto;
     private readonly GroupFullInfoDto _group;
     private string _banReason = string.Empty;
     private bool _banUserPopupOpen;
     private bool _showModalBanUser;
 
-    public DrawGroupPair(Pair entry, ApiController apiController, GroupFullInfoDto group, GroupPairFullInfoDto fullInfoDto, UidDisplayHandler handler) : base(entry, handler)
+    public DrawGroupPair(string id, Pair entry, ApiController apiController, GroupFullInfoDto group, GroupPairFullInfoDto fullInfoDto, UidDisplayHandler handler) : base(id, entry, apiController, handler)
     {
-        _apiController = apiController;
         _group = group;
         _fullInfoDto = fullInfoDto;
     }
@@ -115,7 +113,7 @@ public class DrawGroupPair : DrawPairBase
 
         bool showInfo = (individualAnimDisabled || individualSoundsDisabled || animDisabled || soundsDisabled);
         bool showPlus = _pair.UserPair == null;
-        bool showBars = userIsOwner || (userIsModerator && !entryIsMod && !entryIsOwner);
+        bool showBars = (userIsOwner || (userIsModerator && !entryIsMod && !entryIsOwner)) || !_pair.IsPaused;
 
         var spacing = ImGui.GetStyle().ItemSpacing.X;
         var permIcon = (individualAnimDisabled || individualSoundsDisabled) ? FontAwesomeIcon.ExclamationTriangle
@@ -266,6 +264,17 @@ public class DrawGroupPair : DrawPairBase
                     _ = _apiController.GroupChangeOwnership(_fullInfoDto);
                 }
                 UiSharedService.AttachToolTip("Hold CTRL and SHIFT and click to transfer ownership of this Syncshell to " + (_fullInfoDto.UserAliasOrUID) + Environment.NewLine + "WARNING: This action is irreversible.");
+            }
+
+            ImGui.Separator();
+            if (!_pair.IsPaused)
+            {
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.ExclamationTriangle, "Report Mare Profile"))
+                {
+                    ImGui.CloseCurrentPopup();
+                    _showModalReport = true;
+                }
+                UiSharedService.AttachToolTip("Report this users Mare Profile to the administrative team");
             }
             ImGui.EndPopup();
         }

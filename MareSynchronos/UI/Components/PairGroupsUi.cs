@@ -111,7 +111,7 @@ public class PairGroupsUi
         DrawName(tag, isSpecialTag, visibleInThisTag, usersInThisTag.Count(), otherUidsTaggedWithTag?.Count);
         if (!isSpecialTag)
         {
-            if (onlineUsers.First() is DrawUserPair)
+            if (onlineUsers.Any() && onlineUsers.First() is DrawUserPair)
             {
                 UiSharedService.DrawWithID($"group-{tag}-buttons", () => DrawButtons(tag, allUsers.Cast<DrawUserPair>().Where(p => otherUidsTaggedWithTag!.Contains(p.UID)).ToList()));
             }

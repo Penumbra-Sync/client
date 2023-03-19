@@ -362,8 +362,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 ImGui.InputTextWithHint("Export Descriptor", "This description will be shown on loading the data", ref _exportDescription, 255);
                 if (UiSharedService.IconTextButton(FontAwesomeIcon.Save, "Export Character as MCDF"))
                 {
-                    string defaultFileName = string.IsNullOrEmpty(_exportDescription) 
-                        ? "export.mcdf" 
+                    string defaultFileName = string.IsNullOrEmpty(_exportDescription)
+                        ? "export.mcdf"
                         : string.Join('_', $"{_exportDescription}.mcdf".Split(Path.GetInvalidFileNameChars()));
                     _uiShared.FileDialogManager.SaveFileDialog("Export Character to file", ".mcdf", defaultFileName, ".mcdf", (success, path) =>
                     {
@@ -490,9 +490,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
         ImGui.Separator();
         UiSharedService.FontText("UI", _uiShared.UidFont);
         var showNameInsteadOfNotes = _configService.Current.ShowCharacterNameInsteadOfNotesForVisible;
-        var reverseUserSort = _configService.Current.ReverseUserSort;
         var showVisibleSeparate = _configService.Current.ShowVisibleUsersSeparately;
         var showOfflineSeparate = _configService.Current.ShowOfflineUsersSeparately;
+        var showProfiles = _configService.Current.ProfilesShow;
+        var showNsfwProfiles = _configService.Current.ProfilesAllowNsfw;
+        var profileDelay = _configService.Current.ProfileDelay;
 
         if (ImGui.Checkbox("Show separate Visible group", ref showVisibleSeparate))
         {
@@ -515,12 +517,30 @@ public class SettingsUi : WindowMediatorSubscriberBase
         }
         UiSharedService.DrawHelpText("This will show the character name instead of custom set note when a character is visible");
 
-        if (ImGui.Checkbox("Reverse user sort", ref reverseUserSort))
+        if (ImGui.Checkbox("Show Mare Profiles on Hover", ref showProfiles))
         {
-            _configService.Current.ReverseUserSort = reverseUserSort;
+            Mediator.Publish(new ClearProfileDataMessage());
+            _configService.Current.ProfilesShow = showProfiles;
             _configService.Save();
         }
-        UiSharedService.DrawHelpText("This reverses the user sort from A->Z to Z->A");
+        UiSharedService.DrawHelpText("This will show the configured user profile after a set delay");
+        ImGui.Indent();
+        if (!showProfiles) ImGui.BeginDisabled();
+        if (ImGui.Checkbox("Show profiles marked as NSFW", ref showNsfwProfiles))
+        {
+            Mediator.Publish(new ClearProfileDataMessage());
+            _configService.Current.ProfilesAllowNsfw = showNsfwProfiles;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("Will show profiles that have the NSFW tag enabled");
+        if (ImGui.SliderFloat("Hover Delay", ref profileDelay, 1, 10))
+        {
+            _configService.Current.ProfileDelay = profileDelay;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("Delay until the profile should be displayed");
+        if (!showProfiles) ImGui.EndDisabled();
+        ImGui.Unindent();
 
         ImGui.Separator();
 

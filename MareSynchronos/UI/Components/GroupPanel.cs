@@ -402,7 +402,7 @@ internal sealed class GroupPanel
                 .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsModerator())
                 .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsPinned())
                 .ThenBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase)
-                .Select(c => new DrawGroupPair(c, ApiController, groupDto, c.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
+                .Select(c => new DrawGroupPair(groupDto.GID + c.UserData.UID, c, ApiController, groupDto, c.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
                     _uidDisplayHandler))
                 .ToList();
             var onlineUsers = pairsInGroup.Where(u => u.IsOnline && !u.IsVisible)
@@ -410,7 +410,7 @@ internal sealed class GroupPanel
                 .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsModerator())
                 .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsPinned())
                 .ThenBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase)
-                .Select(c => new DrawGroupPair(c, ApiController, groupDto, c.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
+                .Select(c => new DrawGroupPair(groupDto.GID + c.UserData.UID, c, ApiController, groupDto, c.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
                     _uidDisplayHandler))
                 .ToList();
             var offlineUsers = pairsInGroup.Where(u => !u.IsOnline && !u.IsVisible)
@@ -418,7 +418,7 @@ internal sealed class GroupPanel
                 .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsModerator())
                 .ThenByDescending(u => u.GroupPair[groupDto].GroupPairStatusInfo.IsPinned())
                 .ThenBy(u => u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase)
-                .Select(c => new DrawGroupPair(c, ApiController, groupDto, c.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
+                .Select(c => new DrawGroupPair(groupDto.GID + c.UserData.UID, c, ApiController, groupDto, c.GroupPair.Single(g => GroupDataComparer.Instance.Equals(g.Key.Group, groupDto.Group)).Value,
                     _uidDisplayHandler))
                 .ToList();
 

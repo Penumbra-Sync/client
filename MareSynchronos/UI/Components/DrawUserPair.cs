@@ -13,14 +13,12 @@ namespace MareSynchronos.UI.Components;
 
 public class DrawUserPair : DrawPairBase
 {
-    private readonly ApiController _apiController;
     private readonly SelectGroupForPairUi _selectGroupForPairUi;
 
-    public DrawUserPair(Pair entry, UidDisplayHandler displayHandler, ApiController apiController, SelectGroupForPairUi selectGroupForPairUi) : base(entry, displayHandler)
+    public DrawUserPair(string id, Pair entry, UidDisplayHandler displayHandler, ApiController apiController, SelectGroupForPairUi selectGroupForPairUi) : base(id, entry, apiController, displayHandler)
     {
         if (_pair.UserPair == null) throw new ArgumentException("Pair must be UserPair", nameof(entry));
         _pair = entry;
-        _apiController = apiController;
         _selectGroupForPairUi = selectGroupForPairUi;
     }
 
@@ -209,5 +207,16 @@ public class DrawUserPair : DrawPairBase
             _ = _apiController.UserRemovePair(new(entry.UserData));
         }
         UiSharedService.AttachToolTip("Hold CTRL and click to unpair permanently from " + entryUID);
+
+        ImGui.Separator();
+        if (!entry.IsPaused)
+        {
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.ExclamationTriangle, "Report Mare Profile"))
+            {
+                ImGui.CloseCurrentPopup();
+                _showModalReport = true;
+            }
+            UiSharedService.AttachToolTip("Report this users Mare Profile to the administrative team");
+        }
     }
 }

@@ -23,7 +23,7 @@ public class ConfigurationMigrator : IHostedService
 
     public void Migrate()
     {
-        if (_pi.GetPluginConfig() is Configuration oldConfig)
+        if (_pi.GetPluginConfig() is Configurations.Obsolete.Configuration oldConfig)
         {
             _logger.LogInformation("Migrating Configuration from old config style to 1");
 
@@ -53,11 +53,15 @@ public class ConfigurationMigrator : IHostedService
         {
             try
             {
-                var serverConfig = JsonConvert.DeserializeObject<ServerConfigV0>(File.ReadAllText(ConfigurationPath(ServerConfigService.ConfigName)))!;
-
-                if (serverConfig.Version == 0)
+                var content = File.ReadAllText(ConfigurationPath(ServerConfigService.ConfigName));
+                if (!content.Contains("\"Version\": 1"))
                 {
-                    MigrateServerConfigV0toV1(serverConfig);
+                    var serverConfig = JsonConvert.DeserializeObject<ServerConfigV0>(content);
+
+                    if (serverConfig != null && serverConfig.Version == 0)
+                    {
+                        MigrateServerConfigV0toV1(serverConfig);
+                    }
                 }
             }
             catch (Exception ex)

@@ -409,17 +409,16 @@ public class CompactUi : WindowMediatorSubscriberBase
             .OrderBy(
                 u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
                     ? u.PlayerName
-                    : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
-            .Select(c => new DrawUserPair(c, _uidDisplayHandler, _apiController, _selectGroupForPairUi)).ToList();
+                    : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase).ToList();
 
         if (_configService.Current.ReverseUserSort)
         {
             users.Reverse();
         }
 
-        var onlineUsers = users.Where(u => u.IsOnline || u.UserPair!.OwnPermissions.IsPaused()).ToList();
-        var visibleUsers = onlineUsers.Where(u => u.IsVisible).ToList();
-        var offlineUsers = users.Except(onlineUsers).ToList();
+        var onlineUsers = users.Where(u => u.IsOnline || u.UserPair!.OwnPermissions.IsPaused()).Select(c => new DrawUserPair("Online" + c.UserData.UID, c, _uidDisplayHandler, _apiController, _selectGroupForPairUi)).ToList();
+        var visibleUsers = users.Where(u => u.IsVisible).Select(c => new DrawUserPair("Visible" + c.UserData.UID, c, _uidDisplayHandler, _apiController, _selectGroupForPairUi)).ToList();
+        var offlineUsers = users.Where(u => !u.IsOnline && !u.UserPair!.OwnPermissions.IsPaused()).Select(c => new DrawUserPair("Offline" + c.UserData.UID, c, _uidDisplayHandler, _apiController, _selectGroupForPairUi)).ToList();
 
         ImGui.BeginChild("list", new Vector2(WindowContentWidth, ySize), border: false);
 
@@ -444,7 +443,7 @@ public class CompactUi : WindowMediatorSubscriberBase
 
         if (_apiController.ServerState is ServerState.Connected)
         {
-            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - buttonSize.X) / 2 - (userSize.X + textSize.X) / 2 - ImGui.GetStyle().ItemSpacing.X / 2);
+            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth()) / 2 - (userSize.X + textSize.X) / 2 - ImGui.GetStyle().ItemSpacing.X / 2);
             if (!printShard) ImGui.AlignTextToFramePadding();
             ImGui.TextColored(ImGuiColors.ParsedGreen, userCount);
             ImGui.SameLine();
@@ -460,8 +459,26 @@ public class CompactUi : WindowMediatorSubscriberBase
         if (printShard)
         {
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ImGui.GetStyle().ItemSpacing.Y);
-            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - buttonSize.X) / 2 - shardTextSize.X / 2);
+            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth()) / 2 - shardTextSize.X / 2);
             ImGui.TextUnformatted(shardConnection);
+        }
+
+        ImGui.SameLine();
+        if (printShard)
+        {
+            ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ((userSize.Y + textSize.Y) / 2 + shardTextSize.Y) / 2 - ImGui.GetStyle().ItemSpacing.Y + buttonSize.Y / 2);
+        }
+        var color = UiSharedService.GetBoolColor(!_serverManager.CurrentServer!.FullPause);
+        var connectedIcon = !_serverManager.CurrentServer.FullPause ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
+
+        if (_apiController.ServerState is ServerState.Connected)
+        {
+            ImGui.SetCursorPosX(0 + ImGui.GetStyle().ItemSpacing.X);
+            if (ImGuiComponents.IconButton(FontAwesomeIcon.UserCircle))
+            {
+                Mediator.Publish(new UiToggleMessage(typeof(EditProfileUi)));
+            }
+            UiSharedService.AttachToolTip("Edit your Mare Profile");
         }
 
         ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - buttonSize.X);
@@ -469,8 +486,6 @@ public class CompactUi : WindowMediatorSubscriberBase
         {
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ((userSize.Y + textSize.Y) / 2 + shardTextSize.Y) / 2 - ImGui.GetStyle().ItemSpacing.Y + buttonSize.Y / 2);
         }
-        var color = UiSharedService.GetBoolColor(!_serverManager.CurrentServer!.FullPause);
-        var connectedIcon = !_serverManager.CurrentServer.FullPause ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
 
         if (_apiController.ServerState is not (ServerState.Reconnecting or ServerState.Disconnecting))
         {
