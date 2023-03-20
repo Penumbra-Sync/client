@@ -22,6 +22,7 @@ using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.UI;
+using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.SignalR;
@@ -65,6 +66,11 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<FileUploadManager>();
             collection.AddSingleton<FileTransferOrchestrator>();
             collection.AddSingleton<MarePlugin>();
+            collection.AddSingleton<MareProfileManager>();
+            collection.AddSingleton<UidDisplayHandler>((s) => new UidDisplayHandler(s.GetRequiredService<ILogger<UidDisplayHandler>>(), pluginInterface.UiBuilder,
+                s.GetRequiredService<MareProfileManager>(),
+                s.GetRequiredService<UiSharedService>(), s.GetRequiredService<PairManager>(),
+                s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<MareConfigService>()));
             collection.AddSingleton((s) => new DalamudUtilService(s.GetRequiredService<ILogger<DalamudUtilService>>(),
                 clientState, objectTable, framework, gameGui, condition, gameData,
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<PerformanceCollectorService>()));
@@ -117,6 +123,9 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddScoped<WindowMediatorSubscriberBase, GposeUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, IntroUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, DownloadUi>();
+            collection.AddScoped<WindowMediatorSubscriberBase, EditProfileUi>((s) => new EditProfileUi(s.GetRequiredService<ILogger<EditProfileUi>>(),
+                s.GetRequiredService<MareMediator>(), s.GetRequiredService<ApiController>(), pluginInterface.UiBuilder, s.GetRequiredService<UiSharedService>(),
+                s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareProfileManager>()));
             collection.AddScoped<CacheCreationService>();
             collection.AddScoped<TransientResourceManager>();
             collection.AddScoped<PlayerDataFactory>();

@@ -1,5 +1,6 @@
 ﻿using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Interface.Internal.Notifications;
+using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.WebAPI.Files.Models;
@@ -54,5 +55,6 @@ public record DownloadStartedMessage(GameObjectHandler DownloadId, Dictionary<st
 public record DownloadFinishedMessage(GameObjectHandler DownloadId) : IMessage;
 public record UiToggleMessage(Type UiType) : IMessage;
 public record PlayerUploadingMessage(GameObjectHandler Handler, bool IsUploading) : IMessage;
+public record ClearProfileDataMessage(UserData? UserData = null) : IMessage;
 
 #pragma warning restore MA0048 // File name must match type name

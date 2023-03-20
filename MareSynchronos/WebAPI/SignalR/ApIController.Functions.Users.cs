@@ -49,6 +49,12 @@ public partial class ApiController
         return await _mareHub!.InvokeAsync<List<UserPairDto>>(nameof(UserGetPairedClients)).ConfigureAwait(false);
     }
 
+    public async Task<UserProfileDto> UserGetProfile(UserDto dto)
+    {
+        if (!IsConnected) return new UserProfileDto(dto.User, false, null, null, null);
+        return await _mareHub!.InvokeAsync<UserProfileDto>(nameof(UserGetProfile), dto).ConfigureAwait(false);
+    }
+
     public async Task UserPushData(UserCharaDataMessageDto dto)
     {
         try
@@ -67,9 +73,21 @@ public partial class ApiController
         await _mareHub!.SendAsync(nameof(UserRemovePair), userDto).ConfigureAwait(false);
     }
 
+    public async Task UserReportProfile(UserProfileReportDto userDto)
+    {
+        if (!IsConnected) return;
+        await _mareHub!.SendAsync(nameof(UserReportProfile), userDto).ConfigureAwait(false);
+    }
+
     public async Task UserSetPairPermissions(UserPermissionsDto userPermissions)
     {
         await _mareHub!.SendAsync(nameof(UserSetPairPermissions), userPermissions).ConfigureAwait(false);
+    }
+
+    public async Task UserSetProfile(UserProfileDto userDescription)
+    {
+        if (!IsConnected) return;
+        await _mareHub!.InvokeAsync(nameof(UserSetProfile), userDescription).ConfigureAwait(false);
     }
 
     private async Task PushCharacterDataInternal(CharacterData character, List<UserData> visibleCharacters)

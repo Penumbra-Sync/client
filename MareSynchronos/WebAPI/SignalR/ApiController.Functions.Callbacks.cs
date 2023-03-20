@@ -162,6 +162,13 @@ public partial class ApiController
         return Task.CompletedTask;
     }
 
+    public Task Client_UserUpdateProfile(UserDto dto)
+    {
+        Logger.LogDebug("Client_UserUpdateProfile: {dto}", dto);
+        ExecuteSafely(() => Mediator.Publish(new ClearProfileDataMessage(dto.User)));
+        return Task.CompletedTask;
+    }
+
     public Task Client_UserUpdateSelfPairPermissions(UserPermissionsDto dto)
     {
         Logger.LogDebug("Client_UserUpdateSelfPairPermissions: {dto}", dto);
@@ -275,6 +282,12 @@ public partial class ApiController
     {
         if (_initialized) return;
         _mareHub!.On(nameof(Client_UserUpdateOtherPairPermissions), act);
+    }
+
+    public void OnUserUpdateProfile(Action<UserDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_UserUpdateProfile), act);
     }
 
     public void OnUserUpdateSelfPairPermissions(Action<UserPermissionsDto> act)

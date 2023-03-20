@@ -161,13 +161,13 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public static uint Color(Vector4 color)
     {
-        uint ret = (byte)(color.W);
+        uint ret = (byte)(color.W * 255);
         ret <<= 8;
-        ret += (byte)(color.X);
+        ret += (byte)(color.Z * 255);
         ret <<= 8;
-        ret += (byte)(color.Y);
+        ret += (byte)(color.Y * 255);
         ret <<= 8;
-        ret += (byte)(color.Z);
+        ret += (byte)(color.X * 255);
         return ret;
     }
 
@@ -450,6 +450,13 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         _serverConfigurationManager.SaveNotes();
 
         return true;
+    }
+
+    public void BigText(string text)
+    {
+        if (UidFontBuilt) ImGui.PushFont(UidFont);
+        ImGui.TextUnformatted(text);
+        if (UidFontBuilt) ImGui.PopFont();
     }
 
     public void DrawCacheDirectorySetting()

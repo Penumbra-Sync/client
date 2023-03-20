@@ -3,7 +3,7 @@
   <PropertyGroup>
     <Authors></Authors>
     <Company></Company>
-    <Version>0.8.8</Version>
+    <Version>0.8.10</Version>
     <Description></Description>
     <Copyright></Copyright>
     <PackageProjectUrl>https://github.com/Penumbra-Sync/client</PackageProjectUrl>
@@ -37,6 +37,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
     <PackageReference Include="Penumbra.Api" Version="1.0.7" />
     <PackageReference Include="Penumbra.String" Version="1.0.3" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.0.0" />
     <PackageReference Include="SonarAnalyzer.CSharp" Version="8.54.0.64047">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

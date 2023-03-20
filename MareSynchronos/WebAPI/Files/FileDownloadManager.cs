@@ -242,7 +242,13 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                 fi.LastWriteTime = RandomDayInThePast().Invoke();
                 try
                 {
-                    _ = _fileDbManager.CreateCacheEntry(filePath);
+                    var entry = _fileDbManager.CreateCacheEntry(filePath);
+                    if (!string.Equals(entry?.Hash, file.Hash, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Logger.LogError("Hash mismatch after extracting, got {hash}, expected {expectedHash}, deleting file", entry?.Hash, file.Hash);
+                        File.Delete(filePath);
+                        _fileDbManager.RemoveHash(entry);
+                    }
                 }
                 catch (Exception ex)
                 {

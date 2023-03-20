@@ -66,7 +66,7 @@ public sealed class FileCacheManager : IDisposable
         var fullName = fi.FullName.ToLowerInvariant();
         if (!fullName.Contains(_configService.Current.CacheFolder.ToLowerInvariant(), StringComparison.Ordinal)) return null;
         string prefixedPath = fullName.Replace(_configService.Current.CacheFolder.ToLowerInvariant(), _cachePrefix + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
-        return CreateFileCacheEntity(fi, prefixedPath, fi.Name.ToUpper(CultureInfo.InvariantCulture));
+        return CreateFileCacheEntity(fi, prefixedPath);
     }
 
     public FileCacheEntity? CreateFileEntry(string path)
@@ -122,10 +122,13 @@ public sealed class FileCacheManager : IDisposable
         return validatedCacheEntry;
     }
 
-    public void RemoveHash(FileCacheEntity entity)
+    public void RemoveHash(FileCacheEntity? entity)
     {
-        _logger.LogTrace("Removing {path}", entity.ResolvedFilepath);
-        _fileCaches.Remove(entity.PrefixedFilePath, out _);
+        if (entity != null)
+        {
+            _logger.LogTrace("Removing {path}", entity.ResolvedFilepath);
+            _fileCaches.Remove(entity.PrefixedFilePath, out _);
+        }
     }
 
     public string ResolveFileReplacement(string gamePath)

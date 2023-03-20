@@ -4,7 +4,7 @@ using MareSynchronos.WebAPI;
 namespace MareSynchronos.MareConfiguration.Configurations.Obsolete;
 
 [Serializable]
-[Obsolete]
+[Obsolete("Replaced with ServerConfig")]
 public class ServerConfigV0 : IMareConfiguration
 {
     public string CurrentServer { get; set; } = string.Empty;

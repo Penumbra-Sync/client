@@ -21,9 +21,9 @@ public class TagHandler
         _serverConfigurationManager.AddTag(tag);
     }
 
-    public void AddTagToPairedUid(UserPairDto pair, string tagName)
+    public void AddTagToPairedUid(string uid, string tagName)
     {
-        _serverConfigurationManager.AddTagForUid(pair.User.UID, tagName);
+        _serverConfigurationManager.AddTagForUid(uid, tagName);
     }
 
     public List<string> GetAllTagsSorted()
@@ -38,14 +38,14 @@ public class TagHandler
         return _serverConfigurationManager.GetUidsForTag(tag);
     }
 
-    public bool HasAnyTag(UserPairDto pair)
+    public bool HasAnyTag(string uid)
     {
-        return _serverConfigurationManager.HasTags(pair.User.UID);
+        return _serverConfigurationManager.HasTags(uid);
     }
 
-    public bool HasTag(UserPairDto pair, string tagName)
+    public bool HasTag(string uid, string tagName)
     {
-        return _serverConfigurationManager.ContainsTag(pair.User.UID, tagName);
+        return _serverConfigurationManager.ContainsTag(uid, tagName);
     }
 
     /// <summary>
@@ -64,9 +64,9 @@ public class TagHandler
         _serverConfigurationManager.RemoveTag(tag);
     }
 
-    public void RemoveTagFromPairedUid(UserPairDto pair, string tagName)
+    public void RemoveTagFromPairedUid(string uid, string tagName)
     {
-        _serverConfigurationManager.RemoveTagForUid(pair.User.UID, tagName);
+        _serverConfigurationManager.RemoveTagForUid(uid, tagName);
     }
 
     public void SetTagOpen(string tag, bool open)

@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 
 namespace MareSynchronos.MareConfiguration;
 #pragma warning disable CS0618 // ignore Obsolete tag, the point of this migrator is to migrate obsolete configs to new ones
+#pragma warning disable CS0612 // ignore Obsolete tag, the point of this migrator is to migrate obsolete configs to new ones
 
 public class ConfigurationMigrator : IHostedService
 {
@@ -22,7 +23,7 @@ public class ConfigurationMigrator : IHostedService
 
     public void Migrate()
     {
-        if (_pi.GetPluginConfig() is Configuration oldConfig)
+        if (_pi.GetPluginConfig() is Configurations.Obsolete.Configuration oldConfig)
         {
             _logger.LogInformation("Migrating Configuration from old config style to 1");
 
@@ -52,11 +53,15 @@ public class ConfigurationMigrator : IHostedService
         {
             try
             {
-                var serverConfig = JsonConvert.DeserializeObject<ServerConfigV0>(File.ReadAllText(ConfigurationPath(ServerConfigService.ConfigName)))!;
-
-                if (serverConfig.Version == 0)
+                var content = File.ReadAllText(ConfigurationPath(ServerConfigService.ConfigName));
+                if (!content.Contains("\"Version\": 1"))
                 {
-                    MigrateServerConfigV0toV1(serverConfig);
+                    var serverConfig = JsonConvert.DeserializeObject<ServerConfigV0>(content);
+
+                    if (serverConfig != null && serverConfig.Version == 0)
+                    {
+                        MigrateServerConfigV0toV1(serverConfig);
+                    }
                 }
             }
             catch (Exception ex)
@@ -92,7 +97,6 @@ public class ConfigurationMigrator : IHostedService
 
         MareConfig mareConfigV1 = mareConfigV0.ToV1();
 
-        int i = 0;
         var serverConfig = new ServerConfig()
         {
             ServerStorage = mareConfigV0.ServerStorage.Select(p => p.Value.ToV1()).ToList()
@@ -152,4 +156,5 @@ public class ConfigurationMigrator : IHostedService
     }
 }
 
+#pragma warning restore CS0612 // ignore Obsolete tag, the point of this migrator is to migrate obsolete configs to new ones
 #pragma warning restore CS0618 // ignore Obsolete tag, the point of this migrator is to migrate obsolete configs to new ones

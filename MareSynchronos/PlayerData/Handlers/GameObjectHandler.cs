@@ -84,8 +84,8 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
     public IntPtr Address { get; set; }
     public unsafe Character* Character => (Character*)Address;
-    public Lazy<Dalamud.Game.ClientState.Objects.Types.GameObject?> GameObjectLazy { get; private set; }
     public IntPtr CurrentAddress => _getAddress.Invoke();
+    public Lazy<Dalamud.Game.ClientState.Objects.Types.GameObject?> GameObjectLazy { get; private set; }
     public string Name { get; private set; }
     public ObjectKind ObjectKind { get; }
     private byte[] CustomizeData { get; set; } = new byte[26];
@@ -100,6 +100,8 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             try
             {
                 curPtr = _getAddress.Invoke();
+
+                if (curPtr == IntPtr.Zero) return true;
 
                 var drawObj = GetDrawObj(curPtr);
                 return IsBeingDrawn(drawObj, curPtr);

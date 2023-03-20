@@ -11,6 +11,7 @@ namespace MareSynchronos.UI.Components;
 public class SelectGroupForPairUi
 {
     private readonly TagHandler _tagHandler;
+    private readonly UidDisplayHandler _uidDisplayHandler;
 
     /// <summary>
     /// The group UI is always open for a specific pair. This defines which pair the UI is open for.
@@ -28,21 +29,22 @@ public class SelectGroupForPairUi
     /// </summary>
     private string _tagNameToAdd = "";
 
-    public SelectGroupForPairUi(TagHandler tagHandler)
+    public SelectGroupForPairUi(TagHandler tagHandler, UidDisplayHandler uidDisplayHandler)
     {
         _show = false;
         _pair = null;
         _tagHandler = tagHandler;
+        _uidDisplayHandler = uidDisplayHandler;
     }
 
-    public void Draw(Dictionary<string, bool> showUidForEntry)
+    public void Draw()
     {
         if (_pair == null)
         {
             return;
         }
 
-        var name = PairName(showUidForEntry, _pair);
+        var name = PairName(_pair);
         var popupName = $"Choose Groups for {name}";
         // Is the popup supposed to show but did not open yet? Open it
         if (_show)
@@ -93,30 +95,19 @@ public class SelectGroupForPairUi
         _show = true;
     }
 
-    private static string PairName(Dictionary<string, bool> showUidForEntry, Pair pair)
-    {
-        showUidForEntry.TryGetValue(pair.UserData.UID, out var showUidInsteadOfName);
-        var playerText = pair.GetNote();
-        if (showUidInsteadOfName || string.IsNullOrEmpty(playerText))
-        {
-            playerText = pair.UserData.AliasOrUID;
-        }
-        return playerText;
-    }
-
     private void DrawGroupName(Pair pair, string name)
     {
-        var hasTagBefore = _tagHandler.HasTag(pair.UserPair!, name);
+        var hasTagBefore = _tagHandler.HasTag(pair.UserData.UID, name);
         var hasTag = hasTagBefore;
         if (ImGui.Checkbox(name, ref hasTag))
         {
             if (hasTag)
             {
-                _tagHandler.AddTagToPairedUid(pair.UserPair!, name);
+                _tagHandler.AddTagToPairedUid(pair.UserData.UID, name);
             }
             else
             {
-                _tagHandler.RemoveTagFromPairedUid(pair.UserPair!, name);
+                _tagHandler.RemoveTagFromPairedUid(pair.UserData.UID, name);
             }
         }
     }
@@ -128,7 +119,7 @@ public class SelectGroupForPairUi
             _tagHandler.AddTag(_tagNameToAdd);
             if (_pair != null)
             {
-                _tagHandler.AddTagToPairedUid(_pair.UserPair!, _tagNameToAdd);
+                _tagHandler.AddTagToPairedUid(_pair.UserData.UID, _tagNameToAdd);
             }
             _tagNameToAdd = string.Empty;
         }
@@ -136,5 +127,10 @@ public class SelectGroupForPairUi
         {
             _tagNameToAdd = string.Empty;
         }
+    }
+
+    private string PairName(Pair pair)
+    {
+        return _uidDisplayHandler.GetPlayerText(pair).text;
     }
 }
