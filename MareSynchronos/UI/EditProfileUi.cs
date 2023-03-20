@@ -116,7 +116,7 @@ public class EditProfileUi : WindowMediatorSubscriberBase
         ImGui.Separator();
         _uiSharedService.BigText("Profile Settings");
 
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.FileUpload, "Upload new profile image"))
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.FileUpload, "Upload new profile picture"))
         {
             _fileDialogManager.OpenFileDialog("Select new Profile picture", ".png", (success, file) =>
             {
