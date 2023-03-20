@@ -4,7 +4,6 @@ using Dalamud.Interface.ImGuiFileDialog;
 using ImGuiNET;
 using ImGuiScene;
 using MareSynchronos.API.Data;
-using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
@@ -20,7 +19,7 @@ public class EditProfileUi : WindowMediatorSubscriberBase
     private readonly MareProfileManager _mareProfileManager;
     private readonly UiBuilder _uiBuilder;
     private readonly UiSharedService _uiSharedService;
-    private string _descriptionText;
+    private string _descriptionText = string.Empty;
     private bool _loadedPrior = false;
     private TextureWrap? _pfpTextureWrap;
     private bool _showFileDialogError = false;
@@ -47,7 +46,7 @@ public class EditProfileUi : WindowMediatorSubscriberBase
         Mediator.Subscribe<DisconnectedMessage>(this, (_) => IsOpen = false);
         Mediator.Subscribe<ClearProfileDataMessage>(this, (msg) =>
         {
-            if (string.Equals(msg.UserData.UID, _apiController.UID, StringComparison.Ordinal))
+            if (msg.UserData != null || string.Equals(msg.UserData.UID, _apiController.UID, StringComparison.Ordinal))
             {
                 _pfpTextureWrap?.Dispose();
                 _pfpTextureWrap = null;
@@ -112,7 +111,7 @@ public class EditProfileUi : WindowMediatorSubscriberBase
             $"- !!! AVOID: anything as profile image that can be considered highly illegal or obscene (bestiality, anything that could be considered a sexual act with a minor (that includes Lalafells), etc.){Environment.NewLine}" +
             $"- !!! AVOID: slurs of any kind in the description that can be considered highly offensive{Environment.NewLine}" +
             $"- In case of valid reports from other users this can lead to disabling your profile forever or terminating your Mare account indefinitely.{Environment.NewLine}" +
-            $"- Judgement of your profile validity from reports through staff is not up to debate and decisions to disable your profile/account permanent.{Environment.NewLine}" +
+            $"- Judgement of your profile validity from reports through staff is not up to debate and the decisions to disable your profile/account permanent.{Environment.NewLine}" +
             $"- If your profile picture or profile description could be considered NSFW, enable the toggle below.");
         ImGui.Separator();
         _uiSharedService.BigText("Profile Settings");
