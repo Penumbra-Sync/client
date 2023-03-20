@@ -61,7 +61,7 @@ public class MareProfileManager : MediatorSubscriberBase
             var profile = await _apiController.UserGetProfile(new API.Dto.User.UserDto(data)).ConfigureAwait(false);
             MareProfileData profileData = new(profile.Disabled, profile.IsNSFW ?? false, string.IsNullOrEmpty(profile.ProfilePictureBase64) ? _mareLogo : profile.ProfilePictureBase64,
                 string.IsNullOrEmpty(profile.Description) ? _noDescription : profile.Description);
-            if (profileData.IsNSFW && !_mareConfigService.Current.ProfilesAllowNsfw)
+            if (profileData.IsNSFW && !_mareConfigService.Current.ProfilesAllowNsfw && _apiController.UID != data.UID)
             {
                 _mareProfiles[data] = NsfwProfileData;
             }

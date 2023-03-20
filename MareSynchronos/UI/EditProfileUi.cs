@@ -46,7 +46,7 @@ public class EditProfileUi : WindowMediatorSubscriberBase
         Mediator.Subscribe<DisconnectedMessage>(this, (_) => IsOpen = false);
         Mediator.Subscribe<ClearProfileDataMessage>(this, (msg) =>
         {
-            if (msg.UserData != null || string.Equals(msg.UserData.UID, _apiController.UID, StringComparison.Ordinal))
+            if (msg.UserData == null || string.Equals(msg.UserData.UID, _apiController.UID, StringComparison.Ordinal))
             {
                 _pfpTextureWrap?.Dispose();
                 _pfpTextureWrap = null;
@@ -89,10 +89,10 @@ public class EditProfileUi : WindowMediatorSubscriberBase
             ImGui.Image(_pfpTextureWrap.ImGuiHandle, new System.Numerics.Vector2(_pfpTextureWrap.Width, _pfpTextureWrap.Height));
         }
 
-        ImGui.SameLine(256);
-        var posX = ImGui.GetCursorPosX();
         var spacing = ImGui.GetStyle().ItemSpacing.X;
-        var width = UiSharedService.GetWindowContentRegionWidth() - posX + spacing;
+        ImGui.SameLine(256 + spacing * 2);
+        var posX = ImGui.GetCursorPosX();
+        var width = UiSharedService.GetWindowContentRegionWidth() - posX + spacing * 2;
         if (ImGui.BeginChildFrame(100, new System.Numerics.Vector2(width, 256)))
         {
             var nsfw = profile.IsNSFW;
