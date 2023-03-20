@@ -9,6 +9,7 @@ using ImGuiScene;
 using System.Numerics;
 using Microsoft.Extensions.Logging;
 using MareSynchronos.Services;
+using Dalamud.Interface.GameFonts;
 
 namespace MareSynchronos.UI.Handlers;
 
@@ -127,7 +128,9 @@ public class UidDisplayHandler
                         }
 
                         var posDone = ImGui.GetCursorPos();
+                        ImGui.PushFont(_uiBuilder.GetGameFontHandle(new GameFontStyle(GameFontFamilyAndSize.Axis12)).ImFont);
                         UiSharedService.TextWrapped(mareProfile.Profile.Description);
+                        ImGui.PopFont();
                         ImGui.Unindent();
 
                         var sepColor = ImGui.GetStyle().Colors[(int)ImGuiCol.Separator];

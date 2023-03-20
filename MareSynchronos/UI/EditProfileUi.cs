@@ -1,5 +1,6 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.GameFonts;
 using Dalamud.Interface.ImGuiFileDialog;
 using ImGuiNET;
 using ImGuiScene;
@@ -99,7 +100,9 @@ public class EditProfileUi : WindowMediatorSubscriberBase
             ImGui.BeginDisabled();
             ImGui.Checkbox("Is NSFW", ref nsfw);
             ImGui.EndDisabled();
+            ImGui.PushFont(_uiBuilder.GetGameFontHandle(new GameFontStyle(GameFontFamilyAndSize.Axis12)).ImFont);
             UiSharedService.TextWrapped("Description:" + Environment.NewLine + profile.Description);
+            ImGui.PopFont();
         }
         ImGui.EndChildFrame();
 
@@ -164,7 +167,9 @@ public class EditProfileUi : WindowMediatorSubscriberBase
         UiSharedService.DrawHelpText("If your profile description or image can be considered NSFW, toggle this to ON");
         var widthTextBox = UiSharedService.GetWindowContentRegionWidth() - posX + spacing;
         ImGui.TextUnformatted($"Description {_descriptionText.Length}/750");
+        ImGui.PushFont(_uiBuilder.GetGameFontHandle(new GameFontStyle(GameFontFamilyAndSize.Axis12)).ImFont);
         ImGui.InputTextMultiline("##description", ref _descriptionText, 750, new System.Numerics.Vector2(widthTextBox, 200));
+        ImGui.PopFont();
         if (UiSharedService.IconTextButton(FontAwesomeIcon.Save, "Save Description"))
         {
             _ = _apiController.UserSetProfile(new UserProfileDto(new UserData(_apiController.UID), false, null, null, _descriptionText));
