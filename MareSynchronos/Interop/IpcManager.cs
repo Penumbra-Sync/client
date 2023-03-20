@@ -605,12 +605,12 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
         _penumbraRedrawRequests[obj.Address] = !fireAndForget;
 
-        ActionQueue.Enqueue(action);
-
         try
         {
             if (!fireAndForget)
             {
+                await _dalamudUtil.RunOnFrameworkThread(action);
+
                 var disposeToken = _disposalCts.Token;
                 var combinedToken = CancellationTokenSource.CreateLinkedTokenSource(disposeToken, token).Token;
 
@@ -618,6 +618,10 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
                 if (!combinedToken.IsCancellationRequested)
                     await _dalamudUtil.WaitWhileCharacterIsDrawing(logger, obj, applicationId, 30000, combinedToken).ConfigureAwait(false);
+            }
+            else
+            {
+                _ = _dalamudUtil.RunOnFrameworkThread(action);
             }
         }
         finally

@@ -209,6 +209,12 @@ public class ServerConfigurationManager
 
     internal void DeleteServer(ServerStorage selectedServer)
     {
+        if (Array.IndexOf(_configService.Current.ServerStorage.ToArray(), selectedServer) <
+            _configService.Current.CurrentServer)
+        {
+            _configService.Current.CurrentServer--;
+        }
+
         _configService.Current.ServerStorage.Remove(selectedServer);
         Save();
     }
