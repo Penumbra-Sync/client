@@ -1,4 +1,5 @@
-﻿using Dalamud.Data;
+﻿using Dalamud.ContextMenu;
+using Dalamud.Data;
 using Dalamud.Game;
 using Dalamud.Game.ClientState;
 using Dalamud.Game.ClientState.Conditions;
@@ -57,6 +58,7 @@ public sealed class Plugin : IDalamudPlugin
             // add mare related singletons
             collection.AddSingleton<MareMediator>();
             collection.AddSingleton<FileCacheManager>();
+            collection.AddSingleton<DalamudContextMenu>();
             collection.AddSingleton<ServerConfigurationManager>();
             collection.AddSingleton<PairManager>();
             collection.AddSingleton<ApiController>();

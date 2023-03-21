@@ -1,7 +1,7 @@
 ﻿using Dalamud.Interface.Internal.Notifications;
 using Dalamud.Logging;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using MareSynchronos.API.Data;
-using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
@@ -12,6 +12,7 @@ using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Files;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;
 
 namespace MareSynchronos.PlayerData.Pairs;
 
@@ -59,7 +60,11 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     public string? PlayerName { get; private set; }
     public string PlayerNameHash => OnlineUser.Ident;
     private OnlineUserIdentDto OnlineUser { get; set; }
-    private IntPtr PlayerCharacter => _charaHandler?.Address ?? IntPtr.Zero;
+    public IntPtr PlayerCharacter => _charaHandler?.Address ?? IntPtr.Zero;
+
+    public unsafe uint PlayerCharacterId => (_charaHandler?.Address ?? IntPtr.Zero) == IntPtr.Zero
+        ? uint.MaxValue
+        : ((GameObject*)_charaHandler.Address)->ObjectID;
 
     public void ApplyCharacterData(CharacterData characterData, OptionalPluginWarning warning, bool forced = false)
     {

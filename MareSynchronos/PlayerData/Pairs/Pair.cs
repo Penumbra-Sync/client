@@ -1,4 +1,6 @@
-﻿using Dalamud.Utility;
+﻿using Dalamud.ContextMenu;
+using Dalamud.Game.Text.SeStringHandling;
+using Dalamud.Utility;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.API.Data.Extensions;
@@ -169,5 +171,15 @@ public class Pair
         }
 
         return data;
+    }
+
+    public void AddContextMenu(GameObjectContextMenuOpenArgs args)
+    {
+        if (CachedPlayer == null || args.ObjectId != CachedPlayer.PlayerCharacterId) return;
+
+        args.AddCustomItem(new GameObjectContextMenuItem("Reapply last data", (a) =>
+        {
+            ApplyLastReceivedData(true);
+        } ,true));
     }
 }

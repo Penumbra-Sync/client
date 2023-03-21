@@ -1,4 +1,5 @@
-﻿using Dalamud.Game.ClientState.Objects.SubKinds;
+﻿using Dalamud.ContextMenu;
+using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Interface.Internal.Notifications;
 using Dalamud.Utility;
 using MareSynchronos.API.Data;
@@ -19,21 +20,36 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     private readonly ConcurrentDictionary<UserData, Pair> _allClientPairs = new(UserDataComparer.Instance);
     private readonly ConcurrentDictionary<GroupData, GroupFullInfoDto> _allGroups = new(GroupDataComparer.Instance);
     private readonly MareConfigService _configurationService;
+    private readonly DalamudContextMenu _dalamudContextMenu;
     private readonly Func<Pair> _pairFactory;
     private Lazy<List<Pair>> _directPairsInternal;
 
     private Lazy<Dictionary<GroupFullInfoDto, List<Pair>>> _groupPairsInternal;
 
     public PairManager(ILogger<PairManager> logger, Func<Pair> pairFactory,
-                MareConfigService configurationService, MareMediator mediator) : base(logger, mediator)
+                MareConfigService configurationService, MareMediator mediator,
+                DalamudContextMenu dalamudContextMenu) : base(logger, mediator)
     {
         _pairFactory = pairFactory;
         _configurationService = configurationService;
+        _dalamudContextMenu = dalamudContextMenu;
         Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) => DalamudUtilOnZoneSwitched());
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => DalamudUtilOnDelayedFrameworkUpdate());
         Mediator.Subscribe<DisconnectedMessage>(this, (_) => ClearPairs());
         _directPairsInternal = DirectPairsLazy();
         _groupPairsInternal = GroupPairsLazy();
+
+        _dalamudContextMenu.OnOpenGameObjectContextMenu += DalamudContextMenuOnOnOpenGameObjectContextMenu;
+    }
+
+    private void DalamudContextMenuOnOnOpenGameObjectContextMenu(GameObjectContextMenuOpenArgs args)
+    {
+        if (args.ObjectId == 0xE000000) return;
+
+        foreach (var pair in _allClientPairs.Where((p => p.Value.IsVisible)))
+        {
+            pair.Value.AddContextMenu(args);
+        }
     }
 
     public List<Pair> DirectPairs => _directPairsInternal.Value;
@@ -317,6 +333,8 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
+
+        _dalamudContextMenu.OnOpenGameObjectContextMenu -= DalamudContextMenuOnOnOpenGameObjectContextMenu;
 
         DisposePairs();
     }
