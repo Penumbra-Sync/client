@@ -121,6 +121,7 @@ public class DalamudUtilService : IHostedService
     {
         var mgr = CharacterManager.Instance();
         playerPointer ??= PlayerPointer;
+        if(playerPointer == IntPtr.Zero) return IntPtr.Zero;
         return (IntPtr)mgr->LookupPetByOwnerObject((BattleChara*)playerPointer);
     }
 
