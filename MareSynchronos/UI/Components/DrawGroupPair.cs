@@ -269,6 +269,12 @@ public class DrawGroupPair : DrawPairBase
             ImGui.Separator();
             if (!_pair.IsPaused)
             {
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.User, "Open Profile"))
+                {
+                    _displayHandler.OpenProfile(_pair);
+                    ImGui.CloseCurrentPopup();
+                }
+                UiSharedService.AttachToolTip("Opens the profile for this user in a new window");
                 if (UiSharedService.IconTextButton(FontAwesomeIcon.ExclamationTriangle, "Report Mare Profile"))
                 {
                     ImGui.CloseCurrentPopup();
