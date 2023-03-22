@@ -37,7 +37,7 @@ public class EditProfileUi : WindowMediatorSubscriberBase
         this.SizeConstraints = new()
         {
             MinimumSize = new(768, 512),
-            MaximumSize = new(2000, 2000)
+            MaximumSize = new(768, 2000)
         };
         _apiController = apiController;
         _uiBuilder = uiBuilder;
@@ -89,7 +89,7 @@ public class EditProfileUi : WindowMediatorSubscriberBase
         }
 
         var spacing = ImGui.GetStyle().ItemSpacing.X;
-        ImGui.SameLine(256 + spacing * 2);
+        ImGuiHelpers.ScaledRelativeSameLine(256, spacing);
         ImGui.PushFont(_uiBuilder.GetGameFontHandle(new GameFontStyle(GameFontFamilyAndSize.Axis12)).ImFont);
         var descriptionTextSize = ImGui.CalcTextSize(profile.Description, 256f);
         var childFrame = ImGuiHelpers.ScaledVector2(256 + ImGui.GetStyle().WindowPadding.X + ImGui.GetStyle().WindowBorderSize, 256);
@@ -104,7 +104,6 @@ public class EditProfileUi : WindowMediatorSubscriberBase
         childFrame = childFrame with
         {
             X = childFrame.X + (_adjustedForScollBarsOnlineProfile ? ImGui.GetStyle().ScrollbarSize : 0),
-            Y = childFrame.Y / ImGuiHelpers.GlobalScale
         };
         if (ImGui.BeginChildFrame(101, childFrame))
         {
@@ -203,7 +202,6 @@ public class EditProfileUi : WindowMediatorSubscriberBase
         childFrameLocal = childFrameLocal with
         {
             X = childFrameLocal.X + (_adjustedForScollBarsLocalProfile ? ImGui.GetStyle().ScrollbarSize : 0),
-            Y = childFrameLocal.Y / ImGuiHelpers.GlobalScale
         };
         if (ImGui.BeginChildFrame(102, childFrameLocal))
         {
