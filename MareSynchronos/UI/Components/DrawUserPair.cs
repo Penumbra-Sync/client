@@ -26,7 +26,7 @@ public class DrawUserPair : DrawPairBase
     public bool IsVisible => _pair.IsVisible;
     public UserPairDto UserPair => _pair.UserPair!;
 
-    protected override void DrawLeftSide(float textPos, float originalY)
+    protected override void DrawLeftSide(float textPosY, float originalY)
     {
         FontAwesomeIcon connectionIcon;
         Vector4 connectionColor;
@@ -50,7 +50,7 @@ public class DrawUserPair : DrawPairBase
             connectionColor = ImGuiColors.ParsedGreen;
         }
 
-        ImGui.SetCursorPosY(textPos);
+        ImGui.SetCursorPosY(textPosY);
         ImGui.PushFont(UiBuilder.IconFont);
         UiSharedService.ColorText(connectionIcon.ToIconString(), connectionColor);
         ImGui.PopFont();
@@ -58,7 +58,7 @@ public class DrawUserPair : DrawPairBase
         if (_pair is { IsOnline: true, IsVisible: true })
         {
             ImGui.SameLine();
-            ImGui.SetCursorPosY(textPos);
+            ImGui.SetCursorPosY(textPosY);
             ImGui.PushFont(UiBuilder.IconFont);
             UiSharedService.ColorText(FontAwesomeIcon.Eye.ToIconString(), ImGuiColors.ParsedGreen);
             ImGui.PopFont();
@@ -165,6 +165,15 @@ public class DrawUserPair : DrawPairBase
 
     private void DrawPairedClientMenu(Pair entry)
     {
+        if (!entry.IsPaused)
+        {
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.User, "Open Profile"))
+            {
+                _displayHandler.OpenProfile(entry);
+                ImGui.CloseCurrentPopup();
+            }
+            UiSharedService.AttachToolTip("Opens the profile for this user in a new window");
+        }
         if (entry.IsVisible)
         {
             if (UiSharedService.IconTextButton(FontAwesomeIcon.Sync, "Reload last data"))
@@ -175,6 +184,11 @@ public class DrawUserPair : DrawPairBase
             UiSharedService.AttachToolTip("This reapplies the last received character data to this character");
         }
 
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.PlayCircle, "Cycle pause state"))
+        {
+            _ = _apiController.CyclePause(entry.UserData);
+            ImGui.CloseCurrentPopup();
+        }
         var entryUID = entry.UserData.AliasOrUID;
         if (UiSharedService.IconTextButton(FontAwesomeIcon.Folder, "Pair Groups"))
         {

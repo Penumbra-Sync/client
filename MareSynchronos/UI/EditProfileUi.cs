@@ -100,6 +100,7 @@ public class EditProfileUi : WindowMediatorSubscriberBase
             ImGui.BeginDisabled();
             ImGui.Checkbox("Is NSFW", ref nsfw);
             ImGui.EndDisabled();
+            ImGui.NewLine();
             ImGui.PushFont(_uiBuilder.GetGameFontHandle(new GameFontStyle(GameFontFamilyAndSize.Axis12)).ImFont);
             UiSharedService.TextWrapped("Description:" + Environment.NewLine + profile.Description);
             ImGui.PopFont();

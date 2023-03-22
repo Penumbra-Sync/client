@@ -1,5 +1,4 @@
 ﻿using Dalamud.ContextMenu;
-using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Utility;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Comparer;
@@ -7,6 +6,7 @@ using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
@@ -18,14 +18,17 @@ public class Pair
     private readonly Func<OnlineUserIdentDto, CachedPlayer> _cachedPlayerFactory;
     private readonly MareConfigService _configService;
     private readonly ILogger<Pair> _logger;
+    private readonly MareMediator _mediator;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private OnlineUserIdentDto? _onlineUserIdentDto = null;
     private OptionalPluginWarning? _pluginWarnings;
 
-    public Pair(ILogger<Pair> logger, Func<OnlineUserIdentDto, CachedPlayer> cachedPlayerFactory, MareConfigService configService, ServerConfigurationManager serverConfigurationManager)
+    public Pair(ILogger<Pair> logger, Func<OnlineUserIdentDto, CachedPlayer> cachedPlayerFactory,
+        MareMediator mediator, MareConfigService configService, ServerConfigurationManager serverConfigurationManager)
     {
         _logger = logger;
         _cachedPlayerFactory = cachedPlayerFactory;
+        _mediator = mediator;
         _configService = configService;
         _serverConfigurationManager = serverConfigurationManager;
     }
@@ -45,6 +48,30 @@ public class Pair
     public UserData UserData => UserPair?.User ?? GroupPair.First().Value.User;
     public UserPairDto? UserPair { get; set; }
     private CachedPlayer? CachedPlayer { get; set; }
+
+    public void AddContextMenu(GameObjectContextMenuOpenArgs args)
+    {
+        if (CachedPlayer == null || args.ObjectId != CachedPlayer.PlayerCharacterId) return;
+
+        if (!IsPaused)
+        {
+            args.AddCustomItem(new GameObjectContextMenuItem("[Mare] Open Profile", (a) =>
+            {
+                _mediator.Publish(new ProfileOpenStandaloneMessage(this));
+            }));
+        }
+        args.AddCustomItem(new GameObjectContextMenuItem("[Mare] Reapply last data", (a) =>
+        {
+            ApplyLastReceivedData(true);
+        }, false));
+        if (UserPair != null && UserPair.OtherPermissions.IsPaired() && UserPair.OwnPermissions.IsPaired())
+        {
+            args.AddCustomItem(new GameObjectContextMenuItem("[Mare] Cycle pause state", (a) =>
+            {
+                _mediator.Publish(new CyclePauseMessage(UserData));
+            }, false));
+        }
+    }
 
     public void ApplyData(OnlineUserCharaDataDto data)
     {
@@ -171,15 +198,5 @@ public class Pair
         }
 
         return data;
-    }
-
-    public void AddContextMenu(GameObjectContextMenuOpenArgs args)
-    {
-        if (CachedPlayer == null || args.ObjectId != CachedPlayer.PlayerCharacterId) return;
-
-        args.AddCustomItem(new GameObjectContextMenuItem("Reapply last data", (a) =>
-        {
-            ApplyLastReceivedData(true);
-        } ,true));
     }
 }

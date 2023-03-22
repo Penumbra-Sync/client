@@ -21,6 +21,7 @@ public class MareConfig : IMareConfiguration
     public bool OpenPopupOnAdd { get; set; } = true;
     public int ParallelDownloads { get; set; } = 10;
     public float ProfileDelay { get; set; } = 2;
+    public bool ProfilePopoutRight { get; set; } = true;
     public bool ProfilesAllowNsfw { get; set; } = false;
     public bool ProfilesShow { get; set; } = true;
     public bool ReverseUserSort { get; set; } = false;
