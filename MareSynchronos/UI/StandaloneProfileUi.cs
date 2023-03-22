@@ -51,20 +51,20 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
 
             var mareProfile = _mareProfileManager.GetMareProfile(Pair.UserData);
 
-            if (_textureWrap == null || !mareProfile.Profile.ImageData.Value.SequenceEqual(_lastProfilePicture))
+            if (_textureWrap == null || !mareProfile.ImageData.Value.SequenceEqual(_lastProfilePicture))
             {
                 _textureWrap?.Dispose();
-                _lastProfilePicture = mareProfile.Profile.ImageData.Value;
+                _lastProfilePicture = mareProfile.ImageData.Value;
                 _textureWrap = _uiSharedService.LoadImage(_lastProfilePicture);
             }
 
-            if (_supporterTextureWrap == null || !mareProfile.Profile.SupporterImageData.Value.SequenceEqual(_lastSupporterPicture))
+            if (_supporterTextureWrap == null || !mareProfile.SupporterImageData.Value.SequenceEqual(_lastSupporterPicture))
             {
                 _supporterTextureWrap?.Dispose();
                 _supporterTextureWrap = null;
-                if (!string.IsNullOrEmpty(mareProfile.Profile.Base64SupporterPicture))
+                if (!string.IsNullOrEmpty(mareProfile.Base64SupporterPicture))
                 {
-                    _lastSupporterPicture = mareProfile.Profile.SupporterImageData.Value;
+                    _lastSupporterPicture = mareProfile.SupporterImageData.Value;
                     _supporterTextureWrap = _uiSharedService.LoadImage(_lastSupporterPicture);
                 }
             }
@@ -84,7 +84,7 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
             ImGuiHelpers.ScaledDummy(new Vector2(256, 256 + spacing.Y));
             var postDummy = ImGui.GetCursorPosY();
             ImGui.SameLine();
-            var descriptionTextSize = ImGui.CalcTextSize(mareProfile.Profile.Description, 256f);
+            var descriptionTextSize = ImGui.CalcTextSize(mareProfile.Description, 256f);
             var descriptionChildHeight = rectMax.Y - pos.Y - rectMin.Y - spacing.Y * 2;
             if (descriptionTextSize.Y > descriptionChildHeight && !_adjustedForScrollBars)
             {
@@ -105,7 +105,7 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
             if (ImGui.BeginChildFrame(1000, childFrame))
             {
                 ImGui.PushFont(_uiSharedService.GetGameFontHandle());
-                ImGui.TextWrapped(mareProfile.Profile.Description);
+                ImGui.TextWrapped(mareProfile.Description);
                 ImGui.PopFont();
             }
             ImGui.EndChildFrame();

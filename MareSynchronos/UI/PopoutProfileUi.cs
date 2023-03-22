@@ -87,20 +87,20 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
 
             var mareProfile = _mareProfileManager.GetMareProfile(_pair.UserData);
 
-            if (_textureWrap == null || !mareProfile.Profile.ImageData.Value.SequenceEqual(_lastProfilePicture))
+            if (_textureWrap == null || !mareProfile.ImageData.Value.SequenceEqual(_lastProfilePicture))
             {
                 _textureWrap?.Dispose();
-                _lastProfilePicture = mareProfile.Profile.ImageData.Value;
+                _lastProfilePicture = mareProfile.ImageData.Value;
                 _textureWrap = _uiSharedService.LoadImage(_lastProfilePicture);
             }
 
-            if (_supporterTextureWrap == null || !mareProfile.Profile.SupporterImageData.Value.SequenceEqual(_lastSupporterPicture))
+            if (_supporterTextureWrap == null || !mareProfile.SupporterImageData.Value.SequenceEqual(_lastSupporterPicture))
             {
                 _supporterTextureWrap?.Dispose();
                 _supporterTextureWrap = null;
-                if (!string.IsNullOrEmpty(mareProfile.Profile.Base64SupporterPicture))
+                if (!string.IsNullOrEmpty(mareProfile.Base64SupporterPicture))
                 {
-                    _lastSupporterPicture = mareProfile.Profile.SupporterImageData.Value;
+                    _lastSupporterPicture = mareProfile.SupporterImageData.Value;
                     _supporterTextureWrap = _uiSharedService.LoadImage(_lastSupporterPicture);
                 }
             }
@@ -155,7 +155,7 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
             ImGui.Separator();
             ImGui.PushFont(_uiSharedService.GetGameFontHandle());
             var remaining = ImGui.GetWindowContentRegionMax().Y - ImGui.GetCursorPosY();
-            var descText = mareProfile.Profile.Description;
+            var descText = mareProfile.Description;
             var textSize = ImGui.CalcTextSize(descText, 256f * ImGuiHelpers.GlobalScale);
             bool trimmed = textSize.Y > remaining;
             while (textSize.Y > remaining && descText.Contains(' '))
@@ -163,7 +163,7 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
                 descText = descText.Substring(0, descText.LastIndexOf(' ')).TrimEnd();
                 textSize = ImGui.CalcTextSize(descText + $"...{Environment.NewLine}[Open Full Profile for complete description]", 256f * ImGuiHelpers.GlobalScale);
             }
-            UiSharedService.TextWrapped(trimmed ? descText + $"...{Environment.NewLine}[Open Full Profile for complete description]" : mareProfile.Profile.Description);
+            UiSharedService.TextWrapped(trimmed ? descText + $"...{Environment.NewLine}[Open Full Profile for complete description]" : mareProfile.Description);
             ImGui.PopFont();
 
             var padding = ImGui.GetStyle().WindowPadding.X / 2;

@@ -20,9 +20,12 @@ public class EditProfileUi : WindowMediatorSubscriberBase
     private readonly MareProfileManager _mareProfileManager;
     private readonly UiBuilder _uiBuilder;
     private readonly UiSharedService _uiSharedService;
+    private bool _adjustedForScollBarsLocalProfile = false;
+    private bool _adjustedForScollBarsOnlineProfile = false;
     private string _descriptionText = string.Empty;
-    private bool _loadedPrior = false;
     private TextureWrap? _pfpTextureWrap;
+    private string _profileDescription = string.Empty;
+    private byte[] _profileImage = Array.Empty<byte>();
     private bool _showFileDialogError = false;
     private bool _wasOpen;
 
@@ -57,55 +60,63 @@ public class EditProfileUi : WindowMediatorSubscriberBase
 
     public override void Draw()
     {
-        _uiSharedService.BigText("Current Profile");
+        _uiSharedService.BigText("Current Profile (as saved on server)");
 
-        var (loaded, profile) = _mareProfileManager.GetMareProfile(new API.Data.UserData(_apiController.UID));
+        var profile = _mareProfileManager.GetMareProfile(new UserData(_apiController.UID));
 
-        if (!loaded)
+        if (profile.IsFlagged)
         {
-            _loadedPrior = false;
-            _descriptionText = string.Empty;
-            ImGui.TextUnformatted("Loading profile...");
+            UiSharedService.ColorTextWrapped(profile.Description, ImGuiColors.DalamudRed);
             return;
         }
-        else
-        {
-            if (profile.IsFlagged)
-            {
-                UiSharedService.ColorTextWrapped(profile.Description, ImGuiColors.DalamudRed);
-                return;
-            }
 
-            if (!_loadedPrior)
-            {
-                _descriptionText = profile.Description;
-                _loadedPrior = true;
-                _pfpTextureWrap?.Dispose();
-                _pfpTextureWrap = _uiBuilder.LoadImage(Convert.FromBase64String(profile.Base64ProfilePicture));
-            }
+        if (!_profileImage.SequenceEqual(profile.ImageData.Value))
+        {
+            _profileImage = profile.ImageData.Value;
+            _pfpTextureWrap?.Dispose();
+            _pfpTextureWrap = _uiBuilder.LoadImage(_profileImage);
+        }
+
+        if (!string.Equals(_profileDescription, profile.Description, StringComparison.OrdinalIgnoreCase))
+        {
+            _profileDescription = profile.Description;
+            _descriptionText = _profileDescription;
         }
 
         if (_pfpTextureWrap != null)
         {
-            ImGui.Image(_pfpTextureWrap.ImGuiHandle, new System.Numerics.Vector2(_pfpTextureWrap.Width, _pfpTextureWrap.Height));
+            ImGui.Image(_pfpTextureWrap.ImGuiHandle, ImGuiHelpers.ScaledVector2(_pfpTextureWrap.Width, _pfpTextureWrap.Height));
         }
 
         var spacing = ImGui.GetStyle().ItemSpacing.X;
         ImGui.SameLine(256 + spacing * 2);
-        var posX = ImGui.GetCursorPosX();
-        var width = UiSharedService.GetWindowContentRegionWidth() - posX + spacing * 2;
-        if (ImGui.BeginChildFrame(100, new System.Numerics.Vector2(width, 256)))
+        ImGui.PushFont(_uiBuilder.GetGameFontHandle(new GameFontStyle(GameFontFamilyAndSize.Axis12)).ImFont);
+        var descriptionTextSize = ImGui.CalcTextSize(profile.Description, 256f);
+        var childFrame = ImGuiHelpers.ScaledVector2(256 + ImGui.GetStyle().WindowPadding.X + ImGui.GetStyle().WindowBorderSize, 256);
+        if (descriptionTextSize.Y > childFrame.Y)
         {
-            var nsfw = profile.IsNSFW;
-            ImGui.BeginDisabled();
-            ImGui.Checkbox("Is NSFW", ref nsfw);
-            ImGui.EndDisabled();
-            ImGui.NewLine();
-            ImGui.PushFont(_uiBuilder.GetGameFontHandle(new GameFontStyle(GameFontFamilyAndSize.Axis12)).ImFont);
-            UiSharedService.TextWrapped("Description:" + Environment.NewLine + profile.Description);
-            ImGui.PopFont();
+            _adjustedForScollBarsOnlineProfile = true;
+        }
+        else
+        {
+            _adjustedForScollBarsOnlineProfile = false;
+        }
+        childFrame = childFrame with
+        {
+            X = childFrame.X + (_adjustedForScollBarsOnlineProfile ? ImGui.GetStyle().ScrollbarSize : 0),
+            Y = childFrame.Y / ImGuiHelpers.GlobalScale
+        };
+        if (ImGui.BeginChildFrame(101, childFrame))
+        {
+            UiSharedService.TextWrapped(profile.Description);
         }
         ImGui.EndChildFrame();
+        ImGui.PopFont();
+
+        var nsfw = profile.IsNSFW;
+        ImGui.BeginDisabled();
+        ImGui.Checkbox("Is NSFW", ref nsfw);
+        ImGui.EndDisabled();
 
         ImGui.Separator();
         _uiSharedService.BigText("Notes and Rules for Profiles");
@@ -166,11 +177,41 @@ public class EditProfileUi : WindowMediatorSubscriberBase
             _ = _apiController.UserSetProfile(new UserProfileDto(new UserData(_apiController.UID), false, isNsfw, null, null));
         }
         UiSharedService.DrawHelpText("If your profile description or image can be considered NSFW, toggle this to ON");
-        var widthTextBox = UiSharedService.GetWindowContentRegionWidth() - posX + spacing;
-        ImGui.TextUnformatted($"Description {_descriptionText.Length}/750");
+        var widthTextBox = 400;
+        var posX = ImGui.GetCursorPosX();
+        ImGui.TextUnformatted($"Description {_descriptionText.Length}/1500");
+        ImGui.SetCursorPosX(posX);
+        ImGuiHelpers.ScaledRelativeSameLine(widthTextBox, ImGui.GetStyle().ItemSpacing.X);
+        ImGui.TextUnformatted("Preview (approximate)");
         ImGui.PushFont(_uiBuilder.GetGameFontHandle(new GameFontStyle(GameFontFamilyAndSize.Axis12)).ImFont);
-        ImGui.InputTextMultiline("##description", ref _descriptionText, 750, new System.Numerics.Vector2(widthTextBox, 200));
+        ImGui.InputTextMultiline("##description", ref _descriptionText, 1500, ImGuiHelpers.ScaledVector2(widthTextBox, 200));
         ImGui.PopFont();
+
+        ImGui.SameLine();
+
+        ImGui.PushFont(_uiBuilder.GetGameFontHandle(new GameFontStyle(GameFontFamilyAndSize.Axis12)).ImFont);
+        var descriptionTextSizeLocal = ImGui.CalcTextSize(_descriptionText, 256f);
+        var childFrameLocal = ImGuiHelpers.ScaledVector2(256 + ImGui.GetStyle().WindowPadding.X + ImGui.GetStyle().WindowBorderSize, 200);
+        if (descriptionTextSizeLocal.Y > childFrameLocal.Y)
+        {
+            _adjustedForScollBarsLocalProfile = true;
+        }
+        else
+        {
+            _adjustedForScollBarsLocalProfile = false;
+        }
+        childFrameLocal = childFrameLocal with
+        {
+            X = childFrameLocal.X + (_adjustedForScollBarsLocalProfile ? ImGui.GetStyle().ScrollbarSize : 0),
+            Y = childFrameLocal.Y / ImGuiHelpers.GlobalScale
+        };
+        if (ImGui.BeginChildFrame(102, childFrameLocal))
+        {
+            UiSharedService.TextWrapped(_descriptionText);
+        }
+        ImGui.EndChildFrame();
+        ImGui.PopFont();
+
         if (UiSharedService.IconTextButton(FontAwesomeIcon.Save, "Save Description"))
         {
             _ = _apiController.UserSetProfile(new UserProfileDto(new UserData(_apiController.UID), false, null, null, _descriptionText));
