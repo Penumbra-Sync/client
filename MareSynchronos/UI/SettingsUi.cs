@@ -496,6 +496,14 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var showNsfwProfiles = _configService.Current.ProfilesAllowNsfw;
         var profileDelay = _configService.Current.ProfileDelay;
         var profileOnRight = _configService.Current.ProfilePopoutRight;
+        var enableRightClickMenu = _configService.Current.EnableRightClickMenus;
+
+        if (ImGui.Checkbox("Enable Game Right Click Menu Entries", ref enableRightClickMenu))
+        {
+            _configService.Current.EnableRightClickMenus = enableRightClickMenu;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("This will add Mare related right click menu entries in the game UI on paired players.");
 
         if (ImGui.Checkbox("Show separate Visible group", ref showVisibleSeparate))
         {

@@ -42,16 +42,6 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         _dalamudContextMenu.OnOpenGameObjectContextMenu += DalamudContextMenuOnOnOpenGameObjectContextMenu;
     }
 
-    private void DalamudContextMenuOnOnOpenGameObjectContextMenu(GameObjectContextMenuOpenArgs args)
-    {
-        if (args.ObjectId == 0xE000000) return;
-
-        foreach (var pair in _allClientPairs.Where((p => p.Value.IsVisible)))
-        {
-            pair.Value.AddContextMenu(args);
-        }
-    }
-
     public List<Pair> DirectPairs => _directPairsInternal.Value;
 
     public Dictionary<GroupFullInfoDto, List<Pair>> GroupPairs => _groupPairsInternal.Value;
@@ -337,6 +327,17 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         _dalamudContextMenu.OnOpenGameObjectContextMenu -= DalamudContextMenuOnOnOpenGameObjectContextMenu;
 
         DisposePairs();
+    }
+
+    private void DalamudContextMenuOnOnOpenGameObjectContextMenu(GameObjectContextMenuOpenArgs args)
+    {
+        if (args.ObjectId == 0xE000000) return;
+        if (!_configurationService.Current.EnableRightClickMenus) return;
+
+        foreach (var pair in _allClientPairs.Where((p => p.Value.IsVisible)))
+        {
+            pair.Value.AddContextMenu(args);
+        }
     }
 
     private void DalamudUtilOnDelayedFrameworkUpdate()
