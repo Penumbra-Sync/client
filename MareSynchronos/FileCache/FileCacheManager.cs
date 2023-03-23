@@ -29,9 +29,18 @@ public sealed class FileCacheManager : IDisposable
 
         lock (_fileWriteLock)
         {
-            if (File.Exists(CsvBakPath))
+            try
             {
-                File.Move(CsvBakPath, _csvPath, overwrite: true);
+                if (File.Exists(CsvBakPath))
+                {
+                    File.Move(CsvBakPath, _csvPath, overwrite: true);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to move BAK to ORG, deleting BAK");
+                if (File.Exists(CsvBakPath))
+                    File.Delete(CsvBakPath);
             }
         }
 
