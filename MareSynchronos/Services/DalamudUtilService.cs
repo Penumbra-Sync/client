@@ -92,18 +92,6 @@ public class DalamudUtilService : IHostedService
         return (IntPtr)mgr->LookupBuddyByOwnerObject((BattleChara*)playerPointer);
     }
 
-    public int? GetIndexFromObjectTableByName(string characterName)
-    {
-        for (int i = 0; i < _objectTable.Length; i++)
-        {
-            if (_objectTable[i] == null) continue;
-            if (_objectTable[i]!.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) continue;
-            if (string.Equals(_objectTable[i]!.Name.ToString(), characterName, StringComparison.Ordinal)) return i;
-        }
-
-        return null;
-    }
-
     public unsafe IntPtr GetMinion(IntPtr? playerPointer = null)
     {
         playerPointer ??= PlayerPointer;

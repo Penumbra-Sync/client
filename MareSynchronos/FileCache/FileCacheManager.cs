@@ -131,11 +131,6 @@ public sealed class FileCacheManager : IDisposable
         }
     }
 
-    public string ResolveFileReplacement(string gamePath)
-    {
-        return _ipcManager.PenumbraResolvePath(gamePath);
-    }
-
     public void UpdateHash(FileCacheEntity fileCache)
     {
         _logger.LogTrace("Updating hash for {path}", fileCache.ResolvedFilepath);

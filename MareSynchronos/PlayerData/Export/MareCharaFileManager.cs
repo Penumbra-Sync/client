@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Interop;
 using MareSynchronos.Services;
+using MareSynchronos.Utils;
 
 namespace MareSynchronos.PlayerData.Export;
 
@@ -64,7 +65,7 @@ public class MareCharaFileManager
                 var applicationId = Guid.NewGuid();
                 _ipcManager.ToggleGposeQueueMode(on: true);
                 _ipcManager.PenumbraRemoveTemporaryCollection(_logger, applicationId, charaTarget.Name.TextValue);
-                _ipcManager.PenumbraSetTemporaryMods(_logger, applicationId, charaTarget.Name.TextValue,
+                _ipcManager.PenumbraSetTemporaryMods(_logger, applicationId, charaTarget.Name.TextValue, charaTarget.ObjectTableIndex(),
                     extractedFiles.Union(fileSwaps).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal),
                     LoadedCharaFile.CharaFileData.ManipulationData);
                 using GameObjectHandler tempHandler = _gameObjectHandlerFactory(ObjectKind.Player, () => charaTarget.Address, false);
