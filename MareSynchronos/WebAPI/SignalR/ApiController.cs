@@ -12,6 +12,8 @@ using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Services;
+using MareSynchronos.API.Data.Extensions;
+using MareSynchronos.API.Data;
 
 namespace MareSynchronos.WebAPI;
 
@@ -46,6 +48,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         Mediator.Subscribe<HubClosedMessage>(this, (msg) => MareHubOnClosed(msg.Exception));
         Mediator.Subscribe<HubReconnectedMessage>(this, (msg) => _ = Task.Run(MareHubOnReconnected));
         Mediator.Subscribe<HubReconnectingMessage>(this, (msg) => MareHubOnReconnecting(msg.Exception));
+        Mediator.Subscribe<CyclePauseMessage>(this, (msg) => CyclePause(msg.UserData));
 
         ServerState = ServerState.Offline;
 
@@ -56,12 +59,19 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
     }
 
     public string AuthFailureMessage { get; private set; } = string.Empty;
+
     public Version CurrentClientVersion => _connectionDto?.CurrentClientVersion ?? new Version(0, 0, 0);
+
     public string DisplayName => _connectionDto?.User.AliasOrUID ?? string.Empty;
+
     public bool IsConnected => ServerState == ServerState.Connected;
+
     public bool IsCurrentVersion => (Assembly.GetExecutingAssembly().GetName().Version ?? new Version(0, 0, 0, 0)) >= (_connectionDto?.CurrentClientVersion ?? new Version(0, 0, 0, 0));
+
     public int OnlineUsers => SystemInfoDto.OnlineUsers;
+
     public bool ServerAlive => ServerState is ServerState.Connected or ServerState.RateLimited or ServerState.Unauthorized or ServerState.Disconnected;
+
     public ServerInfo ServerInfo => _connectionDto?.ServerInfo ?? new ServerInfo();
 
     public ServerState ServerState
@@ -75,6 +85,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
     }
 
     public SystemInfoDto SystemInfoDto { get; private set; } = new();
+
     public string UID => _connectionDto?.User.UID ?? string.Empty;
 
     public async Task<bool> CheckClientHealth()
@@ -188,6 +199,29 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                 await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token).ConfigureAwait(false);
             }
         }
+    }
+
+    public Task CyclePause(UserData userData)
+    {
+        CancellationTokenSource cts = new();
+        cts.CancelAfter(TimeSpan.FromSeconds(5));
+        Task.Run(async () =>
+        {
+            var pair = _pairManager.GetOnlineUserPairs().Single(p => p.UserPair != null && p.UserData == userData);
+            var perm = pair.UserPair!.OwnPermissions;
+            perm.SetPaused(true);
+            await UserSetPairPermissions(new API.Dto.User.UserPermissionsDto(userData, perm)).ConfigureAwait(false);
+            // wait until it's changed
+            while (pair.UserPair!.OwnPermissions != perm)
+            {
+                await Task.Delay(250, cts.Token).ConfigureAwait(false);
+                Logger.LogTrace("Waiting for permissions change for {data}", userData);
+            }
+            perm.SetPaused(false);
+            await UserSetPairPermissions(new API.Dto.User.UserPermissionsDto(userData, perm)).ConfigureAwait(false);
+        }, cts.Token).ContinueWith((t) => cts.Dispose());
+
+        return Task.CompletedTask;
     }
 
     public async Task<ConnectionDto> GetConnectionDto()

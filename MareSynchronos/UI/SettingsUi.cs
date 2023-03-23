@@ -495,6 +495,15 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var showProfiles = _configService.Current.ProfilesShow;
         var showNsfwProfiles = _configService.Current.ProfilesAllowNsfw;
         var profileDelay = _configService.Current.ProfileDelay;
+        var profileOnRight = _configService.Current.ProfilePopoutRight;
+        var enableRightClickMenu = _configService.Current.EnableRightClickMenus;
+
+        if (ImGui.Checkbox("Enable Game Right Click Menu Entries", ref enableRightClickMenu))
+        {
+            _configService.Current.EnableRightClickMenus = enableRightClickMenu;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("This will add Mare related right click menu entries in the game UI on paired players.");
 
         if (ImGui.Checkbox("Show separate Visible group", ref showVisibleSeparate))
         {
@@ -526,6 +535,13 @@ public class SettingsUi : WindowMediatorSubscriberBase
         UiSharedService.DrawHelpText("This will show the configured user profile after a set delay");
         ImGui.Indent();
         if (!showProfiles) ImGui.BeginDisabled();
+        if (ImGui.Checkbox("Popout profiles on the right", ref profileOnRight))
+        {
+            _configService.Current.ProfilePopoutRight = profileOnRight;
+            _configService.Save();
+            Mediator.Publish(new CompactUiChange(Vector2.Zero, Vector2.Zero));
+        }
+        UiSharedService.DrawHelpText("Will show profiles on the right side of the main UI");
         if (ImGui.Checkbox("Show profiles marked as NSFW", ref showNsfwProfiles))
         {
             Mediator.Publish(new ClearProfileDataMessage());

@@ -46,6 +46,8 @@ public class CompactUi : WindowMediatorSubscriberBase
     private string _characterOrCommentFilter = string.Empty;
     private Pair? _lastAddedUser;
     private string _lastAddedUserComment = string.Empty;
+    private Vector2 _lastPosition = Vector2.One;
+    private Vector2 _lastSize = Vector2.One;
     private string _pairToAdd = string.Empty;
     private int _secretKeyIdx = 0;
     private bool _showModalForUserAddition;
@@ -197,6 +199,15 @@ public class CompactUi : WindowMediatorSubscriberBase
             UiSharedService.SetScaledWindowSize(275);
             ImGui.EndPopup();
         }
+
+        var pos = ImGui.GetWindowPos();
+        var size = ImGui.GetWindowSize();
+        if (_lastSize != size || _lastPosition != pos)
+        {
+            _lastSize = size;
+            _lastPosition = pos;
+            Mediator.Publish(new CompactUiChange(_lastSize, _lastPosition));
+        }
     }
 
     public override void OnClose()
@@ -344,52 +355,6 @@ public class CompactUi : WindowMediatorSubscriberBase
             ImGuiComponents.DisabledButton(button);
             UiSharedService.AttachToolTip($"Next execution is available at {availableAt} seconds");
         }
-    }
-
-    private void DrawPairedClientMenu(Pair entry)
-    {
-        if (entry.IsVisible)
-        {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Sync, "Reload last data"))
-            {
-                entry.ApplyLastReceivedData(forced: true);
-                ImGui.CloseCurrentPopup();
-            }
-            UiSharedService.AttachToolTip("This reapplies the last received character data to this character");
-        }
-
-        var entryUID = entry.UserData.AliasOrUID;
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Folder, "Pair Groups"))
-        {
-            _selectGroupForPairUi.Open(entry);
-        }
-        UiSharedService.AttachToolTip("Choose pair groups for " + entryUID);
-
-        var isDisableSounds = entry.UserPair!.OwnPermissions.IsDisableSounds();
-        string disableSoundsText = isDisableSounds ? "Enable sound sync" : "Disable sound sync";
-        var disableSoundsIcon = isDisableSounds ? FontAwesomeIcon.VolumeUp : FontAwesomeIcon.VolumeMute;
-        if (UiSharedService.IconTextButton(disableSoundsIcon, disableSoundsText))
-        {
-            var permissions = entry.UserPair.OwnPermissions;
-            permissions.SetDisableSounds(!isDisableSounds);
-            _ = _apiController.UserSetPairPermissions(new UserPermissionsDto(entry.UserData, permissions));
-        }
-
-        var isDisableAnims = entry.UserPair!.OwnPermissions.IsDisableAnimations();
-        string disableAnimsText = isDisableAnims ? "Enable animation sync" : "Disable animation sync";
-        var disableAnimsIcon = isDisableAnims ? FontAwesomeIcon.Running : FontAwesomeIcon.Stop;
-        if (UiSharedService.IconTextButton(disableAnimsIcon, disableAnimsText))
-        {
-            var permissions = entry.UserPair.OwnPermissions;
-            permissions.SetDisableAnimations(!isDisableAnims);
-            _ = _apiController.UserSetPairPermissions(new UserPermissionsDto(entry.UserData, permissions));
-        }
-
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Unpair Permanently") && UiSharedService.CtrlPressed())
-        {
-            _ = _apiController.UserRemovePair(new(entry.UserData));
-        }
-        UiSharedService.AttachToolTip("Hold CTRL and click to unpair permanently from " + entryUID);
     }
 
     private void DrawPairList()

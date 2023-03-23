@@ -11,10 +11,10 @@ public abstract class DrawPairBase
 {
     protected static bool _showModalReport = false;
     protected readonly ApiController _apiController;
+    protected readonly UidDisplayHandler _displayHandler;
     protected Pair _pair;
     private static bool _reportPopupOpen = false;
     private static string _reportReason = string.Empty;
-    private readonly UidDisplayHandler _displayHandler;
     private readonly string _id;
 
     protected DrawPairBase(string id, Pair entry, ApiController apiController, UidDisplayHandler uIDDisplayHandler)

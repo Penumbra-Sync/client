@@ -69,10 +69,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<FileTransferOrchestrator>();
             collection.AddSingleton<MarePlugin>();
             collection.AddSingleton<MareProfileManager>();
-            collection.AddSingleton<UidDisplayHandler>((s) => new UidDisplayHandler(s.GetRequiredService<ILogger<UidDisplayHandler>>(), pluginInterface.UiBuilder,
-                s.GetRequiredService<MareProfileManager>(),
-                s.GetRequiredService<UiSharedService>(), s.GetRequiredService<PairManager>(),
-                s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<MareConfigService>()));
+            collection.AddSingleton<UidDisplayHandler>();
             collection.AddSingleton((s) => new DalamudUtilService(s.GetRequiredService<ILogger<DalamudUtilService>>(),
                 clientState, objectTable, framework, gameGui, condition, gameData,
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<PerformanceCollectorService>()));
@@ -109,6 +106,7 @@ public sealed class Plugin : IDalamudPlugin
                 new Func<Pair>(()
                     => new Pair(s.GetRequiredService<ILogger<Pair>>(),
                         s.GetRequiredService<Func<OnlineUserIdentDto, CachedPlayer>>(),
+                        s.GetRequiredService<MareMediator>(),
                         s.GetRequiredService<MareConfigService>(),
                         s.GetRequiredService<ServerConfigurationManager>())));
             collection.AddSingleton(s =>
@@ -117,6 +115,13 @@ public sealed class Plugin : IDalamudPlugin
                         s.GetRequiredService<MareMediator>(),
                         s.GetRequiredService<FileTransferOrchestrator>(),
                         s.GetRequiredService<FileCacheManager>())));
+            collection.AddSingleton(s =>
+                new Func<Pair, StandaloneProfileUi>((pair) =>
+                    new StandaloneProfileUi(s.GetRequiredService<ILogger<StandaloneProfileUi>>(),
+                    s.GetRequiredService<MareMediator>(),
+                    s.GetRequiredService<UiSharedService>(),
+                    s.GetRequiredService<ServerConfigurationManager>(),
+                    s.GetRequiredService<MareProfileManager>(), pair)));
 
             // add scoped services
             collection.AddScoped<PeriodicFileScanner>();
@@ -125,6 +130,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddScoped<WindowMediatorSubscriberBase, GposeUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, IntroUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, DownloadUi>();
+            collection.AddScoped<WindowMediatorSubscriberBase, PopoutProfileUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, EditProfileUi>((s) => new EditProfileUi(s.GetRequiredService<ILogger<EditProfileUi>>(),
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<ApiController>(), pluginInterface.UiBuilder, s.GetRequiredService<UiSharedService>(),
                 s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareProfileManager>()));
@@ -133,7 +139,8 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddScoped<PlayerDataFactory>();
             collection.AddScoped<OnlinePlayerManager>();
             collection.AddScoped((s) => new UiService(s.GetRequiredService<ILogger<UiService>>(), pluginInterface, s.GetRequiredService<MareConfigService>(),
-                s.GetRequiredService<WindowSystem>(), s.GetServices<WindowMediatorSubscriberBase>(), s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareMediator>()));
+                s.GetRequiredService<WindowSystem>(), s.GetServices<WindowMediatorSubscriberBase>(), s.GetRequiredService<Func<Pair, StandaloneProfileUi>>(),
+                s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareMediator>()));
             collection.AddScoped((s) => new CommandManagerService(commandManager, s.GetRequiredService<PerformanceCollectorService>(), s.GetRequiredService<UiService>(),
                 s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<PeriodicFileScanner>(), s.GetRequiredService<ApiController>(), s.GetRequiredService<MareMediator>()));
             collection.AddScoped((s) => new NotificationService(s.GetRequiredService<ILogger<NotificationService>>(),

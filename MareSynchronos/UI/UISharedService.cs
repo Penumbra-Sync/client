@@ -1,9 +1,11 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.GameFonts;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Plugin;
 using Dalamud.Utility;
 using ImGuiNET;
+using ImGuiScene;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
 using MareSynchronos.Localization;
@@ -43,17 +45,11 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     private readonly MareConfigService _configService;
 
     private readonly DalamudUtilService _dalamudUtil;
-
     private readonly IpcManager _ipcManager;
-
     private readonly Dalamud.Localization _localization;
-
     private readonly DalamudPluginInterface _pluginInterface;
-
     private readonly Dictionary<string, object> _selectedComboItems = new(StringComparer.Ordinal);
-
     private readonly ServerConfigurationManager _serverConfigurationManager;
-
     private bool _cacheDirectoryHasOtherFilesThanCache = false;
 
     private bool _cacheDirectoryIsValidPath = true;
@@ -78,7 +74,8 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     private int _serverSelectionIndex = -1;
 
-    public UiSharedService(ILogger<UiSharedService> logger, IpcManager ipcManager, ApiController apiController, PeriodicFileScanner cacheScanner, FileDialogManager fileDialogManager,
+    public UiSharedService(ILogger<UiSharedService> logger, IpcManager ipcManager, ApiController apiController,
+        PeriodicFileScanner cacheScanner, FileDialogManager fileDialogManager,
         MareConfigService configService, DalamudUtilService dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization,
         ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
     {
@@ -760,6 +757,16 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     [LibraryImport("user32")]
     internal static partial short GetKeyState(int nVirtKey);
+
+    internal ImFontPtr GetGameFontHandle()
+    {
+        return _pluginInterface.UiBuilder.GetGameFontHandle(new GameFontStyle(GameFontFamilyAndSize.Axis12)).ImFont;
+    }
+
+    internal TextureWrap LoadImage(byte[] imageData)
+    {
+        return _pluginInterface.UiBuilder.LoadImage(imageData);
+    }
 
     protected override void Dispose(bool disposing)
     {

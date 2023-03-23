@@ -5,22 +5,23 @@ using MareSynchronos.UI;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
+using MareSynchronos.PlayerData.Pairs;
 
 namespace MareSynchronos.Services;
 
-public sealed class UiService : IDisposable
+public sealed class UiService : DisposableMediatorSubscriberBase
 {
+    private readonly List<WindowMediatorSubscriberBase> _createdWindows = new();
     private readonly DalamudPluginInterface _dalamudPluginInterface;
     private readonly FileDialogManager _fileDialogManager;
     private readonly ILogger<UiService> _logger;
     private readonly MareConfigService _mareConfigService;
-    private readonly MareMediator _mareMediator;
     private readonly WindowSystem _windowSystem;
 
     public UiService(ILogger<UiService> logger, DalamudPluginInterface dalamudPluginInterface,
         MareConfigService mareConfigService, WindowSystem windowSystem,
-        IEnumerable<WindowMediatorSubscriberBase> windows,
-        FileDialogManager fileDialogManager, MareMediator mareMediator)
+        IEnumerable<WindowMediatorSubscriberBase> windows, Func<Pair, StandaloneProfileUi> standaloneProfileUiFactory,
+        FileDialogManager fileDialogManager, MareMediator mareMediator) : base(logger, mareMediator)
     {
         _logger = logger;
         _logger.LogTrace("Creating {type}", GetType().Name);
@@ -28,7 +29,6 @@ public sealed class UiService : IDisposable
         _mareConfigService = mareConfigService;
         _windowSystem = windowSystem;
         _fileDialogManager = fileDialogManager;
-        _mareMediator = mareMediator;
 
         _dalamudPluginInterface.UiBuilder.DisableGposeUiHide = true;
         _dalamudPluginInterface.UiBuilder.Draw += Draw;
@@ -38,24 +38,49 @@ public sealed class UiService : IDisposable
         {
             _windowSystem.AddWindow(window);
         }
-    }
 
-    public void Dispose()
-    {
-        _logger.LogTrace("Disposing {type}", GetType().Name);
+        Mediator.Subscribe<ProfileOpenStandaloneMessage>(this, (msg) =>
+        {
+            if (!_createdWindows.Any(p => p is StandaloneProfileUi
+            && string.Equals(((StandaloneProfileUi)p).Pair.UserData.AliasOrUID, msg.Pair.UserData.AliasOrUID, StringComparison.Ordinal)))
+            {
+                var window = standaloneProfileUiFactory(msg.Pair);
+                _createdWindows.Add(window);
+                _windowSystem.AddWindow(window);
+            }
+        });
 
-        _windowSystem.RemoveAllWindows();
-
-        _dalamudPluginInterface.UiBuilder.Draw -= Draw;
-        _dalamudPluginInterface.UiBuilder.OpenConfigUi -= ToggleUi;
+        Mediator.Subscribe<RemoveWindowMessage>(this, (msg) =>
+        {
+            _windowSystem.RemoveWindow(msg.Window);
+            _createdWindows.Remove(msg.Window);
+            msg.Window.Dispose();
+        });
     }
 
     public void ToggleUi()
     {
         if (_mareConfigService.Current.HasValidSetup())
-            _mareMediator.Publish(new UiToggleMessage(typeof(CompactUi)));
+            Mediator.Publish(new UiToggleMessage(typeof(CompactUi)));
         else
-            _mareMediator.Publish(new UiToggleMessage(typeof(IntroUi)));
+            Mediator.Publish(new UiToggleMessage(typeof(IntroUi)));
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+
+        _logger.LogTrace("Disposing {type}", GetType().Name);
+
+        _windowSystem.RemoveAllWindows();
+
+        foreach (var window in _createdWindows)
+        {
+            window.Dispose();
+        }
+
+        _dalamudPluginInterface.UiBuilder.Draw -= Draw;
+        _dalamudPluginInterface.UiBuilder.OpenConfigUi -= ToggleUi;
     }
 
     private void Draw()

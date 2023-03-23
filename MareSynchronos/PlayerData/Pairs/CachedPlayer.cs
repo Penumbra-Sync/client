@@ -57,14 +57,15 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         Mods = 4
     }
 
-    public string? PlayerName { get; private set; }
-    public string PlayerNameHash => OnlineUser.Ident;
-    private OnlineUserIdentDto OnlineUser { get; set; }
     public IntPtr PlayerCharacter => _charaHandler?.Address ?? IntPtr.Zero;
 
     public unsafe uint PlayerCharacterId => (_charaHandler?.Address ?? IntPtr.Zero) == IntPtr.Zero
         ? uint.MaxValue
         : ((GameObject*)_charaHandler.Address)->ObjectID;
+
+    public string? PlayerName { get; private set; }
+    public string PlayerNameHash => OnlineUser.Ident;
+    private OnlineUserIdentDto OnlineUser { get; set; }
 
     public void ApplyCharacterData(CharacterData characterData, OptionalPluginWarning warning, bool forced = false)
     {
@@ -339,21 +340,21 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             }
 
             bool heelsOffsetDifferent = oldData.HeelsOffset != newData.HeelsOffset;
-            if (heelsOffsetDifferent || forced)
+            if (heelsOffsetDifferent || (forced && newData.HeelsOffset != 0))
             {
                 Logger.LogDebug("Updating {object}/{kind} (Diff heels data) => {change}", this, objectKind, PlayerChanges.Heels);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.Heels);
             }
 
             bool customizeDataDifferent = !string.Equals(oldData.CustomizePlusData, newData.CustomizePlusData, StringComparison.Ordinal);
-            if (customizeDataDifferent || forced)
+            if (customizeDataDifferent || (forced && !string.IsNullOrEmpty(newData.CustomizePlusData)))
             {
                 Logger.LogDebug("Updating {object}/{kind} (Diff customize data) => {change}", this, objectKind, PlayerChanges.Customize);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.Customize);
             }
 
             bool palettePlusDataDifferent = !string.Equals(oldData.PalettePlusData, newData.PalettePlusData, StringComparison.Ordinal);
-            if (palettePlusDataDifferent || forced)
+            if (palettePlusDataDifferent || (forced && !string.IsNullOrEmpty(newData.PalettePlusData)))
             {
                 Logger.LogDebug("Updating {object}/{kind} (Diff palette data) => {change}", this, objectKind, PlayerChanges.Palette);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.Palette);
