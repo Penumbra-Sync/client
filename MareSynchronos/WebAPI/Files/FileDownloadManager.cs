@@ -28,7 +28,10 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         _downloadStatus = new Dictionary<string, FileDownloadStatus>(StringComparer.Ordinal);
         _orchestrator = orchestrator;
         _fileDbManager = fileCacheManager;
+    }
 
+    public void Initialize()
+    {
         Mediator.Subscribe<DownloadReadyMessage>(this, (msg) =>
         {
             if (_downloadReady.ContainsKey(msg.RequestId))

@@ -45,7 +45,7 @@ public class ConfigurationMigrator : IHostedService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning("Failed to migrate, skipping", ex);
+                _logger.LogWarning(ex, "Failed to migrate, skipping");
             }
         }
 
@@ -66,7 +66,7 @@ public class ConfigurationMigrator : IHostedService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning("Failed to migrate ServerConfig", ex);
+                _logger.LogWarning(ex,"Failed to migrate ServerConfig");
             }
         }
     }

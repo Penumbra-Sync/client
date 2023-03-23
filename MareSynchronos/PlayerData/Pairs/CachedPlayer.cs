@@ -124,6 +124,8 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             }
         });
 
+        _downloadManager.Initialize();
+
         Logger.LogDebug("Initializing Player {obj}", this);
     }
 
@@ -184,7 +186,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                         }
                         catch (InvalidOperationException ex)
                         {
-                            Logger.LogWarning("Failed disposing player (not present anymore?)", ex);
+                            Logger.LogWarning(ex, "Failed disposing player (not present anymore?)");
                             break;
                         }
                     }
@@ -459,7 +461,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogInformation("[{applicationId}] Cancelled, reason: {msg}", _applicationId, ex.Message);
+                    Logger.LogWarning(ex, "[{applicationId}] Cancelled", _applicationId);
                 }
             }, token);
         }, downloadToken);
