@@ -274,7 +274,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         return _heelsGetOffset.InvokeFunc();
     }
 
-    public string? GetPenumbraModDirectory()
+    private string? GetPenumbraModDirectoryInternal()
     {
         if (!CheckPenumbraApi()) return null;
         return _penumbraResolveModDir!.Invoke().ToLowerInvariant();
@@ -594,7 +594,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         _heelsAvailable = CheckHeelsApiInternal();
         _customizePlusAvailable = CheckCustomizePlusApiInternal();
         _palettePlusAvailable = CheckPalettePlusApiInternal();
-        PenumbraModDirectory = GetPenumbraModDirectory();
+        PenumbraModDirectory = GetPenumbraModDirectoryInternal();
     }
 
     private void RedrawEvent(IntPtr objectAddress, int objectTableIndex)
