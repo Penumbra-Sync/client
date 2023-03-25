@@ -74,9 +74,7 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
             var rectMax = drawList.GetClipRectMax();
             var headerSize = ImGui.GetCursorPosY() - ImGui.GetStyle().WindowPadding.Y;
 
-            if (_uiSharedService.UidFontBuilt) ImGui.PushFont(_uiSharedService.UidFont);
-            UiSharedService.ColorText(Pair.UserData.AliasOrUID, ImGuiColors.HealerGreen);
-            if (_uiSharedService.UidFontBuilt) ImGui.PopFont();
+            UiSharedService.ColorFontText(Pair.UserData.AliasOrUID, _uiSharedService.UidFont, ImGuiColors.HealerGreen);
             ImGuiHelpers.ScaledDummy(new Vector2(spacing.Y, spacing.Y));
             var textPos = ImGui.GetCursorPosY() - headerSize;
             ImGui.Separator();
@@ -104,9 +102,7 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
             };
             if (ImGui.BeginChildFrame(1000, childFrame))
             {
-                ImGui.PushFont(_uiSharedService.GetGameFontHandle());
-                ImGui.TextWrapped(mareProfile.Description);
-                ImGui.PopFont();
+                UiSharedService.FontText(mareProfile.Description, _uiSharedService.GetGameFontHandle(), true);
             }
             ImGui.EndChildFrame();
 

@@ -12,15 +12,15 @@ using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.ServerConfiguration;
-using MareSynchronos.UI.Components;
 using MareSynchronos.UI.Handlers;
+using MareSynchronos.Services.Mediator;
+using Microsoft.Extensions.Logging;
 
-namespace MareSynchronos.UI;
+namespace MareSynchronos.UI.Components;
 
-internal sealed class GroupPanel
+public sealed class GroupPanel : MediatorSubscriberBase
 {
     private readonly Dictionary<string, bool> _expandedGroupState = new(StringComparer.Ordinal);
-    private readonly CompactUi _mainUi;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly Dictionary<string, bool> _showGidForEntry = new(StringComparer.Ordinal);
@@ -29,6 +29,7 @@ internal sealed class GroupPanel
     private List<BannedGroupUserDto> _bannedUsers = new();
     private int _bulkInviteCount = 10;
     private List<string> _bulkOneTimeInvites = new();
+    private float _contentWidth = 0;
     private string _editGroupComment = string.Empty;
     private string _editGroupEntry = string.Empty;
     private bool _errorGroupCreate = false;
@@ -46,14 +47,20 @@ internal sealed class GroupPanel
     private bool _showModalEnterPassword;
     private string _syncShellPassword = string.Empty;
     private string _syncShellToJoin = string.Empty;
+    private float _transferPartHeight = 0;
 
-    public GroupPanel(CompactUi mainUi, UiSharedService uiShared, PairManager pairManager, UidDisplayHandler uidDisplayHandler, ServerConfigurationManager serverConfigurationManager)
+    public GroupPanel(ILogger<GroupPanel> logger, MareMediator mediator, UiSharedService uiShared, PairManager pairManager, UidDisplayHandler uidDisplayHandler, ServerConfigurationManager serverConfigurationManager) : base(logger, mediator)
     {
-        _mainUi = mainUi;
         _uiShared = uiShared;
         _pairManager = pairManager;
         _uidDisplayHandler = uidDisplayHandler;
         _serverConfigurationManager = serverConfigurationManager;
+
+        mediator.Subscribe<CompactUiContentChangeMessage>(this, (msg) =>
+        {
+            _transferPartHeight = msg.CentralPartHeight;
+            _contentWidth = msg.ContentWidth;
+        });
     }
 
     private ApiController ApiController => _uiShared.ApiController;
@@ -62,7 +69,6 @@ internal sealed class GroupPanel
     {
         UiSharedService.DrawWithID("addsyncshell", DrawAddSyncshell);
         UiSharedService.DrawWithID("syncshelllist", DrawSyncshellList);
-        _mainUi.TransferPartHeight = ImGui.GetCursorPosY();
     }
 
     private void DrawAddSyncshell()
@@ -99,8 +105,8 @@ internal sealed class GroupPanel
             }
         }
         UiSharedService.AttachToolTip(_syncShellToJoin.IsNullOrEmpty()
-            ? (userCanCreateMoreGroups ? "Create Syncshell" : $"You cannot create more than {ApiController.ServerInfo.MaxGroupsCreatedByUser} Syncshells")
-            : (userCanJoinMoreGroups ? "Join Syncshell" + _syncShellToJoin : $"You cannot join more than {ApiController.ServerInfo.MaxGroupsJoinedByUser} Syncshells"));
+            ? userCanCreateMoreGroups ? "Create Syncshell" : $"You cannot create more than {ApiController.ServerInfo.MaxGroupsCreatedByUser} Syncshells"
+            : userCanJoinMoreGroups ? "Join Syncshell" + _syncShellToJoin : $"You cannot join more than {ApiController.ServerInfo.MaxGroupsJoinedByUser} Syncshells");
 
         if (ImGui.BeginPopupModal("Enter Syncshell Password", ref _showModalEnterPassword, UiSharedService.PopupWindowFlags))
         {
@@ -111,9 +117,9 @@ internal sealed class GroupPanel
             ImGui.InputTextWithHint("##password", _syncShellToJoin + " Password", ref _syncShellPassword, 255, ImGuiInputTextFlags.Password);
             if (_errorGroupJoin)
             {
-                UiSharedService.ColorTextWrapped($"An error occured during joining of this Syncshell: you either have joined the maximum amount of Syncshells ({ApiController.ServerInfo.MaxGroupsJoinedByUser}), " +
+                UiSharedService.ColorText($"An error occured during joining of this Syncshell: you either have joined the maximum amount of Syncshells ({ApiController.ServerInfo.MaxGroupsJoinedByUser}), " +
                     $"it does not exist, the password you entered is wrong, you already joined the Syncshell, the Syncshell is full ({ApiController.ServerInfo.MaxGroupUserCount} users) or the Syncshell has closed invites.",
-                    new Vector4(1, 0, 0, 1));
+                    new Vector4(1, 0, 0, 1), true);
             }
             if (ImGui.Button("Join " + _syncShellToJoin))
             {
@@ -165,8 +171,8 @@ internal sealed class GroupPanel
 
             if (_errorGroupCreate)
             {
-                UiSharedService.ColorTextWrapped("You are already owner of the maximum amount of Syncshells (3) or joined the maximum amount of Syncshells (6). Relinquish ownership of your own Syncshells to someone else or leave existing Syncshells.",
-                    new Vector4(1, 0, 0, 1));
+                UiSharedService.ColorText("You are already owner of the maximum amount of Syncshells (3) or joined the maximum amount of Syncshells (6). Relinquish ownership of your own Syncshells to someone else or leave existing Syncshells.",
+                    new Vector4(1, 0, 0, 1), true);
             }
 
             UiSharedService.SetScaledWindowSize(350);
@@ -208,17 +214,13 @@ internal sealed class GroupPanel
 
         if (string.Equals(groupDto.OwnerUID, ApiController.UID, StringComparison.Ordinal))
         {
-            ImGui.PushFont(UiBuilder.IconFont);
-            ImGui.Text(FontAwesomeIcon.Crown.ToIconString());
-            ImGui.PopFont();
+            UiSharedService.Icon(FontAwesomeIcon.Crown);
             UiSharedService.AttachToolTip("You are the owner of Syncshell " + groupName);
             ImGui.SameLine();
         }
         else if (groupDto.GroupUserInfo.IsModerator())
         {
-            ImGui.PushFont(UiBuilder.IconFont);
-            ImGui.Text(FontAwesomeIcon.UserShield.ToIconString());
-            ImGui.PopFont();
+            UiSharedService.Icon(FontAwesomeIcon.UserShield);
             UiSharedService.AttachToolTip("You are a moderator of Syncshell " + groupName);
             ImGui.SameLine();
         }
@@ -233,9 +235,7 @@ internal sealed class GroupPanel
 
         if (!string.Equals(_editGroupEntry, groupDto.GID, StringComparison.Ordinal))
         {
-            if (textIsGid) ImGui.PushFont(UiBuilder.MonoFont);
-            ImGui.TextUnformatted(groupName);
-            if (textIsGid) ImGui.PopFont();
+            UiSharedService.FontText(groupName, textIsGid ? UiBuilder.MonoFont : UiBuilder.DefaultFont, true);
             UiSharedService.AttachToolTip("Left click to switch between GID display and comment" + Environment.NewLine +
                           "Right click to change comment for " + groupName + Environment.NewLine + Environment.NewLine
                           + "Users: " + (pairsInGroup.Count + 1) + ", Owner: " + groupDto.OwnerAliasOrUID);
@@ -352,7 +352,7 @@ internal sealed class GroupPanel
 
             if (!_isPasswordValid)
             {
-                UiSharedService.ColorTextWrapped("The selected password is too short. It must be at least 10 characters.", new Vector4(1, 0, 0, 1));
+                UiSharedService.ColorText("The selected password is too short. It must be at least 10 characters.", new Vector4(1, 0, 0, 1), true);
             }
 
             UiSharedService.SetScaledWindowSize(290);
@@ -701,10 +701,10 @@ internal sealed class GroupPanel
 
     private void DrawSyncshellList()
     {
-        var ySize = _mainUi.TransferPartHeight == 0
+        var ySize = _transferPartHeight == 0
             ? 1
-            : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - _mainUi.TransferPartHeight - ImGui.GetCursorPosY();
-        ImGui.BeginChild("list", new Vector2(_mainUi.WindowContentWidth, ySize), border: false);
+            : ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y - _transferPartHeight - ImGui.GetCursorPosY();
+        ImGui.BeginChild("list", new Vector2(_contentWidth, ySize), border: false);
         foreach (var entry in _pairManager.GroupPairs.OrderBy(g => g.Key.Group.AliasOrGID, StringComparer.OrdinalIgnoreCase).ToList())
         {
             UiSharedService.DrawWithID(entry.Key.Group.GID, () => DrawSyncshell(entry.Key, entry.Value));

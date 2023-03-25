@@ -23,7 +23,9 @@ using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.UI;
+using MareSynchronos.UI.Components;
 using MareSynchronos.UI.Handlers;
+using MareSynchronos.UI.VM;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.SignalR;
@@ -70,6 +72,11 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<MarePlugin>();
             collection.AddSingleton<MareProfileManager>();
             collection.AddSingleton<UidDisplayHandler>();
+            collection.AddSingleton<SelectGroupForPairUi>();
+            collection.AddSingleton<SelectPairForGroupUi>();
+            collection.AddSingleton<PairGroupsUi>();
+            collection.AddSingleton<GroupPanel>();
+            collection.AddSingleton<TagHandler>();
             collection.AddSingleton((s) => new DalamudUtilService(s.GetRequiredService<ILogger<DalamudUtilService>>(),
                 clientState, objectTable, framework, gameGui, condition, gameData,
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<PerformanceCollectorService>()));
@@ -122,11 +129,16 @@ public sealed class Plugin : IDalamudPlugin
                     s.GetRequiredService<UiSharedService>(),
                     s.GetRequiredService<ServerConfigurationManager>(),
                     s.GetRequiredService<MareProfileManager>(), pair)));
+            collection.AddSingleton(s =>
+                new Func<string, Pair, DrawUserPair>((i, p) =>
+                    new DrawUserPair(i, p, s.GetRequiredService<UidDisplayHandler>(), s.GetRequiredService<ApiController>(), s.GetRequiredService<SelectGroupForPairUi>())
+                ));
 
             // add scoped services
+            collection.AddScoped<CompactVM>();
             collection.AddScoped<PeriodicFileScanner>();
             collection.AddScoped<WindowMediatorSubscriberBase, SettingsUi>();
-            collection.AddScoped<WindowMediatorSubscriberBase, CompactUi>();
+            collection.AddScoped<WindowVMBase<ImguiVM>, CompactUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, GposeUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, IntroUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, DownloadUi>();
@@ -139,7 +151,8 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddScoped<PlayerDataFactory>();
             collection.AddScoped<OnlinePlayerManager>();
             collection.AddScoped((s) => new UiService(s.GetRequiredService<ILogger<UiService>>(), pluginInterface, s.GetRequiredService<MareConfigService>(),
-                s.GetRequiredService<WindowSystem>(), s.GetServices<WindowMediatorSubscriberBase>(), s.GetRequiredService<Func<Pair, StandaloneProfileUi>>(),
+                s.GetRequiredService<WindowSystem>(), s.GetServices<WindowMediatorSubscriberBase>(), s.GetServices<WindowVMBase<ImguiVM>>(),
+                s.GetRequiredService<Func<Pair, StandaloneProfileUi>>(),
                 s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareMediator>()));
             collection.AddScoped((s) => new CommandManagerService(commandManager, s.GetRequiredService<PerformanceCollectorService>(), s.GetRequiredService<UiService>(),
                 s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<PeriodicFileScanner>(), s.GetRequiredService<ApiController>(), s.GetRequiredService<MareMediator>()));

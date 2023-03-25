@@ -60,13 +60,13 @@ public class EditProfileUi : WindowMediatorSubscriberBase
 
     public override void Draw()
     {
-        _uiSharedService.BigText("Current Profile (as saved on server)");
+        UiSharedService.FontText("Current Profile (as saved on server)", _uiSharedService.UidFont);
 
         var profile = _mareProfileManager.GetMareProfile(new UserData(_apiController.UID));
 
         if (profile.IsFlagged)
         {
-            UiSharedService.ColorTextWrapped(profile.Description, ImGuiColors.DalamudRed);
+            UiSharedService.ColorText(profile.Description, ImGuiColors.DalamudRed, true);
             return;
         }
 
@@ -118,7 +118,7 @@ public class EditProfileUi : WindowMediatorSubscriberBase
         ImGui.EndDisabled();
 
         ImGui.Separator();
-        _uiSharedService.BigText("Notes and Rules for Profiles");
+        UiSharedService.FontText("Notes and Rules for Profiles", _uiSharedService.UidFont);
 
         ImGui.TextWrapped($"- All users that are paired and unpaused with you will be able to see your profile picture and description.{Environment.NewLine}" +
             $"- Other users have the possibility to report your profile for breaking the rules.{Environment.NewLine}" +
@@ -128,7 +128,7 @@ public class EditProfileUi : WindowMediatorSubscriberBase
             $"- Judgement of your profile validity from reports through staff is not up to debate and the decisions to disable your profile/account permanent.{Environment.NewLine}" +
             $"- If your profile picture or profile description could be considered NSFW, enable the toggle below.");
         ImGui.Separator();
-        _uiSharedService.BigText("Profile Settings");
+        UiSharedService.FontText("Profile Settings", _uiSharedService.UidFont);
 
         if (UiSharedService.IconTextButton(FontAwesomeIcon.FileUpload, "Upload new profile picture"))
         {
@@ -168,7 +168,7 @@ public class EditProfileUi : WindowMediatorSubscriberBase
         UiSharedService.AttachToolTip("Clear your currently uploaded profile picture");
         if (_showFileDialogError)
         {
-            UiSharedService.ColorTextWrapped("The profile picture must be a PNG file with a maximum height and width of 256px and 250KiB size", ImGuiColors.DalamudRed);
+            UiSharedService.ColorText("The profile picture must be a PNG file with a maximum height and width of 256px and 250KiB size", ImGuiColors.DalamudRed, true);
         }
         var isNsfw = profile.IsNSFW;
         if (ImGui.Checkbox("Profile is NSFW", ref isNsfw))

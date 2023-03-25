@@ -95,10 +95,10 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private void DrawBlockedTransfers()
     {
         _lastTab = "BlockedTransfers";
-        UiSharedService.ColorTextWrapped("Files that you attempted to upload or download that were forbidden to be transferred by their creators will appear here. " +
+        UiSharedService.ColorText("Files that you attempted to upload or download that were forbidden to be transferred by their creators will appear here. " +
                              "If you see file paths from your drive here, then those files were not allowed to be uploaded. If you see hashes, those files were not allowed to be downloaded. " +
                              "Ask your paired friend to send you the mod in question through other means, acquire the mod yourself or pester the mod creator to allow it to be sent over Mare.",
-            ImGuiColors.DalamudGrey);
+            ImGuiColors.DalamudGrey, true);
 
         if (ImGui.BeginTable("TransfersTable", 2, ImGuiTableFlags.SizingStretchProp))
         {
@@ -386,12 +386,12 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         });
                     }, Directory.Exists(_configService.Current.ExportFolder) ? _configService.Current.ExportFolder : null);
                 }
-                UiSharedService.ColorTextWrapped("Note: For best results make sure you have everything you want to be shared as well as the correct character appearance" +
-                    " equipped and redraw your character before exporting.", ImGuiColors.DalamudYellow);
+                UiSharedService.ColorText("Note: For best results make sure you have everything you want to be shared as well as the correct character appearance" +
+                    " equipped and redraw your character before exporting.", ImGuiColors.DalamudYellow, true);
             }
             else
             {
-                UiSharedService.ColorTextWrapped("Export in progress", ImGuiColors.DalamudYellow);
+                UiSharedService.ColorText("Export in progress", ImGuiColors.DalamudYellow, true);
             }
 
             ImGui.Unindent();
@@ -471,11 +471,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
         UiSharedService.DrawHelpText("If this option is selected all already existing notes for UIDs will be overwritten by the imported notes.");
         if (_notesSuccessfullyApplied.HasValue && _notesSuccessfullyApplied.Value)
         {
-            UiSharedService.ColorTextWrapped("User Notes successfully imported", ImGuiColors.HealerGreen);
+            UiSharedService.ColorText("User Notes successfully imported", ImGuiColors.HealerGreen, true);
         }
         else if (_notesSuccessfullyApplied.HasValue && !_notesSuccessfullyApplied.Value)
         {
-            UiSharedService.ColorTextWrapped("Attempt to import notes from clipboard failed. Check formatting and try again", ImGuiColors.DalamudRed);
+            UiSharedService.ColorText("Attempt to import notes from clipboard failed. Check formatting and try again", ImGuiColors.DalamudRed, true);
         }
 
         var openPopupOnAddition = _configService.Current.OpenPopupOnAdd;
@@ -723,15 +723,15 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var selectedServer = _serverConfigurationManager.GetServerByIndex(idx);
         if (selectedServer == _serverConfigurationManager.CurrentServer)
         {
-            UiSharedService.ColorTextWrapped("For any changes to be applied to the current service you need to reconnect to the service.", ImGuiColors.DalamudYellow);
+            UiSharedService.ColorText("For any changes to be applied to the current service you need to reconnect to the service.", ImGuiColors.DalamudYellow, true);
         }
 
         if (ImGui.BeginTabBar("serverTabBar"))
         {
             if (ImGui.BeginTabItem("Character Management"))
             {
-                UiSharedService.ColorTextWrapped("Characters listed here will automatically connect to the selected Mare service with the settings as provided below." +
-                    " Make sure to enter the character names correctly or use the 'Add current character' button at the bottom.", ImGuiColors.DalamudYellow);
+                UiSharedService.ColorText("Characters listed here will automatically connect to the selected Mare service with the settings as provided below." +
+                    " Make sure to enter the character names correctly or use the 'Add current character' button at the bottom.", ImGuiColors.DalamudYellow, true);
                 int i = 0;
                 foreach (var item in selectedServer.Authentications.ToList())
                 {

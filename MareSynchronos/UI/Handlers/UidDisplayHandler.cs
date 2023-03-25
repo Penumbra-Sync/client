@@ -38,9 +38,7 @@ public class UidDisplayHandler
         if (!string.Equals(_editNickEntry, pair.UserData.UID, StringComparison.Ordinal))
         {
             ImGui.SetCursorPosY(originalY);
-            if (textIsUid) ImGui.PushFont(UiBuilder.MonoFont);
-            ImGui.TextUnformatted(playerText);
-            if (textIsUid) ImGui.PopFont();
+            UiSharedService.FontText(playerText, textIsUid ? UiBuilder.MonoFont : UiBuilder.DefaultFont);
             if (ImGui.IsItemHovered())
             {
                 if (!string.Equals(_lastMouseOverUid, id))

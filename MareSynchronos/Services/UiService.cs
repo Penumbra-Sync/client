@@ -6,6 +6,7 @@ using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
 using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.UI.VM;
 
 namespace MareSynchronos.Services;
 
@@ -20,7 +21,8 @@ public sealed class UiService : DisposableMediatorSubscriberBase
 
     public UiService(ILogger<UiService> logger, DalamudPluginInterface dalamudPluginInterface,
         MareConfigService mareConfigService, WindowSystem windowSystem,
-        IEnumerable<WindowMediatorSubscriberBase> windows, Func<Pair, StandaloneProfileUi> standaloneProfileUiFactory,
+        IEnumerable<WindowMediatorSubscriberBase> windows, IEnumerable<WindowVMBase<ImguiVM>> vmWindows,
+        Func<Pair, StandaloneProfileUi> standaloneProfileUiFactory,
         FileDialogManager fileDialogManager, MareMediator mareMediator) : base(logger, mareMediator)
     {
         _logger = logger;
@@ -35,6 +37,11 @@ public sealed class UiService : DisposableMediatorSubscriberBase
         _dalamudPluginInterface.UiBuilder.OpenConfigUi += ToggleUi;
 
         foreach (var window in windows)
+        {
+            _windowSystem.AddWindow(window);
+        }
+
+        foreach (var window in vmWindows)
         {
             _windowSystem.AddWindow(window);
         }

@@ -64,12 +64,12 @@ public class GposeUi : WindowMediatorSubscriberBase
                     Task.Run(async () => await _mareCharaFileManager.ApplyMareCharaFile(_dalamudUtil.GposeTargetGameObject).ConfigureAwait(false));
                 }
                 UiSharedService.AttachToolTip("Applies it to the currently selected GPose actor");
-                UiSharedService.ColorTextWrapped("Warning: redrawing or changing the character will revert all applied mods.", ImGuiColors.DalamudYellow);
+                UiSharedService.ColorText("Warning: redrawing or changing the character will revert all applied mods.", ImGuiColors.DalamudYellow, true);
             }
         }
         else
         {
-            UiSharedService.ColorTextWrapped("Loading Character...", ImGuiColors.DalamudYellow);
+            UiSharedService.ColorText("Loading Character...", ImGuiColors.DalamudYellow, true);
         }
         UiSharedService.TextWrapped("Hint: You can disable the automatic loading of this window in the Mare settings and open it manually with /mare gpose");
     }

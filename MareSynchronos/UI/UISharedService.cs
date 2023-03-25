@@ -74,8 +74,10 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     private int _serverSelectionIndex = -1;
 
+    private ImFontPtr? _uidFont;
+
     public UiSharedService(ILogger<UiSharedService> logger, IpcManager ipcManager, ApiController apiController,
-        PeriodicFileScanner cacheScanner, FileDialogManager fileDialogManager,
+            PeriodicFileScanner cacheScanner, FileDialogManager fileDialogManager,
         MareConfigService configService, DalamudUtilService dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization,
         ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
     {
@@ -118,7 +120,17 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public string PlayerName => _dalamudUtil.PlayerName;
 
-    public ImFontPtr UidFont { get; private set; }
+    public ImFontPtr UidFont
+    {
+        get
+        {
+            return _uidFont == null ? UiBuilder.DefaultFont : _uidFont.Value;
+        }
+        private set
+        {
+            _uidFont = value;
+        }
+    }
 
     public bool UidFontBuilt { get; private set; }
 
@@ -168,17 +180,25 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return ret;
     }
 
-    public static void ColorText(string text, Vector4 color)
+    public static void ColorFontText(string text, ImFontPtr font, Vector4 color, bool wrapped = false)
     {
-        ImGui.PushStyleColor(ImGuiCol.Text, color);
-        ImGui.TextUnformatted(text);
-        ImGui.PopStyleColor();
+        ImGui.PushFont(font);
+        ColorText(text, color, wrapped);
+        ImGui.PopFont();
     }
 
-    public static void ColorTextWrapped(string text, Vector4 color)
+    public static void ColorIcon(FontAwesomeIcon icon, Vector4 color, bool wrapped = false)
+    {
+        ColorFontText(icon.ToIconString(), UiBuilder.IconFont, color, wrapped);
+    }
+
+    public static void ColorText(string text, Vector4 color, bool wrapped = false)
     {
         ImGui.PushStyleColor(ImGuiCol.Text, color);
-        TextWrapped(text);
+        if (wrapped)
+            TextWrapped(text);
+        else
+            ImGui.TextUnformatted(text);
         ImGui.PopStyleColor();
     }
 
@@ -263,10 +283,13 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.PopID();
     }
 
-    public static void FontText(string text, ImFontPtr font)
+    public static void FontText(string text, ImFontPtr font, bool wrapped = false)
     {
         ImGui.PushFont(font);
-        ImGui.TextUnformatted(text);
+        if (wrapped)
+            TextWrapped(text);
+        else
+            ImGui.TextUnformatted(text);
         ImGui.PopFont();
     }
 
@@ -310,6 +333,13 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     public static float GetWindowContentRegionWidth()
     {
         return ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
+    }
+
+    public static void Icon(FontAwesomeIcon icon)
+    {
+        ImGui.PushFont(UiBuilder.IconFont);
+        TextWrapped(icon.ToIconString());
+        ImGui.PopFont();
     }
 
     public static bool IconTextButton(FontAwesomeIcon icon, string text)
@@ -366,18 +396,18 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     public static void OutlineTextWrapped(string text, Vector4 textcolor, Vector4 outlineColor, float dist = 3)
     {
         var cursorPos = ImGui.GetCursorPos();
-        ColorTextWrapped(text, outlineColor);
+        ColorText(text, outlineColor, true);
         ImGui.SetCursorPos(new(cursorPos.X, cursorPos.Y + dist));
-        ColorTextWrapped(text, outlineColor);
+        ColorText(text, outlineColor, true);
         ImGui.SetCursorPos(new(cursorPos.X + dist, cursorPos.Y));
-        ColorTextWrapped(text, outlineColor);
+        ColorText(text, outlineColor, true);
         ImGui.SetCursorPos(new(cursorPos.X + dist, cursorPos.Y + dist));
-        ColorTextWrapped(text, outlineColor);
+        ColorText(text, outlineColor, true);
 
         ImGui.SetCursorPos(new(cursorPos.X + dist / 2, cursorPos.Y + dist / 2));
-        ColorTextWrapped(text, textcolor);
+        ColorText(text, textcolor, true);
         ImGui.SetCursorPos(new(cursorPos.X + dist / 2, cursorPos.Y + dist / 2));
-        ColorTextWrapped(text, textcolor);
+        ColorText(text, textcolor, true);
     }
 
     public static void SetScaledWindowSize(float width, bool centerWindow = true)
@@ -449,16 +479,9 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return true;
     }
 
-    public void BigText(string text)
-    {
-        if (UidFontBuilt) ImGui.PushFont(UidFont);
-        ImGui.TextUnformatted(text);
-        if (UidFontBuilt) ImGui.PopFont();
-    }
-
     public void DrawCacheDirectorySetting()
     {
-        ColorTextWrapped("Note: The storage folder should be somewhere close to root (i.e. C:\\MareStorage) in a new empty folder. DO NOT point this to your game folder. DO NOT point this to your Penumbra folder.", ImGuiColors.DalamudYellow);
+        ColorText("Note: The storage folder should be somewhere close to root (i.e. C:\\MareStorage) in a new empty folder. DO NOT point this to your game folder. DO NOT point this to your Penumbra folder.", ImGuiColors.DalamudYellow, true);
         var cacheDirectory = _configService.Current.CacheFolder;
         ImGui.InputText("Storage Folder##cache", ref cacheDirectory, 255, ImGuiInputTextFlags.ReadOnly);
 
@@ -493,20 +516,20 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
         if (_isPenumbraDirectory)
         {
-            ColorTextWrapped("Do not point the storage path directly to the Penumbra directory. If necessary, make a subfolder in it.", ImGuiColors.DalamudRed);
+            ColorText("Do not point the storage path directly to the Penumbra directory. If necessary, make a subfolder in it.", ImGuiColors.DalamudRed, true);
         }
         else if (!_isDirectoryWritable)
         {
-            ColorTextWrapped("The folder you selected does not exist or cannot be written to. Please provide a valid path.", ImGuiColors.DalamudRed);
+            ColorText("The folder you selected does not exist or cannot be written to. Please provide a valid path.", ImGuiColors.DalamudRed, true);
         }
         else if (_cacheDirectoryHasOtherFilesThanCache)
         {
-            ColorTextWrapped("Your selected directory has files inside that are not Mare related. Use an empty directory or a previous Mare storage directory only.", ImGuiColors.DalamudRed);
+            ColorText("Your selected directory has files inside that are not Mare related. Use an empty directory or a previous Mare storage directory only.", ImGuiColors.DalamudRed, true);
         }
         else if (!_cacheDirectoryIsValidPath)
         {
-            ColorTextWrapped("Your selected directory contains illegal characters unreadable by FFXIV. " +
-                             "Restrict yourself to latin letters (A-Z), underscores (_), dashes (-) and arabic numbers (0-9).", ImGuiColors.DalamudRed);
+            ColorText("Your selected directory contains illegal characters unreadable by FFXIV. " +
+                             "Restrict yourself to latin letters (A-Z), underscores (_), dashes (-) and arabic numbers (0-9).", ImGuiColors.DalamudRed, true);
         }
 
         float maxCacheSize = (float)_configService.Current.MaxLocalCacheInGiB;
@@ -753,6 +776,14 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     public void RecalculateFileCacheSize()
     {
         _cacheScanner.InvokeScan(forced: true);
+    }
+
+    internal static Vector2 CalcFontTextSize(string uidText, ImFontPtr imFont)
+    {
+        ImGui.PushFont(imFont);
+        var result = ImGui.CalcTextSize(uidText);
+        ImGui.PopFont();
+        return result;
     }
 
     [LibraryImport("user32")]

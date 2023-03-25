@@ -43,18 +43,12 @@ public class DrawGroupPair : DrawPairBase
             presenceColor = ImGuiColors.DalamudGrey;
             presenceText = entryUID + " online status is unknown (paused)";
 
-            ImGui.PushFont(UiBuilder.IconFont);
-            UiSharedService.ColorText(FontAwesomeIcon.PauseCircle.ToIconString(), ImGuiColors.DalamudYellow);
-            ImGui.PopFont();
-
+            UiSharedService.ColorIcon(FontAwesomeIcon.PauseCircle, ImGuiColors.DalamudYellow);
             UiSharedService.AttachToolTip("Pairing status with " + entryUID + " is paused");
         }
         else
         {
-            ImGui.PushFont(UiBuilder.IconFont);
-            UiSharedService.ColorText(FontAwesomeIcon.Check.ToIconString(), ImGuiColors.ParsedGreen);
-            ImGui.PopFont();
-
+            UiSharedService.ColorIcon(FontAwesomeIcon.Check, ImGuiColors.ParsedGreen);
             UiSharedService.AttachToolTip("You are paired with " + entryUID);
         }
 
@@ -63,36 +57,28 @@ public class DrawGroupPair : DrawPairBase
 
         ImGui.SameLine();
         ImGui.SetCursorPosY(textPosY);
-        ImGui.PushFont(UiBuilder.IconFont);
-        UiSharedService.ColorText(presenceIcon.ToIconString(), presenceColor);
-        ImGui.PopFont();
+        UiSharedService.ColorIcon(presenceIcon, presenceColor);
         UiSharedService.AttachToolTip(presenceText);
 
         if (entryIsOwner)
         {
             ImGui.SameLine();
             ImGui.SetCursorPosY(textPosY);
-            ImGui.PushFont(UiBuilder.IconFont);
-            ImGui.TextUnformatted(FontAwesomeIcon.Crown.ToIconString());
-            ImGui.PopFont();
+            UiSharedService.FontText(FontAwesomeIcon.Crown.ToIconString(), UiBuilder.IconFont);
             UiSharedService.AttachToolTip("User is owner of this Syncshell");
         }
         else if (entryIsMod)
         {
             ImGui.SameLine();
             ImGui.SetCursorPosY(textPosY);
-            ImGui.PushFont(UiBuilder.IconFont);
-            ImGui.TextUnformatted(FontAwesomeIcon.UserShield.ToIconString());
-            ImGui.PopFont();
+            UiSharedService.FontText(FontAwesomeIcon.UserShield.ToIconString(), UiBuilder.IconFont);
             UiSharedService.AttachToolTip("User is moderator of this Syncshell");
         }
         else if (entryIsPinned)
         {
             ImGui.SameLine();
             ImGui.SetCursorPosY(textPosY);
-            ImGui.PushFont(UiBuilder.IconFont);
-            ImGui.TextUnformatted(FontAwesomeIcon.Thumbtack.ToIconString());
-            ImGui.PopFont();
+            UiSharedService.FontText(FontAwesomeIcon.Thumbtack.ToIconString(), UiBuilder.IconFont);
             UiSharedService.AttachToolTip("User is pinned in this Syncshell");
         }
     }

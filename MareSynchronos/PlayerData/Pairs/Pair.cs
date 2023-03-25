@@ -123,6 +123,8 @@ public class Pair
 
         CachedPlayer.Initialize(name);
 
+        _mediator.Publish(new PairManagerUpdateMessage());
+
         ApplyLastReceivedData();
 
         return true;

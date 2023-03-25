@@ -51,17 +51,13 @@ public class DrawUserPair : DrawPairBase
         }
 
         ImGui.SetCursorPosY(textPosY);
-        ImGui.PushFont(UiBuilder.IconFont);
-        UiSharedService.ColorText(connectionIcon.ToIconString(), connectionColor);
-        ImGui.PopFont();
+        UiSharedService.ColorIcon(connectionIcon, connectionColor);
         UiSharedService.AttachToolTip(connectionText);
         if (_pair is { IsOnline: true, IsVisible: true })
         {
             ImGui.SameLine();
             ImGui.SetCursorPosY(textPosY);
-            ImGui.PushFont(UiBuilder.IconFont);
-            UiSharedService.ColorText(FontAwesomeIcon.Eye.ToIconString(), ImGuiColors.ParsedGreen);
-            ImGui.PopFont();
+            UiSharedService.ColorIcon(FontAwesomeIcon.Eye, ImGuiColors.ParsedGreen);
             UiSharedService.AttachToolTip(_pair.UserData.AliasOrUID + " is visible: " + _pair.PlayerName!);
         }
     }

@@ -56,17 +56,15 @@ public class IntroUi : WindowMediatorSubscriberBase
 
         if (!_configService.Current.AcceptedAgreement && !_readFirstPage)
         {
-            if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
-            ImGui.TextUnformatted("Welcome to Mare Synchronos");
-            if (_uiShared.UidFontBuilt) ImGui.PopFont();
+            UiSharedService.FontText("Welcome to Mare Synchronos", _uiShared.UidFont);
             ImGui.Separator();
             UiSharedService.TextWrapped("Mare Synchronos is a plugin that will replicate your full current character state including all Penumbra mods to other paired Mare Synchronos users. " +
                               "Note that you will have to have Penumbra as well as Glamourer installed to use this plugin.");
             UiSharedService.TextWrapped("We will have to setup a few things first before you can start using this plugin. Click on next to continue.");
 
-            UiSharedService.ColorTextWrapped("Note: Any modifications you have applied through anything but Penumbra cannot be shared and your character state on other clients " +
+            UiSharedService.ColorText("Note: Any modifications you have applied through anything but Penumbra cannot be shared and your character state on other clients " +
                                  "might look broken because of this or others players mods might not apply on your end altogether. " +
-                                 "If you want to use this plugin you will have to move your mods to Penumbra.", ImGuiColors.DalamudYellow);
+                                 "If you want to use this plugin you will have to move your mods to Penumbra.", ImGuiColors.DalamudYellow, true);
             if (!_uiShared.DrawOtherPluginState()) return;
             ImGui.Separator();
             if (ImGui.Button("Next##toAgreement"))
@@ -145,7 +143,7 @@ public class IntroUi : WindowMediatorSubscriberBase
 
             if (!_uiShared.HasValidPenumbraModPath)
             {
-                UiSharedService.ColorTextWrapped("You do not have a valid Penumbra path set. Open Penumbra and set up a valid path for the mod directory.", ImGuiColors.DalamudRed);
+                UiSharedService.ColorText("You do not have a valid Penumbra path set. Open Penumbra and set up a valid path for the mod directory.", ImGuiColors.DalamudRed, true);
             }
             else
             {
@@ -153,9 +151,9 @@ public class IntroUi : WindowMediatorSubscriberBase
                                      "Additionally, a local storage folder must be set where Mare Synchronos will download other character files to. " +
                                      "Once the storage folder is set and the scan complete, this page will automatically forward to registration at a service.");
                 UiSharedService.TextWrapped("Note: The initial scan, depending on the amount of mods you have, might take a while. Please wait until it is completed.");
-                UiSharedService.ColorTextWrapped("Warning: once past this step you should not delete the FileCache.csv of Mare Synchronos in the Plugin Configurations folder of Dalamud. " +
-                                          "Otherwise on the next launch a full re-scan of the file cache database will be initiated.", ImGuiColors.DalamudYellow);
-                UiSharedService.ColorTextWrapped("Warning: if the scan is hanging and does nothing for a long time, chances are high your Penumbra folder is not set up properly.", ImGuiColors.DalamudYellow);
+                UiSharedService.ColorText("Warning: once past this step you should not delete the FileCache.csv of Mare Synchronos in the Plugin Configurations folder of Dalamud. " +
+                                          "Otherwise on the next launch a full re-scan of the file cache database will be initiated.", ImGuiColors.DalamudYellow, true);
+                UiSharedService.ColorText("Warning: if the scan is hanging and does nothing for a long time, chances are high your Penumbra folder is not set up properly.", ImGuiColors.DalamudYellow, true);
                 _uiShared.DrawCacheDirectorySetting();
             }
 
@@ -205,7 +203,7 @@ public class IntroUi : WindowMediatorSubscriberBase
             ImGui.InputText("", ref _secretKey, 64);
             if (_secretKey.Length > 0 && _secretKey.Length != 64)
             {
-                UiSharedService.ColorTextWrapped("Your secret key must be exactly 64 characters long. Don't enter your Lodestone auth here.", ImGuiColors.DalamudRed);
+                UiSharedService.ColorText("Your secret key must be exactly 64 characters long. Don't enter your Lodestone auth here.", ImGuiColors.DalamudRed, true);
             }
             else if (_secretKey.Length == 64)
             {

@@ -109,9 +109,7 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
             var rectMin = drawList.GetClipRectMin();
             var rectMax = drawList.GetClipRectMax();
 
-            if (_uiSharedService.UidFontBuilt) ImGui.PushFont(_uiSharedService.UidFont);
-            UiSharedService.ColorText(_pair.UserData.AliasOrUID, ImGuiColors.HealerGreen);
-            if (_uiSharedService.UidFontBuilt) ImGui.PopFont();
+            UiSharedService.ColorFontText(_pair.UserData.AliasOrUID, _uiSharedService.UidFont, ImGuiColors.HealerGreen);
             ImGui.Dummy(new(spacing.Y, spacing.Y));
             var textPos = ImGui.GetCursorPosY();
             ImGui.Separator();

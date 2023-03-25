@@ -63,5 +63,7 @@ public record ProfilePopoutToggle(Pair? Pair) : IMessage;
 public record CompactUiChange(Vector2 Size, Vector2 Position) : IMessage;
 public record ProfileOpenStandaloneMessage(Pair Pair) : IMessage;
 public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : IMessage;
+public record PairManagerUpdateMessage : IMessage;
+public record CompactUiContentChangeMessage(float CentralPartHeight, float ContentWidth) : IMessage;
 
 #pragma warning restore MA0048 // File name must match type name

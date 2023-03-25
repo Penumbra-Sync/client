@@ -56,7 +56,7 @@ public abstract class DrawPairBase
                 $"The report will be sent to the team of your currently connected Mare Synchronos Service.{Environment.NewLine}" +
                 $"The report will include your user and your contact info (Discord User).{Environment.NewLine}" +
                 $"Depending on the severity of the offense the users Mare profile or account can be permanently disabled or banned.");
-            UiSharedService.ColorTextWrapped("Report spam and wrong reports will not be tolerated and can lead to permanent account suspension.", ImGuiColors.DalamudRed);
+            UiSharedService.ColorText("Report spam and wrong reports will not be tolerated and can lead to permanent account suspension.", ImGuiColors.DalamudRed, true);
             if (string.IsNullOrEmpty(_reportReason)) ImGui.BeginDisabled();
             if (ImGui.Button("Send Report"))
             {
