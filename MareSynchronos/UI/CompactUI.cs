@@ -1,12 +1,9 @@
 ﻿using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Reflection;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
-using Dalamud.Interface.Components;
-using Dalamud.Utility;
 using ImGuiNET;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services.Mediator;
@@ -27,9 +24,7 @@ public class CompactUi : WindowVMBase<ImguiVM>
     private readonly PairGroupsUi _pairGroupsUi;
     private readonly SelectGroupForPairUi _selectGroupForPairUi;
     private readonly SelectPairForGroupUi _selectPairsForGroupUi;
-    private readonly Stopwatch _timeout = new();
     private readonly UiSharedService _uiShared;
-    private bool _buttonState;
     private Vector2 _lastPosition = Vector2.One;
     private Vector2 _lastSize = Vector2.One;
     private bool _showModalForUserAddition;
@@ -113,6 +108,7 @@ public class CompactUi : WindowVMBase<ImguiVM>
             UiSharedService.ColorFontText(unsupported, _uiShared.UidFont, ImGuiColors.DalamudRed);
             UiSharedService.ColorText($"Your Mare Synchronos installation is out of date, the current version is {ver.Major}.{ver.Minor}.{ver.Build}. " +
                 $"It is highly recommended to keep Mare Synchronos up to date. Open /xlplugins and update the plugin.", ImGuiColors.DalamudRed, true);
+            ImGui.Separator();
         }
 
         UiSharedService.DrawWithID("header", DrawUIDHeader);
@@ -237,117 +233,43 @@ public class CompactUi : WindowVMBase<ImguiVM>
 
     private void DrawAddPair()
     {
-        var buttonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Plus);
+        var button = Button.FromCommand(_compactVM.AddPairCommand);
+        var buttonSize = button.GetSize();
+
         ImGui.SetNextItemWidth(UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonSize.X);
         VM.ExecuteWithProp<string>(nameof(CompactVM.PairToAdd), (pairToAdd) =>
         {
             ImGui.InputTextWithHint("##otheruid", "Other players UID/Alias", ref pairToAdd, 20);
             return pairToAdd;
         });
+
         ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - buttonSize.X);
-        var canAdd = _compactVM.CanAddPair;
-        if (!canAdd)
-        {
-            ImGuiComponents.DisabledButton(FontAwesomeIcon.Plus);
-        }
-        else
-        {
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
-            {
-                _compactVM.AddPair();
-            }
-            UiSharedService.AttachToolTip("Pair with " + (_compactVM.PairToAdd.IsNullOrEmpty() ? "other user" : _compactVM.PairToAdd));
-        }
+        button.Draw();
 
         ImGuiHelpers.ScaledDummy(2);
     }
 
     private void DrawFilter()
     {
-        var buttonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.ArrowUp);
-        var playButtonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Play);
+        var pauseAllButton = Button.FromCommand(_compactVM.PauseAllCommand);
+        var reverseButton = Button.FromCommand(_compactVM.ReverseSortCommand);
+        var buttonSize = pauseAllButton.GetSize();
+        var reverseButtonSize = reverseButton.GetSize();
 
-        _compactVM.ExecuteWithProp<bool>(nameof(_compactVM.ReverseUserSort), (reverse) =>
-        {
-            var icon = reverse ? FontAwesomeIcon.ArrowUp : FontAwesomeIcon.ArrowDown;
-            var tooltip = reverse ? "Sort by name ascending" : "Sort by name descending";
-            if (ImGuiComponents.IconButton(icon))
-            {
-                reverse = !reverse;
-            }
-            UiSharedService.AttachToolTip(tooltip);
-            return reverse;
-        });
+        reverseButton.Draw();
+
         ImGui.SameLine();
-        /*
-        var users = GetFilteredUsers();
-        var userCount = users.Count;
 
-        var spacing = userCount > 0
-            ? playButtonSize.X + ImGui.GetStyle().ItemSpacing.X * 2
-            : ImGui.GetStyle().ItemSpacing.X;
-
-        ImGui.SetNextItemWidth(WindowContentWidth - buttonSize.X - spacing);
+        ImGui.SetNextItemWidth(WindowContentWidth - buttonSize.X - reverseButtonSize.X - ImGui.GetStyle().ItemSpacing.X * 2);
         VM.ExecuteWithProp<string>(nameof(CompactVM.CharacterOrCommentFilter), (str) =>
         {
             ImGui.InputTextWithHint("##filter", "Filter for UID/notes", ref str, 255);
             return str;
         });
 
-        if (userCount == 0) return;
-
-        var pausedUsers = users.Where(u => u.UserPair!.OwnPermissions.IsPaused() && u.UserPair.OtherPermissions.IsPaired()).ToList();
-        var resumedUsers = users.Where(u => !u.UserPair!.OwnPermissions.IsPaused() && u.UserPair.OtherPermissions.IsPaired()).ToList();
-
-        if (!pausedUsers.Any() && !resumedUsers.Any()) return;
         ImGui.SameLine();
 
-        switch (_buttonState)
-        {
-            case true when !pausedUsers.Any():
-                _buttonState = false;
-                break;
-
-            case false when !resumedUsers.Any():
-                _buttonState = true;
-                break;
-
-            case true:
-                users = pausedUsers;
-                break;
-
-            case false:
-                users = resumedUsers;
-                break;
-        }
-
-        var button = _buttonState ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
-
-        if (!_timeout.IsRunning || _timeout.ElapsedMilliseconds > 15000)
-        {
-            _timeout.Reset();
-
-            if (ImGuiComponents.IconButton(button) && UiSharedService.CtrlPressed())
-            {
-                foreach (var entry in users)
-                {
-                    var perm = entry.UserPair!.OwnPermissions;
-                    perm.SetPaused(!perm.IsPaused());
-                    _ = _apiController.UserSetPairPermissions(new UserPermissionsDto(entry.UserData, perm));
-                }
-
-                _timeout.Start();
-                _buttonState = !_buttonState;
-            }
-            UiSharedService.AttachToolTip($"Hold Control to {(button == FontAwesomeIcon.Play ? "resume" : "pause")} pairing with {users.Count} out of {userCount} displayed users.");
-        }
-        else
-        {
-            var availableAt = (15000 - _timeout.ElapsedMilliseconds) / 1000;
-            ImGuiComponents.DisabledButton(button);
-            UiSharedService.AttachToolTip($"Next execution is available at {availableAt} seconds");
-        }
-        */
+        pauseAllButton.Draw();
     }
 
     private void DrawPairList()
@@ -373,13 +295,14 @@ public class CompactUi : WindowVMBase<ImguiVM>
 
     private void DrawServerStatus()
     {
-        var buttonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Link);
+        var connectButton = Button.FromCommand(_compactVM.ConnectCommand);
+        var buttonSize = connectButton.GetSize();
         var userCount = _compactVM.OnlineUserCount.ToString(CultureInfo.InvariantCulture);
         var userSize = ImGui.CalcTextSize(userCount);
         var textSize = ImGui.CalcTextSize("Users Online");
         string shardConnection = _compactVM.ShardString;
         var shardTextSize = ImGui.CalcTextSize(_compactVM.ShardString);
-        var printShard = !string.IsNullOrEmpty(_compactVM.ShardString) && shardConnection != string.Empty;
+        var printShard = _compactVM.IsConnected && !string.IsNullOrEmpty(_compactVM.ShardString) && shardConnection != string.Empty;
 
         if (_compactVM.IsConnected)
         {
@@ -409,17 +332,10 @@ public class CompactUi : WindowVMBase<ImguiVM>
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ((userSize.Y + textSize.Y) / 2 + shardTextSize.Y) / 2 - ImGui.GetStyle().ItemSpacing.Y + buttonSize.Y / 2);
         }
 
-        var color = UiSharedService.GetBoolColor(!_compactVM.ManuallyDisconnected);
-        var connectedIcon = !_compactVM.ManuallyDisconnected ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
-
         if (_compactVM.IsConnected)
         {
             ImGui.SetCursorPosX(0 + ImGui.GetStyle().ItemSpacing.X);
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.UserCircle))
-            {
-                Mediator.Publish(new UiToggleMessage(typeof(EditProfileUi)));
-            }
-            UiSharedService.AttachToolTip("Edit your Mare Profile");
+            Button.FromCommand(_compactVM.EditUserProfileCommand).Draw();
         }
 
         ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - buttonSize.X);
@@ -428,16 +344,7 @@ public class CompactUi : WindowVMBase<ImguiVM>
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ((userSize.Y + textSize.Y) / 2 + shardTextSize.Y) / 2 - ImGui.GetStyle().ItemSpacing.Y + buttonSize.Y / 2);
         }
 
-        if (!_compactVM.IsReconnecting)
-        {
-            ImGui.PushStyleColor(ImGuiCol.Text, color);
-            if (ImGuiComponents.IconButton(connectedIcon))
-            {
-                _compactVM.ToggleConnection();
-            }
-            ImGui.PopStyleColor();
-            UiSharedService.AttachToolTip(!_compactVM.ManuallyDisconnected ? "Disconnect from " + _compactVM.ServerName : "Connect to " + _compactVM.ServerName);
-        }
+        connectButton.Draw();
     }
 
     private void DrawTransfers()
@@ -496,34 +403,31 @@ public class CompactUi : WindowVMBase<ImguiVM>
         var uidText = _compactVM.GetUidText();
         var buttonSizeX = 0f;
 
+        var settingsButton = Button.FromCommand(_compactVM.OpenSettingsCommand);
+
         var uidTextSize = UiSharedService.CalcFontTextSize(uidText, _uiShared.UidFont);
 
         var originalPos = ImGui.GetCursorPos();
         ImGui.SetWindowFontScale(1.5f);
-        var buttonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Cog);
+        var buttonSize = settingsButton.GetSize();
         buttonSizeX -= buttonSize.X - ImGui.GetStyle().ItemSpacing.X * 2;
         ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - buttonSize.X);
         ImGui.SetCursorPosY(originalPos.Y + uidTextSize.Y / 2 - buttonSize.Y / 2);
-        if (ImGuiComponents.IconButton(FontAwesomeIcon.Cog))
-        {
-            Mediator.Publish(new OpenSettingsUiMessage());
-        }
-        UiSharedService.AttachToolTip("Open the Mare Synchronos Settings");
+
+        settingsButton.Draw();
 
         ImGui.SameLine(); //Important to draw the uidText consistently
         ImGui.SetCursorPos(originalPos);
 
         if (_compactVM.IsConnected)
         {
-            buttonSizeX += UiSharedService.GetIconButtonSize(FontAwesomeIcon.Copy).X - ImGui.GetStyle().ItemSpacing.X * 2;
+            var copyUidButton = Button.FromCommand(_compactVM.CopyUidCommand);
+            buttonSizeX += copyUidButton.GetSize().X - ImGui.GetStyle().ItemSpacing.X * 2;
             ImGui.SetCursorPosY(originalPos.Y + uidTextSize.Y / 2 - buttonSize.Y / 2);
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.Copy))
-            {
-                ImGui.SetClipboardText(_compactVM.GetUidText());
-            }
-            UiSharedService.AttachToolTip("Copy your UID to clipboard");
+            copyUidButton.Draw();
             ImGui.SameLine();
         }
+
         ImGui.SetWindowFontScale(1f);
 
         ImGui.SetCursorPosY(originalPos.Y + buttonSize.Y / 2 - uidTextSize.Y / 2 - ImGui.GetStyle().ItemSpacing.Y / 2);

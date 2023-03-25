@@ -314,6 +314,18 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return iconSize;
     }
 
+    public static Vector2 GetIconTextButtonSize(FontAwesomeIcon icon, string text)
+    {
+        var iconSize = GetIconSize(icon);
+        var textSize = ImGui.CalcTextSize(text);
+        var padding = ImGui.GetStyle().FramePadding;
+        var spacing = ImGui.GetStyle().ItemSpacing;
+
+        var buttonSizeX = iconSize.X + textSize.X + padding.X * 2 + spacing.X;
+        var buttonSizeY = (iconSize.Y > textSize.Y ? iconSize.Y : textSize.Y) + padding.Y * 2;
+        return new Vector2(buttonSizeX, buttonSizeY);
+    }
+
     public static string GetNotes(List<Pair> pairs)
     {
         StringBuilder sb = new();
@@ -436,9 +448,9 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public static bool ShiftPressed() => (GetKeyState(0xA1) & 0x8000) != 0 || (GetKeyState(0xA0) & 0x8000) != 0;
 
-    public static void TextWrapped(string text)
+    public static void TextWrapped(string text, float pos = 0)
     {
-        ImGui.PushTextWrapPos(0);
+        ImGui.PushTextWrapPos(pos);
         ImGui.TextUnformatted(text);
         ImGui.PopTextWrapPos();
     }
