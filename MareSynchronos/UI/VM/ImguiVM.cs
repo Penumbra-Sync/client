@@ -3,12 +3,8 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI.VM;
 
-public abstract class ImguiVM : MediatorSubscriberBase
+public abstract class ImguiVM
 {
-    protected ImguiVM(ILogger logger, MareMediator mediator) : base(logger, mediator)
-    {
-    }
-
     public void ExecuteWithProp<T>(string nameOfProp, Func<T, T> act)
     {
         var prop = GetType().GetProperty(nameOfProp)

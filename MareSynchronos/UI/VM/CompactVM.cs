@@ -1,17 +1,12 @@
 ﻿using Dalamud.Interface.Colors;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
-using MareSynchronos.UI.Components;
 using MareSynchronos.WebAPI;
-using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.WebAPI.SignalR.Utils;
-using Microsoft.Extensions.Logging;
 using System.Numerics;
 using MareSynchronos.MareConfiguration.Models;
-using System.Diagnostics;
 using Dalamud.Interface;
 using ImGuiNET;
 
@@ -21,62 +16,48 @@ public sealed class CompactVM : ImguiVM
 {
     private readonly ApiController _apiController;
     private readonly DalamudUtilService _dalamudUtilService;
-    private readonly Func<string, Pair, DrawUserPair> _drawUserPairFactory;
     private readonly MareConfigService _mareConfigService;
-    private readonly PairManager _pairManager;
+    private readonly MareMediator _mediator;
     private readonly ServerConfigurationManager _serverConfigurationManager;
-    private string _characterFilter = string.Empty;
 
-    private Stopwatch _timeout = new();
-
-    public CompactVM(ILogger<CompactVM> logger, MareMediator mediator, PairManager pairManager, ApiController apiController, DalamudUtilService dalamudUtilService,
-                    MareConfigService mareConfigService, Func<string, Pair, DrawUserPair> drawUserPairFactory, ServerConfigurationManager serverConfigurationManager) : base(logger, mediator)
+    public CompactVM(MareMediator mediator, ApiController apiController, DalamudUtilService dalamudUtilService,
+                    MareConfigService mareConfigService, ServerConfigurationManager serverConfigurationManager)
     {
-        _pairManager = pairManager;
+        _mediator = mediator;
         _apiController = apiController;
         _dalamudUtilService = dalamudUtilService;
         _mareConfigService = mareConfigService;
-        _drawUserPairFactory = drawUserPairFactory;
         _serverConfigurationManager = serverConfigurationManager;
-
-        Mediator.Subscribe<PairManagerUpdateMessage>(this, OnPairManagerUpdate);
-
-        RecreateLazy();
 
         SetupCommands();
     }
 
-    public ButtonCommand AddPairCommand { get; private set; } = new();
-    public string CharacterOrCommentFilter
-    {
-        get => _characterFilter;
-        private set
-        {
-            _characterFilter = value;
-            RecreateLazy();
-        }
-    }
+    public ButtonCommand AddCurrentUserCommand { get; private set; } = new();
+
     public ButtonCommand ConnectCommand { get; private set; } = new();
+
     public ButtonCommand CopyUidCommand { get; private set; } = new();
+
     public ButtonCommand EditUserProfileCommand { get; private set; } = new();
-    public Lazy<List<Pair>> FilteredUsers { get; private set; } = new();
+
     public bool IsConnected => _apiController.ServerState is ServerState.Connected;
+
     public bool IsNoSecretKey => _apiController.ServerState is ServerState.NoSecretKey;
+
     public bool IsReconnecting => _apiController.ServerState is (ServerState.Reconnecting or ServerState.Disconnecting);
-    public Pair? LastAddedUser { get; private set; }
-    public string LastAddedUserComment { get; private set; } = string.Empty;
+
     public bool ManuallyDisconnected => _serverConfigurationManager.CurrentServer!.FullPause;
-    public Lazy<List<DrawUserPair>> OfflineUsers { get; private set; } = new();
+
     public int OnlineUserCount => _apiController.OnlineUsers;
-    public Lazy<List<DrawUserPair>> OnlineUsers { get; private set; } = new();
-    public bool OpenPopupOnAdd => _mareConfigService.Current.OpenPopupOnAdd;
+
     public ButtonCommand OpenSettingsCommand { get; private set; } = new();
-    public string PairToAdd { get; private set; } = string.Empty;
-    public ButtonCommand PauseAllCommand { get; private set; } = new();
-    public ButtonCommand ReverseSortCommand { get; private set; } = new();
+
     public int SecretKeyIdx { get; set; } = 0;
+
     public Dictionary<int, SecretKey> SecretKeys => _serverConfigurationManager.CurrentServer!.SecretKeys;
+
     public string ServerName => _serverConfigurationManager.CurrentServer.ServerName;
+
     public string ShardString =>
 #if DEBUG
                 $"Shard: {_apiController.ServerInfo.ShardName}"
@@ -84,37 +65,10 @@ public sealed class CompactVM : ImguiVM
     string.Equals(_apiController.ServerInfo.ShardName, "Main", StringComparison.OrdinalIgnoreCase) ? string.Empty : $"Shard: {_apiController.ServerInfo.ShardName}"
 #endif
     ;
+
     public bool ShowCharacterNameInsteadOfNotesForVisible => _mareConfigService.Current.ShowCharacterNameInsteadOfNotesForVisible;
+
     public (Version Version, bool IsCurrent) Version => (_apiController.CurrentClientVersion, _apiController.IsCurrentVersion);
-    public Lazy<List<DrawUserPair>> VisibleUsers { get; private set; } = new();
-    private bool ReverseUserSort
-    {
-        get => _mareConfigService.Current.ReverseUserSort;
-        set
-        {
-            _mareConfigService.Current.ReverseUserSort = value;
-            _mareConfigService.Save();
-            RecreateLazy();
-        }
-    }
-
-    public void AddPair()
-    {
-        _ = _apiController.UserAddPair(new(new(PairToAdd)));
-        PairToAdd = string.Empty;
-    }
-
-    public bool CheckLastAddedUser()
-    {
-        if (LastAddedUser != null) return true;
-        if (_pairManager.LastAddedUser == null) return false;
-
-        LastAddedUser = _pairManager.LastAddedUser;
-        _pairManager.LastAddedUser = null;
-        LastAddedUserComment = string.Empty;
-
-        return true;
-    }
 
     public string GetServerError()
     {
@@ -171,15 +125,7 @@ public sealed class CompactVM : ImguiVM
         };
     }
 
-    public void SetNoteForLastAddedUser()
-    {
-        if (LastAddedUser == null) return;
-        _serverConfigurationManager.SetNoteForUid(LastAddedUser.UserData.UID, LastAddedUserComment);
-        LastAddedUser = null;
-        LastAddedUserComment = string.Empty;
-    }
-
-    internal void AddCurrentCharacter()
+    private void AddCurrentCharacter()
     {
         _serverConfigurationManager.CurrentServer!.Authentications.Add(new MareConfiguration.Models.Authentication()
         {
@@ -193,125 +139,22 @@ public sealed class CompactVM : ImguiVM
         _ = _apiController.CreateConnections(forceGetToken: true);
     }
 
-    internal void ToggleConnection()
-    {
-        _serverConfigurationManager.CurrentServer.FullPause = !_serverConfigurationManager.CurrentServer.FullPause;
-        _serverConfigurationManager.Save();
-        _ = _apiController.CreateConnections();
-    }
-
-    private Lazy<List<Pair>> FilteredUserLazy() => new Lazy<List<Pair>>(_pairManager.DirectPairs.Where(p =>
-                                        {
-                                            if (string.IsNullOrEmpty(CharacterOrCommentFilter)) return true;
-                                            return p.UserData.AliasOrUID.Contains(CharacterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ||
-                                                    (p.GetNote()?.Contains(CharacterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                                                    (p.PlayerName?.Contains(CharacterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false);
-                                        }).ToList());
-
-    private void OnPairManagerUpdate(PairManagerUpdateMessage obj)
-    {
-        RecreateLazy();
-    }
-
-    private void RecreateLazy()
-    {
-        Logger.LogTrace("Recreating UI Pairs Lazily");
-
-        FilteredUsers = FilteredUserLazy();
-
-        var users = FilteredUsers.Value
-            .OrderBy(
-                u => ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
-                    ? u.PlayerName
-                    : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase).ToList();
-
-        if (ReverseUserSort)
-        {
-            users.Reverse();
-        }
-
-        OnlineUsers = new Lazy<List<DrawUserPair>>(users.Where(u => u.IsOnline || u.UserPair!.OwnPermissions.IsPaused())
-            .Select(c => _drawUserPairFactory("Online" + c.UserData.UID, c)).ToList());
-        VisibleUsers = new Lazy<List<DrawUserPair>>(users.Where(u => u.IsVisible)
-            .Select(c => _drawUserPairFactory("Visible" + c.UserData.UID, c)).ToList());
-        OfflineUsers = new Lazy<List<DrawUserPair>>(users.Where(u => !u.IsOnline && !u.UserPair!.OwnPermissions.IsPaused())
-            .Select(c => _drawUserPairFactory("Offline" + c.UserData.UID, c)).ToList());
-    }
-
     private void SetupCommands()
     {
-        PauseAllCommand = new ButtonCommand()
-            .WithRequireCtrl()
-            .WithState(0, new ButtonCommand.ButtonCommandContent()
-                .WithIcon(FontAwesomeIcon.Play)
-                .WithAction(() =>
-                {
-                    foreach (Pair user in FilteredUsers.Value.ToList())
-                    {
-                        var perm = user.UserPair!.OwnPermissions;
-                        perm.SetPaused(false);
-                        _ = _apiController.UserSetPairPermissions(new(user.UserData, perm));
-                    }
-                    _timeout = Stopwatch.StartNew();
-                })
-                .WithTooltip(() => "Resume " + FilteredUsers.Value.Count + " users")
-                )
-            .WithState(1, new ButtonCommand.ButtonCommandContent()
-                .WithIcon(FontAwesomeIcon.Pause)
-                .WithAction(() =>
-                {
-                    foreach (Pair user in FilteredUsers.Value.ToList())
-                    {
-                        var perm = user.UserPair!.OwnPermissions;
-                        perm.SetPaused(true);
-                        _ = _apiController.UserSetPairPermissions(new(user.UserData, perm));
-                    }
-                    _timeout = Stopwatch.StartNew();
-                })
-                .WithTooltip(() => "Pause " + FilteredUsers.Value.Count + " users"))
-            .WithState(2, new ButtonCommand.ButtonCommandContent()
-                .WithIcon(FontAwesomeIcon.Clock)
-                .WithEnabled(false)
-                .WithTooltip(() => $"Wait {TimeSpan.FromMilliseconds(15000 - _timeout.ElapsedMilliseconds).TotalSeconds.ToString("0")}s until you can pause/resume again"))
-            .WithStateSelector(() =>
-            {
-                if (_timeout.IsRunning && _timeout.ElapsedMilliseconds < 15000)
-                {
-                    return 2;
-                }
-                if (_timeout.IsRunning && _timeout.ElapsedMilliseconds > 15000)
-                {
-                    _timeout.Stop();
-                }
-                if (FilteredUsers.Value.All(p => p.IsPaused)) return 0;
-                return 1;
-            });
-
-        ReverseSortCommand = new ButtonCommand()
-            .WithState(0, new ButtonCommand.ButtonCommandContent()
-                .WithIcon(FontAwesomeIcon.ArrowDown)
-                .WithAction(() => ReverseUserSort = !ReverseUserSort)
-                .WithTooltip("Sort users descending by name"))
-            .WithState(1, new ButtonCommand.ButtonCommandContent()
-                .WithIcon(FontAwesomeIcon.ArrowUp)
-                .WithAction(() => ReverseUserSort = !ReverseUserSort)
-                .WithTooltip("Sort users ascending by name"))
-            .WithStateSelector(() => ReverseUserSort ? 1 : 0);
-
         EditUserProfileCommand = new ButtonCommand()
-            .WithState(0, new ButtonCommand.ButtonCommandContent()
+            .WithState(0, new ButtonCommand.State()
                 .WithIcon(FontAwesomeIcon.UserCircle)
-                .WithAction(() => Mediator.Publish(new UiToggleMessage(typeof(EditProfileUi))))
+                .WithAction(() => _mediator.Publish(new UiToggleMessage(typeof(EditProfileUi))))
                 .WithTooltip("Edit your Mare Profile"));
 
         ConnectCommand = new ButtonCommand()
-            .WithState(0, new ButtonCommand.ButtonCommandContent()
+            .WithState(0, new ButtonCommand.State()
                 .WithIcon(FontAwesomeIcon.Link)
                 .WithAction(ToggleConnection)
                 .WithTooltip("Disconnect from " + ServerName)
                 .WithForeground(ImGuiColors.HealerGreen)
                 .WithEnabled(() => !IsReconnecting))
-            .WithState(1, new ButtonCommand.ButtonCommandContent()
+            .WithState(1, new ButtonCommand.State()
                 .WithAction(ToggleConnection)
                 .WithIcon(FontAwesomeIcon.Unlink)
                 .WithForeground(ImGuiColors.DalamudRed)
@@ -320,36 +163,28 @@ public sealed class CompactVM : ImguiVM
             .WithStateSelector(() => ManuallyDisconnected ? 1 : 0);
 
         CopyUidCommand = new ButtonCommand()
-            .WithState(0, new ButtonCommand.ButtonCommandContent()
+            .WithState(0, new ButtonCommand.State()
                 .WithIcon(FontAwesomeIcon.Copy)
                 .WithTooltip("Copy your UID to clipboard")
                 .WithAction(() => ImGui.SetClipboardText(_apiController.DisplayName)));
 
         OpenSettingsCommand = new ButtonCommand()
-            .WithState(0, new ButtonCommand.ButtonCommandContent()
+            .WithState(0, new ButtonCommand.State()
                 .WithIcon(FontAwesomeIcon.Cog)
                 .WithTooltip("Open Settings")
-                .WithAction(() => Mediator.Publish(new UiToggleMessage(typeof(SettingsUi)))));
+                .WithAction(() => _mediator.Publish(new UiToggleMessage(typeof(SettingsUi)))));
 
-        AddPairCommand = new ButtonCommand()
-            .WithState(0, new ButtonCommand.ButtonCommandContent()
+        AddCurrentUserCommand = new ButtonCommand()
+            .WithState(0, new ButtonCommand.State()
                 .WithIcon(FontAwesomeIcon.Plus)
-                .WithTooltip(() => "Pair with " + PairToAdd)
-                .WithAction(AddPair))
-            .WithState(1, new ButtonCommand.ButtonCommandContent()
-                .WithIcon(FontAwesomeIcon.Plus)
-                .WithEnabled(false)
-                .WithTooltip("Enter a UID to pair with that user"))
-            .WithState(2, new ButtonCommand.ButtonCommandContent()
-                .WithIcon(FontAwesomeIcon.Ban)
-                .WithForeground(ImGuiColors.DalamudRed)
-                .WithEnabled(false)
-                .WithTooltip(() => "You are already paired with " + PairToAdd))
-            .WithStateSelector(() =>
-            {
-                if (string.IsNullOrEmpty(PairToAdd)) return 1;
-                if (_pairManager.DirectPairs.Any(p => string.Equals(p.UserData.UID, PairToAdd, StringComparison.Ordinal) || string.Equals(p.UserData.Alias, PairToAdd, StringComparison.Ordinal))) return 2;
-                return 0;
-            });
+                .WithText("Add current character with secret key")
+                .WithAction(AddCurrentCharacter));
+    }
+
+    private void ToggleConnection()
+    {
+        _serverConfigurationManager.CurrentServer.FullPause = !_serverConfigurationManager.CurrentServer.FullPause;
+        _serverConfigurationManager.Save();
+        _ = _apiController.CreateConnections();
     }
 }

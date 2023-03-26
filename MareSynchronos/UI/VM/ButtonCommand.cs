@@ -6,11 +6,11 @@ namespace MareSynchronos.UI.VM;
 
 public class ButtonCommand
 {
-    private readonly Dictionary<int, ButtonCommandContent> _dict = new Dictionary<int, ButtonCommandContent>();
+    private readonly Dictionary<int, State> _dict = new Dictionary<int, State>();
 
+    public Func<int> InternalState { get; private set; } = () => 0;
     public bool RequireCtrl { get; private set; } = false;
-    public Func<int> State { get; private set; } = () => 0;
-    public ButtonCommandContent StatefulCommandContent => _dict.GetValueOrDefault(State.Invoke(), new ButtonCommandContent());
+    public State StatefulCommandContent => _dict.GetValueOrDefault(InternalState.Invoke(), new State());
 
     public ButtonCommand WithRequireCtrl()
     {
@@ -18,7 +18,7 @@ public class ButtonCommand
         return this;
     }
 
-    public ButtonCommand WithState(int state, ButtonCommandContent command)
+    public ButtonCommand WithState(int state, State command)
     {
         _dict[state] = command;
         return this;
@@ -26,11 +26,11 @@ public class ButtonCommand
 
     public ButtonCommand WithStateSelector(Func<int> func)
     {
-        State = func;
+        InternalState = func;
         return this;
     }
 
-    public class ButtonCommandContent
+    public class State
     {
         public Func<string> ButtonText { get; private set; } = () => string.Empty;
         public Func<bool> Enabled { get; private set; } = () => true;
@@ -39,67 +39,67 @@ public class ButtonCommand
         public Action OnClick { get; private set; } = () => { };
         public Func<string> Tooltip { get; private set; } = () => string.Empty;
 
-        public ButtonCommandContent WithAction(Action act)
+        public State WithAction(Action act)
         {
             OnClick = act;
             return this;
         }
 
-        public ButtonCommandContent WithEnabled(bool enabled)
+        public State WithEnabled(bool enabled)
         {
             Enabled = () => enabled;
             return this;
         }
 
-        public ButtonCommandContent WithEnabled(Func<bool> enabled)
+        public State WithEnabled(Func<bool> enabled)
         {
             Enabled = enabled;
             return this;
         }
 
-        public ButtonCommandContent WithForeground(Func<Vector4> color)
+        public State WithForeground(Func<Vector4> color)
         {
             Foreground = color;
             return this;
         }
 
-        public ButtonCommandContent WithForeground(Vector4 color)
+        public State WithForeground(Vector4 color)
         {
             Foreground = () => color;
             return this;
         }
 
-        public ButtonCommandContent WithIcon(FontAwesomeIcon icon)
+        public State WithIcon(FontAwesomeIcon icon)
         {
             Icon = () => icon;
             return this;
         }
 
-        public ButtonCommandContent WithIcon(Func<FontAwesomeIcon> icon)
+        public State WithIcon(Func<FontAwesomeIcon> icon)
         {
             Icon = icon;
             return this;
         }
 
-        public ButtonCommandContent WithText(string text)
+        public State WithText(string text)
         {
             ButtonText = () => text;
             return this;
         }
 
-        public ButtonCommandContent WithText(Func<string> text)
+        public State WithText(Func<string> text)
         {
             ButtonText = text;
             return this;
         }
 
-        public ButtonCommandContent WithTooltip(string text)
+        public State WithTooltip(string text)
         {
             Tooltip = () => text;
             return this;
         }
 
-        public ButtonCommandContent WithTooltip(Func<string> text)
+        public State WithTooltip(Func<string> text)
         {
             Tooltip = text;
             return this;

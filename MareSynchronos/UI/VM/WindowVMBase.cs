@@ -12,6 +12,12 @@ public abstract class WindowVMBase<T> : WindowMediatorSubscriberBase where T : I
         VM = vm;
     }
 
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        Mediator.UnsubscribeAll(this);
+    }
+
     protected Lazy<T1> GetLazyVM<T1>() where T1 : ImguiVM
     {
         return new Lazy<T1>(VM.As<T1>());

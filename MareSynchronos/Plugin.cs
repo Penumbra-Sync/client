@@ -77,6 +77,11 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<PairGroupsUi>();
             collection.AddSingleton<GroupPanel>();
             collection.AddSingleton<TagHandler>();
+            collection.AddSingleton<CompactTransferUiElement>();
+            collection.AddSingleton<TransferVM>();
+            collection.AddSingleton<IndividualPairVM>();
+            collection.AddSingleton<IndividualPairUiElement>();
+
             collection.AddSingleton((s) => new DalamudUtilService(s.GetRequiredService<ILogger<DalamudUtilService>>(),
                 clientState, objectTable, framework, gameGui, condition, gameData,
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<PerformanceCollectorService>()));
