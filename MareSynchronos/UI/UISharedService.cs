@@ -354,18 +354,21 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.PopFont();
     }
 
-    public static bool IconTextButton(FontAwesomeIcon icon, string text)
+    public static bool IconTextButton(FontAwesomeIcon icon, string text, Vector2? size = null)
     {
         var buttonClicked = false;
 
-        var iconSize = GetIconSize(icon);
-        var textSize = ImGui.CalcTextSize(text);
         var padding = ImGui.GetStyle().FramePadding;
-        var spacing = ImGui.GetStyle().ItemSpacing;
 
-        var buttonSizeX = iconSize.X + textSize.X + padding.X * 2 + spacing.X;
-        var buttonSizeY = (iconSize.Y > textSize.Y ? iconSize.Y : textSize.Y) + padding.Y * 2;
-        var buttonSize = new Vector2(buttonSizeX, buttonSizeY);
+        Vector2 buttonSize;
+        if (size == null)
+        {
+            buttonSize = GetIconTextButtonSize(icon, text);
+        }
+        else
+        {
+            buttonSize = size.Value;
+        }
 
         if (ImGui.Button("###" + icon.ToIconString() + text, buttonSize))
         {

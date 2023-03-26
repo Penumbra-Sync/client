@@ -1,18 +1,18 @@
 ﻿using ImGuiNET;
-using MareSynchronos.UI.VM;
+using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI.Components;
 
 public class PopupModal
 {
-    private readonly ConditionalModalVM _modal;
+    private readonly ConditionalModal _modal;
 
-    private PopupModal(ConditionalModalVM modal)
+    private PopupModal(ConditionalModal modal)
     {
         _modal = modal;
     }
 
-    public static PopupModal FromConditionalModal(ConditionalModalVM conditionalModal)
+    public static PopupModal FromConditionalModal(ConditionalModal conditionalModal)
     {
         return new PopupModal(conditionalModal);
     }
@@ -29,7 +29,7 @@ public class PopupModal
             _modal.OpenState = false;
         }
 
-        _modal.ExecuteWithProp<bool>(nameof(ConditionalModalVM.OpenState), (openState) =>
+        _modal.ExecuteWithProp<bool>(nameof(ConditionalModal.OpenState), (openState) =>
         {
             if (ImGui.BeginPopupModal(_modal.Name, ref openState, UiSharedService.PopupWindowFlags))
             {
@@ -38,5 +38,10 @@ public class PopupModal
             }
             return openState;
         });
+
+        if (!_modal.OpenState)
+        {
+            _modal.OnClose.Invoke();
+        }
     }
 }

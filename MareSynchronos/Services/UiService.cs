@@ -5,8 +5,8 @@ using MareSynchronos.UI;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
-using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.UI.VM;
+using MareSynchronos.UI.Components;
 
 namespace MareSynchronos.Services;
 
@@ -21,8 +21,8 @@ public sealed class UiService : DisposableMediatorSubscriberBase
 
     public UiService(ILogger<UiService> logger, DalamudPluginInterface dalamudPluginInterface,
         MareConfigService mareConfigService, WindowSystem windowSystem,
-        IEnumerable<WindowMediatorSubscriberBase> windows, IEnumerable<WindowVMBase<ImguiVM>> vmWindows,
-        Func<Pair, StandaloneProfileUi> standaloneProfileUiFactory,
+        IEnumerable<WindowMediatorSubscriberBase> windows,
+        Func<DrawPairVMBase, StandaloneProfileUi> standaloneProfileUiFactory,
         FileDialogManager fileDialogManager, MareMediator mareMediator) : base(logger, mareMediator)
     {
         _logger = logger;
@@ -41,15 +41,10 @@ public sealed class UiService : DisposableMediatorSubscriberBase
             _windowSystem.AddWindow(window);
         }
 
-        foreach (var window in vmWindows)
-        {
-            _windowSystem.AddWindow(window);
-        }
-
         Mediator.Subscribe<ProfileOpenStandaloneMessage>(this, (msg) =>
         {
             if (!_createdWindows.Any(p => p is StandaloneProfileUi
-            && string.Equals(((StandaloneProfileUi)p).Pair.UserData.AliasOrUID, msg.Pair.UserData.AliasOrUID, StringComparison.Ordinal)))
+                && string.Equals(((StandaloneProfileUi)p).Pair.DisplayName, msg.Pair.DisplayName, StringComparison.Ordinal)))
             {
                 var window = standaloneProfileUiFactory(msg.Pair);
                 _createdWindows.Add(window);

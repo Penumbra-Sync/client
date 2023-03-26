@@ -79,8 +79,8 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<TagHandler>();
             collection.AddSingleton<CompactTransferUiElement>();
             collection.AddSingleton<TransferVM>();
-            collection.AddSingleton<IndividualPairVM>();
-            collection.AddSingleton<IndividualPairUiElement>();
+            collection.AddSingleton<IndividualPairListVM>();
+            collection.AddSingleton<IndividualPairListUiElement>();
 
             collection.AddSingleton((s) => new DalamudUtilService(s.GetRequiredService<ILogger<DalamudUtilService>>(),
                 clientState, objectTable, framework, gameGui, condition, gameData,
@@ -128,22 +128,28 @@ public sealed class Plugin : IDalamudPlugin
                         s.GetRequiredService<FileTransferOrchestrator>(),
                         s.GetRequiredService<FileCacheManager>())));
             collection.AddSingleton(s =>
-                new Func<Pair, StandaloneProfileUi>((pair) =>
+                new Func<DrawPairVMBase, StandaloneProfileUi>((pair) =>
                     new StandaloneProfileUi(s.GetRequiredService<ILogger<StandaloneProfileUi>>(),
                     s.GetRequiredService<MareMediator>(),
                     s.GetRequiredService<UiSharedService>(),
                     s.GetRequiredService<ServerConfigurationManager>(),
                     s.GetRequiredService<MareProfileManager>(), pair)));
             collection.AddSingleton(s =>
-                new Func<string, Pair, DrawUserPair>((i, p) =>
-                    new DrawUserPair(i, p, s.GetRequiredService<UidDisplayHandler>(), s.GetRequiredService<ApiController>(), s.GetRequiredService<SelectGroupForPairUi>())
+                new Func<DrawUserPairVM, DrawUserPair>((v) =>
+                    new DrawUserPair(v, s.GetRequiredService<UidDisplayHandler>(), s.GetRequiredService<ApiController>())
+                ));
+            collection.AddSingleton(s =>
+                new Func<Pair, DrawUserPairVM>((p) =>
+                    new DrawUserPairVM(p, s.GetRequiredService<MareMediator>(), s.GetRequiredService<ApiController>(),
+                        s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<MareConfigService>(),
+                        s.GetRequiredService<SelectGroupForPairUi>())
                 ));
 
             // add scoped services
             collection.AddScoped<CompactVM>();
             collection.AddScoped<PeriodicFileScanner>();
             collection.AddScoped<WindowMediatorSubscriberBase, SettingsUi>();
-            collection.AddScoped<WindowVMBase<ImguiVM>, CompactUi>();
+            collection.AddScoped<WindowMediatorSubscriberBase, CompactUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, GposeUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, IntroUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, DownloadUi>();
@@ -156,8 +162,8 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddScoped<PlayerDataFactory>();
             collection.AddScoped<OnlinePlayerManager>();
             collection.AddScoped((s) => new UiService(s.GetRequiredService<ILogger<UiService>>(), pluginInterface, s.GetRequiredService<MareConfigService>(),
-                s.GetRequiredService<WindowSystem>(), s.GetServices<WindowMediatorSubscriberBase>(), s.GetServices<WindowVMBase<ImguiVM>>(),
-                s.GetRequiredService<Func<Pair, StandaloneProfileUi>>(),
+                s.GetRequiredService<WindowSystem>(), s.GetServices<WindowMediatorSubscriberBase>(),
+                s.GetRequiredService<Func<DrawPairVMBase, StandaloneProfileUi>>(),
                 s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareMediator>()));
             collection.AddScoped((s) => new CommandManagerService(commandManager, s.GetRequiredService<PerformanceCollectorService>(), s.GetRequiredService<UiService>(),
                 s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<PeriodicFileScanner>(), s.GetRequiredService<ApiController>(), s.GetRequiredService<MareMediator>()));

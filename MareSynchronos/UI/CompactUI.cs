@@ -11,11 +11,11 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
-public class CompactUi : WindowVMBase<ImguiVM>
+public class CompactUi : WindowMediatorSubscriberBase
 {
     private readonly CompactVM _compactVM;
     private readonly GroupPanel _groupPanel;
-    private readonly IndividualPairUiElement _pairUiElement;
+    private readonly IndividualPairListUiElement _pairUiElement;
     private readonly CompactTransferUiElement _transferUi;
     private readonly UiSharedService _uiShared;
     private float _filterHeight;
@@ -27,7 +27,7 @@ public class CompactUi : WindowVMBase<ImguiVM>
     private float _windowContentWidth;
 
     public CompactUi(CompactVM compactVM, ILogger<CompactUi> logger, MareMediator mediator, UiSharedService uiShared,
-        IndividualPairUiElement pairUiElement, GroupPanel groupPanel, CompactTransferUiElement transferUi) : base(compactVM, logger, mediator, "###MareSynchronosMainUI")
+        IndividualPairListUiElement pairUiElement, GroupPanel groupPanel, CompactTransferUiElement transferUi) : base(logger, mediator, "###MareSynchronosMainUI")
     {
         _uiShared = uiShared;
         _pairUiElement = pairUiElement;

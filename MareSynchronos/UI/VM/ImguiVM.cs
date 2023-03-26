@@ -1,7 +1,4 @@
-﻿using MareSynchronos.Services.Mediator;
-using Microsoft.Extensions.Logging;
-
-namespace MareSynchronos.UI.VM;
+﻿namespace MareSynchronos.UI.VM;
 
 public abstract class ImguiVM
 {

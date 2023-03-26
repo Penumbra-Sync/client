@@ -1,14 +1,7 @@
-﻿using Dalamud.Interface.Colors;
-using Dalamud.Interface.Components;
-using Dalamud.Interface;
-using ImGuiNET;
-using MareSynchronos.PlayerData.Pairs;
-using MareSynchronos.API.Data.Extensions;
+﻿using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.WebAPI;
-using MareSynchronos.API.Dto.User;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.API.Dto.Group;
-using MareSynchronos.API.Data.Enum;
 
 namespace MareSynchronos.UI.Components;
 
@@ -20,7 +13,7 @@ public class DrawGroupPair : DrawPairBase
     private bool _banUserPopupOpen;
     private bool _showModalBanUser;
 
-    public DrawGroupPair(string id, Pair entry, ApiController apiController, GroupFullInfoDto group, GroupPairFullInfoDto fullInfoDto, UidDisplayHandler handler) : base(id, entry, apiController, handler)
+    public DrawGroupPair(string id, Pair entry, ApiController apiController, GroupFullInfoDto group, GroupPairFullInfoDto fullInfoDto, UidDisplayHandler handler) : base(null, apiController, handler)
     {
         _group = group;
         _fullInfoDto = fullInfoDto;
@@ -28,6 +21,8 @@ public class DrawGroupPair : DrawPairBase
 
     protected override void DrawLeftSide(float textPosY, float originalY)
     {
+        // TODO: fix
+        /*
         var entryUID = _pair.UserData.AliasOrUID;
         var entryIsMod = _fullInfoDto.GroupPairStatusInfo.IsModerator();
         var entryIsOwner = string.Equals(_pair.UserData.UID, _group.OwnerUID, StringComparison.Ordinal);
@@ -80,11 +75,14 @@ public class DrawGroupPair : DrawPairBase
             ImGui.SetCursorPosY(textPosY);
             UiSharedService.FontText(FontAwesomeIcon.Thumbtack.ToIconString(), UiBuilder.IconFont);
             UiSharedService.AttachToolTip("User is pinned in this Syncshell");
-        }
+        }*/
     }
 
     protected override float DrawRightSide(float textPosY, float originalY)
     {
+        return 0;
+        // TODO: fix
+        /*
         var entryUID = _fullInfoDto.UserAliasOrUID;
         var entryIsMod = _fullInfoDto.GroupPairStatusInfo.IsModerator();
         var entryIsOwner = string.Equals(_pair.UserData.UID, _group.OwnerUID, StringComparison.Ordinal);
@@ -257,14 +255,15 @@ public class DrawGroupPair : DrawPairBase
             {
                 if (UiSharedService.IconTextButton(FontAwesomeIcon.User, "Open Profile"))
                 {
-                    _displayHandler.OpenProfile(_pair);
+                    // todo
+                    //_displayHandler.OpenProfile(_pair);
                     ImGui.CloseCurrentPopup();
                 }
                 UiSharedService.AttachToolTip("Opens the profile for this user in a new window");
                 if (UiSharedService.IconTextButton(FontAwesomeIcon.ExclamationTriangle, "Report Mare Profile"))
                 {
                     ImGui.CloseCurrentPopup();
-                    _showModalReport = true;
+                    //_showModalReport = true;
                 }
                 UiSharedService.AttachToolTip("Report this users Mare Profile to the administrative team");
             }
@@ -295,6 +294,6 @@ public class DrawGroupPair : DrawPairBase
             ImGui.EndPopup();
         }
 
-        return pos - spacing;
+        return pos - spacing;*/
     }
 }

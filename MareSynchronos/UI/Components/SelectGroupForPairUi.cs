@@ -131,6 +131,6 @@ public class SelectGroupForPairUi
 
     private string PairName(Pair pair)
     {
-        return _uidDisplayHandler.GetPlayerText(pair).text;
+        return pair.GetNote() ?? pair.UserData.AliasOrUID;
     }
 }

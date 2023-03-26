@@ -57,7 +57,8 @@ public class Pair
         {
             args.AddCustomItem(new GameObjectContextMenuItem("[Mare] Open Profile", (a) =>
             {
-                _mediator.Publish(new ProfileOpenStandaloneMessage(this));
+                // todo: fix
+                //_mediator.Publish(new ProfileOpenStandaloneMessage(this));
             }));
         }
         args.AddCustomItem(new GameObjectContextMenuItem("[Mare] Reapply last data", (a) =>

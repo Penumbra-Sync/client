@@ -1,7 +1,6 @@
 ﻿using System.Numerics;
 using Dalamud.Interface;
 using ImGuiNET;
-using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI.Components;
@@ -9,20 +8,18 @@ namespace MareSynchronos.UI.Components;
 public class SelectPairForGroupUi
 {
     private readonly TagHandler _tagHandler;
-    private readonly UidDisplayHandler _uidDisplayHandler;
     private string _filter = string.Empty;
     private bool _opened = false;
     private HashSet<string> _peopleInGroup = new(StringComparer.Ordinal);
     private bool _show = false;
     private string _tag = string.Empty;
 
-    public SelectPairForGroupUi(TagHandler tagHandler, UidDisplayHandler uidDisplayHandler)
+    public SelectPairForGroupUi(TagHandler tagHandler)
     {
         _tagHandler = tagHandler;
-        _uidDisplayHandler = uidDisplayHandler;
     }
 
-    public void Draw(List<Pair> pairs)
+    public void Draw(List<DrawUserPairVM> pairs)
     {
         var workHeight = ImGui.GetMainViewport().WorkSize.Y / ImGuiHelpers.GlobalScale;
         var minSize = new Vector2(300, workHeight < 400 ? workHeight : 400) * ImGuiHelpers.GlobalScale;
@@ -84,8 +81,8 @@ public class SelectPairForGroupUi
         _show = true;
     }
 
-    private string PairName(Pair pair)
+    private string PairName(DrawUserPairVM pair)
     {
-        return _uidDisplayHandler.GetPlayerText(pair).text;
+        return pair.GetNote() ?? pair.DisplayName;
     }
 }

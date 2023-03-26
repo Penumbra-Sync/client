@@ -7,14 +7,14 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI.Components;
 
-public class IndividualPairUiElement : WindowElementVMBase<ImguiVM>
+public class IndividualPairListUiElement : WindowElementVMBase<ImguiVM>
 {
     private readonly PairGroupsUi _pairGroupsUi;
-    private readonly IndividualPairVM _pairVM;
+    private readonly IndividualPairListVM _pairVM;
     private readonly SelectGroupForPairUi _selectGroupForPairUi;
     private readonly SelectPairForGroupUi _selectPairForGroupUi;
 
-    public IndividualPairUiElement(IndividualPairVM pairVM, ILogger<IndividualPairUiElement> logger, MareMediator mediator,
+    public IndividualPairListUiElement(IndividualPairListVM pairVM, ILogger<IndividualPairListUiElement> logger, MareMediator mediator,
         PairGroupsUi pairGroupsUi, SelectPairForGroupUi selectPairForGroupUi, SelectGroupForPairUi selectGroupForPairUi) : base(pairVM, logger, mediator)
     {
         _pairVM = pairVM;
@@ -39,6 +39,7 @@ public class IndividualPairUiElement : WindowElementVMBase<ImguiVM>
 
         UiSharedService.DrawWithID("group-user-popup", () => _selectPairForGroupUi.Draw(_pairVM.FilteredUsers.Value));
         UiSharedService.DrawWithID("grouping-popup", () => _selectGroupForPairUi.Draw());
+
         UiSharedService.DrawWithID("addpair", DrawAddPair);
         UiSharedService.DrawWithID("pairs", () => DrawPairs(transferPartHeight, windowContentWidth));
         var filter = ImGui.GetCursorPosY();
@@ -52,7 +53,7 @@ public class IndividualPairUiElement : WindowElementVMBase<ImguiVM>
         var addPairButtonSize = addPairButton.GetSize();
 
         ImGui.SetNextItemWidth(UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - addPairButtonSize.X);
-        VM.ExecuteWithProp<string>(nameof(IndividualPairVM.PairToAdd), (pairToAdd) =>
+        VM.ExecuteWithProp<string>(nameof(IndividualPairListVM.PairToAdd), (pairToAdd) =>
         {
             ImGui.InputTextWithHint("##otheruid", "Other players UID/Alias", ref pairToAdd, 20);
             return pairToAdd;
@@ -76,7 +77,7 @@ public class IndividualPairUiElement : WindowElementVMBase<ImguiVM>
         ImGui.SameLine();
 
         ImGui.SetNextItemWidth(windowContentWidth - buttonSize.X - reverseButtonSize.X - ImGui.GetStyle().ItemSpacing.X * 2);
-        VM.ExecuteWithProp<string>(nameof(IndividualPairVM.CharacterOrCommentFilter), (str) =>
+        VM.ExecuteWithProp<string>(nameof(IndividualPairListVM.CharacterOrCommentFilter), (str) =>
         {
             ImGui.InputTextWithHint("##filter", "Filter for UID/notes", ref str, 255);
             return str;

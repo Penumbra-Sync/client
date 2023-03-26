@@ -8,9 +8,16 @@ public class ButtonCommand
 {
     private readonly Dictionary<int, State> _dict = new Dictionary<int, State>();
 
+    public bool ClosePopup { get; private set; } = false;
     public Func<int> InternalState { get; private set; } = () => 0;
     public bool RequireCtrl { get; private set; } = false;
     public State StatefulCommandContent => _dict.GetValueOrDefault(InternalState.Invoke(), new State());
+
+    public ButtonCommand WithClosePopup()
+    {
+        ClosePopup = true;
+        return this;
+    }
 
     public ButtonCommand WithRequireCtrl()
     {
@@ -38,6 +45,7 @@ public class ButtonCommand
         public Func<FontAwesomeIcon> Icon { get; private set; } = () => FontAwesomeIcon.None;
         public Action OnClick { get; private set; } = () => { };
         public Func<string> Tooltip { get; private set; } = () => string.Empty;
+        public Func<bool> Visibility { get; private set; } = () => true;
 
         public State WithAction(Action act)
         {
@@ -102,6 +110,18 @@ public class ButtonCommand
         public State WithTooltip(Func<string> text)
         {
             Tooltip = text;
+            return this;
+        }
+
+        public State WithVisibility(Func<bool> visibility)
+        {
+            Visibility = visibility;
+            return this;
+        }
+
+        public State WithVisibility(bool visibility)
+        {
+            Visibility = () => visibility;
             return this;
         }
     }

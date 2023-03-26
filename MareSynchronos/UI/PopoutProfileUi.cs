@@ -1,40 +1,35 @@
 ﻿using Dalamud.Interface.Colors;
 using ImGuiNET;
 using ImGuiScene;
-using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
-using MareSynchronos.Services.ServerConfiguration;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
-using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.MareConfiguration;
 using Dalamud.Interface;
+using MareSynchronos.UI.Components;
 
 namespace MareSynchronos.UI;
 
 public class PopoutProfileUi : WindowMediatorSubscriberBase
 {
     private readonly MareProfileManager _mareProfileManager;
-    private readonly ServerConfigurationManager _serverManager;
     private readonly UiSharedService _uiSharedService;
     private Vector2 _lastMainPos = Vector2.Zero;
     private Vector2 _lastMainSize = Vector2.Zero;
     private byte[] _lastProfilePicture = Array.Empty<byte>();
     private byte[] _lastSupporterPicture = Array.Empty<byte>();
-    private Pair? _pair;
+    private DrawPairVMBase? _pair;
     private TextureWrap? _supporterTextureWrap;
     private TextureWrap? _textureWrap;
 
     public PopoutProfileUi(ILogger<PopoutProfileUi> logger, MareMediator mediator, UiSharedService uiBuilder,
-        ServerConfigurationManager serverManager, MareConfigService mareConfigService,
-        MareProfileManager mareProfileManager) : base(logger, mediator, "###MareSynchronosPopoutProfileUI")
+        MareConfigService mareConfigService, MareProfileManager mareProfileManager) : base(logger, mediator, "###MareSynchronosPopoutProfileUI")
     {
         _uiSharedService = uiBuilder;
-        _serverManager = serverManager;
         _mareProfileManager = mareProfileManager;
 
-        Flags = ImGuiWindowFlags.NoDecoration;
+        Flags = ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoScrollWithMouse;
 
         Mediator.Subscribe<ProfilePopoutToggle>(this, (msg) =>
         {
@@ -52,20 +47,20 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
         {
             if (msg.Size != Vector2.Zero)
             {
-                var border = ImGui.GetStyle().WindowBorderSize;
-                var padding = ImGui.GetStyle().WindowPadding;
-                var spacing = ImGui.GetStyle().ItemSpacing;
+                var border = ImGui.GetStyle().WindowBorderSize / ImGuiHelpers.GlobalScale;
+                var padding = ImGui.GetStyle().WindowPadding / ImGuiHelpers.GlobalScale;
+                var spacing = ImGui.GetStyle().ItemSpacing / ImGuiHelpers.GlobalScale;
                 Size = new(256 + (padding.X * 2) + border, msg.Size.Y / ImGuiHelpers.GlobalScale);
                 _lastMainSize = msg.Size;
             }
             var mainPos = msg.Position == Vector2.Zero ? _lastMainPos : msg.Position;
             if (mareConfigService.Current.ProfilePopoutRight)
             {
-                Position = new(mainPos.X + _lastMainSize.X * ImGuiHelpers.GlobalScale, mainPos.Y);
+                Position = new(mainPos.X + _lastMainSize.X, mainPos.Y);
             }
             else
             {
-                Position = new(mainPos.X - Size.Value.X * ImGuiHelpers.GlobalScale, mainPos.Y);
+                Position = new(mainPos.X - Size.Value.X, mainPos.Y);
             }
 
             if (msg.Position != Vector2.Zero)
@@ -109,13 +104,13 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
             var rectMin = drawList.GetClipRectMin();
             var rectMax = drawList.GetClipRectMax();
 
-            UiSharedService.ColorFontText(_pair.UserData.AliasOrUID, _uiSharedService.UidFont, ImGuiColors.HealerGreen);
+            UiSharedService.ColorFontText(_pair.DisplayName, _uiSharedService.UidFont, ImGuiColors.HealerGreen);
             ImGui.Dummy(new(spacing.Y, spacing.Y));
             var textPos = ImGui.GetCursorPosY();
             ImGui.Separator();
             var imagePos = ImGui.GetCursorPos();
             ImGui.Dummy(new(256, 256 * ImGuiHelpers.GlobalScale + spacing.Y));
-            var note = _serverManager.GetNoteForUid(_pair.UserData.UID);
+            var note = _pair.GetNote();
             if (!string.IsNullOrEmpty(note))
             {
                 UiSharedService.ColorText(note, ImGuiColors.DalamudGrey);
@@ -127,26 +122,26 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
                 ImGui.SameLine();
                 ImGui.TextUnformatted($"({_pair.PlayerName})");
             }
-            if (_pair.UserPair != null)
+            if (_pair.IsDirectlyPaired)
             {
                 ImGui.TextUnformatted("Directly paired");
-                if (_pair.UserPair.OwnPermissions.IsPaused())
+                if (_pair.IsPausedFromSource)
                 {
                     ImGui.SameLine();
                     UiSharedService.ColorText("You: paused", ImGuiColors.DalamudYellow);
                 }
-                if (_pair.UserPair.OtherPermissions.IsPaused())
+                if (_pair.IsPausedFromTarget)
                 {
                     ImGui.SameLine();
                     UiSharedService.ColorText("They: paused", ImGuiColors.DalamudYellow);
                 }
             }
-            if (_pair.GroupPair.Any())
+            if (_pair.IsIndirectlyPaired)
             {
                 ImGui.TextUnformatted("Paired through Syncshells:");
-                foreach (var groupPair in _pair.GroupPair)
+                foreach (var group in _pair.GroupPairs.Value)
                 {
-                    ImGui.TextUnformatted("- " + groupPair.Key.GroupAliasOrGID);
+                    ImGui.TextUnformatted("- " + group);
                 }
             }
 
@@ -175,7 +170,7 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
                 new Vector2(rectMin.X + padding + remainingWidth + newWidth, rectMin.Y + spacing.Y + imagePos.Y + remainingHeight + newHeight));
             if (_supporterTextureWrap != null)
             {
-                const float iconSize = 38;
+                float iconSize = 38 * ImGuiHelpers.GlobalScale;
                 drawList.AddImage(_supporterTextureWrap.ImGuiHandle,
                     new Vector2(rectMax.X - iconSize - spacing.X, rectMin.Y + (textPos / 2) - (iconSize / 2)),
                     new Vector2(rectMax.X - spacing.X, rectMin.Y + iconSize + (textPos / 2) - (iconSize / 2)));

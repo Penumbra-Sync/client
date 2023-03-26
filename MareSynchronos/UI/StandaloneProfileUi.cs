@@ -1,14 +1,13 @@
 ﻿using Dalamud.Interface.Colors;
 using ImGuiNET;
 using ImGuiScene;
-using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
-using MareSynchronos.API.Data.Extensions;
 using Dalamud.Interface;
+using MareSynchronos.UI.Components;
 
 namespace MareSynchronos.UI;
 
@@ -24,8 +23,8 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
     private TextureWrap? _textureWrap;
 
     public StandaloneProfileUi(ILogger<StandaloneProfileUi> logger, MareMediator mediator, UiSharedService uiBuilder,
-        ServerConfigurationManager serverManager, MareProfileManager mareProfileManager, Pair pair)
-        : base(logger, mediator, "Mare Profile of " + pair.UserData.AliasOrUID + "##MareSynchronosStandaloneProfileUI" + pair.UserData.AliasOrUID)
+        ServerConfigurationManager serverManager, MareProfileManager mareProfileManager, DrawPairVMBase pair)
+        : base(logger, mediator, "Mare Profile of " + pair.DisplayName + "##MareSynchronosStandaloneProfileUI" + pair.DisplayName)
     {
         _uiSharedService = uiBuilder;
         _serverManager = serverManager;
@@ -41,7 +40,7 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
         IsOpen = true;
     }
 
-    public Pair Pair { get; init; }
+    public DrawPairVMBase Pair { get; init; }
 
     public override void Draw()
     {
@@ -119,26 +118,26 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
                 ImGui.SameLine();
                 ImGui.TextUnformatted($"({Pair.PlayerName})");
             }
-            if (Pair.UserPair != null)
+            if (Pair.IsDirectlyPaired)
             {
                 ImGui.TextUnformatted("Directly paired");
-                if (Pair.UserPair.OwnPermissions.IsPaused())
+                if (Pair.IsPausedFromSource)
                 {
                     ImGui.SameLine();
                     UiSharedService.ColorText("You: paused", ImGuiColors.DalamudYellow);
                 }
-                if (Pair.UserPair.OtherPermissions.IsPaused())
+                if (Pair.IsPausedFromTarget)
                 {
                     ImGui.SameLine();
                     UiSharedService.ColorText("They: paused", ImGuiColors.DalamudYellow);
                 }
             }
-            if (Pair.GroupPair.Any())
+            if (Pair.IsIndirectlyPaired)
             {
                 ImGui.TextUnformatted("Paired through Syncshells:");
-                foreach (var groupPair in Pair.GroupPair)
+                foreach (var group in Pair.GroupPairs.Value)
                 {
-                    ImGui.TextUnformatted("- " + groupPair.Key.GroupAliasOrGID);
+                    ImGui.TextUnformatted("- " + group);
                 }
             }
 

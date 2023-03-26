@@ -1,6 +1,5 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
-using Dalamud.Interface.Components;
 using ImGuiNET;
 using MareSynchronos.UI.VM;
 using System.Numerics;
@@ -22,8 +21,10 @@ public class Button
         return new Button(command);
     }
 
-    public void Draw()
+    public void Draw(Vector2? size = null)
     {
+        var visible = _command.StatefulCommandContent.Visibility.Invoke();
+        if (!visible) return;
         var enabled = _command.StatefulCommandContent.Enabled.Invoke();
         var text = _command.StatefulCommandContent.ButtonText.Invoke();
         var icon = _command.StatefulCommandContent.Icon.Invoke();
@@ -33,18 +34,31 @@ public class Button
         if (!enabled) ImGui.BeginDisabled();
         if (!string.IsNullOrEmpty(text) && icon != FontAwesomeIcon.None)
         {
-            if (UiSharedService.IconTextButton(icon, text) && (!_command.RequireCtrl || (_command.RequireCtrl && UiSharedService.CtrlPressed())))
+            if (UiSharedService.IconTextButton(icon, text, size) && (!_command.RequireCtrl || (_command.RequireCtrl && UiSharedService.CtrlPressed())))
+            {
                 _command.StatefulCommandContent.OnClick();
+                if (_command.ClosePopup) ImGui.CloseCurrentPopup();
+            }
         }
         else if (icon != FontAwesomeIcon.None)
         {
-            if (ImGuiComponents.IconButton(icon) && (!_command.RequireCtrl || (_command.RequireCtrl && UiSharedService.CtrlPressed())))
+            ImGui.PushFont(UiBuilder.IconFont);
+            var button = size == null ? ImGui.Button(icon.ToIconString()) : ImGui.Button(icon.ToIconString(), size.Value);
+            if (button && (!_command.RequireCtrl || (_command.RequireCtrl && UiSharedService.CtrlPressed())))
+            {
                 _command.StatefulCommandContent.OnClick();
+                if (_command.ClosePopup) ImGui.CloseCurrentPopup();
+            }
+            ImGui.PopFont();
         }
         else if (!string.IsNullOrEmpty(text))
         {
-            if (ImGui.Button(text) && (!_command.RequireCtrl || (_command.RequireCtrl && UiSharedService.CtrlPressed())))
+            var button = size == null ? ImGui.Button(text) : ImGui.Button(text, size.Value);
+            if (button && (!_command.RequireCtrl || (_command.RequireCtrl && UiSharedService.CtrlPressed())))
+            {
                 _command.StatefulCommandContent.OnClick();
+                if (_command.ClosePopup) ImGui.CloseCurrentPopup();
+            }
         }
         else
         {
