@@ -6,6 +6,7 @@ using Dalamud.Interface.Colors;
 using ImGuiNET;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.UI.Components;
+using MareSynchronos.UI.Components.UIElement;
 using MareSynchronos.UI.VM;
 using Microsoft.Extensions.Logging;
 

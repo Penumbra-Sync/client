@@ -7,7 +7,7 @@ using MareSynchronos.Services.ServerConfiguration;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
 using Dalamud.Interface;
-using MareSynchronos.UI.Components;
+using MareSynchronos.UI.VM;
 
 namespace MareSynchronos.UI;
 

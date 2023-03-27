@@ -9,6 +9,7 @@ using System.Numerics;
 using MareSynchronos.MareConfiguration.Models;
 using Dalamud.Interface;
 using ImGuiNET;
+using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI.VM;
 

@@ -1,7 +1,7 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using ImGuiNET;
-using MareSynchronos.UI.VM;
+using MareSynchronos.UI.Handlers;
 using System.Numerics;
 
 namespace MareSynchronos.UI.Components;

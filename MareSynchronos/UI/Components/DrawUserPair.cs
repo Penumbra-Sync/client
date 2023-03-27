@@ -5,6 +5,7 @@ using ImGuiNET;
 using MareSynchronos.WebAPI;
 using MareSynchronos.UI.Handlers;
 using FFXIVClientStructs.FFXIV.Common.Math;
+using MareSynchronos.UI.VM;
 
 namespace MareSynchronos.UI.Components;
 

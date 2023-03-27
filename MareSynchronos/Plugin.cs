@@ -24,6 +24,7 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.UI;
 using MareSynchronos.UI.Components;
+using MareSynchronos.UI.Components.UIElement;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.UI.VM;
 using MareSynchronos.WebAPI;

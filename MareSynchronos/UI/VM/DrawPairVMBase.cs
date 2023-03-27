@@ -1,6 +1,5 @@
 ﻿using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.WebAPI;
-using MareSynchronos.UI.VM;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface;
 using MareSynchronos.Services.Mediator;
@@ -10,7 +9,7 @@ using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Extensions;
 
-namespace MareSynchronos.UI.Components;
+namespace MareSynchronos.UI.VM;
 
 public abstract class DrawPairVMBase : ImguiVM
 {

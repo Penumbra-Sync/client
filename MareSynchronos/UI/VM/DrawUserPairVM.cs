@@ -4,12 +4,13 @@ using MareSynchronos.PlayerData.Pairs;
 using System.Numerics;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.WebAPI;
-using MareSynchronos.UI.VM;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.UI.Components;
+using MareSynchronos.UI.Handlers;
 
-namespace MareSynchronos.UI.Components;
+namespace MareSynchronos.UI.VM;
 
 public class DrawUserPairVM : DrawPairVMBase
 {

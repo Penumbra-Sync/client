@@ -3,7 +3,6 @@ using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Pairs;
-using MareSynchronos.UI.Components;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using MareSynchronos.Services.ServerConfiguration;

@@ -3,7 +3,7 @@ using Dalamud.Interface.Internal.Notifications;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto;
 using MareSynchronos.PlayerData.Handlers;
-using MareSynchronos.UI.Components;
+using MareSynchronos.UI.VM;
 using MareSynchronos.WebAPI.Files.Models;
 using System.Numerics;
 

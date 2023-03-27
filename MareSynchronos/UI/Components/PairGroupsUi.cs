@@ -3,6 +3,7 @@ using Dalamud.Interface.Components;
 using ImGuiNET;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.UI.Handlers;
+using MareSynchronos.UI.VM;
 
 namespace MareSynchronos.UI.Components;
 
@@ -27,7 +28,7 @@ public class PairGroupsUi
         // we can end up with a bunch of useless pair groups
         var tagsWithPairsInThem = _tagHandler.GetAllTagsSorted();
         var allUsers = visibleUsers.Concat(onlineUsers).Concat(offlineUsers).ToList();
-        if (typeof(T) == typeof(DrawPairVMBase))
+        if (typeof(T) == typeof(DrawUserPairVM))
         {
             DrawUserPairs(tagsWithPairsInThem, allUsers.Cast<DrawUserPairVM>().ToList(), visibleUsers.Cast<DrawUserPairVM>(), onlineUsers.Cast<DrawUserPairVM>(), offlineUsers.Cast<DrawUserPairVM>());
         }

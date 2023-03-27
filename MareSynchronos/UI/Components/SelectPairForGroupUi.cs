@@ -2,6 +2,7 @@
 using Dalamud.Interface;
 using ImGuiNET;
 using MareSynchronos.UI.Handlers;
+using MareSynchronos.UI.VM;
 
 namespace MareSynchronos.UI.Components;
 

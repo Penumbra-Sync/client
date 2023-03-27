@@ -4,7 +4,7 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.UI.VM;
 using Microsoft.Extensions.Logging;
 
-namespace MareSynchronos.UI.Components;
+namespace MareSynchronos.UI.Components.UIElement;
 
 public class CompactTransferUiElement : WindowElementVMBase<ImguiVM>
 {

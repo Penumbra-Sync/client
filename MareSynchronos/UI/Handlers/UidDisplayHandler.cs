@@ -3,7 +3,7 @@ using ImGuiNET;
 using MareSynchronos.MareConfiguration;
 using ImGuiScene;
 using MareSynchronos.Services.Mediator;
-using MareSynchronos.UI.Components;
+using MareSynchronos.UI.VM;
 
 namespace MareSynchronos.UI.Handlers;
 

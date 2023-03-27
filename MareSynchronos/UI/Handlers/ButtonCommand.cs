@@ -2,7 +2,7 @@
 using Dalamud.Interface.Colors;
 using System.Numerics;
 
-namespace MareSynchronos.UI.VM;
+namespace MareSynchronos.UI.Handlers;
 
 public class ButtonCommand
 {
