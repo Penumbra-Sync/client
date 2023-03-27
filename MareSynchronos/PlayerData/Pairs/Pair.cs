@@ -35,7 +35,7 @@ public class Pair
 
     public bool CachedPlayerExists => CachedPlayer?.CheckExistence() ?? false;
     public Dictionary<GroupFullInfoDto, GroupPairFullInfoDto> GroupPair { get; set; } = new(GroupDtoComparer.Instance);
-    public bool HasCachedPlayer => CachedPlayer != null && !string.IsNullOrEmpty(CachedPlayer.PlayerName);
+    public bool HasCachedPlayer => CachedPlayer != null && !string.IsNullOrEmpty(CachedPlayer.PlayerName) && _onlineUserIdentDto != null;
     public bool IsOnline => CachedPlayer != null;
 
     public bool IsPaused => UserPair != null && UserPair.OtherPermissions.IsPaired() ? UserPair.OtherPermissions.IsPaused() || UserPair.OwnPermissions.IsPaused()
@@ -44,9 +44,11 @@ public class Pair
     public bool IsVisible => CachedPlayer?.PlayerName != null;
     public CharacterData? LastReceivedCharacterData { get; set; }
     public string? PlayerName => CachedPlayer?.PlayerName ?? string.Empty;
-    public string PlayerNameHash => CachedPlayer?.PlayerNameHash ?? string.Empty;
+
     public UserData UserData => UserPair?.User ?? GroupPair.First().Value.User;
+
     public UserPairDto? UserPair { get; set; }
+
     private CachedPlayer? CachedPlayer { get; set; }
 
     public void AddContextMenu(GameObjectContextMenuOpenArgs args)
@@ -105,6 +107,21 @@ public class Pair
         return _serverConfigurationManager.GetNoteForUid(UserData.UID);
     }
 
+    public string GetPlayerNameHash()
+    {
+        try
+        {
+            return CachedPlayer?.PlayerNameHash ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error accessing PlayerNameHash, recreating CachedPlayer");
+            RecreateCachedPlayer();
+        }
+
+        return string.Empty;
+    }
+
     public bool HasAnyConnection()
     {
         return UserPair != null || GroupPair.Any();
@@ -141,7 +158,12 @@ public class Pair
 
     public void RecreateCachedPlayer(OnlineUserIdentDto? dto = null)
     {
-        if (dto == null && _onlineUserIdentDto == null) return;
+        if (dto == null && _onlineUserIdentDto == null)
+        {
+            CachedPlayer?.Dispose();
+            CachedPlayer = null;
+            return;
+        }
         if (dto != null)
         {
             _onlineUserIdentDto = dto;
@@ -187,14 +209,14 @@ public class Pair
         if (disableAnimations || disableSounds)
         {
             _logger.LogTrace("Data cleaned up: Animations disabled: {disableAnimations}, Sounds disabled: {disableSounds}", disableAnimations, disableSounds);
-            foreach (var kvp in data.FileReplacements)
+            foreach (var objectKind in data.FileReplacements.Select(k => k.Key))
             {
                 if (disableSounds)
-                    data.FileReplacements[kvp.Key] = data.FileReplacements[kvp.Key]
+                    data.FileReplacements[objectKind] = data.FileReplacements[objectKind]
                         .Where(f => !f.GamePaths.Any(p => p.EndsWith("scd", StringComparison.OrdinalIgnoreCase)))
                         .ToList();
                 if (disableAnimations)
-                    data.FileReplacements[kvp.Key] = data.FileReplacements[kvp.Key]
+                    data.FileReplacements[objectKind] = data.FileReplacements[objectKind]
                         .Where(f => !f.GamePaths.Any(p => p.EndsWith("tmb", StringComparison.OrdinalIgnoreCase) || p.EndsWith("pap", StringComparison.OrdinalIgnoreCase)))
                         .ToList();
             }

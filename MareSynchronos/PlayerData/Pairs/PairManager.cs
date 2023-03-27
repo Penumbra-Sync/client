@@ -21,9 +21,9 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     private readonly ConcurrentDictionary<GroupData, GroupFullInfoDto> _allGroups = new(GroupDataComparer.Instance);
     private readonly MareConfigService _configurationService;
     private readonly DalamudContextMenu _dalamudContextMenu;
+    private readonly Dictionary<string, Pair> _indexedPairs = new(StringComparer.Ordinal);
     private readonly Func<Pair> _pairFactory;
     private Lazy<List<Pair>> _directPairsInternal;
-
     private Lazy<Dictionary<GroupFullInfoDto, List<Pair>>> _groupPairsInternal;
 
     public PairManager(ILogger<PairManager> logger, Func<Pair> pairFactory,
@@ -36,6 +36,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) => DalamudUtilOnZoneSwitched());
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => DalamudUtilOnDelayedFrameworkUpdate());
         Mediator.Subscribe<DisconnectedMessage>(this, (_) => ClearPairs());
+        Mediator.Subscribe<CutsceneEndMessage>(this, (_) => ReapplyPairData());
         _directPairsInternal = DirectPairsLazy();
         _groupPairsInternal = GroupPairsLazy();
 
@@ -90,14 +91,19 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         RecreateLazy();
     }
 
+    public List<(PlayerCharacter Character, Pair Pair)> FindAllPairs(List<PlayerCharacter> playerCharacters)
+    {
+        return playerCharacters.Select(p => (p, _indexedPairs.TryGetValue(p.GetHash256(), out var pair) ? pair : null)).Where(p => p.Item2 != null).ToList()!;
+    }
+
     public Pair? FindPair(PlayerCharacter? pChar)
     {
         if (pChar == null) return null;
         var hash = pChar.GetHash256();
-        return GetOnlineUserPairs().Find(p => string.Equals(p.PlayerNameHash, hash, StringComparison.Ordinal));
+        return _allClientPairs.Values.FirstOrDefault(f => string.Equals(hash, f.GetPlayerNameHash()));
     }
 
-    public List<Pair> GetOnlineUserPairs() => _allClientPairs.Where(p => !string.IsNullOrEmpty(p.Value.PlayerNameHash)).Select(p => p.Value).ToList();
+    public List<Pair> GetOnlineUserPairs() => _allClientPairs.Where(p => !string.IsNullOrEmpty(p.Value.GetPlayerNameHash())).Select(p => p.Value).ToList();
 
     public List<UserData> GetVisibleUsers() => _allClientPairs.Where(p => p.Value.HasCachedPlayer).Select(p => p.Key).ToList();
 
@@ -342,6 +348,14 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
 
     private void DalamudUtilOnDelayedFrameworkUpdate()
     {
+        _indexedPairs.Clear();
+        foreach (var pair in _allClientPairs.Values.Where(p => string.IsNullOrEmpty(p.PlayerName)))
+        {
+            var hash = pair.GetPlayerNameHash();
+            if (string.IsNullOrEmpty(hash)) continue;
+            _indexedPairs[hash] = pair;
+        }
+
         foreach (Pair pair in _allClientPairs.Select(p => p.Value).Where(p => p.HasCachedPlayer).ToList())
         {
             if (!pair.CachedPlayerExists)
@@ -383,6 +397,14 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
             }
             return outDict;
         });
+    }
+
+    private void ReapplyPairData()
+    {
+        foreach (var pair in _allClientPairs.Select(k => k.Value))
+        {
+            pair.ApplyLastReceivedData(true);
+        }
     }
 
     private void RecreateLazy()
