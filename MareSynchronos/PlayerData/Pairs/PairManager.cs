@@ -36,6 +36,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) => DalamudUtilOnZoneSwitched());
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => DalamudUtilOnDelayedFrameworkUpdate());
         Mediator.Subscribe<DisconnectedMessage>(this, (_) => ClearPairs());
+        Mediator.Subscribe<CutsceneEndMessage>(this, (_) => ReapplyPairData());
         _directPairsInternal = DirectPairsLazy();
         _groupPairsInternal = GroupPairsLazy();
 
@@ -383,6 +384,14 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
             }
             return outDict;
         });
+    }
+
+    private void ReapplyPairData()
+    {
+        foreach (var pair in _allClientPairs.Select(k => k.Value))
+        {
+            pair.ApplyLastReceivedData();
+        }
     }
 
     private void RecreateLazy()
