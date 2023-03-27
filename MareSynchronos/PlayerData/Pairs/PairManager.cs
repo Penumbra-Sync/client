@@ -94,10 +94,10 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     {
         if (pChar == null) return null;
         var hash = pChar.GetHash256();
-        return GetOnlineUserPairs().Find(p => string.Equals(p.PlayerNameHash, hash, StringComparison.Ordinal));
+        return _allClientPairs.Values.FirstOrDefault(f => string.Equals(hash, f.GetPlayerNameHash()));
     }
 
-    public List<Pair> GetOnlineUserPairs() => _allClientPairs.Where(p => !string.IsNullOrEmpty(p.Value.PlayerNameHash)).Select(p => p.Value).ToList();
+    public List<Pair> GetOnlineUserPairs() => _allClientPairs.Where(p => !string.IsNullOrEmpty(p.Value.GetPlayerNameHash())).Select(p => p.Value).ToList();
 
     public List<UserData> GetVisibleUsers() => _allClientPairs.Where(p => p.Value.HasCachedPlayer).Select(p => p.Key).ToList();
 

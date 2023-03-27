@@ -24,7 +24,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     private readonly Func<ObjectKind, Func<nint>, bool, GameObjectHandler> _gameObjectHandlerFactory;
     private readonly IpcManager _ipcManager;
     private readonly IHostApplicationLifetime _lifetime;
-    private CancellationTokenSource _applicationCancellationTokenSource = new();
+    private CancellationTokenSource? _applicationCancellationTokenSource = new();
     private Guid _applicationId;
     private Task? _applicationTask;
     private CharacterData _cachedData = new();
@@ -158,37 +158,35 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         try
         {
             Guid applicationId = Guid.NewGuid();
-            _applicationCancellationTokenSource.Cancel();
-            _applicationCancellationTokenSource.Dispose();
-            _downloadCancellationTokenSource?.Cancel();
-            _downloadCancellationTokenSource?.Dispose();
+            _applicationCancellationTokenSource?.CancelDispose();
+            _applicationCancellationTokenSource = null;
+            _downloadCancellationTokenSource?.CancelDispose();
             _downloadCancellationTokenSource = null;
             _charaHandler?.Dispose();
             _charaHandler = null;
 
-            if (!_lifetime.ApplicationStopping.IsCancellationRequested)
-            {
-                if (_dalamudUtil.IsZoning)
-                {
-                    Logger.LogTrace("[{applicationId}] Removing temp collection for {name} ({OnlineUser})", applicationId, name, OnlineUser);
-                    _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name);
-                }
-                else if (!_dalamudUtil.IsZoning && !_dalamudUtil.IsInCutscene)
-                {
-                    Logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser);
-                    _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name);
+            if (_lifetime.ApplicationStopping.IsCancellationRequested) return;
 
-                    foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData.FileReplacements)
+            if (_dalamudUtil.IsZoning)
+            {
+                Logger.LogTrace("[{applicationId}] Removing temp collection for {name} ({OnlineUser})", applicationId, name, OnlineUser);
+                _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name);
+            }
+            else if (_dalamudUtil is { IsZoning: false, IsInCutscene: false })
+            {
+                Logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser);
+                _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name);
+
+                foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData.FileReplacements)
+                {
+                    try
                     {
-                        try
-                        {
-                            RevertCustomizationData(item.Key, name, applicationId).GetAwaiter().GetResult();
-                        }
-                        catch (InvalidOperationException ex)
-                        {
-                            Logger.LogWarning(ex, "Failed disposing player (not present anymore?)");
-                            break;
-                        }
+                        RevertCustomizationData(item.Key, name, applicationId).GetAwaiter().GetResult();
+                    }
+                    catch (InvalidOperationException ex)
+                    {
+                        Logger.LogWarning(ex, "Failed disposing player (not present anymore?)");
+                        break;
                     }
                 }
             }
@@ -381,9 +379,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
         var updateModdedPaths = updatedData.Values.Any(v => v.Any(p => p == PlayerChanges.Mods));
 
-        _downloadCancellationTokenSource?.Cancel();
-        _downloadCancellationTokenSource?.Dispose();
-        _downloadCancellationTokenSource = new CancellationTokenSource();
+        _downloadCancellationTokenSource = _downloadCancellationTokenSource?.CancelRecreate();
         var downloadToken = _downloadCancellationTokenSource.Token;
 
         Task.Run(async () =>
@@ -421,17 +417,19 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                 }
             }
 
-            while ((!_applicationTask?.IsCompleted ?? false) && !downloadToken.IsCancellationRequested && !_applicationCancellationTokenSource.IsCancellationRequested)
+            var appToken = _applicationCancellationTokenSource?.Token;
+            while ((!_applicationTask?.IsCompleted ?? false) 
+                   && !downloadToken.IsCancellationRequested
+                   && (!appToken?.IsCancellationRequested ?? false))
             {
                 // block until current application is done
                 Logger.LogDebug("Waiting for current data application (Id: {id}) for player ({handler}) to finish", _applicationId, PlayerName);
                 await Task.Delay(250).ConfigureAwait(false);
             }
 
-            if (downloadToken.IsCancellationRequested || _applicationCancellationTokenSource.IsCancellationRequested) return;
+            if (downloadToken.IsCancellationRequested || (appToken?.IsCancellationRequested ?? false)) return;
 
-            _applicationCancellationTokenSource?.Dispose();
-            _applicationCancellationTokenSource = new();
+            _applicationCancellationTokenSource = _applicationCancellationTokenSource.CancelRecreate();
             var token = _applicationCancellationTokenSource.Token;
             _applicationTask = Task.Run(async () =>
             {
@@ -441,7 +439,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                     Logger.LogDebug("[{applicationId}] Starting application task", _applicationId);
 
                     Logger.LogDebug("[{applicationId}] Waiting for initial draw for for {handler}", _applicationId, _charaHandler);
-                    await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, _charaHandler, _applicationId, 30000, token).ConfigureAwait(false);
+                    await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, _charaHandler!, _applicationId, 30000, token).ConfigureAwait(false);
 
                     token.ThrowIfCancellationRequested();
 
@@ -471,9 +469,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     {
         var player = _dalamudUtil.GetCharacterFromObjectTableByIndex(msg.ObjTblIdx);
         if (player == null || !string.Equals(player.Name.ToString(), PlayerName, StringComparison.OrdinalIgnoreCase)) return;
-        _redrawCts.Cancel();
-        _redrawCts.Dispose();
-        _redrawCts = new();
+        _redrawCts = _redrawCts.CancelRecreate();
         _redrawCts.CancelAfter(TimeSpan.FromSeconds(30));
         var token = _redrawCts.Token;
 
@@ -484,7 +480,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             Logger.LogDebug("Unauthorized character change detected");
             await ApplyCustomizationData(applicationId, new(ObjectKind.Player,
                 new HashSet<PlayerChanges>(new[] { PlayerChanges.Palette, PlayerChanges.Customize, PlayerChanges.Heels, PlayerChanges.Mods })),
-                _cachedData, _applicationCancellationTokenSource.Token).ConfigureAwait(false);
+                _cachedData, token).ConfigureAwait(false);
         }, token);
     }
 

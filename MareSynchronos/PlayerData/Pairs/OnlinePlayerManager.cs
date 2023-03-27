@@ -54,7 +54,7 @@ public class OnlinePlayerManager : DisposableMediatorSubscriberBase
 
             if (pair.InitializePair(pChar.Name.ToString()))
             {
-                newVisiblePlayers.Add(pair.UserData ?? pair.GroupPair.First().Value.User);
+                newVisiblePlayers.Add(pair.UserData);
             }
         }
 

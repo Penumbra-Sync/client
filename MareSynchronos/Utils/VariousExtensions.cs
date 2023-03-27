@@ -19,4 +19,23 @@ public static class VariousExtensions
 
         return ((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)gameObject.Address)->ObjectIndex;
     }
+
+    public static void CancelDispose(this CancellationTokenSource? cts)
+    {
+        try
+        {
+            cts?.Cancel();
+            cts?.Dispose();
+        }
+        catch(ObjectDisposedException)
+        {
+            // swallow it
+        }
+    }
+
+    public static CancellationTokenSource CancelRecreate(this CancellationTokenSource? cts)
+    {
+        cts.CancelDispose();
+        return new CancellationTokenSource();
+    }
 }
