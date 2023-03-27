@@ -81,6 +81,12 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
         if (string.Equals(characterData.DataHash.Value, _cachedData.DataHash.Value, StringComparison.Ordinal) && !forced) return;
 
+        if (_dalamudUtil.IsInCutscene || _dalamudUtil.IsInGpose)
+        {
+            Logger.LogInformation("Received data for {player} while in cutscene/gpose, returning", this);
+            return;
+        }
+
         var charaDataToUpdate = CheckUpdatedData(_cachedData.DeepClone(), characterData, forced);
 
         if (charaDataToUpdate.TryGetValue(ObjectKind.Player, out var playerChanges))
@@ -375,11 +381,12 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         if (!updatedData.Any())
         {
             Logger.LogDebug("Nothing to update for {obj}", this);
+            return;
         }
 
         var updateModdedPaths = updatedData.Values.Any(v => v.Any(p => p == PlayerChanges.Mods));
 
-        _downloadCancellationTokenSource = _downloadCancellationTokenSource?.CancelRecreate();
+        _downloadCancellationTokenSource = _downloadCancellationTokenSource?.CancelRecreate() ?? new CancellationTokenSource();
         var downloadToken = _downloadCancellationTokenSource.Token;
 
         Task.Run(async () =>
@@ -429,7 +436,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
             if (downloadToken.IsCancellationRequested || (appToken?.IsCancellationRequested ?? false)) return;
 
-            _applicationCancellationTokenSource = _applicationCancellationTokenSource.CancelRecreate();
+            _applicationCancellationTokenSource = _applicationCancellationTokenSource.CancelRecreate() ?? new CancellationTokenSource();
             var token = _applicationCancellationTokenSource.Token;
             _applicationTask = Task.Run(async () =>
             {
