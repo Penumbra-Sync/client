@@ -21,9 +21,9 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     private readonly ConcurrentDictionary<GroupData, GroupFullInfoDto> _allGroups = new(GroupDataComparer.Instance);
     private readonly MareConfigService _configurationService;
     private readonly DalamudContextMenu _dalamudContextMenu;
+    private readonly Dictionary<string, Pair> _indexedPairs = new(StringComparer.Ordinal);
     private readonly Func<Pair> _pairFactory;
     private Lazy<List<Pair>> _directPairsInternal;
-
     private Lazy<Dictionary<GroupFullInfoDto, List<Pair>>> _groupPairsInternal;
 
     public PairManager(ILogger<PairManager> logger, Func<Pair> pairFactory,
@@ -91,14 +91,9 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         RecreateLazy();
     }
 
-    public List<(PlayerCharacter Character, Pair? Pair)> FindAllPairs(List<PlayerCharacter> playerCharacters)
+    public List<(PlayerCharacter Character, Pair Pair)> FindAllPairs(List<PlayerCharacter> playerCharacters)
     {
-        var indexedPairs = new Dictionary<string, Pair>(StringComparer.Ordinal);
-        foreach (var pair in _allClientPairs.Values)
-        {
-            indexedPairs[pair.GetPlayerNameHash()] = pair;
-        }
-        return playerCharacters.Select(p => (p, indexedPairs.TryGetValue(p.GetHash256(), out var pair) ? pair : null)).ToList();
+        return playerCharacters.Select(p => (p, _indexedPairs.TryGetValue(p.GetHash256(), out var pair) ? pair : null)).Where(p => p.Item2 != null).ToList()!;
     }
 
     public Pair? FindPair(PlayerCharacter? pChar)
@@ -353,6 +348,14 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
 
     private void DalamudUtilOnDelayedFrameworkUpdate()
     {
+        _indexedPairs.Clear();
+        foreach (var pair in _allClientPairs.Values.Where(p => string.IsNullOrEmpty(p.PlayerName)))
+        {
+            var hash = pair.GetPlayerNameHash();
+            if (string.IsNullOrEmpty(hash)) continue;
+            _indexedPairs[hash] = pair;
+        }
+
         foreach (Pair pair in _allClientPairs.Select(p => p.Value).Where(p => p.HasCachedPlayer).ToList())
         {
             if (!pair.CachedPlayerExists)

@@ -47,7 +47,7 @@ public class OnlinePlayerManager : DisposableMediatorSubscriberBase
 
         var playerCharacters = _dalamudUtil.GetPlayerCharacters();
         var chars = _pairManager.FindAllPairs(playerCharacters);
-        var newVisiblePlayers = (from pChar in chars.Where(p => p.Pair != null && p.Pair.InitializePair(p.Character.Name.ToString()))
+        var newVisiblePlayers = (from pChar in chars.Where(p => p.Pair.InitializePair(p.Character.Name.ToString()))
                                  select pChar.Pair.UserData).ToList();
 
         if (newVisiblePlayers.Any())
