@@ -5,6 +5,7 @@ using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files;
 using Microsoft.Extensions.Logging;
+using System.Linq;
 
 namespace MareSynchronos.PlayerData.Pairs;
 
@@ -47,16 +48,9 @@ public class OnlinePlayerManager : DisposableMediatorSubscriberBase
 
         var playerCharacters = _dalamudUtil.GetPlayerCharacters();
         var newVisiblePlayers = new List<UserData>();
-        foreach (var pChar in playerCharacters)
-        {
-            var pair = _pairManager.FindPair(pChar);
-            if (pair == null) continue;
-
-            if (pair.InitializePair(pChar.Name.ToString()))
-            {
-                newVisiblePlayers.Add(pair.UserData);
-            }
-        }
+        var chars = _pairManager.FindAllPairs(playerCharacters);
+        newVisiblePlayers.AddRange(from pChar in chars.Where(p => p.Pair != null && p.Pair.InitializePair(p.Character.Name.ToString()))
+                                   select pChar.Pair.UserData);
 
         if (newVisiblePlayers.Any())
         {

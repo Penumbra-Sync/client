@@ -91,6 +91,11 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         RecreateLazy();
     }
 
+    public List<(PlayerCharacter Character, Pair? Pair)> FindAllPairs(List<PlayerCharacter> playerCharacters)
+    {
+        return playerCharacters.Select(p => (p, _allClientPairs.Values.FirstOrDefault(f => string.Equals(p.GetHash256(), f.GetPlayerNameHash())))).ToList();
+    }
+
     public Pair? FindPair(PlayerCharacter? pChar)
     {
         if (pChar == null) return null;

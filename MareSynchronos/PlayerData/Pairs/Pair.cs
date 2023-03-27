@@ -45,22 +45,10 @@ public class Pair
     public CharacterData? LastReceivedCharacterData { get; set; }
     public string? PlayerName => CachedPlayer?.PlayerName ?? string.Empty;
 
-    public string GetPlayerNameHash()
-    {
-        try
-        {
-            return CachedPlayer?.PlayerNameHash ?? string.Empty;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Error accessing PlayerNameHash, recreating CachedPlayer");
-            RecreateCachedPlayer();
-        }
-
-        return string.Empty;
-    }
     public UserData UserData => UserPair?.User ?? GroupPair.First().Value.User;
+
     public UserPairDto? UserPair { get; set; }
+
     private CachedPlayer? CachedPlayer { get; set; }
 
     public void AddContextMenu(GameObjectContextMenuOpenArgs args)
@@ -116,6 +104,21 @@ public class Pair
     public string? GetNote()
     {
         return _serverConfigurationManager.GetNoteForUid(UserData.UID);
+    }
+
+    public string GetPlayerNameHash()
+    {
+        try
+        {
+            return CachedPlayer?.PlayerNameHash ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error accessing PlayerNameHash, recreating CachedPlayer");
+            RecreateCachedPlayer();
+        }
+
+        return string.Empty;
     }
 
     public bool HasAnyConnection()
@@ -203,14 +206,14 @@ public class Pair
         if (disableAnimations || disableSounds)
         {
             _logger.LogTrace("Data cleaned up: Animations disabled: {disableAnimations}, Sounds disabled: {disableSounds}", disableAnimations, disableSounds);
-            foreach (var kvp in data.FileReplacements)
+            foreach (var objectKind in data.FileReplacements.Select(k => k.Key))
             {
                 if (disableSounds)
-                    data.FileReplacements[kvp.Key] = data.FileReplacements[kvp.Key]
+                    data.FileReplacements[objectKind] = data.FileReplacements[objectKind]
                         .Where(f => !f.GamePaths.Any(p => p.EndsWith("scd", StringComparison.OrdinalIgnoreCase)))
                         .ToList();
                 if (disableAnimations)
-                    data.FileReplacements[kvp.Key] = data.FileReplacements[kvp.Key]
+                    data.FileReplacements[objectKind] = data.FileReplacements[objectKind]
                         .Where(f => !f.GamePaths.Any(p => p.EndsWith("tmb", StringComparison.OrdinalIgnoreCase) || p.EndsWith("pap", StringComparison.OrdinalIgnoreCase)))
                         .ToList();
             }
