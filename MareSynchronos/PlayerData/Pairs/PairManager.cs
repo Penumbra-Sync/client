@@ -93,11 +93,12 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
 
     public List<(PlayerCharacter Character, Pair? Pair)> FindAllPairs(List<PlayerCharacter> playerCharacters)
     {
-        return playerCharacters.Select(p =>
+        var indexedPairs = new Dictionary<string, Pair>(StringComparer.Ordinal);
+        foreach (var pair in _allClientPairs.Values)
         {
-            var hash = p.GetHash256();
-            return (p, _allClientPairs.Values.FirstOrDefault(f => string.Equals(hash, f.GetPlayerNameHash())));
-        }).ToList();
+            indexedPairs[pair.GetPlayerNameHash()] = pair;
+        }
+        return playerCharacters.Select(p => (p, indexedPairs.TryGetValue(p.GetHash256(), out var pair) ? pair : null)).ToList();
     }
 
     public Pair? FindPair(PlayerCharacter? pChar)

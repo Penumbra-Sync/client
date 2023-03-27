@@ -5,7 +5,6 @@ using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files;
 using Microsoft.Extensions.Logging;
-using System.Linq;
 
 namespace MareSynchronos.PlayerData.Pairs;
 
