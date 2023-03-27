@@ -47,10 +47,9 @@ public class OnlinePlayerManager : DisposableMediatorSubscriberBase
         if (!_dalamudUtil.IsPlayerPresent || !_apiController.IsConnected) return;
 
         var playerCharacters = _dalamudUtil.GetPlayerCharacters();
-        var newVisiblePlayers = new List<UserData>();
         var chars = _pairManager.FindAllPairs(playerCharacters);
-        newVisiblePlayers.AddRange(from pChar in chars.Where(p => p.Pair != null && p.Pair.InitializePair(p.Character.Name.ToString()))
-                                   select pChar.Pair.UserData);
+        var newVisiblePlayers = (from pChar in chars.Where(p => p.Pair != null && p.Pair.InitializePair(p.Character.Name.ToString()))
+                                 select pChar.Pair.UserData).ToList();
 
         if (newVisiblePlayers.Any())
         {

@@ -395,7 +395,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     {
         foreach (var pair in _allClientPairs.Select(k => k.Value))
         {
-            pair.ApplyLastReceivedData();
+            pair.ApplyLastReceivedData(true);
         }
     }
 
