@@ -268,11 +268,17 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
     private unsafe bool IsBeingDrawn(IntPtr drawObj, IntPtr curPtr)
     {
-        Logger.LogTrace("IsBeingDrawn for ptr {curPtr} : {drawObj}", curPtr.ToString("X"), drawObj.ToString("X"));
+        Logger.LogTrace("IsBeingDrawn for {kind} ptr {curPtr} : {drawObj}", ObjectKind, curPtr.ToString("X"), drawObj.ToString("X"));
+        if (ObjectKind == ObjectKind.Player)
+        {
+            return drawObj == IntPtr.Zero
+                           || (((CharacterBase*)drawObj)->HasModelInSlotLoaded != 0)
+                           || (((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0)
+                           || (((GameObject*)curPtr)->RenderFlags & 0b100000000000) == 0b100000000000;
+        }
+
         return drawObj == IntPtr.Zero
-                       || (((CharacterBase*)drawObj)->HasModelInSlotLoaded != 0)
-                       || (((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0)
-                       || (((GameObject*)curPtr)->RenderFlags & 0b100000000000) == 0b100000000000;
+            || ((GameObject*)curPtr)->RenderFlags != 0x0;
     }
 
     private void ZoneSwitchEnd()
