@@ -26,6 +26,7 @@ public class DalamudUtilService : IHostedService
     private readonly MareMediator _mediator;
     private readonly ObjectTable _objectTable;
     private readonly PerformanceCollectorService _performanceCollector;
+    private readonly List<uint> ClassJobIdsIgnoredForPets = new() { 30 };
     private uint? _classJobId = 0;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
     private bool _sentBetweenAreas = false;
@@ -107,6 +108,7 @@ public class DalamudUtilService : IHostedService
 
     public unsafe IntPtr GetPet(IntPtr? playerPointer = null)
     {
+        if (ClassJobIdsIgnoredForPets.Contains(_classJobId ?? 0)) return IntPtr.Zero;
         var mgr = CharacterManager.Instance();
         playerPointer ??= PlayerPointer;
         if (playerPointer == IntPtr.Zero) return IntPtr.Zero;
@@ -320,7 +322,7 @@ public class DalamudUtilService : IHostedService
             if (_classJobId != newclassJobId)
             {
                 _classJobId = newclassJobId;
-                _mediator.Publish(new ClassJobChangedMessage());
+                _mediator.Publish(new ClassJobChangedMessage(_classJobId));
             }
         }
 

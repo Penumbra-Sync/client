@@ -30,19 +30,10 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         _fileDbManager = fileCacheManager;
     }
 
-    public void Initialize()
-    {
-        Mediator.Subscribe<DownloadReadyMessage>(this, (msg) =>
-        {
-            if (_downloadReady.ContainsKey(msg.RequestId))
-            {
-                _downloadReady[msg.RequestId] = true;
-            }
-        });
-    }
-
     public List<DownloadFileTransfer> CurrentDownloads { get; private set; } = new();
+
     public List<FileTransfer> ForbiddenTransfers => _orchestrator.ForbiddenTransfers;
+
     public bool IsDownloading => !CurrentDownloads.Any();
 
     public void CancelDownload()
@@ -67,6 +58,17 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
             Mediator.Publish(new DownloadFinishedMessage(gameObject));
             Mediator.Publish(new ResumeScanMessage("Download"));
         }
+    }
+
+    public void Initialize()
+    {
+        Mediator.Subscribe<DownloadReadyMessage>(this, (msg) =>
+        {
+            if (_downloadReady.ContainsKey(msg.RequestId))
+            {
+                _downloadReady[msg.RequestId] = true;
+            }
+        });
     }
 
     protected override void Dispose(bool disposing)
@@ -195,9 +197,16 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                 var tempPath = _fileDbManager.GetCacheFilePath(file.Hash, isTemporaryFile: true);
                 Progress<long> progress = new((bytesDownloaded) =>
                 {
-                    if (!_downloadStatus.ContainsKey(fileGroup.Key)) return;
-                    _downloadStatus[fileGroup.Key].TransferredBytes += bytesDownloaded;
-                    file.Transferred += bytesDownloaded;
+                    try
+                    {
+                        if (!_downloadStatus.ContainsKey(fileGroup.Key)) return;
+                        _downloadStatus[fileGroup.Key].TransferredBytes += bytesDownloaded;
+                        file.Transferred += bytesDownloaded;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "Could not set download progress");
+                    }
                 });
 
                 try

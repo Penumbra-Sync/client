@@ -102,16 +102,12 @@ public sealed class MareMediator : IDisposable
     {
         lock (_addRemoveLock)
         {
-            foreach (KeyValuePair<Type, HashSet<SubscriberAction>> kvp in _subscriberDict)
+            foreach (Type kvp in _subscriberDict.Select(k => k.Key))
             {
-                int unSubbed = _subscriberDict[kvp.Key]?.RemoveWhere(p => p.Subscriber == subscriber) ?? 0;
+                int unSubbed = _subscriberDict[kvp]?.RemoveWhere(p => p.Subscriber == subscriber) ?? 0;
                 if (unSubbed > 0)
                 {
-                    _logger.LogDebug("{sub} unsubscribed from {msg}", subscriber.GetType().Name, kvp.Key.Name);
-                    if (_subscriberDict[kvp.Key].Any())
-                    {
-                        _logger.LogTrace("Remaining Subscribers: {item}", string.Join(", ", _subscriberDict[kvp.Key].Select(k => k.Subscriber.GetType().Name)));
-                    }
+                    _logger.LogDebug("{sub} unsubscribed from {msg}", subscriber.GetType().Name, kvp.Name);
                 }
             }
         }

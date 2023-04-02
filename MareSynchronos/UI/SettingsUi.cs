@@ -132,11 +132,19 @@ public class SettingsUi : WindowMediatorSubscriberBase
         UiSharedService.FontText("Transfer Settings", _uiShared.UidFont);
 
         int maxParallelDownloads = _configService.Current.ParallelDownloads;
+        bool useAlternativeUpload = _configService.Current.UseAlternativeFileUpload;
         if (ImGui.SliderInt("Maximum Parallel Downloads", ref maxParallelDownloads, 1, 10))
         {
             _configService.Current.ParallelDownloads = maxParallelDownloads;
             _configService.Save();
         }
+
+        if (ImGui.Checkbox("Use Alternative Upload Method", ref useAlternativeUpload))
+        {
+            _configService.Current.UseAlternativeFileUpload = useAlternativeUpload;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("This will attempt to upload files in one go instead of a stream. Typically not necessary to enable. Use if you have upload issues.");
 
         ImGui.Separator();
         UiSharedService.FontText("Transfer UI", _uiShared.UidFont);
