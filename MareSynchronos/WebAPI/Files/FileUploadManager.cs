@@ -183,7 +183,14 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
 
         Progress<UploadProgress> prog = new((prog) =>
         {
-            CurrentUploads.Single(f => string.Equals(f.Hash, fileHash, StringComparison.Ordinal)).Transferred = prog.Uploaded;
+            try
+            {
+                CurrentUploads.Single(f => string.Equals(f.Hash, fileHash, StringComparison.Ordinal)).Transferred = prog.Uploaded;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "[{hash}] Could not set upload progress", fileHash);
+            }
         });
         var streamContent = new ProgressableStreamContent(ms, prog);
         streamContent.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");

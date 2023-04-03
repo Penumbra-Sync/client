@@ -260,10 +260,10 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         }).ConfigureAwait(false);
     }
 
-    public string GetCustomizePlusScale()
+    public async Task<string> GetCustomizePlusScale()
     {
         if (!CheckCustomizePlusApi()) return string.Empty;
-        var scale = _customizePlusGetBodyScale.InvokeFunc(_dalamudUtil.PlayerName);
+        var scale = await _dalamudUtil.RunOnFrameworkThread(() => _customizePlusGetBodyScale.InvokeFunc(_dalamudUtil.PlayerName)).ConfigureAwait(false);
         if (string.IsNullOrEmpty(scale)) return string.Empty;
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(scale));
     }
@@ -310,7 +310,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         }
     }
 
-    public string GlamourerGetCharacterCustomization(IntPtr character)
+    public async Task<string> GlamourerGetCharacterCustomization(IntPtr character)
     {
         if (!CheckGlamourerApi()) return string.Empty;
         try
@@ -318,7 +318,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj is Character c)
             {
-                var glamourerString = _glamourerGetAllCustomization!.InvokeFunc(c);
+                var glamourerString = await _dalamudUtil.RunOnFrameworkThread(() => _glamourerGetAllCustomization!.InvokeFunc(c)).ConfigureAwait(false);
                 byte[] bytes = Convert.FromBase64String(glamourerString);
                 // ignore transparency
                 bytes[88] = 128;
@@ -361,10 +361,10 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         }).ConfigureAwait(false);
     }
 
-    public string PalettePlusBuildPalette()
+    public async Task<string> PalettePlusBuildPalette()
     {
         if (!CheckPalettePlusApi()) return string.Empty;
-        var palette = _palettePlusBuildCharaPalette.InvokeFunc(_dalamudUtil.PlayerCharacter);
+        var palette = await _dalamudUtil.RunOnFrameworkThread(() => _palettePlusBuildCharaPalette.InvokeFunc(_dalamudUtil.PlayerCharacter)).ConfigureAwait(false);
         if (string.IsNullOrEmpty(palette)) return string.Empty;
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(palette));
     }
@@ -434,9 +434,9 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         logger.LogTrace("[{applicationId}] RemoveTemporaryCollection: {ret2}", applicationId, ret2);
     }
 
-    public (string[] forward, string[][] reverse) PenumbraResolvePaths(string[] forward, string[] reverse)
+    public async Task<(string[] forward, string[][] reverse)> PenumbraResolvePaths(string[] forward, string[] reverse)
     {
-        return _penumbraResolvePaths.Invoke(forward, reverse);
+        return await _dalamudUtil.RunOnFrameworkThread(() => _penumbraResolvePaths.Invoke(forward, reverse));
     }
 
     public void PenumbraSetTemporaryMods(ILogger logger, Guid applicationId, string characterName, int? idx, Dictionary<string, string> modPaths, string manipulationData)

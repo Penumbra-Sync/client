@@ -323,9 +323,9 @@ public class PlayerDataFactory
         // gather up data from ipc
         previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
         previousData.HeelsOffset = _ipcManager.GetHeelsOffset();
-        Task<string> getGlamourerData = Task.Run(() => _ipcManager.GlamourerGetCharacterCustomization(playerRelatedObject.Address));
-        Task<string> getCustomizeData = Task.Run(_ipcManager.GetCustomizePlusScale);
-        Task<string> getPalettePlusData = Task.Run(_ipcManager.PalettePlusBuildPalette);
+        Task<string> getGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(playerRelatedObject.Address);
+        Task<string> getCustomizeData = _ipcManager.GetCustomizePlusScale();
+        Task<string> getPalettePlusData = _ipcManager.PalettePlusBuildPalette();
         previousData.GlamourerString[playerRelatedObject.ObjectKind] = await getGlamourerData.ConfigureAwait(false);
         _logger.LogDebug("Glamourer is now: {data}", previousData.GlamourerString[playerRelatedObject.ObjectKind]);
         previousData.CustomizePlusScale = await getCustomizeData.ConfigureAwait(false);
@@ -335,7 +335,7 @@ public class PlayerDataFactory
 
         // gather static replacements from render model
         var (forwardResolve, reverseResolve) = BuildDataFromModel(objectKind, charaPointer, token);
-        Dictionary<string, List<string>> resolvedPaths = GetFileReplacementsFromPaths(forwardResolve, reverseResolve);
+        Dictionary<string, List<string>> resolvedPaths = await GetFileReplacementsFromPaths(forwardResolve, reverseResolve).ConfigureAwait(false);
         previousData.FileReplacements[objectKind] =
                 new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)), FileReplacementComparer.Instance)
                 .Where(p => p.HasFileReplacement).ToHashSet();
@@ -363,7 +363,7 @@ public class PlayerDataFactory
 
         // get all remaining paths and resolve them
         var transientPaths = ManageSemiTransientData(objectKind, charaPointer);
-        var resolvedTransientPaths = GetFileReplacementsFromPaths(transientPaths, new HashSet<string>(StringComparer.Ordinal));
+        var resolvedTransientPaths = await GetFileReplacementsFromPaths(transientPaths, new HashSet<string>(StringComparer.Ordinal)).ConfigureAwait(false);
 
         _logger.LogDebug("== Transient Replacements ==");
         foreach (var replacement in resolvedTransientPaths.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)).OrderBy(f => f.ResolvedPath, StringComparer.Ordinal))
@@ -387,12 +387,12 @@ public class PlayerDataFactory
         return previousData;
     }
 
-    private Dictionary<string, List<string>> GetFileReplacementsFromPaths(HashSet<string> forwardResolve, HashSet<string> reverseResolve)
+    private async Task<Dictionary<string, List<string>>> GetFileReplacementsFromPaths(HashSet<string> forwardResolve, HashSet<string> reverseResolve)
     {
         var forwardPaths = forwardResolve.ToArray();
         var reversePaths = reverseResolve.ToArray();
         Dictionary<string, List<string>> resolvedPaths = new(StringComparer.Ordinal);
-        var (forward, reverse) = _ipcManager.PenumbraResolvePaths(forwardPaths, reversePaths);
+        var (forward, reverse) = await _ipcManager.PenumbraResolvePaths(forwardPaths, reversePaths).ConfigureAwait(false);
         for (int i = 0; i < forwardPaths.Length; i++)
         {
             var filePath = forward[i].ToLowerInvariant();
