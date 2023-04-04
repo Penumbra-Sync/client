@@ -320,19 +320,6 @@ public class PlayerDataFactory
 
         Stopwatch st = Stopwatch.StartNew();
 
-        // gather up data from ipc
-        previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
-        previousData.HeelsOffset = _ipcManager.GetHeelsOffset();
-        Task<string> getGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(playerRelatedObject.Address);
-        Task<string> getCustomizeData = _ipcManager.GetCustomizePlusScale();
-        Task<string> getPalettePlusData = _ipcManager.PalettePlusBuildPalette();
-        previousData.GlamourerString[playerRelatedObject.ObjectKind] = await getGlamourerData.ConfigureAwait(false);
-        _logger.LogDebug("Glamourer is now: {data}", previousData.GlamourerString[playerRelatedObject.ObjectKind]);
-        previousData.CustomizePlusScale = await getCustomizeData.ConfigureAwait(false);
-        _logger.LogDebug("Customize is now: {data}", previousData.CustomizePlusScale);
-        previousData.PalettePlusPalette = await getPalettePlusData.ConfigureAwait(false);
-        _logger.LogDebug("Palette is now: {data}", previousData.PalettePlusPalette);
-
         // gather static replacements from render model
         var (forwardResolve, reverseResolve) = BuildDataFromModel(objectKind, charaPointer, token);
         Dictionary<string, List<string>> resolvedPaths = await GetFileReplacementsFromPaths(forwardResolve, reverseResolve).ConfigureAwait(false);
@@ -380,6 +367,19 @@ public class PlayerDataFactory
         {
             previousData.FileReplacements[item.Key] = new HashSet<FileReplacement>(item.Value.Where(v => v.HasFileReplacement).OrderBy(v => v.ResolvedPath, StringComparer.Ordinal), FileReplacementComparer.Instance);
         }
+
+        // gather up data from ipc
+        previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
+        previousData.HeelsOffset = _ipcManager.GetHeelsOffset();
+        Task<string> getGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(playerRelatedObject.Address);
+        Task<string> getCustomizeData = _ipcManager.GetCustomizePlusScale();
+        Task<string> getPalettePlusData = _ipcManager.PalettePlusBuildPalette();
+        previousData.GlamourerString[playerRelatedObject.ObjectKind] = await getGlamourerData.ConfigureAwait(false);
+        _logger.LogDebug("Glamourer is now: {data}", previousData.GlamourerString[playerRelatedObject.ObjectKind]);
+        previousData.CustomizePlusScale = await getCustomizeData.ConfigureAwait(false);
+        _logger.LogDebug("Customize is now: {data}", previousData.CustomizePlusScale);
+        previousData.PalettePlusPalette = await getPalettePlusData.ConfigureAwait(false);
+        _logger.LogDebug("Palette is now: {data}", previousData.PalettePlusPalette);
 
         st.Stop();
         _logger.LogInformation("Building character data for {obj} took {time}ms", objectKind, TimeSpan.FromTicks(st.ElapsedTicks).TotalMilliseconds);
