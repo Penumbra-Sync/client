@@ -22,6 +22,7 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         _mareConfig = mareConfig;
         _serverManager = serverManager;
         _httpClient = new();
+        _httpClient.Timeout = TimeSpan.FromSeconds(300);
 
         _availableDownloadSlots = mareConfig.Current.ParallelDownloads;
         _downloadSemaphore = new(_availableDownloadSlots);

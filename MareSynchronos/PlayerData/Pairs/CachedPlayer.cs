@@ -213,7 +213,8 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     {
         await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, PlayerName!)).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
-        await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.PenumbraSetTemporaryMods(Logger, applicationId, PlayerName!, _charaHandler?.GameObjectLazy?.Value.ObjectTableIndex(), moddedPaths, manipulationData)).ConfigureAwait(false);
+        await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.PenumbraSetTemporaryMods(Logger, applicationId, PlayerName!,
+            _charaHandler?.GameObjectLazy?.Value.ObjectTableIndex(), moddedPaths, manipulationData)).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
     }
 
@@ -425,7 +426,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             }
 
             var appToken = _applicationCancellationTokenSource?.Token;
-            while ((!_applicationTask?.IsCompleted ?? false) 
+            while ((!_applicationTask?.IsCompleted ?? false)
                    && !downloadToken.IsCancellationRequested
                    && (!appToken?.IsCancellationRequested ?? false))
             {
