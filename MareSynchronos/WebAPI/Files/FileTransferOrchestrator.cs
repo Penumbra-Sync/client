@@ -22,6 +22,7 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         _mareConfig = mareConfig;
         _serverManager = serverManager;
         _httpClient = new();
+        _httpClient.Timeout = TimeSpan.FromSeconds(300);
 
         _availableDownloadSlots = mareConfig.Current.ParallelDownloads;
         _downloadSemaphore = new(_availableDownloadSlots);
@@ -55,7 +56,10 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
     public async Task<HttpResponseMessage> SendRequestAsync<T>(HttpMethod method, Uri uri, T content, CancellationToken ct) where T : class
     {
         using var requestMessage = new HttpRequestMessage(method, uri);
-        requestMessage.Content = JsonContent.Create(content);
+        if (content is not ByteArrayContent)
+            requestMessage.Content = JsonContent.Create(content);
+        else
+            requestMessage.Content = content as ByteArrayContent;
         return await SendRequestInternalAsync(requestMessage, ct).ConfigureAwait(false);
     }
 
@@ -84,7 +88,7 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
     {
         requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _serverManager.GetToken());
 
-        if (requestMessage.Content != null && requestMessage.Content is not StreamContent)
+        if (requestMessage.Content != null && requestMessage.Content is not StreamContent && requestMessage.Content is not ByteArrayContent)
         {
             var content = await ((JsonContent)requestMessage.Content).ReadAsStringAsync().ConfigureAwait(false);
             Logger.LogDebug("Sending {method} to {uri} (Content: {content})", requestMessage.Method, requestMessage.RequestUri, content);

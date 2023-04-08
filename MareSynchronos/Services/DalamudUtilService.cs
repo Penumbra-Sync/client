@@ -12,6 +12,7 @@ using MareSynchronos.Utils;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 namespace MareSynchronos.Services;
@@ -26,6 +27,7 @@ public class DalamudUtilService : IHostedService
     private readonly MareMediator _mediator;
     private readonly ObjectTable _objectTable;
     private readonly PerformanceCollectorService _performanceCollector;
+    private readonly List<uint> ClassJobIdsIgnoredForPets = new() { 30 };
     private uint? _classJobId = 0;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
     private bool _sentBetweenAreas = false;
@@ -52,6 +54,7 @@ public class DalamudUtilService : IHostedService
     public unsafe GameObject* GposeTarget => TargetSystem.Instance()->GPoseTarget;
     public unsafe Dalamud.Game.ClientState.Objects.Types.GameObject? GposeTargetGameObject => GposeTarget == null ? null : _objectTable[GposeTarget->ObjectIndex];
     public bool IsInCutscene { get; private set; } = false;
+    public bool IsInFrameworkThread => _framework.IsInFrameworkUpdateThread;
     public bool IsInGpose { get; private set; } = false;
     public bool IsLoggedIn { get; private set; }
     public bool IsPlayerPresent => _clientState.LocalPlayer != null && _clientState.LocalPlayer.IsValid();
@@ -107,6 +110,7 @@ public class DalamudUtilService : IHostedService
 
     public unsafe IntPtr GetPet(IntPtr? playerPointer = null)
     {
+        if (ClassJobIdsIgnoredForPets.Contains(_classJobId ?? 0)) return IntPtr.Zero;
         var mgr = CharacterManager.Instance();
         playerPointer ??= PlayerPointer;
         if (playerPointer == IntPtr.Zero) return IntPtr.Zero;
@@ -144,20 +148,37 @@ public class DalamudUtilService : IHostedService
         return false;
     }
 
-    public async Task RunOnFrameworkThread(Action act)
+    public async Task RunOnFrameworkThread(Action act, [CallerMemberName] string callerMember = "",
+        [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int lineNumber = 0)
     {
-        _logger.LogTrace("Running Action on framework thread (FrameworkContext: {ctx}): {act}", _framework.IsInFrameworkUpdateThread, act);
+        _logger.LogTrace("Running Action on framework thread (FrameworkContext: {ctx}): {member} in {file}:{line}", _framework.IsInFrameworkUpdateThread, callerMember, callerFilePath, lineNumber);
         if (!_framework.IsInFrameworkUpdateThread)
-            await _framework.RunOnFrameworkThread(act).ConfigureAwait(false);
+        {
+            await _framework.RunOnFrameworkThread(act).ContinueWith((_) => Task.CompletedTask).ConfigureAwait(false);
+            while (_framework.IsInFrameworkUpdateThread) // yield the thread again, should technically never be triggered
+            {
+                _logger.LogTrace("Still on framework");
+                await Task.Delay(1).ConfigureAwait(false);
+            }
+        }
         else
             act();
     }
 
-    public async Task<T> RunOnFrameworkThread<T>(Func<T> func)
+    public async Task<T> RunOnFrameworkThread<T>(Func<T> func, [CallerMemberName] string callerMember = "",
+        [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int lineNumber = 0)
     {
-        _logger.LogTrace("Running Func on framework thread (FrameworkContext: {ctx}): {act}", _framework.IsInFrameworkUpdateThread, func);
+        _logger.LogTrace("Running Func on framework thread (FrameworkContext: {ctx}): {member} in {file}:{line}", _framework.IsInFrameworkUpdateThread, callerMember, callerFilePath, lineNumber);
         if (!_framework.IsInFrameworkUpdateThread)
-            return await _framework.RunOnFrameworkThread(func).ConfigureAwait(false);
+        {
+            var result = await _framework.RunOnFrameworkThread(func).ContinueWith((task) => task.Result).ConfigureAwait(false);
+            while (_framework.IsInFrameworkUpdateThread) // yield the thread again, should technically never be triggered
+            {
+                _logger.LogTrace("Still on framework");
+                await Task.Delay(1).ConfigureAwait(false);
+            }
+            return result;
+        }
         else
             return func.Invoke();
     }
@@ -320,7 +341,7 @@ public class DalamudUtilService : IHostedService
             if (_classJobId != newclassJobId)
             {
                 _classJobId = newclassJobId;
-                _mediator.Publish(new ClassJobChangedMessage());
+                _mediator.Publish(new ClassJobChangedMessage(_classJobId));
             }
         }
 

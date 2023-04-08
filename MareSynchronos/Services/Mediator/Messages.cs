@@ -16,7 +16,7 @@ public record OpenSettingsUiMessage : IMessage;
 public record DalamudLoginMessage : IMessage;
 public record DalamudLogoutMessage : IMessage;
 public record FrameworkUpdateMessage : IMessage;
-public record ClassJobChangedMessage : IMessage;
+public record ClassJobChangedMessage(uint? ClassJob) : IMessage;
 public record DelayedFrameworkUpdateMessage : IMessage;
 public record ZoneSwitchStartMessage : IMessage;
 public record ZoneSwitchEndMessage : IMessage;

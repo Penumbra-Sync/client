@@ -105,11 +105,10 @@ public sealed class FileCacheManager : IDisposable
 
     public FileCacheEntity? GetFileCacheByHash(string hash)
     {
-        if (_fileCaches.Any(f => string.Equals(f.Value.Hash, hash, StringComparison.Ordinal)))
+        var entry = _fileCaches.FirstOrDefault(f => string.Equals(f.Value.Hash, hash, StringComparison.Ordinal));
+        if (!EqualityComparer<KeyValuePair<string, FileCacheEntity>>.Default.Equals(entry, default))
         {
-            return GetValidatedFileCache(_fileCaches.Where(f => string.Equals(f.Value.Hash, hash, StringComparison.Ordinal))
-                .OrderByDescending(f => f.Value.PrefixedFilePath.Length)
-                .FirstOrDefault(f => string.Equals(f.Value.Hash, hash, StringComparison.Ordinal)).Value);
+            return GetValidatedFileCache(entry.Value);
         }
 
         return null;

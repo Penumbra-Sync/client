@@ -113,20 +113,20 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         return true;
     }
 
-    public void Initialize(string name)
+    public async Task Initialize(string name)
     {
         PlayerName = name;
         _charaHandler = _gameObjectHandlerFactory(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName)?.Address ?? IntPtr.Zero, false);
 
-        _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
+        _originalGlamourerData = await _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter).ConfigureAwait(false);
         _lastGlamourerData = _originalGlamourerData;
         Mediator.Subscribe<PenumbraRedrawMessage>(this, IpcManagerOnPenumbraRedrawEvent);
-        Mediator.Subscribe<CharacterChangedMessage>(this, (msg) =>
+        Mediator.Subscribe<CharacterChangedMessage>(this, async (msg) =>
         {
             if (msg.GameObjectHandler == _charaHandler && (_applicationTask?.IsCompleted ?? true))
             {
                 Logger.LogTrace("Saving new Glamourer Data for {this}", this);
-                _lastGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter);
+                _lastGlamourerData = await _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter).ConfigureAwait(false);
             }
         });
 
@@ -213,7 +213,8 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     {
         await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, PlayerName!)).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
-        await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.PenumbraSetTemporaryMods(Logger, applicationId, PlayerName!, _charaHandler?.GameObjectLazy?.Value.ObjectTableIndex(), moddedPaths, manipulationData)).ConfigureAwait(false);
+        await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.PenumbraSetTemporaryMods(Logger, applicationId, PlayerName!,
+            _charaHandler?.GameObjectLazy?.Value.ObjectTableIndex(), moddedPaths, manipulationData)).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
     }
 
@@ -425,7 +426,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             }
 
             var appToken = _applicationCancellationTokenSource?.Token;
-            while ((!_applicationTask?.IsCompleted ?? false) 
+            while ((!_applicationTask?.IsCompleted ?? false)
                    && !downloadToken.IsCancellationRequested
                    && (!appToken?.IsCancellationRequested ?? false))
             {
