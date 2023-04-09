@@ -64,14 +64,14 @@ public class MareCharaFileManager
                 }
                 var applicationId = Guid.NewGuid();
                 _ipcManager.ToggleGposeQueueMode(on: true);
-                _ipcManager.PenumbraRemoveTemporaryCollection(_logger, applicationId, charaTarget.Name.TextValue);
-                _ipcManager.PenumbraSetTemporaryMods(_logger, applicationId, charaTarget.Name.TextValue, charaTarget.ObjectTableIndex(),
+                await _ipcManager.PenumbraRemoveTemporaryCollection(_logger, applicationId, charaTarget.Name.TextValue).ConfigureAwait(false);
+                await _ipcManager.PenumbraSetTemporaryMods(_logger, applicationId, charaTarget.Name.TextValue, charaTarget.ObjectTableIndex(),
                     extractedFiles.Union(fileSwaps).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal),
-                    LoadedCharaFile.CharaFileData.ManipulationData);
+                    LoadedCharaFile.CharaFileData.ManipulationData).ConfigureAwait(false);
                 using GameObjectHandler tempHandler = _gameObjectHandlerFactory(ObjectKind.Player, () => charaTarget.Address, false);
                 await _ipcManager.GlamourerApplyAll(_logger, tempHandler, LoadedCharaFile.CharaFileData.GlamourerData, applicationId, disposeCts.Token).ConfigureAwait(false);
                 _dalamudUtil.WaitWhileGposeCharacterIsDrawing(charaTarget.Address, 30000);
-                _ipcManager.PenumbraRemoveTemporaryCollection(_logger, applicationId, charaTarget.Name.TextValue);
+                await _ipcManager.PenumbraRemoveTemporaryCollection(_logger, applicationId, charaTarget.Name.TextValue).ConfigureAwait(false);
                 _ipcManager.ToggleGposeQueueMode(on: false);
             }
         }

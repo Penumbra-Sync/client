@@ -141,95 +141,13 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
     public bool CheckCustomizePlusApi() => _customizePlusAvailable;
 
-    private bool CheckCustomizePlusApiInternal()
-    {
-        try
-        {
-            return string.Equals(_customizePlusApiVersion.InvokeFunc(), "1.0", StringComparison.Ordinal);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
     public bool CheckGlamourerApi() => _glamourerAvailable;
-
-    private bool CheckGlamourerApiInternal()
-    {
-        bool apiAvailable = false;
-        try
-        {
-            apiAvailable = _glamourerApiVersion.InvokeFunc() >= 0;
-            _shownGlamourerUnavailable = _shownGlamourerUnavailable && !apiAvailable;
-            return apiAvailable;
-        }
-        catch
-        {
-            return apiAvailable;
-        }
-        finally
-        {
-            if (!apiAvailable && !_shownGlamourerUnavailable)
-            {
-                _shownGlamourerUnavailable = true;
-                Mediator.Publish(new NotificationMessage("Glamourer inactive", "Your Glamourer installation is not active or out of date. Update Glamourer to continue to use Mare.", NotificationType.Error));
-            }
-        }
-    }
 
     public bool CheckHeelsApi() => _heelsAvailable;
 
-    private bool CheckHeelsApiInternal()
-    {
-        try
-        {
-            return string.Equals(_heelsGetApiVersion.InvokeFunc(), "1.0.1", StringComparison.Ordinal);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
     public bool CheckPalettePlusApi() => _palettePlusAvailable;
 
-    private bool CheckPalettePlusApiInternal()
-    {
-        try
-        {
-            return string.Equals(_palettePlusApiVersion.InvokeFunc(), "1.1.0", StringComparison.Ordinal);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
     public bool CheckPenumbraApi() => _penumbraAvailable;
-
-    private bool CheckPenumbraApiInternal()
-    {
-        bool apiAvailable = false;
-        try
-        {
-            apiAvailable = _penumbraApiVersion.Invoke() is { Item1: 4, Item2: >= 19 } && _penumbraEnabled.Invoke();
-            _shownPenumbraUnavailable = _shownPenumbraUnavailable && !apiAvailable;
-            return apiAvailable;
-        }
-        catch
-        {
-            return apiAvailable;
-        }
-        finally
-        {
-            if (!apiAvailable && !_shownPenumbraUnavailable)
-            {
-                _shownPenumbraUnavailable = true;
-                Mediator.Publish(new NotificationMessage("Penumbra inactive", "Your Penumbra installation is not active or out of date. Update Penumbra and/or the Enable Mods setting in Penumbra to continue to use Mare.", NotificationType.Error));
-            }
-        }
-    }
 
     public async Task CustomizePlusRevert(IntPtr character)
     {
@@ -272,12 +190,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     {
         if (!CheckHeelsApi()) return 0.0f;
         return _heelsGetOffset.InvokeFunc();
-    }
-
-    private string? GetPenumbraModDirectoryInternal()
-    {
-        if (!CheckPenumbraApi()) return null;
-        return _penumbraResolveModDir!.Invoke().ToLowerInvariant();
     }
 
     public async Task GlamourerApplyAll(ILogger logger, GameObjectHandler handler, string? customization, Guid applicationId, CancellationToken token, bool fireAndForget = false)
@@ -423,38 +335,44 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         }
     }
 
-    public void PenumbraRemoveTemporaryCollection(ILogger logger, Guid applicationId, string characterName)
+    public async Task PenumbraRemoveTemporaryCollection(ILogger logger, Guid applicationId, string characterName)
     {
         if (!CheckPenumbraApi()) return;
-        var collName = "Mare_" + characterName;
-        logger.LogTrace("[{applicationId}] Removing temp collection for {collName}", applicationId, collName);
-        var ret = _penumbraRemoveTemporaryMod.Invoke("MareChara", collName, 0);
-        logger.LogTrace("[{applicationId}] RemoveTemporaryMod: {ret}", applicationId, ret);
-        var ret2 = _penumbraRemoveTemporaryCollection.Invoke(collName);
-        logger.LogTrace("[{applicationId}] RemoveTemporaryCollection: {ret2}", applicationId, ret2);
+        await _dalamudUtil.RunOnFrameworkThread(() =>
+        {
+            var collName = "Mare_" + characterName;
+            logger.LogTrace("[{applicationId}] Removing temp collection for {collName}", applicationId, collName);
+            var ret = _penumbraRemoveTemporaryMod.Invoke("MareChara", collName, 0);
+            logger.LogTrace("[{applicationId}] RemoveTemporaryMod: {ret}", applicationId, ret);
+            var ret2 = _penumbraRemoveTemporaryCollection.Invoke(collName);
+            logger.LogTrace("[{applicationId}] RemoveTemporaryCollection: {ret2}", applicationId, ret2);
+        }).ConfigureAwait(false);
     }
 
     public async Task<(string[] forward, string[][] reverse)> PenumbraResolvePaths(string[] forward, string[] reverse)
     {
-        return await _dalamudUtil.RunOnFrameworkThread(() => _penumbraResolvePaths.Invoke(forward, reverse));
+        return await _dalamudUtil.RunOnFrameworkThread(() => _penumbraResolvePaths.Invoke(forward, reverse)).ConfigureAwait(false);
     }
 
-    public void PenumbraSetTemporaryMods(ILogger logger, Guid applicationId, string characterName, int? idx, Dictionary<string, string> modPaths, string manipulationData)
+    public async Task PenumbraSetTemporaryMods(ILogger logger, Guid applicationId, string characterName, int? idx, Dictionary<string, string> modPaths, string manipulationData)
     {
         if (!CheckPenumbraApi() || idx == null) return;
 
-        var collName = "Mare_" + characterName;
-        var ret = _penumbraCreateNamedTemporaryCollection.Invoke(collName);
-        logger.LogTrace("[{applicationId}] Creating Temp Collection {collName}, Success: {ret}", applicationId, collName, ret);
-        var retAssign = _penumbraAssignTemporaryCollection.Invoke(collName, idx.Value, c: true);
-        logger.LogTrace("[{applicationId}] Assigning Temp Collection {collName} to index {idx}, Success: {ret}", applicationId, collName, idx, retAssign);
-        foreach (var mod in modPaths)
+        await _dalamudUtil.RunOnFrameworkThread(() =>
         {
-            logger.LogTrace("[{applicationId}] Change: {from} => {to}", applicationId, mod.Key, mod.Value);
-        }
+            var collName = "Mare_" + characterName;
+            var ret = _penumbraCreateNamedTemporaryCollection.Invoke(collName);
+            logger.LogTrace("[{applicationId}] Creating Temp Collection {collName}, Success: {ret}", applicationId, collName, ret);
+            var retAssign = _penumbraAssignTemporaryCollection.Invoke(collName, idx.Value, c: true);
+            logger.LogTrace("[{applicationId}] Assigning Temp Collection {collName} to index {idx}, Success: {ret}", applicationId, collName, idx, retAssign);
+            foreach (var mod in modPaths)
+            {
+                logger.LogTrace("[{applicationId}] Change: {from} => {to}", applicationId, mod.Key, mod.Value);
+            }
 
-        var ret2 = _penumbraAddTemporaryMod.Invoke("MareChara", collName, modPaths, manipulationData, 0);
-        logger.LogTrace("[{applicationId}] Setting temp mods for {collName}, Success: {ret2}", applicationId, collName, ret2);
+            var ret2 = _penumbraAddTemporaryMod.Invoke("MareChara", collName, modPaths, manipulationData, 0);
+            logger.LogTrace("[{applicationId}] Setting temp mods for {collName}, Success: {ret2}", applicationId, collName, ret2);
+        }).ConfigureAwait(false);
     }
 
     public void ToggleGposeQueueMode(bool on)
@@ -498,10 +416,98 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         _customizePlusOnScaleUpdate.Unsubscribe(OnCustomizePlusScaleChange);
     }
 
+    private bool CheckCustomizePlusApiInternal()
+    {
+        try
+        {
+            return string.Equals(_customizePlusApiVersion.InvokeFunc(), "1.0", StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private bool CheckGlamourerApiInternal()
+    {
+        bool apiAvailable = false;
+        try
+        {
+            apiAvailable = _glamourerApiVersion.InvokeFunc() >= 0;
+            _shownGlamourerUnavailable = _shownGlamourerUnavailable && !apiAvailable;
+            return apiAvailable;
+        }
+        catch
+        {
+            return apiAvailable;
+        }
+        finally
+        {
+            if (!apiAvailable && !_shownGlamourerUnavailable)
+            {
+                _shownGlamourerUnavailable = true;
+                Mediator.Publish(new NotificationMessage("Glamourer inactive", "Your Glamourer installation is not active or out of date. Update Glamourer to continue to use Mare.", NotificationType.Error));
+            }
+        }
+    }
+
+    private bool CheckHeelsApiInternal()
+    {
+        try
+        {
+            return string.Equals(_heelsGetApiVersion.InvokeFunc(), "1.0.1", StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private bool CheckPalettePlusApiInternal()
+    {
+        try
+        {
+            return string.Equals(_palettePlusApiVersion.InvokeFunc(), "1.1.0", StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private bool CheckPenumbraApiInternal()
+    {
+        bool apiAvailable = false;
+        try
+        {
+            apiAvailable = _penumbraApiVersion.Invoke() is { Item1: 4, Item2: >= 19 } && _penumbraEnabled.Invoke();
+            _shownPenumbraUnavailable = _shownPenumbraUnavailable && !apiAvailable;
+            return apiAvailable;
+        }
+        catch
+        {
+            return apiAvailable;
+        }
+        finally
+        {
+            if (!apiAvailable && !_shownPenumbraUnavailable)
+            {
+                _shownPenumbraUnavailable = true;
+                Mediator.Publish(new NotificationMessage("Penumbra inactive", "Your Penumbra installation is not active or out of date. Update Penumbra and/or the Enable Mods setting in Penumbra to continue to use Mare.", NotificationType.Error));
+            }
+        }
+    }
+
     private void ClearActionQueue()
     {
         ActionQueue.Clear();
         _gposeActionQueue.Clear();
+    }
+
+    private string? GetPenumbraModDirectoryInternal()
+    {
+        if (!CheckPenumbraApi()) return null;
+        return _penumbraResolveModDir!.Invoke().ToLowerInvariant();
     }
 
     private void HandleActionQueue()
@@ -564,7 +570,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         {
             if (!fireAndForget)
             {
-                await _dalamudUtil.RunOnFrameworkThread(action);
+                await _dalamudUtil.RunOnFrameworkThread(action).ConfigureAwait(false);
 
                 var disposeToken = _disposalCts.Token;
                 var combinedToken = CancellationTokenSource.CreateLinkedTokenSource(disposeToken, token).Token;

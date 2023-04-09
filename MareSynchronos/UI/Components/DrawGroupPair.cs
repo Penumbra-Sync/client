@@ -14,11 +14,11 @@ namespace MareSynchronos.UI.Components;
 
 public class DrawGroupPair : DrawPairBase
 {
+    private static string _banReason = string.Empty;
+    private static bool _banUserPopupOpen;
+    private static bool _showModalBanUser;
     private readonly GroupPairFullInfoDto _fullInfoDto;
     private readonly GroupFullInfoDto _group;
-    private string _banReason = string.Empty;
-    private bool _banUserPopupOpen;
-    private bool _showModalBanUser;
 
     public DrawGroupPair(string id, Pair entry, ApiController apiController, GroupFullInfoDto group, GroupPairFullInfoDto fullInfoDto, UidDisplayHandler handler) : base(id, entry, apiController, handler)
     {

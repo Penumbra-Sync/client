@@ -176,12 +176,12 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             if (_dalamudUtil.IsZoning)
             {
                 Logger.LogTrace("[{applicationId}] Removing temp collection for {name} ({OnlineUser})", applicationId, name, OnlineUser);
-                _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name);
+                _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name).GetAwaiter().GetResult();
             }
             else if (_dalamudUtil is { IsZoning: false, IsInCutscene: false })
             {
                 Logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser);
-                _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name);
+                _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name).GetAwaiter().GetResult();
 
                 foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData.FileReplacements)
                 {
@@ -211,10 +211,10 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
     private async Task ApplyBaseData(Guid applicationId, Dictionary<string, string> moddedPaths, string manipulationData, CancellationToken token)
     {
-        await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, PlayerName!)).ConfigureAwait(false);
+        await _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, PlayerName!).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
-        await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.PenumbraSetTemporaryMods(Logger, applicationId, PlayerName!,
-            _charaHandler?.GameObjectLazy?.Value.ObjectTableIndex(), moddedPaths, manipulationData)).ConfigureAwait(false);
+        await _ipcManager.PenumbraSetTemporaryMods(Logger, applicationId, PlayerName!,
+            _charaHandler?.GameObjectLazy?.Value.ObjectTableIndex(), moddedPaths, manipulationData).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
     }
 
