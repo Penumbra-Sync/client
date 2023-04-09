@@ -852,7 +852,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 ImGui.Separator();
                 if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add new Secret Key"))
                 {
-                    selectedServer.SecretKeys.Add(selectedServer.SecretKeys.Max(p => p.Key) + 1, new SecretKey()
+                    selectedServer.SecretKeys.Add(selectedServer.SecretKeys.Any() ? selectedServer.SecretKeys.Max(p => p.Key) + 1 : 0, new SecretKey()
                     {
                         FriendlyName = "New Secret Key",
                     });
