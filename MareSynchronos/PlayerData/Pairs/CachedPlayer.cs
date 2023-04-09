@@ -173,12 +173,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
             if (_lifetime.ApplicationStopping.IsCancellationRequested) return;
 
-            if (_dalamudUtil.IsZoning)
-            {
-                Logger.LogTrace("[{applicationId}] Removing temp collection for {name} ({OnlineUser})", applicationId, name, OnlineUser);
-                _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name).GetAwaiter().GetResult();
-            }
-            else if (_dalamudUtil is { IsZoning: false, IsInCutscene: false })
+            if (_dalamudUtil is { IsZoning: false, IsInCutscene: false })
             {
                 Logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser);
                 _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name).GetAwaiter().GetResult();
