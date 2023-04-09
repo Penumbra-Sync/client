@@ -5,6 +5,7 @@ using MareSynchronos.WebAPI.Files.Models;
 using Microsoft.Extensions.Logging;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Reflection;
 
 namespace MareSynchronos.WebAPI.Files;
 
@@ -23,6 +24,8 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         _serverManager = serverManager;
         _httpClient = new();
         _httpClient.Timeout = TimeSpan.FromSeconds(300);
+        var ver = Assembly.GetExecutingAssembly().GetName().Version;
+        _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("MareSynchronos", ver!.Major + "." + ver!.Minor + "." + ver!.Build));
 
         _availableDownloadSlots = mareConfig.Current.ParallelDownloads;
         _downloadSemaphore = new(_availableDownloadSlots);

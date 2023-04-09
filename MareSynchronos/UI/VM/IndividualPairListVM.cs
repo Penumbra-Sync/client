@@ -177,8 +177,8 @@ public sealed class IndividualPairListVM : ImguiVM, IMediatorSubscriber, IDispos
                 })
                 .WithTooltip(() => "Pause " + FilteredUsers.Value.Count + " users"))
             .WithState(2, new ButtonCommand.State()
-        .WithIcon(FontAwesomeIcon.Clock)
-        .WithEnabled(false)
+                .WithIcon(FontAwesomeIcon.Clock)
+                .WithEnabled(false)
                 .WithTooltip(() => $"Wait {TimeSpan.FromMilliseconds(15000 - _timeout.ElapsedMilliseconds).TotalSeconds.ToString("0")}s until you can pause/resume again"))
         .WithStateSelector(() =>
         {

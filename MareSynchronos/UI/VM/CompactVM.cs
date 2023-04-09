@@ -22,7 +22,7 @@ public sealed class CompactVM : ImguiVM
     private readonly ServerConfigurationManager _serverConfigurationManager;
 
     public CompactVM(MareMediator mediator, ApiController apiController, DalamudUtilService dalamudUtilService,
-                    MareConfigService mareConfigService, ServerConfigurationManager serverConfigurationManager)
+                        MareConfigService mareConfigService, ServerConfigurationManager serverConfigurationManager)
     {
         _mediator = mediator;
         _apiController = apiController;
@@ -34,31 +34,20 @@ public sealed class CompactVM : ImguiVM
     }
 
     public ButtonCommand AddCurrentUserCommand { get; private set; } = new();
-
     public ButtonCommand ConnectCommand { get; private set; } = new();
-
     public ButtonCommand CopyUidCommand { get; private set; } = new();
-
     public ButtonCommand EditUserProfileCommand { get; private set; } = new();
-
+    public ButtonCommand GroupsCommand { get; private set; } = new();
+    public ButtonCommand IndividualsCommand { get; private set; } = new();
     public bool IsConnected => _apiController.ServerState is ServerState.Connected;
-
     public bool IsNoSecretKey => _apiController.ServerState is ServerState.NoSecretKey;
-
     public bool IsReconnecting => _apiController.ServerState is (ServerState.Reconnecting or ServerState.Disconnecting);
-
     public bool ManuallyDisconnected => _serverConfigurationManager.CurrentServer!.FullPause;
-
     public int OnlineUserCount => _apiController.OnlineUsers;
-
     public ButtonCommand OpenSettingsCommand { get; private set; } = new();
-
     public int SecretKeyIdx { get; set; } = 0;
-
     public Dictionary<int, SecretKey> SecretKeys => _serverConfigurationManager.CurrentServer!.SecretKeys;
-
     public string ServerName => _serverConfigurationManager.CurrentServer.ServerName;
-
     public string ShardString =>
 #if DEBUG
                 $"Shard: {_apiController.ServerInfo.ShardName}"
@@ -66,9 +55,8 @@ public sealed class CompactVM : ImguiVM
     string.Equals(_apiController.ServerInfo.ShardName, "Main", StringComparison.OrdinalIgnoreCase) ? string.Empty : $"Shard: {_apiController.ServerInfo.ShardName}"
 #endif
     ;
-
     public bool ShowCharacterNameInsteadOfNotesForVisible => _mareConfigService.Current.ShowCharacterNameInsteadOfNotesForVisible;
-
+    public bool ShowSyncshells { get; private set; } = false;
     public (Version Version, bool IsCurrent) Version => (_apiController.CurrentClientVersion, _apiController.IsCurrentVersion);
 
     public string GetServerError()
@@ -164,12 +152,14 @@ public sealed class CompactVM : ImguiVM
             .WithStateSelector(() => ManuallyDisconnected ? 1 : 0);
 
         CopyUidCommand = new ButtonCommand()
+            .WithScale(1.5f)
             .WithState(0, new ButtonCommand.State()
                 .WithIcon(FontAwesomeIcon.Copy)
                 .WithTooltip("Copy your UID to clipboard")
                 .WithAction(() => ImGui.SetClipboardText(_apiController.DisplayName)));
 
         OpenSettingsCommand = new ButtonCommand()
+            .WithScale(1.5f)
             .WithState(0, new ButtonCommand.State()
                 .WithIcon(FontAwesomeIcon.Cog)
                 .WithTooltip("Open Settings")
@@ -180,6 +170,34 @@ public sealed class CompactVM : ImguiVM
                 .WithIcon(FontAwesomeIcon.Plus)
                 .WithText("Add current character with secret key")
                 .WithAction(AddCurrentCharacter));
+
+        IndividualsCommand = new ButtonCommand()
+            .WithState(0, new ButtonCommand.State()
+                .WithIcon(FontAwesomeIcon.User)
+                .WithBackground(() => ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonHovered])
+                .WithTooltip("[Active] Individual pairs"))
+            .WithState(1, new ButtonCommand.State()
+                .WithIcon(FontAwesomeIcon.User)
+                .WithAction(() => ShowSyncshells = false)
+                .WithTooltip("Switch to Individual Pairs"))
+            .WithStateSelector(() =>
+            {
+                return ShowSyncshells ? 1 : 0;
+            });
+
+        GroupsCommand = new ButtonCommand()
+            .WithState(0, new ButtonCommand.State()
+                .WithIcon(FontAwesomeIcon.UserFriends)
+                .WithBackground(() => ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonHovered])
+                .WithTooltip("[Active] Syncshells"))
+            .WithState(1, new ButtonCommand.State()
+                .WithIcon(FontAwesomeIcon.UserFriends)
+                .WithAction(() => ShowSyncshells = true)
+                .WithTooltip("Switch to Syncshells"))
+            .WithStateSelector(() =>
+            {
+                return ShowSyncshells ? 0 : 1;
+            });
     }
 
     private void ToggleConnection()

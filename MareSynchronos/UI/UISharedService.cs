@@ -321,7 +321,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         var padding = ImGui.GetStyle().FramePadding;
         var spacing = ImGui.GetStyle().ItemSpacing;
 
-        var buttonSizeX = iconSize.X + textSize.X + padding.X * 2 + spacing.X;
+        var buttonSizeX = iconSize.X + textSize.X + padding.X * 3 + spacing.X;
         var buttonSizeY = (iconSize.Y > textSize.Y ? iconSize.Y : textSize.Y) + padding.Y * 2;
         return new Vector2(buttonSizeX, buttonSizeY);
     }

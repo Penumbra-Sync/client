@@ -1,5 +1,5 @@
 ﻿using Dalamud.Interface;
-using Dalamud.Interface.Colors;
+using ImGuiNET;
 using System.Numerics;
 
 namespace MareSynchronos.UI.Handlers;
@@ -9,8 +9,10 @@ public class ButtonCommand
     private readonly Dictionary<int, State> _dict = new Dictionary<int, State>();
 
     public bool ClosePopup { get; private set; } = false;
+    public string CommandId { get; } = Guid.NewGuid().ToString("n");
     public Func<int> InternalState { get; private set; } = () => 0;
     public bool RequireCtrl { get; private set; } = false;
+    public float Scale { get; private set; } = 1f;
     public State StatefulCommandContent => _dict.GetValueOrDefault(InternalState.Invoke(), new State());
 
     public ButtonCommand WithClosePopup()
@@ -22,6 +24,12 @@ public class ButtonCommand
     public ButtonCommand WithRequireCtrl()
     {
         RequireCtrl = true;
+        return this;
+    }
+
+    public ButtonCommand WithScale(float scale)
+    {
+        Scale = scale;
         return this;
     }
 
@@ -39,9 +47,11 @@ public class ButtonCommand
 
     public class State
     {
+        public Func<Vector4?> Background { get; private set; } = () => null;
         public Func<string> ButtonText { get; private set; } = () => string.Empty;
         public Func<bool> Enabled { get; private set; } = () => true;
-        public Func<Vector4> Foreground { get; internal set; } = () => ImGuiColors.DalamudWhite;
+        public Func<ImFontPtr?> Font { get; private set; } = () => null;
+        public Func<Vector4?> Foreground { get; internal set; } = () => null;
         public Func<FontAwesomeIcon> Icon { get; private set; } = () => FontAwesomeIcon.None;
         public Action OnClick { get; private set; } = () => { };
         public Func<string> Tooltip { get; private set; } = () => string.Empty;
@@ -53,10 +63,20 @@ public class ButtonCommand
             return this;
         }
 
+        public State WithBackground(Func<Vector4?> color)
+        {
+            Background = color;
+            return this;
+        }
+
+        public State WithBackground(Vector4? color)
+        {
+            return WithBackground(() => color);
+        }
+
         public State WithEnabled(bool enabled)
         {
-            Enabled = () => enabled;
-            return this;
+            return WithEnabled(() => enabled);
         }
 
         public State WithEnabled(Func<bool> enabled)
@@ -65,22 +85,31 @@ public class ButtonCommand
             return this;
         }
 
-        public State WithForeground(Func<Vector4> color)
+        public State WithFont(ImFontPtr? imFontPtr)
+        {
+            return WithFont(() => imFontPtr);
+        }
+
+        public State WithFont(Func<ImFontPtr?> font)
+        {
+            Font = font;
+            return this;
+        }
+
+        public State WithForeground(Func<Vector4?> color)
         {
             Foreground = color;
             return this;
         }
 
-        public State WithForeground(Vector4 color)
+        public State WithForeground(Vector4? color)
         {
-            Foreground = () => color;
-            return this;
+            return WithForeground(() => color);
         }
 
         public State WithIcon(FontAwesomeIcon icon)
         {
-            Icon = () => icon;
-            return this;
+            return WithIcon(() => icon);
         }
 
         public State WithIcon(Func<FontAwesomeIcon> icon)
@@ -91,8 +120,7 @@ public class ButtonCommand
 
         public State WithText(string text)
         {
-            ButtonText = () => text;
-            return this;
+            return WithText(() => text);
         }
 
         public State WithText(Func<string> text)
@@ -103,8 +131,7 @@ public class ButtonCommand
 
         public State WithTooltip(string text)
         {
-            Tooltip = () => text;
-            return this;
+            return WithTooltip(() => text);
         }
 
         public State WithTooltip(Func<string> text)
@@ -121,8 +148,7 @@ public class ButtonCommand
 
         public State WithVisibility(bool visibility)
         {
-            Visibility = () => visibility;
-            return this;
+            return WithVisibility(() => visibility);
         }
     }
 }

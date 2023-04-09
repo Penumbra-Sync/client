@@ -11,11 +11,29 @@ namespace MareSynchronos.UI.Components;
 
 public class DrawUserPair : DrawPairBase
 {
+    private readonly Button _btnChangeAnims;
+    private readonly Button _btnChangeSounds;
+    private readonly Button _btnCycle;
+    private readonly Button _btnPairGroups;
+    private readonly Button _btnPause;
+    private readonly Button _btnProfile;
+    private readonly Button _btnReload;
+    private readonly Button _btnRemovePair;
+    private readonly Button _btnReport;
     private readonly DrawUserPairVM _drawUserPairVM;
 
     public DrawUserPair(DrawUserPairVM drawUserPairVM, UidDisplayHandler displayHandler, ApiController apiController) : base(drawUserPairVM, apiController, displayHandler)
     {
         _drawUserPairVM = drawUserPairVM;
+        _btnProfile = Button.FromCommand(_drawUserPairVM.OpenProfileCommand);
+        _btnReload = Button.FromCommand(_drawUserPairVM.ReloadLastDataCommand);
+        _btnCycle = Button.FromCommand(_drawUserPairVM.CyclePauseStateCommand);
+        _btnPairGroups = Button.FromCommand(_drawUserPairVM.SelectPairGroupsCommand);
+        _btnChangeSounds = Button.FromCommand(_drawUserPairVM.ChangeSoundsCommand);
+        _btnChangeAnims = Button.FromCommand(_drawUserPairVM.ChangeAnimationsCommand);
+        _btnRemovePair = Button.FromCommand(_drawUserPairVM.RemovePairCommand);
+        _btnReport = Button.FromCommand(_drawUserPairVM.ReportProfileCommand);
+        _btnPause = Button.FromCommand(_drawUserPairVM.PauseCommand);
     }
 
     protected override void DrawLeftSide(float textPosY, float originalY)
@@ -36,8 +54,7 @@ public class DrawUserPair : DrawPairBase
 
     protected override float DrawRightSide(float textPosY, float originalY)
     {
-        var pauseButton = Button.FromCommand(_drawUserPairVM.PauseCommand);
-        var pauseIconSize = pauseButton.GetSize();
+        var pauseIconSize = _btnPause.Size;
         var barButtonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars);
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
         var windowEndX = ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth();
@@ -95,7 +112,7 @@ public class DrawUserPair : DrawPairBase
             }
             ImGui.SameLine(windowEndX - barButtonSize.X - spacingX - pauseIconSize.X);
             ImGui.SetCursorPosY(originalY);
-            pauseButton.Draw();
+            _btnPause.Draw();
         }
 
         // Flyout Menu
@@ -121,28 +138,20 @@ public class DrawUserPair : DrawPairBase
 
     private void DrawPairedClientMenu()
     {
-        var profile = Button.FromCommand(_drawUserPairVM.OpenProfileCommand);
-        var reload = Button.FromCommand(_drawUserPairVM.ReloadLastDataCommand);
-        var cycle = Button.FromCommand(_drawUserPairVM.CyclePauseStateCommand);
-        var pairGroups = Button.FromCommand(_drawUserPairVM.SelectPairGroupsCommand);
-        var changeSounds = Button.FromCommand(_drawUserPairVM.ChangeSoundsCommand);
-        var changeAnims = Button.FromCommand(_drawUserPairVM.ChangeAnimationsCommand);
-        var removePair = Button.FromCommand(_drawUserPairVM.RemovePairCommand);
-        var report = Button.FromCommand(_drawUserPairVM.ReportProfileCommand);
-        var btnSizeProfile = profile.GetSize();
-        var max = Enumerable.Max<float>(new[] { btnSizeProfile.X, reload.GetSize().X, cycle.GetSize().X,
-            pairGroups.GetSize().X, changeSounds.GetSize().X, changeAnims.GetSize().X, removePair.GetSize().X, report.GetSize().X });
+        var btnSizeProfile = _btnProfile.Size;
+        var max = Enumerable.Max<float>(new[] { btnSizeProfile.X, _btnReload.Size.X, _btnCycle.Size.X,
+            _btnPairGroups.Size.X, _btnChangeSounds.Size.X, _btnChangeAnims.Size.X, _btnRemovePair.Size.X, _btnReport.Size.X });
         var btnSize = new Vector2(max, btnSizeProfile.Y);
 
-        profile.Draw(btnSize);
-        reload.Draw(btnSize);
-        cycle.Draw(btnSize);
+        _btnProfile.Draw(btnSize);
+        _btnReload.Draw(btnSize);
+        _btnCycle.Draw(btnSize);
         ImGui.Separator();
-        pairGroups.Draw(btnSize);
-        changeSounds.Draw(btnSize);
-        changeAnims.Draw(btnSize);
-        removePair.Draw(btnSize);
+        _btnPairGroups.Draw(btnSize);
+        _btnChangeSounds.Draw(btnSize);
+        _btnChangeAnims.Draw(btnSize);
+        _btnRemovePair.Draw(btnSize);
         ImGui.Separator();
-        report.Draw(btnSize);
+        _btnReport.Draw(btnSize);
     }
 }

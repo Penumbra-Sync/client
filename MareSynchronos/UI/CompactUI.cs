@@ -14,6 +14,13 @@ namespace MareSynchronos.UI;
 
 public class CompactUi : WindowMediatorSubscriberBase
 {
+    private readonly Button _btnAddCurrentUser;
+    private readonly Button _btnConnect;
+    private readonly Button _btnCopyUid;
+    private readonly Button _btnEditProfile;
+    private readonly Button _btnGroup;
+    private readonly Button _btnIndividual;
+    private readonly Button _btnOpenSettings;
     private readonly CompactVM _compactVM;
     private readonly GroupPanel _groupPanel;
     private readonly IndividualPairListUiElement _pairUiElement;
@@ -22,7 +29,6 @@ public class CompactUi : WindowMediatorSubscriberBase
     private float _filterHeight;
     private Vector2 _lastPosition = Vector2.One;
     private Vector2 _lastSize = Vector2.One;
-    private bool _showSyncShells;
     private float _transferPartHeight;
     private bool _wasOpen;
     private float _windowContentWidth;
@@ -56,6 +62,16 @@ public class CompactUi : WindowMediatorSubscriberBase
             MinimumSize = new Vector2(350, 400),
             MaximumSize = new Vector2(350, 2000),
         };
+
+        Flags |= ImGuiWindowFlags.NoDocking;
+
+        _btnIndividual = Button.FromCommand(_compactVM.IndividualsCommand);
+        _btnGroup = Button.FromCommand(_compactVM.GroupsCommand);
+        _btnCopyUid = Button.FromCommand(_compactVM.CopyUidCommand);
+        _btnOpenSettings = Button.FromCommand(_compactVM.OpenSettingsCommand);
+        _btnEditProfile = Button.FromCommand(_compactVM.EditUserProfileCommand);
+        _btnConnect = Button.FromCommand(_compactVM.ConnectCommand);
+        _btnAddCurrentUser = Button.FromCommand(_compactVM.AddCurrentUserCommand);
     }
 
     private float TransferPartHeight
@@ -106,45 +122,14 @@ public class CompactUi : WindowMediatorSubscriberBase
 
         if (_compactVM.IsConnected)
         {
-            var hasShownSyncShells = _showSyncShells;
+            var buttonSize = new Vector2((UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X) / 2, 30 * ImGuiHelpers.GlobalScale);
 
-            ImGui.PushFont(UiBuilder.IconFont);
-            if (!hasShownSyncShells)
-            {
-                ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonHovered]);
-            }
-            if (ImGui.Button(FontAwesomeIcon.User.ToIconString(), new Vector2((UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X) / 2, 30 * ImGuiHelpers.GlobalScale)))
-            {
-                _showSyncShells = false;
-            }
-            if (!hasShownSyncShells)
-            {
-                ImGui.PopStyleColor();
-            }
-            ImGui.PopFont();
-            UiSharedService.AttachToolTip("Individual pairs");
-
+            _btnIndividual.Draw(buttonSize);
             ImGui.SameLine();
-
-            ImGui.PushFont(UiBuilder.IconFont);
-            if (hasShownSyncShells)
-            {
-                ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonHovered]);
-            }
-            if (ImGui.Button(FontAwesomeIcon.UserFriends.ToIconString(), new Vector2((UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X) / 2, 30 * ImGuiHelpers.GlobalScale)))
-            {
-                _showSyncShells = true;
-            }
-            if (hasShownSyncShells)
-            {
-                ImGui.PopStyleColor();
-            }
-            ImGui.PopFont();
-
-            UiSharedService.AttachToolTip("Syncshells");
+            _btnGroup.Draw(buttonSize);
 
             ImGui.Separator();
-            if (!hasShownSyncShells)
+            if (!_compactVM.ShowSyncshells)
             {
                 UiSharedService.DrawWithID("pairlist", () => _filterHeight = _pairUiElement.DrawPairList(TransferPartHeight, WindowContentWidth));
             }
@@ -175,8 +160,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         var keys = _compactVM.SecretKeys;
         if (keys.TryGetValue(_compactVM.SecretKeyIdx, out var secretKey))
         {
-            Button.FromCommand(_compactVM.AddCurrentUserCommand).Draw();
-
+            _btnAddCurrentUser.Draw();
             _compactVM.SecretKeyIdx = _uiShared.DrawCombo("Secret Key##addCharacterSecretKey", keys, (f) => f.Value.FriendlyName, (f) => _compactVM.SecretKeyIdx = f.Key).Key;
         }
         else
@@ -187,8 +171,7 @@ public class CompactUi : WindowMediatorSubscriberBase
 
     private void DrawServerStatus()
     {
-        var connectButton = Button.FromCommand(_compactVM.ConnectCommand);
-        var buttonSize = connectButton.GetSize();
+        var buttonSize = _btnConnect.Size;
         var userCount = _compactVM.OnlineUserCount.ToString(CultureInfo.InvariantCulture);
         var userSize = ImGui.CalcTextSize(userCount);
         var textSize = ImGui.CalcTextSize("Users Online");
@@ -227,7 +210,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         if (_compactVM.IsConnected)
         {
             ImGui.SetCursorPosX(0 + ImGui.GetStyle().ItemSpacing.X);
-            Button.FromCommand(_compactVM.EditUserProfileCommand).Draw();
+            _btnEditProfile.Draw();
         }
 
         ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - buttonSize.X);
@@ -236,7 +219,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ((userSize.Y + textSize.Y) / 2 + shardTextSize.Y) / 2 - ImGui.GetStyle().ItemSpacing.Y + buttonSize.Y / 2);
         }
 
-        connectButton.Draw();
+        _btnConnect.Draw();
     }
 
     private void DrawUIDHeader()
@@ -244,32 +227,26 @@ public class CompactUi : WindowMediatorSubscriberBase
         var uidText = _compactVM.GetUidText();
         var buttonSizeX = 0f;
 
-        var settingsButton = Button.FromCommand(_compactVM.OpenSettingsCommand);
-
         var uidTextSize = UiSharedService.CalcFontTextSize(uidText, _uiShared.UidFont);
 
         var originalPos = ImGui.GetCursorPos();
-        ImGui.SetWindowFontScale(1.5f);
-        var buttonSize = settingsButton.GetSize();
+        var buttonSize = _btnOpenSettings.Size;
         buttonSizeX -= buttonSize.X - ImGui.GetStyle().ItemSpacing.X * 2;
         ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - buttonSize.X);
         ImGui.SetCursorPosY(originalPos.Y + uidTextSize.Y / 2 - buttonSize.Y / 2);
 
-        settingsButton.Draw();
+        _btnOpenSettings.Draw();
 
         ImGui.SameLine(); //Important to draw the uidText consistently
         ImGui.SetCursorPos(originalPos);
 
         if (_compactVM.IsConnected)
         {
-            var copyUidButton = Button.FromCommand(_compactVM.CopyUidCommand);
-            buttonSizeX += copyUidButton.GetSize().X - ImGui.GetStyle().ItemSpacing.X * 2;
+            buttonSizeX += _btnCopyUid.Size.X - ImGui.GetStyle().ItemSpacing.X * 2;
             ImGui.SetCursorPosY(originalPos.Y + uidTextSize.Y / 2 - buttonSize.Y / 2);
-            copyUidButton.Draw();
+            _btnCopyUid.Draw();
             ImGui.SameLine();
         }
-
-        ImGui.SetWindowFontScale(1f);
 
         ImGui.SetCursorPosY(originalPos.Y + buttonSize.Y / 2 - uidTextSize.Y / 2 - ImGui.GetStyle().ItemSpacing.Y / 2);
         ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMax().X + ImGui.GetWindowContentRegionMin().X) / 2 + buttonSizeX - uidTextSize.X / 2);

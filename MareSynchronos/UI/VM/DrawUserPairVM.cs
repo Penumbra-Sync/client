@@ -9,17 +9,20 @@ using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.UI.Components;
 using MareSynchronos.UI.Handlers;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI.VM;
 
 public class DrawUserPairVM : DrawPairVMBase
 {
+    private readonly ILogger<DrawUserPairVM> _logger;
     private readonly SelectGroupForPairUi _selectGroupForPairUi;
 
-    public DrawUserPairVM(Pair pair, MareMediator mediator, ApiController apiController, ServerConfigurationManager serverConfigurationManager,
+    public DrawUserPairVM(ILogger<DrawUserPairVM> logger, Pair pair, MareMediator mediator, ApiController apiController, ServerConfigurationManager serverConfigurationManager,
         MareConfigService mareConfigService, SelectGroupForPairUi selectGroupForPairUi)
         : base(pair, apiController, mediator, serverConfigurationManager, mareConfigService)
     {
+        _logger = logger;
         _selectGroupForPairUi = selectGroupForPairUi;
     }
 
@@ -95,7 +98,11 @@ public class DrawUserPairVM : DrawPairVMBase
         CyclePauseStateCommand = new ButtonCommand()
             .WithClosePopup()
             .WithState(0, new ButtonCommand.State()
-                .WithAction(() => _apiController.CyclePause(_pair.UserData))
+                .WithAction(() =>
+                {
+                    _logger.LogInformation("Cycling pause");
+                    _apiController.CyclePause(_pair.UserData);
+                })
                 .WithVisibility(() => IsOnline)
                 .WithText("Cycle Pause State")
                 .WithIcon(FontAwesomeIcon.PlayCircle)

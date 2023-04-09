@@ -141,7 +141,7 @@ public sealed class Plugin : IDalamudPlugin
                 ));
             collection.AddSingleton(s =>
                 new Func<Pair, DrawUserPairVM>((p) =>
-                    new DrawUserPairVM(p, s.GetRequiredService<MareMediator>(), s.GetRequiredService<ApiController>(),
+                    new DrawUserPairVM(s.GetRequiredService<ILogger<DrawUserPairVM>>(), p, s.GetRequiredService<MareMediator>(), s.GetRequiredService<ApiController>(),
                         s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<MareConfigService>(),
                         s.GetRequiredService<SelectGroupForPairUi>())
                 ));

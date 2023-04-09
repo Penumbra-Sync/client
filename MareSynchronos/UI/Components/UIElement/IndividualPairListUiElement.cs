@@ -9,8 +9,11 @@ namespace MareSynchronos.UI.Components.UIElement;
 
 public class IndividualPairListUiElement : WindowElementVMBase<ImguiVM>
 {
+    private readonly Button _addPairButton;
     private readonly PairGroupsUi _pairGroupsUi;
     private readonly IndividualPairListVM _pairVM;
+    private readonly Button _pauseAllButton;
+    private readonly Button _reverseButton;
     private readonly SelectGroupForPairUi _selectGroupForPairUi;
     private readonly SelectPairForGroupUi _selectPairForGroupUi;
 
@@ -21,6 +24,9 @@ public class IndividualPairListUiElement : WindowElementVMBase<ImguiVM>
         _pairGroupsUi = pairGroupsUi;
         _selectPairForGroupUi = selectPairForGroupUi;
         _selectGroupForPairUi = selectGroupForPairUi;
+        _addPairButton = Button.FromCommand(_pairVM.AddPairCommand);
+        _reverseButton = Button.FromCommand(_pairVM.ReverseSortCommand);
+        _pauseAllButton = Button.FromCommand(_pairVM.PauseAllCommand);
     }
 
     public float DrawPairList(float transferPartHeight, float windowContentWidth)
@@ -49,8 +55,7 @@ public class IndividualPairListUiElement : WindowElementVMBase<ImguiVM>
 
     private void DrawAddPair()
     {
-        var addPairButton = Button.FromCommand(_pairVM.AddPairCommand);
-        var addPairButtonSize = addPairButton.GetSize();
+        var addPairButtonSize = _addPairButton.Size;
 
         ImGui.SetNextItemWidth(UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - addPairButtonSize.X);
         VM.ExecuteWithProp<string>(nameof(IndividualPairListVM.PairToAdd), (pairToAdd) =>
@@ -60,19 +65,17 @@ public class IndividualPairListUiElement : WindowElementVMBase<ImguiVM>
         });
 
         ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - addPairButtonSize.X);
-        addPairButton.Draw();
+        _addPairButton.Draw();
 
         ImGuiHelpers.ScaledDummy(2);
     }
 
     private void DrawFilter(float windowContentWidth)
     {
-        var pauseAllButton = Button.FromCommand(_pairVM.PauseAllCommand);
-        var reverseButton = Button.FromCommand(_pairVM.ReverseSortCommand);
-        var buttonSize = pauseAllButton.GetSize();
-        var reverseButtonSize = reverseButton.GetSize();
+        var buttonSize = _pauseAllButton.Size;
+        var reverseButtonSize = _reverseButton.Size;
 
-        reverseButton.Draw();
+        _reverseButton.Draw();
 
         ImGui.SameLine();
 
@@ -85,7 +88,7 @@ public class IndividualPairListUiElement : WindowElementVMBase<ImguiVM>
 
         ImGui.SameLine();
 
-        pauseAllButton.Draw();
+        _pauseAllButton.Draw();
     }
 
     private void DrawPairs(float transferPartHeight, float windowContentWidth)
