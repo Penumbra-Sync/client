@@ -87,6 +87,8 @@ public class CompactUi : WindowMediatorSubscriberBase
         Mediator.Subscribe<DownloadStartedMessage>(this, (msg) => _currentDownloads[msg.DownloadId] = msg.DownloadStatus);
         Mediator.Subscribe<DownloadFinishedMessage>(this, (msg) => _currentDownloads.TryRemove(msg.DownloadId, out _));
 
+        Flags |= ImGuiWindowFlags.NoDocking;
+
         SizeConstraints = new WindowSizeConstraints()
         {
             MinimumSize = new Vector2(350, 400),
