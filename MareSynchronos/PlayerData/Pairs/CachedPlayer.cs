@@ -387,14 +387,14 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
         Task.Run(async () =>
         {
-            List<FileReplacementData> toDownloadReplacements;
-
             Dictionary<string, string> moddedPaths = new(StringComparer.Ordinal);
 
             if (updateModdedPaths)
             {
                 int attempts = 0;
-                while ((toDownloadReplacements = TryCalculateModdedDictionary(charaData, out moddedPaths)).Count > 0 && attempts++ <= 10)
+                List<FileReplacementData> toDownloadReplacements = TryCalculateModdedDictionary(charaData, out moddedPaths, downloadToken);
+
+                while ((toDownloadReplacements.Count > 0 && attempts++ <= 10 && !downloadToken.IsCancellationRequested))
                 {
                     _downloadManager.CancelDownload();
                     Logger.LogDebug("Downloading missing files for player {name}, {kind}", PlayerName, updatedData);
@@ -411,7 +411,9 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                         return;
                     }
 
-                    if (TryCalculateModdedDictionary(charaData, out moddedPaths).All(c => _downloadManager.ForbiddenTransfers.Any(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
+                    toDownloadReplacements = TryCalculateModdedDictionary(charaData, out moddedPaths, downloadToken);
+
+                    if (toDownloadReplacements.All(c => _downloadManager.ForbiddenTransfers.Any(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
                     {
                         break;
                     }
@@ -573,26 +575,28 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
     }
 
-    private List<FileReplacementData> TryCalculateModdedDictionary(CharacterData charaData, out Dictionary<string, string> moddedDictionary)
+    private List<FileReplacementData> TryCalculateModdedDictionary(CharacterData charaData, out Dictionary<string, string> moddedDictionary, CancellationToken token)
     {
         List<FileReplacementData> missingFiles = new();
         moddedDictionary = new Dictionary<string, string>(StringComparer.Ordinal);
         try
         {
-            foreach (var item in charaData.FileReplacements.SelectMany(k => k.Value.Where(v => string.IsNullOrEmpty(v.FileSwapPath))).ToList())
+            var replacementList = charaData.FileReplacements.SelectMany(k => k.Value.Where(v => string.IsNullOrEmpty(v.FileSwapPath))).DistinctBy(p => p.Hash).ToList();
+            foreach (var item in replacementList)
             {
-                foreach (var gamePath in item.GamePaths)
+                token.ThrowIfCancellationRequested();
+                var fileCache = _fileDbManager.GetFileCacheByHash(item.Hash);
+                if (fileCache != null)
                 {
-                    var fileCache = _fileDbManager.GetFileCacheByHash(item.Hash);
-                    if (fileCache != null)
+                    foreach (var gamePath in item.GamePaths)
                     {
                         moddedDictionary[gamePath] = fileCache.ResolvedFilepath;
                     }
-                    else
-                    {
-                        Logger.LogTrace("Missing file: {hash}", item.Hash);
-                        missingFiles.Add(item);
-                    }
+                }
+                else
+                {
+                    Logger.LogTrace("Missing file: {hash}", item.Hash);
+                    missingFiles.Add(item);
                 }
             }
 
