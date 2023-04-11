@@ -14,6 +14,8 @@ using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Services;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Data;
+using System.Net.Http.Headers;
+using System.Net.Http;
 
 namespace MareSynchronos.WebAPI;
 
@@ -138,6 +140,8 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                 {
                     Logger.LogDebug("Requesting new JWT");
                     using HttpClient httpClient = new();
+                    var ver = Assembly.GetExecutingAssembly().GetName().Version;
+                    httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("MareSynchronos", ver!.Major + "." + ver!.Minor + "." + ver!.Build));
                     var postUri = MareAuth.AuthFullPath(new Uri(_serverManager.CurrentApiUrl
                         .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
                         .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)));
