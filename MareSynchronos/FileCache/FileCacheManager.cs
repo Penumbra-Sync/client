@@ -15,7 +15,7 @@ public sealed class FileCacheManager : IDisposable
     private const string _penumbraPrefix = "{penumbra}";
     private readonly MareConfigService _configService;
     private readonly string _csvPath;
-    private readonly ConcurrentDictionary<string, FileCacheEntity> _fileCaches = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, List<FileCacheEntity>> _fileCaches = new(StringComparer.Ordinal);
     private readonly object _fileWriteLock = new();
     private readonly IpcManager _ipcManager;
     private readonly ILogger<FileCacheManager> _logger;
@@ -39,8 +39,15 @@ public sealed class FileCacheManager : IDisposable
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to move BAK to ORG, deleting BAK");
-                if (File.Exists(CsvBakPath))
-                    File.Delete(CsvBakPath);
+                try
+                {
+                    if (File.Exists(CsvBakPath))
+                        File.Delete(CsvBakPath);
+                }
+                catch (Exception ex1)
+                {
+                    _logger.LogWarning(ex1, "Could not delete bak file");
+                }
             }
         }
 
@@ -55,7 +62,7 @@ public sealed class FileCacheManager : IDisposable
                     var hash = splittedEntry[0];
                     var path = splittedEntry[1];
                     var time = splittedEntry[2];
-                    _fileCaches[path] = ReplacePathPrefixes(new FileCacheEntity(hash, path, time));
+                    AddHashedFile(ReplacePathPrefixes(new FileCacheEntity(hash, path, time)));
                 }
                 catch (Exception)
                 {
@@ -96,7 +103,7 @@ public sealed class FileCacheManager : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    public List<FileCacheEntity> GetAllFileCaches() => _fileCaches.Values.ToList();
+    public List<FileCacheEntity> GetAllFileCaches() => _fileCaches.Values.SelectMany(v => v).ToList();
 
     public string GetCacheFilePath(string hash, bool isTemporaryFile)
     {
@@ -105,19 +112,18 @@ public sealed class FileCacheManager : IDisposable
 
     public FileCacheEntity? GetFileCacheByHash(string hash)
     {
-        var entry = _fileCaches.FirstOrDefault(f => string.Equals(f.Value.Hash, hash, StringComparison.Ordinal));
-        if (!EqualityComparer<KeyValuePair<string, FileCacheEntity>>.Default.Equals(entry, default))
+        if (_fileCaches.TryGetValue(hash, out var hashes))
         {
-            return GetValidatedFileCache(entry.Value);
+            var item = hashes.FirstOrDefault();
+            if (item != null) return GetValidatedFileCache(item);
         }
-
         return null;
     }
 
     public FileCacheEntity? GetFileCacheByPath(string path)
     {
         var cleanedPath = path.Replace("/", "\\", StringComparison.OrdinalIgnoreCase).ToLowerInvariant().Replace(_ipcManager.PenumbraModDirectory!.ToLowerInvariant(), "", StringComparison.OrdinalIgnoreCase);
-        var entry = _fileCaches.Values.FirstOrDefault(f => f.ResolvedFilepath.EndsWith(cleanedPath, StringComparison.OrdinalIgnoreCase));
+        var entry = _fileCaches.SelectMany(v => v.Value).FirstOrDefault(f => f.ResolvedFilepath.EndsWith(cleanedPath, StringComparison.OrdinalIgnoreCase));
 
         if (entry == null)
         {
@@ -130,22 +136,26 @@ public sealed class FileCacheManager : IDisposable
         return validatedCacheEntry;
     }
 
-    public void RemoveHash(FileCacheEntity? entity)
+    public void RemoveHashedFile(FileCacheEntity? fileCache)
     {
-        if (entity != null)
+        if (fileCache == null) return;
+        if (_fileCaches.TryGetValue(fileCache.Hash, out var caches))
         {
-            _logger.LogTrace("Removing {path}", entity.ResolvedFilepath);
-            _fileCaches.Remove(entity.PrefixedFilePath, out _);
+            caches?.RemoveAll(c => string.Equals(c.PrefixedFilePath, fileCache.PrefixedFilePath, StringComparison.Ordinal));
+            if (_fileCaches.Count == 0)
+            {
+                _fileCaches.Remove(fileCache.Hash, out _);
+            }
         }
     }
 
-    public void UpdateHash(FileCacheEntity fileCache)
+    public void UpdateHashedFile(FileCacheEntity fileCache)
     {
         _logger.LogTrace("Updating hash for {path}", fileCache.ResolvedFilepath);
         fileCache.Hash = Crypto.GetFileHash(fileCache.ResolvedFilepath);
         fileCache.LastModifiedDateTicks = new FileInfo(fileCache.ResolvedFilepath).LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture);
-        _fileCaches.Remove(fileCache.PrefixedFilePath, out _);
-        _fileCaches[fileCache.PrefixedFilePath] = fileCache;
+        RemoveHashedFile(fileCache);
+        AddHashedFile(fileCache);
     }
 
     public (FileState, FileCacheEntity) ValidateFileCacheEntity(FileCacheEntity fileCache)
@@ -167,9 +177,9 @@ public sealed class FileCacheManager : IDisposable
     public void WriteOutFullCsv()
     {
         StringBuilder sb = new();
-        foreach (var entry in _fileCaches.OrderBy(f => f.Value.PrefixedFilePath, StringComparer.OrdinalIgnoreCase))
+        foreach (var entry in _fileCaches.SelectMany(k => k.Value).OrderBy(f => f.PrefixedFilePath, StringComparer.OrdinalIgnoreCase))
         {
-            sb.AppendLine(entry.Value.CsvEntry);
+            sb.AppendLine(entry.CsvEntry);
         }
         if (File.Exists(_csvPath))
         {
@@ -189,12 +199,22 @@ public sealed class FileCacheManager : IDisposable
         }
     }
 
+    private void AddHashedFile(FileCacheEntity fileCache)
+    {
+        if (!_fileCaches.TryGetValue(fileCache.Hash, out var entries))
+        {
+            _fileCaches[fileCache.Hash] = entries = new();
+        }
+
+        entries.Add(fileCache);
+    }
+
     private FileCacheEntity? CreateFileCacheEntity(FileInfo fileInfo, string prefixedPath, string? hash = null)
     {
         hash ??= Crypto.GetFileHash(fileInfo.FullName);
         var entity = new FileCacheEntity(hash, prefixedPath, fileInfo.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture));
         entity = ReplacePathPrefixes(entity);
-        _fileCaches[prefixedPath] = entity;
+        AddHashedFile(entity);
         lock (_fileWriteLock)
         {
             File.AppendAllLines(_csvPath, new[] { entity.CsvEntry });
@@ -230,13 +250,13 @@ public sealed class FileCacheManager : IDisposable
         var file = new FileInfo(fileCache.ResolvedFilepath);
         if (!file.Exists)
         {
-            _fileCaches.Remove(fileCache.PrefixedFilePath, out _);
+            RemoveHashedFile(fileCache);
             return null;
         }
 
         if (!string.Equals(file.LastWriteTimeUtc.Ticks.ToString(), fileCache.LastModifiedDateTicks, StringComparison.Ordinal))
         {
-            UpdateHash(fileCache);
+            UpdateHashedFile(fileCache);
         }
 
         return fileCache;

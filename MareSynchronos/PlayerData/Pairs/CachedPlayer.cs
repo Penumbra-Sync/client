@@ -12,6 +12,8 @@ using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Files;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;
 
 namespace MareSynchronos.PlayerData.Pairs;
@@ -422,6 +424,8 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                 }
             }
 
+            downloadToken.ThrowIfCancellationRequested();
+
             var appToken = _applicationCancellationTokenSource?.Token;
             while ((!_applicationTask?.IsCompleted ?? false)
                    && !downloadToken.IsCancellationRequested
@@ -577,12 +581,19 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
     private List<FileReplacementData> TryCalculateModdedDictionary(CharacterData charaData, out Dictionary<string, string> moddedDictionary, CancellationToken token)
     {
+        Stopwatch st = Stopwatch.StartNew();
         List<FileReplacementData> missingFiles = new();
         moddedDictionary = new Dictionary<string, string>(StringComparer.Ordinal);
+        ConcurrentDictionary<string, string> outputDict = new ConcurrentDictionary<string, string>(StringComparer.Ordinal);
         try
         {
             var replacementList = charaData.FileReplacements.SelectMany(k => k.Value.Where(v => string.IsNullOrEmpty(v.FileSwapPath))).DistinctBy(p => p.Hash).ToList();
-            foreach (var item in replacementList)
+            Parallel.ForEach(replacementList, new ParallelOptions()
+            {
+                CancellationToken = token,
+                MaxDegreeOfParallelism = 4
+            },
+            (item) =>
             {
                 token.ThrowIfCancellationRequested();
                 var fileCache = _fileDbManager.GetFileCacheByHash(item.Hash);
@@ -590,7 +601,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                 {
                     foreach (var gamePath in item.GamePaths)
                     {
-                        moddedDictionary[gamePath] = fileCache.ResolvedFilepath;
+                        outputDict[gamePath] = fileCache.ResolvedFilepath;
                     }
                 }
                 else
@@ -598,7 +609,9 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                     Logger.LogTrace("Missing file: {hash}", item.Hash);
                     missingFiles.Add(item);
                 }
-            }
+            });
+
+            moddedDictionary = outputDict.ToDictionary(k => k.Key, k => k.Value, StringComparer.Ordinal);
 
             foreach (var item in charaData.FileReplacements.SelectMany(k => k.Value.Where(v => !string.IsNullOrEmpty(v.FileSwapPath))).ToList())
             {
@@ -613,7 +626,8 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         {
             PluginLog.Error(ex, "Something went wrong during calculation replacements");
         }
-        Logger.LogDebug("ModdedPaths calculated, missing files: {count}", missingFiles.Count);
+        st.Stop();
+        Logger.LogDebug("ModdedPaths calculated in {time}ms, missing files: {count}", st.ElapsedMilliseconds, missingFiles.Count);
         return missingFiles;
     }
 }

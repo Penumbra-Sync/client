@@ -258,12 +258,12 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         {
             foreach (var entity in entitiesToUpdate)
             {
-                _fileDbManager.UpdateHash(entity);
+                _fileDbManager.UpdateHashedFile(entity);
             }
 
             foreach (var entity in entitiesToRemove)
             {
-                _fileDbManager.RemoveHash(entity);
+                _fileDbManager.RemoveHashedFile(entity);
             }
 
             _fileDbManager.WriteOutFullCsv();
