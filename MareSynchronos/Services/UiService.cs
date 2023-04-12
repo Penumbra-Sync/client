@@ -6,11 +6,13 @@ using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
 using MareSynchronos.UI.VM;
+using MareSynchronos.UI3.Views;
 
 namespace MareSynchronos.Services;
 
 public sealed class UiService : DisposableMediatorSubscriberBase
 {
+    private readonly List<ThemedWindow> _createdThemedWindows = new();
     private readonly List<WindowMediatorSubscriberBase> _createdWindows = new();
     private readonly DalamudPluginInterface _dalamudPluginInterface;
     private readonly FileDialogManager _fileDialogManager;
@@ -20,7 +22,7 @@ public sealed class UiService : DisposableMediatorSubscriberBase
 
     public UiService(ILogger<UiService> logger, DalamudPluginInterface dalamudPluginInterface,
         MareConfigService mareConfigService, WindowSystem windowSystem,
-        IEnumerable<WindowMediatorSubscriberBase> windows,
+        IEnumerable<WindowMediatorSubscriberBase> windows, IEnumerable<ThemedWindow> themedWindows,
         Func<DrawPairVMBase, StandaloneProfileUi> standaloneProfileUiFactory,
         FileDialogManager fileDialogManager, MareMediator mareMediator) : base(logger, mareMediator)
     {
@@ -38,6 +40,11 @@ public sealed class UiService : DisposableMediatorSubscriberBase
         foreach (var window in windows)
         {
             _windowSystem.AddWindow(window);
+        }
+
+        foreach (var themedWindow in themedWindows)
+        {
+            _windowSystem.AddWindow(themedWindow);
         }
 
         Mediator.Subscribe<ProfileOpenStandaloneMessage>(this, (msg) =>
@@ -78,6 +85,11 @@ public sealed class UiService : DisposableMediatorSubscriberBase
         foreach (var window in _createdWindows)
         {
             window.Dispose();
+        }
+
+        foreach (var themedWindow in _createdThemedWindows)
+        {
+            themedWindow.Dispose();
         }
 
         _dalamudPluginInterface.UiBuilder.Draw -= Draw;

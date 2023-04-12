@@ -27,6 +27,8 @@ using MareSynchronos.UI.Components;
 using MareSynchronos.UI.Components.UIElement;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.UI.VM;
+using MareSynchronos.UI3.Themes;
+using MareSynchronos.UI3.Views;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.SignalR;
@@ -94,6 +96,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton((s) => new NotesConfigService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new ServerTagConfigService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new TransientConfigService(pluginInterface.ConfigDirectory.FullName));
+            collection.AddSingleton((s) => new UiConfigService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new ConfigurationMigrator(s.GetRequiredService<ILogger<ConfigurationMigrator>>(), pluginInterface));
 
             // func factory method singletons
@@ -146,6 +149,11 @@ public sealed class Plugin : IDalamudPlugin
                         s.GetRequiredService<SelectGroupForPairUi>())
                 ));
 
+            // new ui shit
+            collection.AddSingleton<ITheme, DarkTheme>();
+            collection.AddScoped<ThemeEngine>(s => new ThemeEngine(s.GetRequiredService<UiConfigService>(), s.GetServices<ITheme>(), pluginInterface.UiBuilder));
+            collection.AddScoped<ThemedWindow, MainView>();
+
             // add scoped services
             collection.AddScoped<CompactVM>();
             collection.AddScoped<PeriodicFileScanner>();
@@ -163,7 +171,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddScoped<PlayerDataFactory>();
             collection.AddScoped<OnlinePlayerManager>();
             collection.AddScoped((s) => new UiService(s.GetRequiredService<ILogger<UiService>>(), pluginInterface, s.GetRequiredService<MareConfigService>(),
-                s.GetRequiredService<WindowSystem>(), s.GetServices<WindowMediatorSubscriberBase>(),
+                s.GetRequiredService<WindowSystem>(), s.GetServices<WindowMediatorSubscriberBase>(), s.GetServices<ThemedWindow>(),
                 s.GetRequiredService<Func<DrawPairVMBase, StandaloneProfileUi>>(),
                 s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareMediator>()));
             collection.AddScoped((s) => new CommandManagerService(commandManager, s.GetRequiredService<PerformanceCollectorService>(), s.GetRequiredService<UiService>(),
