@@ -587,7 +587,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         ConcurrentDictionary<string, string> outputDict = new ConcurrentDictionary<string, string>(StringComparer.Ordinal);
         try
         {
-            var replacementList = charaData.FileReplacements.SelectMany(k => k.Value.Where(v => string.IsNullOrEmpty(v.FileSwapPath))).DistinctBy(p => p.Hash).ToList();
+            var replacementList = charaData.FileReplacements.SelectMany(k => k.Value.Where(v => string.IsNullOrEmpty(v.FileSwapPath))).ToList();
             Parallel.ForEach(replacementList, new ParallelOptions()
             {
                 CancellationToken = token,
