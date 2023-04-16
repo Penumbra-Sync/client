@@ -56,7 +56,8 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         Heels = 1,
         Customize = 2,
         Palette = 3,
-        Mods = 4
+        Mods = 4,
+        Honorific = 5,
     }
 
     public IntPtr PlayerCharacter => _charaHandler?.Address ?? IntPtr.Zero;
@@ -256,6 +257,10 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                         await _ipcManager.HeelsSetOffsetForPlayer(handler.Address, charaData.HeelsOffset).ConfigureAwait(false);
                         break;
 
+                    case PlayerChanges.Honorific:
+                        await _ipcManager.HonorificSetTitle(handler.Address, charaData.HonorificData).ConfigureAwait(false);
+                        break;
+
                     case PlayerChanges.Mods:
                         if (charaData.GlamourerData.TryGetValue(changes.Key, out var glamourerData))
                         {
@@ -362,6 +367,13 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             {
                 Logger.LogDebug("Updating {object}/{kind} (Diff palette data) => {change}", this, objectKind, PlayerChanges.Palette);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.Palette);
+            }
+
+            bool honorificDataDifferent = !string.Equals(oldData.HonorificData, newData.HonorificData, StringComparison.Ordinal);
+            if (honorificDataDifferent || (forced && !string.IsNullOrEmpty(newData.HonorificData)))
+            {
+                Logger.LogDebug("Updating {object}/{kind} (Diff honorific data) => {change}", this, objectKind, PlayerChanges.Honorific);
+                charaDataToUpdate[objectKind].Add(PlayerChanges.Honorific);
             }
         }
 
@@ -513,6 +525,12 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             warning.ShownPalettePlusWarning = true;
         }
 
+        if (changes.Contains(PlayerChanges.Honorific) && !warning.ShownHonorificWarning && !_ipcManager.CheckHonorificApi())
+        {
+            missingPluginsForData.Add("Honorific");
+            warning.ShownHonorificWarning = true;
+        }
+        
         if (missingPluginsForData.Any())
         {
             Mediator.Publish(new NotificationMessage("Missing plugins for " + PlayerName,
@@ -549,6 +567,10 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             CheckForNameAndThrow(tempHandler, name);
             Logger.LogDebug("[{applicationId}] Restoring Palette+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             await _ipcManager.PalettePlusRemovePalette(address).ConfigureAwait(false);
+            CheckForNameAndThrow(tempHandler, name);
+            Logger.LogDebug("[{applicationId}] Restoring Honorific for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
+            await _ipcManager.HonorificClearTitle(address).ConfigureAwait(false);
+            
         }
         else if (objectKind == ObjectKind.MinionOrMount)
         {

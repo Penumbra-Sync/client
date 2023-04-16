@@ -380,6 +380,8 @@ public class PlayerDataFactory
         _logger.LogDebug("Customize is now: {data}", previousData.CustomizePlusScale);
         previousData.PalettePlusPalette = await getPalettePlusData.ConfigureAwait(false);
         _logger.LogDebug("Palette is now: {data}", previousData.PalettePlusPalette);
+        previousData.HonorificData = _ipcManager.HonorificGetTitle();
+        _logger.LogDebug("Honorific is now: {data}", previousData.HonorificData);
 
         st.Stop();
         _logger.LogInformation("Building character data for {obj} took {time}ms", objectKind, TimeSpan.FromTicks(st.ElapsedTicks).TotalMilliseconds);

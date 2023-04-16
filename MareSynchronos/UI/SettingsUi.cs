@@ -308,6 +308,16 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
         UiSharedService.FontText("Debug", _uiShared.UidFont);
 
+        if (LastCreatedCharacterData != null && ImGui.TreeNode("Last created character data"))
+        {
+            foreach (var l in JsonSerializer.Serialize(LastCreatedCharacterData, new JsonSerializerOptions() { WriteIndented = true }).Split('\n'))
+            {
+                ImGui.Text($"{l}");
+            }
+            
+            ImGui.TreePop();
+        }
+        
         if (UiSharedService.IconTextButton(FontAwesomeIcon.Copy, "[DEBUG] Copy Last created Character Data to clipboard"))
         {
             if (LastCreatedCharacterData != null)

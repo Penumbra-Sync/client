@@ -16,6 +16,7 @@ public class CharacterData
 
     public string ManipulationString { get; set; } = string.Empty;
     public string PalettePlusPalette { get; set; } = string.Empty;
+    public string HonorificData { get; set; } = string.Empty;
 
     public API.Data.CharacterData ToAPI()
     {
@@ -42,6 +43,7 @@ public class CharacterData
             HeelsOffset = HeelsOffset,
             CustomizePlusData = CustomizePlusScale,
             PalettePlusData = PalettePlusPalette,
+            HonorificData = HonorificData
         };
     }
 
