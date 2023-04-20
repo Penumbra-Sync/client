@@ -375,7 +375,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         var users = GetFilteredUsers()
             .OrderBy(
                 u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
-                    ? u.PlayerName
+                    ? (_configService.Current.PreferNotesOverNamesForVisible ? u.GetNote() : u.PlayerName)
                     : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase).ToList();
 
         if (_configService.Current.ReverseUserSort)

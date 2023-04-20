@@ -516,6 +516,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var profileDelay = _configService.Current.ProfileDelay;
         var profileOnRight = _configService.Current.ProfilePopoutRight;
         var enableRightClickMenu = _configService.Current.EnableRightClickMenus;
+        var preferNotesInsteadOfName = _configService.Current.PreferNotesOverNamesForVisible;
 
         if (ImGui.Checkbox("Enable Game Right Click Menu Entries", ref enableRightClickMenu))
         {
@@ -538,12 +539,23 @@ public class SettingsUi : WindowMediatorSubscriberBase
         }
         UiSharedService.DrawHelpText("This will show all currently offline users in a special 'Offline' group in the main UI.");
 
-        if (ImGui.Checkbox("Show player name instead of note for visible players", ref showNameInsteadOfNotes))
+        if (ImGui.Checkbox("Show player name for visible players", ref showNameInsteadOfNotes))
         {
             _configService.Current.ShowCharacterNameInsteadOfNotesForVisible = showNameInsteadOfNotes;
             _configService.Save();
         }
         UiSharedService.DrawHelpText("This will show the character name instead of custom set note when a character is visible");
+
+        ImGui.Indent();
+        if (!_configService.Current.ShowCharacterNameInsteadOfNotesForVisible) ImGui.BeginDisabled();
+        if (ImGui.Checkbox("Prefer notes over player names for visible players", ref preferNotesInsteadOfName))
+        {
+            _configService.Current.PreferNotesOverNamesForVisible = preferNotesInsteadOfName;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("If you set a note for a player it will be shown instead of the player name");
+        if (!_configService.Current.ShowCharacterNameInsteadOfNotesForVisible) ImGui.EndDisabled();
+        ImGui.Unindent();
 
         if (ImGui.Checkbox("Show Mare Profiles on Hover", ref showProfiles))
         {

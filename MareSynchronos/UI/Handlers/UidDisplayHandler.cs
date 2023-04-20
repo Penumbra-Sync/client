@@ -142,6 +142,14 @@ public class UidDisplayHandler
         {
             playerText = pair.PlayerName;
             textIsUid = false;
+            if (_mareConfigService.Current.PreferNotesOverNamesForVisible)
+            {
+                var note = pair.GetNote();
+                if (note != null)
+                {
+                    playerText = note;
+                }
+            }
         }
 
         return (textIsUid, playerText!);
