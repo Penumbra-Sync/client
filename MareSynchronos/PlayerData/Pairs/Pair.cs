@@ -97,6 +97,7 @@ public class Pair
             ShownCustomizePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
             ShownHeelsWarning = _configService.Current.DisableOptionalPluginWarnings,
             ShownPalettePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
+            ShownHonorificWarning = _configService.Current.DisableOptionalPluginWarnings,
         };
 
         CachedPlayer.ApplyCharacterData(RemoveNotSyncedFiles(LastReceivedCharacterData.DeepClone())!, _pluginWarnings, forced);
@@ -137,6 +138,7 @@ public class Pair
             ShownCustomizePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
             ShownHeelsWarning = _configService.Current.DisableOptionalPluginWarnings,
             ShownPalettePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
+            ShownHonorificWarning = _configService.Current.DisableOptionalPluginWarnings,
         };
 
         CachedPlayer.Initialize(name);
