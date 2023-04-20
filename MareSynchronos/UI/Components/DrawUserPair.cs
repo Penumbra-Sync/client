@@ -80,8 +80,9 @@ public class DrawUserPair : DrawPairBase
         {
             var individualSoundsDisabled = (_pair.UserPair?.OwnPermissions.IsDisableSounds() ?? false) || (_pair.UserPair?.OtherPermissions.IsDisableSounds() ?? false);
             var individualAnimDisabled = (_pair.UserPair?.OwnPermissions.IsDisableAnimations() ?? false) || (_pair.UserPair?.OtherPermissions.IsDisableAnimations() ?? false);
+            var individualVFXDisabled = (_pair.UserPair?.OwnPermissions.IsDisableVFX() ?? false) || (_pair.UserPair?.OtherPermissions.IsDisableVFX() ?? false);
 
-            if (individualAnimDisabled || individualSoundsDisabled)
+            if (individualAnimDisabled || individualSoundsDisabled || individualVFXDisabled)
             {
                 var infoIconPosDist = windowEndX - barButtonSize.X - spacingX - pauseIconSize.X - spacingX;
                 var icon = FontAwesomeIcon.ExclamationTriangle;
@@ -119,6 +120,17 @@ public class DrawUserPair : DrawPairBase
                         ImGui.NewLine();
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
                         ImGui.Text("You: " + (_pair.UserPair!.OwnPermissions.IsDisableAnimations() ? "Disabled" : "Enabled") + ", They: " + (_pair.UserPair!.OtherPermissions.IsDisableAnimations() ? "Disabled" : "Enabled"));
+                    }
+
+                    if (individualVFXDisabled)
+                    {
+                        var userVFXText = "VFX sync disabled with " + _pair.UserData.AliasOrUID;
+                        UiSharedService.FontText(FontAwesomeIcon.Circle.ToIconString(), UiBuilder.IconFont);
+                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                        ImGui.Text(userVFXText);
+                        ImGui.NewLine();
+                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                        ImGui.Text("You: " + (_pair.UserPair!.OwnPermissions.IsDisableVFX() ? "Disabled" : "Enabled") + ", They: " + (_pair.UserPair!.OtherPermissions.IsDisableVFX() ? "Disabled" : "Enabled"));
                     }
 
                     ImGui.EndTooltip();
@@ -213,6 +225,16 @@ public class DrawUserPair : DrawPairBase
         {
             var permissions = entry.UserPair.OwnPermissions;
             permissions.SetDisableAnimations(!isDisableAnims);
+            _ = _apiController.UserSetPairPermissions(new UserPermissionsDto(entry.UserData, permissions));
+        }
+
+        var isDisableVFX = entry.UserPair!.OwnPermissions.IsDisableVFX();
+        string disableVFXText = isDisableAnims ? "Enable VFX sync" : "Disable VFX sync";
+        var disableVFXIcon = isDisableAnims ? FontAwesomeIcon.Sun : FontAwesomeIcon.Circle;
+        if (UiSharedService.IconTextButton(disableVFXIcon, disableVFXText))
+        {
+            var permissions = entry.UserPair.OwnPermissions;
+            permissions.SetDisableVFX(!isDisableVFX);
             _ = _apiController.UserSetPairPermissions(new UserPermissionsDto(entry.UserData, permissions));
         }
 
