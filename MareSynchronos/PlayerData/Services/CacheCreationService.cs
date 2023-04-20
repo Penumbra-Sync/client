@@ -61,6 +61,11 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
                 PalettePlusChanged();
             }
         });
+        Mediator.Subscribe<HonorificMessage>(this, async (_) =>
+        {
+            Logger.LogDebug("Received Honorific change, updating player");
+            await AddPlayerCacheToCreate().ConfigureAwait(false);
+        });
         Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, async (msg) =>
         {
             Logger.LogDebug("Received Penumbra Mod settings change, updating player");

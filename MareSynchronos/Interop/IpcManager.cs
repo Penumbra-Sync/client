@@ -1,5 +1,6 @@
 ﻿using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
+using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
 using Action = System.Action;
 using System.Collections.Concurrent;
@@ -57,12 +58,18 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly FuncSubscriber<string, string, int, PenumbraApiEc> _penumbraRemoveTemporaryMod;
     private readonly FuncSubscriber<string> _penumbraResolveModDir;
     private readonly FuncSubscriber<string[], string[], (string[], string[][])> _penumbraResolvePaths;
+    private readonly ICallGateSubscriber<(uint major, uint minor)> _honorificApiVersion;
+    private readonly ICallGateSubscriber<(string Title, bool IsPrefix)> _honorificGetLocalCharacterTitle;
+    private readonly ICallGateSubscriber<Character, object> _honorificClearCharacterTitle;
+    private readonly ICallGateSubscriber<Character, string, bool, object> _honorificSetCharacterTitle;
+    private readonly ICallGateSubscriber<string, bool, object> _honorificLocalCharacterTitleChanged;
     private bool _customizePlusAvailable = false;
     private CancellationTokenSource _disposalCts = new();
     private bool _glamourerAvailable = false;
     private bool _heelsAvailable = false;
     private bool _inGposeQueueMode = false;
     private bool _palettePlusAvailable = false;
+    private bool _honorificAvailable = false;
     private bool _penumbraAvailable = false;
     private bool _shownGlamourerUnavailable = false;
     private bool _shownPenumbraUnavailable = false;
@@ -124,6 +131,14 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
         _palettePlusPaletteChanged.Subscribe(OnPalettePlusPaletteChange);
 
+        _honorificApiVersion = pi.GetIpcSubscriber<(uint, uint)>("Honorific.ApiVersion");
+        _honorificGetLocalCharacterTitle = pi.GetIpcSubscriber<(string, bool)>("Honorific.GetLocalCharacterTitle");
+        _honorificClearCharacterTitle = pi.GetIpcSubscriber<Character, object>("Honorific.ClearCharacterTitle");
+        _honorificSetCharacterTitle = pi.GetIpcSubscriber<Character, string, bool, object>("Honorific.SetCharacterTitle");
+        _honorificLocalCharacterTitleChanged = pi.GetIpcSubscriber<string, bool, object>("Honorific.LocalCharacterTitleChanged");
+
+        _honorificLocalCharacterTitleChanged.Subscribe(OnHonorificLocalCharacterTitleChanged);
+
         if (Initialized)
         {
             Mediator.Publish(new PenumbraInitializedMessage());
@@ -146,6 +161,8 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public bool CheckHeelsApi() => _heelsAvailable;
 
     public bool CheckPalettePlusApi() => _palettePlusAvailable;
+    
+    public bool CheckHonorificApi() => _honorificAvailable;
 
     public bool CheckPenumbraApi() => _penumbraAvailable;
 
@@ -269,6 +286,48 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
             {
                 Logger.LogTrace("Applying Heels data to {chara}", character.ToString("X"));
                 _heelsRegisterPlayer.InvokeAction(gameObj, offset);
+            }
+        }).ConfigureAwait(false);
+    }
+    
+    public string HonorificGetTitle()
+    {
+        if (!CheckHonorificApi()) return string.Empty;
+        (string? title, bool isPrefix) = _honorificGetLocalCharacterTitle.InvokeFunc();
+        return $"{(isPrefix ? 1 : 0)}{title}";
+    }
+
+    public async Task HonorificSetTitle(IntPtr character, string honorificData)
+    {
+        if (!CheckHonorificApi()) return;
+        await _dalamudUtil.RunOnFrameworkThread(() =>
+        {
+            Logger.LogTrace("Applying Honorific data to {chara}", character.ToString("X"));
+            var gameObj = _dalamudUtil.CreateGameObject(character);
+            if (gameObj is PlayerCharacter pc)
+            {
+                if (string.IsNullOrEmpty(honorificData))
+                {
+                    _honorificClearCharacterTitle!.InvokeAction(pc);
+                }
+                else
+                {
+                    _honorificSetCharacterTitle!.InvokeAction(pc, honorificData[1..],  honorificData[0] == '1');
+                }
+            }
+        }).ConfigureAwait(false);
+    }
+
+    public async Task HonorificClearTitle(nint character)
+    {
+        if (!CheckHonorificApi()) return;
+        await _dalamudUtil.RunOnFrameworkThread(() =>
+        {
+            var gameObj = _dalamudUtil.CreateGameObject(character);
+            if (gameObj is PlayerCharacter c)
+            {
+                Logger.LogTrace("Honorific removing for {addr}", c.Address.ToString("X"));
+                _honorificClearCharacterTitle!.InvokeAction(c);
             }
         }).ConfigureAwait(false);
     }
@@ -414,6 +473,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         _heelsOffsetUpdate.Unsubscribe(HeelsOffsetChange);
         _palettePlusPaletteChanged.Unsubscribe(OnPalettePlusPaletteChange);
         _customizePlusOnScaleUpdate.Unsubscribe(OnCustomizePlusScaleChange);
+        _honorificLocalCharacterTitleChanged.Unsubscribe(OnHonorificLocalCharacterTitleChanged);
     }
 
     private bool CheckCustomizePlusApiInternal()
@@ -468,6 +528,18 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         try
         {
             return string.Equals(_palettePlusApiVersion.InvokeFunc(), "1.1.0", StringComparison.Ordinal);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private bool CheckHonorificApiInternal()
+    {
+        try
+        {
+            return _honorificApiVersion.InvokeFunc() is { Item1: 1, Item2: >= 0 };
         }
         catch
         {
@@ -545,6 +617,11 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         Mediator.Publish(new PalettePlusMessage(character));
     }
 
+    private void OnHonorificLocalCharacterTitleChanged(string title, bool isPrefix)
+    {
+        Mediator.Publish(new HonorificMessage());
+    }
+    
     private void PenumbraDispose()
     {
         _disposalCts.Cancel();
@@ -600,6 +677,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         _heelsAvailable = CheckHeelsApiInternal();
         _customizePlusAvailable = CheckCustomizePlusApiInternal();
         _palettePlusAvailable = CheckPalettePlusApiInternal();
+        _honorificAvailable = CheckHonorificApiInternal();
         PenumbraModDirectory = GetPenumbraModDirectoryInternal();
     }
 
