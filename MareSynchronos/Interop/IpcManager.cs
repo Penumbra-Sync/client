@@ -420,7 +420,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     {
         try
         {
-            return string.Equals(_customizePlusApiVersion.InvokeFunc(), "1.0", StringComparison.Ordinal);
+            return string.Equals(_customizePlusApiVersion.InvokeFunc(), "2.0", StringComparison.Ordinal);
         }
         catch
         {
