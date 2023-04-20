@@ -229,8 +229,8 @@ public class DrawUserPair : DrawPairBase
         }
 
         var isDisableVFX = entry.UserPair!.OwnPermissions.IsDisableVFX();
-        string disableVFXText = isDisableAnims ? "Enable VFX sync" : "Disable VFX sync";
-        var disableVFXIcon = isDisableAnims ? FontAwesomeIcon.Sun : FontAwesomeIcon.Circle;
+        string disableVFXText = isDisableVFX ? "Enable VFX sync" : "Disable VFX sync";
+        var disableVFXIcon = isDisableVFX ? FontAwesomeIcon.Sun : FontAwesomeIcon.Circle;
         if (UiSharedService.IconTextButton(disableVFXIcon, disableVFXText))
         {
             var permissions = entry.UserPair.OwnPermissions;

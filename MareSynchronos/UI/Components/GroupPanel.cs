@@ -626,7 +626,7 @@ internal sealed class GroupPanel
                 + Environment.NewLine + "Note: this setting does not apply to individual pairs that are also in the syncshell.");
 
             var vfxText = userVFXDisabled ? "Enable VFX sync" : "Disable VFX sync";
-            if (UiSharedService.IconTextButton(userAnimIcon, vfxText))
+            if (UiSharedService.IconTextButton(userVFXIcon, vfxText))
             {
                 ImGui.CloseCurrentPopup();
                 var perm = groupDto.GroupUserPermissions;
