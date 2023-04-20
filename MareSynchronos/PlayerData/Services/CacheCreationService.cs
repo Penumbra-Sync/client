@@ -17,6 +17,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
     private readonly CharacterData _playerData = new();
     private readonly Dictionary<ObjectKind, GameObjectHandler> _playerRelatedObjects = new();
     private Task? _cacheCreationTask;
+    private CancellationTokenSource _honorificCts = new();
     private CancellationTokenSource _palettePlusCts = new();
 
     public CacheCreationService(ILogger<CacheCreationService> logger, MareMediator mediator, Func<ObjectKind, Func<IntPtr>, bool, GameObjectHandler> gameObjectHandlerFactory,
@@ -64,7 +65,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         Mediator.Subscribe<HonorificMessage>(this, async (_) =>
         {
             Logger.LogDebug("Received Honorific change, updating player");
-            await AddPlayerCacheToCreate().ConfigureAwait(false);
+            HonorificChanged();
         });
         Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, async (msg) =>
         {
@@ -95,6 +96,20 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         await _cacheCreateLock.WaitAsync().ConfigureAwait(false);
         _cachesToCreate[ObjectKind.Player] = _playerRelatedObjects[ObjectKind.Player];
         _cacheCreateLock.Release();
+    }
+
+    private void HonorificChanged()
+    {
+        _honorificCts?.Cancel();
+        _honorificCts?.Dispose();
+        _honorificCts = new();
+        var token = _honorificCts.Token;
+
+        Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(3), token).ConfigureAwait(false);
+            await AddPlayerCacheToCreate().ConfigureAwait(false);
+        }, token);
     }
 
     private void PalettePlusChanged()
