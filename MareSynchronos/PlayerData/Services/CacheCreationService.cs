@@ -62,10 +62,13 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
                 PalettePlusChanged();
             }
         });
-        Mediator.Subscribe<HonorificMessage>(this, async (_) =>
+        Mediator.Subscribe<HonorificMessage>(this, (msg) =>
         {
-            Logger.LogDebug("Received Honorific change, updating player");
-            HonorificChanged();
+            if (!string.Equals(msg.NewHonorificTitle, _playerData.HonorificData, StringComparison.Ordinal))
+            {
+                Logger.LogDebug("Received Honorific change, updating player");
+                HonorificChanged();
+            }
         });
         Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, async (msg) =>
         {
