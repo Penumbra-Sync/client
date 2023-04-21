@@ -141,7 +141,7 @@ public class Pair
             ShownHonorificWarning = _configService.Current.DisableOptionalPluginWarnings,
         };
 
-        CachedPlayer.Initialize(name);
+        CachedPlayer.Initialize(name).Wait();
 
         ApplyLastReceivedData();
 
@@ -222,7 +222,7 @@ public class Pair
                     data.FileReplacements[objectKind] = data.FileReplacements[objectKind]
                         .Where(f => !f.GamePaths.Any(p => p.EndsWith("tmb", StringComparison.OrdinalIgnoreCase) || p.EndsWith("pap", StringComparison.OrdinalIgnoreCase)))
                         .ToList();
-                if(disableVFX)
+                if (disableVFX)
                     data.FileReplacements[objectKind] = data.FileReplacements[objectKind]
                         .Where(f => !f.GamePaths.Any(p => p.EndsWith("atex", StringComparison.OrdinalIgnoreCase) || p.EndsWith("avfx", StringComparison.OrdinalIgnoreCase)))
                         .ToList();

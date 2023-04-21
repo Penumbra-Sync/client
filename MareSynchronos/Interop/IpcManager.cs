@@ -34,6 +34,11 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly ICallGateSubscriber<float, object?> _heelsOffsetUpdate;
     private readonly ICallGateSubscriber<GameObject, float, object?> _heelsRegisterPlayer;
     private readonly ICallGateSubscriber<GameObject, object?> _heelsUnregisterPlayer;
+    private readonly ICallGateSubscriber<(uint major, uint minor)> _honorificApiVersion;
+    private readonly ICallGateSubscriber<Character, object> _honorificClearCharacterTitle;
+    private readonly ICallGateSubscriber<(string Title, bool IsPrefix)> _honorificGetLocalCharacterTitle;
+    private readonly ICallGateSubscriber<string, bool, object> _honorificLocalCharacterTitleChanged;
+    private readonly ICallGateSubscriber<Character, string, bool, object> _honorificSetCharacterTitle;
     private readonly ConcurrentQueue<Action> _normalQueue = new();
     private readonly ICallGateSubscriber<string> _palettePlusApiVersion;
     private readonly ICallGateSubscriber<Character, string> _palettePlusBuildCharaPalette;
@@ -58,18 +63,13 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly FuncSubscriber<string, string, int, PenumbraApiEc> _penumbraRemoveTemporaryMod;
     private readonly FuncSubscriber<string> _penumbraResolveModDir;
     private readonly FuncSubscriber<string[], string[], (string[], string[][])> _penumbraResolvePaths;
-    private readonly ICallGateSubscriber<(uint major, uint minor)> _honorificApiVersion;
-    private readonly ICallGateSubscriber<(string Title, bool IsPrefix)> _honorificGetLocalCharacterTitle;
-    private readonly ICallGateSubscriber<Character, object> _honorificClearCharacterTitle;
-    private readonly ICallGateSubscriber<Character, string, bool, object> _honorificSetCharacterTitle;
-    private readonly ICallGateSubscriber<string, bool, object> _honorificLocalCharacterTitleChanged;
     private bool _customizePlusAvailable = false;
     private CancellationTokenSource _disposalCts = new();
     private bool _glamourerAvailable = false;
     private bool _heelsAvailable = false;
+    private bool _honorificAvailable = false;
     private bool _inGposeQueueMode = false;
     private bool _palettePlusAvailable = false;
-    private bool _honorificAvailable = false;
     private bool _penumbraAvailable = false;
     private bool _shownGlamourerUnavailable = false;
     private bool _shownPenumbraUnavailable = false;
@@ -160,9 +160,9 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
     public bool CheckHeelsApi() => _heelsAvailable;
 
-    public bool CheckPalettePlusApi() => _palettePlusAvailable;
-    
     public bool CheckHonorificApi() => _honorificAvailable;
+
+    public bool CheckPalettePlusApi() => _palettePlusAvailable;
 
     public bool CheckPenumbraApi() => _penumbraAvailable;
 
@@ -289,7 +289,21 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
             }
         }).ConfigureAwait(false);
     }
-    
+
+    public async Task HonorificClearTitle(nint character)
+    {
+        if (!CheckHonorificApi()) return;
+        await _dalamudUtil.RunOnFrameworkThread(() =>
+        {
+            var gameObj = _dalamudUtil.CreateGameObject(character);
+            if (gameObj is PlayerCharacter c)
+            {
+                Logger.LogTrace("Honorific removing for {addr}", c.Address.ToString("X"));
+                _honorificClearCharacterTitle!.InvokeAction(c);
+            }
+        }).ConfigureAwait(false);
+    }
+
     public string HonorificGetTitle()
     {
         if (!CheckHonorificApi()) return string.Empty;
@@ -312,22 +326,8 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
                 }
                 else
                 {
-                    _honorificSetCharacterTitle!.InvokeAction(pc, honorificData[1..],  honorificData[0] == '1');
+                    _honorificSetCharacterTitle!.InvokeAction(pc, honorificData[1..], honorificData[0] == '1');
                 }
-            }
-        }).ConfigureAwait(false);
-    }
-
-    public async Task HonorificClearTitle(nint character)
-    {
-        if (!CheckHonorificApi()) return;
-        await _dalamudUtil.RunOnFrameworkThread(() =>
-        {
-            var gameObj = _dalamudUtil.CreateGameObject(character);
-            if (gameObj is PlayerCharacter c)
-            {
-                Logger.LogTrace("Honorific removing for {addr}", c.Address.ToString("X"));
-                _honorificClearCharacterTitle!.InvokeAction(c);
             }
         }).ConfigureAwait(false);
     }
@@ -523,11 +523,11 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         }
     }
 
-    private bool CheckPalettePlusApiInternal()
+    private bool CheckHonorificApiInternal()
     {
         try
         {
-            return string.Equals(_palettePlusApiVersion.InvokeFunc(), "1.1.0", StringComparison.Ordinal);
+            return _honorificApiVersion.InvokeFunc() is { Item1: 1, Item2: >= 0 };
         }
         catch
         {
@@ -535,11 +535,11 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         }
     }
 
-    private bool CheckHonorificApiInternal()
+    private bool CheckPalettePlusApiInternal()
     {
         try
         {
-            return _honorificApiVersion.InvokeFunc() is { Item1: 1, Item2: >= 0 };
+            return string.Equals(_palettePlusApiVersion.InvokeFunc(), "1.1.0", StringComparison.Ordinal);
         }
         catch
         {
@@ -612,16 +612,16 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         Mediator.Publish(new CustomizePlusMessage());
     }
 
+    private void OnHonorificLocalCharacterTitleChanged(string title, bool isPrefix)
+    {
+        Mediator.Publish(new HonorificMessage((isPrefix ? 0 : 1) + title));
+    }
+
     private void OnPalettePlusPaletteChange(Character character, string palette)
     {
         Mediator.Publish(new PalettePlusMessage(character));
     }
 
-    private void OnHonorificLocalCharacterTitleChanged(string title, bool isPrefix)
-    {
-        Mediator.Publish(new HonorificMessage());
-    }
-    
     private void PenumbraDispose()
     {
         _disposalCts.Cancel();
