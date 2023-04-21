@@ -1,6 +1,5 @@
 ﻿using Dalamud.ContextMenu;
 using Dalamud.Utility;
-using Lumina.Excel.GeneratedSheets;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.API.Data.Extensions;

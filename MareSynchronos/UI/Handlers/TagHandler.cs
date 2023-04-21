@@ -1,5 +1,4 @@
-﻿using MareSynchronos.API.Dto.User;
-using MareSynchronos.Services.ServerConfiguration;
+﻿using MareSynchronos.Services.ServerConfiguration;
 
 namespace MareSynchronos.UI.Handlers;
 

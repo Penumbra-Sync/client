@@ -15,7 +15,6 @@ using MareSynchronos.Services;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Data;
 using System.Net.Http.Headers;
-using System.Net.Http;
 
 namespace MareSynchronos.WebAPI;
 
