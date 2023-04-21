@@ -142,7 +142,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         {
             if (curPtr != IntPtr.Zero)
             {
-                var drawObjAddr = (IntPtr)((GameObject*)curPtr)->GetDrawObject();
+                var drawObjAddr = (IntPtr)((GameObject*)curPtr)->DrawObject;
                 drawObjDiff = drawObjAddr != DrawObjectAddress;
                 DrawObjectAddress = drawObjAddr;
             }
@@ -263,7 +263,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
     private unsafe IntPtr GetDrawObj(nint curPtr)
     {
-        return (IntPtr)((GameObject*)curPtr)->GetDrawObject();
+        return (IntPtr)((GameObject*)curPtr)->DrawObject;
     }
 
     private unsafe bool IsBeingDrawn(IntPtr drawObj, IntPtr curPtr)
