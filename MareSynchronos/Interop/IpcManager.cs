@@ -308,7 +308,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     {
         if (!CheckHonorificApi()) return string.Empty;
         (string? title, bool isPrefix) = _honorificGetLocalCharacterTitle.InvokeFunc();
-        return $"{(isPrefix ? 1 : 0)}{title}";
+        return string.IsNullOrEmpty(title) ? string.Empty : $"{(isPrefix ? 1 : 0)}{title}";
     }
 
     public async Task HonorificSetTitle(IntPtr character, string honorificData)
