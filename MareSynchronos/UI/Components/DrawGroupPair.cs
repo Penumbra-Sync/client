@@ -7,11 +7,11 @@ namespace MareSynchronos.UI.Components;
 
 public class DrawGroupPair : DrawPairBase
 {
+    private static string _banReason = string.Empty;
+    private static bool _banUserPopupOpen;
+    private static bool _showModalBanUser;
     private readonly GroupPairFullInfoDto _fullInfoDto;
     private readonly GroupFullInfoDto _group;
-    private string _banReason = string.Empty;
-    private bool _banUserPopupOpen;
-    private bool _showModalBanUser;
 
     public DrawGroupPair(string id, Pair entry, ApiController apiController, GroupFullInfoDto group, GroupPairFullInfoDto fullInfoDto, UidDisplayHandler handler) : base(null, apiController, handler)
     {
@@ -92,16 +92,18 @@ public class DrawGroupPair : DrawPairBase
 
         var soundsDisabled = _fullInfoDto.GroupUserPermissions.IsDisableSounds();
         var animDisabled = _fullInfoDto.GroupUserPermissions.IsDisableAnimations();
+        var vfxDisabled = _fullInfoDto.GroupUserPermissions.IsDisableVFX();
         var individualSoundsDisabled = (_pair.UserPair?.OwnPermissions.IsDisableSounds() ?? false) || (_pair.UserPair?.OtherPermissions.IsDisableSounds() ?? false);
         var individualAnimDisabled = (_pair.UserPair?.OwnPermissions.IsDisableAnimations() ?? false) || (_pair.UserPair?.OtherPermissions.IsDisableAnimations() ?? false);
+        var individualVFXDisabled = (_pair.UserPair?.OwnPermissions.IsDisableVFX() ?? false) || (_pair.UserPair?.OtherPermissions.IsDisableVFX() ?? false);
 
         bool showInfo = (individualAnimDisabled || individualSoundsDisabled || animDisabled || soundsDisabled);
         bool showPlus = _pair.UserPair == null;
         bool showBars = (userIsOwner || (userIsModerator && !entryIsMod && !entryIsOwner)) || !_pair.IsPaused;
 
         var spacing = ImGui.GetStyle().ItemSpacing.X;
-        var permIcon = (individualAnimDisabled || individualSoundsDisabled) ? FontAwesomeIcon.ExclamationTriangle
-            : ((soundsDisabled || animDisabled) ? FontAwesomeIcon.InfoCircle : FontAwesomeIcon.None);
+        var permIcon = (individualAnimDisabled || individualSoundsDisabled || individualVFXDisabled) ? FontAwesomeIcon.ExclamationTriangle
+            : ((soundsDisabled || animDisabled || vfxDisabled) ? FontAwesomeIcon.InfoCircle : FontAwesomeIcon.None);
         var infoIconWidth = UiSharedService.GetIconSize(permIcon).X;
         var plusButtonWidth = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Plus).X;
         var barButtonWidth = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars).X;
@@ -146,6 +148,17 @@ public class DrawGroupPair : DrawPairBase
                     ImGui.Text("You: " + (_pair.UserPair!.OwnPermissions.IsDisableAnimations() ? "Disabled" : "Enabled") + ", They: " + (_pair.UserPair!.OtherPermissions.IsDisableAnimations() ? "Disabled" : "Enabled"));
                 }
 
+                if (individualVFXDisabled)
+                {
+                    var userVFXText = "VFX sync disabled with " + _pair.UserData.AliasOrUID;
+                    UiSharedService.FontText(FontAwesomeIcon.Circle.ToIconString(), UiBuilder.IconFont);
+                    ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                    ImGui.Text(userVFXText);
+                    ImGui.NewLine();
+                    ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                    ImGui.Text("You: " + (_pair.UserPair!.OwnPermissions.IsDisableVFX() ? "Disabled" : "Enabled") + ", They: " + (_pair.UserPair!.OtherPermissions.IsDisableVFX() ? "Disabled" : "Enabled"));
+                }
+
                 ImGui.EndTooltip();
             }
             ImGui.SameLine();
@@ -174,6 +187,14 @@ public class DrawGroupPair : DrawPairBase
                     UiSharedService.FontText(FontAwesomeIcon.Stop.ToIconString(), UiBuilder.IconFont);
                     ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
                     ImGui.Text(userAnimText);
+                }
+
+                if (vfxDisabled)
+                {
+                    var userVFXText = "VFX sync disabled by " + _pair.UserData.AliasOrUID;
+                    UiSharedService.FontText(FontAwesomeIcon.Circle.ToIconString(), UiBuilder.IconFont);
+                    ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                    ImGui.Text(userVFXText);
                 }
 
                 ImGui.EndTooltip();

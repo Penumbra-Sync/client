@@ -465,17 +465,21 @@ public sealed class GroupPanel : MediatorSubscriberBase
         bool invitesEnabled = !groupDto.GroupPermissions.IsDisableInvites();
         var soundsDisabled = groupDto.GroupPermissions.IsDisableSounds();
         var animDisabled = groupDto.GroupPermissions.IsDisableAnimations();
+        var vfxDisabled = groupDto.GroupPermissions.IsDisableVFX();
 
         var userSoundsDisabled = groupDto.GroupUserPermissions.IsDisableSounds();
         var userAnimDisabled = groupDto.GroupUserPermissions.IsDisableAnimations();
+        var userVFXDisabled = groupDto.GroupUserPermissions.IsDisableVFX();
 
-        bool showInfoIcon = !invitesEnabled || soundsDisabled || animDisabled || userSoundsDisabled || userAnimDisabled;
+        bool showInfoIcon = !invitesEnabled || soundsDisabled || animDisabled || vfxDisabled || userSoundsDisabled || userAnimDisabled || userVFXDisabled;
 
         var lockedIcon = invitesEnabled ? FontAwesomeIcon.LockOpen : FontAwesomeIcon.Lock;
         var animIcon = animDisabled ? FontAwesomeIcon.Stop : FontAwesomeIcon.Running;
         var soundsIcon = soundsDisabled ? FontAwesomeIcon.VolumeOff : FontAwesomeIcon.VolumeUp;
+        var vfxIcon = vfxDisabled ? FontAwesomeIcon.Circle : FontAwesomeIcon.Sun;
         var userAnimIcon = userAnimDisabled ? FontAwesomeIcon.Stop : FontAwesomeIcon.Running;
         var userSoundsIcon = userSoundsDisabled ? FontAwesomeIcon.VolumeOff : FontAwesomeIcon.VolumeUp;
+        var userVFXIcon = userVFXDisabled ? FontAwesomeIcon.Circle : FontAwesomeIcon.Sun;
 
         var iconSize = UiSharedService.GetIconSize(infoIcon);
         var diffLockUnlockIcons = showInfoIcon ? (UiSharedService.GetIconSize(infoIcon).X - iconSize.X) / 2 : 0;
@@ -489,7 +493,7 @@ public sealed class GroupPanel : MediatorSubscriberBase
             if (ImGui.IsItemHovered())
             {
                 ImGui.BeginTooltip();
-                if (!invitesEnabled || soundsDisabled || animDisabled)
+                if (!invitesEnabled || soundsDisabled || animDisabled || vfxDisabled)
                 {
                     ImGui.Text("Syncshell permissions");
 
@@ -516,11 +520,19 @@ public sealed class GroupPanel : MediatorSubscriberBase
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
                         ImGui.Text(animText);
                     }
+
+                    if (vfxDisabled)
+                    {
+                        var vfxText = "VFX sync disabled through owner";
+                        UiSharedService.FontText(vfxIcon.ToIconString(), UiBuilder.IconFont);
+                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                        ImGui.Text(vfxText);
+                    }
                 }
 
-                if (userSoundsDisabled || userAnimDisabled)
+                if (userSoundsDisabled || userAnimDisabled || userVFXDisabled)
                 {
-                    if (!invitesEnabled || soundsDisabled || animDisabled)
+                    if (!invitesEnabled || soundsDisabled || animDisabled || vfxDisabled)
                         ImGui.Separator();
 
                     ImGui.Text("Your permissions");
@@ -541,7 +553,15 @@ public sealed class GroupPanel : MediatorSubscriberBase
                         ImGui.Text(userAnimText);
                     }
 
-                    if (!invitesEnabled || soundsDisabled || animDisabled)
+                    if (userVFXDisabled)
+                    {
+                        var userVFXText = "VFX sync disabled through you";
+                        UiSharedService.FontText(userVFXIcon.ToIconString(), UiBuilder.IconFont);
+                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                        ImGui.Text(userVFXText);
+                    }
+
+                    if (!invitesEnabled || soundsDisabled || animDisabled || vfxDisabled)
                         UiSharedService.TextWrapped("Note that syncshell permissions for disabling take precedence over your own set permissions");
                 }
                 ImGui.EndTooltip();
@@ -605,6 +625,20 @@ public sealed class GroupPanel : MediatorSubscriberBase
                 + Environment.NewLine + "Note: this setting can be forcefully overridden to 'disabled' through the syncshell owner."
                 + Environment.NewLine + "Note: this setting does not apply to individual pairs that are also in the syncshell.");
 
+            var vfxText = userVFXDisabled ? "Enable VFX sync" : "Disable VFX sync";
+            if (UiSharedService.IconTextButton(userVFXIcon, vfxText))
+            {
+                ImGui.CloseCurrentPopup();
+                var perm = groupDto.GroupUserPermissions;
+                perm.SetDisableVFX(!perm.IsDisableVFX());
+                _ = ApiController.GroupChangeIndividualPermissionState(new(groupDto.Group, new UserData(ApiController.UID), perm));
+            }
+            UiSharedService.AttachToolTip("Sets your allowance for VFX synchronization for users of this syncshell."
+                                          + Environment.NewLine + "Disabling the synchronization will stop applying VFX modifications for users of this syncshell."
+                                          + Environment.NewLine + "Note: this setting might also affect animation synchronization to some degree"
+                                          + Environment.NewLine + "Note: this setting can be forcefully overridden to 'disabled' through the syncshell owner."
+                                          + Environment.NewLine + "Note: this setting does not apply to individual pairs that are also in the syncshell.");
+
             if (isOwner || groupDto.GroupUserInfo.IsModerator())
             {
                 ImGui.Separator();
@@ -659,6 +693,18 @@ public sealed class GroupPanel : MediatorSubscriberBase
                     _ = ApiController.GroupChangeGroupPermissionState(new(groupDto.Group, perm));
                 }
                 UiSharedService.AttachToolTip("Sets syncshell-wide allowance for animations synchronization for all users." + Environment.NewLine
+                    + "Note: users that are individually paired with others in the syncshell will ignore this setting." + Environment.NewLine
+                    + "Note: if the synchronization is enabled, users can individually override this setting to disabled.");
+
+                var groupVFXText = vfxDisabled ? "Enable syncshell VFX sync" : "Disable syncshell VFX sync";
+                if (UiSharedService.IconTextButton(vfxIcon, groupVFXText))
+                {
+                    ImGui.CloseCurrentPopup();
+                    var perm = groupDto.GroupPermissions;
+                    perm.SetDisableVFX(!perm.IsDisableVFX());
+                    _ = ApiController.GroupChangeGroupPermissionState(new(groupDto.Group, perm));
+                }
+                UiSharedService.AttachToolTip("Sets syncshell-wide allowance for VFX synchronization for all users." + Environment.NewLine
                     + "Note: users that are individually paired with others in the syncshell will ignore this setting." + Environment.NewLine
                     + "Note: if the synchronization is enabled, users can individually override this setting to disabled.");
 

@@ -99,7 +99,18 @@ public class DrawUserPair : DrawPairBase
                         ImGui.Text(userAnimText);
                         ImGui.NewLine();
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text("You: " + (_drawUserPairVM.AnimationDisabledFromTarget ? "Disabled" : "Enabled") + ", They: " + (_drawUserPairVM.AnimationDisabledFromTarget ? "Disabled" : "Enabled"));
+                        ImGui.Text("You: " + (_drawUserPairVM.AnimationDisabledFromSource ? "Disabled" : "Enabled") + ", They: " + (_drawUserPairVM.AnimationDisabledFromTarget ? "Disabled" : "Enabled"));
+                    }
+
+                    if (_drawUserPairVM.VFXDisabled)
+                    {
+                        var userVFXText = "VFX sync disabled with " + _drawUserPairVM.DisplayName;
+                        UiSharedService.FontText(FontAwesomeIcon.Circle.ToIconString(), UiBuilder.IconFont);
+                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                        ImGui.Text(userVFXText);
+                        ImGui.NewLine();
+                        ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+                        ImGui.Text("You: " + (_drawUserPairVM.VFXDisabledFromSource ? "Disabled" : "Enabled") + ", They: " + (_drawUserPairVM.VFXDisabledFromTarget ? "Disabled" : "Enabled"));
                     }
 
                     ImGui.EndTooltip();

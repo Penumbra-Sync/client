@@ -31,17 +31,20 @@ public class DrawUserPairVM : DrawPairVMBase
     public bool AnimationDisabledFromTarget => _pair.UserPair!.OtherPermissions.IsDisableAnimations();
     public ButtonCommand ChangeAnimationsCommand { get; private set; } = new();
     public ButtonCommand ChangeSoundsCommand { get; private set; } = new();
+    public ButtonCommand ChangeVFXCommand { get; private set; } = new();
     public ButtonCommand CyclePauseStateCommand { get; private set; } = new();
     public bool HasModifiedPermissions => SoundDisabled || AnimationDisabled;
     public bool OneSidedPair => _pair.UserPair!.OwnPermissions.IsPaired() && !_pair.UserPair!.OtherPermissions.IsPaired();
     public ButtonCommand PauseCommand { get; private set; } = new();
     public ButtonCommand ReloadLastDataCommand { get; private set; } = new();
     public ButtonCommand RemovePairCommand { get; private set; } = new();
-
     public ButtonCommand SelectPairGroupsCommand { get; private set; } = new();
     public bool SoundDisabled => SoundDisabledFromSource || SoundDisabledFromTarget;
     public bool SoundDisabledFromSource => _pair.UserPair!.OwnPermissions.IsDisableSounds();
     public bool SoundDisabledFromTarget => _pair.UserPair!.OtherPermissions.IsDisableSounds();
+    public bool VFXDisabled => VFXDisabledFromSource || VFXDisabledFromTarget;
+    public bool VFXDisabledFromSource => _pair.UserPair!.OwnPermissions.IsDisableVFX();
+    public bool VFXDisabledFromTarget => _pair.UserPair!.OtherPermissions.IsDisableVFX();
 
     public (FontAwesomeIcon Icon, Vector4 Color, string PopupText) GetConnection()
     {
@@ -168,6 +171,32 @@ public class DrawUserPairVM : DrawPairVMBase
                 .WithText($"Enable animation sync")
                 .WithTooltip($"Enable animation sync with {DisplayName}"))
             .WithStateSelector(() => _pair.UserPair!.OwnPermissions.IsDisableAnimations() ? 1 : 0);
+
+        ChangeVFXCommand = new ButtonCommand()
+            .WithClosePopup()
+            .WithState(0, new ButtonCommand.State()
+                .WithAction(() =>
+                {
+                    var perm = _pair.UserPair!.OwnPermissions;
+                    perm.SetDisableVFX(true);
+                    _ = _apiController.UserSetPairPermissions(new(_pair.UserData, perm));
+                })
+                .WithVisibility(() => !OneSidedPair)
+                .WithIcon(FontAwesomeIcon.Circle)
+                .WithText($"Disable VFX sync")
+                .WithTooltip($"Disable VFX sync with {DisplayName}"))
+            .WithState(1, new ButtonCommand.State()
+                .WithAction(() =>
+                {
+                    var perm = _pair.UserPair!.OwnPermissions;
+                    perm.SetDisableVFX(false);
+                    _ = _apiController.UserSetPairPermissions(new(_pair.UserData, perm));
+                })
+                .WithVisibility(() => !OneSidedPair)
+                .WithIcon(FontAwesomeIcon.Sun)
+                .WithText($"Enable VFX sync")
+                .WithTooltip($"Enable VFX sync with {DisplayName}"))
+            .WithStateSelector(() => _pair.UserPair!.OwnPermissions.IsDisableVFX() ? 1 : 0);
 
         PauseCommand = new ButtonCommand()
             .WithClosePopup()

@@ -12,6 +12,8 @@ using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Files;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;
 
 namespace MareSynchronos.PlayerData.Pairs;
@@ -54,7 +56,8 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         Heels = 1,
         Customize = 2,
         Palette = 3,
-        Mods = 4
+        Mods = 4,
+        Honorific = 5,
     }
 
     public IntPtr PlayerCharacter => _charaHandler?.Address ?? IntPtr.Zero;
@@ -173,15 +176,10 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
             if (_lifetime.ApplicationStopping.IsCancellationRequested) return;
 
-            if (_dalamudUtil.IsZoning)
-            {
-                Logger.LogTrace("[{applicationId}] Removing temp collection for {name} ({OnlineUser})", applicationId, name, OnlineUser);
-                _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name);
-            }
-            else if (_dalamudUtil is { IsZoning: false, IsInCutscene: false })
+            if (_dalamudUtil is { IsZoning: false, IsInCutscene: false })
             {
                 Logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser);
-                _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name);
+                _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name).GetAwaiter().GetResult();
 
                 foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData.FileReplacements)
                 {
@@ -211,10 +209,10 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
     private async Task ApplyBaseData(Guid applicationId, Dictionary<string, string> moddedPaths, string manipulationData, CancellationToken token)
     {
-        await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, PlayerName!)).ConfigureAwait(false);
+        await _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, PlayerName!).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
-        await _dalamudUtil.RunOnFrameworkThread(() => _ipcManager.PenumbraSetTemporaryMods(Logger, applicationId, PlayerName!,
-            _charaHandler?.GameObjectLazy?.Value.ObjectTableIndex(), moddedPaths, manipulationData)).ConfigureAwait(false);
+        await _ipcManager.PenumbraSetTemporaryMods(Logger, applicationId, PlayerName!,
+            _charaHandler?.GameObjectLazy?.Value.ObjectTableIndex(), moddedPaths, manipulationData).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
     }
 
@@ -257,6 +255,10 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
                     case PlayerChanges.Heels:
                         await _ipcManager.HeelsSetOffsetForPlayer(handler.Address, charaData.HeelsOffset).ConfigureAwait(false);
+                        break;
+
+                    case PlayerChanges.Honorific:
+                        await _ipcManager.HonorificSetTitle(handler.Address, charaData.HonorificData).ConfigureAwait(false);
                         break;
 
                     case PlayerChanges.Mods:
@@ -366,6 +368,13 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                 Logger.LogDebug("Updating {object}/{kind} (Diff palette data) => {change}", this, objectKind, PlayerChanges.Palette);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.Palette);
             }
+
+            bool honorificDataDifferent = !string.Equals(oldData.HonorificData, newData.HonorificData, StringComparison.Ordinal);
+            if (honorificDataDifferent || (forced && !string.IsNullOrEmpty(newData.HonorificData)))
+            {
+                Logger.LogDebug("Updating {object}/{kind} (Diff honorific data) => {change}", this, objectKind, PlayerChanges.Honorific);
+                charaDataToUpdate[objectKind].Add(PlayerChanges.Honorific);
+            }
         }
 
         foreach (KeyValuePair<ObjectKind, HashSet<PlayerChanges>> data in charaDataToUpdate.ToList())
@@ -392,14 +401,14 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
         Task.Run(async () =>
         {
-            List<FileReplacementData> toDownloadReplacements;
-
             Dictionary<string, string> moddedPaths = new(StringComparer.Ordinal);
 
             if (updateModdedPaths)
             {
                 int attempts = 0;
-                while ((toDownloadReplacements = TryCalculateModdedDictionary(charaData, out moddedPaths)).Count > 0 && attempts++ <= 10)
+                List<FileReplacementData> toDownloadReplacements = TryCalculateModdedDictionary(charaData, out moddedPaths, downloadToken);
+
+                while ((toDownloadReplacements.Count > 0 && attempts++ <= 10 && !downloadToken.IsCancellationRequested))
                 {
                     _downloadManager.CancelDownload();
                     Logger.LogDebug("Downloading missing files for player {name}, {kind}", PlayerName, updatedData);
@@ -416,7 +425,9 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                         return;
                     }
 
-                    if (TryCalculateModdedDictionary(charaData, out moddedPaths).All(c => _downloadManager.ForbiddenTransfers.Any(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
+                    toDownloadReplacements = TryCalculateModdedDictionary(charaData, out moddedPaths, downloadToken);
+
+                    if (toDownloadReplacements.All(c => _downloadManager.ForbiddenTransfers.Any(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
                     {
                         break;
                     }
@@ -424,6 +435,8 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                     await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
                 }
             }
+
+            downloadToken.ThrowIfCancellationRequested();
 
             var appToken = _applicationCancellationTokenSource?.Token;
             while ((!_applicationTask?.IsCompleted ?? false)
@@ -512,6 +525,12 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             warning.ShownPalettePlusWarning = true;
         }
 
+        if (changes.Contains(PlayerChanges.Honorific) && !warning.ShownHonorificWarning && !_ipcManager.CheckHonorificApi())
+        {
+            missingPluginsForData.Add("Honorific");
+            warning.ShownHonorificWarning = true;
+        }
+        
         if (missingPluginsForData.Any())
         {
             Mediator.Publish(new NotificationMessage("Missing plugins for " + PlayerName,
@@ -548,6 +567,10 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             CheckForNameAndThrow(tempHandler, name);
             Logger.LogDebug("[{applicationId}] Restoring Palette+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             await _ipcManager.PalettePlusRemovePalette(address).ConfigureAwait(false);
+            CheckForNameAndThrow(tempHandler, name);
+            Logger.LogDebug("[{applicationId}] Restoring Honorific for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
+            await _ipcManager.HonorificClearTitle(address).ConfigureAwait(false);
+            
         }
         else if (objectKind == ObjectKind.MinionOrMount)
         {
@@ -578,28 +601,39 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
     }
 
-    private List<FileReplacementData> TryCalculateModdedDictionary(CharacterData charaData, out Dictionary<string, string> moddedDictionary)
+    private List<FileReplacementData> TryCalculateModdedDictionary(CharacterData charaData, out Dictionary<string, string> moddedDictionary, CancellationToken token)
     {
+        Stopwatch st = Stopwatch.StartNew();
         List<FileReplacementData> missingFiles = new();
         moddedDictionary = new Dictionary<string, string>(StringComparer.Ordinal);
+        ConcurrentDictionary<string, string> outputDict = new ConcurrentDictionary<string, string>(StringComparer.Ordinal);
         try
         {
-            foreach (var item in charaData.FileReplacements.SelectMany(k => k.Value.Where(v => string.IsNullOrEmpty(v.FileSwapPath))).ToList())
+            var replacementList = charaData.FileReplacements.SelectMany(k => k.Value.Where(v => string.IsNullOrEmpty(v.FileSwapPath))).ToList();
+            Parallel.ForEach(replacementList, new ParallelOptions()
             {
-                foreach (var gamePath in item.GamePaths)
+                CancellationToken = token,
+                MaxDegreeOfParallelism = 4
+            },
+            (item) =>
+            {
+                token.ThrowIfCancellationRequested();
+                var fileCache = _fileDbManager.GetFileCacheByHash(item.Hash);
+                if (fileCache != null)
                 {
-                    var fileCache = _fileDbManager.GetFileCacheByHash(item.Hash);
-                    if (fileCache != null)
+                    foreach (var gamePath in item.GamePaths)
                     {
-                        moddedDictionary[gamePath] = fileCache.ResolvedFilepath;
-                    }
-                    else
-                    {
-                        Logger.LogTrace("Missing file: {hash}", item.Hash);
-                        missingFiles.Add(item);
+                        outputDict[gamePath] = fileCache.ResolvedFilepath;
                     }
                 }
-            }
+                else
+                {
+                    Logger.LogTrace("Missing file: {hash}", item.Hash);
+                    missingFiles.Add(item);
+                }
+            });
+
+            moddedDictionary = outputDict.ToDictionary(k => k.Key, k => k.Value, StringComparer.Ordinal);
 
             foreach (var item in charaData.FileReplacements.SelectMany(k => k.Value.Where(v => !string.IsNullOrEmpty(v.FileSwapPath))).ToList())
             {
@@ -614,7 +648,8 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         {
             PluginLog.Error(ex, "Something went wrong during calculation replacements");
         }
-        Logger.LogDebug("ModdedPaths calculated, missing files: {count}", missingFiles.Count);
+        st.Stop();
+        Logger.LogDebug("ModdedPaths calculated in {time}ms, missing files: {count}", st.ElapsedMilliseconds, missingFiles.Count);
         return missingFiles;
     }
 }

@@ -23,7 +23,7 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         _mareConfig = mareConfig;
         _serverManager = serverManager;
         _httpClient = new();
-        _httpClient.Timeout = TimeSpan.FromSeconds(300);
+        _httpClient.Timeout = TimeSpan.FromSeconds(3000);
         var ver = Assembly.GetExecutingAssembly().GetName().Version;
         _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("MareSynchronos", ver!.Major + "." + ver!.Minor + "." + ver!.Build));
 

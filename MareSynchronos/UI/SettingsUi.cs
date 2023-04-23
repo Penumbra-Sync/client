@@ -307,7 +307,18 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _lastTab = "Debug";
 
         UiSharedService.FontText("Debug", _uiShared.UidFont);
-
+#if DEBUG
+        if (LastCreatedCharacterData != null && ImGui.TreeNode("Last created character data"))
+        {
+            
+            foreach (var l in JsonSerializer.Serialize(LastCreatedCharacterData, new JsonSerializerOptions() { WriteIndented = true }).Split('\n'))
+            {
+                ImGui.Text($"{l}");
+            }
+            
+            ImGui.TreePop();
+        }
+#endif
         if (UiSharedService.IconTextButton(FontAwesomeIcon.Copy, "[DEBUG] Copy Last created Character Data to clipboard"))
         {
             if (LastCreatedCharacterData != null)
@@ -505,6 +516,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var profileDelay = _configService.Current.ProfileDelay;
         var profileOnRight = _configService.Current.ProfilePopoutRight;
         var enableRightClickMenu = _configService.Current.EnableRightClickMenus;
+        var preferNotesInsteadOfName = _configService.Current.PreferNotesOverNamesForVisible;
 
         if (ImGui.Checkbox("Enable Game Right Click Menu Entries", ref enableRightClickMenu))
         {
@@ -527,12 +539,23 @@ public class SettingsUi : WindowMediatorSubscriberBase
         }
         UiSharedService.DrawHelpText("This will show all currently offline users in a special 'Offline' group in the main UI.");
 
-        if (ImGui.Checkbox("Show player name instead of note for visible players", ref showNameInsteadOfNotes))
+        if (ImGui.Checkbox("Show player name for visible players", ref showNameInsteadOfNotes))
         {
             _configService.Current.ShowCharacterNameInsteadOfNotesForVisible = showNameInsteadOfNotes;
             _configService.Save();
         }
         UiSharedService.DrawHelpText("This will show the character name instead of custom set note when a character is visible");
+
+        ImGui.Indent();
+        if (!_configService.Current.ShowCharacterNameInsteadOfNotesForVisible) ImGui.BeginDisabled();
+        if (ImGui.Checkbox("Prefer notes over player names for visible players", ref preferNotesInsteadOfName))
+        {
+            _configService.Current.PreferNotesOverNamesForVisible = preferNotesInsteadOfName;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("If you set a note for a player it will be shown instead of the player name");
+        if (!_configService.Current.ShowCharacterNameInsteadOfNotesForVisible) ImGui.EndDisabled();
+        ImGui.Unindent();
 
         if (ImGui.Checkbox("Show Mare Profiles on Hover", ref showProfiles))
         {
@@ -852,7 +875,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 ImGui.Separator();
                 if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add new Secret Key"))
                 {
-                    selectedServer.SecretKeys.Add(selectedServer.SecretKeys.Max(p => p.Key) + 1, new SecretKey()
+                    selectedServer.SecretKeys.Add(selectedServer.SecretKeys.Any() ? selectedServer.SecretKeys.Max(p => p.Key) + 1 : 0, new SecretKey()
                     {
                         FriendlyName = "New Secret Key",
                     });

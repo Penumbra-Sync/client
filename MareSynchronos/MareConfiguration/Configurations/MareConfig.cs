@@ -27,6 +27,7 @@ public class MareConfig : IMareConfiguration
     public bool ProfilesShow { get; set; } = true;
     public bool ReverseUserSort { get; set; } = false;
     public bool ShowCharacterNameInsteadOfNotesForVisible { get; set; } = false;
+    public bool PreferNotesOverNamesForVisible { get; set; } = false;
     public bool ShowOfflineUsersSeparately { get; set; } = true;
     public bool ShowOnlineNotifications { get; set; } = false;
     public bool ShowOnlineNotificationsOnlyForIndividualPairs { get; set; } = true;

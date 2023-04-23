@@ -35,6 +35,7 @@ public record HeelsOffsetMessage : IMessage;
 public record PenumbraResourceLoadMessage(IntPtr GameObject, string GamePath, string FilePath) : IMessage;
 public record CustomizePlusMessage : IMessage;
 public record PalettePlusMessage(Character Character) : IMessage;
+public record HonorificMessage(string NewHonorificTitle) : IMessage;
 public record PlayerChangedMessage(API.Data.CharacterData Data) : IMessage;
 public record CharacterChangedMessage(GameObjectHandler GameObjectHandler) : IMessage;
 public record TransientResourceChangedMessage(IntPtr Address) : IMessage;

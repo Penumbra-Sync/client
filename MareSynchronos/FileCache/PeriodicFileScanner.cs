@@ -106,11 +106,14 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
             }
         });
 
-        if (FileCacheSize < (long)(_configService.Current.MaxLocalCacheInGiB * 1024d * 1024d * 1024d)) return false;
+        var maxCacheInBytes = (long)(_configService.Current.MaxLocalCacheInGiB * 1024d * 1024d * 1024d);
+
+        if (FileCacheSize < maxCacheInBytes) return false;
 
         var allFiles = Directory.EnumerateFiles(_configService.Current.CacheFolder)
             .Select(f => new FileInfo(f)).OrderBy(f => f.LastAccessTime).ToList();
-        while (FileCacheSize > (long)(_configService.Current.MaxLocalCacheInGiB * 1024d * 1024d * 1024d))
+        var maxCacheBuffer = maxCacheInBytes * 0.05d;
+        while (FileCacheSize > maxCacheInBytes - (long)maxCacheBuffer)
         {
             var oldestFile = allFiles[0];
             FileCacheSize -= oldestFile.Length;
@@ -258,12 +261,12 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         {
             foreach (var entity in entitiesToUpdate)
             {
-                _fileDbManager.UpdateHash(entity);
+                _fileDbManager.UpdateHashedFile(entity);
             }
 
             foreach (var entity in entitiesToRemove)
             {
-                _fileDbManager.RemoveHash(entity);
+                _fileDbManager.RemoveHashedFile(entity);
             }
 
             _fileDbManager.WriteOutFullCsv();

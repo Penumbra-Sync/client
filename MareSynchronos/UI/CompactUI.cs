@@ -57,6 +57,8 @@ public class CompactUi : WindowMediatorSubscriberBase
         Mediator.Subscribe<CutsceneStartMessage>(this, (_) => UiSharedService_GposeStart());
         Mediator.Subscribe<CutsceneEndMessage>(this, (_) => UiSharedService_GposeEnd());
 
+        Flags |= ImGuiWindowFlags.NoDocking;
+
         SizeConstraints = new WindowSizeConstraints()
         {
             MinimumSize = new Vector2(350, 400),

@@ -70,6 +70,8 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     private bool _palettePlusExists = false;
 
+    private bool _honorificExists = false;
+
     private bool _penumbraExists = false;
 
     private int _serverSelectionIndex = -1;
@@ -105,6 +107,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             _customizePlusExists = _ipcManager.CheckCustomizePlusApi();
             _heelsExists = _ipcManager.CheckHeelsApi();
             _palettePlusExists = _ipcManager.CheckPalettePlusApi();
+            _honorificExists = _ipcManager.CheckHonorificApi();
         });
     }
 
@@ -639,6 +642,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         var heelsColor = _heelsExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         var customizeColor = _customizePlusExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         var paletteColor = _palettePlusExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
+        var honorificColor = _honorificExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         ImGui.Text("Penumbra:");
         ImGui.SameLine();
         ImGui.TextColored(penumbraColor, _penumbraExists ? "Available" : "Unavailable");
@@ -659,6 +663,10 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.Text("Palette+:");
         ImGui.SameLine();
         ImGui.TextColored(paletteColor, _palettePlusExists ? "Available" : "Unavailable");
+        ImGui.SameLine();
+        ImGui.Text("Honorific:");
+        ImGui.SameLine();
+        ImGui.TextColored(honorificColor, _honorificExists ? "Available" : "Unavailable");
 
         if (!_penumbraExists || !_glamourerExists)
         {
