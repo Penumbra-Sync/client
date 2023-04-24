@@ -43,6 +43,7 @@ public class DownloadUi : WindowMediatorSubscriberBase
         Flags |= ImGuiWindowFlags.NoScrollbar;
         Flags |= ImGuiWindowFlags.NoTitleBar;
         Flags |= ImGuiWindowFlags.NoDecoration;
+        Flags |= ImGuiWindowFlags.NoFocusOnAppearing;
 
         ForceMainWindow = true;
 
