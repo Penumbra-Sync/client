@@ -3,40 +3,37 @@ using Dalamud.Interface.Components;
 using ImGuiNET;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.UI.Handlers;
-using MareSynchronos.UI.VM;
 
 namespace MareSynchronos.UI.Components;
 
 public class PairGroupsUi
 {
-    private readonly Func<DrawUserPairVM, DrawUserPair> _drawUserPairFactory;
     private readonly MareConfigService _mareConfig;
     private readonly SelectPairForGroupUi _selectGroupForPairUi;
     private readonly TagHandler _tagHandler;
 
-    public PairGroupsUi(MareConfigService mareConfig, TagHandler tagHandler, SelectPairForGroupUi selectGroupForPairUi, Func<DrawUserPairVM, DrawUserPair> drawUserPairFactory)
+    public PairGroupsUi(MareConfigService mareConfig, TagHandler tagHandler, SelectPairForGroupUi selectGroupForPairUi)
     {
         _mareConfig = mareConfig;
         _tagHandler = tagHandler;
         _selectGroupForPairUi = selectGroupForPairUi;
-        _drawUserPairFactory = drawUserPairFactory;
     }
 
-    public void Draw<T>(List<T> visibleUsers, List<T> onlineUsers, List<T> offlineUsers) where T : DrawPairVMBase
+    public void Draw<T>(List<T> visibleUsers, List<T> onlineUsers, List<T> offlineUsers) where T : DrawUserPair
     {
         // Only render those tags that actually have pairs in them, otherwise
         // we can end up with a bunch of useless pair groups
         var tagsWithPairsInThem = _tagHandler.GetAllTagsSorted();
         var allUsers = visibleUsers.Concat(onlineUsers).Concat(offlineUsers).ToList();
-        if (typeof(T) == typeof(DrawUserPairVM))
+        if (typeof(T) == typeof(DrawUserPair))
         {
-            DrawUserPairs(tagsWithPairsInThem, allUsers.Cast<DrawUserPairVM>().ToList(), visibleUsers.Cast<DrawUserPairVM>(), onlineUsers.Cast<DrawUserPairVM>(), offlineUsers.Cast<DrawUserPairVM>());
+            DrawUserPairs(tagsWithPairsInThem, allUsers.Cast<DrawUserPair>().ToList(), visibleUsers.Cast<DrawUserPair>(), onlineUsers.Cast<DrawUserPair>(), offlineUsers.Cast<DrawUserPair>());
         }
     }
 
-    private void DrawButtons(string tag, List<DrawUserPairVM> availablePairsInThisTag)
+    private void DrawButtons(string tag, List<DrawUserPair> availablePairsInThisTag)
     {
-        var allArePaused = availablePairsInThisTag.All(pair => pair.IsPausedFromSource);
+        var allArePaused = availablePairsInThisTag.All(pair => pair.DataContext.IsPausedFromSource);
         var pauseButton = allArePaused ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
         var flyoutMenuX = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars).X;
         var pauseButtonX = UiSharedService.GetIconButtonSize(pauseButton).X;
@@ -85,9 +82,9 @@ public class PairGroupsUi
         }
     }
 
-    private void DrawCategory(string tag, IEnumerable<DrawUserPairVM> onlineUsers, IEnumerable<DrawUserPairVM> allUsers, IEnumerable<DrawUserPairVM>? visibleUsers = null)
+    private void DrawCategory(string tag, IEnumerable<DrawUserPair> onlineUsers, IEnumerable<DrawUserPair> allUsers, IEnumerable<DrawUserPair>? visibleUsers = null)
     {
-        IEnumerable<DrawUserPairVM> usersInThisTag;
+        IEnumerable<DrawUserPair> usersInThisTag;
         HashSet<string>? otherUidsTaggedWithTag = null;
         bool isSpecialTag = false;
         int visibleInThisTag = 0;
@@ -100,9 +97,9 @@ public class PairGroupsUi
         {
             otherUidsTaggedWithTag = _tagHandler.GetOtherUidsForTag(tag);
             usersInThisTag = onlineUsers
-                .Where(pair => otherUidsTaggedWithTag.Contains(pair.UserData.UID))
+                .Where(pair => otherUidsTaggedWithTag.Contains(pair.DataContext.UserData.UID))
                 .ToList();
-            visibleInThisTag = visibleUsers?.Count(p => otherUidsTaggedWithTag.Contains(p.UserData.UID)) ?? 0;
+            visibleInThisTag = visibleUsers?.Count(p => otherUidsTaggedWithTag.Contains(p.DataContext.UserData.UID)) ?? 0;
         }
 
         if (isSpecialTag && !usersInThisTag.Any()) return;
@@ -110,7 +107,7 @@ public class PairGroupsUi
         DrawName(tag, isSpecialTag, visibleInThisTag, usersInThisTag.Count(), otherUidsTaggedWithTag?.Count);
         if (!isSpecialTag && onlineUsers.Any())
         {
-            UiSharedService.DrawWithID($"group-{tag}-buttons", () => DrawButtons(tag, allUsers.Where(p => otherUidsTaggedWithTag!.Contains(p.UserData.UID)).ToList()));
+            UiSharedService.DrawWithID($"group-{tag}-buttons", () => DrawButtons(tag, allUsers.Where(p => otherUidsTaggedWithTag!.Contains(p.DataContext.UserData.UID)).ToList()));
         }
 
         if (!_tagHandler.IsTagOpen(tag)) return;
@@ -174,17 +171,17 @@ public class PairGroupsUi
         }
     }
 
-    private void DrawPairs(string tag, IEnumerable<DrawUserPairVM> availablePairsInThisCategory)
+    private void DrawPairs(string tag, IEnumerable<DrawUserPair> availablePairsInThisCategory)
     {
         // These are all the OtherUIDs that are tagged with this tag
         foreach (var pair in availablePairsInThisCategory)
         {
-            UiSharedService.DrawWithID($"tag-{tag}-pair-${pair.UserData.UID}", () => _drawUserPairFactory(pair).DrawPairedClient());
+            UiSharedService.DrawWithID($"tag-{tag}-pair-${pair.DataContext.UserData.UID}", () => pair.DrawPairedClient());
         }
         ImGui.Separator();
     }
 
-    private void DrawUserPairs(List<string> tagsWithPairsInThem, List<DrawUserPairVM> allUsers, IEnumerable<DrawUserPairVM> visibleUsers, IEnumerable<DrawUserPairVM> onlineUsers, IEnumerable<DrawUserPairVM> offlineUsers)
+    private void DrawUserPairs(List<string> tagsWithPairsInThem, List<DrawUserPair> allUsers, IEnumerable<DrawUserPair> visibleUsers, IEnumerable<DrawUserPair> onlineUsers, IEnumerable<DrawUserPair> offlineUsers)
     {
         if (_mareConfig.Current.ShowVisibleUsersSeparately)
         {
@@ -204,32 +201,32 @@ public class PairGroupsUi
         if (_mareConfig.Current.ShowOfflineUsersSeparately)
         {
             UiSharedService.DrawWithID($"group-OnlineCustomTag", () => DrawCategory(TagHandler.CustomOnlineTag,
-                onlineUsers.Where(u => !_tagHandler.HasAnyTag(u.UserData.UID)).ToList(), allUsers));
+                onlineUsers.Where(u => !_tagHandler.HasAnyTag(u.DataContext.UserData.UID)).ToList(), allUsers));
             UiSharedService.DrawWithID($"group-OfflineCustomTag", () => DrawCategory(TagHandler.CustomOfflineTag,
-                offlineUsers.Where(u => !u.IsPausedFromTarget).ToList(), allUsers));
+                offlineUsers.Where(u => !u.DataContext.IsPausedFromTarget).ToList(), allUsers));
         }
         else
         {
             UiSharedService.DrawWithID($"group-OnlineCustomTag", () => DrawCategory(TagHandler.CustomOnlineTag,
-                onlineUsers.Concat(offlineUsers).Where(u => !u.OneSidedPair && !_tagHandler.HasAnyTag(u.UserData.UID)).ToList(), allUsers));
+                onlineUsers.Concat(offlineUsers).Where(u => !u.DataContext.OneSidedPair && !_tagHandler.HasAnyTag(u.DataContext.UserData.UID)).ToList(), allUsers));
         }
         UiSharedService.DrawWithID($"group-UnpairedCustomTag", () => DrawCategory(TagHandler.CustomUnpairedTag,
-            offlineUsers.Where(u => u.OneSidedPair).ToList(), allUsers));
+            offlineUsers.Where(u => u.DataContext.OneSidedPair).ToList(), allUsers));
     }
 
-    private void PauseRemainingPairs(List<DrawUserPairVM> availablePairs)
+    private void PauseRemainingPairs(List<DrawUserPair> availablePairs)
     {
-        foreach (var pairToPause in availablePairs.Where(pair => !pair.IsPausedFromSource))
+        foreach (var pairToPause in availablePairs.Where(pair => !pair.DataContext.IsPausedFromSource))
         {
-            pairToPause.SetPaused(true);
+            pairToPause.DataContext.SetPaused(true);
         }
     }
 
-    private void ResumeAllPairs(List<DrawUserPairVM> availablePairs)
+    private void ResumeAllPairs(List<DrawUserPair> availablePairs)
     {
-        foreach (var pairToPause in availablePairs.Where(pair => pair.IsPausedFromSource))
+        foreach (var pairToPause in availablePairs.Where(pair => pair.DataContext.IsPausedFromSource))
         {
-            pairToPause.SetPaused(false);
+            pairToPause.DataContext.SetPaused(false);
         }
     }
 

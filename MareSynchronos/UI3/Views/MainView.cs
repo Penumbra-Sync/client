@@ -38,7 +38,7 @@ public class MainView : ThemedWindow, IUiComponent
         string dev = "Dev Build";
         var ver = Assembly.GetExecutingAssembly().GetName().Version!;
         WindowName = $"Mare Synchronos {dev} ({ver.Major}.{ver.Minor}.{ver.Build})###MareSynchronosMainUI3";
-        Toggle();
+        //Toggle();
 #else
         var ver = Assembly.GetExecutingAssembly().GetName().Version;
         WindowName = "Mare Synchronos " + ver.Major + "." + ver.Minor + "." + ver.Build + "###MareSynchronosMainUI";

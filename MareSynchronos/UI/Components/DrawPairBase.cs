@@ -7,13 +7,13 @@ using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.UI.Components;
 
-public abstract class DrawPairBase
+public abstract class DrawPairBase<T> : UIElementBase<T> where T : DrawPairVMBase
 {
     protected readonly ApiController _apiController;
     protected readonly UidDisplayHandler _displayHandler;
     private readonly DrawPairVMBase _drawUserPairVMBase;
 
-    protected DrawPairBase(DrawPairVMBase drawUserPairVMBase, ApiController apiController, UidDisplayHandler uIDDisplayHandler)
+    protected DrawPairBase(T drawUserPairVMBase, ApiController apiController, UidDisplayHandler uIDDisplayHandler) : base(drawUserPairVMBase)
     {
         _drawUserPairVMBase = drawUserPairVMBase;
         _apiController = apiController;

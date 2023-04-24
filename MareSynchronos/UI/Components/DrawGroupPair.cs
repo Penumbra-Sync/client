@@ -2,10 +2,11 @@
 using MareSynchronos.WebAPI;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.API.Dto.Group;
+using MareSynchronos.UI.VM;
 
 namespace MareSynchronos.UI.Components;
 
-public class DrawGroupPair : DrawPairBase
+public class DrawGroupPair : DrawPairBase<DrawPairVMBase>
 {
     private static string _banReason = string.Empty;
     private static bool _banUserPopupOpen;

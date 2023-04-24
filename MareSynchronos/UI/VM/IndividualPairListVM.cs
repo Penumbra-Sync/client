@@ -8,6 +8,7 @@ using MareSynchronos.WebAPI;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.UI.Handlers;
+using MareSynchronos.UI.Components;
 
 namespace MareSynchronos.UI.VM;
 
@@ -21,7 +22,7 @@ public sealed class IndividualPairListVM : ImguiVM, IMediatorSubscriber, IDispos
     private Stopwatch _timeout = new();
 
     public IndividualPairListVM(PairManager pairManager, MareConfigService mareConfigService,
-        Func<Pair, DrawUserPairVM> drawUserPairVMFactory,
+        Func<Pair, DrawUserPairVM> drawUserPairVMFactory, Func<DrawUserPairVM, DrawUserPair> drawUserPairFactory,
         ApiController apiController, ServerConfigurationManager serverConfigurationManager, MareMediator mediator)
     {
         _pairManager = pairManager;
@@ -40,9 +41,9 @@ public sealed class IndividualPairListVM : ImguiVM, IMediatorSubscriber, IDispos
                     (p.PlayerName?.Contains(CharacterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false);
         }).Select(p => drawUserPairVMFactory(p)).ToList());
 
-        OnlineUsers = new ResettableLazy<List<DrawUserPairVM>>(() => GetFilteredUsers().Where(u => u.IsOnline || u.IsPausedFromSource).ToList());
-        VisibleUsers = new ResettableLazy<List<DrawUserPairVM>>(() => GetFilteredUsers().Where(u => u.IsVisible).ToList());
-        OfflineUsers = new ResettableLazy<List<DrawUserPairVM>>(() => GetFilteredUsers().Where(u => !u.IsOnline && !u.IsPausedFromSource).ToList());
+        OnlineUsers = new ResettableLazy<List<DrawUserPair>>(() => GetFilteredUsers().Where(u => u.IsOnline || u.IsPausedFromSource).Select(c => drawUserPairFactory(c)).ToList());
+        VisibleUsers = new ResettableLazy<List<DrawUserPair>>(() => GetFilteredUsers().Where(u => u.IsVisible).Select(c => drawUserPairFactory(c)).ToList());
+        OfflineUsers = new ResettableLazy<List<DrawUserPair>>(() => GetFilteredUsers().Where(u => !u.IsOnline && !u.IsPausedFromSource).Select(c => drawUserPairFactory(c)).ToList());
 
         RecreateLazy();
         SetupCommands();
@@ -69,9 +70,9 @@ public sealed class IndividualPairListVM : ImguiVM, IMediatorSubscriber, IDispos
     public ConditionalModal LastAddedUserModal { get; private set; } = new();
 
     public MareMediator Mediator { get; }
-    public ResettableLazy<List<DrawUserPairVM>> OfflineUsers { get; }
+    public ResettableLazy<List<DrawUserPair>> OfflineUsers { get; }
 
-    public ResettableLazy<List<DrawUserPairVM>> OnlineUsers { get; }
+    public ResettableLazy<List<DrawUserPair>> OnlineUsers { get; }
 
     public string PairToAdd { get; private set; } = string.Empty;
 
@@ -81,7 +82,7 @@ public sealed class IndividualPairListVM : ImguiVM, IMediatorSubscriber, IDispos
 
     public ButtonCommand SetNoteForLastAddedUserCommand { get; private set; } = new();
 
-    public ResettableLazy<List<DrawUserPairVM>> VisibleUsers { get; }
+    public ResettableLazy<List<DrawUserPair>> VisibleUsers { get; }
     private bool ReverseUserSort
     {
         get => _mareConfigService.Current.ReverseUserSort;

@@ -1,39 +1,23 @@
 ﻿using Dalamud.Interface.Colors;
-using Dalamud.Interface.Components;
 using Dalamud.Interface;
 using ImGuiNET;
 using MareSynchronos.WebAPI;
 using MareSynchronos.UI.Handlers;
-using FFXIVClientStructs.FFXIV.Common.Math;
 using MareSynchronos.UI.VM;
 
 namespace MareSynchronos.UI.Components;
 
-public class DrawUserPair : DrawPairBase
+public class DrawUserPair : DrawPairBase<DrawUserPairVM>
 {
-    private readonly Button _btnChangeAnims;
-    private readonly Button _btnChangeSounds;
-    private readonly Button _btnCycle;
-    private readonly Button _btnPairGroups;
     private readonly Button _btnPause;
-    private readonly Button _btnProfile;
-    private readonly Button _btnReload;
-    private readonly Button _btnRemovePair;
-    private readonly Button _btnReport;
     private readonly DrawUserPairVM _drawUserPairVM;
+    private readonly FlyoutMenu _flyoutMenu;
 
     public DrawUserPair(DrawUserPairVM drawUserPairVM, UidDisplayHandler displayHandler, ApiController apiController) : base(drawUserPairVM, apiController, displayHandler)
     {
         _drawUserPairVM = drawUserPairVM;
-        _btnProfile = Button.FromCommand(_drawUserPairVM.OpenProfileCommand);
-        _btnReload = Button.FromCommand(_drawUserPairVM.ReloadLastDataCommand);
-        _btnCycle = Button.FromCommand(_drawUserPairVM.CyclePauseStateCommand);
-        _btnPairGroups = Button.FromCommand(_drawUserPairVM.SelectPairGroupsCommand);
-        _btnChangeSounds = Button.FromCommand(_drawUserPairVM.ChangeSoundsCommand);
-        _btnChangeAnims = Button.FromCommand(_drawUserPairVM.ChangeAnimationsCommand);
-        _btnRemovePair = Button.FromCommand(_drawUserPairVM.RemovePairCommand);
-        _btnReport = Button.FromCommand(_drawUserPairVM.ReportProfileCommand);
         _btnPause = Button.FromCommand(_drawUserPairVM.PauseCommand);
+        _flyoutMenu = FlyoutMenu.FromCommand(_drawUserPairVM.FlyoutMenu);
     }
 
     protected override void DrawLeftSide(float textPosY, float originalY)
@@ -55,7 +39,7 @@ public class DrawUserPair : DrawPairBase
     protected override float DrawRightSide(float textPosY, float originalY)
     {
         var pauseIconSize = _btnPause.Size;
-        var barButtonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars);
+        var barButtonSize = _flyoutMenu.Size;
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
         var windowEndX = ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth();
         var rightSideStart = 0f;
@@ -134,35 +118,8 @@ public class DrawUserPair : DrawPairBase
         ImGui.SameLine(windowEndX - barButtonSize.X);
         ImGui.SetCursorPosY(originalY);
 
-        if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
-        {
-            ImGui.OpenPopup("User Flyout Menu");
-        }
-        if (ImGui.BeginPopup("User Flyout Menu"))
-        {
-            UiSharedService.DrawWithID($"buttons-{_drawUserPairVM.DisplayName}", DrawPairedClientMenu);
-            ImGui.EndPopup();
-        }
+        _flyoutMenu.Draw();
 
         return rightSideStart;
-    }
-
-    private void DrawPairedClientMenu()
-    {
-        var btnSizeProfile = _btnProfile.Size;
-        var max = Enumerable.Max<float>(new[] { btnSizeProfile.X, _btnReload.Size.X, _btnCycle.Size.X,
-            _btnPairGroups.Size.X, _btnChangeSounds.Size.X, _btnChangeAnims.Size.X, _btnRemovePair.Size.X, _btnReport.Size.X });
-        var btnSize = new Vector2(max, btnSizeProfile.Y);
-
-        _btnProfile.Draw(btnSize);
-        _btnReload.Draw(btnSize);
-        _btnCycle.Draw(btnSize);
-        ImGui.Separator();
-        _btnPairGroups.Draw(btnSize);
-        _btnChangeSounds.Draw(btnSize);
-        _btnChangeAnims.Draw(btnSize);
-        _btnRemovePair.Draw(btnSize);
-        ImGui.Separator();
-        _btnReport.Draw(btnSize);
     }
 }

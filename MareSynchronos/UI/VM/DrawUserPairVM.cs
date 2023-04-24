@@ -33,6 +33,7 @@ public class DrawUserPairVM : DrawPairVMBase
     public ButtonCommand ChangeSoundsCommand { get; private set; } = new();
     public ButtonCommand ChangeVFXCommand { get; private set; } = new();
     public ButtonCommand CyclePauseStateCommand { get; private set; } = new();
+    public FlyoutMenuCommand FlyoutMenu { get; private set; } = new();
     public bool HasModifiedPermissions => SoundDisabled || AnimationDisabled;
     public bool OneSidedPair => _pair.UserPair!.OwnPermissions.IsPaired() && !_pair.UserPair!.OtherPermissions.IsPaired();
     public ButtonCommand PauseCommand { get; private set; } = new();
@@ -230,5 +231,16 @@ public class DrawUserPairVM : DrawPairVMBase
                 .WithAction(() => _ = _apiController.UserRemovePair(new(_pair.UserData)))
                 .WithText("Remove Pair")
                 .WithTooltip($"Unpair permanently from {DisplayName}"));
+
+        FlyoutMenu = new FlyoutMenuCommand()
+            .WithCommand("Data", OpenProfileCommand)
+            .WithCommand("Data", ReloadLastDataCommand)
+            .WithCommand("Data", CyclePauseStateCommand)
+            .WithCommand("Data", SelectPairGroupsCommand)
+            .WithCommand("Permissions", ChangeSoundsCommand)
+            .WithCommand("Permissions", ChangeAnimationsCommand)
+            .WithCommand("Permissions", ChangeVFXCommand)
+            .WithCommand("Permissions", RemovePairCommand)
+            .WithCommand("Reporting", ReportProfileCommand);
     }
 }

@@ -6,7 +6,7 @@ namespace MareSynchronos.UI.Handlers;
 
 public class ButtonCommand
 {
-    private readonly Dictionary<int, State> _dict = new Dictionary<int, State>();
+    private readonly Dictionary<int, State> _dict = new();
 
     public bool ClosePopup { get; private set; } = false;
     public string CommandId { get; } = Guid.NewGuid().ToString("n");
