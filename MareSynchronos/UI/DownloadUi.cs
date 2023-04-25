@@ -68,10 +68,6 @@ public class DownloadUi : WindowMediatorSubscriberBase
 
     public override void Draw()
     {
-        if (!_configService.Current.ShowTransferWindow && !_configService.Current.ShowTransferBars) return;
-        if (!_currentDownloads.Any() && !_fileTransferManager.CurrentUploads.Any() && !_uploadingPlayers.Any()) return;
-        if (!IsOpen) return;
-
         if (_configService.Current.ShowTransferWindow)
         {
             try
@@ -213,6 +209,14 @@ public class DownloadUi : WindowMediatorSubscriberBase
                 }
             }
         }
+    }
+
+    public override bool DrawConditions()
+    {
+        if (!_configService.Current.ShowTransferWindow && !_configService.Current.ShowTransferBars) return false;
+        if (!_currentDownloads.Any() && !_fileTransferManager.CurrentUploads.Any() && !_uploadingPlayers.Any()) return false;
+        if (!IsOpen) return false;
+        return true;
     }
 
     public override void PreDraw()
