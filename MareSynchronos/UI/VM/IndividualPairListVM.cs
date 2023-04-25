@@ -8,7 +8,7 @@ using MareSynchronos.WebAPI;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.UI.Handlers;
-using MareSynchronos.UI.Components;
+using MareSynchronos.API.Data.Extensions;
 
 namespace MareSynchronos.UI.VM;
 
@@ -18,20 +18,24 @@ public sealed class IndividualPairListVM : ImguiVM, IMediatorSubscriber, IDispos
     private readonly MareConfigService _mareConfigService;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
+    private readonly TagHandler _tagHandler;
     private string _characterFilter = string.Empty;
     private Stopwatch _timeout = new();
 
     public IndividualPairListVM(PairManager pairManager, MareConfigService mareConfigService,
-        Func<Pair, DrawUserPairVM> drawUserPairVMFactory, Func<DrawUserPairVM, DrawUserPair> drawUserPairFactory,
-        ApiController apiController, ServerConfigurationManager serverConfigurationManager, MareMediator mediator)
+        ApiController apiController, ServerConfigurationManager serverConfigurationManager, MareMediator mediator, TagHandler tagHandler,
+        Func<string, CustomTag, TaggedPairListVM> taggedPairListVMFactory)
     {
         _pairManager = pairManager;
         _mareConfigService = mareConfigService;
         _apiController = apiController;
         _serverConfigurationManager = serverConfigurationManager;
         Mediator = mediator;
+        _tagHandler = tagHandler;
 
-        Mediator.Subscribe<PairManagerUpdateMessage>(this, (_) => RecreateLazy());
+        Mediator.Subscribe<PairManagerUpdateMessage>(this, (_) => RecreateLazy(false));
+        Mediator.Subscribe<TagCreationMessage>(this, (_) => RecreateLazy(true));
+        Mediator.Subscribe<TagDeletionMessage>(this, (_) => RecreateLazy(true));
 
         FilteredUsers = new(() => _pairManager.DirectPairs.Where(p =>
         {
@@ -39,50 +43,54 @@ public sealed class IndividualPairListVM : ImguiVM, IMediatorSubscriber, IDispos
             return p.UserData.AliasOrUID.Contains(CharacterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ||
                     (p.GetNote()?.Contains(CharacterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false) ||
                     (p.PlayerName?.Contains(CharacterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false);
-        }).Select(p => drawUserPairVMFactory(p)).ToList());
+        }).ToList());
 
-        OnlineUsers = new ResettableLazy<List<DrawUserPair>>(() => GetFilteredUsers().Where(u => u.IsOnline || u.IsPausedFromSource).Select(c => drawUserPairFactory(c)).ToList());
-        VisibleUsers = new ResettableLazy<List<DrawUserPair>>(() => GetFilteredUsers().Where(u => u.IsVisible).Select(c => drawUserPairFactory(c)).ToList());
-        OfflineUsers = new ResettableLazy<List<DrawUserPair>>(() => GetFilteredUsers().Where(u => !u.IsOnline && !u.IsPausedFromSource).Select(c => drawUserPairFactory(c)).ToList());
+        Tags = new ResettableLazy<List<TaggedPairListVM>>(() =>
+        {
+            List<TaggedPairListVM> taggedPairListVMs = new List<TaggedPairListVM>();
+            var tags = _tagHandler.GetAllTagsSorted();
+            if (_mareConfigService.Current.ShowVisibleUsersSeparately) taggedPairListVMs.Add(taggedPairListVMFactory("Mare_Visible", CustomTag.Visible));
+            foreach (var tag in tags.OrderBy(t => t, StringComparer.OrdinalIgnoreCase))
+            {
+                taggedPairListVMs.Add(taggedPairListVMFactory(tag, CustomTag.UserTag));
+            }
+            taggedPairListVMs.Add(taggedPairListVMFactory("Mare_Online", CustomTag.AllUsers));
+            if (_mareConfigService.Current.ShowOfflineUsersSeparately) taggedPairListVMs.Add(taggedPairListVMFactory("Mare_Offline", CustomTag.Offline));
+            taggedPairListVMs.Add(taggedPairListVMFactory("Mare_Unpaired", CustomTag.Unpaired));
+            foreach (var vm in taggedPairListVMs)
+            {
+                vm.SetReverse(_mareConfigService.Current.ReverseUserSort);
+            }
+            return taggedPairListVMs;
+        });
 
-        RecreateLazy();
+        RecreateLazy(true);
         SetupCommands();
     }
 
     public ButtonCommand AddPairCommand { get; private set; } = new();
-
     public string CharacterOrCommentFilter
     {
         get => _characterFilter;
         private set
         {
             _characterFilter = value;
-            RecreateLazy();
+            foreach (var tag in Tags.Value)
+            {
+                tag.SetFilter(_characterFilter);
+            }
         }
     }
-
-    public ResettableLazy<List<DrawUserPairVM>> FilteredUsers { get; }
-
+    public ResettableLazy<List<Pair>> FilteredUsers { get; }
     public Pair? LastAddedUser { get; private set; }
-
     public string LastAddedUserComment { get; private set; } = string.Empty;
-
     public ConditionalModal LastAddedUserModal { get; private set; } = new();
-
     public MareMediator Mediator { get; }
-    public ResettableLazy<List<DrawUserPair>> OfflineUsers { get; }
-
-    public ResettableLazy<List<DrawUserPair>> OnlineUsers { get; }
-
     public string PairToAdd { get; private set; } = string.Empty;
-
     public ButtonCommand PauseAllCommand { get; private set; } = new();
-
     public ButtonCommand ReverseSortCommand { get; private set; } = new();
-
     public ButtonCommand SetNoteForLastAddedUserCommand { get; private set; } = new();
-
-    public ResettableLazy<List<DrawUserPair>> VisibleUsers { get; }
+    public ResettableLazy<List<TaggedPairListVM>> Tags { get; }
     private bool ReverseUserSort
     {
         get => _mareConfigService.Current.ReverseUserSort;
@@ -90,12 +98,19 @@ public sealed class IndividualPairListVM : ImguiVM, IMediatorSubscriber, IDispos
         {
             _mareConfigService.Current.ReverseUserSort = value;
             _mareConfigService.Save();
-            RecreateLazy();
+            foreach (var tag in Tags.Value)
+            {
+                tag.SetReverse(value);
+            }
         }
     }
 
     public void Dispose()
     {
+        foreach (var value in Tags.Value)
+        {
+            value.Dispose();
+        }
         Mediator.UnsubscribeAll(this);
     }
 
@@ -118,28 +133,17 @@ public sealed class IndividualPairListVM : ImguiVM, IMediatorSubscriber, IDispos
         return true;
     }
 
-    private List<DrawUserPairVM> GetFilteredUsers()
-    {
-        var users = FilteredUsers.Value
-            .OrderBy(
-                u => _mareConfigService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
-                    ? u.PlayerName
-                    : u.GetNote() ?? u.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase).ToList();
-
-        if (ReverseUserSort)
-        {
-            users.Reverse();
-        }
-
-        return users;
-    }
-
-    private void RecreateLazy()
+    private void RecreateLazy(bool resetTags)
     {
         FilteredUsers.Reset();
-        OnlineUsers.Reset();
-        OfflineUsers.Reset();
-        VisibleUsers.Reset();
+        if (resetTags)
+        {
+            foreach (var value in Tags.Value)
+            {
+                value.Dispose();
+            }
+            Tags.Reset();
+        }
     }
 
     private void SetNoteForLastAddedUser()
@@ -158,9 +162,11 @@ public sealed class IndividualPairListVM : ImguiVM, IMediatorSubscriber, IDispos
                 .WithIcon(FontAwesomeIcon.Play)
                 .WithAction(() =>
                 {
-                    foreach (DrawUserPairVM user in FilteredUsers.Value.ToList())
+                    foreach (var user in FilteredUsers.Value.ToList())
                     {
-                        user.SetPaused(false);
+                        var perm = user.UserPair!.OwnPermissions;
+                        perm.SetPaused(true);
+                        _ = _apiController.UserSetPairPermissions(new(user.UserData, perm));
                     }
                     _timeout = Stopwatch.StartNew();
                 })
@@ -170,9 +176,11 @@ public sealed class IndividualPairListVM : ImguiVM, IMediatorSubscriber, IDispos
                 .WithIcon(FontAwesomeIcon.Pause)
                 .WithAction(() =>
                 {
-                    foreach (DrawUserPairVM user in FilteredUsers.Value.ToList())
+                    foreach (var user in FilteredUsers.Value.ToList())
                     {
-                        user.SetPaused(true);
+                        var perm = user.UserPair!.OwnPermissions;
+                        perm.SetPaused(false);
+                        _ = _apiController.UserSetPairPermissions(new(user.UserData, perm));
                     }
                     _timeout = Stopwatch.StartNew();
                 })

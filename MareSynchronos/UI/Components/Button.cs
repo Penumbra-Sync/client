@@ -14,6 +14,8 @@ public class Button
     private readonly ResettableLazy<Vector2> _sizeLazy;
     private ButtonCommand.State? _lastState;
 
+    private bool _sizeDirty = false;
+
     private Button(ButtonCommand command)
     {
         _command = command;
@@ -59,10 +61,9 @@ public class Button
     {
         get
         {
-            if (_lastState != _command.StatefulCommandContent)
+            if (_sizeDirty)
             {
                 _sizeLazy.Reset();
-                _lastState = _command.StatefulCommandContent;
             }
 
             return _sizeLazy;
@@ -76,16 +77,22 @@ public class Button
 
     public void Draw(Vector2? size = null)
     {
-        var visible = _command.StatefulCommandContent.Visibility.Invoke();
+        var newState = _command.StatefulCommandContent;
+        if (newState != _lastState)
+        {
+            _sizeDirty = true;
+            _lastState = newState;
+        }
+        var visible = _lastState.Visibility.Invoke();
         if (!visible) return;
 
-        var enabled = _command.StatefulCommandContent.Enabled.Invoke();
-        var text = _command.StatefulCommandContent.ButtonText.Invoke();
-        var icon = _command.StatefulCommandContent.Icon.Invoke();
-        var tooltip = _command.StatefulCommandContent.Tooltip.Invoke();
-        var color = _command.StatefulCommandContent.Foreground.Invoke();
-        var bgcolor = _command.StatefulCommandContent.Background.Invoke();
-        var font = _command.StatefulCommandContent.Font.Invoke();
+        var enabled = _lastState.Enabled.Invoke();
+        var text = _lastState.ButtonText.Invoke();
+        var icon = _lastState.Icon.Invoke();
+        var tooltip = _lastState.Tooltip.Invoke();
+        var color = _lastState.Foreground.Invoke();
+        var bgcolor = _lastState.Background.Invoke();
+        var font = _lastState.Font.Invoke();
 
         ImGui.PushID(_command.CommandId);
 
@@ -98,7 +105,7 @@ public class Button
         {
             if (UiSharedService.IconTextButton(icon, text, size) && (!_command.RequireCtrl || (_command.RequireCtrl && UiSharedService.CtrlPressed())))
             {
-                _command.StatefulCommandContent.OnClick();
+                _lastState.OnClick();
                 if (_command.ClosePopup) ImGui.CloseCurrentPopup();
             }
         }
@@ -108,7 +115,7 @@ public class Button
             var button = size == null ? ImGui.Button(icon.ToIconString()) : ImGui.Button(icon.ToIconString(), size.Value);
             if (button && (!_command.RequireCtrl || (_command.RequireCtrl && UiSharedService.CtrlPressed())))
             {
-                _command.StatefulCommandContent.OnClick();
+                _lastState.OnClick();
                 if (_command.ClosePopup) ImGui.CloseCurrentPopup();
             }
             ImGui.PopFont();
@@ -118,7 +125,7 @@ public class Button
             var button = size == null ? ImGui.Button(text) : ImGui.Button(text, size.Value);
             if (button && (!_command.RequireCtrl || (_command.RequireCtrl && UiSharedService.CtrlPressed())))
             {
-                _command.StatefulCommandContent.OnClick();
+                _lastState.OnClick();
                 if (_command.ClosePopup) ImGui.CloseCurrentPopup();
             }
         }

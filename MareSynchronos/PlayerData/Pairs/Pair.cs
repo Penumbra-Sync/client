@@ -43,7 +43,7 @@ public class Pair
 
     public bool IsVisible => CachedPlayer?.PlayerName != null;
     public CharacterData? LastReceivedCharacterData { get; set; }
-    public string? PlayerName => CachedPlayer?.PlayerName ?? string.Empty;
+    public string? PlayerName => CachedPlayer?.PlayerName;
 
     public UserData UserData => UserPair?.User ?? GroupPair.First().Value.User;
 
@@ -143,7 +143,7 @@ public class Pair
 
         CachedPlayer.Initialize(name).Wait();
 
-        _mediator.Publish(new PairManagerUpdateMessage());
+        _mediator.Publish(new PairManagerUpdateMessage(UserData));
 
         ApplyLastReceivedData();
 

@@ -310,12 +310,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
 #if DEBUG
         if (LastCreatedCharacterData != null && ImGui.TreeNode("Last created character data"))
         {
-            
             foreach (var l in JsonSerializer.Serialize(LastCreatedCharacterData, new JsonSerializerOptions() { WriteIndented = true }).Split('\n'))
             {
                 ImGui.Text($"{l}");
             }
-            
+
             ImGui.TreePop();
         }
 #endif
@@ -529,6 +528,9 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _configService.Current.ShowVisibleUsersSeparately = showVisibleSeparate;
             _configService.Save();
+            Mediator.Publish(new SettingsChangedMessage<bool>(nameof(MareConfiguration.Configurations.MareConfig),
+                nameof(MareConfiguration.Configurations.MareConfig.ShowVisibleUsersSeparately),
+                showVisibleSeparate));
         }
         UiSharedService.DrawHelpText("This will show all currently visible users in a special 'Visible' group in the main UI.");
 
@@ -536,6 +538,9 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _configService.Current.ShowOfflineUsersSeparately = showOfflineSeparate;
             _configService.Save();
+            Mediator.Publish(new SettingsChangedMessage<bool>(nameof(MareConfiguration.Configurations.MareConfig),
+                nameof(MareConfiguration.Configurations.MareConfig.ShowOfflineUsersSeparately),
+                showVisibleSeparate));
         }
         UiSharedService.DrawHelpText("This will show all currently offline users in a special 'Offline' group in the main UI.");
 

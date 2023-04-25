@@ -3,8 +3,40 @@ using Dalamud.Interface.Components;
 using ImGuiNET;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.UI.Handlers;
+using MareSynchronos.UI.VM;
 
 namespace MareSynchronos.UI.Components;
+
+public class TagView : UIElementBase<TaggedPairListVM>
+{
+    private readonly MareConfigService _mareConfigService;
+    private readonly Button _pauseButton;
+
+    public TagView(TaggedPairListVM vm, MareConfigService mareConfigService) : base(vm)
+    {
+        _mareConfigService = mareConfigService;
+        _pauseButton = Button.FromCommand(vm.PauseAllCommand);
+    }
+
+    public void Draw()
+    {
+        if (!DataContext.IsVisible) return;
+        ImGui.TextUnformatted(DataContext.Tag);
+        if (DataContext.CustomTag == CustomTag.UserTag)
+        {
+            ImGui.SameLine();
+            _pauseButton.Draw();
+        }
+        ImGui.Indent(15);
+        foreach (var user in DataContext.DrawnUsers.Value)
+        {
+            user.DrawPairedClient();
+        }
+        ImGui.Unindent(15);
+
+        // todo: actually write this nicely
+    }
+}
 
 public class PairGroupsUi
 {

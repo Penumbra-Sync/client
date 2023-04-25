@@ -43,7 +43,7 @@ public class IndividualPairListUiElement : WindowElementVMBase<ImguiVM>
             UiSharedService.SetScaledWindowSize(275);
         });
 
-        UiSharedService.DrawWithID("group-user-popup", () => _selectPairForGroupUi.Draw(_pairVM.FilteredUsers.Value));
+        //UiSharedService.DrawWithID("group-user-popup", () => _selectPairForGroupUi.Draw(_pairVM.FilteredUsers.Value));
         UiSharedService.DrawWithID("grouping-popup", () => _selectGroupForPairUi.Draw());
 
         UiSharedService.DrawWithID("addpair", DrawAddPair);
@@ -99,7 +99,12 @@ public class IndividualPairListUiElement : WindowElementVMBase<ImguiVM>
 
         ImGui.BeginChild("list", new Vector2(windowContentWidth, ySize), border: false);
 
-        _pairGroupsUi.Draw(_pairVM.VisibleUsers.Value, _pairVM.OnlineUsers.Value, _pairVM.OfflineUsers.Value);
+        foreach (var tag in _pairVM.Tags.Value)
+        {
+            tag.TagView.Draw();
+        }
+
+        //_pairGroupsUi.Draw(_pairVM.VisibleUsers.Value, _pairVM.OnlineUsers.Value, _pairVM.OfflineUsers.Value);
 
         ImGui.EndChild();
     }

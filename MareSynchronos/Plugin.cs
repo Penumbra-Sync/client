@@ -148,6 +148,11 @@ public sealed class Plugin : IDalamudPlugin
                         s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<MareConfigService>(),
                         s.GetRequiredService<SelectGroupForPairUi>())
                 ));
+            collection.AddSingleton(s =>
+                new Func<string, CustomTag, TaggedPairListVM>((p, b) => new TaggedPairListVM(p, b, s.GetRequiredService<PairManager>(), s.GetRequiredService<Func<Pair, DrawUserPairVM>>(),
+                    s.GetRequiredService<Func<DrawUserPairVM, DrawUserPair>>(), s.GetRequiredService<TagHandler>(), s.GetRequiredService<MareMediator>(),
+                    s.GetRequiredService<Func<TaggedPairListVM, TagView>>(), s.GetRequiredService<MareConfigService>())));
+            collection.AddSingleton(s => new Func<TaggedPairListVM, TagView>(p => new TagView(p, s.GetRequiredService<MareConfigService>())));
 
             // new ui shit
             collection.AddSingleton<ITheme, DarkTheme>();

@@ -64,7 +64,11 @@ public record ProfilePopoutToggle(DrawPairVMBase? Pair) : IMessage;
 public record CompactUiChange(Vector2 Size, Vector2 Position) : IMessage;
 public record ProfileOpenStandaloneMessage(DrawPairVMBase Pair) : IMessage;
 public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : IMessage;
-public record PairManagerUpdateMessage : IMessage;
+public record PairManagerUpdateMessage(UserData? User = null) : IMessage;
 public record CompactUiContentChangeMessage(float CentralPartHeight, float ContentWidth) : IMessage;
+public record TagUpdateMessage(string Tag) : IMessage;
+public record TagCreationMessage(string Tag) : IMessage;
+public record TagDeletionMessage(string Tag) : IMessage;
+public record SettingsChangedMessage<T>(string ConfigName, string SettingName, T value) : IMessage;
 
 #pragma warning restore MA0048 // File name must match type name

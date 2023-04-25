@@ -1,4 +1,5 @@
-﻿using MareSynchronos.Services.ServerConfiguration;
+﻿using MareSynchronos.Services.Mediator;
+using MareSynchronos.Services.ServerConfiguration;
 
 namespace MareSynchronos.UI.Handlers;
 
@@ -8,21 +9,25 @@ public class TagHandler
     public const string CustomOnlineTag = "Mare_Online";
     public const string CustomUnpairedTag = "Mare_Unpaired";
     public const string CustomVisibleTag = "Mare_Visible";
+    private readonly MareMediator _mareMediator;
     private readonly ServerConfigurationManager _serverConfigurationManager;
 
-    public TagHandler(ServerConfigurationManager serverConfigurationManager)
+    public TagHandler(ServerConfigurationManager serverConfigurationManager, MareMediator mareMediator)
     {
         _serverConfigurationManager = serverConfigurationManager;
+        _mareMediator = mareMediator;
     }
 
     public void AddTag(string tag)
     {
         _serverConfigurationManager.AddTag(tag);
+        _mareMediator.Publish(new TagCreationMessage(tag));
     }
 
     public void AddTagToPairedUid(string uid, string tagName)
     {
         _serverConfigurationManager.AddTagForUid(uid, tagName);
+        _mareMediator.Publish(new TagUpdateMessage(tagName));
     }
 
     public List<string> GetAllTagsSorted()
@@ -61,11 +66,13 @@ public class TagHandler
     {
         // First remove the tag from teh available pair tags
         _serverConfigurationManager.RemoveTag(tag);
+        _mareMediator.Publish(new TagDeletionMessage(tag));
     }
 
     public void RemoveTagFromPairedUid(string uid, string tagName)
     {
         _serverConfigurationManager.RemoveTagForUid(uid, tagName);
+        _mareMediator.Publish(new TagUpdateMessage(tagName));
     }
 
     public void SetTagOpen(string tag, bool open)

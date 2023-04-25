@@ -41,6 +41,7 @@ public class FlyoutMenu
 
     public void Draw()
     {
+        ImGui.PushID(_command.CommandId);
         ImGui.SetWindowFontScale(_command.Scale);
         if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
         {
@@ -50,7 +51,7 @@ public class FlyoutMenu
 
         if (ImGui.BeginPopup(_command.CommandId))
         {
-            ImGui.PushID(_command.CommandId);
+            ImGui.PushID("popup-" + _command.CommandId);
             var widthX = Enumerable.Max<float>(_menuEntries.SelectMany(k => k.Value).Where(k => k.Size != Vector2.Zero).Select(k => k.Size.X));
 
             var firstEntryY = _menuEntries.First(f => f.Value.Find(e => e.Size != Vector2.Zero) != null).Value[0].Size.Y;
@@ -71,5 +72,6 @@ public class FlyoutMenu
             ImGui.PopID();
             ImGui.EndPopup();
         }
+        ImGui.PopID();
     }
 }
