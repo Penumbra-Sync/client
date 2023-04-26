@@ -81,9 +81,9 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         _playerRelatedObjects[ObjectKind.MinionOrMount] =
             gameObjectHandlerFactory(ObjectKind.MinionOrMount, () => dalamudUtil.GetMinionOrMount(), true);
         _playerRelatedObjects[ObjectKind.Pet] =
-            gameObjectHandlerFactory(ObjectKind.Pet, () => dalamudUtil.GetPet(), true);
+            gameObjectHandlerFactory(ObjectKind.Pet, () => dalamudUtil.GetPet().GetAwaiter().GetResult(), true);
         _playerRelatedObjects[ObjectKind.Companion] =
-            gameObjectHandlerFactory(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), true);
+            gameObjectHandlerFactory(ObjectKind.Companion, () => dalamudUtil.GetCompanion().GetAwaiter().GetResult(), true);
     }
 
     protected override void Dispose(bool disposing)

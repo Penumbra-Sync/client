@@ -88,7 +88,12 @@ public class DalamudUtilService : IHostedService
         return (Dalamud.Game.ClientState.Objects.Types.Character)objTableObj;
     }
 
-    public unsafe IntPtr GetCompanion(IntPtr? playerPointer = null)
+    public async Task<IntPtr> GetCompanion(IntPtr? playerPointer = null)
+    {
+        return await RunOnFrameworkThread(() => GetCompanionInternal(playerPointer));
+    }
+
+    private unsafe IntPtr GetCompanionInternal(IntPtr? playerPointer = null)
     {
         var mgr = CharacterManager.Instance();
         playerPointer ??= PlayerPointer;
@@ -108,7 +113,12 @@ public class DalamudUtilService : IHostedService
         return _objectTable.GetObjectAddress(((GameObject*)playerPointer)->ObjectIndex + 1);
     }
 
-    public unsafe IntPtr GetPet(IntPtr? playerPointer = null)
+    public async Task<IntPtr> GetPet(IntPtr? playerPointer = null)
+    {
+        return await RunOnFrameworkThread(() => GetPetInternal(playerPointer));
+    }
+
+    private unsafe IntPtr GetPetInternal(IntPtr? playerPointer = null)
     {
         if (ClassJobIdsIgnoredForPets.Contains(_classJobId ?? 0)) return IntPtr.Zero;
         var mgr = CharacterManager.Instance();

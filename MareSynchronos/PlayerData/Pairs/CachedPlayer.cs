@@ -224,9 +224,9 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         var handler = changes.Key switch
         {
             ObjectKind.Player => _charaHandler!,
-            ObjectKind.Companion => _gameObjectHandlerFactory(changes.Key, () => _dalamudUtil.GetCompanion(ptr), false),
+            ObjectKind.Companion => _gameObjectHandlerFactory(changes.Key, () => _dalamudUtil.GetCompanion(ptr).GetAwaiter().GetResult(), false),
             ObjectKind.MinionOrMount => _gameObjectHandlerFactory(changes.Key, () => _dalamudUtil.GetMinionOrMount(ptr), false),
-            ObjectKind.Pet => _gameObjectHandlerFactory(changes.Key, () => _dalamudUtil.GetPet(ptr), false),
+            ObjectKind.Pet => _gameObjectHandlerFactory(changes.Key, () => _dalamudUtil.GetPet(ptr).GetAwaiter().GetResult(), false),
             _ => throw new NotSupportedException("ObjectKind not supported: " + changes.Key)
         };
 
@@ -583,7 +583,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
         else if (objectKind == ObjectKind.Pet)
         {
-            var pet = _dalamudUtil.GetPet(address);
+            var pet = await _dalamudUtil.GetPet(address);
             if (pet != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = _gameObjectHandlerFactory(ObjectKind.Pet, () => pet, false);
@@ -592,7 +592,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
         else if (objectKind == ObjectKind.Companion)
         {
-            var companion = _dalamudUtil.GetCompanion(address);
+            var companion = await _dalamudUtil.GetCompanion(address);
             if (companion != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = _gameObjectHandlerFactory(ObjectKind.Pet, () => companion, false);

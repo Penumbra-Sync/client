@@ -55,7 +55,7 @@ public class PlayerDataFactory
             pointerIsZero = playerRelatedObject.Address == IntPtr.Zero;
             try
             {
-                pointerIsZero = CheckForNullDrawObject(playerRelatedObject.Address);
+                pointerIsZero = await CheckForNullDrawObject(playerRelatedObject.Address);
             }
             catch
             {
@@ -101,7 +101,12 @@ public class PlayerDataFactory
         previousData.GlamourerString = previousGlamourerData;
     }
 
-    private static unsafe bool CheckForNullDrawObject(IntPtr playerPointer)
+    private async Task<bool> CheckForNullDrawObject(IntPtr playerPointer)
+    {
+        return await _dalamudUtil.RunOnFrameworkThread(() => CheckForNullDrawObjectUnsafe(playerPointer));
+    }
+
+    private unsafe bool CheckForNullDrawObjectUnsafe(IntPtr playerPointer)
     {
         return ((Character*)playerPointer)->GameObject.DrawObject == null;
     }
@@ -321,7 +326,7 @@ public class PlayerDataFactory
         Stopwatch st = Stopwatch.StartNew();
 
         // gather static replacements from render model
-        var (forwardResolve, reverseResolve) = BuildDataFromModel(objectKind, charaPointer, token);
+        var (forwardResolve, reverseResolve) = await _dalamudUtil.RunOnFrameworkThread(() => BuildDataFromModel(objectKind, charaPointer, token));
         Dictionary<string, List<string>> resolvedPaths = await GetFileReplacementsFromPaths(forwardResolve, reverseResolve).ConfigureAwait(false);
         previousData.FileReplacements[objectKind] =
                 new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)), FileReplacementComparer.Instance)
