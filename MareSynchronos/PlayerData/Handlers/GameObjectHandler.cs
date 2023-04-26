@@ -99,7 +99,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             nint curPtr = IntPtr.Zero;
             try
             {
-                curPtr = _getAddress.Invoke();
+                curPtr = CurrentAddress;
 
                 if (curPtr == IntPtr.Zero) return true;
 
@@ -136,7 +136,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
     {
         if (_haltProcessing) return;
 
-        var curPtr = _getAddress.Invoke();
+        var curPtr = CurrentAddress;
         bool drawObjDiff = false;
         try
         {

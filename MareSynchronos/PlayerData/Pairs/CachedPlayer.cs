@@ -530,7 +530,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             missingPluginsForData.Add("Honorific");
             warning.ShownHonorificWarning = true;
         }
-        
+
         if (missingPluginsForData.Any())
         {
             Mediator.Publish(new NotificationMessage("Missing plugins for " + PlayerName,
@@ -570,7 +570,6 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             CheckForNameAndThrow(tempHandler, name);
             Logger.LogDebug("[{applicationId}] Restoring Honorific for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             await _ipcManager.HonorificClearTitle(address).ConfigureAwait(false);
-            
         }
         else if (objectKind == ObjectKind.MinionOrMount)
         {
@@ -583,7 +582,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
         else if (objectKind == ObjectKind.Pet)
         {
-            var pet = await _dalamudUtil.GetPet(address);
+            var pet = await _dalamudUtil.GetPet(address).ConfigureAwait(false);
             if (pet != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = _gameObjectHandlerFactory(ObjectKind.Pet, () => pet, false);
@@ -592,7 +591,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
         else if (objectKind == ObjectKind.Companion)
         {
-            var companion = await _dalamudUtil.GetCompanion(address);
+            var companion = await _dalamudUtil.GetCompanion(address).ConfigureAwait(false);
             if (companion != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = _gameObjectHandlerFactory(ObjectKind.Pet, () => companion, false);

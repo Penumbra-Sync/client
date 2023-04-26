@@ -696,12 +696,9 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
     private void ResourceLoaded(IntPtr ptr, string arg1, string arg2)
     {
-        Task.Run(() =>
+        if (ptr != IntPtr.Zero && string.Compare(arg1, arg2, ignoreCase: true, System.Globalization.CultureInfo.InvariantCulture) != 0)
         {
-            if (ptr != IntPtr.Zero && string.Compare(arg1, arg2, ignoreCase: true, System.Globalization.CultureInfo.InvariantCulture) != 0)
-            {
-                Mediator.Publish(new PenumbraResourceLoadMessage(ptr, arg1, arg2));
-            }
-        });
+            Mediator.Publish(new PenumbraResourceLoadMessage(ptr, arg1, arg2));
+        }
     }
 }

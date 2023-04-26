@@ -90,14 +90,7 @@ public class DalamudUtilService : IHostedService
 
     public async Task<IntPtr> GetCompanion(IntPtr? playerPointer = null)
     {
-        return await RunOnFrameworkThread(() => GetCompanionInternal(playerPointer));
-    }
-
-    private unsafe IntPtr GetCompanionInternal(IntPtr? playerPointer = null)
-    {
-        var mgr = CharacterManager.Instance();
-        playerPointer ??= PlayerPointer;
-        return (IntPtr)mgr->LookupBuddyByOwnerObject((BattleChara*)playerPointer);
+        return await RunOnFrameworkThread(() => GetCompanionInternal(playerPointer)).ConfigureAwait(false);
     }
 
     public unsafe IntPtr GetMinion(IntPtr? playerPointer = null)
@@ -115,16 +108,7 @@ public class DalamudUtilService : IHostedService
 
     public async Task<IntPtr> GetPet(IntPtr? playerPointer = null)
     {
-        return await RunOnFrameworkThread(() => GetPetInternal(playerPointer));
-    }
-
-    private unsafe IntPtr GetPetInternal(IntPtr? playerPointer = null)
-    {
-        if (ClassJobIdsIgnoredForPets.Contains(_classJobId ?? 0)) return IntPtr.Zero;
-        var mgr = CharacterManager.Instance();
-        playerPointer ??= PlayerPointer;
-        if (playerPointer == IntPtr.Zero) return IntPtr.Zero;
-        return (IntPtr)mgr->LookupPetByOwnerObject((BattleChara*)playerPointer);
+        return await RunOnFrameworkThread(() => GetPetInternal(playerPointer)).ConfigureAwait(false);
     }
 
     public PlayerCharacter? GetPlayerCharacterFromObjectTableByName(string characterName)
@@ -161,9 +145,10 @@ public class DalamudUtilService : IHostedService
     public async Task RunOnFrameworkThread(Action act, [CallerMemberName] string callerMember = "",
         [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int lineNumber = 0)
     {
-        _logger.LogTrace("Running Action on framework thread (FrameworkContext: {ctx}): {member} in {file}:{line}", _framework.IsInFrameworkUpdateThread, callerMember, callerFilePath, lineNumber);
         if (!_framework.IsInFrameworkUpdateThread)
         {
+            _logger.LogTrace("Running Action on framework thread (FrameworkContext: {ctx}): {member} in {file}:{line}", _framework.IsInFrameworkUpdateThread, callerMember, callerFilePath, lineNumber);
+
             await _framework.RunOnFrameworkThread(act).ContinueWith((_) => Task.CompletedTask).ConfigureAwait(false);
             while (_framework.IsInFrameworkUpdateThread) // yield the thread again, should technically never be triggered
             {
@@ -178,9 +163,10 @@ public class DalamudUtilService : IHostedService
     public async Task<T> RunOnFrameworkThread<T>(Func<T> func, [CallerMemberName] string callerMember = "",
         [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int lineNumber = 0)
     {
-        _logger.LogTrace("Running Func on framework thread (FrameworkContext: {ctx}): {member} in {file}:{line}", _framework.IsInFrameworkUpdateThread, callerMember, callerFilePath, lineNumber);
         if (!_framework.IsInFrameworkUpdateThread)
         {
+            _logger.LogTrace("Running Func on framework thread (FrameworkContext: {ctx}): {member} in {file}:{line}", _framework.IsInFrameworkUpdateThread, callerMember, callerFilePath, lineNumber);
+
             var result = await _framework.RunOnFrameworkThread(func).ContinueWith((task) => task.Result).ConfigureAwait(false);
             while (_framework.IsInFrameworkUpdateThread) // yield the thread again, should technically never be triggered
             {
@@ -274,6 +260,7 @@ public class DalamudUtilService : IHostedService
 
     private unsafe void FrameworkOnUpdateInternal()
     {
+        if (_clientState.LocalPlayer?.IsDead ?? false) return;
         if (GposeTarget != null && !IsInGpose)
         {
             _logger.LogDebug("Gpose start");
@@ -358,5 +345,22 @@ public class DalamudUtilService : IHostedService
         _mediator.Publish(new DelayedFrameworkUpdateMessage());
 
         _delayedFrameworkUpdateCheck = DateTime.Now;
+    }
+
+    private unsafe IntPtr GetCompanionInternal(IntPtr? playerPointer = null)
+    {
+        var mgr = CharacterManager.Instance();
+        playerPointer ??= PlayerPointer;
+        if (playerPointer == IntPtr.Zero || (IntPtr)mgr == IntPtr.Zero) return IntPtr.Zero;
+        return (IntPtr)mgr->LookupBuddyByOwnerObject((BattleChara*)playerPointer);
+    }
+
+    private unsafe IntPtr GetPetInternal(IntPtr? playerPointer = null)
+    {
+        if (ClassJobIdsIgnoredForPets.Contains(_classJobId ?? 0)) return IntPtr.Zero;
+        var mgr = CharacterManager.Instance();
+        playerPointer ??= PlayerPointer;
+        if (playerPointer == IntPtr.Zero || (IntPtr)mgr == IntPtr.Zero) return IntPtr.Zero;
+        return (IntPtr)mgr->LookupPetByOwnerObject((BattleChara*)playerPointer);
     }
 }
