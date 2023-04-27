@@ -147,7 +147,7 @@ public class DalamudUtilService : IHostedService
     {
         if (!_framework.IsInFrameworkUpdateThread)
         {
-            _logger.LogTrace("Running Action on framework thread (FrameworkContext: {ctx}): {member} in {file}:{line}", _framework.IsInFrameworkUpdateThread, callerMember, callerFilePath, lineNumber);
+            //_logger.LogTrace("Running Action on framework thread (FrameworkContext: {ctx}): {member} in {file}:{line}", _framework.IsInFrameworkUpdateThread, callerMember, callerFilePath, lineNumber);
 
             await _framework.RunOnFrameworkThread(act).ContinueWith((_) => Task.CompletedTask).ConfigureAwait(false);
             while (_framework.IsInFrameworkUpdateThread) // yield the thread again, should technically never be triggered
@@ -165,7 +165,7 @@ public class DalamudUtilService : IHostedService
     {
         if (!_framework.IsInFrameworkUpdateThread)
         {
-            _logger.LogTrace("Running Func on framework thread (FrameworkContext: {ctx}): {member} in {file}:{line}", _framework.IsInFrameworkUpdateThread, callerMember, callerFilePath, lineNumber);
+            //_logger.LogTrace("Running Func on framework thread (FrameworkContext: {ctx}): {member} in {file}:{line}", _framework.IsInFrameworkUpdateThread, callerMember, callerFilePath, lineNumber);
 
             var result = await _framework.RunOnFrameworkThread(func).ContinueWith((task) => task.Result).ConfigureAwait(false);
             while (_framework.IsInFrameworkUpdateThread) // yield the thread again, should technically never be triggered

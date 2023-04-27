@@ -10,59 +10,71 @@ using System.Numerics;
 namespace MareSynchronos.Services.Mediator;
 
 #pragma warning disable MA0048 // File name must match type name
-public record SwitchToIntroUiMessage : IMessage;
-public record SwitchToMainUiMessage : IMessage;
-public record OpenSettingsUiMessage : IMessage;
-public record DalamudLoginMessage : IMessage;
-public record DalamudLogoutMessage : IMessage;
-public record FrameworkUpdateMessage : IMessage;
-public record ClassJobChangedMessage(uint? ClassJob) : IMessage;
-public record DelayedFrameworkUpdateMessage : IMessage;
-public record ZoneSwitchStartMessage : IMessage;
-public record ZoneSwitchEndMessage : IMessage;
-public record CutsceneStartMessage : IMessage;
-public record GposeStartMessage : IMessage;
-public record GposeEndMessage : IMessage;
-public record CutsceneEndMessage : IMessage;
-public record CutsceneFrameworkUpdateMessage : IMessage;
-public record ConnectedMessage(ConnectionDto Connection) : IMessage;
-public record DisconnectedMessage : IMessage;
-public record PenumbraModSettingChangedMessage : IMessage;
-public record PenumbraInitializedMessage : IMessage;
-public record PenumbraDisposedMessage : IMessage;
-public record PenumbraRedrawMessage(IntPtr Address, int ObjTblIdx, bool WasRequested) : IMessage;
-public record HeelsOffsetMessage : IMessage;
-public record PenumbraResourceLoadMessage(IntPtr GameObject, string GamePath, string FilePath) : IMessage;
-public record CustomizePlusMessage : IMessage;
-public record PalettePlusMessage(Character Character) : IMessage;
-public record HonorificMessage(string NewHonorificTitle) : IMessage;
-public record PlayerChangedMessage(API.Data.CharacterData Data) : IMessage;
-public record CharacterChangedMessage(GameObjectHandler GameObjectHandler) : IMessage;
-public record TransientResourceChangedMessage(IntPtr Address) : IMessage;
-public record AddWatchedGameObjectHandler(GameObjectHandler Handler) : IMessage;
-public record RemoveWatchedGameObjectHandler(GameObjectHandler Handler) : IMessage;
-public record HaltScanMessage(string Source) : IMessage;
-public record ResumeScanMessage(string Source) : IMessage;
+public record SwitchToIntroUiMessage : MessageBase;
+public record SwitchToMainUiMessage : MessageBase;
+public record OpenSettingsUiMessage : MessageBase;
+public record DalamudLoginMessage : MessageBase;
+public record DalamudLogoutMessage : MessageBase;
+public record FrameworkUpdateMessage : MessageBase
+{
+    public override bool KeepThreadContext => true;
+}
+public record ClassJobChangedMessage(uint? ClassJob) : MessageBase;
+public record DelayedFrameworkUpdateMessage : MessageBase
+{
+    public override bool KeepThreadContext => true;
+}
+public record ZoneSwitchStartMessage : MessageBase;
+public record ZoneSwitchEndMessage : MessageBase;
+public record CutsceneStartMessage : MessageBase;
+public record GposeStartMessage : MessageBase;
+public record GposeEndMessage : MessageBase;
+public record CutsceneEndMessage : MessageBase;
+public record CutsceneFrameworkUpdateMessage : MessageBase
+{
+    public override bool KeepThreadContext => true;
+}
+public record ConnectedMessage(ConnectionDto Connection) : MessageBase;
+public record DisconnectedMessage : MessageBase;
+public record PenumbraModSettingChangedMessage : MessageBase;
+public record PenumbraInitializedMessage : MessageBase;
+public record PenumbraDisposedMessage : MessageBase;
+public record PenumbraRedrawMessage(IntPtr Address, int ObjTblIdx, bool WasRequested) : MessageBase;
+public record HeelsOffsetMessage : MessageBase;
+public record PenumbraResourceLoadMessage(IntPtr GameObject, string GamePath, string FilePath) : MessageBase
+{
+    public override bool KeepThreadContext => true;
+}
+public record CustomizePlusMessage : MessageBase;
+public record PalettePlusMessage(Character Character) : MessageBase;
+public record HonorificMessage(string NewHonorificTitle) : MessageBase;
+public record PlayerChangedMessage(API.Data.CharacterData Data) : MessageBase;
+public record CharacterChangedMessage(GameObjectHandler GameObjectHandler) : MessageBase;
+public record TransientResourceChangedMessage(IntPtr Address) : MessageBase;
+public record AddWatchedGameObjectHandler(GameObjectHandler Handler) : MessageBase;
+public record RemoveWatchedGameObjectHandler(GameObjectHandler Handler) : MessageBase;
+public record HaltScanMessage(string Source) : MessageBase;
+public record ResumeScanMessage(string Source) : MessageBase;
 public record NotificationMessage
-    (string Title, string Message, NotificationType Type, uint TimeShownOnScreen = 3000) : IMessage;
-public record CreateCacheForObjectMessage(GameObjectHandler ObjectToCreateFor) : IMessage;
-public record ClearCacheForObjectMessage(GameObjectHandler ObjectToCreateFor) : IMessage;
-public record CharacterDataCreatedMessage(API.Data.CharacterData CharacterData) : IMessage;
-public record PenumbraStartRedrawMessage(IntPtr Address) : IMessage;
-public record PenumbraEndRedrawMessage(IntPtr Address) : IMessage;
-public record HubReconnectingMessage(Exception? Exception) : IMessage;
-public record HubReconnectedMessage(string? Arg) : IMessage;
-public record HubClosedMessage(Exception? Exception) : IMessage;
-public record DownloadReadyMessage(Guid RequestId) : IMessage;
-public record DownloadStartedMessage(GameObjectHandler DownloadId, Dictionary<string, FileDownloadStatus> DownloadStatus) : IMessage;
-public record DownloadFinishedMessage(GameObjectHandler DownloadId) : IMessage;
-public record UiToggleMessage(Type UiType) : IMessage;
-public record PlayerUploadingMessage(GameObjectHandler Handler, bool IsUploading) : IMessage;
-public record ClearProfileDataMessage(UserData? UserData = null) : IMessage;
-public record CyclePauseMessage(UserData UserData) : IMessage;
-public record ProfilePopoutToggle(Pair? Pair) : IMessage;
-public record CompactUiChange(Vector2 Size, Vector2 Position) : IMessage;
-public record ProfileOpenStandaloneMessage(Pair Pair) : IMessage;
-public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : IMessage;
+    (string Title, string Message, NotificationType Type, uint TimeShownOnScreen = 3000) : MessageBase;
+public record CreateCacheForObjectMessage(GameObjectHandler ObjectToCreateFor) : MessageBase;
+public record ClearCacheForObjectMessage(GameObjectHandler ObjectToCreateFor) : MessageBase;
+public record CharacterDataCreatedMessage(API.Data.CharacterData CharacterData) : MessageBase;
+public record PenumbraStartRedrawMessage(IntPtr Address) : MessageBase;
+public record PenumbraEndRedrawMessage(IntPtr Address) : MessageBase;
+public record HubReconnectingMessage(Exception? Exception) : MessageBase;
+public record HubReconnectedMessage(string? Arg) : MessageBase;
+public record HubClosedMessage(Exception? Exception) : MessageBase;
+public record DownloadReadyMessage(Guid RequestId) : MessageBase;
+public record DownloadStartedMessage(GameObjectHandler DownloadId, Dictionary<string, FileDownloadStatus> DownloadStatus) : MessageBase;
+public record DownloadFinishedMessage(GameObjectHandler DownloadId) : MessageBase;
+public record UiToggleMessage(Type UiType) : MessageBase;
+public record PlayerUploadingMessage(GameObjectHandler Handler, bool IsUploading) : MessageBase;
+public record ClearProfileDataMessage(UserData? UserData = null) : MessageBase;
+public record CyclePauseMessage(UserData UserData) : MessageBase;
+public record ProfilePopoutToggle(Pair? Pair) : MessageBase;
+public record CompactUiChange(Vector2 Size, Vector2 Position) : MessageBase;
+public record ProfileOpenStandaloneMessage(Pair Pair) : MessageBase;
+public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : MessageBase;
 
 #pragma warning restore MA0048 // File name must match type name
