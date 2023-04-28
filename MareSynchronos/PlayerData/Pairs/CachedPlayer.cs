@@ -119,7 +119,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     public async Task Initialize(string name)
     {
         PlayerName = name;
-        _charaHandler = _gameObjectHandlerFactory(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName)?.Address ?? IntPtr.Zero, false);
+        _charaHandler = _gameObjectHandlerFactory(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName), false);
 
         _originalGlamourerData = await _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter).ConfigureAwait(false);
         _lastGlamourerData = _originalGlamourerData;
@@ -541,7 +541,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
     private async Task RevertCustomizationData(ObjectKind objectKind, string name, Guid applicationId)
     {
-        nint address = _dalamudUtil.GetPlayerCharacterFromObjectTableByName(name)?.Address ?? IntPtr.Zero;
+        nint address = _dalamudUtil.GetPlayerCharacterFromObjectTableByName(name);
         if (address == IntPtr.Zero) return;
 
         var cancelToken = new CancellationTokenSource();

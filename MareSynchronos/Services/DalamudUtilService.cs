@@ -30,6 +30,7 @@ public class DalamudUtilService : IHostedService
     private readonly List<uint> ClassJobIdsIgnoredForPets = new() { 30 };
     private uint? _classJobId = 0;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
+    private Dictionary<string, IntPtr> _playerCharas = new(StringComparer.Ordinal);
     private bool _sentBetweenAreas = false;
 
     public DalamudUtilService(ILogger<DalamudUtilService> logger, ClientState clientState, ObjectTable objectTable, Framework framework,
@@ -111,35 +112,20 @@ public class DalamudUtilService : IHostedService
         return await RunOnFrameworkThread(() => GetPetInternal(playerPointer)).ConfigureAwait(false);
     }
 
-    public PlayerCharacter? GetPlayerCharacterFromObjectTableByName(string characterName)
+    public IntPtr GetPlayerCharacterFromObjectTableByName(string characterName)
     {
-        foreach (var item in _objectTable)
-        {
-            if (item.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) continue;
-            if (string.Equals(item.Name.ToString(), characterName, StringComparison.Ordinal)) return (PlayerCharacter)item;
-        }
-
-        return null;
+        if (_playerCharas.TryGetValue(characterName, out var pchar)) return pchar;
+        return IntPtr.Zero;
     }
 
     public List<PlayerCharacter> GetPlayerCharacters()
     {
-        return _objectTable.Where(obj =>
-            obj.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player &&
-            !string.Equals(obj.Name.ToString(), PlayerName, StringComparison.Ordinal)).Cast<PlayerCharacter>().ToList();
+        return _objectTable.OfType<PlayerCharacter>().ToList();
     }
 
     public unsafe bool IsGameObjectPresent(IntPtr key)
     {
-        foreach (var obj in _objectTable)
-        {
-            if (obj.Address == key)
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return _objectTable.Any(f => f.Address == key);
     }
 
     public async Task RunOnFrameworkThread(Action act, [CallerMemberName] string callerMember = "",
@@ -261,6 +247,9 @@ public class DalamudUtilService : IHostedService
     private unsafe void FrameworkOnUpdateInternal()
     {
         if (_clientState.LocalPlayer?.IsDead ?? false) return;
+
+        _playerCharas = _objectTable.OfType<PlayerCharacter>().ToDictionary(p => p.Name.ToString(), p => p.Address, StringComparer.Ordinal);
+
         if (GposeTarget != null && !IsInGpose)
         {
             _logger.LogDebug("Gpose start");
