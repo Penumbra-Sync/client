@@ -22,6 +22,7 @@ public enum CustomTag
 public sealed class TaggedPairListVM : ImguiVM, IMediatorSubscriber, IDisposable
 {
     private readonly MareConfigService _mareConfigService;
+
     private readonly PairManager _pairManager;
     private bool _reverse = false;
     private string _uiFilter = string.Empty;
@@ -35,7 +36,9 @@ public sealed class TaggedPairListVM : ImguiVM, IMediatorSubscriber, IDisposable
         _pairManager = pairManager;
         Mediator = mediator;
         _mareConfigService = mareConfigService;
-        AllTagPairs = new(() => tagHandler.GetOtherUidsForTag(tag));
+        AllTagPairs = new(() => tagHandler.GetAllTagsSorted().Where(u => !string.Equals(u, Tag, StringComparison.Ordinal))
+            .SelectMany(u => tagHandler.GetOtherUidsForTag(u).Distinct(StringComparer.Ordinal)).ToList());
+        CurrentTagPairs = new(() => tagHandler.GetOtherUidsForTag(tag));
         Mediator.Subscribe<TagUpdateMessage>(this, (msg) =>
         {
             if (string.Equals(msg.Tag, Tag, StringComparison.Ordinal))
@@ -45,7 +48,7 @@ public sealed class TaggedPairListVM : ImguiVM, IMediatorSubscriber, IDisposable
         });
         Mediator.Subscribe<PairManagerUpdateMessage>(this, (msg) =>
         {
-            if (msg.User == null || msg.User != null && AllTagPairs.Value.Contains(msg.User.UID))
+            if (msg.User == null || msg.User != null && CurrentTagPairs.Value.Contains(msg.User.UID))
             {
                 RecreateLazy();
             }
@@ -73,9 +76,11 @@ public sealed class TaggedPairListVM : ImguiVM, IMediatorSubscriber, IDisposable
                 switch (CustomTag)
                 {
                     case CustomTag.UserTag:
-                        return AllTagPairs.Value.Contains(p.UserPair!.User.UID);
+                        return CurrentTagPairs.Value.Contains(p.UserPair!.User.UID);
 
                     case CustomTag.AllUsers:
+                        return !AllTagPairs.Value.Contains(p.UserPair!.User.UID);
+
                     case CustomTag.Offline:
                     case CustomTag.Visible:
                         return true;
@@ -129,6 +134,7 @@ public sealed class TaggedPairListVM : ImguiVM, IMediatorSubscriber, IDisposable
         TagView = tagFactory(this);
     }
 
+    public ResettableLazy<List<string>> AllTagPairs { get; }
     public CustomTag CustomTag { get; }
     public ResettableLazy<List<DrawUserPair>> DrawnUsers { get; }
     public bool IsVisible => CustomTag != CustomTag.UserTag && DrawnUsers.Value.Any() || CustomTag == CustomTag.UserTag;
@@ -141,7 +147,7 @@ public sealed class TaggedPairListVM : ImguiVM, IMediatorSubscriber, IDisposable
     public ResettableLazy<List<DrawUserPairVM>> UsersInTag { get; }
 
     public ResettableLazy<List<DrawUserPair>> VisibleUsers { get; }
-    private ResettableLazy<HashSet<string>> AllTagPairs { get; }
+    private ResettableLazy<HashSet<string>> CurrentTagPairs { get; }
 
     public void Dispose()
     {
@@ -162,10 +168,11 @@ public sealed class TaggedPairListVM : ImguiVM, IMediatorSubscriber, IDisposable
 
     private void RecreateLazy()
     {
+        AllTagPairs.Reset();
         UsersInTag.Reset();
         OfflineUsers.Reset();
         OnlineUsers.Reset();
-        AllTagPairs.Reset();
+        CurrentTagPairs.Reset();
         VisibleUsers.Reset();
         DrawnUsers.Reset();
     }
