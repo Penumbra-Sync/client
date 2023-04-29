@@ -11,7 +11,6 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
@@ -31,7 +30,7 @@ public class DalamudUtilService : IHostedService
     private readonly List<uint> ClassJobIdsIgnoredForPets = new() { 30 };
     private uint? _classJobId = 0;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
-    private Dictionary<string, IntPtr> _playerCharas = new(StringComparer.Ordinal);
+    private Dictionary<string, PlayerCharacter> _playerCharas = new(StringComparer.Ordinal);
     private bool _sentBetweenAreas = false;
 
     public DalamudUtilService(ILogger<DalamudUtilService> logger, ClientState clientState, ObjectTable objectTable, Framework framework,
@@ -113,15 +112,10 @@ public class DalamudUtilService : IHostedService
         return await RunOnFrameworkThread(() => GetPetInternal(playerPointer)).ConfigureAwait(false);
     }
 
-    public IntPtr GetPlayerCharacterFromObjectTableByName(string characterName, uint worldid)
+    public IntPtr GetPlayerCharacterFromObjectTableByIdent(string characterName)
     {
-        if (_playerCharas.TryGetValue(characterName + worldid.ToString(CultureInfo.InvariantCulture), out var pchar)) return pchar;
+        if (_playerCharas.TryGetValue(characterName, out var pchar)) return pchar.Address;
         return IntPtr.Zero;
-    }
-
-    public List<PlayerCharacter> GetPlayerCharacters()
-    {
-        return _objectTable.OfType<PlayerCharacter>().ToList();
     }
 
     public unsafe bool IsGameObjectPresent(IntPtr key)
@@ -238,7 +232,8 @@ public class DalamudUtilService : IHostedService
 
     internal PlayerCharacter? FindPlayerByNameHash(string ident)
     {
-        return _objectTable.OfType<PlayerCharacter>().FirstOrDefault(p => p.GetHash256().Equals(ident, StringComparison.Ordinal));
+        _playerCharas.TryGetValue(ident, out var result);
+        return result;
     }
 
     private void FrameworkOnUpdate(Framework framework)
@@ -250,7 +245,7 @@ public class DalamudUtilService : IHostedService
     {
         if (_clientState.LocalPlayer?.IsDead ?? false) return;
 
-        _playerCharas = _objectTable.OfType<PlayerCharacter>().ToDictionary(p => p.Name.ToString() + p.HomeWorld.Id.ToString(), p => p.Address, StringComparer.Ordinal);
+        _playerCharas = _performanceCollector.LogPerformance(this, "ObjTableToCharas", () => _objectTable.OfType<PlayerCharacter>().ToDictionary(p => p.GetHash256(), p => p, StringComparer.Ordinal));
 
         if (GposeTarget != null && !IsInGpose)
         {

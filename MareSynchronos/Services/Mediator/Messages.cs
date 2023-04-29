@@ -30,7 +30,7 @@ public record DisconnectedMessage : SameThreadMessage;
 public record PenumbraModSettingChangedMessage : MessageBase;
 public record PenumbraInitializedMessage : MessageBase;
 public record PenumbraDisposedMessage : MessageBase;
-public record PenumbraRedrawMessage(IntPtr Address, int ObjTblIdx, bool WasRequested) : MessageBase;
+public record PenumbraRedrawMessage(IntPtr Address, int ObjTblIdx, bool WasRequested) : SameThreadMessage;
 public record HeelsOffsetMessage : MessageBase;
 public record PenumbraResourceLoadMessage(IntPtr GameObject, string GamePath, string FilePath) : SameThreadMessage;
 public record CustomizePlusMessage : MessageBase;

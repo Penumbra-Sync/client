@@ -14,6 +14,7 @@ namespace MareSynchronos.PlayerData.Pairs;
 public class Pair
 {
     private readonly Func<OnlineUserIdentDto, CachedPlayer> _cachedPlayerFactory;
+    private readonly SemaphoreSlim _creationSemaphore = new(1);
     private readonly ILogger<Pair> _logger;
     private readonly MareMediator _mediator;
     private readonly ServerConfigurationManager _serverConfigurationManager;
@@ -89,19 +90,28 @@ public class Pair
 
     public void CreateCachedPlayer(OnlineUserIdentDto? dto = null)
     {
-        if (dto == null && _onlineUserIdentDto == null)
+        try
         {
-            CachedPlayer?.Dispose();
-            CachedPlayer = null;
-            return;
-        }
-        if (dto != null)
-        {
-            _onlineUserIdentDto = dto;
-        }
+            _creationSemaphore.Wait();
 
-        CachedPlayer?.Dispose();
-        CachedPlayer = _cachedPlayerFactory(_onlineUserIdentDto!);
+            if (dto == null && _onlineUserIdentDto == null)
+            {
+                CachedPlayer?.Dispose();
+                CachedPlayer = null;
+                return;
+            }
+            if (dto != null)
+            {
+                _onlineUserIdentDto = dto;
+            }
+
+            CachedPlayer?.Dispose();
+            CachedPlayer = _cachedPlayerFactory(_onlineUserIdentDto!);
+        }
+        finally
+        {
+            _creationSemaphore.Release();
+        }
     }
 
     public string? GetNote()

@@ -160,7 +160,7 @@ public sealed class MareMediator : IHostedService
     private void ExecuteSubscriber<T>(SubscriberAction subscriber, T message) where T : MessageBase
     {
         var isSameThread = message.KeepThreadContext ? "$" : string.Empty;
-        _performanceCollector.LogPerformance(this, $"{isSameThread}Execute>{message.GetType().Name}+{subscriber.Subscriber.GetType().Name}", () => ((Action<T>)subscriber.Action).Invoke(message));
+        _performanceCollector.LogPerformance(this, $"{isSameThread}Execute>{message.GetType().Name}+{subscriber.Subscriber.GetType().Name}>{subscriber.Subscriber}", () => ((Action<T>)subscriber.Action).Invoke(message));
     }
 
     private sealed class SubscriberAction

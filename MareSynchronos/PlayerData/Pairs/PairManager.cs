@@ -1,5 +1,4 @@
 ﻿using Dalamud.ContextMenu;
-using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Interface.Internal.Notifications;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Comparer;
@@ -8,7 +7,6 @@ using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
-using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 
@@ -20,7 +18,6 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     private readonly ConcurrentDictionary<GroupData, GroupFullInfoDto> _allGroups = new(GroupDataComparer.Instance);
     private readonly MareConfigService _configurationService;
     private readonly DalamudContextMenu _dalamudContextMenu;
-    private readonly Dictionary<string, Pair> _indexedPairs = new(StringComparer.Ordinal);
     private readonly Func<Pair> _pairFactory;
     private Lazy<List<Pair>> _directPairsInternal;
     private Lazy<Dictionary<GroupFullInfoDto, List<Pair>>> _groupPairsInternal;
@@ -32,7 +29,6 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         _pairFactory = pairFactory;
         _configurationService = configurationService;
         _dalamudContextMenu = dalamudContextMenu;
-        Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => DalamudUtilOnDelayedFrameworkUpdate());
         Mediator.Subscribe<DisconnectedMessage>(this, (_) => ClearPairs());
         Mediator.Subscribe<CutsceneEndMessage>(this, (_) => ReapplyPairData());
         _directPairsInternal = DirectPairsLazy();
@@ -87,18 +83,6 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         _allClientPairs.Clear();
         _allGroups.Clear();
         RecreateLazy();
-    }
-
-    public List<(PlayerCharacter Character, Pair Pair)> FindAllPairs(List<PlayerCharacter> playerCharacters)
-    {
-        return playerCharacters.Select(p => (p, _indexedPairs.TryGetValue(p.GetHash256(), out var pair) ? pair : null)).Where(p => p.Item2 != null).ToList()!;
-    }
-
-    public Pair? FindPair(PlayerCharacter? pChar)
-    {
-        if (pChar == null) return null;
-        var hash = pChar.GetHash256();
-        return _allClientPairs.Values.FirstOrDefault(f => string.Equals(hash, f.GetPlayerNameHash()));
     }
 
     public List<Pair> GetOnlineUserPairs() => _allClientPairs.Where(p => !string.IsNullOrEmpty(p.Value.GetPlayerNameHash())).Select(p => p.Value).ToList();
@@ -338,17 +322,6 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         foreach (var pair in _allClientPairs.Where((p => p.Value.IsVisible)))
         {
             pair.Value.AddContextMenu(args);
-        }
-    }
-
-    private void DalamudUtilOnDelayedFrameworkUpdate()
-    {
-        _indexedPairs.Clear();
-        foreach (var pair in _allClientPairs.Values.Where(p => string.IsNullOrEmpty(p.PlayerName)))
-        {
-            var hash = pair.GetPlayerNameHash();
-            if (string.IsNullOrEmpty(hash)) continue;
-            _indexedPairs[hash] = pair;
         }
     }
 

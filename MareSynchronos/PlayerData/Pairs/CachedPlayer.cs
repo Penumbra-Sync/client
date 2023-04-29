@@ -78,7 +78,6 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         : ((GameObject*)_charaHandler!.Address)->ObjectID;
     public string? PlayerName { get; private set; }
     public string PlayerNameHash => OnlineUser.Ident;
-    public uint? PlayerWorld { get; private set; }
 
     public void ApplyCharacterData(CharacterData characterData, bool forced = false)
     {
@@ -157,7 +156,6 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         SetUploading(false);
         _downloadManager.Dispose();
         var name = PlayerName;
-        var world = PlayerWorld;
         Logger.LogDebug("Disposing {name} ({user})", name, OnlineUser);
         try
         {
@@ -180,7 +178,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                 {
                     try
                     {
-                        RevertCustomizationData(item.Key, name, world ?? 0, applicationId).GetAwaiter().GetResult();
+                        RevertCustomizationData(item.Key, name, applicationId).GetAwaiter().GetResult();
                     }
                     catch (InvalidOperationException ex)
                     {
@@ -469,6 +467,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                     foreach (var kind in updatedData)
                     {
                         await ApplyCustomizationData(_applicationId, kind, charaData, token).ConfigureAwait(false);
+                        token.ThrowIfCancellationRequested();
                     }
 
                     Logger.LogDebug("[{applicationId}] Application finished", _applicationId);
@@ -488,7 +487,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             var pc = _dalamudUtil.FindPlayerByNameHash(OnlineUser.Ident);
             if (pc == null) return;
             Logger.LogDebug("One-Time Initializing {this}", this);
-            Initialize(pc.Name.ToString(), pc.HomeWorld.Id);
+            Initialize(pc.Name.ToString());
             Logger.LogDebug("One-Time Initialized {this}", this);
         }
 
@@ -498,10 +497,13 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             Mediator.Publish(new CachedPlayerVisibleMessage(this));
             Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);
             _framesSinceNotVisible = 0;
-            _lastGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter).GetAwaiter().GetResult();
             if (_cachedData != null)
             {
-                Task.Run(() => ApplyCharacterData(_cachedData, true));
+                Task.Run(async () =>
+                {
+                    _lastGlamourerData = await _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter).ConfigureAwait(false);
+                    ApplyCharacterData(_cachedData, true);
+                });
             }
         }
         else if (_charaHandler?.Address == IntPtr.Zero && IsVisible)
@@ -515,11 +517,10 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
     }
 
-    private void Initialize(string name, uint worldid)
+    private void Initialize(string name)
     {
         PlayerName = name;
-        PlayerWorld = worldid;
-        _charaHandler = _gameObjectHandlerFactory(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName, worldid), false);
+        _charaHandler = _gameObjectHandlerFactory(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByIdent(OnlineUser.Ident), false);
 
         _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter).ConfigureAwait(false).GetAwaiter().GetResult();
         _lastGlamourerData = _originalGlamourerData;
@@ -589,13 +590,13 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
     }
 
-    private async Task RevertCustomizationData(ObjectKind objectKind, string name, uint world, Guid applicationId)
+    private async Task RevertCustomizationData(ObjectKind objectKind, string name, Guid applicationId)
     {
-        nint address = _dalamudUtil.GetPlayerCharacterFromObjectTableByName(name, world);
+        nint address = _dalamudUtil.GetPlayerCharacterFromObjectTableByIdent(OnlineUser.Ident);
         if (address == IntPtr.Zero) return;
 
         var cancelToken = new CancellationTokenSource();
-        cancelToken.CancelAfter(TimeSpan.FromSeconds(10));
+        cancelToken.CancelAfter(TimeSpan.FromSeconds(60));
 
         Logger.LogDebug("[{applicationId}] Reverting all Customization for {alias}/{name} {objectKind}", applicationId, OnlineUser.User.AliasOrUID, name, objectKind);
 
@@ -603,11 +604,8 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         {
             using GameObjectHandler tempHandler = _gameObjectHandlerFactory(ObjectKind.Player, () => address, false);
             CheckForNameAndThrow(tempHandler, name);
-            Logger.LogDebug("[{applicationId}] Restoring Customization for {alias}/{name}: {data}", applicationId, OnlineUser.User.AliasOrUID, name, _originalGlamourerData);
-            await _ipcManager.GlamourerApplyOnlyCustomization(Logger, tempHandler, _originalGlamourerData, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
-            CheckForNameAndThrow(tempHandler, name);
-            Logger.LogDebug("[{applicationId}] Restoring Equipment for {alias}/{name}: {data}", applicationId, OnlineUser.User.AliasOrUID, name, _lastGlamourerData);
-            await _ipcManager.GlamourerApplyOnlyEquipment(Logger, tempHandler, _lastGlamourerData, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
+            Logger.LogDebug("[{applicationId}] Restoring Customization and Equipment for {alias}/{name}: {data}", applicationId, OnlineUser.User.AliasOrUID, name, _originalGlamourerData);
+            await _ipcManager.GlamourerApplyCustomizationAndEquipment(Logger, tempHandler, _originalGlamourerData, _lastGlamourerData, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
             CheckForNameAndThrow(tempHandler, name);
             Logger.LogDebug("[{applicationId}] Restoring Heels for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             await _ipcManager.HeelsRestoreOffsetForPlayer(address).ConfigureAwait(false);
