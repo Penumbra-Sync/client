@@ -204,8 +204,8 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     {
         await _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, PlayerName!).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
-        await _ipcManager.PenumbraSetTemporaryMods(Logger, applicationId, PlayerName!,
-            _charaHandler?.GameObjectLazy?.Value.ObjectTableIndex(), moddedPaths, manipulationData).ConfigureAwait(false);
+        var objTableIndex = await _dalamudUtil.RunOnFrameworkThread(() => _charaHandler!.GameObjectLazy!.Value.ObjectTableIndex()).ConfigureAwait(false);
+        await _ipcManager.PenumbraSetTemporaryMods(Logger, applicationId, PlayerName!, objTableIndex, moddedPaths, manipulationData).ConfigureAwait(false);
         token.ThrowIfCancellationRequested();
     }
 
@@ -485,7 +485,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         if (string.IsNullOrEmpty(PlayerName))
         {
             var pc = _dalamudUtil.FindPlayerByNameHash(OnlineUser.Ident);
-            if (pc == null) return;
+            if (pc == default((string, nint))) return;
             Logger.LogDebug("One-Time Initializing {this}", this);
             Initialize(pc.Name.ToString());
             Logger.LogDebug("One-Time Initialized {this}", this);

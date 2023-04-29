@@ -146,9 +146,6 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
     {
         Logger.LogDebug("Downloading files for {id}", gameObjectHandler.Name);
 
-        // force create lazy
-        _ = gameObjectHandler.GameObjectLazy.Value;
-
         List<DownloadFileDto> downloadFileInfoFromService = new();
         downloadFileInfoFromService.AddRange(await FilesGetSizes(fileReplacement.Select(f => f.Hash).ToList(), ct).ConfigureAwait(false));
 

@@ -171,9 +171,9 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public async Task CustomizePlusRevert(IntPtr character)
     {
         if (!CheckCustomizePlusApi()) return;
-        await _dalamudUtil.RunOnFrameworkThread(() =>
+        await _dalamudUtil.RunOnFrameworkThread(async () =>
         {
-            var gameObj = _dalamudUtil.CreateGameObject(character);
+            var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(true);
             if (gameObj is Character c)
             {
                 Logger.LogTrace("CustomizePlus reverting for {chara}", c.Address.ToString("X"));
@@ -185,9 +185,9 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public async Task CustomizePlusSetBodyScale(IntPtr character, string scale)
     {
         if (!CheckCustomizePlusApi() || string.IsNullOrEmpty(scale)) return;
-        await _dalamudUtil.RunOnFrameworkThread(() =>
+        await _dalamudUtil.RunOnFrameworkThread(async () =>
         {
-            var gameObj = _dalamudUtil.CreateGameObject(character);
+            var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(true);
             if (gameObj is Character c)
             {
                 string decodedScale = Encoding.UTF8.GetString(Convert.FromBase64String(scale));
@@ -217,7 +217,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         try
         {
             await _glamourerApplicationSemaphore.WaitAsync().ConfigureAwait(true);
-            var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
+            var gameObj = await _dalamudUtil.CreateGameObject(handler.Address).ConfigureAwait(false);
             if (gameObj is Character c)
             {
                 await PenumbraRedrawAsync(logger, handler, applicationId, () => _glamourerApplyAll!.InvokeAction(customization, c), fireAndForget, token).ConfigureAwait(false);
@@ -235,10 +235,10 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         try
         {
             await _glamourerApplicationSemaphore.WaitAsync().ConfigureAwait(false);
-            var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
+            var gameObj = await _dalamudUtil.CreateGameObject(handler.Address).ConfigureAwait(false);
             if (gameObj is Character c)
             {
-                await PenumbraRedrawAsync(logger, handler, applicationid, () => _glamourerApplyOnlyEquipment!.InvokeAction(customization, c), fireAndForget, token).ConfigureAwait(false);
+                await PenumbraRedrawAsync(logger, handler, applicationid, () => _glamourerApplyOnlyCustomization!.InvokeAction(customization, c), fireAndForget, token).ConfigureAwait(false);
                 await PenumbraRedrawAsync(logger, handler, applicationid, () => _glamourerApplyOnlyEquipment!.InvokeAction(equipment, c), fireAndForget, token).ConfigureAwait(false);
             }
         }
@@ -253,7 +253,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         if (!CheckGlamourerApi()) return string.Empty;
         try
         {
-            var gameObj = _dalamudUtil.CreateGameObject(character);
+            var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(false);
             if (gameObj is Character c)
             {
                 var glamourerString = await _dalamudUtil.RunOnFrameworkThread(() => _glamourerGetAllCustomization!.InvokeFunc(c)).ConfigureAwait(false);
@@ -274,9 +274,9 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public async Task HeelsRestoreOffsetForPlayer(IntPtr character)
     {
         if (!CheckHeelsApi()) return;
-        await _dalamudUtil.RunOnFrameworkThread(() =>
+        await _dalamudUtil.RunOnFrameworkThread(async () =>
         {
-            var gameObj = _dalamudUtil.CreateGameObject(character);
+            var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(true);
             if (gameObj != null)
             {
                 Logger.LogTrace("Restoring Heels data to {chara}", character.ToString("X"));
@@ -288,9 +288,9 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public async Task HeelsSetOffsetForPlayer(IntPtr character, float offset)
     {
         if (!CheckHeelsApi()) return;
-        await _dalamudUtil.RunOnFrameworkThread(() =>
+        await _dalamudUtil.RunOnFrameworkThread(async () =>
         {
-            var gameObj = _dalamudUtil.CreateGameObject(character);
+            var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(true);
             if (gameObj != null)
             {
                 Logger.LogTrace("Applying Heels data to {chara}", character.ToString("X"));
@@ -302,9 +302,9 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public async Task HonorificClearTitle(nint character)
     {
         if (!CheckHonorificApi()) return;
-        await _dalamudUtil.RunOnFrameworkThread(() =>
+        await _dalamudUtil.RunOnFrameworkThread(async () =>
         {
-            var gameObj = _dalamudUtil.CreateGameObject(character);
+            var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(true);
             if (gameObj is PlayerCharacter c)
             {
                 Logger.LogTrace("Honorific removing for {addr}", c.Address.ToString("X"));
@@ -323,10 +323,10 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public async Task HonorificSetTitle(IntPtr character, string honorificData)
     {
         if (!CheckHonorificApi()) return;
-        await _dalamudUtil.RunOnFrameworkThread(() =>
+        await _dalamudUtil.RunOnFrameworkThread(async () =>
         {
             Logger.LogTrace("Applying Honorific data to {chara}", character.ToString("X"));
-            var gameObj = _dalamudUtil.CreateGameObject(character);
+            var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(true);
             if (gameObj is PlayerCharacter pc)
             {
                 if (string.IsNullOrEmpty(honorificData))
@@ -352,9 +352,9 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public async Task PalettePlusRemovePalette(IntPtr character)
     {
         if (!CheckPalettePlusApi()) return;
-        await _dalamudUtil.RunOnFrameworkThread(() =>
+        await _dalamudUtil.RunOnFrameworkThread(async () =>
         {
-            var gameObj = _dalamudUtil.CreateGameObject(character);
+            var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(true);
             if (gameObj is Character c)
             {
                 Logger.LogTrace("PalettePlus removing for {addr}", c.Address.ToString("X"));
@@ -366,9 +366,9 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public async Task PalettePlusSetPalette(IntPtr character, string palette)
     {
         if (!CheckPalettePlusApi()) return;
-        await _dalamudUtil.RunOnFrameworkThread(() =>
+        await _dalamudUtil.RunOnFrameworkThread(async () =>
         {
-            var gameObj = _dalamudUtil.CreateGameObject(character);
+            var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(true);
             if (gameObj is Character c)
             {
                 string decodedPalette = Encoding.UTF8.GetString(Convert.FromBase64String(palette));
@@ -398,7 +398,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         if (!CheckPenumbraApi() || _dalamudUtil.IsZoning) return;
         await _dalamudUtil.RunOnFrameworkThread(async () =>
         {
-            var gameObj = _dalamudUtil.CreateGameObject(handler.Address);
+            var gameObj = await _dalamudUtil.CreateGameObject(handler.Address).ConfigureAwait(true);
             if (gameObj is Character c)
             {
                 await PenumbraRedrawAsync(logger, handler, applicationId, () => _penumbraRedrawObject!.Invoke(c, RedrawType.Redraw), fireAndForget, token).ConfigureAwait(false);
@@ -626,7 +626,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
     private void OnHonorificLocalCharacterTitleChanged(string title, bool isPrefix)
     {
-        Mediator.Publish(new HonorificMessage((isPrefix ? 0 : 1) + title));
+        Mediator.Publish(new HonorificMessage((isPrefix ? 1 : 0) + title));
     }
 
     private void OnPalettePlusPaletteChange(Character character, string palette)

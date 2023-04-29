@@ -164,7 +164,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             Address = curPtr;
             if (addrDiff)
             {
-                GameObjectLazy = new(() => _dalamudUtil.CreateGameObject(curPtr));
+                GameObjectLazy = new(() => _dalamudUtil.CreateGameObject(curPtr).GetAwaiter().GetResult());
             }
             var chara = (Character*)curPtr;
             var name = new ByteString(chara->GameObject.Name).ToString();

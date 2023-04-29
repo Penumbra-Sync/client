@@ -30,7 +30,7 @@ public class DalamudUtilService : IHostedService
     private readonly List<uint> ClassJobIdsIgnoredForPets = new() { 30 };
     private uint? _classJobId = 0;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
-    private Dictionary<string, PlayerCharacter> _playerCharas = new(StringComparer.Ordinal);
+    private Dictionary<string, (string Name, nint Address)> _playerCharas = new(StringComparer.Ordinal);
     private bool _sentBetweenAreas = false;
 
     public DalamudUtilService(ILogger<DalamudUtilService> logger, ClientState clientState, ObjectTable objectTable, Framework framework,
@@ -77,9 +77,9 @@ public class DalamudUtilService : IHostedService
         return obj != null && obj.IsValid();
     }
 
-    public Dalamud.Game.ClientState.Objects.Types.GameObject? CreateGameObject(IntPtr reference)
+    public async Task<Dalamud.Game.ClientState.Objects.Types.GameObject?> CreateGameObject(IntPtr reference)
     {
-        return _objectTable.CreateObjectReference(reference);
+        return await RunOnFrameworkThread(() => _objectTable.CreateObjectReference(reference)).ConfigureAwait(false);
     }
 
     public Dalamud.Game.ClientState.Objects.Types.Character? GetCharacterFromObjectTableByIndex(int index)
@@ -92,12 +92,6 @@ public class DalamudUtilService : IHostedService
     public async Task<IntPtr> GetCompanion(IntPtr? playerPointer = null)
     {
         return await RunOnFrameworkThread(() => GetCompanionInternal(playerPointer)).ConfigureAwait(false);
-    }
-
-    public unsafe IntPtr GetMinion(IntPtr? playerPointer = null)
-    {
-        playerPointer ??= PlayerPointer;
-        return (IntPtr)((Character*)playerPointer)->CompanionObject;
     }
 
     public unsafe IntPtr GetMinionOrMount(IntPtr? playerPointer = null)
@@ -230,7 +224,7 @@ public class DalamudUtilService : IHostedService
         return _gameGui.WorldToScreen(obj.Position, out var screenPos) ? screenPos : Vector2.Zero;
     }
 
-    internal PlayerCharacter? FindPlayerByNameHash(string ident)
+    internal (string Name, nint Address) FindPlayerByNameHash(string ident)
     {
         _playerCharas.TryGetValue(ident, out var result);
         return result;
@@ -245,7 +239,7 @@ public class DalamudUtilService : IHostedService
     {
         if (_clientState.LocalPlayer?.IsDead ?? false) return;
 
-        _playerCharas = _performanceCollector.LogPerformance(this, "ObjTableToCharas", () => _objectTable.OfType<PlayerCharacter>().ToDictionary(p => p.GetHash256(), p => p, StringComparer.Ordinal));
+        _playerCharas = _performanceCollector.LogPerformance(this, "ObjTableToCharas", () => _objectTable.OfType<PlayerCharacter>().ToDictionary(p => p.GetHash256(), p => (p.Name.ToString(), p.Address), StringComparer.Ordinal));
 
         if (GposeTarget != null && !IsInGpose)
         {
