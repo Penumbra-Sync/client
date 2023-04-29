@@ -1,11 +1,9 @@
 ﻿using Dalamud.ContextMenu;
-using Dalamud.Utility;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
-using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Utils;
@@ -16,20 +14,17 @@ namespace MareSynchronos.PlayerData.Pairs;
 public class Pair
 {
     private readonly Func<OnlineUserIdentDto, CachedPlayer> _cachedPlayerFactory;
-    private readonly MareConfigService _configService;
     private readonly ILogger<Pair> _logger;
     private readonly MareMediator _mediator;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private OnlineUserIdentDto? _onlineUserIdentDto = null;
-    private OptionalPluginWarning? _pluginWarnings;
 
     public Pair(ILogger<Pair> logger, Func<OnlineUserIdentDto, CachedPlayer> cachedPlayerFactory,
-        MareMediator mediator, MareConfigService configService, ServerConfigurationManager serverConfigurationManager)
+        MareMediator mediator, ServerConfigurationManager serverConfigurationManager)
     {
         _logger = logger;
         _cachedPlayerFactory = cachedPlayerFactory;
         _mediator = mediator;
-        _configService = configService;
         _serverConfigurationManager = serverConfigurationManager;
     }
 
@@ -41,7 +36,7 @@ public class Pair
     public bool IsPaused => UserPair != null && UserPair.OtherPermissions.IsPaired() ? UserPair.OtherPermissions.IsPaused() || UserPair.OwnPermissions.IsPaused()
             : GroupPair.All(p => p.Key.GroupUserPermissions.IsPaused() || p.Value.GroupUserPermissions.IsPaused());
 
-    public bool IsVisible => CachedPlayer?.PlayerName != null;
+    public bool IsVisible => CachedPlayer?.IsVisible ?? false;
     public CharacterData? LastReceivedCharacterData { get; set; }
     public string? PlayerName => CachedPlayer?.PlayerName ?? string.Empty;
 
@@ -79,8 +74,6 @@ public class Pair
     {
         if (CachedPlayer == null) throw new InvalidOperationException("CachedPlayer not initialized");
 
-        if (string.Equals(LastReceivedCharacterData?.DataHash.Value, data.CharaData.DataHash.Value, StringComparison.Ordinal)) return;
-
         LastReceivedCharacterData = data.CharaData;
 
         ApplyLastReceivedData();
@@ -91,71 +84,10 @@ public class Pair
         if (CachedPlayer == null) return;
         if (LastReceivedCharacterData == null) return;
 
-        _pluginWarnings ??= new()
-        {
-            ShownCustomizePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
-            ShownHeelsWarning = _configService.Current.DisableOptionalPluginWarnings,
-            ShownPalettePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
-            ShownHonorificWarning = _configService.Current.DisableOptionalPluginWarnings,
-        };
-
-        CachedPlayer.ApplyCharacterData(RemoveNotSyncedFiles(LastReceivedCharacterData.DeepClone())!, _pluginWarnings, forced);
+        CachedPlayer.ApplyCharacterData(RemoveNotSyncedFiles(LastReceivedCharacterData.DeepClone())!, forced);
     }
 
-    public string? GetNote()
-    {
-        return _serverConfigurationManager.GetNoteForUid(UserData.UID);
-    }
-
-    public string GetPlayerNameHash()
-    {
-        try
-        {
-            return CachedPlayer?.PlayerNameHash ?? string.Empty;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Error accessing PlayerNameHash, recreating CachedPlayer");
-            RecreateCachedPlayer();
-        }
-
-        return string.Empty;
-    }
-
-    public bool HasAnyConnection()
-    {
-        return UserPair != null || GroupPair.Any();
-    }
-
-    public bool InitializePair(string name)
-    {
-        if (!PlayerName.IsNullOrEmpty()) return false;
-
-        if (CachedPlayer == null) throw new InvalidOperationException("CachedPlayer not initialized");
-        _pluginWarnings ??= new()
-        {
-            ShownCustomizePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
-            ShownHeelsWarning = _configService.Current.DisableOptionalPluginWarnings,
-            ShownPalettePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
-            ShownHonorificWarning = _configService.Current.DisableOptionalPluginWarnings,
-        };
-
-        CachedPlayer.Initialize(name).Wait();
-
-        ApplyLastReceivedData();
-
-        return true;
-    }
-
-    public void MarkOffline()
-    {
-        _onlineUserIdentDto = null;
-        LastReceivedCharacterData = null;
-        CachedPlayer?.Dispose();
-        CachedPlayer = null;
-    }
-
-    public void RecreateCachedPlayer(OnlineUserIdentDto? dto = null)
+    public void CreateCachedPlayer(OnlineUserIdentDto? dto = null)
     {
         if (dto == null && _onlineUserIdentDto == null)
         {
@@ -170,6 +102,29 @@ public class Pair
 
         CachedPlayer?.Dispose();
         CachedPlayer = _cachedPlayerFactory(_onlineUserIdentDto!);
+    }
+
+    public string? GetNote()
+    {
+        return _serverConfigurationManager.GetNoteForUid(UserData.UID);
+    }
+
+    public string GetPlayerNameHash()
+    {
+        return CachedPlayer?.PlayerNameHash ?? string.Empty;
+    }
+
+    public bool HasAnyConnection()
+    {
+        return UserPair != null || GroupPair.Any();
+    }
+
+    public void MarkOffline()
+    {
+        _onlineUserIdentDto = null;
+        LastReceivedCharacterData = null;
+        CachedPlayer?.Dispose();
+        CachedPlayer = null;
     }
 
     public void SetNote(string note)

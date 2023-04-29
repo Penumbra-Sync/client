@@ -329,7 +329,6 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
     {
         _healthCheckTokenSource?.Cancel();
         Mediator.Publish(new DisconnectedMessage());
-        _pairManager.ClearPairs();
         ServerState = ServerState.Offline;
         if (arg != null)
         {

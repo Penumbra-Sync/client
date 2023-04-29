@@ -135,33 +135,32 @@ public sealed class MareMediator : IHostedService
             {
                 subscribersCopy = subscribers?.Where(s => s.Subscriber != null).ToHashSet() ?? new HashSet<SubscriberAction>();
             }
-            _performanceCollector.LogPerformance(this, $"Execute>{message.GetType().Name}", () =>
-            {
-                foreach (SubscriberAction subscriber in subscribersCopy)
-                {
-                    try
-                    {
-                        typeof(MareMediator)
-                            .GetMethod(nameof(ExecuteSubscriber), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
-                            .MakeGenericMethod(message.GetType())
-                            .Invoke(this, new object[] { subscriber, message });
-                    }
-                    catch (Exception ex)
-                    {
-                        if (_lastErrorTime.TryGetValue(subscriber, out var lastErrorTime) && lastErrorTime.Add(TimeSpan.FromSeconds(10)) > DateTime.UtcNow)
-                            continue;
 
-                        _logger.LogCritical(ex, "Error executing {type} for subscriber {subscriber}", message.GetType().Name, subscriber.Subscriber.GetType().Name);
-                        _lastErrorTime[subscriber] = DateTime.UtcNow;
-                    }
+            foreach (SubscriberAction subscriber in subscribersCopy)
+            {
+                try
+                {
+                    typeof(MareMediator)
+                        .GetMethod(nameof(ExecuteSubscriber), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
+                        .MakeGenericMethod(message.GetType())
+                        .Invoke(this, new object[] { subscriber, message });
                 }
-            });
+                catch (Exception ex)
+                {
+                    if (_lastErrorTime.TryGetValue(subscriber, out var lastErrorTime) && lastErrorTime.Add(TimeSpan.FromSeconds(10)) > DateTime.UtcNow)
+                        continue;
+
+                    _logger.LogCritical(ex, "Error executing {type} for subscriber {subscriber}", message.GetType().Name, subscriber.Subscriber.GetType().Name);
+                    _lastErrorTime[subscriber] = DateTime.UtcNow;
+                }
+            }
         }
     }
 
     private void ExecuteSubscriber<T>(SubscriberAction subscriber, T message) where T : MessageBase
     {
-        _performanceCollector.LogPerformance(this, $"Publish>{message.GetType().Name}+{subscriber.Subscriber.GetType().Name}", () => ((Action<T>)subscriber.Action).Invoke(message));
+        var isSameThread = message.KeepThreadContext ? "$" : string.Empty;
+        _performanceCollector.LogPerformance(this, $"{isSameThread}Execute>{message.GetType().Name}+{subscriber.Subscriber.GetType().Name}", () => ((Action<T>)subscriber.Action).Invoke(message));
     }
 
     private sealed class SubscriberAction

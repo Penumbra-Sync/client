@@ -15,36 +15,24 @@ public record SwitchToMainUiMessage : MessageBase;
 public record OpenSettingsUiMessage : MessageBase;
 public record DalamudLoginMessage : MessageBase;
 public record DalamudLogoutMessage : MessageBase;
-public record FrameworkUpdateMessage : MessageBase
-{
-    public override bool KeepThreadContext => true;
-}
+public record FrameworkUpdateMessage : SameThreadMessage;
 public record ClassJobChangedMessage(uint? ClassJob) : MessageBase;
-public record DelayedFrameworkUpdateMessage : MessageBase
-{
-    public override bool KeepThreadContext => true;
-}
+public record DelayedFrameworkUpdateMessage : SameThreadMessage;
 public record ZoneSwitchStartMessage : MessageBase;
 public record ZoneSwitchEndMessage : MessageBase;
 public record CutsceneStartMessage : MessageBase;
 public record GposeStartMessage : MessageBase;
 public record GposeEndMessage : MessageBase;
 public record CutsceneEndMessage : MessageBase;
-public record CutsceneFrameworkUpdateMessage : MessageBase
-{
-    public override bool KeepThreadContext => true;
-}
+public record CutsceneFrameworkUpdateMessage : SameThreadMessage;
 public record ConnectedMessage(ConnectionDto Connection) : MessageBase;
-public record DisconnectedMessage : MessageBase;
+public record DisconnectedMessage : SameThreadMessage;
 public record PenumbraModSettingChangedMessage : MessageBase;
 public record PenumbraInitializedMessage : MessageBase;
 public record PenumbraDisposedMessage : MessageBase;
 public record PenumbraRedrawMessage(IntPtr Address, int ObjTblIdx, bool WasRequested) : MessageBase;
 public record HeelsOffsetMessage : MessageBase;
-public record PenumbraResourceLoadMessage(IntPtr GameObject, string GamePath, string FilePath) : MessageBase
-{
-    public override bool KeepThreadContext => true;
-}
+public record PenumbraResourceLoadMessage(IntPtr GameObject, string GamePath, string FilePath) : SameThreadMessage;
 public record CustomizePlusMessage : MessageBase;
 public record PalettePlusMessage(Character Character) : MessageBase;
 public record HonorificMessage(string NewHonorificTitle) : MessageBase;
@@ -76,5 +64,6 @@ public record ProfilePopoutToggle(Pair? Pair) : MessageBase;
 public record CompactUiChange(Vector2 Size, Vector2 Position) : MessageBase;
 public record ProfileOpenStandaloneMessage(Pair Pair) : MessageBase;
 public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : MessageBase;
+public record CachedPlayerVisibleMessage(CachedPlayer Player) : MessageBase;
 
 #pragma warning restore MA0048 // File name must match type name

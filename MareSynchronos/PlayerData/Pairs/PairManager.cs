@@ -1,7 +1,6 @@
 ﻿using Dalamud.ContextMenu;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Interface.Internal.Notifications;
-using Dalamud.Utility;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.API.Data.Extensions;
@@ -33,7 +32,6 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         _pairFactory = pairFactory;
         _configurationService = configurationService;
         _dalamudContextMenu = dalamudContextMenu;
-        Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) => DalamudUtilOnZoneSwitched());
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => DalamudUtilOnDelayedFrameworkUpdate());
         Mediator.Subscribe<DisconnectedMessage>(this, (_) => ClearPairs());
         Mediator.Subscribe<CutsceneEndMessage>(this, (_) => ReapplyPairData());
@@ -105,7 +103,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
 
     public List<Pair> GetOnlineUserPairs() => _allClientPairs.Where(p => !string.IsNullOrEmpty(p.Value.GetPlayerNameHash())).Select(p => p.Value).ToList();
 
-    public List<UserData> GetVisibleUsers() => _allClientPairs.Where(p => p.Value.HasCachedPlayer).Select(p => p.Key).ToList();
+    public List<UserData> GetVisibleUsers() => _allClientPairs.Where(p => p.Value.IsVisible).Select(p => p.Key).ToList();
 
     public void MarkPairOffline(UserData user)
     {
@@ -139,7 +137,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
             Mediator.Publish(new NotificationMessage("User online", msg, NotificationType.Info, 5000));
         }
 
-        pair.RecreateCachedPlayer(dto);
+        pair.CreateCachedPlayer(dto);
         RecreateLazy();
     }
 
@@ -147,15 +145,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     {
         if (!_allClientPairs.ContainsKey(dto.User)) throw new InvalidOperationException("No user found for " + dto.User);
 
-        var pair = _allClientPairs[dto.User];
-        if (!pair.PlayerName.IsNullOrEmpty())
-        {
-            pair.ApplyData(dto);
-        }
-        else
-        {
-            _allClientPairs[dto.User].LastReceivedCharacterData = dto.CharaData;
-        }
+        _allClientPairs[dto.User].ApplyData(dto);
     }
 
     public void RemoveGroup(GroupData data)
@@ -360,32 +350,16 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
             if (string.IsNullOrEmpty(hash)) continue;
             _indexedPairs[hash] = pair;
         }
-
-        foreach (Pair pair in _allClientPairs.Select(p => p.Value).Where(p => p.HasCachedPlayer).ToList())
-        {
-            if (!pair.CachedPlayerExists)
-            {
-                pair.RecreateCachedPlayer();
-            }
-        }
-    }
-
-    private void DalamudUtilOnZoneSwitched()
-    {
-        DisposePairs(recreate: true);
     }
 
     private Lazy<List<Pair>> DirectPairsLazy() => new(() => _allClientPairs.Select(k => k.Value).Where(k => k.UserPair != null).ToList());
 
-    private void DisposePairs(bool recreate = false)
+    private void DisposePairs()
     {
         Logger.LogDebug("Disposing all Pairs");
         Parallel.ForEach(_allClientPairs, item =>
         {
-            if (recreate)
-                item.Value.RecreateCachedPlayer();
-            else
-                item.Value.MarkOffline();
+            item.Value.MarkOffline();
         });
 
         RecreateLazy();

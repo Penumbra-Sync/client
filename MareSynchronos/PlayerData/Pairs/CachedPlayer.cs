@@ -5,6 +5,7 @@ using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
@@ -26,20 +27,21 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     private readonly Func<ObjectKind, Func<nint>, bool, GameObjectHandler> _gameObjectHandlerFactory;
     private readonly IpcManager _ipcManager;
     private readonly IHostApplicationLifetime _lifetime;
+    private readonly OptionalPluginWarning _pluginWarnings;
     private CancellationTokenSource? _applicationCancellationTokenSource = new();
     private Guid _applicationId;
     private Task? _applicationTask;
     private CharacterData _cachedData = new();
     private GameObjectHandler? _charaHandler;
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
+    private int _framesSinceNotVisible = 0;
     private string _lastGlamourerData = string.Empty;
     private string _originalGlamourerData = string.Empty;
-
     private CancellationTokenSource _redrawCts = new();
 
     public CachedPlayer(ILogger<CachedPlayer> logger, OnlineUserIdentDto onlineUser,
-            Func<ObjectKind, Func<nint>, bool, GameObjectHandler> gameObjectHandlerFactory,
-        IpcManager ipcManager, FileDownloadManager transferManager,
+                Func<ObjectKind, Func<nint>, bool, GameObjectHandler> gameObjectHandlerFactory,
+        IpcManager ipcManager, FileDownloadManager transferManager, MareConfigService mareConfigService,
         DalamudUtilService dalamudUtil, IHostApplicationLifetime lifetime, FileCacheManager fileDbManager, MareMediator mediator) : base(logger, mediator)
     {
         OnlineUser = onlineUser;
@@ -49,6 +51,14 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         _dalamudUtil = dalamudUtil;
         _lifetime = lifetime;
         _fileDbManager = fileDbManager;
+        Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
+        _pluginWarnings ??= new()
+        {
+            ShownCustomizePlusWarning = mareConfigService.Current.DisableOptionalPluginWarnings,
+            ShownHeelsWarning = mareConfigService.Current.DisableOptionalPluginWarnings,
+            ShownPalettePlusWarning = mareConfigService.Current.DisableOptionalPluginWarnings,
+            ShownHonorificWarning = mareConfigService.Current.DisableOptionalPluginWarnings,
+        };
     }
 
     private enum PlayerChanges
@@ -56,28 +66,34 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         Heels = 1,
         Customize = 2,
         Palette = 3,
-        Mods = 4,
-        Honorific = 5,
+        Honorific = 4,
+        Mods = 5,
     }
 
+    public bool IsVisible { get; private set; }
+    public OnlineUserIdentDto OnlineUser { get; private set; }
     public IntPtr PlayerCharacter => _charaHandler?.Address ?? IntPtr.Zero;
-
     public unsafe uint PlayerCharacterId => (_charaHandler?.Address ?? IntPtr.Zero) == IntPtr.Zero
         ? uint.MaxValue
-        : ((GameObject*)_charaHandler.Address)->ObjectID;
-
+        : ((GameObject*)_charaHandler!.Address)->ObjectID;
     public string? PlayerName { get; private set; }
     public string PlayerNameHash => OnlineUser.Ident;
-    private OnlineUserIdentDto OnlineUser { get; set; }
+    public uint? PlayerWorld { get; private set; }
 
-    public void ApplyCharacterData(CharacterData characterData, OptionalPluginWarning warning, bool forced = false)
+    public void ApplyCharacterData(CharacterData characterData, bool forced = false)
     {
+        if (_charaHandler == null)
+        {
+            _cachedData = characterData;
+            return;
+        }
+
         SetUploading(false);
 
         Logger.LogDebug("Received data for {player}", this);
+        Logger.LogDebug("Hash for data is {newHash}, current cache hash is {oldHash}", characterData.DataHash.Value, _cachedData.DataHash.Value);
 
         Logger.LogDebug("Checking for files to download for player {name}", this);
-        Logger.LogDebug("Hash for data is {newHash}, current cache hash is {oldHash}", characterData.DataHash.Value, _cachedData.DataHash.Value);
 
         if (!_ipcManager.CheckPenumbraApi()) return;
         if (!_ipcManager.CheckGlamourerApi()) return;
@@ -94,7 +110,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
         if (charaDataToUpdate.TryGetValue(ObjectKind.Player, out var playerChanges))
         {
-            NotifyForMissingPlugins(playerChanges, warning);
+            NotifyForMissingPlugins(playerChanges);
         }
 
         Logger.LogDebug("Downloading and applying character for {name}", this);
@@ -114,28 +130,6 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
 
         return true;
-    }
-
-    public async Task Initialize(string name)
-    {
-        PlayerName = name;
-        _charaHandler = _gameObjectHandlerFactory(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName), false);
-
-        _originalGlamourerData = await _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter).ConfigureAwait(false);
-        _lastGlamourerData = _originalGlamourerData;
-        Mediator.Subscribe<PenumbraRedrawMessage>(this, IpcManagerOnPenumbraRedrawEvent);
-        Mediator.Subscribe<CharacterChangedMessage>(this, async (msg) =>
-        {
-            if (msg.GameObjectHandler == _charaHandler && (_applicationTask?.IsCompleted ?? true))
-            {
-                Logger.LogTrace("Saving new Glamourer Data for {this}", this);
-                _lastGlamourerData = await _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter).ConfigureAwait(false);
-            }
-        });
-
-        _downloadManager.Initialize();
-
-        Logger.LogDebug("Initializing Player {obj}", this);
     }
 
     public override string ToString()
@@ -163,6 +157,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         SetUploading(false);
         _downloadManager.Dispose();
         var name = PlayerName;
+        var world = PlayerWorld;
         Logger.LogDebug("Disposing {name} ({user})", name, OnlineUser);
         try
         {
@@ -185,7 +180,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                 {
                     try
                     {
-                        RevertCustomizationData(item.Key, name, applicationId).GetAwaiter().GetResult();
+                        RevertCustomizationData(item.Key, name, world ?? 0, applicationId).GetAwaiter().GetResult();
                     }
                     catch (InvalidOperationException ex)
                     {
@@ -414,7 +409,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                     Logger.LogDebug("Downloading missing files for player {name}, {kind}", PlayerName, updatedData);
                     if (toDownloadReplacements.Any())
                     {
-                        await _downloadManager.DownloadFiles(_charaHandler, toDownloadReplacements, downloadToken).ConfigureAwait(false);
+                        await _downloadManager.DownloadFiles(_charaHandler!, toDownloadReplacements, downloadToken).ConfigureAwait(false);
                         _downloadManager.CancelDownload();
                     }
 
@@ -486,6 +481,61 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }, downloadToken);
     }
 
+    private void FrameworkUpdate()
+    {
+        if (string.IsNullOrEmpty(PlayerName))
+        {
+            var pc = _dalamudUtil.FindPlayerByNameHash(OnlineUser.Ident);
+            if (pc == null) return;
+            Logger.LogDebug("One-Time Initializing {this}", this);
+            Initialize(pc.Name.ToString(), pc.HomeWorld.Id);
+            Logger.LogDebug("One-Time Initialized {this}", this);
+        }
+
+        if (_charaHandler?.Address != IntPtr.Zero && !IsVisible)
+        {
+            IsVisible = true;
+            Mediator.Publish(new CachedPlayerVisibleMessage(this));
+            Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);
+            _framesSinceNotVisible = 0;
+            _lastGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter).GetAwaiter().GetResult();
+            if (_cachedData != null)
+            {
+                Task.Run(() => ApplyCharacterData(_cachedData, true));
+            }
+        }
+        else if (_charaHandler?.Address == IntPtr.Zero && IsVisible)
+        {
+            _framesSinceNotVisible++;
+            if (_framesSinceNotVisible > 30)
+            {
+                IsVisible = false;
+                Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);
+            }
+        }
+    }
+
+    private void Initialize(string name, uint worldid)
+    {
+        PlayerName = name;
+        PlayerWorld = worldid;
+        _charaHandler = _gameObjectHandlerFactory(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByName(PlayerName, worldid), false);
+
+        _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter).ConfigureAwait(false).GetAwaiter().GetResult();
+        _lastGlamourerData = _originalGlamourerData;
+        Mediator.Subscribe<PenumbraRedrawMessage>(this, IpcManagerOnPenumbraRedrawEvent);
+        Mediator.Subscribe<CharacterChangedMessage>(this, async (msg) =>
+        {
+            if (msg.GameObjectHandler == _charaHandler && (_applicationTask?.IsCompleted ?? true))
+            {
+                Logger.LogTrace("Saving new Glamourer Data for {this}", this);
+                _lastGlamourerData = await _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter).ConfigureAwait(false);
+            }
+        });
+
+        _downloadManager.Initialize();
+    }
+
     private void IpcManagerOnPenumbraRedrawEvent(PenumbraRedrawMessage msg)
     {
         var player = _dalamudUtil.GetCharacterFromObjectTableByIndex(msg.ObjTblIdx);
@@ -505,30 +555,30 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }, token);
     }
 
-    private void NotifyForMissingPlugins(HashSet<PlayerChanges> changes, OptionalPluginWarning warning)
+    private void NotifyForMissingPlugins(HashSet<PlayerChanges> changes)
     {
         List<string> missingPluginsForData = new();
-        if (changes.Contains(PlayerChanges.Heels) && !warning.ShownHeelsWarning && !_ipcManager.CheckHeelsApi())
+        if (changes.Contains(PlayerChanges.Heels) && !_pluginWarnings.ShownHeelsWarning && !_ipcManager.CheckHeelsApi())
         {
             missingPluginsForData.Add("Heels");
-            warning.ShownHeelsWarning = true;
+            _pluginWarnings.ShownHeelsWarning = true;
         }
-        if (changes.Contains(PlayerChanges.Customize) && !warning.ShownCustomizePlusWarning && !_ipcManager.CheckCustomizePlusApi())
+        if (changes.Contains(PlayerChanges.Customize) && !_pluginWarnings.ShownCustomizePlusWarning && !_ipcManager.CheckCustomizePlusApi())
         {
             missingPluginsForData.Add("Customize+");
-            warning.ShownCustomizePlusWarning = true;
+            _pluginWarnings.ShownCustomizePlusWarning = true;
         }
 
-        if (changes.Contains(PlayerChanges.Palette) && !warning.ShownPalettePlusWarning && !_ipcManager.CheckPalettePlusApi())
+        if (changes.Contains(PlayerChanges.Palette) && !_pluginWarnings.ShownPalettePlusWarning && !_ipcManager.CheckPalettePlusApi())
         {
             missingPluginsForData.Add("Palette+");
-            warning.ShownPalettePlusWarning = true;
+            _pluginWarnings.ShownPalettePlusWarning = true;
         }
 
-        if (changes.Contains(PlayerChanges.Honorific) && !warning.ShownHonorificWarning && !_ipcManager.CheckHonorificApi())
+        if (changes.Contains(PlayerChanges.Honorific) && !_pluginWarnings.ShownHonorificWarning && !_ipcManager.CheckHonorificApi())
         {
             missingPluginsForData.Add("Honorific");
-            warning.ShownHonorificWarning = true;
+            _pluginWarnings.ShownHonorificWarning = true;
         }
 
         if (missingPluginsForData.Any())
@@ -539,9 +589,9 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
     }
 
-    private async Task RevertCustomizationData(ObjectKind objectKind, string name, Guid applicationId)
+    private async Task RevertCustomizationData(ObjectKind objectKind, string name, uint world, Guid applicationId)
     {
-        nint address = _dalamudUtil.GetPlayerCharacterFromObjectTableByName(name);
+        nint address = _dalamudUtil.GetPlayerCharacterFromObjectTableByName(name, world);
         if (address == IntPtr.Zero) return;
 
         var cancelToken = new CancellationTokenSource();

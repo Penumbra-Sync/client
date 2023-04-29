@@ -55,7 +55,7 @@ public class PlayerDataFactory
             pointerIsZero = playerRelatedObject.Address == IntPtr.Zero;
             try
             {
-                pointerIsZero = await CheckForNullDrawObject(playerRelatedObject.Address);
+                pointerIsZero = await CheckForNullDrawObject(playerRelatedObject.Address).ConfigureAwait(false);
             }
             catch
             {
@@ -99,16 +99,6 @@ public class PlayerDataFactory
 
         previousData.FileReplacements = previousFileReplacements;
         previousData.GlamourerString = previousGlamourerData;
-    }
-
-    private async Task<bool> CheckForNullDrawObject(IntPtr playerPointer)
-    {
-        return await _dalamudUtil.RunOnFrameworkThread(() => CheckForNullDrawObjectUnsafe(playerPointer));
-    }
-
-    private unsafe bool CheckForNullDrawObjectUnsafe(IntPtr playerPointer)
-    {
-        return ((Character*)playerPointer)->GameObject.DrawObject == null;
     }
 
     private unsafe void AddPlayerSpecificReplacements(Human* human, HashSet<string> forwardResolve, HashSet<string> reverseResolve)
@@ -297,6 +287,16 @@ public class PlayerDataFactory
         return (forwardResolve, reverseResolve);
     }
 
+    private async Task<bool> CheckForNullDrawObject(IntPtr playerPointer)
+    {
+        return await _dalamudUtil.RunOnFrameworkThread(() => CheckForNullDrawObjectUnsafe(playerPointer)).ConfigureAwait(false);
+    }
+
+    private unsafe bool CheckForNullDrawObjectUnsafe(IntPtr playerPointer)
+    {
+        return ((Character*)playerPointer)->GameObject.DrawObject == null;
+    }
+
     private async Task<CharacterData> CreateCharacterData(CharacterData previousData, GameObjectHandler playerRelatedObject, CancellationToken token)
     {
         var objectKind = playerRelatedObject.ObjectKind;
@@ -326,7 +326,7 @@ public class PlayerDataFactory
         Stopwatch st = Stopwatch.StartNew();
 
         // gather static replacements from render model
-        var (forwardResolve, reverseResolve) = await _dalamudUtil.RunOnFrameworkThread(() => BuildDataFromModel(objectKind, charaPointer, token));
+        var (forwardResolve, reverseResolve) = await _dalamudUtil.RunOnFrameworkThread(() => BuildDataFromModel(objectKind, charaPointer, token)).ConfigureAwait(false);
         Dictionary<string, List<string>> resolvedPaths = await GetFileReplacementsFromPaths(forwardResolve, reverseResolve).ConfigureAwait(false);
         previousData.FileReplacements[objectKind] =
                 new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)), FileReplacementComparer.Instance)

@@ -13,6 +13,7 @@ public class OnlinePlayerManager : DisposableMediatorSubscriberBase
     private readonly ApiController _apiController;
     private readonly DalamudUtilService _dalamudUtil;
     private readonly FileUploadManager _fileTransferManager;
+    private readonly HashSet<CachedPlayer> _newVisiblePlayers = new();
     private readonly PairManager _pairManager;
     private CharacterData? _lastSentData;
 
@@ -39,22 +40,18 @@ public class OnlinePlayerManager : DisposableMediatorSubscriberBase
                 Logger.LogDebug("Not sending data for {hash}", newData.DataHash.Value);
             }
         });
+        Mediator.Subscribe<CachedPlayerVisibleMessage>(this, (msg) => _newVisiblePlayers.Add(msg.Player));
     }
 
     private void FrameworkOnUpdate()
     {
         if (!_dalamudUtil.IsPlayerPresent || !_apiController.IsConnected) return;
 
-        var playerCharacters = _dalamudUtil.GetPlayerCharacters();
-        var chars = _pairManager.FindAllPairs(playerCharacters);
-        var newVisiblePlayers = (from pChar in chars.Where(p => p.Pair.InitializePair(p.Character.Name.ToString()))
-                                 select pChar.Pair.UserData).ToList();
-
-        if (newVisiblePlayers.Any())
-        {
-            Logger.LogTrace("Has new visible players, pushing character data");
-            PushCharacterData(newVisiblePlayers);
-        }
+        if (!_newVisiblePlayers.Any()) return;
+        var newVisiblePlayers = _newVisiblePlayers.ToList();
+        _newVisiblePlayers.Clear();
+        Logger.LogTrace("Has new visible players, pushing character data");
+        PushCharacterData(newVisiblePlayers.Select(c => c.OnlineUser.User).ToList());
     }
 
     private void PlayerManagerOnPlayerHasChanged()

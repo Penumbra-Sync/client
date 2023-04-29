@@ -98,6 +98,7 @@ public sealed class Plugin : IDalamudPlugin
                         s.GetRequiredService<Func<ObjectKind, Func<nint>, bool, GameObjectHandler>>(),
                         s.GetRequiredService<IpcManager>(),
                         s.GetRequiredService<Func<FileDownloadManager>>().Invoke(),
+                        s.GetRequiredService<MareConfigService>(),
                         s.GetRequiredService<DalamudUtilService>(),
                         s.GetRequiredService<IHostApplicationLifetime>(),
                         s.GetRequiredService<FileCacheManager>(),
@@ -107,7 +108,6 @@ public sealed class Plugin : IDalamudPlugin
                     => new Pair(s.GetRequiredService<ILogger<Pair>>(),
                         s.GetRequiredService<Func<OnlineUserIdentDto, CachedPlayer>>(),
                         s.GetRequiredService<MareMediator>(),
-                        s.GetRequiredService<MareConfigService>(),
                         s.GetRequiredService<ServerConfigurationManager>())));
             collection.AddSingleton(s =>
                 new Func<FileDownloadManager>(()

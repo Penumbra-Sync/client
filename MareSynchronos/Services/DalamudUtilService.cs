@@ -11,6 +11,7 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
@@ -112,9 +113,9 @@ public class DalamudUtilService : IHostedService
         return await RunOnFrameworkThread(() => GetPetInternal(playerPointer)).ConfigureAwait(false);
     }
 
-    public IntPtr GetPlayerCharacterFromObjectTableByName(string characterName)
+    public IntPtr GetPlayerCharacterFromObjectTableByName(string characterName, uint worldid)
     {
-        if (_playerCharas.TryGetValue(characterName, out var pchar)) return pchar;
+        if (_playerCharas.TryGetValue(characterName + worldid.ToString(CultureInfo.InvariantCulture), out var pchar)) return pchar;
         return IntPtr.Zero;
     }
 
@@ -133,8 +134,6 @@ public class DalamudUtilService : IHostedService
     {
         if (!_framework.IsInFrameworkUpdateThread)
         {
-            //_logger.LogTrace("Running Action on framework thread (FrameworkContext: {ctx}): {member} in {file}:{line}", _framework.IsInFrameworkUpdateThread, callerMember, callerFilePath, lineNumber);
-
             await _framework.RunOnFrameworkThread(act).ContinueWith((_) => Task.CompletedTask).ConfigureAwait(false);
             while (_framework.IsInFrameworkUpdateThread) // yield the thread again, should technically never be triggered
             {
@@ -151,8 +150,6 @@ public class DalamudUtilService : IHostedService
     {
         if (!_framework.IsInFrameworkUpdateThread)
         {
-            //_logger.LogTrace("Running Func on framework thread (FrameworkContext: {ctx}): {member} in {file}:{line}", _framework.IsInFrameworkUpdateThread, callerMember, callerFilePath, lineNumber);
-
             var result = await _framework.RunOnFrameworkThread(func).ContinueWith((task) => task.Result).ConfigureAwait(false);
             while (_framework.IsInFrameworkUpdateThread) // yield the thread again, should technically never be triggered
             {
@@ -239,6 +236,11 @@ public class DalamudUtilService : IHostedService
         return _gameGui.WorldToScreen(obj.Position, out var screenPos) ? screenPos : Vector2.Zero;
     }
 
+    internal PlayerCharacter? FindPlayerByNameHash(string ident)
+    {
+        return _objectTable.OfType<PlayerCharacter>().FirstOrDefault(p => p.GetHash256().Equals(ident, StringComparison.Ordinal));
+    }
+
     private void FrameworkOnUpdate(Framework framework)
     {
         _performanceCollector.LogPerformance(this, "FrameworkOnUpdate", FrameworkOnUpdateInternal);
@@ -248,7 +250,7 @@ public class DalamudUtilService : IHostedService
     {
         if (_clientState.LocalPlayer?.IsDead ?? false) return;
 
-        _playerCharas = _objectTable.OfType<PlayerCharacter>().ToDictionary(p => p.Name.ToString(), p => p.Address, StringComparer.Ordinal);
+        _playerCharas = _objectTable.OfType<PlayerCharacter>().ToDictionary(p => p.Name.ToString() + p.HomeWorld.Id.ToString(), p => p.Address, StringComparer.Ordinal);
 
         if (GposeTarget != null && !IsInGpose)
         {
