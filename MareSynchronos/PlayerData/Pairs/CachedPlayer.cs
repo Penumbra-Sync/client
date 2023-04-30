@@ -149,9 +149,9 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
     protected override void Dispose(bool disposing)
     {
-        if (string.IsNullOrEmpty(PlayerName)) return; // already disposed
-
         base.Dispose(disposing);
+
+        if (string.IsNullOrEmpty(PlayerName)) return; // already disposed
 
         SetUploading(false);
         _downloadManager.Dispose();
