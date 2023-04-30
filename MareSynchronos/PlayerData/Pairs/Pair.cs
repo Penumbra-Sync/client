@@ -92,9 +92,9 @@ public class Pair
     {
         try
         {
-            if (CachedPlayer != null) return;
-
             _creationSemaphore.Wait();
+
+            if (CachedPlayer != null) return;
 
             if (dto == null && _onlineUserIdentDto == null)
             {
