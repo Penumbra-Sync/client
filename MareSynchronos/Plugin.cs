@@ -9,14 +9,11 @@ using Dalamud.Game.Gui;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
-using MareSynchronos.API.Data.Enum;
-using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Export;
 using MareSynchronos.PlayerData.Factories;
-using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.PlayerData.Services;
 using MareSynchronos.Services;
@@ -70,6 +67,10 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<MarePlugin>();
             collection.AddSingleton<MareProfileManager>();
             collection.AddSingleton<UidDisplayHandler>();
+            collection.AddSingleton<GameObjectHandlerFactory>();
+            collection.AddSingleton<FileDownloadManagerFactory>();
+            collection.AddSingleton<CachedPlayerFactory>();
+            collection.AddSingleton<PairFactory>();
             collection.AddSingleton((s) => new DalamudUtilService(s.GetRequiredService<ILogger<DalamudUtilService>>(),
                 clientState, objectTable, framework, gameGui, condition, gameData,
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<PerformanceCollectorService>()));
@@ -84,37 +85,6 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton((s) => new ConfigurationMigrator(s.GetRequiredService<ILogger<ConfigurationMigrator>>(), pluginInterface));
 
             // func factory method singletons
-            collection.AddSingleton(s =>
-                new Func<ObjectKind, Func<nint>, bool, GameObjectHandler>((o, f, b)
-                    => new GameObjectHandler(s.GetRequiredService<ILogger<GameObjectHandler>>(),
-                        s.GetRequiredService<PerformanceCollectorService>(),
-                        s.GetRequiredService<MareMediator>(),
-                        s.GetRequiredService<DalamudUtilService>(),
-                        o, f, b)));
-            collection.AddSingleton(s =>
-                new Func<OnlineUserIdentDto, CachedPlayer>((o)
-                    => new CachedPlayer(s.GetRequiredService<ILogger<CachedPlayer>>(),
-                        o,
-                        s.GetRequiredService<Func<ObjectKind, Func<nint>, bool, GameObjectHandler>>(),
-                        s.GetRequiredService<IpcManager>(),
-                        s.GetRequiredService<Func<FileDownloadManager>>().Invoke(),
-                        s.GetRequiredService<MareConfigService>(),
-                        s.GetRequiredService<DalamudUtilService>(),
-                        s.GetRequiredService<IHostApplicationLifetime>(),
-                        s.GetRequiredService<FileCacheManager>(),
-                        s.GetRequiredService<MareMediator>())));
-            collection.AddSingleton(s =>
-                new Func<Pair>(()
-                    => new Pair(s.GetRequiredService<ILogger<Pair>>(),
-                        s.GetRequiredService<Func<OnlineUserIdentDto, CachedPlayer>>(),
-                        s.GetRequiredService<MareMediator>(),
-                        s.GetRequiredService<ServerConfigurationManager>())));
-            collection.AddSingleton(s =>
-                new Func<FileDownloadManager>(()
-                    => new FileDownloadManager(s.GetRequiredService<ILogger<FileDownloadManager>>(),
-                        s.GetRequiredService<MareMediator>(),
-                        s.GetRequiredService<FileTransferOrchestrator>(),
-                        s.GetRequiredService<FileCacheManager>())));
             collection.AddSingleton(s =>
                 new Func<Pair, StandaloneProfileUi>((pair) =>
                     new StandaloneProfileUi(s.GetRequiredService<ILogger<StandaloneProfileUi>>(),

@@ -4,6 +4,7 @@ using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
+using MareSynchronos.PlayerData.Factories;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Utils;
@@ -13,14 +14,14 @@ namespace MareSynchronos.PlayerData.Pairs;
 
 public class Pair
 {
-    private readonly Func<OnlineUserIdentDto, CachedPlayer> _cachedPlayerFactory;
+    private readonly CachedPlayerFactory _cachedPlayerFactory;
     private readonly SemaphoreSlim _creationSemaphore = new(1);
     private readonly ILogger<Pair> _logger;
     private readonly MareMediator _mediator;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private OnlineUserIdentDto? _onlineUserIdentDto = null;
 
-    public Pair(ILogger<Pair> logger, Func<OnlineUserIdentDto, CachedPlayer> cachedPlayerFactory,
+    public Pair(ILogger<Pair> logger, CachedPlayerFactory cachedPlayerFactory,
         MareMediator mediator, ServerConfigurationManager serverConfigurationManager)
     {
         _logger = logger;
@@ -29,7 +30,6 @@ public class Pair
         _serverConfigurationManager = serverConfigurationManager;
     }
 
-    public bool CachedPlayerExists => CachedPlayer?.CheckExistence() ?? false;
     public Dictionary<GroupFullInfoDto, GroupPairFullInfoDto> GroupPair { get; set; } = new(GroupDtoComparer.Instance);
     public bool HasCachedPlayer => CachedPlayer != null && !string.IsNullOrEmpty(CachedPlayer.PlayerName) && _onlineUserIdentDto != null;
     public bool IsOnline => CachedPlayer != null;
@@ -108,7 +108,7 @@ public class Pair
             }
 
             CachedPlayer?.Dispose();
-            CachedPlayer = _cachedPlayerFactory(_onlineUserIdentDto!);
+            CachedPlayer = _cachedPlayerFactory.Create(_onlineUserIdentDto!);
         }
         finally
         {

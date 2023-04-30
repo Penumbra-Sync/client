@@ -6,6 +6,7 @@ using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.PlayerData.Factories;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
@@ -18,11 +19,11 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     private readonly ConcurrentDictionary<GroupData, GroupFullInfoDto> _allGroups = new(GroupDataComparer.Instance);
     private readonly MareConfigService _configurationService;
     private readonly DalamudContextMenu _dalamudContextMenu;
-    private readonly Func<Pair> _pairFactory;
+    private readonly PairFactory _pairFactory;
     private Lazy<List<Pair>> _directPairsInternal;
     private Lazy<Dictionary<GroupFullInfoDto, List<Pair>>> _groupPairsInternal;
 
-    public PairManager(ILogger<PairManager> logger, Func<Pair> pairFactory,
+    public PairManager(ILogger<PairManager> logger, PairFactory pairFactory,
                 MareConfigService configurationService, MareMediator mediator,
                 DalamudContextMenu dalamudContextMenu) : base(logger, mediator)
     {
@@ -51,7 +52,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
 
     public void AddGroupPair(GroupPairFullInfoDto dto)
     {
-        if (!_allClientPairs.ContainsKey(dto.User)) _allClientPairs[dto.User] = _pairFactory.Invoke();
+        if (!_allClientPairs.ContainsKey(dto.User)) _allClientPairs[dto.User] = _pairFactory.Create();
 
         var group = _allGroups[dto.Group];
         _allClientPairs[dto.User].GroupPair[group] = dto;
@@ -62,7 +63,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     {
         if (!_allClientPairs.ContainsKey(dto.User))
         {
-            _allClientPairs[dto.User] = _pairFactory.Invoke();
+            _allClientPairs[dto.User] = _pairFactory.Create();
         }
         else
         {

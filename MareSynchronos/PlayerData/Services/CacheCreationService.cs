@@ -20,7 +20,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
     private CancellationTokenSource _honorificCts = new();
     private CancellationTokenSource _palettePlusCts = new();
 
-    public CacheCreationService(ILogger<CacheCreationService> logger, MareMediator mediator, Func<ObjectKind, Func<IntPtr>, bool, GameObjectHandler> gameObjectHandlerFactory,
+    public CacheCreationService(ILogger<CacheCreationService> logger, MareMediator mediator, GameObjectHandlerFactory gameObjectHandlerFactory,
         PlayerDataFactory characterDataFactory, DalamudUtilService dalamudUtil) : base(logger, mediator)
     {
         _characterDataFactory = characterDataFactory;
@@ -76,14 +76,14 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
             await AddPlayerCacheToCreate().ConfigureAwait(false);
         });
 
-        _playerRelatedObjects[ObjectKind.Player] =
-            gameObjectHandlerFactory(ObjectKind.Player, () => dalamudUtil.PlayerPointer, true);
-        _playerRelatedObjects[ObjectKind.MinionOrMount] =
-            gameObjectHandlerFactory(ObjectKind.MinionOrMount, () => dalamudUtil.GetMinionOrMount(), true);
-        _playerRelatedObjects[ObjectKind.Pet] =
-            gameObjectHandlerFactory(ObjectKind.Pet, () => dalamudUtil.GetPet().GetAwaiter().GetResult(), true);
-        _playerRelatedObjects[ObjectKind.Companion] =
-            gameObjectHandlerFactory(ObjectKind.Companion, () => dalamudUtil.GetCompanion().GetAwaiter().GetResult(), true);
+        _playerRelatedObjects[ObjectKind.Player] = gameObjectHandlerFactory.Create(ObjectKind.Player, () => dalamudUtil.PlayerPointer, true)
+            .GetAwaiter().GetResult();
+        _playerRelatedObjects[ObjectKind.MinionOrMount] = gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => dalamudUtil.GetMinionOrMount().GetAwaiter().GetResult(), true)
+            .GetAwaiter().GetResult();
+        _playerRelatedObjects[ObjectKind.Pet] = gameObjectHandlerFactory.Create(ObjectKind.Pet, () => dalamudUtil.GetPet().GetAwaiter().GetResult(), true)
+            .GetAwaiter().GetResult();
+        _playerRelatedObjects[ObjectKind.Companion] = gameObjectHandlerFactory.Create(ObjectKind.Companion, () => dalamudUtil.GetCompanion().GetAwaiter().GetResult(), true)
+            .GetAwaiter().GetResult();
     }
 
     protected override void Dispose(bool disposing)

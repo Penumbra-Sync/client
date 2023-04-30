@@ -84,13 +84,22 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
     public IntPtr Address { get; set; }
     public unsafe Character* Character => (Character*)Address;
-    public IntPtr CurrentAddress => _getAddress.Invoke();
     public Lazy<Dalamud.Game.ClientState.Objects.Types.GameObject?> GameObjectLazy { get; private set; }
+
     public string Name { get; private set; }
+
     public ObjectKind ObjectKind { get; }
+
     private byte[] CustomizeData { get; set; } = new byte[26];
+
     private IntPtr DrawObjectAddress { get; set; }
+
     private byte[] EquipSlotData { get; set; } = new byte[40];
+
+    public async Task<IntPtr> CurrentAddress()
+    {
+        return await _dalamudUtil.RunOnFrameworkThread(_getAddress.Invoke).ConfigureAwait(true);
+    }
 
     public async Task<bool> IsBeingDrawnRunOnFramework()
     {
@@ -99,7 +108,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             nint curPtr = IntPtr.Zero;
             try
             {
-                curPtr = CurrentAddress;
+                curPtr = CurrentAddress().GetAwaiter().GetResult();
 
                 if (curPtr == IntPtr.Zero) return true;
 
@@ -136,7 +145,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
     {
         if (_haltProcessing) return;
 
-        var curPtr = CurrentAddress;
+        var curPtr = CurrentAddress().GetAwaiter().GetResult();
         bool drawObjDiff = false;
         try
         {

@@ -12,7 +12,6 @@ using Microsoft.Extensions.Logging;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services;
-using System;
 
 namespace MareSynchronos.Interop;
 

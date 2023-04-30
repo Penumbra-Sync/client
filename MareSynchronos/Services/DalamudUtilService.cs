@@ -12,13 +12,13 @@ using MareSynchronos.Utils;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 namespace MareSynchronos.Services;
 
 public class DalamudUtilService : IHostedService
 {
+    private readonly List<uint> _classJobIdsIgnoredForPets = new() { 30 };
     private readonly ClientState _clientState;
     private readonly Condition _condition;
     private readonly Framework _framework;
@@ -27,7 +27,6 @@ public class DalamudUtilService : IHostedService
     private readonly MareMediator _mediator;
     private readonly ObjectTable _objectTable;
     private readonly PerformanceCollectorService _performanceCollector;
-    private readonly List<uint> ClassJobIdsIgnoredForPets = new() { 30 };
     private uint? _classJobId = 0;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
     private Dictionary<string, (string Name, nint Address)> _playerCharas = new(StringComparer.Ordinal);
@@ -94,11 +93,9 @@ public class DalamudUtilService : IHostedService
         return await RunOnFrameworkThread(() => GetCompanionInternal(playerPointer)).ConfigureAwait(false);
     }
 
-    public unsafe IntPtr GetMinionOrMount(IntPtr? playerPointer = null)
+    public async Task<IntPtr> GetMinionOrMount(IntPtr? playerPointer = null)
     {
-        playerPointer ??= PlayerPointer;
-        if (playerPointer == IntPtr.Zero) return IntPtr.Zero;
-        return _objectTable.GetObjectAddress(((GameObject*)playerPointer)->ObjectIndex + 1);
+        return await RunOnFrameworkThread(() => GetMinionOrMountInternal(playerPointer)).ConfigureAwait(false);
     }
 
     public async Task<IntPtr> GetPet(IntPtr? playerPointer = null)
@@ -117,8 +114,7 @@ public class DalamudUtilService : IHostedService
         return _objectTable.Any(f => f.Address == key);
     }
 
-    public async Task RunOnFrameworkThread(Action act, [CallerMemberName] string callerMember = "",
-        [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int lineNumber = 0)
+    public async Task RunOnFrameworkThread(Action act)
     {
         if (!_framework.IsInFrameworkUpdateThread)
         {
@@ -133,8 +129,7 @@ public class DalamudUtilService : IHostedService
             act();
     }
 
-    public async Task<T> RunOnFrameworkThread<T>(Func<T> func, [CallerMemberName] string callerMember = "",
-        [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int lineNumber = 0)
+    public async Task<T> RunOnFrameworkThread<T>(Func<T> func)
     {
         if (!_framework.IsInFrameworkUpdateThread)
         {
@@ -146,8 +141,8 @@ public class DalamudUtilService : IHostedService
             }
             return result;
         }
-        else
-            return func.Invoke();
+
+        return func.Invoke();
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -171,7 +166,7 @@ public class DalamudUtilService : IHostedService
 
     public async Task WaitWhileCharacterIsDrawing(ILogger logger, GameObjectHandler handler, Guid redrawId, int timeOut = 5000, CancellationToken? ct = null)
     {
-        if (!_clientState.IsLoggedIn || handler.CurrentAddress == IntPtr.Zero) return;
+        if (!_clientState.IsLoggedIn || handler.Address == IntPtr.Zero) return;
 
         logger.LogTrace("[{redrawId}] Starting wait for {handler} to draw", redrawId, handler);
 
@@ -337,9 +332,16 @@ public class DalamudUtilService : IHostedService
         return (IntPtr)mgr->LookupBuddyByOwnerObject((BattleChara*)playerPointer);
     }
 
+    private unsafe IntPtr GetMinionOrMountInternal(IntPtr? playerPointer = null)
+    {
+        playerPointer ??= PlayerPointer;
+        if (playerPointer == IntPtr.Zero) return IntPtr.Zero;
+        return _objectTable.GetObjectAddress(((GameObject*)playerPointer)->ObjectIndex + 1);
+    }
+
     private unsafe IntPtr GetPetInternal(IntPtr? playerPointer = null)
     {
-        if (ClassJobIdsIgnoredForPets.Contains(_classJobId ?? 0)) return IntPtr.Zero;
+        if (_classJobIdsIgnoredForPets.Contains(_classJobId ?? 0)) return IntPtr.Zero;
         var mgr = CharacterManager.Instance();
         playerPointer ??= PlayerPointer;
         if (playerPointer == IntPtr.Zero || (IntPtr)mgr == IntPtr.Zero) return IntPtr.Zero;
