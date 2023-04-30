@@ -239,7 +239,9 @@ public class DalamudUtilService : IHostedService
     {
         if (_clientState.LocalPlayer?.IsDead ?? false) return;
 
-        _playerCharas = _performanceCollector.LogPerformance(this, "ObjTableToCharas", () => _objectTable.OfType<PlayerCharacter>().ToDictionary(p => p.GetHash256(), p => (p.Name.ToString(), p.Address), StringComparer.Ordinal));
+        _playerCharas = _performanceCollector.LogPerformance(this, "ObjTableToCharas",
+            () => _objectTable.OfType<PlayerCharacter>().Where(o => o.ObjectIndex < 240)
+                .ToDictionary(p => p.GetHash256(), p => (p.Name.ToString(), p.Address), StringComparer.Ordinal));
 
         if (GposeTarget != null && !IsInGpose)
         {
