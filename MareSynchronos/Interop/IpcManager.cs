@@ -170,30 +170,24 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public async Task CustomizePlusRevert(IntPtr character)
     {
         if (!CheckCustomizePlusApi()) return;
-        await _dalamudUtil.RunOnFrameworkThread(async () =>
+        var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(false);
+        if (gameObj is Character c)
         {
-            var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(true);
-            if (gameObj is Character c)
-            {
-                Logger.LogTrace("CustomizePlus reverting for {chara}", c.Address.ToString("X"));
-                _customizePlusRevert!.InvokeAction(c);
-            }
-        }).ConfigureAwait(false);
+            Logger.LogTrace("CustomizePlus reverting for {chara}", c.Address.ToString("X"));
+            await _dalamudUtil.RunOnFrameworkThread(() => _customizePlusRevert!.InvokeAction(c)).ConfigureAwait(false);
+        }
     }
 
     public async Task CustomizePlusSetBodyScale(IntPtr character, string scale)
     {
         if (!CheckCustomizePlusApi() || string.IsNullOrEmpty(scale)) return;
-        await _dalamudUtil.RunOnFrameworkThread(async () =>
+        var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(false);
+        if (gameObj is Character c)
         {
-            var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(true);
-            if (gameObj is Character c)
-            {
-                string decodedScale = Encoding.UTF8.GetString(Convert.FromBase64String(scale));
-                Logger.LogTrace("CustomizePlus applying for {chara}", c.Address.ToString("X"));
-                _customizePlusSetBodyScaleToCharacter!.InvokeAction(decodedScale, c);
-            }
-        }).ConfigureAwait(false);
+            string decodedScale = Encoding.UTF8.GetString(Convert.FromBase64String(scale));
+            Logger.LogTrace("CustomizePlus applying for {chara}", c.Address.ToString("X"));
+            await _dalamudUtil.RunOnFrameworkThread(() => _customizePlusSetBodyScaleToCharacter!.InvokeAction(decodedScale, c)).ConfigureAwait(false);
+        }
     }
 
     public async Task<string> GetCustomizePlusScale()
@@ -215,11 +209,15 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization) || _dalamudUtil.IsZoning) return;
         try
         {
-            await _glamourerApplicationSemaphore.WaitAsync().ConfigureAwait(true);
+            await _glamourerApplicationSemaphore.WaitAsync(token).ConfigureAwait(false);
             var gameObj = await _dalamudUtil.CreateGameObject(handler.Address).ConfigureAwait(false);
             if (gameObj is Character c)
             {
-                await PenumbraRedrawAsync(logger, handler, applicationId, () => _glamourerApplyAll!.InvokeAction(customization, c), fireAndForget, token).ConfigureAwait(false);
+                await PenumbraRedrawAsync(logger, handler, applicationId, () =>
+                {
+                    logger.LogDebug("[{appid}] Calling on IPC: GlamourerApplyAll", applicationId);
+                    _glamourerApplyAll!.InvokeAction(customization, c);
+                }, fireAndForget).ConfigureAwait(false);
             }
         }
         finally
@@ -233,12 +231,20 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization) || _dalamudUtil.IsZoning) return;
         try
         {
-            await _glamourerApplicationSemaphore.WaitAsync().ConfigureAwait(false);
+            await _glamourerApplicationSemaphore.WaitAsync(token).ConfigureAwait(false);
             var gameObj = await _dalamudUtil.CreateGameObject(handler.Address).ConfigureAwait(false);
             if (gameObj is Character c)
             {
-                await PenumbraRedrawAsync(logger, handler, applicationid, () => _glamourerApplyOnlyCustomization!.InvokeAction(customization, c), fireAndForget, token).ConfigureAwait(false);
-                await PenumbraRedrawAsync(logger, handler, applicationid, () => _glamourerApplyOnlyEquipment!.InvokeAction(equipment, c), fireAndForget, token).ConfigureAwait(false);
+                await PenumbraRedrawAsync(logger, handler, applicationid, () =>
+                {
+                    logger.LogDebug("[{appid}] Calling on IPC: GlamourerApplyOnlyCustomization", applicationid);
+                    _glamourerApplyOnlyCustomization!.InvokeAction(customization, c);
+                }, fireAndForget).ConfigureAwait(false);
+                await PenumbraRedrawAsync(logger, handler, applicationid, () =>
+                {
+                    logger.LogDebug("[{appid}] Calling on IPC: GlamourerApplyOnlyEquipment", applicationid);
+                    _glamourerApplyOnlyEquipment!.InvokeAction(equipment, c);
+                }, fireAndForget).ConfigureAwait(false);
             }
         }
         finally
@@ -273,43 +279,34 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public async Task HeelsRestoreOffsetForPlayer(IntPtr character)
     {
         if (!CheckHeelsApi()) return;
-        await _dalamudUtil.RunOnFrameworkThread(async () =>
+        var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(false);
+        if (gameObj != null)
         {
-            var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(true);
-            if (gameObj != null)
-            {
-                Logger.LogTrace("Restoring Heels data to {chara}", character.ToString("X"));
-                _heelsUnregisterPlayer.InvokeAction(gameObj);
-            }
-        }).ConfigureAwait(false);
+            Logger.LogTrace("Restoring Heels data to {chara}", character.ToString("X"));
+            await _dalamudUtil.RunOnFrameworkThread(() => _heelsUnregisterPlayer.InvokeAction(gameObj)).ConfigureAwait(false);
+        }
     }
 
     public async Task HeelsSetOffsetForPlayer(IntPtr character, float offset)
     {
         if (!CheckHeelsApi()) return;
-        await _dalamudUtil.RunOnFrameworkThread(async () =>
+        var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(false);
+        if (gameObj != null)
         {
-            var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(true);
-            if (gameObj != null)
-            {
-                Logger.LogTrace("Applying Heels data to {chara}", character.ToString("X"));
-                _heelsRegisterPlayer.InvokeAction(gameObj, offset);
-            }
-        }).ConfigureAwait(false);
+            Logger.LogTrace("Applying Heels data to {chara}", character.ToString("X"));
+            await _dalamudUtil.RunOnFrameworkThread(() => _heelsRegisterPlayer.InvokeAction(gameObj, offset)).ConfigureAwait(false);
+        }
     }
 
     public async Task HonorificClearTitle(nint character)
     {
         if (!CheckHonorificApi()) return;
-        await _dalamudUtil.RunOnFrameworkThread(async () =>
+        var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(false);
+        if (gameObj is PlayerCharacter c)
         {
-            var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(true);
-            if (gameObj is PlayerCharacter c)
-            {
-                Logger.LogTrace("Honorific removing for {addr}", c.Address.ToString("X"));
-                _honorificClearCharacterTitle!.InvokeAction(c);
-            }
-        }).ConfigureAwait(false);
+            Logger.LogTrace("Honorific removing for {addr}", c.Address.ToString("X"));
+            await _dalamudUtil.RunOnFrameworkThread(() => _honorificClearCharacterTitle!.InvokeAction(c)).ConfigureAwait(false);
+        }
     }
 
     public string HonorificGetTitle()
@@ -322,11 +319,11 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public async Task HonorificSetTitle(IntPtr character, string honorificData)
     {
         if (!CheckHonorificApi()) return;
-        await _dalamudUtil.RunOnFrameworkThread(async () =>
+        Logger.LogTrace("Applying Honorific data to {chara}", character.ToString("X"));
+        var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(false);
+        if (gameObj is PlayerCharacter pc)
         {
-            Logger.LogTrace("Applying Honorific data to {chara}", character.ToString("X"));
-            var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(true);
-            if (gameObj is PlayerCharacter pc)
+            await _dalamudUtil.RunOnFrameworkThread(() =>
             {
                 if (string.IsNullOrEmpty(honorificData))
                 {
@@ -336,8 +333,8 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
                 {
                     _honorificSetCharacterTitle!.InvokeAction(pc, honorificData[1..], honorificData[0] == '1');
                 }
-            }
-        }).ConfigureAwait(false);
+            }).ConfigureAwait(false);
+        }
     }
 
     public async Task<string> PalettePlusBuildPalette()
@@ -351,24 +348,21 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public async Task PalettePlusRemovePalette(IntPtr character)
     {
         if (!CheckPalettePlusApi()) return;
-        await _dalamudUtil.RunOnFrameworkThread(async () =>
+        var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(false);
+        if (gameObj is Character c)
         {
-            var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(true);
-            if (gameObj is Character c)
-            {
-                Logger.LogTrace("PalettePlus removing for {addr}", c.Address.ToString("X"));
-                _palettePlusRemoveCharaPalette!.InvokeAction(c);
-            }
-        }).ConfigureAwait(false);
+            Logger.LogTrace("PalettePlus removing for {addr}", c.Address.ToString("X"));
+            await _dalamudUtil.RunOnFrameworkThread(() => _palettePlusRemoveCharaPalette!.InvokeAction(c)).ConfigureAwait(false);
+        }
     }
 
     public async Task PalettePlusSetPalette(IntPtr character, string palette)
     {
         if (!CheckPalettePlusApi()) return;
-        await _dalamudUtil.RunOnFrameworkThread(async () =>
+        var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(false);
+        if (gameObj is Character c)
         {
-            var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(true);
-            if (gameObj is Character c)
+            await _dalamudUtil.RunOnFrameworkThread(() =>
             {
                 string decodedPalette = Encoding.UTF8.GetString(Convert.FromBase64String(palette));
 
@@ -382,8 +376,8 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
                     Logger.LogTrace("PalettePlus applying for {addr}", c.Address.ToString("X"));
                     _palettePlusSetCharaPalette!.InvokeAction(c, decodedPalette);
                 }
-            }
-        }).ConfigureAwait(false);
+            }).ConfigureAwait(false);
+        }
     }
 
     public string PenumbraGetMetaManipulations()
@@ -395,14 +389,23 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public async Task PenumbraRedraw(ILogger logger, GameObjectHandler handler, Guid applicationId, CancellationToken token, bool fireAndForget = false)
     {
         if (!CheckPenumbraApi() || _dalamudUtil.IsZoning) return;
-        await _dalamudUtil.RunOnFrameworkThread(async () =>
+        try
         {
-            var gameObj = await _dalamudUtil.CreateGameObject(handler.Address).ConfigureAwait(true);
+            await _glamourerApplicationSemaphore.WaitAsync(token).ConfigureAwait(false);
+            var gameObj = await _dalamudUtil.CreateGameObject(handler.Address).ConfigureAwait(false);
             if (gameObj is Character c)
             {
-                await PenumbraRedrawAsync(logger, handler, applicationId, () => _penumbraRedrawObject!.Invoke(c, RedrawType.Redraw), fireAndForget, token).ConfigureAwait(false);
+                await PenumbraRedrawAsync(logger, handler, applicationId, () =>
+                {
+                    logger.LogDebug("[{appid}] Calling on IPC: PenumbraRedraw", applicationId);
+                    _penumbraRedrawObject!.Invoke(c, RedrawType.Redraw);
+                }, fireAndForget).ConfigureAwait(false);
             }
-        }).ConfigureAwait(false);
+        }
+        finally
+        {
+            _glamourerApplicationSemaphore.Release();
+        }
     }
 
     public async Task PenumbraRemoveTemporaryCollection(ILogger logger, Guid applicationId, string characterName)
@@ -648,7 +651,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         _penumbraRedraw!.Invoke("self", RedrawType.Redraw);
     }
 
-    private async Task PenumbraRedrawAsync(ILogger logger, GameObjectHandler obj, Guid applicationId, Action action, bool fireAndForget, CancellationToken token)
+    private async Task PenumbraRedrawAsync(ILogger logger, GameObjectHandler obj, Guid applicationId, Action action, bool fireAndForget)
     {
         Mediator.Publish(new PenumbraStartRedrawMessage(obj.Address));
 
@@ -660,13 +663,10 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
             {
                 await _dalamudUtil.RunOnFrameworkThread(action).ConfigureAwait(false);
 
-                var disposeToken = _disposalCts.Token;
-                var combinedToken = CancellationTokenSource.CreateLinkedTokenSource(disposeToken, token).Token;
+                await Task.Delay(TimeSpan.FromSeconds(1), _disposalCts.Token).ConfigureAwait(false);
 
-                await Task.Delay(TimeSpan.FromSeconds(1), combinedToken).ConfigureAwait(false);
-
-                if (!combinedToken.IsCancellationRequested)
-                    await _dalamudUtil.WaitWhileCharacterIsDrawing(logger, obj, applicationId, 30000, combinedToken).ConfigureAwait(false);
+                if (!_disposalCts.Token.IsCancellationRequested)
+                    await _dalamudUtil.WaitWhileCharacterIsDrawing(logger, obj, applicationId, 30000, _disposalCts.Token).ConfigureAwait(false);
             }
             else
             {

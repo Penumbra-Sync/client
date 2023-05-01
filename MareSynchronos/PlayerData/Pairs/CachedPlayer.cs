@@ -32,7 +32,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     private CancellationTokenSource? _applicationCancellationTokenSource = new();
     private Guid _applicationId;
     private Task? _applicationTask;
-    private CharacterData _cachedData = new();
+    private CharacterData? _cachedData = null;
     private GameObjectHandler? _charaHandler;
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
     private int _framesSinceNotVisible = 0;
@@ -91,14 +91,14 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         SetUploading(false);
 
         Logger.LogDebug("Received data for {player}", this);
-        Logger.LogDebug("Hash for data is {newHash}, current cache hash is {oldHash}", characterData.DataHash.Value, _cachedData.DataHash.Value);
+        Logger.LogDebug("Hash for data is {newHash}, current cache hash is {oldHash}", characterData.DataHash.Value, _cachedData?.DataHash.Value ?? "NODATA");
 
         Logger.LogDebug("Checking for files to download for player {name}", this);
 
         if (!_ipcManager.CheckPenumbraApi()) return;
         if (!_ipcManager.CheckGlamourerApi()) return;
 
-        if (string.Equals(characterData.DataHash.Value, _cachedData.DataHash.Value, StringComparison.Ordinal) && !forced) return;
+        if (string.Equals(characterData.DataHash.Value, _cachedData?.DataHash.Value ?? string.Empty, StringComparison.Ordinal) && !forced) return;
 
         if (_dalamudUtil.IsInCutscene || _dalamudUtil.IsInGpose)
         {
@@ -106,7 +106,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             return;
         }
 
-        var charaDataToUpdate = CheckUpdatedData(_cachedData.DeepClone(), characterData, forced);
+        var charaDataToUpdate = CheckUpdatedData(_cachedData?.DeepClone() ?? new(), characterData, forced);
 
         if (charaDataToUpdate.TryGetValue(ObjectKind.Player, out var playerChanges))
         {
@@ -163,7 +163,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                 Logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser);
                 _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name).GetAwaiter().GetResult();
 
-                foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData.FileReplacements)
+                foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData?.FileReplacements ?? new())
                 {
                     try
                     {
@@ -184,7 +184,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         finally
         {
             PlayerName = null;
-            _cachedData = new();
+            _cachedData = null;
             Logger.LogDebug("Disposing {name} complete", name);
         }
     }
@@ -539,9 +539,12 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             var applicationId = Guid.NewGuid();
             await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, _charaHandler!, applicationId, ct: token).ConfigureAwait(false);
             Logger.LogDebug("Unauthorized character change detected");
-            await ApplyCustomizationData(applicationId, new(ObjectKind.Player,
-                new HashSet<PlayerChanges>(new[] { PlayerChanges.Palette, PlayerChanges.Customize, PlayerChanges.Heels, PlayerChanges.Mods })),
-                _cachedData, token).ConfigureAwait(false);
+            if (_cachedData != null)
+            {
+                await ApplyCustomizationData(applicationId, new(ObjectKind.Player,
+                    new HashSet<PlayerChanges>(new[] { PlayerChanges.Palette, PlayerChanges.Customize, PlayerChanges.Heels, PlayerChanges.Mods })),
+                    _cachedData, token).ConfigureAwait(false);
+            }
         }, token);
     }
 
@@ -685,7 +688,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             PluginLog.Error(ex, "Something went wrong during calculation replacements");
         }
         st.Stop();
-        Logger.LogDebug("ModdedPaths calculated in {time}ms, missing files: {count}", st.ElapsedMilliseconds, missingFiles.Count);
+        Logger.LogDebug("ModdedPaths calculated in {time}ms, missing files: {count}, total files: {total}", st.ElapsedMilliseconds, missingFiles.Count, moddedDictionary.Keys.Count);
         return missingFiles;
     }
 }
