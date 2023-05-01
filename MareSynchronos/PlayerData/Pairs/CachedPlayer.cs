@@ -195,6 +195,10 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         {
             throw new InvalidOperationException("Player name not equal to requested name, pointer invalid");
         }
+        if (handler.Address == IntPtr.Zero)
+        {
+            throw new InvalidOperationException("Player pointer is zero, pointer invalid");
+        }
     }
 
     private async Task ApplyBaseData(Guid applicationId, Dictionary<string, string> moddedPaths, string manipulationData, CancellationToken token)

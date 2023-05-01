@@ -359,13 +359,12 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public async Task PalettePlusSetPalette(IntPtr character, string palette)
     {
         if (!CheckPalettePlusApi()) return;
+        string decodedPalette = Encoding.UTF8.GetString(Convert.FromBase64String(palette));
         var gameObj = await _dalamudUtil.CreateGameObject(character).ConfigureAwait(false);
         if (gameObj is Character c)
         {
             await _dalamudUtil.RunOnFrameworkThread(() =>
             {
-                string decodedPalette = Encoding.UTF8.GetString(Convert.FromBase64String(palette));
-
                 if (string.IsNullOrEmpty(decodedPalette))
                 {
                     Logger.LogTrace("PalettePlus removing for {addr}", c.Address.ToString("X"));

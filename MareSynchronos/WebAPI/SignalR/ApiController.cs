@@ -174,10 +174,29 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
                 ServerState = ServerState.Connected;
 
+                var currentClientVer = Assembly.GetExecutingAssembly().GetName().Version!;
+
                 if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
                 {
                     await StopConnection(ServerState.VersionMisMatch).ConfigureAwait(false);
+                    if (_connectionDto.CurrentClientVersion > currentClientVer)
+                    {
+                        Mediator.Publish(new NotificationMessage("Client incompatible",
+                            $"Your client is outdated ({currentClientVer.Major}.{currentClientVer.Minor}.{currentClientVer.Build}), current is: " +
+                            $"{_connectionDto.CurrentClientVersion.Major}.{_connectionDto.CurrentClientVersion.Minor}.{_connectionDto.CurrentClientVersion.Build}. " +
+                            $"This client version is incompatible and will not be able to connect. Please update your Mare Synchronos client.",
+                            Dalamud.Interface.Internal.Notifications.NotificationType.Error));
+                    }
                     return;
+                }
+
+                if (_connectionDto.CurrentClientVersion > currentClientVer)
+                {
+                    Mediator.Publish(new NotificationMessage("Client outdated",
+                        $"Your client is oudated ({currentClientVer.Major}.{currentClientVer.Minor}.{currentClientVer.Build}), current is: " +
+                        $"{_connectionDto.CurrentClientVersion.Major}.{_connectionDto.CurrentClientVersion.Minor}.{_connectionDto.CurrentClientVersion.Build}. " +
+                        $"Please keep your Mare Synchronos client up-to-date.",
+                        Dalamud.Interface.Internal.Notifications.NotificationType.Error));
                 }
             }
             catch (HttpRequestException ex)

@@ -105,25 +105,17 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
     {
         return await _dalamudUtil.RunOnFrameworkThread(() =>
         {
-            nint curPtr = IntPtr.Zero;
-            try
+            var curPtr = _getAddress.Invoke();
+
+            if (curPtr == IntPtr.Zero)
             {
-                curPtr = CurrentAddress().GetAwaiter().GetResult();
-
-                if (curPtr == IntPtr.Zero) return true;
-
-                var drawObj = GetDrawObj(curPtr);
-                return IsBeingDrawn(drawObj, curPtr);
-            }
-            catch (Exception)
-            {
-                if (curPtr != IntPtr.Zero)
-                {
-                    return true;
-                }
-
+                Address = IntPtr.Zero;
+                DrawObjectAddress = IntPtr.Zero;
                 return false;
             }
+
+            var drawObj = GetDrawObj(curPtr);
+            return IsBeingDrawn(drawObj, curPtr);
         }).ConfigureAwait(false);
     }
 

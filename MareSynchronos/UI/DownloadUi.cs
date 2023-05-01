@@ -213,6 +213,7 @@ public class DownloadUi : WindowMediatorSubscriberBase
 
     public override bool DrawConditions()
     {
+        if (_uiShared.EditTrackerPosition) return true;
         if (!_configService.Current.ShowTransferWindow && !_configService.Current.ShowTransferBars) return false;
         if (!_currentDownloads.Any() && !_fileTransferManager.CurrentUploads.Any() && !_uploadingPlayers.Any()) return false;
         if (!IsOpen) return false;
