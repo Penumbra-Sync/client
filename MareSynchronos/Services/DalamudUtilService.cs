@@ -76,9 +76,20 @@ public class DalamudUtilService : IHostedService
         return obj != null && obj.IsValid();
     }
 
-    public async Task<Dalamud.Game.ClientState.Objects.Types.GameObject?> CreateGameObject(IntPtr reference)
+    public async Task<Dalamud.Game.ClientState.Objects.Types.GameObject?> CreateGameObjectAsync(IntPtr reference)
     {
         return await RunOnFrameworkThread(() => _objectTable.CreateObjectReference(reference)).ConfigureAwait(false);
+    }
+
+    public void EnsureIsOnFramework()
+    {
+        if (!_framework.IsInFrameworkUpdateThread) throw new InvalidOperationException("Can only be run on Framework");
+    }
+
+    public Dalamud.Game.ClientState.Objects.Types.GameObject? CreateGameObject(IntPtr reference)
+    {
+        EnsureIsOnFramework();
+        return _objectTable.CreateObjectReference(reference);
     }
 
     public Dalamud.Game.ClientState.Objects.Types.Character? GetCharacterFromObjectTableByIndex(int index)
@@ -176,7 +187,7 @@ public class DalamudUtilService : IHostedService
         {
             while ((!ct?.IsCancellationRequested ?? true)
                    && curWaitTime < timeOut
-                   && await handler.IsBeingDrawnRunOnFramework().ConfigureAwait(false)) // 0b100000000000 is "still rendering" or something
+                   && await handler.IsBeingDrawnRunOnFrameworkAsync().ConfigureAwait(false)) // 0b100000000000 is "still rendering" or something
             {
                 logger.LogTrace("[{redrawId}] Waiting for {handler} to finish drawing", redrawId, handler);
                 curWaitTime += tick;

@@ -316,7 +316,7 @@ public class PlayerDataFactory
         // wait until chara is not drawing and present so nothing spontaneously explodes
         await _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, playerRelatedObject, Guid.NewGuid(), 30000, ct: token).ConfigureAwait(false);
         int totalWaitTime = 10000;
-        while (!DalamudUtilService.IsObjectPresent(await _dalamudUtil.RunOnFrameworkThread(() => _dalamudUtil.CreateGameObject(charaPointer).GetAwaiter().GetResult()).ConfigureAwait(false)) && totalWaitTime > 0)
+        while (!DalamudUtilService.IsObjectPresent(await _dalamudUtil.RunOnFrameworkThread(() => _dalamudUtil.CreateGameObjectAsync(charaPointer).GetAwaiter().GetResult()).ConfigureAwait(false)) && totalWaitTime > 0)
         {
             _logger.LogTrace("Character is null but it shouldn't be, waiting");
             await Task.Delay(50, token).ConfigureAwait(false);
@@ -376,9 +376,9 @@ public class PlayerDataFactory
         // gather up data from ipc
         previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
         previousData.HeelsOffset = _ipcManager.GetHeelsOffset();
-        Task<string> getGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(playerRelatedObject.Address);
-        Task<string> getCustomizeData = _ipcManager.GetCustomizePlusScale();
-        Task<string> getPalettePlusData = _ipcManager.PalettePlusBuildPalette();
+        Task<string> getGlamourerData = _ipcManager.GlamourerGetCharacterCustomizationAsync(playerRelatedObject.Address);
+        Task<string> getCustomizeData = _ipcManager.GetCustomizePlusScaleAsync();
+        Task<string> getPalettePlusData = _ipcManager.PalettePlusBuildPaletteAsync();
         previousData.GlamourerString[playerRelatedObject.ObjectKind] = await getGlamourerData.ConfigureAwait(false);
         _logger.LogDebug("Glamourer is now: {data}", previousData.GlamourerString[playerRelatedObject.ObjectKind]);
         previousData.CustomizePlusScale = await getCustomizeData.ConfigureAwait(false);
@@ -399,7 +399,7 @@ public class PlayerDataFactory
         var forwardPaths = forwardResolve.ToArray();
         var reversePaths = reverseResolve.ToArray();
         Dictionary<string, List<string>> resolvedPaths = new(StringComparer.Ordinal);
-        var (forward, reverse) = await _ipcManager.PenumbraResolvePaths(forwardPaths, reversePaths).ConfigureAwait(false);
+        var (forward, reverse) = await _ipcManager.PenumbraResolvePathsAsync(forwardPaths, reversePaths).ConfigureAwait(false);
         for (int i = 0; i < forwardPaths.Length; i++)
         {
             var filePath = forward[i].ToLowerInvariant();

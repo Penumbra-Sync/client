@@ -169,7 +169,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
 
     private void DalamudUtil_FrameworkUpdate()
     {
-        _cachedFrameAddresses = _playerRelatedPointers.Select(c => c.CurrentAddress().GetAwaiter().GetResult()).ToHashSet();
+        _cachedFrameAddresses = _playerRelatedPointers.Select(c => c.CurrentAddress()).ToHashSet();
         _cachedHandledPaths.Clear();
         foreach (var item in TransientResources.Where(item => !_dalamudUtil.IsGameObjectPresent(item.Key)).Select(i => i.Key).ToList())
         {

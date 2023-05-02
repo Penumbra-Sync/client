@@ -14,8 +14,10 @@ using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Files;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using static System.Net.Mime.MediaTypeNames;
 using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;
 
 namespace MareSynchronos.PlayerData.Pairs;
@@ -161,13 +163,13 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             if (_dalamudUtil is { IsZoning: false, IsInCutscene: false })
             {
                 Logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser);
-                _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, name).GetAwaiter().GetResult();
+                _ipcManager.PenumbraRemoveTemporaryCollectionAsync(Logger, applicationId, name).GetAwaiter().GetResult();
 
                 foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData?.FileReplacements ?? new())
                 {
                     try
                     {
-                        RevertCustomizationData(item.Key, name, applicationId).GetAwaiter().GetResult();
+                        RevertCustomizationDataAsync(item.Key, name, applicationId).GetAwaiter().GetResult();
                     }
                     catch (InvalidOperationException ex)
                     {
@@ -200,19 +202,8 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             throw new InvalidOperationException("Player pointer is zero, pointer invalid");
         }
     }
-
-    private async Task ApplyBaseData(Guid applicationId, Dictionary<string, string> moddedPaths, string manipulationData, CancellationToken token)
-    {
-        await _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, PlayerName!).ConfigureAwait(true);
-        token.ThrowIfCancellationRequested();
-        var gameObj = await _charaHandler!.GetGameObject().ConfigureAwait(true);
-        if (gameObj == null) return;
-        var objTableIndex = await _dalamudUtil.RunOnFrameworkThread(() => gameObj.ObjectTableIndex()).ConfigureAwait(true);
-        await _ipcManager.PenumbraSetTemporaryMods(Logger, applicationId, PlayerName!, objTableIndex, moddedPaths, manipulationData).ConfigureAwait(true);
-        token.ThrowIfCancellationRequested();
-    }
-
-    private async Task ApplyCustomizationData(Guid applicationId, KeyValuePair<ObjectKind, HashSet<PlayerChanges>> changes, CharacterData charaData, CancellationToken token)
+    
+    private async Task ApplyCustomizationDataAsync(Guid applicationId, KeyValuePair<ObjectKind, HashSet<PlayerChanges>> changes, CharacterData charaData, CancellationToken token)
     {
         if (PlayerCharacter == IntPtr.Zero) return;
         var ptr = PlayerCharacter;
@@ -242,29 +233,29 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                 switch (change)
                 {
                     case PlayerChanges.Palette:
-                        await _ipcManager.PalettePlusSetPalette(handler.Address, charaData.PalettePlusData).ConfigureAwait(false);
+                        await _ipcManager.PalettePlusSetPaletteAsync(handler.Address, charaData.PalettePlusData).ConfigureAwait(false);
                         break;
 
                     case PlayerChanges.Customize:
-                        await _ipcManager.CustomizePlusSetBodyScale(handler.Address, charaData.CustomizePlusData).ConfigureAwait(false);
+                        await _ipcManager.CustomizePlusSetBodyScaleAsync(handler.Address, charaData.CustomizePlusData).ConfigureAwait(false);
                         break;
 
                     case PlayerChanges.Heels:
-                        await _ipcManager.HeelsSetOffsetForPlayer(handler.Address, charaData.HeelsOffset).ConfigureAwait(false);
+                        await _ipcManager.HeelsSetOffsetForPlayerAsync(handler.Address, charaData.HeelsOffset).ConfigureAwait(false);
                         break;
 
                     case PlayerChanges.Honorific:
-                        await _ipcManager.HonorificSetTitle(handler.Address, charaData.HonorificData).ConfigureAwait(false);
+                        await _ipcManager.HonorificSetTitleAsync(handler.Address, charaData.HonorificData).ConfigureAwait(false);
                         break;
 
                     case PlayerChanges.Mods:
                         if (charaData.GlamourerData.TryGetValue(changes.Key, out var glamourerData))
                         {
-                            await _ipcManager.GlamourerApplyAll(Logger, handler, glamourerData, applicationId, token).ConfigureAwait(false);
+                            await _ipcManager.GlamourerApplyAllAsync(Logger, handler, glamourerData, applicationId, token).ConfigureAwait(false);
                         }
                         else
                         {
-                            await _ipcManager.PenumbraRedraw(Logger, handler, applicationId, token).ConfigureAwait(false);
+                            await _ipcManager.PenumbraRedrawAsync(Logger, handler, applicationId, token).ConfigureAwait(false);
                         }
                         break;
                 }
@@ -452,26 +443,29 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
                     token.ThrowIfCancellationRequested();
 
-                    var applyBaseData = new Action(() => ApplyBaseData(_applicationId, moddedPaths, charaData.ManipulationData, token).ConfigureAwait(true).GetAwaiter().GetResult());
-
                     if (updateModdedPaths && (moddedPaths.Any() || !string.IsNullOrEmpty(charaData.ManipulationData)))
                     {
-                        while (!await _dalamudUtil.RunOnFrameworkThread(() =>
+                        await _charaHandler!.ActOnFrameworkAfterEnsureNoDrawAsync(() => _ipcManager
+                            .PenumbraRemoveTemporaryCollectionAsync(Logger, _applicationId, PlayerName!)
+                                .ConfigureAwait(true).GetAwaiter().GetResult(), token);
+                        token.ThrowIfCancellationRequested();
+
+                        await _charaHandler!.ActOnFrameworkAfterEnsureNoDrawAsync(() =>
                         {
-                            if (_charaHandler!.IsBeingDrawn()) return false;
-                            applyBaseData();
-                            return true;
-                        }).ConfigureAwait(false))
-                        {
-                            await Task.Delay(250, token).ConfigureAwait(false);
-                        }
+                            var gameObj = _charaHandler!.GetGameObject();
+                            if (gameObj == null) return;
+                            var objTableIndex = gameObj.ObjectTableIndex();
+                            _ipcManager.PenumbraSetTemporaryModsAsync(Logger, _applicationId, PlayerName!, objTableIndex, moddedPaths, charaData.ManipulationData)
+                                .ConfigureAwait(true).GetAwaiter().GetResult();
+                        }, token);
+                        token.ThrowIfCancellationRequested();
                     }
 
                     token.ThrowIfCancellationRequested();
 
                     foreach (var kind in updatedData)
                     {
-                        await ApplyCustomizationData(_applicationId, kind, charaData, token).ConfigureAwait(false);
+                        await ApplyCustomizationDataAsync(_applicationId, kind, charaData, token).ConfigureAwait(false);
                         token.ThrowIfCancellationRequested();
                     }
 
@@ -506,7 +500,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             {
                 Task.Run(async () =>
                 {
-                    _lastGlamourerData = await _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter).ConfigureAwait(false);
+                    _lastGlamourerData = await _ipcManager.GlamourerGetCharacterCustomizationAsync(PlayerCharacter).ConfigureAwait(false);
                     ApplyCharacterData(_cachedData, true);
                 });
             }
@@ -527,7 +521,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         PlayerName = name;
         _charaHandler = _gameObjectHandlerFactory.Create(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByIdent(OnlineUser.Ident), false).GetAwaiter().GetResult();
 
-        _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter).ConfigureAwait(false).GetAwaiter().GetResult();
+        _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomizationAsync(PlayerCharacter).ConfigureAwait(false).GetAwaiter().GetResult();
         _lastGlamourerData = _originalGlamourerData;
         Mediator.Subscribe<PenumbraRedrawMessage>(this, IpcManagerOnPenumbraRedrawEvent);
         Mediator.Subscribe<CharacterChangedMessage>(this, async (msg) =>
@@ -535,7 +529,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             if (msg.GameObjectHandler == _charaHandler && (_applicationTask?.IsCompleted ?? true))
             {
                 Logger.LogTrace("Saving new Glamourer Data for {this}", this);
-                _lastGlamourerData = await _ipcManager.GlamourerGetCharacterCustomization(PlayerCharacter).ConfigureAwait(false);
+                _lastGlamourerData = await _ipcManager.GlamourerGetCharacterCustomizationAsync(PlayerCharacter).ConfigureAwait(false);
             }
         });
 
@@ -557,7 +551,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             Logger.LogDebug("Unauthorized character change detected");
             if (_cachedData != null)
             {
-                await ApplyCustomizationData(applicationId, new(ObjectKind.Player,
+                await ApplyCustomizationDataAsync(applicationId, new(ObjectKind.Player,
                     new HashSet<PlayerChanges>(new[] { PlayerChanges.Palette, PlayerChanges.Customize, PlayerChanges.Heels, PlayerChanges.Mods })),
                     _cachedData, token).ConfigureAwait(false);
             }
@@ -598,7 +592,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
     }
 
-    private async Task RevertCustomizationData(ObjectKind objectKind, string name, Guid applicationId)
+    private async Task RevertCustomizationDataAsync(ObjectKind objectKind, string name, Guid applicationId)
     {
         nint address = _dalamudUtil.GetPlayerCharacterFromObjectTableByIdent(OnlineUser.Ident);
         if (address == IntPtr.Zero) return;
@@ -613,19 +607,19 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Player, () => address, false).ConfigureAwait(false);
             CheckForNameAndThrow(tempHandler, name);
             Logger.LogDebug("[{applicationId}] Restoring Customization and Equipment for {alias}/{name}: {data}", applicationId, OnlineUser.User.AliasOrUID, name, _originalGlamourerData);
-            await _ipcManager.GlamourerApplyCustomizationAndEquipment(Logger, tempHandler, _originalGlamourerData, _lastGlamourerData, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
+            await _ipcManager.GlamourerApplyCustomizationAndEquipmentAsync(Logger, tempHandler, _originalGlamourerData, _lastGlamourerData, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
             CheckForNameAndThrow(tempHandler, name);
             Logger.LogDebug("[{applicationId}] Restoring Heels for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
-            await _ipcManager.HeelsRestoreOffsetForPlayer(address).ConfigureAwait(false);
+            await _ipcManager.HeelsRestoreOffsetForPlayerAsync(address).ConfigureAwait(false);
             CheckForNameAndThrow(tempHandler, name);
             Logger.LogDebug("[{applicationId}] Restoring C+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
-            await _ipcManager.CustomizePlusRevert(address).ConfigureAwait(false);
+            await _ipcManager.CustomizePlusRevertAsync(address).ConfigureAwait(false);
             CheckForNameAndThrow(tempHandler, name);
             Logger.LogDebug("[{applicationId}] Restoring Palette+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
-            await _ipcManager.PalettePlusRemovePalette(address).ConfigureAwait(false);
+            await _ipcManager.PalettePlusRemovePaletteAsync(address).ConfigureAwait(false);
             CheckForNameAndThrow(tempHandler, name);
             Logger.LogDebug("[{applicationId}] Restoring Honorific for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
-            await _ipcManager.HonorificClearTitle(address).ConfigureAwait(false);
+            await _ipcManager.HonorificClearTitleAsync(address).ConfigureAwait(false);
         }
         else if (objectKind == ObjectKind.MinionOrMount)
         {
@@ -633,7 +627,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             if (minionOrMount != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => minionOrMount, false).ConfigureAwait(false);
-                await _ipcManager.PenumbraRedraw(Logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
+                await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
             }
         }
         else if (objectKind == ObjectKind.Pet)
@@ -642,7 +636,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             if (pet != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => pet, false).ConfigureAwait(false);
-                await _ipcManager.PenumbraRedraw(Logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
+                await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
             }
         }
         else if (objectKind == ObjectKind.Companion)
@@ -651,7 +645,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             if (companion != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => companion, false).ConfigureAwait(false);
-                await _ipcManager.PenumbraRedraw(Logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
+                await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
             }
         }
     }

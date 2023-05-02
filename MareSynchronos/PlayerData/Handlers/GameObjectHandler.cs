@@ -28,7 +28,11 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         _performanceCollector = performanceCollector;
         ObjectKind = objectKind;
         _dalamudUtil = dalamudUtil;
-        _getAddress = getAddress;
+        _getAddress = () =>
+        {
+            _dalamudUtil.EnsureIsOnFramework();
+            return getAddress.Invoke();
+        };
         _isOwnedObject = watchedObject;
         Name = string.Empty;
 
@@ -82,29 +86,25 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         CheckAndUpdateObject();
     }
 
-    public IntPtr Address { get; set; }
-    public unsafe Character* Character => (Character*)Address;
+    public IntPtr Address { get; private set; }
     public string Name { get; private set; }
-
     public ObjectKind ObjectKind { get; }
-
     private byte[] CustomizeData { get; set; } = new byte[26];
-
     private IntPtr DrawObjectAddress { get; set; }
-
     private byte[] EquipSlotData { get; set; } = new byte[40];
 
-    public async Task<IntPtr> CurrentAddress()
+    public IntPtr CurrentAddress()
     {
-        return await _dalamudUtil.RunOnFrameworkThread(_getAddress.Invoke).ConfigureAwait(true);
+        _dalamudUtil.EnsureIsOnFramework();
+        return _getAddress.Invoke();
     }
 
-    public async Task<Dalamud.Game.ClientState.Objects.Types.GameObject?> GetGameObject()
+    public Dalamud.Game.ClientState.Objects.Types.GameObject? GetGameObject()
     {
-        return await _dalamudUtil.CreateGameObject(Address).ConfigureAwait(true);
+        return _dalamudUtil.CreateGameObject(Address);
     }
 
-    public bool IsBeingDrawn()
+    private bool IsBeingDrawn()
     {
         var curPtr = _getAddress();
         Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, CurPtr: {ptr}", this, curPtr.ToString("X"));
@@ -123,7 +123,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         return IsBeingDrawn(drawObj, curPtr);
     }
 
-    public async Task<bool> IsBeingDrawnRunOnFramework()
+    public async Task<bool> IsBeingDrawnRunOnFrameworkAsync()
     {
         return await _dalamudUtil.RunOnFrameworkThread(IsBeingDrawn).ConfigureAwait(false);
     }
@@ -140,6 +140,19 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
         if (_isOwnedObject)
             Mediator.Publish(new RemoveWatchedGameObjectHandler(this));
+    }
+
+    public async Task ActOnFrameworkAfterEnsureNoDrawAsync(Action act, CancellationToken token)
+    {
+        while (await _dalamudUtil.RunOnFrameworkThread(() =>
+               {
+                   if (IsBeingDrawn()) return true;
+                   act();
+                   return false;
+               }).ConfigureAwait(false))
+        {
+            await Task.Delay(250, token).ConfigureAwait(false);
+        }
     }
 
     private unsafe void CheckAndUpdateObject()
@@ -200,12 +213,12 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
                 _clearCts?.Dispose();
                 _clearCts = new();
                 var token = _clearCts.Token;
-                _ = Task.Run(() => ClearTask(token), token);
+                _ = Task.Run(() => ClearAsync(token), token);
             }
         }
     }
 
-    private async Task ClearTask(CancellationToken token)
+    private async Task ClearAsync(CancellationToken token)
     {
         Logger.LogDebug("[{this}] Running Clear Task", this);
         await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
