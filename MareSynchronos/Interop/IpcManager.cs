@@ -660,7 +660,15 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         {
             if (!fireAndForget)
             {
-                await _dalamudUtil.RunOnFrameworkThread(action).ConfigureAwait(false);
+                while (!await _dalamudUtil.RunOnFrameworkThread(() =>
+                    {
+                        if (obj.IsBeingDrawn()) return false;
+                        action();
+                        return true;
+                    }).ConfigureAwait(false))
+                {
+                    await Task.Delay(250).ConfigureAwait(false);
+                }
 
                 await Task.Delay(TimeSpan.FromSeconds(1), _disposalCts.Token).ConfigureAwait(false);
 

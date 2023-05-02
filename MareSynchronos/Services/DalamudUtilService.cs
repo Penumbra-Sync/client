@@ -176,7 +176,7 @@ public class DalamudUtilService : IHostedService
         {
             while ((!ct?.IsCancellationRequested ?? true)
                    && curWaitTime < timeOut
-                   && await handler.IsBeingDrawnRunOnFramework().ConfigureAwait(true)) // 0b100000000000 is "still rendering" or something
+                   && await handler.IsBeingDrawnRunOnFramework().ConfigureAwait(false)) // 0b100000000000 is "still rendering" or something
             {
                 logger.LogTrace("[{redrawId}] Waiting for {handler} to finish drawing", redrawId, handler);
                 curWaitTime += tick;

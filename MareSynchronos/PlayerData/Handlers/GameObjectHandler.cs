@@ -84,8 +84,6 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
     public IntPtr Address { get; set; }
     public unsafe Character* Character => (Character*)Address;
-    public Lazy<Dalamud.Game.ClientState.Objects.Types.GameObject?> GameObjectLazy { get; private set; }
-
     public string Name { get; private set; }
 
     public ObjectKind ObjectKind { get; }
@@ -101,22 +99,33 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         return await _dalamudUtil.RunOnFrameworkThread(_getAddress.Invoke).ConfigureAwait(true);
     }
 
+    public async Task<Dalamud.Game.ClientState.Objects.Types.GameObject?> GetGameObject()
+    {
+        return await _dalamudUtil.CreateGameObject(Address).ConfigureAwait(true);
+    }
+
+    public bool IsBeingDrawn()
+    {
+        var curPtr = _getAddress();
+        Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, CurPtr: {ptr}", this, curPtr.ToString("X"));
+
+        if (curPtr == IntPtr.Zero)
+        {
+            Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, CurPtr is ZERO, returning", this);
+
+            Address = IntPtr.Zero;
+            DrawObjectAddress = IntPtr.Zero;
+            return false;
+        }
+
+        var drawObj = GetDrawObj(curPtr);
+        Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, DrawObjPtr: {ptr}", this, drawObj.ToString("X"));
+        return IsBeingDrawn(drawObj, curPtr);
+    }
+
     public async Task<bool> IsBeingDrawnRunOnFramework()
     {
-        return await _dalamudUtil.RunOnFrameworkThread(() =>
-        {
-            var curPtr = _getAddress.Invoke();
-
-            if (curPtr == IntPtr.Zero)
-            {
-                Address = IntPtr.Zero;
-                DrawObjectAddress = IntPtr.Zero;
-                return false;
-            }
-
-            var drawObj = GetDrawObj(curPtr);
-            return IsBeingDrawn(drawObj, curPtr);
-        }).ConfigureAwait(false);
+        return await _dalamudUtil.RunOnFrameworkThread(IsBeingDrawn).ConfigureAwait(false);
     }
 
     public override string ToString()
@@ -137,23 +146,24 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
     {
         if (_haltProcessing) return;
 
-        var curPtr = CurrentAddress().GetAwaiter().GetResult();
-        bool drawObjDiff = false;
-        try
+        var prevAddr = Address;
+        var prevDrawObj = DrawObjectAddress;
+
+        Address = _getAddress();
+        if (Address != IntPtr.Zero)
         {
-            if (curPtr != IntPtr.Zero)
-            {
-                var drawObjAddr = (IntPtr)((GameObject*)curPtr)->DrawObject;
-                drawObjDiff = drawObjAddr != DrawObjectAddress;
-                DrawObjectAddress = drawObjAddr;
-            }
+            var drawObjAddr = (IntPtr)((GameObject*)Address)->DrawObject;
+            DrawObjectAddress = drawObjAddr;
         }
-        catch (Exception ex)
+        else
         {
-            Logger.LogError(ex, "Error during checking for draw object for {name}", this);
+            DrawObjectAddress = IntPtr.Zero;
         }
 
-        if (curPtr != IntPtr.Zero && DrawObjectAddress != IntPtr.Zero)
+        bool drawObjDiff = DrawObjectAddress != prevDrawObj;
+        bool addrDiff = Address != prevAddr;
+
+        if (Address != IntPtr.Zero && DrawObjectAddress != IntPtr.Zero)
         {
             if (_clearCts != null)
             {
@@ -161,13 +171,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
                 _clearCts?.Cancel();
                 _clearCts = null;
             }
-            bool addrDiff = Address != curPtr;
-            Address = curPtr;
-            if (addrDiff)
-            {
-                GameObjectLazy = new(() => _dalamudUtil.CreateGameObject(curPtr).GetAwaiter().GetResult());
-            }
-            var chara = (Character*)curPtr;
+            var chara = (Character*)Address;
             var name = new ByteString(chara->GameObject.Name).ToString();
             bool nameChange = !string.Equals(name, Name, StringComparison.Ordinal);
             Name = name;
@@ -181,19 +185,15 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
             var customizeDiff = CompareAndUpdateCustomizeData(chara->CustomizeData);
 
-            if ((addrDiff || equipDiff || customizeDiff || drawObjDiff || nameChange) && _isOwnedObject)
+            if ((addrDiff || drawObjDiff || equipDiff || customizeDiff || nameChange) && _isOwnedObject)
             {
-                Logger.LogTrace("[{this}] Changed", this);
-
-                Logger.LogDebug("[{this}] Sending CreateCacheObjectMessage", this);
+                Logger.LogDebug("[{this}] Changed, Sending CreateCacheObjectMessage", this);
                 Mediator.Publish(new CreateCacheForObjectMessage(this));
             }
         }
-        else if (Address != IntPtr.Zero || DrawObjectAddress != IntPtr.Zero)
+        else if (addrDiff || drawObjDiff)
         {
-            Address = IntPtr.Zero;
-            DrawObjectAddress = IntPtr.Zero;
-            Logger.LogTrace("[{this}] Changed -> Null", this);
+            Logger.LogTrace("[{this}] Changed", this);
             if (_isOwnedObject && ObjectKind != ObjectKind.Player)
             {
                 _clearCts?.Cancel();
@@ -264,18 +264,29 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
     private unsafe IntPtr GetDrawObj(nint curPtr)
     {
+        Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Getting new DrawObject", this);
         return (IntPtr)((GameObject*)curPtr)->DrawObject;
     }
 
     private unsafe bool IsBeingDrawn(IntPtr drawObj, IntPtr curPtr)
     {
-        Logger.LogTrace("IsBeingDrawn for {kind} ptr {curPtr} : {drawObj}", ObjectKind, curPtr.ToString("X"), drawObj.ToString("X"));
+        Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Checking IsBeingDrawn for Ptr {curPtr} : DrawObj {drawObj}", this, curPtr.ToString("X"), drawObj.ToString("X"));
         if (ObjectKind == ObjectKind.Player)
         {
-            return drawObj == IntPtr.Zero
-                           || (((CharacterBase*)drawObj)->HasModelInSlotLoaded != 0)
-                           || (((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0)
-                           || (((GameObject*)curPtr)->RenderFlags & 0b100000000000) == 0b100000000000;
+            var drawObjZero = drawObj == IntPtr.Zero;
+            Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Condition IsDrawObjZero: {cond}", this, drawObjZero);
+            if (drawObjZero) return true;
+            var renderFlags = (((GameObject*)curPtr)->RenderFlags) != 0x0;
+            Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Condition RenderFlags: {cond}", this, renderFlags);
+            if (renderFlags) return true;
+            var modelInSlotLoaded = (((CharacterBase*)drawObj)->HasModelInSlotLoaded != 0);
+            Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Condition ModelInSlotLoaded: {cond}", this, modelInSlotLoaded);
+            if (modelInSlotLoaded) return true;
+            var modelFilesInSlotLoaded = (((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0);
+            Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Condition ModelFilesInSlotLoaded: {cond}", this, modelFilesInSlotLoaded);
+            if (modelFilesInSlotLoaded) return true;
+            Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Is not being drawn", this);
+            return false;
         }
 
         return drawObj == IntPtr.Zero

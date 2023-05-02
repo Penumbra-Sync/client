@@ -115,7 +115,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
         Logger.LogDebug("Downloading and applying character for {name}", this);
 
-        DownloadAndApplyCharacter(characterData, charaDataToUpdate);
+        DownloadAndApplyCharacter(characterData.DeepClone(), charaDataToUpdate);
 
         _cachedData = characterData;
     }
@@ -203,10 +203,12 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
     private async Task ApplyBaseData(Guid applicationId, Dictionary<string, string> moddedPaths, string manipulationData, CancellationToken token)
     {
-        await _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, PlayerName!).ConfigureAwait(false);
+        await _ipcManager.PenumbraRemoveTemporaryCollection(Logger, applicationId, PlayerName!).ConfigureAwait(true);
         token.ThrowIfCancellationRequested();
-        var objTableIndex = await _dalamudUtil.RunOnFrameworkThread(() => _charaHandler!.GameObjectLazy!.Value.ObjectTableIndex()).ConfigureAwait(false);
-        await _ipcManager.PenumbraSetTemporaryMods(Logger, applicationId, PlayerName!, objTableIndex, moddedPaths, manipulationData).ConfigureAwait(false);
+        var gameObj = await _charaHandler!.GetGameObject().ConfigureAwait(true);
+        if (gameObj == null) return;
+        var objTableIndex = await _dalamudUtil.RunOnFrameworkThread(() => gameObj.ObjectTableIndex()).ConfigureAwait(true);
+        await _ipcManager.PenumbraSetTemporaryMods(Logger, applicationId, PlayerName!, objTableIndex, moddedPaths, manipulationData).ConfigureAwait(true);
         token.ThrowIfCancellationRequested();
     }
 
@@ -443,16 +445,26 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                 try
                 {
                     _applicationId = Guid.NewGuid();
-                    Logger.LogDebug("[{applicationId}] Starting application task", _applicationId);
+                    Logger.LogDebug("[{applicationId}] Starting application task for {this}", _applicationId, this);
 
                     Logger.LogDebug("[{applicationId}] Waiting for initial draw for for {handler}", _applicationId, _charaHandler);
                     await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, _charaHandler!, _applicationId, 30000, token).ConfigureAwait(false);
 
                     token.ThrowIfCancellationRequested();
 
+                    var applyBaseData = new Action(() => ApplyBaseData(_applicationId, moddedPaths, charaData.ManipulationData, token).ConfigureAwait(true).GetAwaiter().GetResult());
+
                     if (updateModdedPaths && (moddedPaths.Any() || !string.IsNullOrEmpty(charaData.ManipulationData)))
                     {
-                        await ApplyBaseData(_applicationId, moddedPaths, charaData.ManipulationData, token).ConfigureAwait(false);
+                        while (!await _dalamudUtil.RunOnFrameworkThread(() =>
+                        {
+                            if (_charaHandler!.IsBeingDrawn()) return false;
+                            applyBaseData();
+                            return true;
+                        }).ConfigureAwait(false))
+                        {
+                            await Task.Delay(250, token).ConfigureAwait(false);
+                        }
                     }
 
                     token.ThrowIfCancellationRequested();

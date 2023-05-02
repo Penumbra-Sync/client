@@ -36,7 +36,7 @@ public record PenumbraResourceLoadMessage(IntPtr GameObject, string GamePath, st
 public record CustomizePlusMessage : MessageBase;
 public record PalettePlusMessage(Character Character) : MessageBase;
 public record HonorificMessage(string NewHonorificTitle) : MessageBase;
-public record PlayerChangedMessage(API.Data.CharacterData Data) : MessageBase;
+public record PlayerChangedMessage(CharacterData Data) : MessageBase;
 public record CharacterChangedMessage(GameObjectHandler GameObjectHandler) : MessageBase;
 public record TransientResourceChangedMessage(IntPtr Address) : MessageBase;
 public record AddWatchedGameObjectHandler(GameObjectHandler Handler) : MessageBase;
@@ -47,7 +47,7 @@ public record NotificationMessage
     (string Title, string Message, NotificationType Type, uint TimeShownOnScreen = 3000) : MessageBase;
 public record CreateCacheForObjectMessage(GameObjectHandler ObjectToCreateFor) : MessageBase;
 public record ClearCacheForObjectMessage(GameObjectHandler ObjectToCreateFor) : MessageBase;
-public record CharacterDataCreatedMessage(API.Data.CharacterData CharacterData) : MessageBase;
+public record CharacterDataCreatedMessage(CharacterData CharacterData) : SameThreadMessage;
 public record PenumbraStartRedrawMessage(IntPtr Address) : MessageBase;
 public record PenumbraEndRedrawMessage(IntPtr Address) : MessageBase;
 public record HubReconnectingMessage(Exception? Exception) : MessageBase;

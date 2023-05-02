@@ -181,7 +181,7 @@ public sealed class PerformanceCollectorService : IHostedService
                 }
                 catch (Exception e)
                 {
-                    _logger.LogDebug(e, "Error removing performance counter {counter}", entries.Key);
+                    _logger.LogWarning(e, "Error removing performance counter {counter}", entries.Key);
                 }
             }
         }

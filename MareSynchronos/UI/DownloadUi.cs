@@ -139,7 +139,7 @@ public class DownloadUi : WindowMediatorSubscriberBase
 
             foreach (var transfer in _currentDownloads.ToList())
             {
-                var screenPos = _dalamudUtilService.WorldToScreen(transfer.Key.GameObjectLazy.Value);
+                var screenPos = _dalamudUtilService.WorldToScreen(transfer.Key.GetGameObject().ConfigureAwait(true).GetAwaiter().GetResult());
                 if (screenPos == Vector2.Zero) continue;
 
                 var totalBytes = transfer.Value.Sum(c => c.Value.TotalBytes);
@@ -182,7 +182,7 @@ public class DownloadUi : WindowMediatorSubscriberBase
             {
                 foreach (var player in _uploadingPlayers.Select(p => p.Key).ToList())
                 {
-                    var screenPos = _dalamudUtilService.WorldToScreen(player.GameObjectLazy.Value);
+                    var screenPos = _dalamudUtilService.WorldToScreen(player.GetGameObject().GetAwaiter().GetResult());
                     if (screenPos == Vector2.Zero) continue;
 
                     try
