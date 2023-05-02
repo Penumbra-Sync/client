@@ -148,7 +148,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                     var result = await httpClient.PostAsync(postUri, new FormUrlEncodedContent(new[]
                     {
                         new KeyValuePair<string, string>("auth", auth),
-                        new KeyValuePair<string, string>("charaIdent", _dalamudUtil.PlayerNameHashed),
+                        new KeyValuePair<string, string>("charaIdent", await _dalamudUtil.GetPlayerNameHashedAsync().ConfigureAwait(false)),
                     })).ConfigureAwait(false);
                     AuthFailureMessage = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
                     result.EnsureSuccessStatusCode();
@@ -156,7 +156,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                     Logger.LogDebug("JWT Success");
                 }
 
-                while (!_dalamudUtil.IsPlayerPresent && !token.IsCancellationRequested)
+                while (!await _dalamudUtil.GetIsPlayerPresentAsync().ConfigureAwait(false) && !token.IsCancellationRequested)
                 {
                     Logger.LogDebug("Player not loaded in yet, waiting");
                     await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);

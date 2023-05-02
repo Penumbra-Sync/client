@@ -76,13 +76,13 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
             await AddPlayerCacheToCreate().ConfigureAwait(false);
         });
 
-        _playerRelatedObjects[ObjectKind.Player] = gameObjectHandlerFactory.Create(ObjectKind.Player, () => dalamudUtil.PlayerPointer, true)
+        _playerRelatedObjects[ObjectKind.Player] = gameObjectHandlerFactory.Create(ObjectKind.Player, () => dalamudUtil.GetPlayerPointer(), true)
             .GetAwaiter().GetResult();
-        _playerRelatedObjects[ObjectKind.MinionOrMount] = gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => dalamudUtil.GetMinionOrMount().GetAwaiter().GetResult(), true)
+        _playerRelatedObjects[ObjectKind.MinionOrMount] = gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => dalamudUtil.GetMinionOrMount(), true)
             .GetAwaiter().GetResult();
-        _playerRelatedObjects[ObjectKind.Pet] = gameObjectHandlerFactory.Create(ObjectKind.Pet, () => dalamudUtil.GetPet().GetAwaiter().GetResult(), true)
+        _playerRelatedObjects[ObjectKind.Pet] = gameObjectHandlerFactory.Create(ObjectKind.Pet, () => dalamudUtil.GetPet(), true)
             .GetAwaiter().GetResult();
-        _playerRelatedObjects[ObjectKind.Companion] = gameObjectHandlerFactory.Create(ObjectKind.Companion, () => dalamudUtil.GetCompanion().GetAwaiter().GetResult(), true)
+        _playerRelatedObjects[ObjectKind.Companion] = gameObjectHandlerFactory.Create(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), true)
             .GetAwaiter().GetResult();
     }
 

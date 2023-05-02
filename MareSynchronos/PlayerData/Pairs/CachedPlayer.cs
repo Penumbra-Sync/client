@@ -202,7 +202,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             throw new InvalidOperationException("Player pointer is zero, pointer invalid");
         }
     }
-    
+
     private async Task ApplyCustomizationDataAsync(Guid applicationId, KeyValuePair<ObjectKind, HashSet<PlayerChanges>> changes, CharacterData charaData, CancellationToken token)
     {
         if (PlayerCharacter == IntPtr.Zero) return;
@@ -211,9 +211,9 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         var handler = changes.Key switch
         {
             ObjectKind.Player => _charaHandler!,
-            ObjectKind.Companion => await _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetCompanion(ptr).GetAwaiter().GetResult(), false).ConfigureAwait(false),
-            ObjectKind.MinionOrMount => await _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetMinionOrMount(ptr).GetAwaiter().GetResult(), false).ConfigureAwait(false),
-            ObjectKind.Pet => await _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetPet(ptr).GetAwaiter().GetResult(), false).ConfigureAwait(false),
+            ObjectKind.Companion => await _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetCompanion(ptr), false).ConfigureAwait(false),
+            ObjectKind.MinionOrMount => await _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetMinionOrMount(ptr), false).ConfigureAwait(false),
+            ObjectKind.Pet => await _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetPet(ptr), false).ConfigureAwait(false),
             _ => throw new NotSupportedException("ObjectKind not supported: " + changes.Key)
         };
 
@@ -447,7 +447,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                     {
                         await _charaHandler!.ActOnFrameworkAfterEnsureNoDrawAsync(() => _ipcManager
                             .PenumbraRemoveTemporaryCollectionAsync(Logger, _applicationId, PlayerName!)
-                                .ConfigureAwait(true).GetAwaiter().GetResult(), token);
+                                .ConfigureAwait(true).GetAwaiter().GetResult(), token).ConfigureAwait(false);
                         token.ThrowIfCancellationRequested();
 
                         await _charaHandler!.ActOnFrameworkAfterEnsureNoDrawAsync(() =>
@@ -457,7 +457,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                             var objTableIndex = gameObj.ObjectTableIndex();
                             _ipcManager.PenumbraSetTemporaryModsAsync(Logger, _applicationId, PlayerName!, objTableIndex, moddedPaths, charaData.ManipulationData)
                                 .ConfigureAwait(true).GetAwaiter().GetResult();
-                        }, token);
+                        }, token).ConfigureAwait(false);
                         token.ThrowIfCancellationRequested();
                     }
 
@@ -519,7 +519,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     private void Initialize(string name)
     {
         PlayerName = name;
-        _charaHandler = _gameObjectHandlerFactory.Create(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromObjectTableByIdent(OnlineUser.Ident), false).GetAwaiter().GetResult();
+        _charaHandler = _gameObjectHandlerFactory.Create(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromCachedTableByIdent(OnlineUser.Ident), false).GetAwaiter().GetResult();
 
         _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomizationAsync(PlayerCharacter).ConfigureAwait(false).GetAwaiter().GetResult();
         _lastGlamourerData = _originalGlamourerData;
@@ -594,7 +594,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
     private async Task RevertCustomizationDataAsync(ObjectKind objectKind, string name, Guid applicationId)
     {
-        nint address = _dalamudUtil.GetPlayerCharacterFromObjectTableByIdent(OnlineUser.Ident);
+        nint address = _dalamudUtil.GetPlayerCharacterFromCachedTableByIdent(OnlineUser.Ident);
         if (address == IntPtr.Zero) return;
 
         var cancelToken = new CancellationTokenSource();
@@ -623,7 +623,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
         else if (objectKind == ObjectKind.MinionOrMount)
         {
-            var minionOrMount = await _dalamudUtil.GetMinionOrMount(address).ConfigureAwait(false);
+            var minionOrMount = await _dalamudUtil.GetMinionOrMountAsync(address).ConfigureAwait(false);
             if (minionOrMount != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => minionOrMount, false).ConfigureAwait(false);
@@ -632,7 +632,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
         else if (objectKind == ObjectKind.Pet)
         {
-            var pet = await _dalamudUtil.GetPet(address).ConfigureAwait(false);
+            var pet = await _dalamudUtil.GetPetAsync(address).ConfigureAwait(false);
             if (pet != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => pet, false).ConfigureAwait(false);
@@ -641,7 +641,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
         else if (objectKind == ObjectKind.Companion)
         {
-            var companion = await _dalamudUtil.GetCompanion(address).ConfigureAwait(false);
+            var companion = await _dalamudUtil.GetCompanionAsync(address).ConfigureAwait(false);
             if (companion != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => companion, false).ConfigureAwait(false);

@@ -45,7 +45,7 @@ public class OnlinePlayerManager : DisposableMediatorSubscriberBase
 
     private void FrameworkOnUpdate()
     {
-        if (!_dalamudUtil.IsPlayerPresent || !_apiController.IsConnected) return;
+        if (!_dalamudUtil.GetIsPlayerPresent() || !_apiController.IsConnected) return;
 
         if (!_newVisiblePlayers.Any()) return;
         var newVisiblePlayers = _newVisiblePlayers.ToList();

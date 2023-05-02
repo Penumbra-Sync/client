@@ -64,14 +64,12 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     private bool _heelsExists = false;
 
+    private bool _honorificExists = false;
     private bool _isDirectoryWritable = false;
 
     private bool _isPenumbraDirectory = false;
 
     private bool _palettePlusExists = false;
-
-    private bool _honorificExists = false;
-
     private bool _penumbraExists = false;
 
     private int _serverSelectionIndex = -1;
@@ -119,7 +117,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public bool IsInGpose => _dalamudUtil.IsInCutscene;
 
-    public string PlayerName => _dalamudUtil.PlayerName;
+    public string PlayerName => _dalamudUtil.GetPlayerName();
 
     public ImFontPtr UidFont { get; private set; }
 
@@ -127,7 +125,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public Dictionary<ushort, string> WorldData => _dalamudUtil.WorldData.Value;
 
-    public uint WorldId => _dalamudUtil.WorldId;
+    public uint WorldId => _dalamudUtil.GetWorldId();
 
     public static void AttachToolTip(string text)
     {

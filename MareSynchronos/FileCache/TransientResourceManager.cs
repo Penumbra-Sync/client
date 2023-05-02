@@ -24,6 +24,8 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         _configurationService = configurationService;
         _dalamudUtil = dalamudUtil;
 
+        PlayerPersistentDataKey = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult() + "_" + _dalamudUtil.GetWorldIdAsync().GetAwaiter().GetResult();
+
         SemiTransientResources.TryAdd(ObjectKind.Player, new HashSet<string>(StringComparer.Ordinal));
         if (_configurationService.Current.PlayerPersistentTransientCache.TryGetValue(PlayerPersistentDataKey, out var gamePaths))
         {
@@ -60,7 +62,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         });
     }
 
-    private string PlayerPersistentDataKey => _dalamudUtil.PlayerName + "_" + _dalamudUtil.WorldId;
+    private string PlayerPersistentDataKey { get; }
     private ConcurrentDictionary<ObjectKind, HashSet<string>> SemiTransientResources { get; } = new();
     private ConcurrentDictionary<IntPtr, HashSet<string>> TransientResources { get; } = new();
 
@@ -185,7 +187,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             Logger.LogDebug("Penumbra Mod Settings changed, verifying SemiTransientResources");
             foreach (var item in SemiTransientResources)
             {
-                Mediator.Publish(new TransientResourceChangedMessage(_dalamudUtil.PlayerPointer));
+                Mediator.Publish(new TransientResourceChangedMessage(_dalamudUtil.GetPlayerPointer()));
             }
         });
     }

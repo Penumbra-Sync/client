@@ -57,8 +57,8 @@ public class ServerConfigurationManager
             Save();
         }
 
-        var charaName = _dalamudUtil.PlayerName;
-        var worldId = _dalamudUtil.WorldId;
+        var charaName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult();
+        var worldId = _dalamudUtil.GetWorldIdAsync().GetAwaiter().GetResult();
         if (!currentServer.Authentications.Any() && currentServer.SecretKeys.Any())
         {
             currentServer.Authentications.Add(new Authentication()
@@ -112,8 +112,8 @@ public class ServerConfigurationManager
 
     public string? GetToken()
     {
-        var charaName = _dalamudUtil.PlayerName;
-        var worldId = _dalamudUtil.WorldId;
+        var charaName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult();
+        var worldId = _dalamudUtil.GetWorldIdAsync().GetAwaiter().GetResult();
         var secretKey = GetSecretKey();
         if (secretKey == null) return null;
         if (_tokenDictionary.TryGetValue(new JwtCache(CurrentApiUrl, charaName, worldId, secretKey), out var token))
@@ -138,8 +138,8 @@ public class ServerConfigurationManager
 
     public void SaveToken(string token)
     {
-        var charaName = _dalamudUtil.PlayerName;
-        var worldId = _dalamudUtil.WorldId;
+        var charaName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult();
+        var worldId = _dalamudUtil.GetWorldIdAsync().GetAwaiter().GetResult();
         var secretKey = GetSecretKey();
         if (string.IsNullOrEmpty(secretKey)) throw new InvalidOperationException("No secret key set");
         _tokenDictionary[new JwtCache(CurrentApiUrl, charaName, worldId, secretKey)] = token;
@@ -158,8 +158,8 @@ public class ServerConfigurationManager
         var server = GetServerByIndex(serverSelectionIndex);
         server.Authentications.Add(new Authentication()
         {
-            CharacterName = _dalamudUtil.PlayerName,
-            WorldId = _dalamudUtil.WorldId,
+            CharacterName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult(),
+            WorldId = _dalamudUtil.GetWorldIdAsync().GetAwaiter().GetResult(),
             SecretKeyIdx = addLastSecretKey ? server.SecretKeys.Last().Key : -1,
         });
         Save();

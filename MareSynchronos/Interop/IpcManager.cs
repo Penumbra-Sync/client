@@ -24,7 +24,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly ICallGateSubscriber<string, Character?, object> _customizePlusSetBodyScaleToCharacter;
     private readonly DalamudUtilService _dalamudUtil;
     private readonly ICallGateSubscriber<int> _glamourerApiVersion;
-    private readonly SemaphoreSlim _redrawSemaphore = new(2);
     private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyAll;
     private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyOnlyCustomization;
     private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyOnlyEquipment;
@@ -64,6 +63,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly FuncSubscriber<string, string, int, PenumbraApiEc> _penumbraRemoveTemporaryMod;
     private readonly FuncSubscriber<string> _penumbraResolveModDir;
     private readonly FuncSubscriber<string[], string[], (string[], string[][])> _penumbraResolvePaths;
+    private readonly SemaphoreSlim _redrawSemaphore = new(2);
     private bool _customizePlusAvailable = false;
     private CancellationTokenSource _disposalCts = new();
     private bool _glamourerAvailable = false;
@@ -193,7 +193,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public async Task<string> GetCustomizePlusScaleAsync()
     {
         if (!CheckCustomizePlusApi()) return string.Empty;
-        var scale = await _dalamudUtil.RunOnFrameworkThread(() => _customizePlusGetBodyScale.InvokeFunc(_dalamudUtil.PlayerName)).ConfigureAwait(false);
+        var scale = await _dalamudUtil.RunOnFrameworkThread(() => _customizePlusGetBodyScale.InvokeFunc(_dalamudUtil.GetPlayerName())).ConfigureAwait(false);
         if (string.IsNullOrEmpty(scale)) return string.Empty;
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(scale));
     }
@@ -340,7 +340,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public async Task<string> PalettePlusBuildPaletteAsync()
     {
         if (!CheckPalettePlusApi()) return string.Empty;
-        var palette = await _dalamudUtil.RunOnFrameworkThread(() => _palettePlusBuildCharaPalette.InvokeFunc(_dalamudUtil.PlayerCharacter)).ConfigureAwait(false);
+        var palette = await _dalamudUtil.RunOnFrameworkThread(() => _palettePlusBuildCharaPalette.InvokeFunc(_dalamudUtil.GetPlayerCharacter())).ConfigureAwait(false);
         if (string.IsNullOrEmpty(palette)) return string.Empty;
         return Convert.ToBase64String(Encoding.UTF8.GetBytes(palette));
     }

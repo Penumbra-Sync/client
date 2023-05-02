@@ -124,7 +124,7 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
 
     private async Task WaitForPlayerAndLaunchCharacterManager()
     {
-        while (!_dalamudUtil.IsPlayerPresent)
+        while (!await _dalamudUtil.GetIsPlayerPresentAsync().ConfigureAwait(false))
         {
             await Task.Delay(100).ConfigureAwait(false);
         }

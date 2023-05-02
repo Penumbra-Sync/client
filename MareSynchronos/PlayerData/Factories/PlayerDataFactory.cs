@@ -316,7 +316,7 @@ public class PlayerDataFactory
         // wait until chara is not drawing and present so nothing spontaneously explodes
         await _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, playerRelatedObject, Guid.NewGuid(), 30000, ct: token).ConfigureAwait(false);
         int totalWaitTime = 10000;
-        while (!DalamudUtilService.IsObjectPresent(await _dalamudUtil.RunOnFrameworkThread(() => _dalamudUtil.CreateGameObjectAsync(charaPointer).GetAwaiter().GetResult()).ConfigureAwait(false)) && totalWaitTime > 0)
+        while (!await _dalamudUtil.IsObjectPresentAsync(await _dalamudUtil.CreateGameObjectAsync(charaPointer).ConfigureAwait(false)).ConfigureAwait(false) && totalWaitTime > 0)
         {
             _logger.LogTrace("Character is null but it shouldn't be, waiting");
             await Task.Delay(50, token).ConfigureAwait(false);

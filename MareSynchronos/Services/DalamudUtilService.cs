@@ -54,26 +54,16 @@ public class DalamudUtilService : IHostedService
     public unsafe GameObject* GposeTarget => TargetSystem.Instance()->GPoseTarget;
     public unsafe Dalamud.Game.ClientState.Objects.Types.GameObject? GposeTargetGameObject => GposeTarget == null ? null : _objectTable[GposeTarget->ObjectIndex];
     public bool IsInCutscene { get; private set; } = false;
-    public bool IsInFrameworkThread => _framework.IsInFrameworkUpdateThread;
     public bool IsInGpose { get; private set; } = false;
     public bool IsLoggedIn { get; private set; }
-    public bool IsPlayerPresent => _clientState.LocalPlayer != null && _clientState.LocalPlayer.IsValid();
     public bool IsZoning => _condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51];
-    public PlayerCharacter PlayerCharacter => _clientState.LocalPlayer!;
-
-    public string PlayerName => _clientState.LocalPlayer?.Name.ToString() ?? "--";
-
-    public string PlayerNameHashed => (PlayerName + _clientState.LocalPlayer!.HomeWorld.Id).GetHash256();
-
-    public IntPtr PlayerPointer => _clientState.LocalPlayer?.Address ?? IntPtr.Zero;
 
     public Lazy<Dictionary<ushort, string>> WorldData { get; private set; }
 
-    public uint WorldId => _clientState.LocalPlayer!.HomeWorld.Id;
-
-    public static bool IsObjectPresent(Dalamud.Game.ClientState.Objects.Types.GameObject? obj)
+    public Dalamud.Game.ClientState.Objects.Types.GameObject? CreateGameObject(IntPtr reference)
     {
-        return obj != null && obj.IsValid();
+        EnsureIsOnFramework();
+        return _objectTable.CreateObjectReference(reference);
     }
 
     public async Task<Dalamud.Game.ClientState.Objects.Types.GameObject?> CreateGameObjectAsync(IntPtr reference)
@@ -86,43 +76,126 @@ public class DalamudUtilService : IHostedService
         if (!_framework.IsInFrameworkUpdateThread) throw new InvalidOperationException("Can only be run on Framework");
     }
 
-    public Dalamud.Game.ClientState.Objects.Types.GameObject? CreateGameObject(IntPtr reference)
-    {
-        EnsureIsOnFramework();
-        return _objectTable.CreateObjectReference(reference);
-    }
-
     public Dalamud.Game.ClientState.Objects.Types.Character? GetCharacterFromObjectTableByIndex(int index)
     {
+        EnsureIsOnFramework();
         var objTableObj = _objectTable[index];
         if (objTableObj!.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) return null;
         return (Dalamud.Game.ClientState.Objects.Types.Character)objTableObj;
     }
 
-    public async Task<IntPtr> GetCompanion(IntPtr? playerPointer = null)
+    public unsafe IntPtr GetCompanion(IntPtr? playerPointer = null)
     {
-        return await RunOnFrameworkThread(() => GetCompanionInternal(playerPointer)).ConfigureAwait(false);
+        EnsureIsOnFramework();
+        var mgr = CharacterManager.Instance();
+        playerPointer ??= GetPlayerPointer();
+        if (playerPointer == IntPtr.Zero || (IntPtr)mgr == IntPtr.Zero) return IntPtr.Zero;
+        return (IntPtr)mgr->LookupBuddyByOwnerObject((BattleChara*)playerPointer);
     }
 
-    public async Task<IntPtr> GetMinionOrMount(IntPtr? playerPointer = null)
+    public async Task<IntPtr> GetCompanionAsync(IntPtr? playerPointer = null)
     {
-        return await RunOnFrameworkThread(() => GetMinionOrMountInternal(playerPointer)).ConfigureAwait(false);
+        return await RunOnFrameworkThread(() => GetCompanion(playerPointer)).ConfigureAwait(false);
     }
 
-    public async Task<IntPtr> GetPet(IntPtr? playerPointer = null)
+    public bool GetIsPlayerPresent()
     {
-        return await RunOnFrameworkThread(() => GetPetInternal(playerPointer)).ConfigureAwait(false);
+        EnsureIsOnFramework();
+        return _clientState.LocalPlayer != null && _clientState.LocalPlayer.IsValid();
     }
 
-    public IntPtr GetPlayerCharacterFromObjectTableByIdent(string characterName)
+    public async Task<bool> GetIsPlayerPresentAsync()
+    {
+        return await RunOnFrameworkThread(GetIsPlayerPresent).ConfigureAwait(false);
+    }
+
+    public unsafe IntPtr GetMinionOrMount(IntPtr? playerPointer = null)
+    {
+        EnsureIsOnFramework();
+        playerPointer ??= GetPlayerPointer();
+        if (playerPointer == IntPtr.Zero) return IntPtr.Zero;
+        return _objectTable.GetObjectAddress(((GameObject*)playerPointer)->ObjectIndex + 1);
+    }
+
+    public async Task<IntPtr> GetMinionOrMountAsync(IntPtr? playerPointer = null)
+    {
+        return await RunOnFrameworkThread(() => GetMinionOrMount(playerPointer)).ConfigureAwait(false);
+    }
+
+    public unsafe IntPtr GetPet(IntPtr? playerPointer = null)
+    {
+        EnsureIsOnFramework();
+        if (_classJobIdsIgnoredForPets.Contains(_classJobId ?? 0)) return IntPtr.Zero;
+        var mgr = CharacterManager.Instance();
+        playerPointer ??= GetPlayerPointer();
+        if (playerPointer == IntPtr.Zero || (IntPtr)mgr == IntPtr.Zero) return IntPtr.Zero;
+        return (IntPtr)mgr->LookupPetByOwnerObject((BattleChara*)playerPointer);
+    }
+
+    public async Task<IntPtr> GetPetAsync(IntPtr? playerPointer = null)
+    {
+        return await RunOnFrameworkThread(() => GetPet(playerPointer)).ConfigureAwait(false);
+    }
+
+    public PlayerCharacter GetPlayerCharacter()
+    {
+        EnsureIsOnFramework();
+        return _clientState.LocalPlayer!;
+    }
+
+    public IntPtr GetPlayerCharacterFromCachedTableByIdent(string characterName)
     {
         if (_playerCharas.TryGetValue(characterName, out var pchar)) return pchar.Address;
         return IntPtr.Zero;
     }
 
+    public string GetPlayerName()
+    {
+        EnsureIsOnFramework();
+        return _clientState.LocalPlayer?.Name.ToString() ?? "--";
+    }
+
+    public async Task<string> GetPlayerNameAsync()
+    {
+        return await RunOnFrameworkThread(GetPlayerName).ConfigureAwait(false);
+    }
+
+    public async Task<string> GetPlayerNameHashedAsync()
+    {
+        return await RunOnFrameworkThread(() => (GetPlayerName() + GetWorldId()).GetHash256()).ConfigureAwait(false);
+    }
+
+    public IntPtr GetPlayerPointer()
+    {
+        EnsureIsOnFramework();
+        return _clientState.LocalPlayer?.Address ?? IntPtr.Zero;
+    }
+
+    public uint GetWorldId()
+    {
+        EnsureIsOnFramework();
+        return _clientState.LocalPlayer!.HomeWorld.Id;
+    }
+
+    public async Task<uint> GetWorldIdAsync()
+    {
+        return await RunOnFrameworkThread(GetWorldId).ConfigureAwait(false);
+    }
+
     public unsafe bool IsGameObjectPresent(IntPtr key)
     {
         return _objectTable.Any(f => f.Address == key);
+    }
+
+    public bool IsObjectPresent(Dalamud.Game.ClientState.Objects.Types.GameObject? obj)
+    {
+        EnsureIsOnFramework();
+        return obj != null && obj.IsValid();
+    }
+
+    public async Task<bool> IsObjectPresentAsync(Dalamud.Game.ClientState.Objects.Types.GameObject? obj)
+    {
+        return await RunOnFrameworkThread(() => IsObjectPresent(obj)).ConfigureAwait(false);
     }
 
     public async Task RunOnFrameworkThread(Action act)
@@ -333,29 +406,5 @@ public class DalamudUtilService : IHostedService
         _mediator.Publish(new DelayedFrameworkUpdateMessage());
 
         _delayedFrameworkUpdateCheck = DateTime.Now;
-    }
-
-    private unsafe IntPtr GetCompanionInternal(IntPtr? playerPointer = null)
-    {
-        var mgr = CharacterManager.Instance();
-        playerPointer ??= PlayerPointer;
-        if (playerPointer == IntPtr.Zero || (IntPtr)mgr == IntPtr.Zero) return IntPtr.Zero;
-        return (IntPtr)mgr->LookupBuddyByOwnerObject((BattleChara*)playerPointer);
-    }
-
-    private unsafe IntPtr GetMinionOrMountInternal(IntPtr? playerPointer = null)
-    {
-        playerPointer ??= PlayerPointer;
-        if (playerPointer == IntPtr.Zero) return IntPtr.Zero;
-        return _objectTable.GetObjectAddress(((GameObject*)playerPointer)->ObjectIndex + 1);
-    }
-
-    private unsafe IntPtr GetPetInternal(IntPtr? playerPointer = null)
-    {
-        if (_classJobIdsIgnoredForPets.Contains(_classJobId ?? 0)) return IntPtr.Zero;
-        var mgr = CharacterManager.Instance();
-        playerPointer ??= PlayerPointer;
-        if (playerPointer == IntPtr.Zero || (IntPtr)mgr == IntPtr.Zero) return IntPtr.Zero;
-        return (IntPtr)mgr->LookupPetByOwnerObject((BattleChara*)playerPointer);
     }
 }
