@@ -36,11 +36,11 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly ICallGateSubscriber<GameObject, object?> _heelsUnregisterPlayer;
     private readonly ICallGateSubscriber<(uint major, uint minor)> _honorificApiVersion;
     private readonly ICallGateSubscriber<Character, object> _honorificClearCharacterTitle;
+    private readonly ICallGateSubscriber<object> _honorificDisposing;
     private readonly ICallGateSubscriber<string> _honorificGetLocalCharacterTitle;
     private readonly ICallGateSubscriber<string, object> _honorificLocalCharacterTitleChanged;
-    private readonly ICallGateSubscriber<Character, string, object> _honorificSetCharacterTitle;
-    private readonly ICallGateSubscriber<object> _honorificDisposing;
     private readonly ICallGateSubscriber<object> _honorificReady;
+    private readonly ICallGateSubscriber<Character, string, object> _honorificSetCharacterTitle;
     private readonly ConcurrentQueue<Action> _normalQueue = new();
     private readonly ICallGateSubscriber<string> _palettePlusApiVersion;
     private readonly ICallGateSubscriber<Character, string> _palettePlusBuildCharaPalette;
@@ -155,6 +155,8 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         Mediator.Subscribe<CutsceneFrameworkUpdateMessage>(this, (_) => HandleGposeActionQueue());
         Mediator.Subscribe<ZoneSwitchEndMessage>(this, (_) => ClearActionQueue());
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => PeriodicApiStateCheck());
+
+        PeriodicApiStateCheck();
     }
 
     public bool Initialized => CheckPenumbraApiInternal() && CheckGlamourerApiInternal();
@@ -337,22 +339,29 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     {
         if (!CheckHonorificApi()) return;
         Logger.LogTrace("Applying Honorific data to {chara}", character.ToString("X"));
-        await _dalamudUtil.RunOnFrameworkThread(() =>
+        try
         {
-            var gameObj = _dalamudUtil.CreateGameObject(character);
-            if (gameObj is PlayerCharacter pc)
+            await _dalamudUtil.RunOnFrameworkThread(() =>
             {
-                string honorificData = string.IsNullOrEmpty(honorificDataB64) ? string.Empty : Encoding.UTF8.GetString(Convert.FromBase64String(honorificDataB64));
-                if (string.IsNullOrEmpty(honorificData))
+                var gameObj = _dalamudUtil.CreateGameObject(character);
+                if (gameObj is PlayerCharacter pc)
                 {
-                    _honorificClearCharacterTitle!.InvokeAction(pc);
+                    string honorificData = string.IsNullOrEmpty(honorificDataB64) ? string.Empty : Encoding.UTF8.GetString(Convert.FromBase64String(honorificDataB64));
+                    if (string.IsNullOrEmpty(honorificData))
+                    {
+                        _honorificClearCharacterTitle!.InvokeAction(pc);
+                    }
+                    else
+                    {
+                        _honorificSetCharacterTitle!.InvokeAction(pc, honorificData);
+                    }
                 }
-                else
-                {
-                    _honorificSetCharacterTitle!.InvokeAction(pc, honorificData);
-                }
-            }
-        }).ConfigureAwait(false);
+            }).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            Logger.LogWarning(e, "Could not apply Honorific data");
+        }
     }
 
     public async Task<string> PalettePlusBuildPaletteAsync()
@@ -645,15 +654,15 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         Mediator.Publish(new CustomizePlusMessage());
     }
 
+    private void OnHonorificDisposing()
+    {
+        Mediator.Publish(new HonorificMessage(string.Empty));
+    }
+
     private void OnHonorificLocalCharacterTitleChanged(string titleJson)
     {
         string titleData = string.IsNullOrEmpty(titleJson) ? string.Empty : Convert.ToBase64String(Encoding.UTF8.GetBytes(titleJson));
         Mediator.Publish(new HonorificMessage(titleData));
-    }
-
-    private void OnHonorificDisposing()
-    {
-        Mediator.Publish(new HonorificMessage(string.Empty));
     }
 
     private void OnHonorificReady()

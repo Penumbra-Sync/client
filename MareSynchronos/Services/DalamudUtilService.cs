@@ -332,7 +332,15 @@ public class DalamudUtilService : IHostedService
 
     private unsafe void FrameworkOnUpdateInternal()
     {
-        if (_clientState.LocalPlayer?.IsDead ?? false) return;
+        if (_clientState.LocalPlayer == null)
+        {
+            return;
+        }
+
+        if (_clientState.LocalPlayer?.IsDead ?? false)
+        {
+            return;
+        }
 
         IsAnythingDrawing = false;
         _playerCharas = _performanceCollector.LogPerformance(this, "ObjTableToCharas",
