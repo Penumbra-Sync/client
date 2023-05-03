@@ -36,9 +36,11 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly ICallGateSubscriber<GameObject, object?> _heelsUnregisterPlayer;
     private readonly ICallGateSubscriber<(uint major, uint minor)> _honorificApiVersion;
     private readonly ICallGateSubscriber<Character, object> _honorificClearCharacterTitle;
-    private readonly ICallGateSubscriber<(string Title, bool IsPrefix)> _honorificGetLocalCharacterTitle;
-    private readonly ICallGateSubscriber<string, bool, object> _honorificLocalCharacterTitleChanged;
-    private readonly ICallGateSubscriber<Character, string, bool, object> _honorificSetCharacterTitle;
+    private readonly ICallGateSubscriber<string> _honorificGetLocalCharacterTitle;
+    private readonly ICallGateSubscriber<string, object> _honorificLocalCharacterTitleChanged;
+    private readonly ICallGateSubscriber<Character, string, object> _honorificSetCharacterTitle;
+    private readonly ICallGateSubscriber<object> _honorificDisposing;
+    private readonly ICallGateSubscriber<object> _honorificReady;
     private readonly ConcurrentQueue<Action> _normalQueue = new();
     private readonly ICallGateSubscriber<string> _palettePlusApiVersion;
     private readonly ICallGateSubscriber<Character, string> _palettePlusBuildCharaPalette;
@@ -133,12 +135,16 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         _palettePlusPaletteChanged.Subscribe(OnPalettePlusPaletteChange);
 
         _honorificApiVersion = pi.GetIpcSubscriber<(uint, uint)>("Honorific.ApiVersion");
-        _honorificGetLocalCharacterTitle = pi.GetIpcSubscriber<(string, bool)>("Honorific.GetLocalCharacterTitle");
+        _honorificGetLocalCharacterTitle = pi.GetIpcSubscriber<string>("Honorific.GetLocalCharacterTitle");
         _honorificClearCharacterTitle = pi.GetIpcSubscriber<Character, object>("Honorific.ClearCharacterTitle");
-        _honorificSetCharacterTitle = pi.GetIpcSubscriber<Character, string, bool, object>("Honorific.SetCharacterTitle");
-        _honorificLocalCharacterTitleChanged = pi.GetIpcSubscriber<string, bool, object>("Honorific.LocalCharacterTitleChanged");
+        _honorificSetCharacterTitle = pi.GetIpcSubscriber<Character, string, object>("Honorific.SetCharacterTitle");
+        _honorificLocalCharacterTitleChanged = pi.GetIpcSubscriber<string, object>("Honorific.LocalCharacterTitleChanged");
+        _honorificDisposing = pi.GetIpcSubscriber<object>("Honorific.Disposing");
+        _honorificReady = pi.GetIpcSubscriber<object>("Honorific.Ready");
 
         _honorificLocalCharacterTitleChanged.Subscribe(OnHonorificLocalCharacterTitleChanged);
+        _honorificDisposing.Subscribe(OnHonorificDisposing);
+        _honorificReady.Subscribe(OnHonorificReady);
 
         if (Initialized)
         {
@@ -312,11 +318,11 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public string HonorificGetTitle()
     {
         if (!CheckHonorificApi()) return string.Empty;
-        (string? title, bool isPrefix) = _honorificGetLocalCharacterTitle.InvokeFunc();
-        return string.IsNullOrEmpty(title) ? string.Empty : $"{(isPrefix ? 1 : 0)}{title}";
+        string title = _honorificGetLocalCharacterTitle.InvokeFunc();
+        return string.IsNullOrEmpty(title) ? string.Empty : Convert.ToBase64String(Encoding.UTF8.GetBytes(title));
     }
 
-    public async Task HonorificSetTitleAsync(IntPtr character, string honorificData)
+    public async Task HonorificSetTitleAsync(IntPtr character, string honorificDataB64)
     {
         if (!CheckHonorificApi()) return;
         Logger.LogTrace("Applying Honorific data to {chara}", character.ToString("X"));
@@ -325,13 +331,14 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         {
             await _dalamudUtil.RunOnFrameworkThread(() =>
             {
+                string honorificData = string.IsNullOrEmpty(honorificDataB64) ? string.Empty : Encoding.UTF8.GetString(Convert.FromBase64String(honorificDataB64));
                 if (string.IsNullOrEmpty(honorificData))
                 {
                     _honorificClearCharacterTitle!.InvokeAction(pc);
                 }
                 else
                 {
-                    _honorificSetCharacterTitle!.InvokeAction(pc, honorificData[1..], honorificData[0] == '1');
+                    _honorificSetCharacterTitle!.InvokeAction(pc, honorificData);
                 }
             }).ConfigureAwait(false);
         }
@@ -487,6 +494,8 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         _palettePlusPaletteChanged.Unsubscribe(OnPalettePlusPaletteChange);
         _customizePlusOnScaleUpdate.Unsubscribe(OnCustomizePlusScaleChange);
         _honorificLocalCharacterTitleChanged.Unsubscribe(OnHonorificLocalCharacterTitleChanged);
+        _honorificDisposing.Unsubscribe(OnHonorificDisposing);
+        _honorificReady.Unsubscribe(OnHonorificReady);
     }
 
     private bool CheckCustomizePlusApiInternal()
@@ -540,7 +549,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     {
         try
         {
-            return _honorificApiVersion.InvokeFunc() is { Item1: 1, Item2: >= 0 };
+            return _honorificApiVersion.InvokeFunc() is { Item1: 2, Item2: >= 0 };
         }
         catch
         {
@@ -625,9 +634,21 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         Mediator.Publish(new CustomizePlusMessage());
     }
 
-    private void OnHonorificLocalCharacterTitleChanged(string title, bool isPrefix)
+    private void OnHonorificLocalCharacterTitleChanged(string titleJson)
     {
-        Mediator.Publish(new HonorificMessage((isPrefix ? 1 : 0) + title));
+        string titleData = string.IsNullOrEmpty(titleJson) ? string.Empty : Convert.ToBase64String(Encoding.UTF8.GetBytes(titleJson));
+        Mediator.Publish(new HonorificMessage(titleData));
+    }
+
+    private void OnHonorificDisposing()
+    {
+        Mediator.Publish(new HonorificMessage(string.Empty));
+    }
+
+    private void OnHonorificReady()
+    {
+        _honorificAvailable = CheckHonorificApiInternal();
+        Mediator.Publish(new HonorificReadyMessage());
     }
 
     private void OnPalettePlusPaletteChange(Character character, string palette)

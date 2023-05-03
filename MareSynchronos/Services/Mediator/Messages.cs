@@ -36,6 +36,7 @@ public record PenumbraResourceLoadMessage(IntPtr GameObject, string GamePath, st
 public record CustomizePlusMessage : MessageBase;
 public record PalettePlusMessage(Character Character) : MessageBase;
 public record HonorificMessage(string NewHonorificTitle) : MessageBase;
+public record HonorificReadyMessage : MessageBase;
 public record PlayerChangedMessage(CharacterData Data) : MessageBase;
 public record CharacterChangedMessage(GameObjectHandler GameObjectHandler) : MessageBase;
 public record TransientResourceChangedMessage(IntPtr Address) : MessageBase;
