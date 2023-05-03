@@ -31,6 +31,7 @@ public class DalamudUtilService : IHostedService
     private readonly PerformanceCollectorService _performanceCollector;
     private uint? _classJobId = 0;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
+    private string _lastGlobalBlockPlayer = string.Empty;
     private Dictionary<string, (string Name, nint Address)> _playerCharas = new(StringComparer.Ordinal);
     private bool _sentBetweenAreas = false;
 
@@ -325,6 +326,55 @@ public class DalamudUtilService : IHostedService
         return result;
     }
 
+    private unsafe void CheckCharacterForDrawing(PlayerCharacter p)
+    {
+        if (!IsAnythingDrawing)
+        {
+            var gameObj = (GameObject*)p.Address;
+            var drawObj = gameObj->DrawObject;
+            var playerName = p.Name.ToString();
+            bool isDrawing = false;
+            if ((nint)drawObj != IntPtr.Zero)
+            {
+                isDrawing = gameObj->RenderFlags == 0b100000000000;
+                if (!isDrawing)
+                {
+                    isDrawing = ((CharacterBase*)drawObj)->HasModelInSlotLoaded != 0;
+                    if (!isDrawing)
+                    {
+                        isDrawing = ((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0;
+                        if (isDrawing)
+                        {
+                            if (!string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal))
+                            {
+                                _lastGlobalBlockPlayer = playerName;
+                                _logger.LogTrace("Global draw block: START => {name} (HasModelFilesInSlotLoaded)", playerName);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (!string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal))
+                        {
+                            _lastGlobalBlockPlayer = playerName;
+                            _logger.LogTrace("Global draw block: START => {name} (HasModelInSlotLoaded)", playerName);
+                        }
+                    }
+                }
+                else
+                {
+                    if (!string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal))
+                    {
+                        _lastGlobalBlockPlayer = playerName;
+                        _logger.LogTrace("Global draw block: START => {name} (RenderFlags)", playerName);
+                    }
+                }
+            }
+
+            IsAnythingDrawing |= isDrawing;
+        }
+    }
+
     private void FrameworkOnUpdate(Framework framework)
     {
         _performanceCollector.LogPerformance(this, "FrameworkOnUpdate", FrameworkOnUpdateInternal);
@@ -347,40 +397,15 @@ public class DalamudUtilService : IHostedService
             () => _objectTable.OfType<PlayerCharacter>().Where(o => o.ObjectIndex < 240)
                 .ToDictionary(p => p.GetHash256(), p =>
                 {
-                    if (!IsAnythingDrawing)
-                    {
-                        var gameObj = (GameObject*)p.Address;
-                        var drawObj = gameObj->DrawObject;
-                        bool isDrawing = false;
-                        if ((nint)drawObj != IntPtr.Zero)
-                        {
-                            isDrawing = gameObj->RenderFlags == 0b100000000000;
-                            if (!isDrawing)
-                            {
-                                isDrawing = ((CharacterBase*)drawObj)->HasModelInSlotLoaded != 0;
-                                if (!isDrawing)
-                                {
-                                    isDrawing = ((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0;
-                                    if (isDrawing)
-                                    {
-                                        _logger.LogTrace("Global draw block triggered by {name} due to HasModelFilesInSlotLoaded", p.Name.ToString());
-                                    }
-                                }
-                                else
-                                {
-                                    _logger.LogTrace("Global draw block triggered by {name} due to HasModelInSlotLoaded", p.Name.ToString());
-                                }
-                            }
-                            else
-                            {
-                                _logger.LogTrace("Global draw block triggered by {name} due to RenderFlags", p.Name.ToString());
-                            }
-                        }
-
-                        IsAnythingDrawing |= isDrawing;
-                    }
+                    CheckCharacterForDrawing(p);
                     return (p.Name.ToString(), p.Address);
                 }, StringComparer.Ordinal));
+
+        if (!IsAnythingDrawing && !string.IsNullOrEmpty(_lastGlobalBlockPlayer))
+        {
+            _logger.LogTrace("Global draw block: END => {name}", _lastGlobalBlockPlayer);
+            _lastGlobalBlockPlayer = string.Empty;
+        }
 
         if (GposeTarget != null && !IsInGpose)
         {
