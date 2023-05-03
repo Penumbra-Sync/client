@@ -350,24 +350,34 @@ public class DalamudUtilService : IHostedService
                     if (!IsAnythingDrawing)
                     {
                         var gameObj = (GameObject*)p.Address;
-                        bool isDrawing = gameObj->RenderFlags == 0b100000000000;
-                        if (!isDrawing)
+                        var drawObj = gameObj->DrawObject;
+                        bool isDrawing = false;
+                        if ((nint)drawObj != IntPtr.Zero)
                         {
-                            var drawObj = gameObj->DrawObject;
-                            if ((nint)drawObj != IntPtr.Zero)
+                            isDrawing = gameObj->RenderFlags == 0b100000000000;
+                            if (!isDrawing)
                             {
                                 isDrawing = ((CharacterBase*)drawObj)->HasModelInSlotLoaded != 0;
                                 if (!isDrawing)
                                 {
                                     isDrawing = ((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0;
+                                    if (isDrawing)
+                                    {
+                                        _logger.LogTrace("Global draw block triggered by {name} due to HasModelFilesInSlotLoaded", p.Name.ToString());
+                                    }
                                 }
+                                else
+                                {
+                                    _logger.LogTrace("Global draw block triggered by {name} due to HasModelInSlotLoaded", p.Name.ToString());
+                                }
+                            }
+                            else
+                            {
+                                _logger.LogTrace("Global draw block triggered by {name} due to RenderFlags", p.Name.ToString());
                             }
                         }
 
-                        if (isDrawing)
-                        {
-                            IsAnythingDrawing = true;
-                        }
+                        IsAnythingDrawing |= isDrawing;
                     }
                     return (p.Name.ToString(), p.Address);
                 }, StringComparer.Ordinal));
