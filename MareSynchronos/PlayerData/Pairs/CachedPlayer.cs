@@ -14,10 +14,8 @@ using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Files;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using static System.Net.Mime.MediaTypeNames;
 using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;
 
 namespace MareSynchronos.PlayerData.Pairs;
@@ -55,6 +53,12 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         _lifetime = lifetime;
         _fileDbManager = fileDbManager;
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
+        Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) =>
+        {
+            _charaHandler?.Invalidate();
+            IsVisible = false;
+        }
+        );
         _pluginWarnings ??= new()
         {
             ShownCustomizePlusWarning = mareConfigService.Current.DisableOptionalPluginWarnings,
@@ -445,16 +449,14 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
                     if (updateModdedPaths && (moddedPaths.Any() || !string.IsNullOrEmpty(charaData.ManipulationData)))
                     {
-                        await _charaHandler!.ActOnFrameworkAfterEnsureNoDrawAsync(() => _ipcManager
+                        await _charaHandler!.ActOnFrameworkAfterEnsureNoDrawAsync((_) => _ipcManager
                             .PenumbraRemoveTemporaryCollectionAsync(Logger, _applicationId, PlayerName!)
                                 .ConfigureAwait(true).GetAwaiter().GetResult(), token).ConfigureAwait(false);
                         token.ThrowIfCancellationRequested();
 
-                        await _charaHandler!.ActOnFrameworkAfterEnsureNoDrawAsync(() =>
+                        await _charaHandler!.ActOnFrameworkAfterEnsureNoDrawAsync((chara) =>
                         {
-                            var gameObj = _charaHandler!.GetGameObject();
-                            if (gameObj == null) return;
-                            var objTableIndex = gameObj.ObjectTableIndex();
+                            var objTableIndex = chara.ObjectTableIndex();
                             _ipcManager.PenumbraSetTemporaryModsAsync(Logger, _applicationId, PlayerName!, objTableIndex, moddedPaths, charaData.ManipulationData)
                                 .ConfigureAwait(true).GetAwaiter().GetResult();
                         }, token).ConfigureAwait(false);
@@ -510,6 +512,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             _framesSinceNotVisible++;
             if (_framesSinceNotVisible > 30)
             {
+                _framesSinceNotVisible = 30;
                 IsVisible = false;
                 Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);
             }
@@ -627,7 +630,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             if (minionOrMount != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => minionOrMount, false).ConfigureAwait(false);
-                await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
+                await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
             }
         }
         else if (objectKind == ObjectKind.Pet)
@@ -636,7 +639,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             if (pet != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => pet, false).ConfigureAwait(false);
-                await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
+                await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
             }
         }
         else if (objectKind == ObjectKind.Companion)
@@ -645,7 +648,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             if (companion != IntPtr.Zero)
             {
                 using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => companion, false).ConfigureAwait(false);
-                await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
+                await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
             }
         }
     }

@@ -185,9 +185,9 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         Task.Run(() =>
         {
             Logger.LogDebug("Penumbra Mod Settings changed, verifying SemiTransientResources");
-            foreach (var item in SemiTransientResources)
+            foreach (var item in _playerRelatedPointers)
             {
-                Mediator.Publish(new TransientResourceChangedMessage(_dalamudUtil.GetPlayerPointer()));
+                Mediator.Publish(new TransientResourceChangedMessage(item.Address));
             }
         });
     }

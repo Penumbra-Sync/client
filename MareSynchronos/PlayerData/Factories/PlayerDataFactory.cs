@@ -375,7 +375,7 @@ public class PlayerDataFactory
 
         // gather up data from ipc
         previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
-        previousData.HeelsOffset = _ipcManager.GetHeelsOffset();
+        Task<float> getHeelsOffset = _ipcManager.GetHeelsOffsetAsync();
         Task<string> getGlamourerData = _ipcManager.GlamourerGetCharacterCustomizationAsync(playerRelatedObject.Address);
         Task<string> getCustomizeData = _ipcManager.GetCustomizePlusScaleAsync();
         Task<string> getPalettePlusData = _ipcManager.PalettePlusBuildPaletteAsync();
@@ -387,6 +387,8 @@ public class PlayerDataFactory
         _logger.LogDebug("Palette is now: {data}", previousData.PalettePlusPalette);
         previousData.HonorificData = _ipcManager.HonorificGetTitle();
         _logger.LogDebug("Honorific is now: {data}", previousData.HonorificData);
+        previousData.HeelsOffset = await getHeelsOffset.ConfigureAwait(false);
+        _logger.LogDebug("Heels is now: {heels}", previousData.HeelsOffset);
 
         st.Stop();
         _logger.LogInformation("Building character data for {obj} took {time}ms", objectKind, TimeSpan.FromTicks(st.ElapsedTicks).TotalMilliseconds);

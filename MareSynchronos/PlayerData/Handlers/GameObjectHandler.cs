@@ -1,6 +1,4 @@
-﻿using FFXIVClientStructs.FFXIV.Client.Game.Character;
-using FFXIVClientStructs.FFXIV.Client.Game.Object;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
+﻿using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
@@ -61,6 +59,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         Mediator.Subscribe<CutsceneEndMessage>(this, (_) =>
         {
             _haltProcessing = false;
+            ZoneSwitchEnd();
         });
         Mediator.Subscribe<PenumbraStartRedrawMessage>(this, (msg) =>
         {
@@ -93,12 +92,16 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
     private IntPtr DrawObjectAddress { get; set; }
     private byte[] EquipSlotData { get; set; } = new byte[40];
 
-    public async Task ActOnFrameworkAfterEnsureNoDrawAsync(Action act, CancellationToken token)
+    public async Task ActOnFrameworkAfterEnsureNoDrawAsync(Action<Dalamud.Game.ClientState.Objects.Types.Character> act, CancellationToken token)
     {
         while (await _dalamudUtil.RunOnFrameworkThread(() =>
                {
                    if (IsBeingDrawn()) return true;
-                   act();
+                   var gameObj = _dalamudUtil.CreateGameObject(Address);
+                   if (gameObj is Dalamud.Game.ClientState.Objects.Types.Character chara)
+                   {
+                       act.Invoke(chara);
+                   }
                    return false;
                }).ConfigureAwait(false))
         {
@@ -115,6 +118,12 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
     public Dalamud.Game.ClientState.Objects.Types.GameObject? GetGameObject()
     {
         return _dalamudUtil.CreateGameObject(Address);
+    }
+
+    public void Invalidate()
+    {
+        Address = IntPtr.Zero;
+        DrawObjectAddress = IntPtr.Zero;
     }
 
     public async Task<bool> IsBeingDrawnRunOnFrameworkAsync()
@@ -146,7 +155,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         Address = _getAddress();
         if (Address != IntPtr.Zero)
         {
-            var drawObjAddr = (IntPtr)((GameObject*)Address)->DrawObject;
+            var drawObjAddr = (IntPtr)((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)Address)->DrawObject;
             DrawObjectAddress = drawObjAddr;
         }
         else
@@ -165,7 +174,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
                 _clearCts?.Cancel();
                 _clearCts = null;
             }
-            var chara = (Character*)Address;
+            var chara = (FFXIVClientStructs.FFXIV.Client.Game.Character.Character*)Address;
             var name = new ByteString(chara->GameObject.Name).ToString();
             bool nameChange = !string.Equals(name, Name, StringComparison.Ordinal);
             Name = name;
@@ -259,11 +268,17 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
     private unsafe IntPtr GetDrawObj(nint curPtr)
     {
         Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Getting new DrawObject", this);
-        return (IntPtr)((GameObject*)curPtr)->DrawObject;
+        return (IntPtr)((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)curPtr)->DrawObject;
     }
 
     private bool IsBeingDrawn()
     {
+        if (_dalamudUtil.IsAnythingDrawing)
+        {
+            Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Global draw block", this);
+            return true;
+        }
+
         var curPtr = _getAddress();
         Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, CurPtr: {ptr}", this, curPtr.ToString("X"));
 
@@ -289,7 +304,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             var drawObjZero = drawObj == IntPtr.Zero;
             Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Condition IsDrawObjZero: {cond}", this, drawObjZero);
             if (drawObjZero) return true;
-            var renderFlags = (((GameObject*)curPtr)->RenderFlags) != 0x0;
+            var renderFlags = (((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)curPtr)->RenderFlags) != 0x0;
             Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Condition RenderFlags: {cond}", this, renderFlags);
             if (renderFlags) return true;
             var modelInSlotLoaded = (((CharacterBase*)drawObj)->HasModelInSlotLoaded != 0);
@@ -303,7 +318,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         }
 
         return drawObj == IntPtr.Zero
-            || ((GameObject*)curPtr)->RenderFlags != 0x0;
+            || ((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)curPtr)->RenderFlags != 0x0;
     }
 
     private void ZoneSwitchEnd()

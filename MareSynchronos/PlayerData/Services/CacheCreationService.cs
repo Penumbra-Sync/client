@@ -18,6 +18,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
     private readonly Dictionary<ObjectKind, GameObjectHandler> _playerRelatedObjects = new();
     private Task? _cacheCreationTask;
     private CancellationTokenSource _honorificCts = new();
+    private bool _isZoning = false;
     private CancellationTokenSource _palettePlusCts = new();
 
     public CacheCreationService(ILogger<CacheCreationService> logger, MareMediator mediator, GameObjectHandlerFactory gameObjectHandlerFactory,
@@ -27,7 +28,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
 
         Mediator.Subscribe<CreateCacheForObjectMessage>(this, (msg) =>
         {
-            Logger.LogDebug("Received CreateCacheForObject for {handler}, updating player", msg.ObjectToCreateFor);
+            Logger.LogDebug("Received CreateCacheForObject for {handler}, updating", msg.ObjectToCreateFor);
             _cacheCreateLock.Wait();
             _cachesToCreate[msg.ObjectToCreateFor.ObjectKind] = msg.ObjectToCreateFor;
             _cacheCreateLock.Release();
@@ -37,25 +38,32 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         {
             Task.Run(() =>
             {
+                Logger.LogTrace("Clearing cache for {obj}", msg.ObjectToCreateFor);
                 _playerData.FileReplacements.Remove(msg.ObjectToCreateFor.ObjectKind);
                 _playerData.GlamourerString.Remove(msg.ObjectToCreateFor.ObjectKind);
                 Mediator.Publish(new CharacterDataCreatedMessage(_playerData.ToAPI()));
             });
         });
 
+        Mediator.Subscribe<ZoneSwitchStartMessage>(this, (msg) => _isZoning = true);
+        Mediator.Subscribe<ZoneSwitchEndMessage>(this, (msg) => _isZoning = false);
+
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (msg) => ProcessCacheCreation());
         Mediator.Subscribe<CustomizePlusMessage>(this, async (_) =>
         {
+            if (_isZoning) return;
             Logger.LogDebug("Received CustomizePlus change, updating player");
             await AddPlayerCacheToCreate().ConfigureAwait(false);
         });
         Mediator.Subscribe<HeelsOffsetMessage>(this, async (_) =>
         {
+            if (_isZoning) return;
             Logger.LogDebug("Received Heels Offset change, updating player");
             await AddPlayerCacheToCreate().ConfigureAwait(false);
         });
         Mediator.Subscribe<PalettePlusMessage>(this, (msg) =>
         {
+            if (_isZoning) return;
             if (msg.Character.Address == _playerRelatedObjects[ObjectKind.Player].Address)
             {
                 Logger.LogDebug("Received PalettePlus change, updating player");
@@ -64,6 +72,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         });
         Mediator.Subscribe<HonorificMessage>(this, (msg) =>
         {
+            if (_isZoning) return;
             if (!string.Equals(msg.NewHonorificTitle, _playerData.HonorificData, StringComparison.Ordinal))
             {
                 Logger.LogDebug("Received Honorific change, updating player");
@@ -76,7 +85,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
             await AddPlayerCacheToCreate().ConfigureAwait(false);
         });
 
-        _playerRelatedObjects[ObjectKind.Player] = gameObjectHandlerFactory.Create(ObjectKind.Player, () => dalamudUtil.GetPlayerPointer(), true)
+        _playerRelatedObjects[ObjectKind.Player] = gameObjectHandlerFactory.Create(ObjectKind.Player, dalamudUtil.GetPlayerPointer, true)
             .GetAwaiter().GetResult();
         _playerRelatedObjects[ObjectKind.MinionOrMount] = gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => dalamudUtil.GetMinionOrMount(), true)
             .GetAwaiter().GetResult();
@@ -131,6 +140,8 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
 
     private void ProcessCacheCreation()
     {
+        if (_isZoning) return;
+
         if (_cachesToCreate.Any() && (_cacheCreationTask?.IsCompleted ?? true))
         {
             _cacheCreateLock.Wait();

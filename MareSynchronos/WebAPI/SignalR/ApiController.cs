@@ -168,7 +168,8 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
                 await _mareHub.StartAsync(token).ConfigureAwait(false);
 
-                await InitializeData().ConfigureAwait(false);
+                InitializeApiHooks();
+                await LoadIninitialPairs().ConfigureAwait(false);
 
                 _connectionDto = await GetConnectionDto().ConfigureAwait(false);
 
@@ -198,6 +199,8 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                         $"Please keep your Mare Synchronos client up-to-date.",
                         Dalamud.Interface.Internal.Notifications.NotificationType.Error));
                 }
+
+                await LoadOnlinePairs().ConfigureAwait(false);
             }
             catch (HttpRequestException ex)
             {
@@ -283,7 +286,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         ServerState = ServerState.Offline;
     }
 
-    private async Task InitializeData()
+    private void InitializeApiHooks()
     {
         if (_mareHub == null) return;
 
@@ -311,6 +314,16 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         OnGroupSendFullInfo((dto) => Client_GroupSendFullInfo(dto));
         OnGroupSendInfo((dto) => Client_GroupSendInfo(dto));
 
+        _healthCheckTokenSource?.Cancel();
+        _healthCheckTokenSource?.Dispose();
+        _healthCheckTokenSource = new CancellationTokenSource();
+        _ = ClientHealthCheck(_healthCheckTokenSource.Token);
+
+        _initialized = true;
+    }
+
+    private async Task LoadIninitialPairs()
+    {
         foreach (var userPair in await UserGetPairedClients().ConfigureAwait(false))
         {
             Logger.LogDebug("Individual Pair: {userPair}", userPair);
@@ -330,18 +343,15 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                 _pairManager.AddGroupPair(user);
             }
         }
+    }
 
+    private async Task LoadOnlinePairs()
+    {
         foreach (var entry in await UserGetOnlinePairs().ConfigureAwait(false))
         {
+            Logger.LogDebug("Pair online: {pair}", entry);
             _pairManager.MarkPairOnline(entry, sendNotif: false);
         }
-
-        _healthCheckTokenSource?.Cancel();
-        _healthCheckTokenSource?.Dispose();
-        _healthCheckTokenSource = new CancellationTokenSource();
-        _ = ClientHealthCheck(_healthCheckTokenSource.Token);
-
-        _initialized = true;
     }
 
     private void MareHubOnClosed(Exception? arg)
@@ -364,13 +374,15 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         ServerState = ServerState.Connecting;
         try
         {
-            await InitializeData().ConfigureAwait(false);
+            InitializeApiHooks();
+            await LoadIninitialPairs().ConfigureAwait(false);
             _connectionDto = await GetConnectionDto().ConfigureAwait(false);
             if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
             {
                 await StopConnection(ServerState.VersionMisMatch).ConfigureAwait(false);
                 return;
             }
+            await LoadOnlinePairs().ConfigureAwait(false);
             ServerState = ServerState.Connected;
         }
         catch (Exception ex)

@@ -6,12 +6,14 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.Gui;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 namespace MareSynchronos.Services;
@@ -53,6 +55,7 @@ public class DalamudUtilService : IHostedService
 
     public unsafe GameObject* GposeTarget => TargetSystem.Instance()->GPoseTarget;
     public unsafe Dalamud.Game.ClientState.Objects.Types.GameObject? GposeTargetGameObject => GposeTarget == null ? null : _objectTable[GposeTarget->ObjectIndex];
+    public bool IsAnythingDrawing { get; private set; } = false;
     public bool IsInCutscene { get; private set; } = false;
     public bool IsInGpose { get; private set; } = false;
     public bool IsLoggedIn { get; private set; }
@@ -171,6 +174,11 @@ public class DalamudUtilService : IHostedService
         return _clientState.LocalPlayer?.Address ?? IntPtr.Zero;
     }
 
+    public async Task<IntPtr> GetPlayerPointerAsync()
+    {
+        return await RunOnFrameworkThread(GetPlayerPointer).ConfigureAwait(false);
+    }
+
     public uint GetWorldId()
     {
         EnsureIsOnFramework();
@@ -198,35 +206,43 @@ public class DalamudUtilService : IHostedService
         return await RunOnFrameworkThread(() => IsObjectPresent(obj)).ConfigureAwait(false);
     }
 
-    public async Task RunOnFrameworkThread(Action act)
+    public async Task RunOnFrameworkThread(Action act, [CallerMemberName] string callerMember = "", [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerLineNumber = 0)
     {
-        if (!_framework.IsInFrameworkUpdateThread)
+        var fileName = Path.GetFileNameWithoutExtension(callerFilePath);
+        await _performanceCollector.LogPerformance(this, "RunOnFramework:Act/" + fileName + ">" + callerMember + ":" + callerLineNumber, async () =>
         {
-            await _framework.RunOnFrameworkThread(act).ContinueWith((_) => Task.CompletedTask).ConfigureAwait(false);
-            while (_framework.IsInFrameworkUpdateThread) // yield the thread again, should technically never be triggered
+            if (!_framework.IsInFrameworkUpdateThread)
             {
-                _logger.LogTrace("Still on framework");
-                await Task.Delay(1).ConfigureAwait(false);
+                await _framework.RunOnFrameworkThread(act).ContinueWith((_) => Task.CompletedTask).ConfigureAwait(false);
+                while (_framework.IsInFrameworkUpdateThread) // yield the thread again, should technically never be triggered
+                {
+                    _logger.LogTrace("Still on framework");
+                    await Task.Delay(1).ConfigureAwait(false);
+                }
             }
-        }
-        else
-            act();
+            else
+                act();
+        }).ConfigureAwait(false);
     }
 
-    public async Task<T> RunOnFrameworkThread<T>(Func<T> func)
+    public async Task<T> RunOnFrameworkThread<T>(Func<T> func, [CallerMemberName] string callerMember = "", [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerLineNumber = 0)
     {
-        if (!_framework.IsInFrameworkUpdateThread)
+        var fileName = Path.GetFileNameWithoutExtension(callerFilePath);
+        return await _performanceCollector.LogPerformance(this, "RunOnFramework:Func<" + typeof(T) + ">/" + fileName + ">" + callerMember + ":" + callerLineNumber, async () =>
         {
-            var result = await _framework.RunOnFrameworkThread(func).ContinueWith((task) => task.Result).ConfigureAwait(false);
-            while (_framework.IsInFrameworkUpdateThread) // yield the thread again, should technically never be triggered
+            if (!_framework.IsInFrameworkUpdateThread)
             {
-                _logger.LogTrace("Still on framework");
-                await Task.Delay(1).ConfigureAwait(false);
+                var result = await _framework.RunOnFrameworkThread(func).ContinueWith((task) => task.Result).ConfigureAwait(false);
+                while (_framework.IsInFrameworkUpdateThread) // yield the thread again, should technically never be triggered
+                {
+                    _logger.LogTrace("Still on framework");
+                    await Task.Delay(1).ConfigureAwait(false);
+                }
+                return result;
             }
-            return result;
-        }
 
-        return func.Invoke();
+            return func.Invoke();
+        }).ConfigureAwait(false);
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -318,9 +334,35 @@ public class DalamudUtilService : IHostedService
     {
         if (_clientState.LocalPlayer?.IsDead ?? false) return;
 
+        IsAnythingDrawing = false;
         _playerCharas = _performanceCollector.LogPerformance(this, "ObjTableToCharas",
             () => _objectTable.OfType<PlayerCharacter>().Where(o => o.ObjectIndex < 240)
-                .ToDictionary(p => p.GetHash256(), p => (p.Name.ToString(), p.Address), StringComparer.Ordinal));
+                .ToDictionary(p => p.GetHash256(), p =>
+                {
+                    if (!IsAnythingDrawing)
+                    {
+                        var gameObj = (GameObject*)p.Address;
+                        bool isDrawing = gameObj->RenderFlags == 0b100000000000;
+                        if (!isDrawing)
+                        {
+                            var drawObj = gameObj->DrawObject;
+                            if ((nint)drawObj != IntPtr.Zero)
+                            {
+                                isDrawing = ((CharacterBase*)drawObj)->HasModelInSlotLoaded != 0;
+                                if (!isDrawing)
+                                {
+                                    isDrawing = ((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0;
+                                }
+                            }
+                        }
+
+                        if (isDrawing)
+                        {
+                            IsAnythingDrawing = true;
+                        }
+                    }
+                    return (p.Name.ToString(), p.Address);
+                }, StringComparer.Ordinal));
 
         if (GposeTarget != null && !IsInGpose)
         {
