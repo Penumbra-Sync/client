@@ -535,6 +535,12 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                 _lastGlamourerData = await _ipcManager.GlamourerGetCharacterCustomizationAsync(PlayerCharacter).ConfigureAwait(false);
             }
         });
+        Mediator.Subscribe<HonorificReadyMessage>(this,  async (_) =>
+        {
+            if (string.IsNullOrEmpty(_cachedData?.HonorificData)) return;
+            Logger.LogTrace("Reapplying Honorific data for {this}", this);
+           await _ipcManager.HonorificSetTitleAsync(PlayerCharacter, _cachedData.HonorificData).ConfigureAwait(false);
+        });
 
         _downloadManager.Initialize();
     }
