@@ -303,7 +303,6 @@ public class DalamudUtilService : IHostedService
         const int tick = 250;
         int curWaitTime = 0;
         _logger.LogTrace("RenderFlags: {flags}", obj->RenderFlags.ToString("X"));
-        // ReSharper disable once LoopVariableIsNeverChangedInsideLoop
         while (obj->RenderFlags != 0x00 && curWaitTime < timeOut)
         {
             _logger.LogTrace($"Waiting for gpose actor to finish drawing");
@@ -382,11 +381,6 @@ public class DalamudUtilService : IHostedService
 
     private unsafe void FrameworkOnUpdateInternal()
     {
-        if (_clientState.LocalPlayer == null)
-        {
-            return;
-        }
-
         if (_clientState.LocalPlayer?.IsDead ?? false)
         {
             return;
