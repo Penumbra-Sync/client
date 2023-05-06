@@ -10,7 +10,6 @@ using MareSynchronos.Interop;
 using MareSynchronos.Services;
 using MareSynchronos.Utils;
 using MareSynchronos.PlayerData.Factories;
-using Lumina.Excel.GeneratedSheets;
 
 namespace MareSynchronos.PlayerData.Export;
 
