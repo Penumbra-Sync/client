@@ -10,6 +10,7 @@ using MareSynchronos.Interop;
 using MareSynchronos.Services;
 using MareSynchronos.Utils;
 using MareSynchronos.PlayerData.Factories;
+using Lumina.Excel.GeneratedSheets;
 
 namespace MareSynchronos.PlayerData.Export;
 
@@ -66,9 +67,10 @@ public class MareCharaFileManager
                 var applicationId = Guid.NewGuid();
                 _ipcManager.ToggleGposeQueueMode(on: true);
                 await _ipcManager.PenumbraRemoveTemporaryCollectionAsync(_logger, applicationId, charaTarget.Name.TextValue).ConfigureAwait(false);
-                await _ipcManager.PenumbraSetTemporaryModsAsync(_logger, applicationId, charaTarget.Name.TextValue, charaTarget.ObjectTableIndex(),
-                    extractedFiles.Union(fileSwaps).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal),
-                    LoadedCharaFile.CharaFileData.ManipulationData).ConfigureAwait(false);
+                var coll = await _ipcManager.PenumbraCreateTemporaryCollection(_logger, charaTarget.Name.TextValue).ConfigureAwait(false);
+                await _ipcManager.PenumbraAssignTemporaryCollection(_logger, coll, charaTarget.ObjectTableIndex()!.Value).ConfigureAwait(false);
+                await _ipcManager.PenumbraSetTemporaryModsAsync(_logger, applicationId, coll, extractedFiles.Union(fileSwaps).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal)).ConfigureAwait(false);
+                await _ipcManager.PenumbraSetManipulationDataAsync(_logger, applicationId, coll, LoadedCharaFile.CharaFileData.ManipulationData).ConfigureAwait(false);
                 using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Player, () => charaTarget.Address, false).ConfigureAwait(false);
                 await _ipcManager.GlamourerApplyAllAsync(_logger, tempHandler, LoadedCharaFile.CharaFileData.GlamourerData, applicationId, disposeCts.Token).ConfigureAwait(false);
                 _dalamudUtil.WaitWhileGposeCharacterIsDrawing(charaTarget.Address, 30000);
