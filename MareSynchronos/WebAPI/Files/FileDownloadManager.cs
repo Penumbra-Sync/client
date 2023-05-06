@@ -191,7 +191,8 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
 
             foreach (var file in fileGroup)
             {
-                var tempPath = _fileDbManager.GetCacheFilePath(file.Hash, isTemporaryFile: true);
+                var ext = fileReplacement.First(f => string.Equals(f.Hash, file.Hash, StringComparison.OrdinalIgnoreCase)).GamePaths.First().Split(".").Last();
+                var tempPath = _fileDbManager.GetCacheFilePath(file.Hash, ext, isTemporaryFile: true);
                 Progress<long> progress = new((bytesDownloaded) =>
                 {
                     try
@@ -235,7 +236,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                 var tempFileData = await File.ReadAllBytesAsync(tempPath, token).ConfigureAwait(false);
                 var extractedFile = LZ4Codec.Unwrap(tempFileData);
                 File.Delete(tempPath);
-                var filePath = _fileDbManager.GetCacheFilePath(file.Hash, isTemporaryFile: false);
+                var filePath = _fileDbManager.GetCacheFilePath(file.Hash, ext, isTemporaryFile: false);
                 await File.WriteAllBytesAsync(filePath, extractedFile, token).ConfigureAwait(false);
                 var fi = new FileInfo(filePath);
                 Func<DateTime> RandomDayInThePast()

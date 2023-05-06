@@ -105,9 +105,9 @@ public sealed class FileCacheManager : IDisposable
 
     public List<FileCacheEntity> GetAllFileCaches() => _fileCaches.Values.SelectMany(v => v).ToList();
 
-    public string GetCacheFilePath(string hash, bool isTemporaryFile)
+    public string GetCacheFilePath(string hash, string extension, bool isTemporaryFile)
     {
-        return Path.Combine(_configService.Current.CacheFolder, hash + (isTemporaryFile ? ".tmp" : string.Empty));
+        return Path.Combine(_configService.Current.CacheFolder, hash + "." + extension + (isTemporaryFile ? ".tmp" : string.Empty));
     }
 
     public FileCacheEntity? GetFileCacheByHash(string hash)
@@ -181,12 +181,13 @@ public sealed class FileCacheManager : IDisposable
         {
             sb.AppendLine(entry.CsvEntry);
         }
-        if (File.Exists(_csvPath))
-        {
-            File.Copy(_csvPath, CsvBakPath, overwrite: true);
-        }
         lock (_fileWriteLock)
         {
+            if (File.Exists(_csvPath))
+            {
+                File.Copy(_csvPath, CsvBakPath, overwrite: true);
+            }
+
             try
             {
                 File.WriteAllText(_csvPath, sb.ToString());
@@ -196,6 +197,31 @@ public sealed class FileCacheManager : IDisposable
             {
                 File.WriteAllText(CsvBakPath, sb.ToString());
             }
+        }
+    }
+
+    internal FileCacheEntity MigrateFileHashToExtension(FileCacheEntity fileCache, string ext)
+    {
+        try
+        {
+            RemoveHashedFile(fileCache);
+            FileInfo oldCache = new(fileCache.ResolvedFilepath);
+            var extensionPath = fileCache.ResolvedFilepath.ToUpper() + "." + ext;
+            File.Move(fileCache.ResolvedFilepath, extensionPath, true);
+            var newHashedEntity = new FileCacheEntity(fileCache.Hash, fileCache.PrefixedFilePath + "." + ext, DateTime.UtcNow.Ticks.ToString());
+            newHashedEntity.SetResolvedFilePath(extensionPath);
+            FileInfo newCache = new FileInfo(extensionPath);
+            newCache.LastAccessTime = oldCache.LastAccessTime;
+            newCache.LastWriteTime = oldCache.LastWriteTime;
+            AddHashedFile(newHashedEntity);
+            _logger.LogDebug("Migrated from {oldPath} to {newPath}", fileCache.ResolvedFilepath, newHashedEntity.ResolvedFilepath);
+            return newHashedEntity;
+        }
+        catch (Exception ex)
+        {
+            AddHashedFile(fileCache);
+            _logger.LogWarning(ex, "Failed to migrate entity {entity}", fileCache.PrefixedFilePath);
+            return fileCache;
         }
     }
 

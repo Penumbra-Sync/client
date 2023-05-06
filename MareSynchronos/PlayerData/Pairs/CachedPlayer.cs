@@ -665,6 +665,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         List<FileReplacementData> missingFiles = new();
         moddedDictionary = new Dictionary<string, string>(StringComparer.Ordinal);
         ConcurrentDictionary<string, string> outputDict = new(StringComparer.Ordinal);
+        bool hasMigrationChanges = false;
         try
         {
             var replacementList = charaData.FileReplacements.SelectMany(k => k.Value.Where(v => string.IsNullOrEmpty(v.FileSwapPath))).ToList();
@@ -679,6 +680,12 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                 var fileCache = _fileDbManager.GetFileCacheByHash(item.Hash);
                 if (fileCache != null)
                 {
+                    if (string.IsNullOrEmpty(new FileInfo(fileCache.ResolvedFilepath).Extension))
+                    {
+                        hasMigrationChanges = true;
+                        fileCache = _fileDbManager.MigrateFileHashToExtension(fileCache, item.GamePaths[0].Split(".").Last());
+                    }
+
                     foreach (var gamePath in item.GamePaths)
                     {
                         outputDict[gamePath] = fileCache.ResolvedFilepath;
@@ -706,6 +713,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         {
             PluginLog.Error(ex, "Something went wrong during calculation replacements");
         }
+        if (hasMigrationChanges) _fileDbManager.WriteOutFullCsv();
         st.Stop();
         Logger.LogDebug("ModdedPaths calculated in {time}ms, missing files: {count}, total files: {total}", st.ElapsedMilliseconds, missingFiles.Count, moddedDictionary.Keys.Count);
         return missingFiles;
