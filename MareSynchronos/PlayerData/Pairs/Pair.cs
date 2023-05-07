@@ -133,10 +133,19 @@ public class Pair
 
     public void MarkOffline()
     {
-        _onlineUserIdentDto = null;
-        LastReceivedCharacterData = null;
-        CachedPlayer?.Dispose();
-        CachedPlayer = null;
+        try
+        {
+            _creationSemaphore.Wait();
+            _onlineUserIdentDto = null;
+            LastReceivedCharacterData = null;
+            var player = CachedPlayer;
+            CachedPlayer = null;
+            player?.Dispose();
+        }
+        finally
+        {
+            _creationSemaphore.Release();
+        }
     }
 
     public void SetNote(string note)

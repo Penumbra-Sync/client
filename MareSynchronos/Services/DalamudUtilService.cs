@@ -34,6 +34,7 @@ public class DalamudUtilService : IHostedService
     private string _lastGlobalBlockPlayer = string.Empty;
     private Dictionary<string, (string Name, nint Address)> _playerCharas = new(StringComparer.Ordinal);
     private bool _sentBetweenAreas = false;
+    private ushort _lastZone = 0;
 
     public DalamudUtilService(ILogger<DalamudUtilService> logger, ClientState clientState, ObjectTable objectTable, Framework framework,
         GameGui gameGui, Condition condition, Dalamud.Data.DataManager gameData, MareMediator mediator, PerformanceCollectorService performanceCollector)
@@ -433,12 +434,17 @@ public class DalamudUtilService : IHostedService
 
         if (_condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51])
         {
-            if (!_sentBetweenAreas)
+            var zone = _clientState.TerritoryType;
+            if (_lastZone != zone)
             {
-                _logger.LogDebug("Zone switch/Gpose start");
-                _sentBetweenAreas = true;
-                _mediator.Publish(new ZoneSwitchStartMessage());
-                _mediator.Publish(new HaltScanMessage("Zone switch"));
+                _lastZone = zone;
+                if (!_sentBetweenAreas)
+                {
+                    _logger.LogDebug("Zone switch/Gpose start");
+                    _sentBetweenAreas = true;
+                    _mediator.Publish(new ZoneSwitchStartMessage());
+                    _mediator.Publish(new HaltScanMessage("Zone switch"));
+                }
             }
 
             return;
@@ -462,6 +468,7 @@ public class DalamudUtilService : IHostedService
         {
             _logger.LogDebug("Logged in");
             IsLoggedIn = true;
+            _lastZone = _clientState.TerritoryType;
             _mediator.Publish(new DalamudLoginMessage());
         }
         else if (localPlayer == null && IsLoggedIn)

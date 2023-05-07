@@ -40,6 +40,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     private string _originalGlamourerData = string.Empty;
     private CancellationTokenSource _redrawCts = new();
     private string _penumbraCollection;
+    private CharacterData? _firstTimeInitData;
 
     public CachedPlayer(ILogger<CachedPlayer> logger, OnlineUserIdentDto onlineUser,
                 GameObjectHandlerFactory gameObjectHandlerFactory,
@@ -53,6 +54,9 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         _dalamudUtil = dalamudUtil;
         _lifetime = lifetime;
         _fileDbManager = fileDbManager;
+
+        _penumbraCollection = _ipcManager.PenumbraCreateTemporaryCollection(logger, OnlineUser.User.UID).ConfigureAwait(false).GetAwaiter().GetResult();
+
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
         Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) =>
         {
@@ -76,10 +80,6 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             ShownPalettePlusWarning = mareConfigService.Current.DisableOptionalPluginWarnings,
             ShownHonorificWarning = mareConfigService.Current.DisableOptionalPluginWarnings,
         };
-        Task.Run(async () =>
-        {
-            _penumbraCollection = await _ipcManager.PenumbraCreateTemporaryCollection(logger, OnlineUser.User.UID).ConfigureAwait(false);
-        });
     }
 
     private enum PlayerChanges
@@ -106,7 +106,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     {
         if (_charaHandler == null)
         {
-            _cachedData = characterData;
+            _firstTimeInitData = characterData;
             return;
         }
 
@@ -130,6 +130,11 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
         var charaDataToUpdate = CheckUpdatedData(_cachedData?.DeepClone() ?? new(), characterData, forced);
 
+        if (_charaHandler != null && _firstTimeInitData != null)
+        {
+            _firstTimeInitData = null;
+        }
+
         if (charaDataToUpdate.TryGetValue(ObjectKind.Player, out var playerChanges))
         {
             NotifyForMissingPlugins(playerChanges);
@@ -138,8 +143,6 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         Logger.LogDebug("Downloading and applying character for {name}", this);
 
         DownloadAndApplyCharacter(characterData.DeepClone(), charaDataToUpdate);
-
-        _cachedData = characterData;
     }
 
     public override string ToString()
@@ -161,8 +164,6 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-
-        if (string.IsNullOrEmpty(PlayerName)) return; // already disposed
 
         SetUploading(false);
         _downloadManager.Dispose();
@@ -324,7 +325,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                 if (hasNewAndOldFileReplacements)
                 {
                     bool listsAreEqual = oldData.FileReplacements[objectKind].SequenceEqual(newData.FileReplacements[objectKind], Data.FileReplacementDataComparer.Instance);
-                    if (!listsAreEqual)
+                    if (!listsAreEqual || _firstTimeInitData != null)
                     {
                         Logger.LogDebug("Updating {object}/{kind} (FileReplacements not equal) => {change}", this, objectKind, PlayerChanges.ModFiles);
                         charaDataToUpdate[objectKind].Add(PlayerChanges.ModFiles);
@@ -345,7 +346,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             if (objectKind != ObjectKind.Player) continue;
 
             bool manipDataDifferent = !string.Equals(oldData.ManipulationData, newData.ManipulationData, StringComparison.Ordinal);
-            if (manipDataDifferent)
+            if (manipDataDifferent || _firstTimeInitData != null)
             {
                 Logger.LogDebug("Updating {object}/{kind} (Diff manip data) => {change}", this, objectKind, PlayerChanges.ModManip);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.ModManip);
@@ -492,6 +493,8 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                 {
                     Logger.LogWarning(ex, "[{applicationId}] Cancelled", _applicationId);
                 }
+
+                _cachedData = charaData;
             }, token);
         }, downloadToken);
     }
@@ -513,12 +516,12 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             Mediator.Publish(new CachedPlayerVisibleMessage(this));
             Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);
             _framesSinceNotVisible = 0;
-            if (_cachedData != null)
+            if (_firstTimeInitData != null)
             {
                 Task.Run(async () =>
                 {
                     _lastGlamourerData = await _ipcManager.GlamourerGetCharacterCustomizationAsync(PlayerCharacter).ConfigureAwait(false);
-                    ApplyCharacterData(_cachedData, true);
+                    ApplyCharacterData(_firstTimeInitData, true);
                 });
             }
         }
