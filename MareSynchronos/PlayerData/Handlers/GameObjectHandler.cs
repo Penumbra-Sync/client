@@ -85,6 +85,15 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         _dalamudUtil.RunOnFrameworkThread(CheckAndUpdateObject).GetAwaiter().GetResult();
     }
 
+    private enum DrawCondition
+    {
+        None,
+        DrawObjectZero,
+        RenderFlags,
+        ModelInSlotLoaded,
+        ModelFilesInSlotLoaded
+    }
+
     public IntPtr Address { get; private set; }
     public string Name { get; private set; }
     public ObjectKind ObjectKind { get; }
@@ -265,20 +274,19 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         }
     }
 
-    private unsafe IntPtr GetDrawObj(nint curPtr)
+    private unsafe IntPtr GetDrawObjUnsafe(nint curPtr)
     {
-        Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Getting new DrawObject", this);
         return (IntPtr)((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)curPtr)->DrawObject;
     }
 
     private bool IsBeingDrawn()
     {
         var curPtr = _getAddress();
-        Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, CurPtr: {ptr}", this, curPtr.ToString("X"));
+        Logger.LogTrace("[{this}] IsBeingDrawn, CurPtr: {ptr}", this, curPtr.ToString("X"));
 
         if (curPtr == IntPtr.Zero)
         {
-            Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, CurPtr is ZERO, returning", this);
+            Logger.LogTrace("[{this}] IsBeingDrawn, CurPtr is ZERO, returning", this);
 
             Address = IntPtr.Zero;
             DrawObjectAddress = IntPtr.Zero;
@@ -287,38 +295,34 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
         if (_dalamudUtil.IsAnythingDrawing)
         {
-            Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Global draw block", this);
+            Logger.LogTrace("[{this}] IsBeingDrawn, Global draw block", this);
             return true;
         }
 
-        var drawObj = GetDrawObj(curPtr);
-        Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, DrawObjPtr: {ptr}", this, drawObj.ToString("X"));
-        return IsBeingDrawn(drawObj, curPtr);
+        var drawObj = GetDrawObjUnsafe(curPtr);
+        Logger.LogTrace("[{this}] IsBeingDrawn, DrawObjPtr: {ptr}", this, drawObj.ToString("X"));
+        var isDrawn = IsBeingDrawnUnsafe(drawObj, curPtr);
+        Logger.LogTrace("[{this}] IsBeingDrawn, Condition: {cond}", this, isDrawn);
+        return isDrawn != DrawCondition.None;
     }
 
-    private unsafe bool IsBeingDrawn(IntPtr drawObj, IntPtr curPtr)
+    private unsafe DrawCondition IsBeingDrawnUnsafe(IntPtr drawObj, IntPtr curPtr)
     {
-        Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Checking IsBeingDrawn for Ptr {curPtr} : DrawObj {drawObj}", this, curPtr.ToString("X"), drawObj.ToString("X"));
+        var drawObjZero = drawObj == IntPtr.Zero;
+        if (drawObjZero) return DrawCondition.DrawObjectZero;
+        var renderFlags = (((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)curPtr)->RenderFlags) != 0x0;
+        if (renderFlags) return DrawCondition.RenderFlags;
+
         if (ObjectKind == ObjectKind.Player)
         {
-            var drawObjZero = drawObj == IntPtr.Zero;
-            Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Condition IsDrawObjZero: {cond}", this, drawObjZero);
-            if (drawObjZero) return true;
-            var renderFlags = (((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)curPtr)->RenderFlags) != 0x0;
-            Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Condition RenderFlags: {cond}", this, renderFlags);
-            if (renderFlags) return true;
             var modelInSlotLoaded = (((CharacterBase*)drawObj)->HasModelInSlotLoaded != 0);
-            Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Condition ModelInSlotLoaded: {cond}", this, modelInSlotLoaded);
-            if (modelInSlotLoaded) return true;
+            if (modelInSlotLoaded) return DrawCondition.ModelInSlotLoaded;
             var modelFilesInSlotLoaded = (((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0);
-            Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Condition ModelFilesInSlotLoaded: {cond}", this, modelFilesInSlotLoaded);
-            if (modelFilesInSlotLoaded) return true;
-            Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Is not being drawn", this);
-            return false;
+            if (modelFilesInSlotLoaded) return DrawCondition.ModelFilesInSlotLoaded;
+            return DrawCondition.None;
         }
 
-        return drawObj == IntPtr.Zero
-            || ((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)curPtr)->RenderFlags != 0x0;
+        return DrawCondition.None;
     }
 
     private void ZoneSwitchEnd()

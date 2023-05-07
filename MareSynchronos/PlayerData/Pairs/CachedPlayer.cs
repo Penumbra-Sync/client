@@ -35,12 +35,12 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     private CharacterData? _cachedData = null;
     private GameObjectHandler? _charaHandler;
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
+    private CharacterData? _firstTimeInitData;
     private int _framesSinceNotVisible = 0;
     private string _lastGlamourerData = string.Empty;
     private string _originalGlamourerData = string.Empty;
-    private CancellationTokenSource _redrawCts = new();
     private string _penumbraCollection;
-    private CharacterData? _firstTimeInitData;
+    private CancellationTokenSource _redrawCts = new();
 
     public CachedPlayer(ILogger<CachedPlayer> logger, OnlineUserIdentDto onlineUser,
                 GameObjectHandlerFactory gameObjectHandlerFactory,
@@ -275,6 +275,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                             await _ipcManager.GlamourerApplyAllAsync(Logger, handler, glamourerData, applicationId, token).ConfigureAwait(false);
                         }
                         break;
+
                     case PlayerChanges.ModFiles:
                     case PlayerChanges.ModManip:
                         if (!changes.Value.Contains(PlayerChanges.Glamourer))
@@ -516,12 +517,12 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             Mediator.Publish(new CachedPlayerVisibleMessage(this));
             Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);
             _framesSinceNotVisible = 0;
-            if (_firstTimeInitData != null)
+            if (_firstTimeInitData != null || _cachedData != null)
             {
                 Task.Run(async () =>
                 {
                     _lastGlamourerData = await _ipcManager.GlamourerGetCharacterCustomizationAsync(PlayerCharacter).ConfigureAwait(false);
-                    ApplyCharacterData(_firstTimeInitData, true);
+                    ApplyCharacterData(_firstTimeInitData ?? _cachedData!, true);
                 });
             }
         }
