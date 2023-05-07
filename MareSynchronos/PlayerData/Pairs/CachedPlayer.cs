@@ -487,14 +487,14 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
                         token.ThrowIfCancellationRequested();
                     }
 
+                    _cachedData = charaData;
+
                     Logger.LogDebug("[{applicationId}] Application finished", _applicationId);
                 }
                 catch (Exception ex)
                 {
                     Logger.LogWarning(ex, "[{applicationId}] Cancelled", _applicationId);
                 }
-
-                _cachedData = charaData;
             }, token);
         }, downloadToken);
     }

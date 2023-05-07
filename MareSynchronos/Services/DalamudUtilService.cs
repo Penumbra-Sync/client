@@ -268,7 +268,7 @@ public class DalamudUtilService : IHostedService
 
     public async Task WaitWhileCharacterIsDrawing(ILogger logger, GameObjectHandler handler, Guid redrawId, int timeOut = 5000, CancellationToken? ct = null)
     {
-        if (!_clientState.IsLoggedIn || handler.Address == IntPtr.Zero) return;
+        if (!_clientState.IsLoggedIn) return;
 
         logger.LogTrace("[{redrawId}] Starting wait for {handler} to draw", redrawId, handler);
 

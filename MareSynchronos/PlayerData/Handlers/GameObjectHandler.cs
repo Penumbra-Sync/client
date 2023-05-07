@@ -273,12 +273,6 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
     private bool IsBeingDrawn()
     {
-        if (_dalamudUtil.IsAnythingDrawing)
-        {
-            Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Global draw block", this);
-            return true;
-        }
-
         var curPtr = _getAddress();
         Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, CurPtr: {ptr}", this, curPtr.ToString("X"));
 
@@ -288,7 +282,13 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
             Address = IntPtr.Zero;
             DrawObjectAddress = IntPtr.Zero;
-            return false;
+            throw new InvalidOperationException($"CurPtr for {this} turned ZERO");
+        }
+
+        if (_dalamudUtil.IsAnythingDrawing)
+        {
+            Logger.LogTrace("[{this}] IsBeingDrawnRunOnFramework, Global draw block", this);
+            return true;
         }
 
         var drawObj = GetDrawObj(curPtr);
