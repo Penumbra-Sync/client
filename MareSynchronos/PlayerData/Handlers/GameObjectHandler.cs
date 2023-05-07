@@ -290,7 +290,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
             Address = IntPtr.Zero;
             DrawObjectAddress = IntPtr.Zero;
-            throw new InvalidOperationException($"CurPtr for {this} turned ZERO");
+            throw new ArgumentNullException($"CurPtr for {this} turned ZERO");
         }
 
         if (_dalamudUtil.IsAnythingDrawing)

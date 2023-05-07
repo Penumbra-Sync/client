@@ -1,6 +1,5 @@
 ﻿using Dalamud.Interface.Internal.Notifications;
 using Dalamud.Logging;
-using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
@@ -36,7 +35,6 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     private GameObjectHandler? _charaHandler;
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
     private CharacterData? _firstTimeInitData;
-    private int _framesSinceNotVisible = 0;
     private string _lastGlamourerData = string.Empty;
     private string _originalGlamourerData = string.Empty;
     private string _penumbraCollection;
@@ -98,7 +96,7 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
     public IntPtr PlayerCharacter => _charaHandler?.Address ?? IntPtr.Zero;
     public unsafe uint PlayerCharacterId => (_charaHandler?.Address ?? IntPtr.Zero) == IntPtr.Zero
         ? uint.MaxValue
-        : ((GameObject*)_charaHandler!.Address)->ObjectID;
+        : ((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)_charaHandler!.Address)->ObjectID;
     public string? PlayerName { get; private set; }
     public string PlayerNameHash => OnlineUser.Ident;
 
@@ -492,6 +490,15 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
 
                     Logger.LogDebug("[{applicationId}] Application finished", _applicationId);
                 }
+                catch (ArgumentNullException ex)
+                {
+                    Logger.LogWarning(ex, "[{applicationId}] Cancelled, player turned null during application", _applicationId);
+                    IsVisible = false;
+                    if (_cachedData == null)
+                    {
+                        _firstTimeInitData = charaData.DeepClone();
+                    }
+                }
                 catch (Exception ex)
                 {
                     Logger.LogWarning(ex, "[{applicationId}] Cancelled", _applicationId);
@@ -516,7 +523,6 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             IsVisible = true;
             Mediator.Publish(new CachedPlayerVisibleMessage(this));
             Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);
-            _framesSinceNotVisible = 0;
             if (_firstTimeInitData != null || _cachedData != null)
             {
                 Task.Run(async () =>
@@ -528,13 +534,8 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
         }
         else if (_charaHandler?.Address == IntPtr.Zero && IsVisible)
         {
-            _framesSinceNotVisible++;
-            if (_framesSinceNotVisible > 30)
-            {
-                _framesSinceNotVisible = 30;
-                IsVisible = false;
-                Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);
-            }
+            IsVisible = false;
+            Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);
         }
     }
 
@@ -552,6 +553,10 @@ public sealed class CachedPlayer : DisposableMediatorSubscriberBase
             {
                 Logger.LogTrace("Saving new Glamourer Data for {this}", this);
                 _lastGlamourerData = await _ipcManager.GlamourerGetCharacterCustomizationAsync(PlayerCharacter).ConfigureAwait(false);
+                if (_cachedData != null)
+                {
+                    ApplyCharacterData(_cachedData!, true);
+                }
             }
         });
         Mediator.Subscribe<HonorificReadyMessage>(this, async (_) =>

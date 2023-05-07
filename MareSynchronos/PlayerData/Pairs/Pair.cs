@@ -19,6 +19,7 @@ public class Pair
     private readonly ILogger<Pair> _logger;
     private readonly MareMediator _mediator;
     private readonly ServerConfigurationManager _serverConfigurationManager;
+    private CancellationTokenSource _applicationCts = new CancellationTokenSource();
     private OnlineUserIdentDto? _onlineUserIdentDto = null;
 
     public Pair(ILogger<Pair> logger, CachedPlayerFactory cachedPlayerFactory,
@@ -73,9 +74,31 @@ public class Pair
 
     public void ApplyData(OnlineUserCharaDataDto data)
     {
-        if (CachedPlayer == null) throw new InvalidOperationException("CachedPlayer not initialized");
-
+        _applicationCts = _applicationCts.CancelRecreate();
         LastReceivedCharacterData = data.CharaData;
+
+        if (CachedPlayer == null)
+        {
+            _logger.LogDebug("Received Data for {uid} but CachedPlayer does not exist, waiting", data.User.UID);
+            Task.Run(async () =>
+            {
+                using var timeoutCts = new CancellationTokenSource();
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(120));
+                var appToken = _applicationCts.Token;
+                using var combined = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, appToken);
+                while (CachedPlayer == null && !combined.Token.IsCancellationRequested)
+                {
+                    await Task.Delay(250, combined.Token).ConfigureAwait(false);
+                }
+
+                if (!combined.IsCancellationRequested)
+                {
+                    _logger.LogDebug("Applying delayed data for {uid}", data.User.UID);
+                    ApplyLastReceivedData();
+                }
+            });
+            return;
+        }
 
         ApplyLastReceivedData();
     }
