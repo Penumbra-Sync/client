@@ -73,7 +73,7 @@ public class MareCharaFileManager
                 using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Player, () => charaTarget.Address, false).ConfigureAwait(false);
                 await _ipcManager.GlamourerApplyAllAsync(_logger, tempHandler, LoadedCharaFile.CharaFileData.GlamourerData, applicationId, disposeCts.Token).ConfigureAwait(false);
                 _dalamudUtil.WaitWhileGposeCharacterIsDrawing(charaTarget.Address, 30000);
-                await _ipcManager.PenumbraRemoveTemporaryCollectionAsync(_logger, applicationId, charaTarget.Name.TextValue).ConfigureAwait(false);
+                await _ipcManager.PenumbraRemoveTemporaryCollectionAsync(_logger, applicationId, coll).ConfigureAwait(false);
                 _ipcManager.ToggleGposeQueueMode(on: false);
             }
         }
