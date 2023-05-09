@@ -416,6 +416,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         else if (_charaHandler?.Address == nint.Zero && IsVisible)
         {
             IsVisible = false;
+            _charaHandler?.Invalidate();
             Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);
         }
     }

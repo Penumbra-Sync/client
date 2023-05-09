@@ -4,12 +4,13 @@ using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.Interop;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
+using System.Collections.Concurrent;
 
 namespace MareSynchronos.PlayerData.Pairs;
 
 public class PluginWarningNotificationService
 {
-    private readonly Dictionary<UserData, OptionalPluginWarning> _cachedOptionalPluginWarnings = new(UserDataComparer.Instance);
+    private readonly ConcurrentDictionary<UserData, OptionalPluginWarning> _cachedOptionalPluginWarnings = new(UserDataComparer.Instance);
     private readonly IpcManager _ipcManager;
     private readonly MareConfigService _mareConfigService;
     private readonly MareMediator _mediator;
