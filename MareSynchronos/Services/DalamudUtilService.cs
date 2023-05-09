@@ -32,9 +32,9 @@ public class DalamudUtilService : IHostedService
     private uint? _classJobId = 0;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
     private string _lastGlobalBlockPlayer = string.Empty;
+    private ushort _lastZone = 0;
     private Dictionary<string, (string Name, nint Address)> _playerCharas = new(StringComparer.Ordinal);
     private bool _sentBetweenAreas = false;
-    private ushort _lastZone = 0;
 
     public DalamudUtilService(ILogger<DalamudUtilService> logger, ClientState clientState, ObjectTable objectTable, Framework framework,
         GameGui gameGui, Condition condition, Dalamud.Data.DataManager gameData, MareMediator mediator, PerformanceCollectorService performanceCollector)
@@ -389,7 +389,7 @@ public class DalamudUtilService : IHostedService
 
         IsAnythingDrawing = false;
         _playerCharas = _performanceCollector.LogPerformance(this, "ObjTableToCharas",
-            () => _objectTable.OfType<PlayerCharacter>().Where(o => o.ObjectIndex < 240)
+            () => _objectTable.OfType<PlayerCharacter>().Where(o => o.ObjectIndex < 200)
                 .ToDictionary(p => p.GetHash256(), p =>
                 {
                     CheckCharacterForDrawing(p);
