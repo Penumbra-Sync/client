@@ -65,6 +65,6 @@ public record ProfilePopoutToggle(Pair? Pair) : MessageBase;
 public record CompactUiChange(Vector2 Size, Vector2 Position) : MessageBase;
 public record ProfileOpenStandaloneMessage(Pair Pair) : MessageBase;
 public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : MessageBase;
-public record CachedPlayerVisibleMessage(CachedPlayer Player) : MessageBase;
+public record PairHandlerVisibleMessage(PairHandler Player) : MessageBase;
 
 #pragma warning restore MA0048 // File name must match type name

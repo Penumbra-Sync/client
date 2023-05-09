@@ -62,7 +62,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly ActionSubscriber<GameObject, RedrawType> _penumbraRedrawObject;
     private readonly ConcurrentDictionary<IntPtr, bool> _penumbraRedrawRequests = new();
     private readonly FuncSubscriber<string, PenumbraApiEc> _penumbraRemoveTemporaryCollection;
-    private readonly FuncSubscriber<string, string, int, PenumbraApiEc> _penumbraRemoveTemporaryMod;
     private readonly FuncSubscriber<string> _penumbraResolveModDir;
     private readonly FuncSubscriber<string[], string[], (string[], string[][])> _penumbraResolvePaths;
     private readonly SemaphoreSlim _redrawSemaphore = new(2);
@@ -92,7 +91,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         _penumbraAddTemporaryMod = Penumbra.Api.Ipc.AddTemporaryMod.Subscriber(pi);
         _penumbraCreateNamedTemporaryCollection = Penumbra.Api.Ipc.CreateNamedTemporaryCollection.Subscriber(pi);
         _penumbraRemoveTemporaryCollection = Penumbra.Api.Ipc.RemoveTemporaryCollectionByName.Subscriber(pi);
-        _penumbraRemoveTemporaryMod = Penumbra.Api.Ipc.RemoveTemporaryMod.Subscriber(pi);
         _penumbraAssignTemporaryCollection = Penumbra.Api.Ipc.AssignTemporaryCollection.Subscriber(pi);
         _penumbraResolvePaths = Penumbra.Api.Ipc.ResolvePlayerPaths.Subscriber(pi);
         _penumbraEnabled = Penumbra.Api.Ipc.GetEnabledState.Subscriber(pi);
@@ -409,6 +407,31 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         }).ConfigureAwait(false);
     }
 
+    public async Task PenumbraAssignTemporaryCollectionAsync(ILogger logger, string collName, int idx)
+    {
+        if (!CheckPenumbraApi()) return;
+
+        await _dalamudUtil.RunOnFrameworkThread(() =>
+        {
+            var retAssign = _penumbraAssignTemporaryCollection.Invoke(collName, idx, c: true);
+            logger.LogTrace("Assigning Temp Collection {collName} to index {idx}, Success: {ret}", collName, idx, retAssign);
+            return collName;
+        }).ConfigureAwait(false);
+    }
+
+    public async Task<string> PenumbraCreateTemporaryCollectionAsync(ILogger logger, string uid)
+    {
+        if (!CheckPenumbraApi()) return string.Empty;
+
+        return await _dalamudUtil.RunOnFrameworkThread(() =>
+        {
+            var collName = "Mare_" + uid;
+            var retCreate = _penumbraCreateNamedTemporaryCollection.Invoke(collName);
+            logger.LogTrace("Creating Temp Collection {collName}, Success: {ret}", collName, retCreate);
+            return collName;
+        }).ConfigureAwait(false);
+    }
+
     public string PenumbraGetMetaManipulations()
     {
         if (!CheckPenumbraApi()) return string.Empty;
@@ -449,6 +472,18 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         return await _dalamudUtil.RunOnFrameworkThread(() => _penumbraResolvePaths.Invoke(forward, reverse)).ConfigureAwait(false);
     }
 
+    public async Task PenumbraSetManipulationDataAsync(ILogger logger, Guid applicationId, string collName, string manipulationData)
+    {
+        if (!CheckPenumbraApi()) return;
+
+        await _dalamudUtil.RunOnFrameworkThread(() =>
+        {
+            logger.LogTrace("[{applicationId}] Manip: {data}", applicationId, manipulationData);
+            var retAdd = _penumbraAddTemporaryMod.Invoke("MareChara_Meta", collName, new Dictionary<string, string>(), manipulationData, 0);
+            logger.LogTrace("[{applicationId}] Setting temp meta mod for {collName}, Success: {ret}", applicationId, collName, retAdd);
+        }).ConfigureAwait(false);
+    }
+
     public async Task PenumbraSetTemporaryModsAsync(ILogger logger, Guid applicationId, string collName, Dictionary<string, string> modPaths)
     {
         if (!CheckPenumbraApi()) return;
@@ -459,51 +494,8 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
             {
                 logger.LogTrace("[{applicationId}] Change: {from} => {to}", applicationId, mod.Key, mod.Value);
             }
-            var retRemove = _penumbraRemoveTemporaryMod.Invoke("MareChara_Files", collName, 0);
-            logger.LogTrace("[{applicationId}] Removing prev mod files mod for {collName}, Success: {ret}", applicationId, collName, retRemove);
             var retAdd = _penumbraAddTemporaryMod.Invoke("MareChara_Files", collName, modPaths, string.Empty, 0);
             logger.LogTrace("[{applicationId}] Setting temp files mod for {collName}, Success: {ret}", applicationId, collName, retAdd);
-        }).ConfigureAwait(false);
-    }
-
-    public async Task PenumbraSetManipulationDataAsync(ILogger logger, Guid applicationId, string collName, string manipulationData)
-    {
-        if (!CheckPenumbraApi()) return;
-
-        await _dalamudUtil.RunOnFrameworkThread(() =>
-        {
-            logger.LogTrace("[{applicationId}] Manip: {data}", applicationId, manipulationData);
-            var retRemove = _penumbraRemoveTemporaryMod.Invoke("MareChara_Meta", collName, 0);
-            logger.LogTrace("[{applicationId}] Removing prev meta mod for {collName}, Success: {ret}", applicationId, collName, retRemove);
-            var retAdd = _penumbraAddTemporaryMod.Invoke("MareChara_Meta", collName, new Dictionary<string, string>(), manipulationData, 0);
-            logger.LogTrace("[{applicationId}] Setting temp meta mod for {collName}, Success: {ret}", applicationId, collName, retAdd);
-        }).ConfigureAwait(false);
-    }
-
-    public async Task<string> PenumbraCreateTemporaryCollection(ILogger logger, string uid)
-    {
-        if (!CheckPenumbraApi()) return string.Empty;
-
-        return await _dalamudUtil.RunOnFrameworkThread(() =>
-        {
-            var collName = "Mare_" + uid;
-            var retRemove = _penumbraRemoveTemporaryCollection.Invoke(collName);
-            logger.LogTrace("Removing Temp Collection {collName}, Success: {ret}", collName, retRemove);
-            var retCreate = _penumbraCreateNamedTemporaryCollection.Invoke(collName);
-            logger.LogTrace("Creating Temp Collection {collName}, Success: {ret}", collName, retCreate);
-            return collName;
-        }).ConfigureAwait(false);
-    }
-
-    public async Task PenumbraAssignTemporaryCollection(ILogger logger, string collName, int idx)
-    {
-        if (!CheckPenumbraApi()) return;
-
-        await _dalamudUtil.RunOnFrameworkThread(() =>
-        {
-            var retAssign = _penumbraAssignTemporaryCollection.Invoke(collName, idx, c: true);
-            logger.LogTrace("Assigning Temp Collection {collName} to index {idx}, Success: {ret}", collName, idx, retAssign);
-            return collName;
         }).ConfigureAwait(false);
     }
 

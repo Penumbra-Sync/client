@@ -1,4 +1,5 @@
 ﻿using MareSynchronos.API.Data;
+using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
@@ -13,7 +14,7 @@ public class OnlinePlayerManager : DisposableMediatorSubscriberBase
     private readonly ApiController _apiController;
     private readonly DalamudUtilService _dalamudUtil;
     private readonly FileUploadManager _fileTransferManager;
-    private readonly HashSet<CachedPlayer> _newVisiblePlayers = new();
+    private readonly HashSet<PairHandler> _newVisiblePlayers = new();
     private readonly PairManager _pairManager;
     private CharacterData? _lastSentData;
 
@@ -40,7 +41,7 @@ public class OnlinePlayerManager : DisposableMediatorSubscriberBase
                 Logger.LogDebug("Not sending data for {hash}", newData.DataHash.Value);
             }
         });
-        Mediator.Subscribe<CachedPlayerVisibleMessage>(this, (msg) => _newVisiblePlayers.Add(msg.Player));
+        Mediator.Subscribe<PairHandlerVisibleMessage>(this, (msg) => _newVisiblePlayers.Add(msg.Player));
         Mediator.Subscribe<ConnectedMessage>(this, (_) => PushCharacterData(_pairManager.GetVisibleUsers()));
     }
 

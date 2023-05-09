@@ -69,8 +69,9 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<UidDisplayHandler>();
             collection.AddSingleton<GameObjectHandlerFactory>();
             collection.AddSingleton<FileDownloadManagerFactory>();
-            collection.AddSingleton<CachedPlayerFactory>();
+            collection.AddSingleton<PairHandlerFactory>();
             collection.AddSingleton<PairFactory>();
+            collection.AddSingleton<PluginWarningNotificationService>();
             collection.AddSingleton((s) => new DalamudUtilService(s.GetRequiredService<ILogger<DalamudUtilService>>(),
                 clientState, objectTable, framework, gameGui, condition, gameData,
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<PerformanceCollectorService>()));

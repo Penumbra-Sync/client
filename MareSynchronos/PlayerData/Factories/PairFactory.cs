@@ -7,12 +7,12 @@ namespace MareSynchronos.PlayerData.Factories;
 
 public class PairFactory
 {
-    private readonly CachedPlayerFactory _cachedPlayerFactory;
+    private readonly PairHandlerFactory _cachedPlayerFactory;
     private readonly ILoggerFactory _loggerFactory;
     private readonly MareMediator _mareMediator;
     private readonly ServerConfigurationManager _serverConfigurationManager;
 
-    public PairFactory(ILoggerFactory loggerFactory, CachedPlayerFactory cachedPlayerFactory,
+    public PairFactory(ILoggerFactory loggerFactory, PairHandlerFactory cachedPlayerFactory,
         MareMediator mareMediator, ServerConfigurationManager serverConfigurationManager)
     {
         _loggerFactory = loggerFactory;

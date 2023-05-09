@@ -1,7 +1,7 @@
 ﻿using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
-using MareSynchronos.MareConfiguration;
+using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.PlayerData.Factories;
 
-public class CachedPlayerFactory
+public class PairHandlerFactory
 {
     private readonly DalamudUtilService _dalamudUtilService;
     private readonly FileCacheManager _fileCacheManager;
@@ -19,28 +19,29 @@ public class CachedPlayerFactory
     private readonly IHostApplicationLifetime _hostApplicationLifetime;
     private readonly IpcManager _ipcManager;
     private readonly ILoggerFactory _loggerFactory;
-    private readonly MareConfigService _mareConfigService;
     private readonly MareMediator _mareMediator;
+    private readonly PluginWarningNotificationService _pluginWarningNotificationManager;
 
-    public CachedPlayerFactory(ILoggerFactory loggerFactory, GameObjectHandlerFactory gameObjectHandlerFactory, IpcManager ipcManager,
-        FileDownloadManagerFactory fileDownloadManagerFactory, MareConfigService mareConfigService, DalamudUtilService dalamudUtilService,
-        IHostApplicationLifetime hostApplicationLifetime, FileCacheManager fileCacheManager, MareMediator mareMediator)
+    public PairHandlerFactory(ILoggerFactory loggerFactory, GameObjectHandlerFactory gameObjectHandlerFactory, IpcManager ipcManager,
+        FileDownloadManagerFactory fileDownloadManagerFactory, DalamudUtilService dalamudUtilService,
+        PluginWarningNotificationService pluginWarningNotificationManager, IHostApplicationLifetime hostApplicationLifetime,
+        FileCacheManager fileCacheManager, MareMediator mareMediator)
     {
         _loggerFactory = loggerFactory;
         _gameObjectHandlerFactory = gameObjectHandlerFactory;
         _ipcManager = ipcManager;
         _fileDownloadManagerFactory = fileDownloadManagerFactory;
-        _mareConfigService = mareConfigService;
         _dalamudUtilService = dalamudUtilService;
+        _pluginWarningNotificationManager = pluginWarningNotificationManager;
         _hostApplicationLifetime = hostApplicationLifetime;
         _fileCacheManager = fileCacheManager;
         _mareMediator = mareMediator;
     }
 
-    public CachedPlayer Create(OnlineUserIdentDto onlineUserIdentDto)
+    public PairHandler Create(OnlineUserIdentDto onlineUserIdentDto)
     {
-        return new CachedPlayer(_loggerFactory.CreateLogger<CachedPlayer>(), onlineUserIdentDto, _gameObjectHandlerFactory,
-            _ipcManager, _fileDownloadManagerFactory.Create(), _mareConfigService, _dalamudUtilService, _hostApplicationLifetime,
+        return new PairHandler(_loggerFactory.CreateLogger<PairHandler>(), onlineUserIdentDto, _gameObjectHandlerFactory,
+            _ipcManager, _fileDownloadManagerFactory.Create(), _pluginWarningNotificationManager, _dalamudUtilService, _hostApplicationLifetime,
             _fileCacheManager, _mareMediator);
     }
 }

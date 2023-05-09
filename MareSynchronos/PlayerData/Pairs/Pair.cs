@@ -5,6 +5,7 @@ using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.PlayerData.Factories;
+using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Utils;
@@ -14,7 +15,7 @@ namespace MareSynchronos.PlayerData.Pairs;
 
 public class Pair
 {
-    private readonly CachedPlayerFactory _cachedPlayerFactory;
+    private readonly PairHandlerFactory _cachedPlayerFactory;
     private readonly SemaphoreSlim _creationSemaphore = new(1);
     private readonly ILogger<Pair> _logger;
     private readonly MareMediator _mediator;
@@ -22,7 +23,7 @@ public class Pair
     private CancellationTokenSource _applicationCts = new CancellationTokenSource();
     private OnlineUserIdentDto? _onlineUserIdentDto = null;
 
-    public Pair(ILogger<Pair> logger, CachedPlayerFactory cachedPlayerFactory,
+    public Pair(ILogger<Pair> logger, PairHandlerFactory cachedPlayerFactory,
         MareMediator mediator, ServerConfigurationManager serverConfigurationManager)
     {
         _logger = logger;
@@ -46,7 +47,7 @@ public class Pair
 
     public UserPairDto? UserPair { get; set; }
 
-    private CachedPlayer? CachedPlayer { get; set; }
+    private PairHandler? CachedPlayer { get; set; }
 
     public void AddContextMenu(GameObjectContextMenuOpenArgs args)
     {

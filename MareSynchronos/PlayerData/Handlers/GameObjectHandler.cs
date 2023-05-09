@@ -118,6 +118,18 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         }
     }
 
+    public void CompareNameAndThrow(string name)
+    {
+        if (!string.Equals(Name, name, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Player name not equal to requested name, pointer invalid");
+        }
+        if (Address == IntPtr.Zero)
+        {
+            throw new InvalidOperationException("Player pointer is zero, pointer invalid");
+        }
+    }
+
     public IntPtr CurrentAddress()
     {
         _dalamudUtil.EnsureIsOnFramework();
@@ -133,6 +145,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
     {
         Address = IntPtr.Zero;
         DrawObjectAddress = IntPtr.Zero;
+        _haltProcessing = false;
     }
 
     public async Task<bool> IsBeingDrawnRunOnFrameworkAsync()
@@ -156,8 +169,6 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
     private unsafe void CheckAndUpdateObject()
     {
-        if (_haltProcessing) return;
-
         var prevAddr = Address;
         var prevDrawObj = DrawObjectAddress;
 
@@ -171,6 +182,8 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         {
             DrawObjectAddress = IntPtr.Zero;
         }
+
+        if (_haltProcessing) return;
 
         bool drawObjDiff = DrawObjectAddress != prevDrawObj;
         bool addrDiff = Address != prevAddr;
