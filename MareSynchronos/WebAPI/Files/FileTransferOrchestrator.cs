@@ -109,7 +109,7 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         }
         catch (Exception ex)
         {
-            Logger.LogCritical(ex, "Error during SendRequestInternal for {uri}", requestMessage.RequestUri);
+            Logger.LogWarning(ex, "Error during SendRequestInternal for {uri}", requestMessage.RequestUri);
             throw;
         }
     }

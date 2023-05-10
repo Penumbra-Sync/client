@@ -364,12 +364,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
                     Logger.LogDebug("[{applicationId}] Application finished", _applicationId);
                 }
-                catch (ArgumentNullException ex)
-                {
-                    Logger.LogWarning(ex, "[{applicationId}] Cancelled, player turned null during application", _applicationId);
-                    IsVisible = false;
-                    _applyLastReceivedDataOnVisible = true;
-                }
                 catch (Exception ex)
                 {
                     if (ex is AggregateException aggr && aggr.InnerExceptions.Any(e => e is ArgumentNullException))
@@ -377,7 +371,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                         IsVisible = false;
                         _applyLastReceivedDataOnVisible = true;
                         _cachedData = charaData;
-                        Logger.LogWarning(aggr, "[{applicationId}] Cancelled, player turned null during application", _applicationId);
+                        Logger.LogDebug("[{applicationId}] Cancelled, player turned null during application", _applicationId);
                     }
                     else
                     {
