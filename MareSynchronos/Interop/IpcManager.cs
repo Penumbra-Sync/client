@@ -62,6 +62,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly ActionSubscriber<GameObject, RedrawType> _penumbraRedrawObject;
     private readonly ConcurrentDictionary<IntPtr, bool> _penumbraRedrawRequests = new();
     private readonly FuncSubscriber<string, PenumbraApiEc> _penumbraRemoveTemporaryCollection;
+    private readonly FuncSubscriber<string, string, int, PenumbraApiEc> _penumbraRemoveTemporaryMod;
     private readonly FuncSubscriber<string> _penumbraResolveModDir;
     private readonly FuncSubscriber<string[], string[], (string[], string[][])> _penumbraResolvePaths;
     private readonly SemaphoreSlim _redrawSemaphore = new(2);
@@ -88,6 +89,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         _penumbraApiVersion = Penumbra.Api.Ipc.ApiVersions.Subscriber(pi);
         _penumbraObjectIsRedrawn = Penumbra.Api.Ipc.GameObjectRedrawn.Subscriber(pi, RedrawEvent);
         _penumbraGetMetaManipulations = Penumbra.Api.Ipc.GetPlayerMetaManipulations.Subscriber(pi);
+        _penumbraRemoveTemporaryMod = Penumbra.Api.Ipc.RemoveTemporaryMod.Subscriber(pi);
         _penumbraAddTemporaryMod = Penumbra.Api.Ipc.AddTemporaryMod.Subscriber(pi);
         _penumbraCreateNamedTemporaryCollection = Penumbra.Api.Ipc.CreateNamedTemporaryCollection.Subscriber(pi);
         _penumbraRemoveTemporaryCollection = Penumbra.Api.Ipc.RemoveTemporaryCollectionByName.Subscriber(pi);
@@ -494,6 +496,8 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
             {
                 logger.LogTrace("[{applicationId}] Change: {from} => {to}", applicationId, mod.Key, mod.Value);
             }
+            var retRemove = _penumbraRemoveTemporaryMod.Invoke("MareChara_Files", collName, 0);
+            logger.LogTrace("[{applicationId}] Removing temp files mod for {collName}, Success: {ret}", applicationId, collName, retRemove);
             var retAdd = _penumbraAddTemporaryMod.Invoke("MareChara_Files", collName, modPaths, string.Empty, 0);
             logger.LogTrace("[{applicationId}] Setting temp files mod for {collName}, Success: {ret}", applicationId, collName, retAdd);
         }).ConfigureAwait(false);
