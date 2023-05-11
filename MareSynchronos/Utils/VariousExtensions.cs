@@ -29,7 +29,8 @@ public static class VariousExtensions
         return new CancellationTokenSource();
     }
 
-    public static Dictionary<ObjectKind, HashSet<PlayerChanges>> CheckUpdatedData(this CharacterData newData, CharacterData? oldData, ILogger logger, PairHandler cachedPlayer, bool forced, bool applyLastOnVisible)
+    public static Dictionary<ObjectKind, HashSet<PlayerChanges>> CheckUpdatedData(this CharacterData newData, Guid applicationBase,
+        CharacterData? oldData, ILogger logger, PairHandler cachedPlayer, bool forceApplyCustomization, bool forceApplyMods)
     {
         oldData ??= new();
         var charaDataToUpdate = new Dictionary<ObjectKind, HashSet<PlayerChanges>>();
@@ -52,8 +53,9 @@ public static class VariousExtensions
 
             if (hasNewButNotOldFileReplacements || hasOldButNotNewFileReplacements || hasNewButNotOldGlamourerData || hasOldButNotNewGlamourerData)
             {
-                logger.LogDebug("Updating {object}/{kind} (Some new data arrived: NewButNotOldFiles:{hasNewButNotOldFileReplacements}," +
+                logger.LogDebug("[BASE-{appBase}] Updating {object}/{kind} (Some new data arrived: NewButNotOldFiles:{hasNewButNotOldFileReplacements}," +
                     " OldButNotNewFiles:{hasOldButNotNewFileReplacements}, NewButNotOldGlam:{hasNewButNotOldGlamourerData}, OldButNotNewGlam:{hasOldButNotNewGlamourerData}) => {change}, {change2}",
+                    applicationBase,
                     cachedPlayer, objectKind, hasNewButNotOldFileReplacements, hasOldButNotNewFileReplacements, hasNewButNotOldGlamourerData, hasOldButNotNewGlamourerData, PlayerChanges.ModFiles, PlayerChanges.Glamourer);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.ModFiles);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.Glamourer);
@@ -63,9 +65,9 @@ public static class VariousExtensions
                 if (hasNewAndOldFileReplacements)
                 {
                     bool listsAreEqual = oldData.FileReplacements[objectKind].SequenceEqual(newData.FileReplacements[objectKind], PlayerData.Data.FileReplacementDataComparer.Instance);
-                    if (!listsAreEqual || applyLastOnVisible)
+                    if (!listsAreEqual || forceApplyMods)
                     {
-                        logger.LogDebug("Updating {object}/{kind} (FileReplacements not equal) => {change}", cachedPlayer, objectKind, PlayerChanges.ModFiles);
+                        logger.LogDebug("[BASE-{appBase}] Updating {object}/{kind} (FileReplacements not equal) => {change}", applicationBase, cachedPlayer, objectKind, PlayerChanges.ModFiles);
                         charaDataToUpdate[objectKind].Add(PlayerChanges.ModFiles);
                     }
                 }
@@ -73,9 +75,9 @@ public static class VariousExtensions
                 if (hasNewAndOldGlamourerData)
                 {
                     bool glamourerDataDifferent = !string.Equals(oldData.GlamourerData[objectKind], newData.GlamourerData[objectKind], StringComparison.Ordinal);
-                    if (glamourerDataDifferent || forced)
+                    if (glamourerDataDifferent || forceApplyCustomization)
                     {
-                        logger.LogDebug("Updating {object}/{kind} (Glamourer different) => {change}", cachedPlayer, objectKind, PlayerChanges.Glamourer);
+                        logger.LogDebug("[BASE-{appBase}] Updating {object}/{kind} (Glamourer different) => {change}", applicationBase, cachedPlayer, objectKind, PlayerChanges.Glamourer);
                         charaDataToUpdate[objectKind].Add(PlayerChanges.Glamourer);
                     }
                 }
@@ -84,37 +86,37 @@ public static class VariousExtensions
             if (objectKind != ObjectKind.Player) continue;
 
             bool manipDataDifferent = !string.Equals(oldData.ManipulationData, newData.ManipulationData, StringComparison.Ordinal);
-            if (manipDataDifferent || applyLastOnVisible)
+            if (manipDataDifferent || forceApplyMods)
             {
-                logger.LogDebug("Updating {object}/{kind} (Diff manip data) => {change}", cachedPlayer, objectKind, PlayerChanges.ModManip);
+                logger.LogDebug("[BASE-{appBase}] Updating {object}/{kind} (Diff manip data) => {change}", applicationBase, cachedPlayer, objectKind, PlayerChanges.ModManip);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.ModManip);
             }
 
             bool heelsOffsetDifferent = oldData.HeelsOffset != newData.HeelsOffset;
-            if (heelsOffsetDifferent || (forced && newData.HeelsOffset != 0))
+            if (heelsOffsetDifferent || (forceApplyCustomization && newData.HeelsOffset != 0))
             {
-                logger.LogDebug("Updating {object}/{kind} (Diff heels data) => {change}", cachedPlayer, objectKind, PlayerChanges.Heels);
+                logger.LogDebug("[BASE-{appBase}] Updating {object}/{kind} (Diff heels data) => {change}", applicationBase, cachedPlayer, objectKind, PlayerChanges.Heels);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.Heels);
             }
 
             bool customizeDataDifferent = !string.Equals(oldData.CustomizePlusData, newData.CustomizePlusData, StringComparison.Ordinal);
-            if (customizeDataDifferent || (forced && !string.IsNullOrEmpty(newData.CustomizePlusData)))
+            if (customizeDataDifferent || (forceApplyCustomization && !string.IsNullOrEmpty(newData.CustomizePlusData)))
             {
-                logger.LogDebug("Updating {object}/{kind} (Diff customize data) => {change}", cachedPlayer, objectKind, PlayerChanges.Customize);
+                logger.LogDebug("[BASE-{appBase}] Updating {object}/{kind} (Diff customize data) => {change}", applicationBase, cachedPlayer, objectKind, PlayerChanges.Customize);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.Customize);
             }
 
             bool palettePlusDataDifferent = !string.Equals(oldData.PalettePlusData, newData.PalettePlusData, StringComparison.Ordinal);
-            if (palettePlusDataDifferent || (forced && !string.IsNullOrEmpty(newData.PalettePlusData)))
+            if (palettePlusDataDifferent || (forceApplyCustomization && !string.IsNullOrEmpty(newData.PalettePlusData)))
             {
-                logger.LogDebug("Updating {object}/{kind} (Diff palette data) => {change}", cachedPlayer, objectKind, PlayerChanges.Palette);
+                logger.LogDebug("[BASE-{appBase}] Updating {object}/{kind} (Diff palette data) => {change}", applicationBase, cachedPlayer, objectKind, PlayerChanges.Palette);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.Palette);
             }
 
             bool honorificDataDifferent = !string.Equals(oldData.HonorificData, newData.HonorificData, StringComparison.Ordinal);
-            if (honorificDataDifferent || (forced && !string.IsNullOrEmpty(newData.HonorificData)))
+            if (honorificDataDifferent || (forceApplyCustomization && !string.IsNullOrEmpty(newData.HonorificData)))
             {
-                logger.LogDebug("Updating {object}/{kind} (Diff honorific data) => {change}", cachedPlayer, objectKind, PlayerChanges.Honorific);
+                logger.LogDebug("[BASE-{appBase}] Updating {object}/{kind} (Diff honorific data) => {change}", applicationBase, cachedPlayer, objectKind, PlayerChanges.Honorific);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.Honorific);
             }
         }

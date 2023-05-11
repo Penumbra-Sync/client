@@ -29,10 +29,10 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private CancellationTokenSource? _applicationCancellationTokenSource = new();
     private Guid _applicationId;
     private Task? _applicationTask;
-    private bool _applyLastReceivedDataOnVisible = false;
     private CharacterData? _cachedData = null;
     private GameObjectHandler? _charaHandler;
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
+    private bool _forceApplyMods = false;
     private string _lastGlamourerData = string.Empty;
     private string _originalGlamourerData = string.Empty;
     private string _penumbraCollection;
@@ -83,38 +83,39 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     public string? PlayerName { get; private set; }
     public string PlayerNameHash => OnlineUser.Ident;
 
-    public void ApplyCharacterData(API.Data.CharacterData characterData, bool forced = false)
+    public void ApplyCharacterData(Guid applicationBase, CharacterData characterData, bool forceApplyCustomization = false)
     {
-        if (_charaHandler == null)
+        if (_charaHandler == null || (PlayerCharacter == IntPtr.Zero))
         {
-            _applyLastReceivedDataOnVisible = true;
+            Logger.LogDebug("[BASE-{appBase}] Received data but player was in invalid state, charaHandlerIsNull: {charaIsNull}, playerPointerIsNull: {ptrIsNull}",
+                applicationBase, _charaHandler == null, PlayerCharacter == IntPtr.Zero);
+            _forceApplyMods = _forceApplyMods || (PlayerCharacter == IntPtr.Zero && _cachedData == null);
             _cachedData = characterData;
+            Logger.LogDebug("[BASE-{appBase}] Setting data: {hash}, forceApplyMods: {force}", applicationBase, _cachedData.DataHash.Value, _forceApplyMods);
             return;
         }
 
         SetUploading(false);
 
-        Logger.LogDebug("Received data for {player}", this);
-        Logger.LogDebug("Hash for data is {newHash}, current cache hash is {oldHash}", characterData.DataHash.Value, _cachedData?.DataHash.Value ?? "NODATA");
-
-        Logger.LogDebug("Checking for files to download for player {name}", this);
+        Logger.LogDebug("[BASE-{appbase}] Applying data for {player}, forceApplyCustomization: {forced}, forceApplyMods: {forceMods}", applicationBase, this, forceApplyCustomization, _forceApplyMods);
+        Logger.LogDebug("[BASE-{appbase}] Hash for data is {newHash}, current cache hash is {oldHash}", applicationBase, characterData.DataHash.Value, _cachedData?.DataHash.Value ?? "NODATA");
 
         if (!_ipcManager.CheckPenumbraApi()) return;
         if (!_ipcManager.CheckGlamourerApi()) return;
 
-        if (string.Equals(characterData.DataHash.Value, _cachedData?.DataHash.Value ?? string.Empty, StringComparison.Ordinal) && !forced) return;
+        if (string.Equals(characterData.DataHash.Value, _cachedData?.DataHash.Value ?? string.Empty, StringComparison.Ordinal) && !forceApplyCustomization) return;
 
         if (_dalamudUtil.IsInCutscene || _dalamudUtil.IsInGpose)
         {
-            Logger.LogInformation("Received data for {player} while in cutscene/gpose, returning", this);
+            Logger.LogInformation("[BASE-{appbase}] Application of data for {player} while in cutscene/gpose, returning", applicationBase, this);
             return;
         }
 
-        var charaDataToUpdate = characterData.CheckUpdatedData(_cachedData?.DeepClone() ?? new(), Logger, this, forced, _applyLastReceivedDataOnVisible);
+        var charaDataToUpdate = characterData.CheckUpdatedData(applicationBase, _cachedData?.DeepClone() ?? new(), Logger, this, forceApplyCustomization, _forceApplyMods);
 
-        if (_charaHandler != null && _applyLastReceivedDataOnVisible)
+        if (_charaHandler != null && _forceApplyMods)
         {
-            _applyLastReceivedDataOnVisible = false;
+            _forceApplyMods = false;
         }
 
         if (charaDataToUpdate.TryGetValue(ObjectKind.Player, out var playerChanges))
@@ -122,9 +123,9 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             _pluginWarningNotificationManager.NotifyForMissingPlugins(OnlineUser.User, PlayerName!, playerChanges);
         }
 
-        Logger.LogDebug("Downloading and applying character for {name}", this);
+        Logger.LogDebug("[BASE-{appbase}] Downloading and applying character for {name}", applicationBase, this);
 
-        DownloadAndApplyCharacter(characterData.DeepClone(), charaDataToUpdate);
+        DownloadAndApplyCharacter(applicationBase, characterData.DeepClone(), charaDataToUpdate);
     }
 
     public override string ToString()
@@ -263,11 +264,11 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         }
     }
 
-    private void DownloadAndApplyCharacter(API.Data.CharacterData charaData, Dictionary<ObjectKind, HashSet<PlayerChanges>> updatedData)
+    private void DownloadAndApplyCharacter(Guid applicationBase, CharacterData charaData, Dictionary<ObjectKind, HashSet<PlayerChanges>> updatedData)
     {
         if (!updatedData.Any())
         {
-            Logger.LogDebug("Nothing to update for {obj}", this);
+            Logger.LogDebug("[BASE-{appBase}] Nothing to update for {obj}", applicationBase, this);
             return;
         }
 
@@ -284,12 +285,12 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             if (updateModdedPaths)
             {
                 int attempts = 0;
-                List<FileReplacementData> toDownloadReplacements = TryCalculateModdedDictionary(charaData, out moddedPaths, downloadToken);
+                List<FileReplacementData> toDownloadReplacements = TryCalculateModdedDictionary(applicationBase, charaData, out moddedPaths, downloadToken);
 
                 while (toDownloadReplacements.Count > 0 && attempts++ <= 10 && !downloadToken.IsCancellationRequested)
                 {
                     _downloadManager.CancelDownload();
-                    Logger.LogDebug("Downloading missing files for player {name}, {kind}", PlayerName, updatedData);
+                    Logger.LogDebug("[BASE-{appBase}] Downloading missing files for player {name}, {kind}", applicationBase, PlayerName, updatedData);
                     if (toDownloadReplacements.Any())
                     {
                         await _downloadManager.DownloadFiles(_charaHandler!, toDownloadReplacements, downloadToken).ConfigureAwait(false);
@@ -298,12 +299,12 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
                     if (downloadToken.IsCancellationRequested)
                     {
-                        Logger.LogTrace("Detected cancellation");
+                        Logger.LogTrace("[BASE-{appBase}] Detected cancellation", applicationBase);
                         _downloadManager.CancelDownload();
                         return;
                     }
 
-                    toDownloadReplacements = TryCalculateModdedDictionary(charaData, out moddedPaths, downloadToken);
+                    toDownloadReplacements = TryCalculateModdedDictionary(applicationBase, charaData, out moddedPaths, downloadToken);
 
                     if (toDownloadReplacements.All(c => _downloadManager.ForbiddenTransfers.Any(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
                     {
@@ -322,7 +323,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                    && (!appToken?.IsCancellationRequested ?? false))
             {
                 // block until current application is done
-                Logger.LogDebug("Waiting for current data application (Id: {id}) for player ({handler}) to finish", _applicationId, PlayerName);
+                Logger.LogDebug("[BASE-{appBase}] Waiting for current data application (Id: {id}) for player ({handler}) to finish", applicationBase, _applicationId, PlayerName);
                 await Task.Delay(250).ConfigureAwait(false);
             }
 
@@ -335,7 +336,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                 try
                 {
                     _applicationId = Guid.NewGuid();
-                    Logger.LogDebug("[{applicationId}] Starting application task for {this}", _applicationId, this);
+                    Logger.LogDebug("[BASE-{applicationId}] Starting application task for {this}: {appId}", applicationBase, this, _applicationId);
 
                     Logger.LogDebug("[{applicationId}] Waiting for initial draw for for {handler}", _applicationId, _charaHandler);
                     await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, _charaHandler!, _applicationId, 30000, token).ConfigureAwait(false);
@@ -369,7 +370,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                     if (ex is AggregateException aggr && aggr.InnerExceptions.Any(e => e is ArgumentNullException))
                     {
                         IsVisible = false;
-                        _applyLastReceivedDataOnVisible = true;
+                        _forceApplyMods = true;
                         _cachedData = charaData;
                         Logger.LogDebug("[{applicationId}] Cancelled, player turned null during application", _applicationId);
                     }
@@ -397,14 +398,20 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         {
             IsVisible = true;
             Mediator.Publish(new PairHandlerVisibleMessage(this));
-            Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);
-            if (_applyLastReceivedDataOnVisible && _cachedData != null)
+            if (_cachedData != null)
             {
+                Guid appData = Guid.NewGuid();
+                Logger.LogTrace("{this} visibility changed, now: {visi}, cached data exists => application {app}", this, IsVisible, appData);
+
                 Task.Run(async () =>
                 {
                     _lastGlamourerData = await _ipcManager.GlamourerGetCharacterCustomizationAsync(PlayerCharacter).ConfigureAwait(false);
-                    ApplyCharacterData(_cachedData!, true);
+                    ApplyCharacterData(appData, _cachedData!, true);
                 });
+            }
+            else
+            {
+                Logger.LogTrace("{this} visibility changed, now: {visi}, no cached data exists", this, IsVisible);
             }
         }
         else if (_charaHandler?.Address == nint.Zero && IsVisible)
@@ -431,7 +438,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                 _lastGlamourerData = await _ipcManager.GlamourerGetCharacterCustomizationAsync(PlayerCharacter).ConfigureAwait(false);
                 if (_cachedData != null)
                 {
-                    ApplyCharacterData(_cachedData!, true);
+                    ApplyCharacterData(Guid.NewGuid(), _cachedData!, true);
                 }
             }
         });
@@ -527,7 +534,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         }
     }
 
-    private List<FileReplacementData> TryCalculateModdedDictionary(CharacterData charaData, out Dictionary<string, string> moddedDictionary, CancellationToken token)
+    private List<FileReplacementData> TryCalculateModdedDictionary(Guid applicationBase, CharacterData charaData, out Dictionary<string, string> moddedDictionary, CancellationToken token)
     {
         Stopwatch st = Stopwatch.StartNew();
         List<FileReplacementData> missingFiles = new();
@@ -572,18 +579,18 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             {
                 foreach (var gamePath in item.GamePaths)
                 {
-                    Logger.LogTrace("Adding file swap for {path}: {fileSwap}", gamePath, item.FileSwapPath);
+                    Logger.LogTrace("[BASE-{appBase}] Adding file swap for {path}: {fileSwap}", applicationBase, gamePath, item.FileSwapPath);
                     moddedDictionary[gamePath] = item.FileSwapPath;
                 }
             }
         }
         catch (Exception ex)
         {
-            PluginLog.Error(ex, "Something went wrong during calculation replacements");
+            PluginLog.Error(ex, "[BASE-{appBase}] Something went wrong during calculation replacements", applicationBase);
         }
         if (hasMigrationChanges) _fileDbManager.WriteOutFullCsv();
         st.Stop();
-        Logger.LogDebug("ModdedPaths calculated in {time}ms, missing files: {count}, total files: {total}", st.ElapsedMilliseconds, missingFiles.Count, moddedDictionary.Keys.Count);
+        Logger.LogDebug("[BASE-{appBase}] ModdedPaths calculated in {time}ms, missing files: {count}, total files: {total}", applicationBase, st.ElapsedMilliseconds, missingFiles.Count, moddedDictionary.Keys.Count);
         return missingFiles;
     }
 }
