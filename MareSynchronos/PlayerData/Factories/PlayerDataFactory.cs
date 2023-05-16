@@ -183,8 +183,6 @@ public class PlayerDataFactory
 
             if (string.IsNullOrEmpty(texPath)) continue;
 
-            _logger.LogTrace("Checking File Replacement for Texture {file}", texPath);
-
             AddReplacementsFromTexture(texPath, forwardResolve, reverseResolve);
         }
 
@@ -234,7 +232,7 @@ public class PlayerDataFactory
     {
         if (string.IsNullOrEmpty(texPath)) return;
 
-        _logger.LogTrace("Checking file Replacement for texture {path}", texPath);
+        _logger.LogTrace("Checking File Replacement for Texture {path}", texPath);
 
         if (doNotReverseResolve)
             forwardResolve.Add(texPath);

@@ -59,6 +59,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
         Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) =>
         {
+            MediatorUnsubscribeFromCharacterChanged();
             _charaHandler?.Invalidate();
             IsVisible = false;
         });
@@ -89,7 +90,9 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         {
             Logger.LogDebug("[BASE-{appBase}] Received data but player was in invalid state, charaHandlerIsNull: {charaIsNull}, playerPointerIsNull: {ptrIsNull}",
                 applicationBase, _charaHandler == null, PlayerCharacter == IntPtr.Zero);
-            _forceApplyMods = _forceApplyMods || (PlayerCharacter == IntPtr.Zero && _cachedData == null);
+            var hasDiffMods = characterData.CheckUpdatedData(applicationBase, _cachedData, Logger,
+                this, forceApplyCustomization, false).Any(p => p.Value.Contains(PlayerChanges.ModManip) || p.Value.Contains(PlayerChanges.ModFiles));
+            _forceApplyMods = hasDiffMods || _forceApplyMods || (PlayerCharacter == IntPtr.Zero && _cachedData == null);
             _cachedData = characterData;
             Logger.LogDebug("[BASE-{appBase}] Setting data: {hash}, forceApplyMods: {force}", applicationBase, _cachedData.DataHash.Value, _forceApplyMods);
             return;
@@ -100,14 +103,11 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         Logger.LogDebug("[BASE-{appbase}] Applying data for {player}, forceApplyCustomization: {forced}, forceApplyMods: {forceMods}", applicationBase, this, forceApplyCustomization, _forceApplyMods);
         Logger.LogDebug("[BASE-{appbase}] Hash for data is {newHash}, current cache hash is {oldHash}", applicationBase, characterData.DataHash.Value, _cachedData?.DataHash.Value ?? "NODATA");
 
-        if (!_ipcManager.CheckPenumbraApi()) return;
-        if (!_ipcManager.CheckGlamourerApi()) return;
-
         if (string.Equals(characterData.DataHash.Value, _cachedData?.DataHash.Value ?? string.Empty, StringComparison.Ordinal) && !forceApplyCustomization) return;
 
-        if (_dalamudUtil.IsInCutscene || _dalamudUtil.IsInGpose)
+        if (_dalamudUtil.IsInCutscene || _dalamudUtil.IsInGpose || !_ipcManager.CheckPenumbraApi() || !_ipcManager.CheckGlamourerApi())
         {
-            Logger.LogInformation("[BASE-{appbase}] Application of data for {player} while in cutscene/gpose, returning", applicationBase, this);
+            Logger.LogInformation("[BASE-{appbase}] Application of data for {player} while in cutscene/gpose or Penumbra/Glamourer unavailable, returning", applicationBase, this);
             return;
         }
 
@@ -396,12 +396,12 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
         if (_charaHandler?.Address != nint.Zero && !IsVisible)
         {
+            Guid appData = Guid.NewGuid();
             IsVisible = true;
             Mediator.Publish(new PairHandlerVisibleMessage(this));
             if (_cachedData != null)
             {
-                Guid appData = Guid.NewGuid();
-                Logger.LogTrace("{this} visibility changed, now: {visi}, cached data exists => application {app}", this, IsVisible, appData);
+                Logger.LogTrace("[BASE-{appBase}] {this} visibility changed, now: {visi}, cached data exists", appData, this, IsVisible);
 
                 Task.Run(async () =>
                 {
@@ -413,11 +413,14 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             {
                 Logger.LogTrace("{this} visibility changed, now: {visi}, no cached data exists", this, IsVisible);
             }
+
+            MediatorSubscribeToCharacterChanged();
         }
         else if (_charaHandler?.Address == nint.Zero && IsVisible)
         {
             IsVisible = false;
             _charaHandler?.Invalidate();
+            MediatorUnsubscribeFromCharacterChanged();
             Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);
         }
     }
@@ -430,18 +433,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomizationAsync(PlayerCharacter).ConfigureAwait(false).GetAwaiter().GetResult();
         _lastGlamourerData = _originalGlamourerData;
         Mediator.Subscribe<PenumbraRedrawMessage>(this, IpcManagerOnPenumbraRedrawEvent);
-        Mediator.Subscribe<CharacterChangedMessage>(this, async (msg) =>
-        {
-            if (msg.GameObjectHandler == _charaHandler && (_applicationTask?.IsCompleted ?? true))
-            {
-                Logger.LogTrace("Saving new Glamourer Data for {this}", this);
-                _lastGlamourerData = await _ipcManager.GlamourerGetCharacterCustomizationAsync(PlayerCharacter).ConfigureAwait(false);
-                if (_cachedData != null)
-                {
-                    ApplyCharacterData(Guid.NewGuid(), _cachedData!, true);
-                }
-            }
-        });
         Mediator.Subscribe<HonorificReadyMessage>(this, async (_) =>
         {
             if (string.IsNullOrEmpty(_cachedData?.HonorificData)) return;
@@ -474,6 +465,33 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                     _cachedData, token).ConfigureAwait(false);
             }
         }, token);
+    }
+
+    private void MediatorSubscribeToCharacterChanged()
+    {
+        Mediator.Subscribe<CharacterChangedMessage>(this, (msg) =>
+        {
+            if (msg.GameObjectHandler == _charaHandler && (_applicationTask?.IsCompleted ?? true))
+            {
+                Guid appBase = Guid.NewGuid();
+                var newGlamData = _ipcManager.GlamourerGetCharacterCustomizationAsync(PlayerCharacter).ConfigureAwait(false).GetAwaiter().GetResult();
+                if (!string.Equals(_lastGlamourerData, newGlamData, StringComparison.OrdinalIgnoreCase))
+                {
+                    Logger.LogTrace("[BASE-{appBase}] Saving new Glamourer Data for {this}", appBase, this);
+
+                    _lastGlamourerData = newGlamData;
+                    if (_cachedData != null)
+                    {
+                        ApplyCharacterData(appBase, _cachedData!, true);
+                    }
+                }
+            }
+        });
+    }
+
+    private void MediatorUnsubscribeFromCharacterChanged()
+    {
+        Mediator.Unsubscribe<CharacterChangedMessage>(this);
     }
 
     private async Task RevertCustomizationDataAsync(ObjectKind objectKind, string name, Guid applicationId)
