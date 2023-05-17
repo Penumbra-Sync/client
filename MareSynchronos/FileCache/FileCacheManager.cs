@@ -60,13 +60,14 @@ public sealed class FileCacheManager : IDisposable
                 try
                 {
                     var hash = splittedEntry[0];
+                    if (hash.Length != 40) throw new InvalidOperationException("Expected Hash length of 40, received " + hash.Length);
                     var path = splittedEntry[1];
                     var time = splittedEntry[2];
                     AddHashedFile(ReplacePathPrefixes(new FileCacheEntity(hash, path, time)));
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    _logger.LogWarning("Failed to initialize entry {entry}, ignoring", entry);
+                    _logger.LogWarning(ex, "Failed to initialize entry {entry}, ignoring", entry);
                 }
             }
         }
