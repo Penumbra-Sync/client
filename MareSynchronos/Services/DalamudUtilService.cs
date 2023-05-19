@@ -32,6 +32,7 @@ public class DalamudUtilService : IHostedService
     private uint? _classJobId = 0;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
     private string _lastGlobalBlockPlayer = string.Empty;
+    private string _lastGlobalBlockReason = string.Empty;
     private ushort _lastZone = 0;
     private Dictionary<string, (string Name, nint Address)> _playerCharas = new(StringComparer.Ordinal);
     private bool _sentBetweenAreas = false;
@@ -334,6 +335,7 @@ public class DalamudUtilService : IHostedService
             var drawObj = gameObj->DrawObject;
             var playerName = p.Name.ToString();
             bool isDrawing = false;
+            bool isDrawingChanged = false;
             if ((nint)drawObj != IntPtr.Zero)
             {
                 isDrawing = gameObj->RenderFlags == 0b100000000000;
@@ -345,30 +347,38 @@ public class DalamudUtilService : IHostedService
                         isDrawing = ((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0;
                         if (isDrawing)
                         {
-                            if (!string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal))
+                            if (!string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal) && !string.Equals(_lastGlobalBlockReason, "HasModelFilesInSlotLoaded"))
                             {
                                 _lastGlobalBlockPlayer = playerName;
-                                _logger.LogTrace("Global draw block: START => {name} (HasModelFilesInSlotLoaded)", playerName);
+                                _lastGlobalBlockReason = "HasModelFilesInSlotLoaded";
+                                isDrawingChanged = true;
                             }
                         }
                     }
                     else
                     {
-                        if (!string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal))
+                        if (!string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal) && !string.Equals(_lastGlobalBlockReason, "HasModelInSlotLoaded"))
                         {
                             _lastGlobalBlockPlayer = playerName;
-                            _logger.LogTrace("Global draw block: START => {name} (HasModelInSlotLoaded)", playerName);
+                            _lastGlobalBlockReason = "HasModelInSlotLoaded";
+                            isDrawingChanged = true;
                         }
                     }
                 }
                 else
                 {
-                    if (!string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal))
+                    if (!string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal) && !string.Equals(_lastGlobalBlockReason, "RenderFlags"))
                     {
                         _lastGlobalBlockPlayer = playerName;
-                        _logger.LogTrace("Global draw block: START => {name} (RenderFlags)", playerName);
+                        _lastGlobalBlockReason = "RenderFlags";
+                        isDrawingChanged = true;
                     }
                 }
+            }
+
+            if (isDrawingChanged)
+            {
+                _logger.LogTrace("Global draw block: START => {name} ({reason})", playerName, _lastGlobalBlockReason);
             }
 
             IsAnythingDrawing |= isDrawing;
@@ -400,6 +410,7 @@ public class DalamudUtilService : IHostedService
         {
             _logger.LogTrace("Global draw block: END => {name}", _lastGlobalBlockPlayer);
             _lastGlobalBlockPlayer = string.Empty;
+            _lastGlobalBlockReason = string.Empty;
         }
 
         if (GposeTarget != null && !IsInGpose)
