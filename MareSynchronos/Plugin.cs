@@ -9,14 +9,11 @@ using Dalamud.Game.Gui;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
-using MareSynchronos.API.Data.Enum;
-using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Export;
 using MareSynchronos.PlayerData.Factories;
-using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.PlayerData.Services;
 using MareSynchronos.Services;
@@ -75,6 +72,11 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<MarePlugin>();
             collection.AddSingleton<MareProfileManager>();
             collection.AddSingleton<UidDisplayHandler>();
+            collection.AddSingleton<GameObjectHandlerFactory>();
+            collection.AddSingleton<FileDownloadManagerFactory>();
+            collection.AddSingleton<PairHandlerFactory>();
+            collection.AddSingleton<PairFactory>();
+            collection.AddSingleton<PluginWarningNotificationService>();
             collection.AddSingleton<SelectGroupForPairUi>();
             collection.AddSingleton<SelectPairForGroupUi>();
             collection.AddSingleton<PairGroupsUi>();
@@ -101,38 +103,7 @@ public sealed class Plugin : IDalamudPlugin
 
             // func factory method singletons
             collection.AddSingleton(s =>
-                new Func<ObjectKind, Func<nint>, bool, GameObjectHandler>((o, f, b)
-                    => new GameObjectHandler(s.GetRequiredService<ILogger<GameObjectHandler>>(),
-                        s.GetRequiredService<PerformanceCollectorService>(),
-                        s.GetRequiredService<MareMediator>(),
-                        s.GetRequiredService<DalamudUtilService>(),
-                        o, f, b)));
-            collection.AddSingleton(s =>
-                new Func<OnlineUserIdentDto, CachedPlayer>((o)
-                    => new CachedPlayer(s.GetRequiredService<ILogger<CachedPlayer>>(),
-                        o,
-                        s.GetRequiredService<Func<ObjectKind, Func<nint>, bool, GameObjectHandler>>(),
-                        s.GetRequiredService<IpcManager>(),
-                        s.GetRequiredService<Func<FileDownloadManager>>().Invoke(),
-                        s.GetRequiredService<DalamudUtilService>(),
-                        s.GetRequiredService<IHostApplicationLifetime>(),
-                        s.GetRequiredService<FileCacheManager>(),
-                        s.GetRequiredService<MareMediator>())));
-            collection.AddSingleton(s =>
-                new Func<Pair>(()
-                    => new Pair(s.GetRequiredService<ILogger<Pair>>(),
-                        s.GetRequiredService<Func<OnlineUserIdentDto, CachedPlayer>>(),
-                        s.GetRequiredService<MareMediator>(),
-                        s.GetRequiredService<MareConfigService>(),
-                        s.GetRequiredService<ServerConfigurationManager>())));
-            collection.AddSingleton(s =>
-                new Func<FileDownloadManager>(()
-                    => new FileDownloadManager(s.GetRequiredService<ILogger<FileDownloadManager>>(),
-                        s.GetRequiredService<MareMediator>(),
-                        s.GetRequiredService<FileTransferOrchestrator>(),
-                        s.GetRequiredService<FileCacheManager>())));
-            collection.AddSingleton(s =>
-                new Func<DrawPairVMBase, StandaloneProfileUi>((pair) =>
+                new Func<Pair, StandaloneProfileUi>((pair) =>
                     new StandaloneProfileUi(s.GetRequiredService<ILogger<StandaloneProfileUi>>(),
                     s.GetRequiredService<MareMediator>(),
                     s.GetRequiredService<UiSharedService>(),
@@ -187,6 +158,7 @@ public sealed class Plugin : IDalamudPlugin
                 s.GetRequiredService<PeriodicFileScanner>(), s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareConfigService>(), s.GetRequiredService<DalamudUtilService>(),
                 pluginInterface, s.GetRequiredService<Dalamud.Localization>(), s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<MareMediator>()));
 
+            collection.AddHostedService(p => p.GetRequiredService<MareMediator>());
             collection.AddHostedService(p => p.GetRequiredService<ConfigurationMigrator>());
             collection.AddHostedService(p => p.GetRequiredService<DalamudUtilService>());
             collection.AddHostedService(p => p.GetRequiredService<PerformanceCollectorService>());

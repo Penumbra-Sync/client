@@ -23,6 +23,7 @@ public class ServerConfigurationManager
         _serverTagConfig = serverTagConfig;
         _notesConfig = notesConfig;
         _dalamudUtil = dalamudUtil;
+        EnsureMainExists();
     }
 
     public string CurrentApiUrl => CurrentServer.ServerUri;
@@ -57,8 +58,8 @@ public class ServerConfigurationManager
             Save();
         }
 
-        var charaName = _dalamudUtil.PlayerName;
-        var worldId = _dalamudUtil.WorldId;
+        var charaName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult();
+        var worldId = _dalamudUtil.GetWorldIdAsync().GetAwaiter().GetResult();
         if (!currentServer.Authentications.Any() && currentServer.SecretKeys.Any())
         {
             currentServer.Authentications.Add(new Authentication()
@@ -96,11 +97,7 @@ public class ServerConfigurationManager
         catch
         {
             _configService.Current.CurrentServer = 0;
-            if (!string.Equals(_configService.Current.ServerStorage[0].ServerUri, ApiController.MainServer, StringComparison.OrdinalIgnoreCase))
-            {
-                _configService.Current.ServerStorage.Insert(0, new ServerStorage() { ServerUri = ApiController.MainServiceUri, ServerName = ApiController.MainServer });
-            }
-            Save();
+            EnsureMainExists();
             return CurrentServer!;
         }
     }
@@ -112,8 +109,8 @@ public class ServerConfigurationManager
 
     public string? GetToken()
     {
-        var charaName = _dalamudUtil.PlayerName;
-        var worldId = _dalamudUtil.WorldId;
+        var charaName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult();
+        var worldId = _dalamudUtil.GetWorldIdAsync().GetAwaiter().GetResult();
         var secretKey = GetSecretKey();
         if (secretKey == null) return null;
         if (_tokenDictionary.TryGetValue(new JwtCache(CurrentApiUrl, charaName, worldId, secretKey), out var token))
@@ -138,8 +135,8 @@ public class ServerConfigurationManager
 
     public void SaveToken(string token)
     {
-        var charaName = _dalamudUtil.PlayerName;
-        var worldId = _dalamudUtil.WorldId;
+        var charaName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult();
+        var worldId = _dalamudUtil.GetWorldIdAsync().GetAwaiter().GetResult();
         var secretKey = GetSecretKey();
         if (string.IsNullOrEmpty(secretKey)) throw new InvalidOperationException("No secret key set");
         _tokenDictionary[new JwtCache(CurrentApiUrl, charaName, worldId, secretKey)] = token;
@@ -158,8 +155,8 @@ public class ServerConfigurationManager
         var server = GetServerByIndex(serverSelectionIndex);
         server.Authentications.Add(new Authentication()
         {
-            CharacterName = _dalamudUtil.PlayerName,
-            WorldId = _dalamudUtil.WorldId,
+            CharacterName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult(),
+            WorldId = _dalamudUtil.GetWorldIdAsync().GetAwaiter().GetResult(),
             SecretKeyIdx = addLastSecretKey ? server.SecretKeys.Last().Key : -1,
         });
         Save();
@@ -339,6 +336,15 @@ public class ServerConfigurationManager
     {
         TryCreateCurrentServerTagStorage();
         return _serverTagConfig.Current.ServerTagStorage[CurrentApiUrl];
+    }
+
+    private void EnsureMainExists()
+    {
+        if (_configService.Current.ServerStorage.Count == 0 || !string.Equals(_configService.Current.ServerStorage[0].ServerUri, ApiController.MainServiceUri, StringComparison.OrdinalIgnoreCase))
+        {
+            _configService.Current.ServerStorage.Insert(0, new ServerStorage() { ServerUri = ApiController.MainServiceUri, ServerName = ApiController.MainServer });
+        }
+        Save();
     }
 
     private void TryCreateCurrentNotesStorage()

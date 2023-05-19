@@ -77,7 +77,6 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
     public MarePlugin(ILogger<MarePlugin> logger, MareConfigService mareConfigService,
         ServerConfigurationManager serverConfigurationManager,
         DalamudUtilService dalamudUtil,
-        ConfigurationMigrator configurationMigrator,
         IServiceScopeFactory serviceScopeFactory, MareMediator mediator) : base(logger, mediator)
     {
         _mareConfigService = mareConfigService;
@@ -125,7 +124,7 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
 
     private async Task WaitForPlayerAndLaunchCharacterManager()
     {
-        while (!_dalamudUtil.IsPlayerPresent)
+        while (!await _dalamudUtil.GetIsPlayerPresentAsync().ConfigureAwait(false))
         {
             await Task.Delay(100).ConfigureAwait(false);
         }

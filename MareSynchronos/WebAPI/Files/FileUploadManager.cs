@@ -156,13 +156,18 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
                 await UploadFileStream(compressedFile, fileHash, uploadToken).ConfigureAwait(false);
             else
                 await UploadFileFull(compressedFile, fileHash, uploadToken).ConfigureAwait(false);
+            _verifiedUploadedHashes[fileHash] = DateTime.UtcNow;
         }
         catch (Exception ex)
         {
-            if (!_mareConfigService.Current.UseAlternativeFileUpload)
+            if (!_mareConfigService.Current.UseAlternativeFileUpload && ex is not OperationCanceledException)
             {
                 Logger.LogWarning(ex, "[{hash}] Error during file upload, trying alternative file upload", fileHash);
                 await UploadFileFull(compressedFile, fileHash, uploadToken).ConfigureAwait(false);
+            }
+            else
+            {
+                Logger.LogWarning(ex, "[{hash}] File upload cancelled", fileHash);
             }
         }
     }
@@ -246,7 +251,6 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
             await uploadTask.ConfigureAwait(false);
             uploadTask = UploadFile(data.Item2, file.Hash, uploadToken);
             uploadToken.ThrowIfCancellationRequested();
-            _verifiedUploadedHashes[file.Hash] = DateTime.UtcNow;
         }
 
         if (CurrentUploads.Any())

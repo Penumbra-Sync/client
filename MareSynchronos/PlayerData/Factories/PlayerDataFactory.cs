@@ -55,7 +55,7 @@ public class PlayerDataFactory
             pointerIsZero = playerRelatedObject.Address == IntPtr.Zero;
             try
             {
-                pointerIsZero = CheckForNullDrawObject(playerRelatedObject.Address);
+                pointerIsZero = await CheckForNullDrawObject(playerRelatedObject.Address).ConfigureAwait(false);
             }
             catch
             {
@@ -99,11 +99,6 @@ public class PlayerDataFactory
 
         previousData.FileReplacements = previousFileReplacements;
         previousData.GlamourerString = previousGlamourerData;
-    }
-
-    private static unsafe bool CheckForNullDrawObject(IntPtr playerPointer)
-    {
-        return ((Character*)playerPointer)->GameObject.DrawObject == null;
     }
 
     private unsafe void AddPlayerSpecificReplacements(Human* human, HashSet<string> forwardResolve, HashSet<string> reverseResolve)
@@ -188,8 +183,6 @@ public class PlayerDataFactory
 
             if (string.IsNullOrEmpty(texPath)) continue;
 
-            _logger.LogTrace("Checking File Replacement for Texture {file}", texPath);
-
             AddReplacementsFromTexture(texPath, forwardResolve, reverseResolve);
         }
 
@@ -239,7 +232,7 @@ public class PlayerDataFactory
     {
         if (string.IsNullOrEmpty(texPath)) return;
 
-        _logger.LogTrace("Checking file Replacement for texture {path}", texPath);
+        _logger.LogTrace("Checking File Replacement for Texture {path}", texPath);
 
         if (doNotReverseResolve)
             forwardResolve.Add(texPath);
@@ -292,6 +285,16 @@ public class PlayerDataFactory
         return (forwardResolve, reverseResolve);
     }
 
+    private async Task<bool> CheckForNullDrawObject(IntPtr playerPointer)
+    {
+        return await _dalamudUtil.RunOnFrameworkThread(() => CheckForNullDrawObjectUnsafe(playerPointer)).ConfigureAwait(false);
+    }
+
+    private unsafe bool CheckForNullDrawObjectUnsafe(IntPtr playerPointer)
+    {
+        return ((Character*)playerPointer)->GameObject.DrawObject == null;
+    }
+
     private async Task<CharacterData> CreateCharacterData(CharacterData previousData, GameObjectHandler playerRelatedObject, CancellationToken token)
     {
         var objectKind = playerRelatedObject.ObjectKind;
@@ -311,7 +314,7 @@ public class PlayerDataFactory
         // wait until chara is not drawing and present so nothing spontaneously explodes
         await _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, playerRelatedObject, Guid.NewGuid(), 30000, ct: token).ConfigureAwait(false);
         int totalWaitTime = 10000;
-        while (!DalamudUtilService.IsObjectPresent(_dalamudUtil.CreateGameObject(charaPointer)) && totalWaitTime > 0)
+        while (!await _dalamudUtil.IsObjectPresentAsync(await _dalamudUtil.CreateGameObjectAsync(charaPointer).ConfigureAwait(false)).ConfigureAwait(false) && totalWaitTime > 0)
         {
             _logger.LogTrace("Character is null but it shouldn't be, waiting");
             await Task.Delay(50, token).ConfigureAwait(false);
@@ -321,7 +324,7 @@ public class PlayerDataFactory
         Stopwatch st = Stopwatch.StartNew();
 
         // gather static replacements from render model
-        var (forwardResolve, reverseResolve) = BuildDataFromModel(objectKind, charaPointer, token);
+        var (forwardResolve, reverseResolve) = await _dalamudUtil.RunOnFrameworkThread(() => BuildDataFromModel(objectKind, charaPointer, token)).ConfigureAwait(false);
         Dictionary<string, List<string>> resolvedPaths = await GetFileReplacementsFromPaths(forwardResolve, reverseResolve).ConfigureAwait(false);
         previousData.FileReplacements[objectKind] =
                 new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)), FileReplacementComparer.Instance)
@@ -370,10 +373,10 @@ public class PlayerDataFactory
 
         // gather up data from ipc
         previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
-        previousData.HeelsOffset = _ipcManager.GetHeelsOffset();
-        Task<string> getGlamourerData = _ipcManager.GlamourerGetCharacterCustomization(playerRelatedObject.Address);
-        Task<string> getCustomizeData = _ipcManager.GetCustomizePlusScale();
-        Task<string> getPalettePlusData = _ipcManager.PalettePlusBuildPalette();
+        Task<float> getHeelsOffset = _ipcManager.GetHeelsOffsetAsync();
+        Task<string> getGlamourerData = _ipcManager.GlamourerGetCharacterCustomizationAsync(playerRelatedObject.Address);
+        Task<string> getCustomizeData = _ipcManager.GetCustomizePlusScaleAsync();
+        Task<string> getPalettePlusData = _ipcManager.PalettePlusBuildPaletteAsync();
         previousData.GlamourerString[playerRelatedObject.ObjectKind] = await getGlamourerData.ConfigureAwait(false);
         _logger.LogDebug("Glamourer is now: {data}", previousData.GlamourerString[playerRelatedObject.ObjectKind]);
         previousData.CustomizePlusScale = await getCustomizeData.ConfigureAwait(false);
@@ -382,6 +385,8 @@ public class PlayerDataFactory
         _logger.LogDebug("Palette is now: {data}", previousData.PalettePlusPalette);
         previousData.HonorificData = _ipcManager.HonorificGetTitle();
         _logger.LogDebug("Honorific is now: {data}", previousData.HonorificData);
+        previousData.HeelsOffset = await getHeelsOffset.ConfigureAwait(false);
+        _logger.LogDebug("Heels is now: {heels}", previousData.HeelsOffset);
 
         st.Stop();
         _logger.LogInformation("Building character data for {obj} took {time}ms", objectKind, TimeSpan.FromTicks(st.ElapsedTicks).TotalMilliseconds);
@@ -394,7 +399,7 @@ public class PlayerDataFactory
         var forwardPaths = forwardResolve.ToArray();
         var reversePaths = reverseResolve.ToArray();
         Dictionary<string, List<string>> resolvedPaths = new(StringComparer.Ordinal);
-        var (forward, reverse) = await _ipcManager.PenumbraResolvePaths(forwardPaths, reversePaths).ConfigureAwait(false);
+        var (forward, reverse) = await _ipcManager.PenumbraResolvePathsAsync(forwardPaths, reversePaths).ConfigureAwait(false);
         for (int i = 0; i < forwardPaths.Length; i++)
         {
             var filePath = forward[i].ToLowerInvariant();

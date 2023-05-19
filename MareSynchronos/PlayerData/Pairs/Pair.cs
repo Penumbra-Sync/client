@@ -1,11 +1,11 @@
 ﻿using Dalamud.ContextMenu;
-using Dalamud.Utility;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
-using MareSynchronos.MareConfiguration;
+using MareSynchronos.PlayerData.Factories;
+using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Utils;
@@ -15,25 +15,23 @@ namespace MareSynchronos.PlayerData.Pairs;
 
 public class Pair
 {
-    private readonly Func<OnlineUserIdentDto, CachedPlayer> _cachedPlayerFactory;
-    private readonly MareConfigService _configService;
+    private readonly PairHandlerFactory _cachedPlayerFactory;
+    private readonly SemaphoreSlim _creationSemaphore = new(1);
     private readonly ILogger<Pair> _logger;
     private readonly MareMediator _mediator;
     private readonly ServerConfigurationManager _serverConfigurationManager;
+    private CancellationTokenSource _applicationCts = new CancellationTokenSource();
     private OnlineUserIdentDto? _onlineUserIdentDto = null;
-    private OptionalPluginWarning? _pluginWarnings;
 
-    public Pair(ILogger<Pair> logger, Func<OnlineUserIdentDto, CachedPlayer> cachedPlayerFactory,
-        MareMediator mediator, MareConfigService configService, ServerConfigurationManager serverConfigurationManager)
+    public Pair(ILogger<Pair> logger, PairHandlerFactory cachedPlayerFactory,
+        MareMediator mediator, ServerConfigurationManager serverConfigurationManager)
     {
         _logger = logger;
         _cachedPlayerFactory = cachedPlayerFactory;
         _mediator = mediator;
-        _configService = configService;
         _serverConfigurationManager = serverConfigurationManager;
     }
 
-    public bool CachedPlayerExists => CachedPlayer?.CheckExistence() ?? false;
     public Dictionary<GroupFullInfoDto, GroupPairFullInfoDto> GroupPair { get; set; } = new(GroupDtoComparer.Instance);
     public bool HasCachedPlayer => CachedPlayer != null && !string.IsNullOrEmpty(CachedPlayer.PlayerName) && _onlineUserIdentDto != null;
     public bool IsOnline => CachedPlayer != null;
@@ -41,7 +39,7 @@ public class Pair
     public bool IsPaused => UserPair != null && UserPair.OtherPermissions.IsPaired() ? UserPair.OtherPermissions.IsPaused() || UserPair.OwnPermissions.IsPaused()
             : GroupPair.All(p => p.Key.GroupUserPermissions.IsPaused() || p.Value.GroupUserPermissions.IsPaused());
 
-    public bool IsVisible => CachedPlayer?.PlayerName != null;
+    public bool IsVisible => CachedPlayer?.IsVisible ?? false;
     public CharacterData? LastReceivedCharacterData { get; set; }
     public string? PlayerName => CachedPlayer?.PlayerName;
 
@@ -49,7 +47,7 @@ public class Pair
 
     public UserPairDto? UserPair { get; set; }
 
-    private CachedPlayer? CachedPlayer { get; set; }
+    private PairHandler? CachedPlayer { get; set; }
 
     public void AddContextMenu(GameObjectContextMenuOpenArgs args)
     {
@@ -78,11 +76,31 @@ public class Pair
 
     public void ApplyData(OnlineUserCharaDataDto data)
     {
-        if (CachedPlayer == null) throw new InvalidOperationException("CachedPlayer not initialized");
-
-        if (string.Equals(LastReceivedCharacterData?.DataHash.Value, data.CharaData.DataHash.Value, StringComparison.Ordinal)) return;
-
+        _applicationCts = _applicationCts.CancelRecreate();
         LastReceivedCharacterData = data.CharaData;
+
+        if (CachedPlayer == null)
+        {
+            _logger.LogDebug("Received Data for {uid} but CachedPlayer does not exist, waiting", data.User.UID);
+            Task.Run(async () =>
+            {
+                using var timeoutCts = new CancellationTokenSource();
+                timeoutCts.CancelAfter(TimeSpan.FromSeconds(120));
+                var appToken = _applicationCts.Token;
+                using var combined = CancellationTokenSource.CreateLinkedTokenSource(timeoutCts.Token, appToken);
+                while (CachedPlayer == null && !combined.Token.IsCancellationRequested)
+                {
+                    await Task.Delay(250, combined.Token).ConfigureAwait(false);
+                }
+
+                if (!combined.IsCancellationRequested)
+                {
+                    _logger.LogDebug("Applying delayed data for {uid}", data.User.UID);
+                    ApplyLastReceivedData();
+                }
+            });
+            return;
+        }
 
         ApplyLastReceivedData();
     }
@@ -92,15 +110,35 @@ public class Pair
         if (CachedPlayer == null) return;
         if (LastReceivedCharacterData == null) return;
 
-        _pluginWarnings ??= new()
-        {
-            ShownCustomizePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
-            ShownHeelsWarning = _configService.Current.DisableOptionalPluginWarnings,
-            ShownPalettePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
-            ShownHonorificWarning = _configService.Current.DisableOptionalPluginWarnings,
-        };
+        CachedPlayer.ApplyCharacterData(Guid.NewGuid(), RemoveNotSyncedFiles(LastReceivedCharacterData.DeepClone())!, forced);
+    }
 
-        CachedPlayer.ApplyCharacterData(RemoveNotSyncedFiles(LastReceivedCharacterData.DeepClone())!, _pluginWarnings, forced);
+    public void CreateCachedPlayer(OnlineUserIdentDto? dto = null)
+    {
+        try
+        {
+            _creationSemaphore.Wait();
+
+            if (CachedPlayer != null) return;
+
+            if (dto == null && _onlineUserIdentDto == null)
+            {
+                CachedPlayer?.Dispose();
+                CachedPlayer = null;
+                return;
+            }
+            if (dto != null)
+            {
+                _onlineUserIdentDto = dto;
+            }
+
+            CachedPlayer?.Dispose();
+            CachedPlayer = _cachedPlayerFactory.Create(_onlineUserIdentDto!);
+        }
+        finally
+        {
+            _creationSemaphore.Release();
+        }
     }
 
     public string? GetNote()
@@ -110,17 +148,7 @@ public class Pair
 
     public string GetPlayerNameHash()
     {
-        try
-        {
-            return CachedPlayer?.PlayerNameHash ?? string.Empty;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Error accessing PlayerNameHash, recreating CachedPlayer");
-            RecreateCachedPlayer();
-        }
-
-        return string.Empty;
+        return CachedPlayer?.PlayerNameHash ?? string.Empty;
     }
 
     public bool HasAnyConnection()
@@ -128,51 +156,21 @@ public class Pair
         return UserPair != null || GroupPair.Any();
     }
 
-    public bool InitializePair(string name)
-    {
-        if (!PlayerName.IsNullOrEmpty()) return false;
-
-        if (CachedPlayer == null) throw new InvalidOperationException("CachedPlayer not initialized");
-        _pluginWarnings ??= new()
-        {
-            ShownCustomizePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
-            ShownHeelsWarning = _configService.Current.DisableOptionalPluginWarnings,
-            ShownPalettePlusWarning = _configService.Current.DisableOptionalPluginWarnings,
-            ShownHonorificWarning = _configService.Current.DisableOptionalPluginWarnings,
-        };
-
-        CachedPlayer.Initialize(name).Wait();
-
-        _mediator.Publish(new PairManagerUpdateMessage(UserData));
-
-        ApplyLastReceivedData();
-
-        return true;
-    }
-
     public void MarkOffline()
     {
-        _onlineUserIdentDto = null;
-        LastReceivedCharacterData = null;
-        CachedPlayer?.Dispose();
-        CachedPlayer = null;
-    }
-
-    public void RecreateCachedPlayer(OnlineUserIdentDto? dto = null)
-    {
-        if (dto == null && _onlineUserIdentDto == null)
+        try
         {
-            CachedPlayer?.Dispose();
+            _creationSemaphore.Wait();
+            _onlineUserIdentDto = null;
+            LastReceivedCharacterData = null;
+            var player = CachedPlayer;
             CachedPlayer = null;
-            return;
+            player?.Dispose();
         }
-        if (dto != null)
+        finally
         {
-            _onlineUserIdentDto = dto;
+            _creationSemaphore.Release();
         }
-
-        CachedPlayer?.Dispose();
-        CachedPlayer = _cachedPlayerFactory(_onlineUserIdentDto!);
     }
 
     public void SetNote(string note)

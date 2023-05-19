@@ -130,22 +130,14 @@ public sealed class PerformanceCollectorService : IHostedService
                 sb.Append((" " + TimeSpan.FromTicks(pastEntries.Max(m => m.Item2)).TotalMilliseconds.ToString("0.00000", CultureInfo.InvariantCulture)).PadRight(15));
                 sb.Append('|');
                 sb.Append((" " + TimeSpan.FromTicks((long)pastEntries.Average(m => m.Item2)).TotalMilliseconds.ToString("0.00000", CultureInfo.InvariantCulture)).PadRight(15));
-            }
-            else
-            {
-                sb.Append(" -".PadRight(15));
                 sb.Append('|');
-                sb.Append(" -".PadRight(15));
+                sb.Append((" " + (pastEntries.LastOrDefault()?.Item1.ToString("HH:mm:ss.ffff", CultureInfo.InvariantCulture) ?? "-")).PadRight(15, ' '));
                 sb.Append('|');
-                sb.Append(" -".PadRight(15));
+                sb.Append((" " + pastEntries.Count).PadRight(10));
+                sb.Append('|');
+                sb.Append(' ').Append(entry.Key);
+                sb.AppendLine();
             }
-            sb.Append('|');
-            sb.Append((" " + (pastEntries.LastOrDefault()?.Item1.ToString("HH:mm:ss.ffff", CultureInfo.InvariantCulture) ?? "-")).PadRight(15, ' '));
-            sb.Append('|');
-            sb.Append((" " + pastEntries.Count).PadRight(10));
-            sb.Append('|');
-            sb.Append(' ').Append(entry.Key);
-            sb.AppendLine();
 
             previousCaller = newCaller;
         }
@@ -182,14 +174,14 @@ public sealed class PerformanceCollectorService : IHostedService
                 try
                 {
                     var last = entries.Value.ToList()[^1];
-                    if (last.Item1.AddMinutes(10) < TimeOnly.FromDateTime(DateTime.Now))
+                    if (last.Item1.AddMinutes(10) < TimeOnly.FromDateTime(DateTime.Now) && !_performanceCounters.TryRemove(entries.Key, out _))
                     {
-                        _performanceCounters.Remove(entries.Key, out _);
+                        _logger.LogDebug("Could not remove performance counter {counter}", entries.Key);
                     }
                 }
                 catch (Exception e)
                 {
-                    _logger.LogDebug(e, "Error removing performance counter {counter}", entries.Key);
+                    _logger.LogWarning(e, "Error removing performance counter {counter}", entries.Key);
                 }
             }
         }

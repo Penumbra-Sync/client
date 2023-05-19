@@ -148,7 +148,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                     var result = await httpClient.PostAsync(postUri, new FormUrlEncodedContent(new[]
                     {
                         new KeyValuePair<string, string>("auth", auth),
-                        new KeyValuePair<string, string>("charaIdent", _dalamudUtil.PlayerNameHashed),
+                        new KeyValuePair<string, string>("charaIdent", await _dalamudUtil.GetPlayerNameHashedAsync().ConfigureAwait(false)),
                     })).ConfigureAwait(false);
                     AuthFailureMessage = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
                     result.EnsureSuccessStatusCode();
@@ -156,7 +156,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                     Logger.LogDebug("JWT Success");
                 }
 
-                while (!_dalamudUtil.IsPlayerPresent && !token.IsCancellationRequested)
+                while (!await _dalamudUtil.GetIsPlayerPresentAsync().ConfigureAwait(false) && !token.IsCancellationRequested)
                 {
                     Logger.LogDebug("Player not loaded in yet, waiting");
                     await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
@@ -168,17 +168,39 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
                 await _mareHub.StartAsync(token).ConfigureAwait(false);
 
-                await InitializeData().ConfigureAwait(false);
+                InitializeApiHooks();
+                await LoadIninitialPairs().ConfigureAwait(false);
 
                 _connectionDto = await GetConnectionDto().ConfigureAwait(false);
 
                 ServerState = ServerState.Connected;
 
+                var currentClientVer = Assembly.GetExecutingAssembly().GetName().Version!;
+
                 if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
                 {
                     await StopConnection(ServerState.VersionMisMatch).ConfigureAwait(false);
+                    if (_connectionDto.CurrentClientVersion > currentClientVer)
+                    {
+                        Mediator.Publish(new NotificationMessage("Client incompatible",
+                            $"Your client is outdated ({currentClientVer.Major}.{currentClientVer.Minor}.{currentClientVer.Build}), current is: " +
+                            $"{_connectionDto.CurrentClientVersion.Major}.{_connectionDto.CurrentClientVersion.Minor}.{_connectionDto.CurrentClientVersion.Build}. " +
+                            $"This client version is incompatible and will not be able to connect. Please update your Mare Synchronos client.",
+                            Dalamud.Interface.Internal.Notifications.NotificationType.Error));
+                    }
                     return;
                 }
+
+                if (_connectionDto.CurrentClientVersion > currentClientVer)
+                {
+                    Mediator.Publish(new NotificationMessage("Client outdated",
+                        $"Your client is oudated ({currentClientVer.Major}.{currentClientVer.Minor}.{currentClientVer.Build}), current is: " +
+                        $"{_connectionDto.CurrentClientVersion.Major}.{_connectionDto.CurrentClientVersion.Minor}.{_connectionDto.CurrentClientVersion.Build}. " +
+                        $"Please keep your Mare Synchronos client up-to-date.",
+                        Dalamud.Interface.Internal.Notifications.NotificationType.Error));
+                }
+
+                await LoadOnlinePairs().ConfigureAwait(false);
             }
             catch (HttpRequestException ex)
             {
@@ -264,7 +286,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         ServerState = ServerState.Offline;
     }
 
-    private async Task InitializeData()
+    private void InitializeApiHooks()
     {
         if (_mareHub == null) return;
 
@@ -292,6 +314,16 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         OnGroupSendFullInfo((dto) => Client_GroupSendFullInfo(dto));
         OnGroupSendInfo((dto) => Client_GroupSendInfo(dto));
 
+        _healthCheckTokenSource?.Cancel();
+        _healthCheckTokenSource?.Dispose();
+        _healthCheckTokenSource = new CancellationTokenSource();
+        _ = ClientHealthCheck(_healthCheckTokenSource.Token);
+
+        _initialized = true;
+    }
+
+    private async Task LoadIninitialPairs()
+    {
         foreach (var userPair in await UserGetPairedClients().ConfigureAwait(false))
         {
             Logger.LogDebug("Individual Pair: {userPair}", userPair);
@@ -311,25 +343,21 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                 _pairManager.AddGroupPair(user);
             }
         }
+    }
 
+    private async Task LoadOnlinePairs()
+    {
         foreach (var entry in await UserGetOnlinePairs().ConfigureAwait(false))
         {
+            Logger.LogDebug("Pair online: {pair}", entry);
             _pairManager.MarkPairOnline(entry, sendNotif: false);
         }
-
-        _healthCheckTokenSource?.Cancel();
-        _healthCheckTokenSource?.Dispose();
-        _healthCheckTokenSource = new CancellationTokenSource();
-        _ = ClientHealthCheck(_healthCheckTokenSource.Token);
-
-        _initialized = true;
     }
 
     private void MareHubOnClosed(Exception? arg)
     {
         _healthCheckTokenSource?.Cancel();
         Mediator.Publish(new DisconnectedMessage());
-        _pairManager.ClearPairs();
         ServerState = ServerState.Offline;
         if (arg != null)
         {
@@ -346,13 +374,15 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         ServerState = ServerState.Connecting;
         try
         {
-            await InitializeData().ConfigureAwait(false);
+            InitializeApiHooks();
+            await LoadIninitialPairs().ConfigureAwait(false);
             _connectionDto = await GetConnectionDto().ConfigureAwait(false);
             if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
             {
                 await StopConnection(ServerState.VersionMisMatch).ConfigureAwait(false);
                 return;
             }
+            await LoadOnlinePairs().ConfigureAwait(false);
             ServerState = ServerState.Connected;
         }
         catch (Exception ex)

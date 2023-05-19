@@ -43,6 +43,7 @@ public class DownloadUi : WindowMediatorSubscriberBase
         Flags |= ImGuiWindowFlags.NoScrollbar;
         Flags |= ImGuiWindowFlags.NoTitleBar;
         Flags |= ImGuiWindowFlags.NoDecoration;
+        Flags |= ImGuiWindowFlags.NoFocusOnAppearing;
 
         ForceMainWindow = true;
 
@@ -67,10 +68,6 @@ public class DownloadUi : WindowMediatorSubscriberBase
 
     public override void Draw()
     {
-        if (!_configService.Current.ShowTransferWindow && !_configService.Current.ShowTransferBars) return;
-        if (!_currentDownloads.Any() && !_fileTransferManager.CurrentUploads.Any() && !_uploadingPlayers.Any()) return;
-        if (!IsOpen) return;
-
         if (_configService.Current.ShowTransferWindow)
         {
             try
@@ -142,7 +139,7 @@ public class DownloadUi : WindowMediatorSubscriberBase
 
             foreach (var transfer in _currentDownloads.ToList())
             {
-                var screenPos = _dalamudUtilService.WorldToScreen(transfer.Key.GameObjectLazy.Value);
+                var screenPos = _dalamudUtilService.WorldToScreen(transfer.Key.GetGameObject());
                 if (screenPos == Vector2.Zero) continue;
 
                 var totalBytes = transfer.Value.Sum(c => c.Value.TotalBytes);
@@ -185,7 +182,7 @@ public class DownloadUi : WindowMediatorSubscriberBase
             {
                 foreach (var player in _uploadingPlayers.Select(p => p.Key).ToList())
                 {
-                    var screenPos = _dalamudUtilService.WorldToScreen(player.GameObjectLazy.Value);
+                    var screenPos = _dalamudUtilService.WorldToScreen(player.GetGameObject());
                     if (screenPos == Vector2.Zero) continue;
 
                     try
@@ -212,6 +209,15 @@ public class DownloadUi : WindowMediatorSubscriberBase
                 }
             }
         }
+    }
+
+    public override bool DrawConditions()
+    {
+        if (_uiShared.EditTrackerPosition) return true;
+        if (!_configService.Current.ShowTransferWindow && !_configService.Current.ShowTransferBars) return false;
+        if (!_currentDownloads.Any() && !_fileTransferManager.CurrentUploads.Any() && !_uploadingPlayers.Any()) return false;
+        if (!IsOpen) return false;
+        return true;
     }
 
     public override void PreDraw()
