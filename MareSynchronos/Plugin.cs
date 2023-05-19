@@ -103,7 +103,7 @@ public sealed class Plugin : IDalamudPlugin
 
             // func factory method singletons
             collection.AddSingleton(s =>
-                new Func<Pair, StandaloneProfileUi>((pair) =>
+                new Func<DrawPairVMBase, StandaloneProfileUi>((pair) =>
                     new StandaloneProfileUi(s.GetRequiredService<ILogger<StandaloneProfileUi>>(),
                     s.GetRequiredService<MareMediator>(),
                     s.GetRequiredService<UiSharedService>(),

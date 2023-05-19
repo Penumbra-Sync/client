@@ -118,8 +118,8 @@ public sealed class CompactVM : ImguiVM
     {
         _serverConfigurationManager.CurrentServer!.Authentications.Add(new MareConfiguration.Models.Authentication()
         {
-            CharacterName = _dalamudUtilService.PlayerName,
-            WorldId = _dalamudUtilService.WorldId,
+            CharacterName = _dalamudUtilService.GetPlayerName(),
+            WorldId = _dalamudUtilService.GetWorldId(),
             SecretKeyIdx = SecretKeyIdx
         });
 

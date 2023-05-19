@@ -123,6 +123,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         }
 
         pair.CreateCachedPlayer(dto);
+        Mediator.Publish(new PairManagerUpdateMessage(dto.User));
         RecreateLazy();
     }
 

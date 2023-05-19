@@ -61,16 +61,16 @@ public record UiToggleMessage(Type UiType) : MessageBase;
 public record PlayerUploadingMessage(GameObjectHandler Handler, bool IsUploading) : MessageBase;
 public record ClearProfileDataMessage(UserData? UserData = null) : MessageBase;
 public record CyclePauseMessage(UserData UserData) : MessageBase;
-public record ProfilePopoutToggle(Pair? Pair) : MessageBase;
+public record ProfilePopoutToggle(DrawPairVMBase? Pair) : MessageBase;
 public record CompactUiChange(Vector2 Size, Vector2 Position) : MessageBase;
-public record ProfileOpenStandaloneMessage(Pair Pair) : MessageBase;
+public record ProfileOpenStandaloneMessage(DrawPairVMBase Pair) : MessageBase;
 public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : MessageBase;
 public record PairHandlerVisibleMessage(PairHandler Player) : MessageBase;
-public record PairManagerUpdateMessage(UserData? User = null) : IMessage;
-public record CompactUiContentChangeMessage(float CentralPartHeight, float ContentWidth) : IMessage;
-public record TagUpdateMessage(string Tag) : IMessage;
-public record TagCreationMessage(string Tag) : IMessage;
-public record TagDeletionMessage(string Tag) : IMessage;
-public record SettingsChangedMessage<T>(string ConfigName, string SettingName, T value) : IMessage;
+public record PairManagerUpdateMessage(UserData? User = null) : MessageBase;
+public record CompactUiContentChangeMessage(float CentralPartHeight, float ContentWidth) : MessageBase;
+public record TagUpdateMessage(string Tag) : MessageBase;
+public record TagCreationMessage(string Tag) : MessageBase;
+public record TagDeletionMessage(string Tag) : MessageBase;
+public record SettingsChangedMessage<T>(string ConfigName, string SettingName, T value) : MessageBase;
 
 #pragma warning restore MA0048 // File name must match type name
