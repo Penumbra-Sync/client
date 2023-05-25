@@ -18,6 +18,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
     private Task? _delayedZoningTask;
     private bool _haltProcessing = false;
     private bool _ignoreSendAfterRedraw = false;
+    private int _ptrNullCounter = 0;
     private CancellationTokenSource _zoningCts = new();
 
     public GameObjectHandler(ILogger<GameObjectHandler> logger, PerformanceCollectorService performanceCollector,
@@ -175,6 +176,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         Address = _getAddress();
         if (Address != IntPtr.Zero)
         {
+            _ptrNullCounter = 0;
             var drawObjAddr = (IntPtr)((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)Address)->DrawObject;
             DrawObjectAddress = drawObjAddr;
         }
@@ -296,6 +298,13 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
     {
         var curPtr = _getAddress();
         Logger.LogTrace("[{this}] IsBeingDrawn, CurPtr: {ptr}", this, curPtr.ToString("X"));
+
+        if (curPtr == IntPtr.Zero && _ptrNullCounter < 2)
+        {
+            Logger.LogTrace("[{this}] IsBeingDrawn, CurPtr is ZERO, counter is {cnt}", this, _ptrNullCounter);
+            _ptrNullCounter++;
+            return true;
+        }
 
         if (curPtr == IntPtr.Zero)
         {
