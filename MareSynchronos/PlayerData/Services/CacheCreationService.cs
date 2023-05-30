@@ -36,7 +36,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
 
         Mediator.Subscribe<ClearCacheForObjectMessage>(this, (msg) =>
         {
-            Task.Run(() =>
+            _ = Task.Run(() =>
             {
                 Logger.LogTrace("Clearing cache for {obj}", msg.ObjectToCreateFor);
                 _playerData.FileReplacements.Remove(msg.ObjectToCreateFor.ObjectKind);
@@ -48,7 +48,6 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         Mediator.Subscribe<ZoneSwitchStartMessage>(this, (msg) => _isZoning = true);
         Mediator.Subscribe<ZoneSwitchEndMessage>(this, (msg) => _isZoning = false);
 
-        Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (msg) => ProcessCacheCreation());
         Mediator.Subscribe<CustomizePlusMessage>(this, async (_) =>
         {
             if (_isZoning) return;
@@ -93,6 +92,8 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
             .GetAwaiter().GetResult();
         _playerRelatedObjects[ObjectKind.Companion] = gameObjectHandlerFactory.Create(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), true)
             .GetAwaiter().GetResult();
+
+        Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (msg) => ProcessCacheCreation());
     }
 
     protected override void Dispose(bool disposing)
@@ -117,7 +118,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         _honorificCts = new();
         var token = _honorificCts.Token;
 
-        Task.Run(async () =>
+        _ = Task.Run(async () =>
         {
             await Task.Delay(TimeSpan.FromSeconds(3), token).ConfigureAwait(false);
             await AddPlayerCacheToCreate().ConfigureAwait(false);
@@ -131,7 +132,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         _palettePlusCts = new();
         var token = _palettePlusCts.Token;
 
-        Task.Run(async () =>
+        _ = Task.Run(async () =>
         {
             await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
             await AddPlayerCacheToCreate().ConfigureAwait(false);

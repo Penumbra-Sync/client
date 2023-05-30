@@ -278,7 +278,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         _downloadCancellationTokenSource = _downloadCancellationTokenSource?.CancelRecreate() ?? new CancellationTokenSource();
         var downloadToken = _downloadCancellationTokenSource.Token;
 
-        Task.Run(async () =>
+        _ = Task.Run(async () =>
         {
             Dictionary<string, string> moddedPaths = new(StringComparer.Ordinal);
 
@@ -403,7 +403,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             {
                 Logger.LogTrace("[BASE-{appBase}] {this} visibility changed, now: {visi}, cached data exists", appData, this, IsVisible);
 
-                Task.Run(async () =>
+                _ = Task.Run(async () =>
                 {
                     _lastGlamourerData = await _ipcManager.GlamourerGetCharacterCustomizationAsync(PlayerCharacter).ConfigureAwait(false);
                     ApplyCharacterData(appData, _cachedData!, true);
