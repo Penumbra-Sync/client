@@ -474,7 +474,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
                 _isPenumbraDirectory = string.Equals(path.ToLowerInvariant(), _ipcManager.PenumbraModDirectory?.ToLowerInvariant(), StringComparison.Ordinal);
                 _isDirectoryWritable = IsDirectoryWritable(path);
-                _cacheDirectoryHasOtherFilesThanCache = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Any(f => new FileInfo(f).Name.Length != 40);
+                _cacheDirectoryHasOtherFilesThanCache = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Any(f => Path.GetFileNameWithoutExtension(f).Length != 40);
                 _cacheDirectoryIsValidPath = PathRegex().IsMatch(path);
 
                 if (!string.IsNullOrEmpty(path)

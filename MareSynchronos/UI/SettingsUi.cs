@@ -310,12 +310,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
 #if DEBUG
         if (LastCreatedCharacterData != null && ImGui.TreeNode("Last created character data"))
         {
-            
             foreach (var l in JsonSerializer.Serialize(LastCreatedCharacterData, new JsonSerializerOptions() { WriteIndented = true }).Split('\n'))
             {
                 ImGui.Text($"{l}");
             }
-            
+
             ImGui.TreePop();
         }
 #endif
@@ -391,7 +390,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         _configService.Current.ExportFolder = Path.GetDirectoryName(path) ?? string.Empty;
                         _configService.Save();
 
-                        Task.Run(() =>
+                        _ = Task.Run(() =>
                         {
                             try
                             {
@@ -446,7 +445,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             ImGui.BeginDisabled();
         if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Clear local storage") && UiSharedService.CtrlPressed() && _readClearCache)
         {
-            Task.Run(() =>
+            _ = Task.Run(() =>
             {
                 foreach (var file in Directory.GetFiles(_configService.Current.CacheFolder))
                 {
