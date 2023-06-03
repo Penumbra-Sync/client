@@ -365,7 +365,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         UiSharedService.FontText("Export MCDF", _uiShared.UidFont);
 
         UiSharedService.TextWrapped("This feature allows you to pack your character into a MCDF file and manually send it to other people. MCDF files can officially only be imported during GPose through Mare. " +
-            "Be aware that the possibility exists that people write unoffocial custom exporters to extract the containing data.");
+            "Be aware that the possibility exists that people write unofficial custom exporters to extract the containing data.");
 
         ImGui.Checkbox("##readExport", ref _readExport);
         ImGui.SameLine();
