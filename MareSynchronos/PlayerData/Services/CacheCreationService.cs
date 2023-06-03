@@ -34,6 +34,18 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
             _cacheCreateLock.Release();
         });
 
+        Mediator.Subscribe<ZoneSwitchStartMessage>(this, (msg) => _isZoning = true);
+        Mediator.Subscribe<ZoneSwitchEndMessage>(this, (msg) => _isZoning = false);
+
+        _playerRelatedObjects[ObjectKind.Player] = gameObjectHandlerFactory.Create(ObjectKind.Player, dalamudUtil.GetPlayerPointer, true)
+            .GetAwaiter().GetResult();
+        _playerRelatedObjects[ObjectKind.MinionOrMount] = gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => dalamudUtil.GetMinionOrMount(), true)
+            .GetAwaiter().GetResult();
+        _playerRelatedObjects[ObjectKind.Pet] = gameObjectHandlerFactory.Create(ObjectKind.Pet, () => dalamudUtil.GetPet(), true)
+            .GetAwaiter().GetResult();
+        _playerRelatedObjects[ObjectKind.Companion] = gameObjectHandlerFactory.Create(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), true)
+            .GetAwaiter().GetResult();
+
         Mediator.Subscribe<ClearCacheForObjectMessage>(this, (msg) =>
         {
             _ = Task.Run(() =>
@@ -44,9 +56,6 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
                 Mediator.Publish(new CharacterDataCreatedMessage(_playerData.ToAPI()));
             });
         });
-
-        Mediator.Subscribe<ZoneSwitchStartMessage>(this, (msg) => _isZoning = true);
-        Mediator.Subscribe<ZoneSwitchEndMessage>(this, (msg) => _isZoning = false);
 
         Mediator.Subscribe<CustomizePlusMessage>(this, async (_) =>
         {
@@ -83,15 +92,6 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
             Logger.LogDebug("Received Penumbra Mod settings change, updating player");
             await AddPlayerCacheToCreate().ConfigureAwait(false);
         });
-
-        _playerRelatedObjects[ObjectKind.Player] = gameObjectHandlerFactory.Create(ObjectKind.Player, dalamudUtil.GetPlayerPointer, true)
-            .GetAwaiter().GetResult();
-        _playerRelatedObjects[ObjectKind.MinionOrMount] = gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => dalamudUtil.GetMinionOrMount(), true)
-            .GetAwaiter().GetResult();
-        _playerRelatedObjects[ObjectKind.Pet] = gameObjectHandlerFactory.Create(ObjectKind.Pet, () => dalamudUtil.GetPet(), true)
-            .GetAwaiter().GetResult();
-        _playerRelatedObjects[ObjectKind.Companion] = gameObjectHandlerFactory.Create(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), true)
-            .GetAwaiter().GetResult();
 
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (msg) => ProcessCacheCreation());
     }
