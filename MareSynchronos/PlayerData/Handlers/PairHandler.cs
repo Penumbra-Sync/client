@@ -36,6 +36,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private string _lastGlamourerData = string.Empty;
     private string _originalGlamourerData = string.Empty;
     private string _penumbraCollection;
+    private bool _isVisible;
     private CancellationTokenSource _redrawCts = new();
 
     public PairHandler(ILogger<PairHandler> logger, OnlineUserIdentDto onlineUser,
@@ -75,7 +76,27 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         });
     }
 
-    public bool IsVisible { get; private set; }
+    public bool IsVisible
+    {
+        get => _isVisible;
+        private set
+        {
+            if (value == _isVisible)
+            {
+                return;
+            }
+
+            _isVisible = value;
+            if (value)
+            {
+                Mediator.Publish(new PairHandlerVisibleMessage(this));
+            }
+            else
+            {
+                Mediator.Publish(new PairHandlerInvisibleMessage(PlayerName, OnlineUser, this));
+            }
+        }
+    }
     public OnlineUserIdentDto OnlineUser { get; private set; }
     public nint PlayerCharacter => _charaHandler?.Address ?? nint.Zero;
     public unsafe uint PlayerCharacterId => (_charaHandler?.Address ?? nint.Zero) == nint.Zero
@@ -153,7 +174,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         var name = PlayerName;
         if (IsVisible)
         {
-            Mediator.Publish(new PairHandlerInvisibleMessage(name, OnlineUser, null));
+            Mediator.Publish(new PairHandlerInvisibleMessage(name, OnlineUser, Player: null));
         }
         Logger.LogDebug("Disposing {name} ({user})", name, OnlineUser);
         try
@@ -402,7 +423,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         {
             Guid appData = Guid.NewGuid();
             IsVisible = true;
-            Mediator.Publish(new PairHandlerVisibleMessage(this));
             if (_cachedData != null)
             {
                 Logger.LogTrace("[BASE-{appBase}] {this} visibility changed, now: {visi}, cached data exists", appData, this, IsVisible);
@@ -423,7 +443,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         else if (_charaHandler?.Address == nint.Zero && IsVisible)
         {
             IsVisible = false;
-            Mediator.Publish(new PairHandlerInvisibleMessage(PlayerName, OnlineUser, this));
             _charaHandler?.Invalidate();
             MediatorUnsubscribeFromCharacterChanged();
             Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);
