@@ -68,5 +68,6 @@ public record ProfileOpenStandaloneMessage(Pair Pair) : MessageBase;
 public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : MessageBase;
 public record PairHandlerVisibleMessage(PairHandler Player) : MessageBase;
 public record PairHandlerInvisibleMessage(string? PlayerName, OnlineUserIdentDto OnlineUser, PairHandler? Player) : MessageBase;
+public record DtrEntryUpdateMessage() : MessageBase;
 
 #pragma warning restore MA0048 // File name must match type name

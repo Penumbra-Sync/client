@@ -1,4 +1,6 @@
 ﻿using Dalamud.Game.Gui.Dtr;
+using MareSynchronos.MareConfiguration;
+using MareSynchronos.MareConfiguration.Configurations;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -8,15 +10,17 @@ namespace MareSynchronos.UI;
 public sealed class DtrEntry : DisposableMediatorSubscriberBase, IHostedService
 {
     private readonly DtrBarEntry _entry;
+    private readonly ConfigurationServiceBase<MareConfig> _configService;
 
     private bool _started;
     private bool _connected;
     private int _visiblePairs;
     private string? _text;
 
-    public DtrEntry(ILogger<DtrEntry> logger, MareMediator mediator, DtrBar dtrBar) : base(logger, mediator)
+    public DtrEntry(ILogger<DtrEntry> logger, MareMediator mediator, DtrBar dtrBar, ConfigurationServiceBase<MareConfig> configService) : base(logger, mediator)
     {
         _entry = dtrBar.Get("Mare Synchronos");
+        _configService = configService;
 
         _started = false;
         _connected = false;
@@ -29,6 +33,7 @@ public sealed class DtrEntry : DisposableMediatorSubscriberBase, IHostedService
         mediator.Subscribe<PairHandlerInvisibleMessage>(this, OnPairHandlerInvisible);
         mediator.Subscribe<ConnectedMessage>(this, OnConnected);
         mediator.Subscribe<DisconnectedMessage>(this, OnDisconnected);
+        mediator.Subscribe<DtrEntryUpdateMessage>(this, (_) => Update());
     }
 
     protected override void Dispose(bool disposing)
@@ -40,7 +45,7 @@ public sealed class DtrEntry : DisposableMediatorSubscriberBase, IHostedService
 
     private void Update()
     {
-        _entry.Shown = _started;
+        _entry.Shown = _started && _configService.Current.EnableDtrEntry;
         string text;
         if (!_connected)
         {
