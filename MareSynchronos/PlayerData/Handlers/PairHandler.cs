@@ -153,7 +153,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         var name = PlayerName;
         if (IsVisible)
         {
-            Mediator.Publish(new PairHandlerDisposingVisibleMessage(name, OnlineUser));
+            Mediator.Publish(new PairHandlerInvisibleMessage(name, OnlineUser, null));
         }
         Logger.LogDebug("Disposing {name} ({user})", name, OnlineUser);
         try
@@ -423,7 +423,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         else if (_charaHandler?.Address == nint.Zero && IsVisible)
         {
             IsVisible = false;
-            Mediator.Publish(new PairHandlerInvisibleMessage(this));
+            Mediator.Publish(new PairHandlerInvisibleMessage(PlayerName, OnlineUser, this));
             _charaHandler?.Invalidate();
             MediatorUnsubscribeFromCharacterChanged();
             Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);
