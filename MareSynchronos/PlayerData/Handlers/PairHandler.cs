@@ -1,4 +1,4 @@
-﻿using Dalamud.Logging;
+using Dalamud.Logging;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
@@ -151,6 +151,10 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         SetUploading(false);
         _downloadManager.Dispose();
         var name = PlayerName;
+        if (IsVisible)
+        {
+            Mediator.Publish(new PairHandlerDisposingVisibleMessage(name, OnlineUser));
+        }
         Logger.LogDebug("Disposing {name} ({user})", name, OnlineUser);
         try
         {
@@ -419,6 +423,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         else if (_charaHandler?.Address == nint.Zero && IsVisible)
         {
             IsVisible = false;
+            Mediator.Publish(new PairHandlerInvisibleMessage(this));
             _charaHandler?.Invalidate();
             MediatorUnsubscribeFromCharacterChanged();
             Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);

@@ -1,7 +1,8 @@
-﻿using Dalamud.Game.ClientState.Objects.Types;
+using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Interface.Internal.Notifications;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto;
+using MareSynchronos.API.Dto.User;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.WebAPI.Files.Models;
@@ -66,5 +67,7 @@ public record CompactUiChange(Vector2 Size, Vector2 Position) : MessageBase;
 public record ProfileOpenStandaloneMessage(Pair Pair) : MessageBase;
 public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : MessageBase;
 public record PairHandlerVisibleMessage(PairHandler Player) : MessageBase;
+public record PairHandlerInvisibleMessage(PairHandler Player) : MessageBase;
+public record PairHandlerDisposingVisibleMessage(string? PlayerName, OnlineUserIdentDto OnlineUser) : MessageBase;
 
 #pragma warning restore MA0048 // File name must match type name
