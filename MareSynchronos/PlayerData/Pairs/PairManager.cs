@@ -90,6 +90,8 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
 
     public List<UserData> GetVisibleUsers() => _allClientPairs.Where(p => p.Value.IsVisible).Select(p => p.Key).ToList();
 
+    public int GetVisibleUserCount() => _allClientPairs.Count(p => p.Value.IsVisible);
+
     public void MarkPairOffline(UserData user)
     {
         if (_allClientPairs.TryGetValue(user, out var pair))

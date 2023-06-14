@@ -1,59 +1,56 @@
 ﻿using Dalamud.Game.Gui.Dtr;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Configurations;
-using MareSynchronos.Services.Mediator;
+using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.Utils;
+using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
-public sealed class DtrEntry : DisposableMediatorSubscriberBase, IHostedService
+public sealed class DtrEntry : IDisposable, IHostedService
 {
     private readonly DtrBarEntry _entry;
     private readonly ConfigurationServiceBase<MareConfig> _configService;
+    private readonly PairManager _pairManager;
+    private readonly ApiController _apiController;
 
-    private bool _started;
-    private bool _connected;
-    private int _visiblePairs;
+    private CancellationTokenSource? _cancellationTokenSource;
     private string? _text;
 
-    public DtrEntry(ILogger<DtrEntry> logger, MareMediator mediator, DtrBar dtrBar, ConfigurationServiceBase<MareConfig> configService) : base(logger, mediator)
+    public DtrEntry(DtrBar dtrBar, ConfigurationServiceBase<MareConfig> configService, PairManager pairManager, ApiController apiController)
     {
         _entry = dtrBar.Get("Mare Synchronos");
         _configService = configService;
+        _pairManager = pairManager;
+        _apiController = apiController;
 
-        _started = false;
-        _connected = false;
-        _visiblePairs = 0;
-        _text = null;
-
-        Update();
-
-        mediator.Subscribe<PairHandlerVisibleMessage>(this, OnPairHandlerVisible);
-        mediator.Subscribe<PairHandlerInvisibleMessage>(this, OnPairHandlerInvisible);
-        mediator.Subscribe<ConnectedMessage>(this, OnConnected);
-        mediator.Subscribe<DisconnectedMessage>(this, OnDisconnected);
-        mediator.Subscribe<DtrEntryUpdateMessage>(this, (_) => Update());
+        Clear();
     }
 
-    protected override void Dispose(bool disposing)
+    public void Dispose()
     {
-        base.Dispose(disposing);
-
         _entry.Dispose();
     }
 
     private void Update()
     {
-        _entry.Shown = _started && _configService.Current.EnableDtrEntry;
-        string text;
-        if (!_connected)
+        if (!_configService.Current.EnableDtrEntry)
         {
-            text = "\uE044 \uE04C";
+            Clear();
+            return;
+        }
+
+        _entry.Shown = true;
+
+        string text;
+        if (_apiController.IsConnected)
+        {
+            text = $"\uE044 {_pairManager.GetVisibleUserCount()}";
         }
         else
         {
-            text = $"\uE044 {_visiblePairs}";
+            text = "\uE044 \uE04C";
         }
         if (!string.Equals(text, _text, StringComparison.Ordinal))
         {
@@ -62,42 +59,36 @@ public sealed class DtrEntry : DisposableMediatorSubscriberBase, IHostedService
         }
     }
 
-    private void OnPairHandlerVisible(PairHandlerVisibleMessage _)
+    private void Clear()
     {
-        ++_visiblePairs;
-        Update();
+        _text = null;
+
+        _entry.Shown = false;
+        _entry.Text = null;
     }
 
-    private void OnPairHandlerInvisible(PairHandlerInvisibleMessage _)
+    private async Task RunAsync(CancellationToken cancellationToken)
     {
-        --_visiblePairs;
-        Update();
-    }
-
-    private void OnConnected(ConnectedMessage _)
-    {
-        _connected = true;
-        Update();
-    }
-
-    private void OnDisconnected(DisconnectedMessage _)
-    {
-        _connected = false;
-        Update();
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            Update();
+            await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
+        }
+        Clear();
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _started = true;
-        Update();
+        _cancellationTokenSource = new CancellationTokenSource();
+        CancellationToken token = _cancellationTokenSource.Token;
+        Task.Run(() => RunAsync(token));
 
         return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        _started = false;
-        Update();
+        _cancellationTokenSource?.CancelDispose();
 
         return Task.CompletedTask;
     }

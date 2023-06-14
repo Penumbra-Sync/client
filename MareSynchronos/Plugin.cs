@@ -76,8 +76,8 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton((s) => new DalamudUtilService(s.GetRequiredService<ILogger<DalamudUtilService>>(),
                 clientState, objectTable, framework, gameGui, condition, gameData,
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<PerformanceCollectorService>()));
-            collection.AddSingleton((s) => new DtrEntry(s.GetRequiredService<ILogger<DtrEntry>>(),
-                s.GetRequiredService<MareMediator>(), dtrBar, s.GetRequiredService<MareConfigService>()));
+            collection.AddSingleton((s) => new DtrEntry(dtrBar, s.GetRequiredService<MareConfigService>(),
+                s.GetRequiredService<PairManager>(), s.GetRequiredService<ApiController>()));
             collection.AddSingleton((s) => new IpcManager(s.GetRequiredService<ILogger<IpcManager>>(),
                 pluginInterface, s.GetRequiredService<DalamudUtilService>(), s.GetRequiredService<MareMediator>()));
 

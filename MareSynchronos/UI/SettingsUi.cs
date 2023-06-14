@@ -529,7 +529,6 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _configService.Current.EnableDtrEntry = enableDtrEntry;
             _configService.Save();
-            Mediator.Publish(new DtrEntryUpdateMessage());
         }
         UiSharedService.DrawHelpText("This will add Mare connection status and visible pair count in the Server Info Bar.\nYou can further configure this through your Dalamud Settings.");
 
