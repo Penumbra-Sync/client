@@ -39,7 +39,7 @@ public sealed class Plugin : IDalamudPlugin
         Framework framework, ObjectTable objectTable, ClientState clientState, Condition condition, ChatGui chatGui,
         GameGui gameGui, DtrBar dtrBar)
     {
-        new HostBuilder()
+        _ = new HostBuilder()
         .UseContentRoot(pluginInterface.ConfigDirectory.FullName)
         .ConfigureLogging(lb =>
         {
