@@ -15,7 +15,8 @@ public sealed class DtrEntry : IDisposable, IHostedService
     private readonly PairManager _pairManager;
     private readonly ApiController _apiController;
 
-    private CancellationTokenSource? _cancellationTokenSource;
+    private readonly CancellationTokenSource _cancellationTokenSource = new();
+    private Task? _runTask;
     private string? _text;
 
     public DtrEntry(DtrBar dtrBar, ConfigurationServiceBase<MareConfig> configService, PairManager pairManager, ApiController apiController)
@@ -37,11 +38,17 @@ public sealed class DtrEntry : IDisposable, IHostedService
     {
         if (!_configService.Current.EnableDtrEntry)
         {
-            Clear();
+            if (_entry.Shown)
+            {
+                Clear();
+            }
             return;
         }
 
-        _entry.Shown = true;
+        if (!_entry.Shown)
+        {
+            _entry.Shown = true;
+        }
 
         string text;
         if (_apiController.IsConnected)
@@ -67,29 +74,26 @@ public sealed class DtrEntry : IDisposable, IHostedService
         _entry.Text = null;
     }
 
-    private async Task RunAsync(CancellationToken cancellationToken)
+    private async Task RunAsync()
     {
-        while (!cancellationToken.IsCancellationRequested)
+        while (!_cancellationTokenSource.IsCancellationRequested)
         {
             Update();
-            await Task.Delay(1000, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(1000, _cancellationTokenSource.Token).ConfigureAwait(false);
         }
-        Clear();
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _cancellationTokenSource = new CancellationTokenSource();
-        CancellationToken token = _cancellationTokenSource.Token;
-        Task.Run(() => RunAsync(token));
-
+        _runTask = Task.Run(RunAsync, _cancellationTokenSource.Token);
         return Task.CompletedTask;
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+    public async Task StopAsync(CancellationToken cancellationToken)
     {
-        _cancellationTokenSource?.CancelDispose();
-
-        return Task.CompletedTask;
+        _cancellationTokenSource.Cancel();
+        await _runTask!.ConfigureAwait(false);
+        _cancellationTokenSource.Dispose();
+        Clear();
     }
 }
