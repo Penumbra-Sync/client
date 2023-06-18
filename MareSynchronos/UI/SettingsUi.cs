@@ -365,7 +365,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         UiSharedService.FontText("Export MCDF", _uiShared.UidFont);
 
         UiSharedService.TextWrapped("This feature allows you to pack your character into a MCDF file and manually send it to other people. MCDF files can officially only be imported during GPose through Mare. " +
-            "Be aware that the possibility exists that people write unoffocial custom exporters to extract the containing data.");
+            "Be aware that the possibility exists that people write unofficial custom exporters to extract the containing data.");
 
         ImGui.Checkbox("##readExport", ref _readExport);
         ImGui.SameLine();
@@ -515,6 +515,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var profileDelay = _configService.Current.ProfileDelay;
         var profileOnRight = _configService.Current.ProfilePopoutRight;
         var enableRightClickMenu = _configService.Current.EnableRightClickMenus;
+        var enableDtrEntry = _configService.Current.EnableDtrEntry;
         var preferNotesInsteadOfName = _configService.Current.PreferNotesOverNamesForVisible;
 
         if (ImGui.Checkbox("Enable Game Right Click Menu Entries", ref enableRightClickMenu))
@@ -523,6 +524,13 @@ public class SettingsUi : WindowMediatorSubscriberBase
             _configService.Save();
         }
         UiSharedService.DrawHelpText("This will add Mare related right click menu entries in the game UI on paired players.");
+
+        if (ImGui.Checkbox("Display status and visible pair count in Server Info Bar", ref enableDtrEntry))
+        {
+            _configService.Current.EnableDtrEntry = enableDtrEntry;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("This will add Mare connection status and visible pair count in the Server Info Bar.\nYou can further configure this through your Dalamud Settings.");
 
         if (ImGui.Checkbox("Show separate Visible group", ref showVisibleSeparate))
         {
