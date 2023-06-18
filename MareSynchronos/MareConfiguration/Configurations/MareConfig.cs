@@ -10,6 +10,7 @@ public class MareConfig : IMareConfiguration
     public string CacheFolder { get; set; } = string.Empty;
     public bool DisableOptionalPluginWarnings { get; set; } = false;
     public bool EnableRightClickMenus { get; set; } = true;
+    public bool EnableDtrEntry { get; set; } = false;
     public NotificationLocation ErrorNotification { get; set; } = NotificationLocation.Both;
     public string ExportFolder { get; set; } = string.Empty;
     public bool FileScanPaused { get; set; } = false;
