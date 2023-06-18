@@ -128,31 +128,30 @@ public sealed class MareMediator : IHostedService
 
     private void ExecuteMessage(MessageBase message)
     {
-        if (_subscriberDict.TryGetValue(message.GetType(), out HashSet<SubscriberAction>? subscribers) && subscribers != null && subscribers.Any())
+        if (!_subscriberDict.TryGetValue(message.GetType(), out HashSet<SubscriberAction>? subscribers) || subscribers == null || !subscribers.Any()) return;
+
+        HashSet<SubscriberAction> subscribersCopy = new HashSet<SubscriberAction>();
+        lock (_addRemoveLock)
         {
-            HashSet<SubscriberAction> subscribersCopy = new HashSet<SubscriberAction>();
-            lock (_addRemoveLock)
+            subscribersCopy = subscribers?.Where(s => s.Subscriber != null).ToHashSet() ?? new HashSet<SubscriberAction>();
+        }
+
+        foreach (SubscriberAction subscriber in subscribersCopy)
+        {
+            try
             {
-                subscribersCopy = subscribers?.Where(s => s.Subscriber != null).ToHashSet() ?? new HashSet<SubscriberAction>();
+                typeof(MareMediator)
+                    .GetMethod(nameof(ExecuteSubscriber), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
+                    .MakeGenericMethod(message.GetType())
+                    .Invoke(this, new object[] { subscriber, message });
             }
-
-            foreach (SubscriberAction subscriber in subscribersCopy)
+            catch (Exception ex)
             {
-                try
-                {
-                    typeof(MareMediator)
-                        .GetMethod(nameof(ExecuteSubscriber), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
-                        .MakeGenericMethod(message.GetType())
-                        .Invoke(this, new object[] { subscriber, message });
-                }
-                catch (Exception ex)
-                {
-                    if (_lastErrorTime.TryGetValue(subscriber, out var lastErrorTime) && lastErrorTime.Add(TimeSpan.FromSeconds(10)) > DateTime.UtcNow)
-                        continue;
+                if (_lastErrorTime.TryGetValue(subscriber, out var lastErrorTime) && lastErrorTime.Add(TimeSpan.FromSeconds(10)) > DateTime.UtcNow)
+                    continue;
 
-                    _logger.LogCritical(ex, "Error executing {type} for subscriber {subscriber}", message.GetType().Name, subscriber.Subscriber.GetType().Name);
-                    _lastErrorTime[subscriber] = DateTime.UtcNow;
-                }
+                _logger.LogCritical(ex, "Error executing {type} for subscriber {subscriber}", message.GetType().Name, subscriber.Subscriber.GetType().Name);
+                _lastErrorTime[subscriber] = DateTime.UtcNow;
             }
         }
     }
