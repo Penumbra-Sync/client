@@ -420,6 +420,8 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         {
             IsVisible = false;
             _charaHandler?.Invalidate();
+            _downloadCancellationTokenSource?.CancelDispose();
+            _downloadCancellationTokenSource = null;
             MediatorUnsubscribeFromCharacterChanged();
             Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);
         }
@@ -453,7 +455,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         _redrawCts.CancelAfter(TimeSpan.FromSeconds(30));
         var token = _redrawCts.Token;
 
-        Task.Run(async () =>
+        _ = Task.Run(async () =>
         {
             var applicationId = Guid.NewGuid();
             await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, _charaHandler!, applicationId, ct: token).ConfigureAwait(false);
