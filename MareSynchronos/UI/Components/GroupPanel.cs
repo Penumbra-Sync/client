@@ -74,11 +74,13 @@ internal sealed class GroupPanel
 
         bool userCanJoinMoreGroups = _pairManager.GroupPairs.Count < ApiController.ServerInfo.MaxGroupsJoinedByUser;
         bool userCanCreateMoreGroups = _pairManager.GroupPairs.Count(u => string.Equals(u.Key.Owner.UID, ApiController.UID, StringComparison.Ordinal)) < ApiController.ServerInfo.MaxGroupsCreatedByUser;
+        bool alreadyInGroup = _pairManager.GroupPairs.Select(p => p.Key).Any(p => string.Equals(p.Group.Alias, _syncShellToJoin, StringComparison.Ordinal)
+            || string.Equals(p.Group.GID, _syncShellToJoin, StringComparison.Ordinal));
 
+        if (alreadyInGroup) ImGui.BeginDisabled();
         if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
         {
-            if (_pairManager.GroupPairs.All(w => !string.Equals(w.Key.Group.GID, _syncShellToJoin, StringComparison.Ordinal) && !string.Equals(w.Key.Group.Alias, _syncShellToJoin, StringComparison.Ordinal))
-                && !string.IsNullOrEmpty(_syncShellToJoin))
+            if (!string.IsNullOrEmpty(_syncShellToJoin))
             {
                 if (userCanJoinMoreGroups)
                 {
@@ -101,6 +103,8 @@ internal sealed class GroupPanel
         UiSharedService.AttachToolTip(_syncShellToJoin.IsNullOrEmpty()
             ? (userCanCreateMoreGroups ? "Create Syncshell" : $"You cannot create more than {ApiController.ServerInfo.MaxGroupsCreatedByUser} Syncshells")
             : (userCanJoinMoreGroups ? "Join Syncshell" + _syncShellToJoin : $"You cannot join more than {ApiController.ServerInfo.MaxGroupsJoinedByUser} Syncshells"));
+
+        if (alreadyInGroup) ImGui.EndDisabled();
 
         if (ImGui.BeginPopupModal("Enter Syncshell Password", ref _showModalEnterPassword, UiSharedService.PopupWindowFlags))
         {
