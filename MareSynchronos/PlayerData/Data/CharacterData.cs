@@ -6,17 +6,17 @@ namespace MareSynchronos.PlayerData.Data;
 
 public class CharacterData
 {
-    public string CustomizePlusScale { get; set; } = string.Empty;
+    public Dictionary<ObjectKind, string> CustomizePlusScale { get; set; } = new();
     public Dictionary<ObjectKind, HashSet<FileReplacement>> FileReplacements { get; set; } = new();
 
     public Dictionary<ObjectKind, string> GlamourerString { get; set; } = new();
 
-    public float HeelsOffset { get; set; } = 0f;
+    public string HeelsData { get; set; } = string.Empty;
+    public string HonorificData { get; set; } = string.Empty;
     public bool IsReady => FileReplacements.SelectMany(k => k.Value).All(f => f.Computed);
 
     public string ManipulationString { get; set; } = string.Empty;
     public string PalettePlusPalette { get; set; } = string.Empty;
-    public string HonorificData { get; set; } = string.Empty;
 
     public API.Data.CharacterData ToAPI()
     {
@@ -40,8 +40,8 @@ public class CharacterData
             FileReplacements = fileReplacements,
             GlamourerData = GlamourerString.ToDictionary(d => d.Key, d => d.Value),
             ManipulationData = ManipulationString,
-            HeelsOffset = HeelsOffset,
-            CustomizePlusData = CustomizePlusScale,
+            HeelsData = HeelsData,
+            CustomizePlusData = CustomizePlusScale.ToDictionary(d => d.Key, d => d.Value),
             PalettePlusData = PalettePlusPalette,
             HonorificData = HonorificData
         };

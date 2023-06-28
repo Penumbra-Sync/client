@@ -73,6 +73,7 @@ public class PlayerDataFactory
             _logger.LogTrace("Pointer was zero for {objectKind}", playerRelatedObject.ObjectKind);
             previousData.FileReplacements.Remove(playerRelatedObject.ObjectKind);
             previousData.GlamourerString.Remove(playerRelatedObject.ObjectKind);
+            previousData.CustomizePlusScale.Remove(playerRelatedObject.ObjectKind);
             return;
         }
 
@@ -373,20 +374,20 @@ public class PlayerDataFactory
 
         // gather up data from ipc
         previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
-        Task<float> getHeelsOffset = _ipcManager.GetHeelsOffsetAsync();
+        Task<string> getHeelsOffset = _ipcManager.GetHeelsOffsetAsync();
         Task<string> getGlamourerData = _ipcManager.GlamourerGetCharacterCustomizationAsync(playerRelatedObject.Address);
-        Task<string> getCustomizeData = _ipcManager.GetCustomizePlusScaleAsync();
+        Task<string> getCustomizeData = _ipcManager.GetCustomizePlusScaleAsync(playerRelatedObject.Address);
         Task<string> getPalettePlusData = _ipcManager.PalettePlusBuildPaletteAsync();
         previousData.GlamourerString[playerRelatedObject.ObjectKind] = await getGlamourerData.ConfigureAwait(false);
         _logger.LogDebug("Glamourer is now: {data}", previousData.GlamourerString[playerRelatedObject.ObjectKind]);
-        previousData.CustomizePlusScale = await getCustomizeData.ConfigureAwait(false);
-        _logger.LogDebug("Customize is now: {data}", previousData.CustomizePlusScale);
+        previousData.CustomizePlusScale[playerRelatedObject.ObjectKind] = await getCustomizeData.ConfigureAwait(false);
+        _logger.LogDebug("Customize is now: {data}", previousData.CustomizePlusScale[playerRelatedObject.ObjectKind]);
         previousData.PalettePlusPalette = await getPalettePlusData.ConfigureAwait(false);
         _logger.LogDebug("Palette is now: {data}", previousData.PalettePlusPalette);
         previousData.HonorificData = _ipcManager.HonorificGetTitle();
         _logger.LogDebug("Honorific is now: {data}", previousData.HonorificData);
-        previousData.HeelsOffset = await getHeelsOffset.ConfigureAwait(false);
-        _logger.LogDebug("Heels is now: {heels}", previousData.HeelsOffset);
+        previousData.HeelsData = await getHeelsOffset.ConfigureAwait(false);
+        _logger.LogDebug("Heels is now: {heels}", previousData.HeelsData);
 
         st.Stop();
         _logger.LogInformation("Building character data for {obj} took {time}ms", objectKind, TimeSpan.FromTicks(st.ElapsedTicks).TotalMilliseconds);

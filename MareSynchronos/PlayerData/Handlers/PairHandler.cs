@@ -229,11 +229,14 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                         break;
 
                     case PlayerChanges.Customize:
-                        await _ipcManager.CustomizePlusSetBodyScaleAsync(handler.Address, charaData.CustomizePlusData).ConfigureAwait(false);
+                        if (charaData.CustomizePlusData.TryGetValue(changes.Key, out var customizePlusData))
+                        {
+                            await _ipcManager.CustomizePlusSetBodyScaleAsync(handler.Address, customizePlusData).ConfigureAwait(false);
+                        }
                         break;
 
                     case PlayerChanges.Heels:
-                        await _ipcManager.HeelsSetOffsetForPlayerAsync(handler.Address, charaData.HeelsOffset).ConfigureAwait(false);
+                        await _ipcManager.HeelsSetOffsetForPlayerAsync(handler.Address, charaData.HeelsData).ConfigureAwait(false);
                         break;
 
                     case PlayerChanges.Honorific:

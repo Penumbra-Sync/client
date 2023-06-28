@@ -1,4 +1,5 @@
 ﻿using Dalamud.Game.ClientState.Objects.Types;
+using Dalamud.Utility;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.PlayerData.Handlers;
@@ -83,6 +84,16 @@ public static class VariousExtensions
                 }
             }
 
+            oldData.CustomizePlusData.TryGetValue(objectKind, out var oldCustomizePlusData);
+            newData.CustomizePlusData.TryGetValue(objectKind, out var newCustomizePlusData);
+
+            bool customizeDataDifferent = !string.Equals(oldCustomizePlusData, newCustomizePlusData, StringComparison.Ordinal);
+            if (customizeDataDifferent || (forceApplyCustomization && !string.IsNullOrEmpty(newCustomizePlusData)))
+            {
+                logger.LogDebug("[BASE-{appBase}] Updating {object}/{kind} (Diff customize data) => {change}", applicationBase, cachedPlayer, objectKind, PlayerChanges.Customize);
+                charaDataToUpdate[objectKind].Add(PlayerChanges.Customize);
+            }
+
             if (objectKind != ObjectKind.Player) continue;
 
             bool manipDataDifferent = !string.Equals(oldData.ManipulationData, newData.ManipulationData, StringComparison.Ordinal);
@@ -92,18 +103,11 @@ public static class VariousExtensions
                 charaDataToUpdate[objectKind].Add(PlayerChanges.ModManip);
             }
 
-            bool heelsOffsetDifferent = oldData.HeelsOffset != newData.HeelsOffset;
-            if (heelsOffsetDifferent || (forceApplyCustomization && newData.HeelsOffset != 0))
+            bool heelsOffsetDifferent = !string.Equals(oldData.HeelsData, newData.HeelsData, StringComparison.Ordinal);
+            if (heelsOffsetDifferent || (forceApplyCustomization && !string.IsNullOrEmpty(newData.HeelsData)))
             {
                 logger.LogDebug("[BASE-{appBase}] Updating {object}/{kind} (Diff heels data) => {change}", applicationBase, cachedPlayer, objectKind, PlayerChanges.Heels);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.Heels);
-            }
-
-            bool customizeDataDifferent = !string.Equals(oldData.CustomizePlusData, newData.CustomizePlusData, StringComparison.Ordinal);
-            if (customizeDataDifferent || (forceApplyCustomization && !string.IsNullOrEmpty(newData.CustomizePlusData)))
-            {
-                logger.LogDebug("[BASE-{appBase}] Updating {object}/{kind} (Diff customize data) => {change}", applicationBase, cachedPlayer, objectKind, PlayerChanges.Customize);
-                charaDataToUpdate[objectKind].Add(PlayerChanges.Customize);
             }
 
             bool palettePlusDataDifferent = !string.Equals(oldData.PalettePlusData, newData.PalettePlusData, StringComparison.Ordinal);

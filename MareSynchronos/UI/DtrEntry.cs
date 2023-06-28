@@ -2,7 +2,6 @@
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Configurations;
 using MareSynchronos.PlayerData.Pairs;
-using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Hosting;
 
@@ -46,7 +45,10 @@ public sealed class DtrEntry : IDisposable, IHostedService
         {
             await _runTask!.ConfigureAwait(false);
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        {
+            // ignore cancelled
+        }
         finally
         {
             _cancellationTokenSource.Dispose();

@@ -53,6 +53,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
                 Logger.LogTrace("Clearing cache for {obj}", msg.ObjectToCreateFor);
                 _playerData.FileReplacements.Remove(msg.ObjectToCreateFor.ObjectKind);
                 _playerData.GlamourerString.Remove(msg.ObjectToCreateFor.ObjectKind);
+                _playerData.CustomizePlusScale.Remove(msg.ObjectToCreateFor.ObjectKind);
                 Mediator.Publish(new CharacterDataCreatedMessage(_playerData.ToAPI()));
             });
         });
