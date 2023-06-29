@@ -115,10 +115,10 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         _heelsOffsetUpdate.Subscribe(HeelsOffsetChange);
 
         _customizePlusApiVersion = pi.GetIpcSubscriber<string>("CustomizePlus.GetApiVersion");
-        _customizePlusGetBodyScale = pi.GetIpcSubscriber<Character?, string?>("CustomizePlus.GetBodyScaleFromCharacter");
+        _customizePlusGetBodyScale = pi.GetIpcSubscriber<Character?, string?>("CustomizePlus.GetProfileFromCharacter");
         _customizePlusRevert = pi.GetIpcSubscriber<Character?, object>("CustomizePlus.RevertCharacter");
-        _customizePlusSetBodyScaleToCharacter = pi.GetIpcSubscriber<string, Character?, object>("CustomizePlus.SetBodyScaleToCharacter");
-        _customizePlusOnScaleUpdate = pi.GetIpcSubscriber<string?, object>("CustomizePlus.OnScaleUpdate");
+        _customizePlusSetBodyScaleToCharacter = pi.GetIpcSubscriber<string, Character?, object>("CustomizePlus.SetProfileToCharacter");
+        _customizePlusOnScaleUpdate = pi.GetIpcSubscriber<string?, object>("CustomizePlus.OnLocalPlayerProfileUpdate");
 
         _customizePlusOnScaleUpdate.Subscribe(OnCustomizePlusScaleChange);
 
