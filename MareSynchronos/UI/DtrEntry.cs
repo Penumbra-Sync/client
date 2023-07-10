@@ -13,16 +13,18 @@ public sealed class DtrEntry : IDisposable, IHostedService
     private readonly ApiController _apiController;
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly ILogger<DtrEntry> _logger;
+    private readonly DtrBar _dtrBar;
     private readonly ConfigurationServiceBase<MareConfig> _configService;
-    private readonly Lazy<DtrBarEntry> _entry;
+    private Lazy<DtrBarEntry> _entry;
     private readonly PairManager _pairManager;
     private Task? _runTask;
     private string? _text;
 
     public DtrEntry(ILogger<DtrEntry> logger, DtrBar dtrBar, ConfigurationServiceBase<MareConfig> configService, PairManager pairManager, ApiController apiController)
     {
-        _entry = new(() => dtrBar.Get("Mare Synchronos"));
         _logger = logger;
+        _dtrBar = dtrBar;
+        _entry = new(() => _dtrBar.Get("Mare Synchronos"));
         _configService = configService;
         _pairManager = pairManager;
         _apiController = apiController;
@@ -64,10 +66,14 @@ public sealed class DtrEntry : IDisposable, IHostedService
 
     private void Clear()
     {
+        if (!_entry.IsValueCreated) return;
         _text = null;
+        _logger.LogInformation("Clearing entry");
 
         _entry.Value.Shown = false;
         _entry.Value.Text = null;
+        _entry.Value.Dispose();
+        _entry = new(() => _dtrBar.Get("Mare Synchronos"));
     }
 
     private async Task RunAsync()
@@ -84,8 +90,10 @@ public sealed class DtrEntry : IDisposable, IHostedService
     {
         if (!_configService.Current.EnableDtrEntry)
         {
-            if (_entry.Value.Shown)
+            if (_entry.IsValueCreated && _entry.Value.Shown)
             {
+                _logger.LogInformation("Disabling entry");
+
                 Clear();
             }
             return;
@@ -93,6 +101,7 @@ public sealed class DtrEntry : IDisposable, IHostedService
 
         if (!_entry.Value.Shown)
         {
+            _logger.LogInformation("Showing entry");
             _entry.Value.Shown = true;
         }
 
