@@ -29,6 +29,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private readonly ConcurrentDictionary<GameObjectHandler, Dictionary<string, FileDownloadStatus>> _currentDownloads = new();
     private readonly FileUploadManager _fileTransferManager;
     private readonly FileTransferOrchestrator _fileTransferOrchestrator;
+    private readonly CharacterAnalyzer _characterAnalyzer;
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly PairManager _pairManager;
     private readonly PerformanceCollectorService _performanceCollector;
@@ -50,7 +51,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
         ServerConfigurationManager serverConfigurationManager,
         MareMediator mediator, PerformanceCollectorService performanceCollector,
         FileUploadManager fileTransferManager,
-        FileTransferOrchestrator fileTransferOrchestrator) : base(logger, mediator, "Mare Synchronos Settings")
+        FileTransferOrchestrator fileTransferOrchestrator,
+        CharacterAnalyzer characterAnalyzer) : base(logger, mediator, "Mare Synchronos Settings")
     {
         _configService = configService;
         _mareCharaFileManager = mareCharaFileManager;
@@ -59,6 +61,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _performanceCollector = performanceCollector;
         _fileTransferManager = fileTransferManager;
         _fileTransferOrchestrator = fileTransferOrchestrator;
+        _characterAnalyzer = characterAnalyzer;
         _uiShared = uiShared;
 
         SizeConstraints = new WindowSizeConstraints()
@@ -330,6 +333,23 @@ public class SettingsUi : WindowMediatorSubscriberBase
             }
         }
         UiSharedService.AttachToolTip("Use this when reporting mods being rejected from the server.");
+
+        var isAnalyzing = _characterAnalyzer.IsAnalysisRunning;
+        if (isAnalyzing) ImGui.BeginDisabled();
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.QuestionCircle, "[DEBUG] Analyze current character composition to /xllog"))
+        {
+            _ = _characterAnalyzer.Analyze();
+        }
+        UiSharedService.AttachToolTip("This will compute your current \"Mare load\" and print it to the /xllog");
+        if (isAnalyzing) ImGui.EndDisabled();
+        ImGui.SameLine();
+        if (!isAnalyzing) ImGui.BeginDisabled();
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.StopCircle, "Cancel analysis"))
+        {
+            _characterAnalyzer.CancelAnalyze();
+        }
+        UiSharedService.AttachToolTip("Cancels the current analysis of your character composition");
+        if (!isAnalyzing) ImGui.EndDisabled();
 
         _uiShared.DrawCombo("Log Level", Enum.GetValues<LogLevel>(), (l) => l.ToString(), (l) =>
         {

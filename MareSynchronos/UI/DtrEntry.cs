@@ -2,9 +2,9 @@
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Configurations;
 using MareSynchronos.PlayerData.Pairs;
-using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.UI;
 
@@ -12,25 +12,25 @@ public sealed class DtrEntry : IDisposable, IHostedService
 {
     private readonly ApiController _apiController;
     private readonly CancellationTokenSource _cancellationTokenSource = new();
+    private readonly ILogger<DtrEntry> _logger;
     private readonly ConfigurationServiceBase<MareConfig> _configService;
-    private readonly DtrBarEntry _entry;
+    private readonly Lazy<DtrBarEntry> _entry;
     private readonly PairManager _pairManager;
     private Task? _runTask;
     private string? _text;
 
-    public DtrEntry(DtrBar dtrBar, ConfigurationServiceBase<MareConfig> configService, PairManager pairManager, ApiController apiController)
+    public DtrEntry(ILogger<DtrEntry> logger, DtrBar dtrBar, ConfigurationServiceBase<MareConfig> configService, PairManager pairManager, ApiController apiController)
     {
-        _entry = dtrBar.Get("Mare Synchronos");
+        _entry = new(() => dtrBar.Get("Mare Synchronos"));
+        _logger = logger;
         _configService = configService;
         _pairManager = pairManager;
         _apiController = apiController;
-
-        Clear();
     }
 
     public void Dispose()
     {
-        _entry.Dispose();
+        _entry.Value.Dispose();
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -49,8 +49,16 @@ public sealed class DtrEntry : IDisposable, IHostedService
         catch (OperationCanceledException) { }
         finally
         {
+            _logger.LogDebug("Disposing DtrEntry");
+            if (_entry.IsValueCreated)
+            {
+                Clear();
+
+                _entry.Value.Remove();
+                _entry.Value.Dispose();
+            }
+
             _cancellationTokenSource.Dispose();
-            Clear();
         }
     }
 
@@ -58,16 +66,17 @@ public sealed class DtrEntry : IDisposable, IHostedService
     {
         _text = null;
 
-        _entry.Shown = false;
-        _entry.Text = null;
+        _entry.Value.Shown = false;
+        _entry.Value.Text = null;
     }
 
     private async Task RunAsync()
     {
         while (!_cancellationTokenSource.IsCancellationRequested)
         {
-            Update();
             await Task.Delay(1000, _cancellationTokenSource.Token).ConfigureAwait(false);
+
+            Update();
         }
     }
 
@@ -75,16 +84,16 @@ public sealed class DtrEntry : IDisposable, IHostedService
     {
         if (!_configService.Current.EnableDtrEntry)
         {
-            if (_entry.Shown)
+            if (_entry.Value.Shown)
             {
                 Clear();
             }
             return;
         }
 
-        if (!_entry.Shown)
+        if (!_entry.Value.Shown)
         {
-            _entry.Shown = true;
+            _entry.Value.Shown = true;
         }
 
         string text;
@@ -99,7 +108,7 @@ public sealed class DtrEntry : IDisposable, IHostedService
         if (!string.Equals(text, _text, StringComparison.Ordinal))
         {
             _text = text;
-            _entry.Text = text;
+            _entry.Value.Text = text;
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using MareSynchronos.Interop;
+﻿using LZ4;
+using MareSynchronos.Interop;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
@@ -135,6 +136,13 @@ public sealed class FileCacheManager : IDisposable
         var validatedCacheEntry = GetValidatedFileCache(entry);
 
         return validatedCacheEntry;
+    }
+
+    public async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)
+    {
+        var fileCache = GetFileCacheByHash(fileHash)!.ResolvedFilepath;
+        return (fileHash, LZ4Codec.WrapHC(await File.ReadAllBytesAsync(fileCache, uploadToken).ConfigureAwait(false), 0,
+            (int)new FileInfo(fileCache).Length));
     }
 
     public void RemoveHashedFile(FileCacheEntity? fileCache)
