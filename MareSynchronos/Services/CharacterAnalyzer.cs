@@ -1,4 +1,5 @@
 ﻿using MareSynchronos.API.Data;
+using MareSynchronos.API.Data.Enum;
 using MareSynchronos.FileCache;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.UI;
@@ -10,19 +11,23 @@ namespace MareSynchronos.Services;
 public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
 {
     private readonly FileCacheManager _fileCacheManager;
-    private CharacterData? _lastCreatedData;
     private CancellationTokenSource? _analysisCts;
+    private string _lastDataHash = string.Empty;
+    internal Dictionary<ObjectKind, Dictionary<string, FileDataEntry>> LastAnalysis { get; } = new();
 
     public CharacterAnalyzer(ILogger<CharacterAnalyzer> logger, MareMediator mediator, FileCacheManager fileCacheManager) : base(logger, mediator)
     {
         Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) =>
         {
-            _lastCreatedData = msg.CharacterData.DeepClone();
+            _ = Task.Run(() => BaseAnalysis(msg.CharacterData.DeepClone()));
         });
         _fileCacheManager = fileCacheManager;
     }
 
     public bool IsAnalysisRunning => _analysisCts != null;
+
+    public int CurrentFile { get; internal set; }
+    public int TotalFiles { get; internal set; }
 
     public void CancelAnalyze()
     {
@@ -30,62 +35,122 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
         _analysisCts = null;
     }
 
-    public async Task Analyze()
+    public async Task ComputeAnalysis(bool print = true)
     {
+        Logger.LogDebug("=== Calculating Character Analysis ===");
+
         _analysisCts = _analysisCts?.CancelRecreate() ?? new();
 
         var cancelToken = _analysisCts.Token;
 
-        if (_lastCreatedData == null) return;
-
-        Logger.LogInformation("=== Calculating Character Analysis, this may take a while ===");
-        foreach (var obj in _lastCreatedData.FileReplacements)
+        var allFiles = LastAnalysis.SelectMany(v => v.Value.Select(d => d.Value)).ToList();
+        if (allFiles.Exists(c => !c.IsComputed))
         {
-            Logger.LogInformation("=== File Calculation for {obj} ===", obj.Key);
-            Dictionary<string, List<DataEntry>> data = new(StringComparer.OrdinalIgnoreCase);
-            var totalFiles = obj.Value.Count(c => !string.IsNullOrEmpty(c.Hash));
-            var currentFile = 1;
-            foreach (var hash in obj.Value.Select(c => c.Hash))
+            var remaining = allFiles.Where(c => !c.IsComputed).ToList();
+            TotalFiles = remaining.Count;
+            CurrentFile = 1;
+            Logger.LogDebug("=== Computing {amount} remaining files ===", remaining.Count);
+
+            Mediator.Publish(new HaltScanMessage("CharacterAnalyzer"));
+
+            foreach (var file in remaining)
             {
-                var fileCacheEntry = _fileCacheManager.GetFileCacheByHash(hash);
-                if (fileCacheEntry == null) continue;
-
-                Logger.LogInformation("Computing File {x}/{y}: {hash}", currentFile, totalFiles, hash);
-
-                Logger.LogInformation("  File Path: {path}", fileCacheEntry.ResolvedFilepath);
-
-                var filePath = fileCacheEntry.ResolvedFilepath;
-                FileInfo fi = new(filePath);
-                var ext = fi.Extension;
-                if (!data.ContainsKey(ext)) data[ext] = new List<DataEntry>();
-
-                (_, byte[] fileLength) = await _fileCacheManager.GetCompressedFileData(hash, cancelToken).ConfigureAwait(false);
-
-                Logger.LogInformation("  Original Size: {size}, Compressed Size: {compr}",
-                    UiSharedService.ByteToString(fi.Length), UiSharedService.ByteToString(fileLength.LongLength));
-
-                data[ext].Add(new DataEntry(fi.FullName, fi.Length, fileLength.LongLength));
-
-                currentFile++;
-
-                cancelToken.ThrowIfCancellationRequested();
+                await file.ComputeSizes(_fileCacheManager, cancelToken).ConfigureAwait(false);
+                CurrentFile++;
             }
 
-            Logger.LogInformation("=== Summary by file type for {obj} ===", obj.Key);
-            foreach (var entry in data)
-            {
-                Logger.LogInformation("{ext} files: {count}, size extracted: {size}, size compressed: {sizeComp}", entry.Key, entry.Value.Count,
-                    UiSharedService.ByteToString(entry.Value.Sum(v => v.OriginalSize)), UiSharedService.ByteToString(entry.Value.Sum(v => v.CompressedSize)));
-            }
-            Logger.LogInformation("=== Total summary for {obj} ===", obj.Key);
-            Logger.LogInformation("Total files: {count}, size extracted: {size}, size compressed: {sizeComp}", data.Values.Sum(c => c.Count),
-                UiSharedService.ByteToString(data.Values.Sum(v => v.Sum(c => c.OriginalSize))), UiSharedService.ByteToString(data.Values.Sum(v => v.Sum(c => c.CompressedSize))));
+            _fileCacheManager.WriteOutFullCsv();
 
-            Logger.LogInformation("IMPORTANT NOTES:\n\r- For Mare up- and downloads only the compressed size is relevant.\n\r- An unusually high total files count beyond 200 and up will also increase your download time to others significantly.");
+            Mediator.Publish(new ResumeScanMessage("CharacterAnalzyer"));
         }
+
+        Mediator.Publish(new CharacterDataAnalyzedMessage());
 
         _analysisCts.CancelDispose();
         _analysisCts = null;
+
+        if (print) PrintAnalysis();
+    }
+
+    private void BaseAnalysis(CharacterData charaData)
+    {
+        if (string.Equals(charaData.DataHash.Value, _lastDataHash, StringComparison.Ordinal)) return;
+
+        LastAnalysis.Clear();
+
+        foreach (var obj in charaData.FileReplacements)
+        {
+            Dictionary<string, FileDataEntry> data = new(StringComparer.OrdinalIgnoreCase);
+            foreach (var fileEntry in obj.Value)
+            {
+                var fileCacheEntries = _fileCacheManager.GetAllFileCachesByHash(fileEntry.Hash);
+                if (fileCacheEntries.Count == 0) continue;
+
+                var filePath = fileCacheEntries[0].ResolvedFilepath;
+                FileInfo fi = new(filePath);
+                var ext = fi.Extension[1..];
+
+                foreach (var entry in fileCacheEntries)
+                {
+                    data[fileEntry.Hash] = new FileDataEntry(fileEntry.Hash, ext,
+                        fileEntry.GamePaths.ToList(),
+                        fileCacheEntries.Select(c => c.ResolvedFilepath).ToList(),
+                        entry.Size > 0 ? entry.Size.Value : 0, entry.CompressedSize > 0 ? entry.CompressedSize.Value : 0);
+                }
+            }
+
+            LastAnalysis[obj.Key] = data;
+        }
+
+        Mediator.Publish(new CharacterDataAnalyzedMessage());
+
+        _lastDataHash = charaData.DataHash.Value;
+    }
+
+    private void PrintAnalysis()
+    {
+        if (LastAnalysis.Count == 0) return;
+        foreach (var kvp in LastAnalysis)
+        {
+            int fileCounter = 1;
+            int totalFiles = kvp.Value.Count;
+            Logger.LogInformation("=== Analysis for {obj} ===", kvp.Key);
+
+            foreach (var entry in kvp.Value.OrderBy(b => b.Value.GamePaths.OrderBy(p => p, StringComparer.Ordinal).First(), StringComparer.Ordinal))
+            {
+                Logger.LogInformation("File {x}/{y}: {hash}", fileCounter++, totalFiles, entry.Key);
+                foreach (var path in entry.Value.GamePaths)
+                {
+                    Logger.LogInformation("  Game Path: {path}", path);
+                }
+                if (entry.Value.FilePaths.Count > 1) Logger.LogInformation("  Multiple fitting files detected", entry.Key);
+                foreach (var filePath in entry.Value.FilePaths)
+                {
+                    Logger.LogInformation("  File Path: {path}", filePath);
+                }
+                Logger.LogInformation("  Size: {size}, Compressed: {compressed}", UiSharedService.ByteToString(entry.Value.OriginalSize),
+                    UiSharedService.ByteToString(entry.Value.CompressedSize));
+            }
+        }
+        foreach (var kvp in LastAnalysis)
+        {
+            Logger.LogInformation("=== Detailed summary by file type for {obj} ===", kvp.Key);
+            foreach (var entry in kvp.Value.Select(v => v.Value).GroupBy(v => v.FileType, StringComparer.Ordinal))
+            {
+                Logger.LogInformation("{ext} files: {count}, size extracted: {size}, size compressed: {sizeComp}", entry.Key, entry.Count(),
+                    UiSharedService.ByteToString(entry.Sum(v => v.OriginalSize)), UiSharedService.ByteToString(entry.Sum(v => v.CompressedSize)));
+            }
+            Logger.LogInformation("=== Total summary for {obj} ===", kvp.Key);
+            Logger.LogInformation("Total files: {count}, size extracted: {size}, size compressed: {sizeComp}", kvp.Value.Count,
+            UiSharedService.ByteToString(kvp.Value.Sum(v => v.Value.OriginalSize)), UiSharedService.ByteToString(kvp.Value.Sum(v => v.Value.CompressedSize)));
+        }
+
+        Logger.LogInformation("=== Total summary for all currently present objects ===");
+        Logger.LogInformation("Total files: {count}, size extracted: {size}, size compressed: {sizeComp}",
+            LastAnalysis.Values.Sum(v => v.Values.Count),
+            UiSharedService.ByteToString(LastAnalysis.Values.Sum(c => c.Values.Sum(v => v.OriginalSize))),
+            UiSharedService.ByteToString(LastAnalysis.Values.Sum(c => c.Values.Sum(v => v.CompressedSize))));
+        Logger.LogInformation("IMPORTANT NOTES:\n\r- For Mare up- and downloads only the compressed size is relevant.\n\r- An unusually high total files count beyond 200 and up will also increase your download time to others significantly.");
     }
 
     public void Dispose()
@@ -93,5 +158,23 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
         _analysisCts.CancelDispose();
     }
 
-    private sealed record DataEntry(string filePath, long OriginalSize, long CompressedSize);
+    internal sealed record FileDataEntry(string Hash, string FileType, List<string> GamePaths, List<string> FilePaths, long OriginalSize, long CompressedSize)
+    {
+        public bool IsComputed => OriginalSize > 0 && CompressedSize > 0;
+        public async Task ComputeSizes(FileCacheManager fileCacheManager, CancellationToken token)
+        {
+            var compressedsize = await fileCacheManager.GetCompressedFileData(Hash, token).ConfigureAwait(false);
+            var normalSize = new FileInfo(FilePaths[0]).Length;
+            var entries = fileCacheManager.GetAllFileCachesByHash(Hash);
+            foreach (var entry in entries)
+            {
+                entry.Size = normalSize;
+                entry.CompressedSize = compressedsize.Item2.LongLength;
+            }
+            OriginalSize = normalSize;
+            CompressedSize = compressedsize.Item2.LongLength;
+        }
+        public long OriginalSize { get; private set; } = OriginalSize;
+        public long CompressedSize { get; private set; } = CompressedSize;
+    }
 }

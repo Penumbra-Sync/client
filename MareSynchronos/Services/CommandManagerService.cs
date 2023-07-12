@@ -14,7 +14,6 @@ public sealed class CommandManagerService : IDisposable
     private readonly ApiController _apiController;
     private readonly CommandManager _commandManager;
     private readonly MareMediator _mediator;
-    private readonly CharacterAnalyzer _characterAnalyzer;
     private readonly PerformanceCollectorService _performanceCollectorService;
     private readonly PeriodicFileScanner _periodicFileScanner;
     private readonly ServerConfigurationManager _serverConfigurationManager;
@@ -22,7 +21,7 @@ public sealed class CommandManagerService : IDisposable
 
     public CommandManagerService(CommandManager commandManager, PerformanceCollectorService performanceCollectorService,
         UiService uiService, ServerConfigurationManager serverConfigurationManager, PeriodicFileScanner periodicFileScanner,
-        ApiController apiController, MareMediator mediator, CharacterAnalyzer characterAnalyzer)
+        ApiController apiController, MareMediator mediator)
     {
         _commandManager = commandManager;
         _performanceCollectorService = performanceCollectorService;
@@ -31,7 +30,6 @@ public sealed class CommandManagerService : IDisposable
         _periodicFileScanner = periodicFileScanner;
         _apiController = apiController;
         _mediator = mediator;
-        _characterAnalyzer = characterAnalyzer;
         _commandManager.AddHandler(_commandName, new CommandInfo(OnCommand)
         {
             HelpMessage = "Opens the Mare Synchronos UI"
@@ -102,14 +100,7 @@ public sealed class CommandManagerService : IDisposable
         }
         else if (string.Equals(splitArgs[0], "analyze", StringComparison.OrdinalIgnoreCase))
         {
-            if (splitArgs.Length > 1 && string.Equals(splitArgs[1], "cancel", StringComparison.OrdinalIgnoreCase))
-            {
-                _characterAnalyzer.CancelAnalyze();
-            }
-            else
-            {
-                _ = _characterAnalyzer.Analyze();
-            }
+            _mediator.Publish(new OpenDataAnalysisUiMessage());
         }
     }
 }

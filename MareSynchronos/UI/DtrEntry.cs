@@ -32,7 +32,11 @@ public sealed class DtrEntry : IDisposable, IHostedService
 
     public void Dispose()
     {
-        _entry.Value.Dispose();
+        if (_entry.IsValueCreated)
+        {
+            _logger.LogDebug("Disposing DtrEntry");
+            Clear();
+        }
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -51,15 +55,6 @@ public sealed class DtrEntry : IDisposable, IHostedService
         catch (OperationCanceledException) { }
         finally
         {
-            _logger.LogDebug("Disposing DtrEntry");
-            if (_entry.IsValueCreated)
-            {
-                Clear();
-
-                _entry.Value.Remove();
-                _entry.Value.Dispose();
-            }
-
             _cancellationTokenSource.Dispose();
         }
     }
