@@ -11,15 +11,16 @@ using Microsoft.Extensions.Logging;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services;
+using Dalamud.Utility;
 
 namespace MareSynchronos.Interop;
 
 public sealed class IpcManager : DisposableMediatorSubscriberBase
 {
-    private readonly ICallGateSubscriber<string> _customizePlusApiVersion;
+    private readonly ICallGateSubscriber<(int, int)> _customizePlusApiVersion;
     private readonly ICallGateSubscriber<Character?, string?> _customizePlusGetBodyScale;
-    private readonly ICallGateSubscriber<string?, object> _customizePlusOnScaleUpdate;
-    private readonly ICallGateSubscriber<Character?, object> _customizePlusRevert;
+    private readonly ICallGateSubscriber<string?, string?, object> _customizePlusOnScaleUpdate;
+    private readonly ICallGateSubscriber<Character?, object> _customizePlusRevertCharacter;
     private readonly ICallGateSubscriber<string, Character?, object> _customizePlusSetBodyScaleToCharacter;
     private readonly DalamudUtilService _dalamudUtil;
     private readonly ICallGateSubscriber<int> _glamourerApiVersion;
@@ -114,11 +115,11 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
         _heelsOffsetUpdate.Subscribe(HeelsOffsetChange);
 
-        _customizePlusApiVersion = pi.GetIpcSubscriber<string>("CustomizePlus.GetApiVersion");
+        _customizePlusApiVersion = pi.GetIpcSubscriber<(int, int)>("CustomizePlus.GetApiVersion");
         _customizePlusGetBodyScale = pi.GetIpcSubscriber<Character?, string?>("CustomizePlus.GetProfileFromCharacter");
-        _customizePlusRevert = pi.GetIpcSubscriber<Character?, object>("CustomizePlus.RevertCharacter");
+        _customizePlusRevertCharacter = pi.GetIpcSubscriber<Character?, object>("CustomizePlus.RevertCharacter");
         _customizePlusSetBodyScaleToCharacter = pi.GetIpcSubscriber<string, Character?, object>("CustomizePlus.SetProfileToCharacter");
-        _customizePlusOnScaleUpdate = pi.GetIpcSubscriber<string?, object>("CustomizePlus.OnLocalPlayerProfileUpdate");
+        _customizePlusOnScaleUpdate = pi.GetIpcSubscriber<string?, string?, object>("CustomizePlus.OnProfileUpdate");
 
         _customizePlusOnScaleUpdate.Subscribe(OnCustomizePlusScaleChange);
 
@@ -176,14 +177,14 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
             if (gameObj is Character c)
             {
                 Logger.LogTrace("CustomizePlus reverting for {chara}", c.Address.ToString("X"));
-                _customizePlusRevert!.InvokeAction(c);
+                _customizePlusRevertCharacter!.InvokeAction(c);
             }
         }).ConfigureAwait(false);
     }
 
     public async Task CustomizePlusSetBodyScaleAsync(IntPtr character, string scale)
     {
-        if (!CheckCustomizePlusApi() || string.IsNullOrEmpty(scale)) return;
+        if (!CheckCustomizePlusApi()) return;
         await _dalamudUtil.RunOnFrameworkThread(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(character);
@@ -191,7 +192,14 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
             {
                 string decodedScale = Encoding.UTF8.GetString(Convert.FromBase64String(scale));
                 Logger.LogTrace("CustomizePlus applying for {chara}", c.Address.ToString("X"));
-                _customizePlusSetBodyScaleToCharacter!.InvokeAction(decodedScale, c);
+                if (scale.IsNullOrEmpty())
+                {
+                    _customizePlusRevertCharacter!.InvokeAction(c);
+                }
+                else
+                {
+                    _customizePlusSetBodyScaleToCharacter!.InvokeAction(decodedScale, c);
+                }
             }
         }).ConfigureAwait(false);
     }
@@ -527,7 +535,9 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     {
         try
         {
-            return string.Equals(_customizePlusApiVersion.InvokeFunc(), "2.0", StringComparison.Ordinal);
+            var version = _customizePlusApiVersion.InvokeFunc();
+            if (version.Item1 == 3 && version.Item2 >= 0) return true;
+            return false;
         }
         catch
         {
@@ -628,9 +638,9 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         Mediator.Publish(new HeelsOffsetMessage());
     }
 
-    private void OnCustomizePlusScaleChange(string? scale)
+    private void OnCustomizePlusScaleChange(string? profileName, string? scale)
     {
-        Mediator.Publish(new CustomizePlusMessage());
+        Mediator.Publish(new CustomizePlusMessage(profileName ?? string.Empty));
     }
 
     private void OnHonorificDisposing()
