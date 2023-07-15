@@ -13,6 +13,7 @@ namespace MareSynchronos.Services.Mediator;
 public record SwitchToIntroUiMessage : MessageBase;
 public record SwitchToMainUiMessage : MessageBase;
 public record OpenSettingsUiMessage : MessageBase;
+public record OpenDataAnalysisUiMessage : MessageBase;
 public record DalamudLoginMessage : MessageBase;
 public record DalamudLogoutMessage : MessageBase;
 public record FrameworkUpdateMessage : SameThreadMessage;
@@ -49,6 +50,7 @@ public record NotificationMessage
 public record CreateCacheForObjectMessage(GameObjectHandler ObjectToCreateFor) : MessageBase;
 public record ClearCacheForObjectMessage(GameObjectHandler ObjectToCreateFor) : MessageBase;
 public record CharacterDataCreatedMessage(CharacterData CharacterData) : SameThreadMessage;
+public record CharacterDataAnalyzedMessage : MessageBase;
 public record PenumbraStartRedrawMessage(IntPtr Address) : MessageBase;
 public record PenumbraEndRedrawMessage(IntPtr Address) : MessageBase;
 public record HubReconnectingMessage(Exception? Exception) : MessageBase;

@@ -72,11 +72,12 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<FileDownloadManagerFactory>();
             collection.AddSingleton<PairHandlerFactory>();
             collection.AddSingleton<PairFactory>();
+            collection.AddSingleton<CharacterAnalyzer>();
             collection.AddSingleton<PluginWarningNotificationService>();
             collection.AddSingleton((s) => new DalamudUtilService(s.GetRequiredService<ILogger<DalamudUtilService>>(),
                 clientState, objectTable, framework, gameGui, condition, gameData,
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<PerformanceCollectorService>()));
-            collection.AddSingleton((s) => new DtrEntry(dtrBar, s.GetRequiredService<MareConfigService>(),
+            collection.AddSingleton((s) => new DtrEntry(s.GetRequiredService<ILogger<DtrEntry>>(), dtrBar, s.GetRequiredService<MareConfigService>(),
                 s.GetRequiredService<PairManager>(), s.GetRequiredService<ApiController>()));
             collection.AddSingleton((s) => new IpcManager(s.GetRequiredService<ILogger<IpcManager>>(),
                 pluginInterface, s.GetRequiredService<DalamudUtilService>(), s.GetRequiredService<MareMediator>()));
@@ -105,6 +106,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddScoped<WindowMediatorSubscriberBase, IntroUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, DownloadUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, PopoutProfileUi>();
+            collection.AddScoped<WindowMediatorSubscriberBase, DataAnalysisUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, EditProfileUi>((s) => new EditProfileUi(s.GetRequiredService<ILogger<EditProfileUi>>(),
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<ApiController>(), pluginInterface.UiBuilder, s.GetRequiredService<UiSharedService>(),
                 s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareProfileManager>()));
@@ -116,7 +118,8 @@ public sealed class Plugin : IDalamudPlugin
                 s.GetRequiredService<WindowSystem>(), s.GetServices<WindowMediatorSubscriberBase>(), s.GetRequiredService<Func<Pair, StandaloneProfileUi>>(),
                 s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareMediator>()));
             collection.AddScoped((s) => new CommandManagerService(commandManager, s.GetRequiredService<PerformanceCollectorService>(), s.GetRequiredService<UiService>(),
-                s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<PeriodicFileScanner>(), s.GetRequiredService<ApiController>(), s.GetRequiredService<MareMediator>()));
+                s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<PeriodicFileScanner>(), s.GetRequiredService<ApiController>(), 
+                s.GetRequiredService<MareMediator>()));
             collection.AddScoped((s) => new NotificationService(s.GetRequiredService<ILogger<NotificationService>>(),
                 s.GetRequiredService<MareMediator>(), pluginInterface.UiBuilder, chatGui, s.GetRequiredService<MareConfigService>()));
             collection.AddScoped((s) => new UiSharedService(s.GetRequiredService<ILogger<UiSharedService>>(), s.GetRequiredService<IpcManager>(), s.GetRequiredService<ApiController>(),

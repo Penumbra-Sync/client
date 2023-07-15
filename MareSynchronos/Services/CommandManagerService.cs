@@ -30,7 +30,6 @@ public sealed class CommandManagerService : IDisposable
         _periodicFileScanner = periodicFileScanner;
         _apiController = apiController;
         _mediator = mediator;
-
         _commandManager.AddHandler(_commandName, new CommandInfo(OnCommand)
         {
             HelpMessage = "Opens the Mare Synchronos UI"
@@ -98,6 +97,10 @@ public sealed class CommandManagerService : IDisposable
         else if (string.Equals(splitArgs[0], "medi", StringComparison.OrdinalIgnoreCase))
         {
             _mediator.PrintSubscriberInfo();
+        }
+        else if (string.Equals(splitArgs[0], "analyze", StringComparison.OrdinalIgnoreCase))
+        {
+            _mediator.Publish(new OpenDataAnalysisUiMessage());
         }
     }
 }

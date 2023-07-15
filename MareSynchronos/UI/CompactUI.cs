@@ -520,6 +520,11 @@ public class CompactUi : WindowMediatorSubscriberBase
             ImGui.Text("No downloads in progress");
         }
 
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.PersonCircleQuestion, "Mare Character Data Analysis", WindowContentWidth))
+        {
+            Mediator.Publish(new OpenDataAnalysisUiMessage());
+        }
+
         ImGui.SameLine();
     }
 

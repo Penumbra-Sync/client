@@ -313,7 +313,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
     }
 
-    public static bool IconTextButton(FontAwesomeIcon icon, string text)
+    public static bool IconTextButton(FontAwesomeIcon icon, string text, float? width = null)
     {
         var buttonClicked = false;
 
@@ -322,9 +322,18 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         var padding = ImGui.GetStyle().FramePadding;
         var spacing = ImGui.GetStyle().ItemSpacing;
 
-        var buttonSizeX = iconSize.X + textSize.X + padding.X * 2 + spacing.X;
+        Vector2 buttonSize;
         var buttonSizeY = (iconSize.Y > textSize.Y ? iconSize.Y : textSize.Y) + padding.Y * 2;
-        var buttonSize = new Vector2(buttonSizeX, buttonSizeY);
+
+        if (width == null)
+        {
+            var buttonSizeX = iconSize.X + textSize.X + padding.X * 2 + spacing.X;
+            buttonSize = new Vector2(buttonSizeX, buttonSizeY);
+        }
+        else
+        {
+            buttonSize = new Vector2(width.Value, buttonSizeY);
+        }
 
         if (ImGui.Button("###" + icon.ToIconString() + text, buttonSize))
         {

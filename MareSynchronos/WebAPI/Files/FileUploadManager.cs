@@ -106,13 +106,6 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
         return await response.Content.ReadFromJsonAsync<List<UploadFileDto>>(cancellationToken: ct).ConfigureAwait(false) ?? new List<UploadFileDto>();
     }
 
-    private async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)
-    {
-        var fileCache = _fileDbManager.GetFileCacheByHash(fileHash)!.ResolvedFilepath;
-        return (fileHash, LZ4Codec.WrapHC(await File.ReadAllBytesAsync(fileCache, uploadToken).ConfigureAwait(false), 0,
-            (int)new FileInfo(fileCache).Length));
-    }
-
     private HashSet<string> GetUnverifiedFiles(CharacterData data)
     {
         HashSet<string> unverifiedUploadHashes = new(StringComparer.Ordinal);
@@ -245,7 +238,7 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
         foreach (var file in CurrentUploads.Where(f => f.CanBeTransferred && !f.IsTransferred).ToList())
         {
             Logger.LogDebug("[{hash}] Compressing", file);
-            var data = await GetCompressedFileData(file.Hash, uploadToken).ConfigureAwait(false);
+            var data = await _fileDbManager.GetCompressedFileData(file.Hash, uploadToken).ConfigureAwait(false);
             CurrentUploads.Single(e => string.Equals(e.Hash, data.Item1, StringComparison.Ordinal)).Total = data.Item2.Length;
             Logger.LogDebug("[{hash}] Starting upload for {filePath}", data.Item1, _fileDbManager.GetFileCacheByHash(data.Item1)!.ResolvedFilepath);
             await uploadTask.ConfigureAwait(false);
