@@ -13,6 +13,7 @@ public class FileCacheEntity
         LastModifiedDateTicks = lastModifiedDateTicks;
     }
 
+    public bool IsCacheEntry => PrefixedFilePath.StartsWith(FileCacheManager.CachePrefix, StringComparison.OrdinalIgnoreCase);
     public string CsvEntry => $"{Hash}{FileCacheManager.CsvSplit}{PrefixedFilePath}{FileCacheManager.CsvSplit}{LastModifiedDateTicks}|{Size ?? -1}|{CompressedSize ?? -1}";
     public string Hash { get; set; }
     public string LastModifiedDateTicks { get; set; }

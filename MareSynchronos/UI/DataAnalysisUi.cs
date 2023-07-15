@@ -17,7 +17,8 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
     private bool _hasUpdate = false;
     private Dictionary<ObjectKind, Dictionary<string, CharacterAnalyzer.FileDataEntry>>? _cachedAnalysis;
     private string _selectedHash = string.Empty;
-    private ObjectKind _selectedTab;
+    private ObjectKind _selectedObjectTab;
+    private string _selectedFileTypeTab = string.Empty;
 
     public DataAnalysisUi(ILogger<DataAnalysisUi> logger, MareMediator mediator, CharacterAnalyzer characterAnalyzer) : base(logger, mediator, "Mare Character Data Analysis")
     {
@@ -99,7 +100,7 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
             string text = "";
             var groupedfiles = _cachedAnalysis.Values.SelectMany(f => f.Values).GroupBy(f => f.FileType, StringComparer.Ordinal);
             text = string.Join(Environment.NewLine, groupedfiles.OrderBy(f => f.Key, StringComparer.Ordinal)
-                .Select(f => f.Key + ": " + f.Count() + " files, size: " + UiSharedService.ByteToString(f.Sum(v => v.OriginalSize)) 
+                .Select(f => f.Key + ": " + f.Count() + " files, size: " + UiSharedService.ByteToString(f.Sum(v => v.OriginalSize))
                 + ", compressed: " + UiSharedService.ByteToString(f.Sum(v => v.CompressedSize))));
             ImGui.SetTooltip(text);
         }
@@ -121,10 +122,13 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
             using var tab = ImRaii.TabItem(tabText + "###" + kvp.Key.ToString());
             if (tab.Success)
             {
+                var groupedfiles = kvp.Value.Select(v => v.Value).GroupBy(f => f.FileType, StringComparer.Ordinal).OrderBy(k => k.Key, StringComparer.Ordinal).ToList();
+
                 ImGui.TextUnformatted("Files for " + kvp.Key);
                 ImGui.SameLine();
                 ImGui.TextUnformatted(kvp.Value.Count.ToString());
                 ImGui.SameLine();
+
                 using (var font = ImRaii.PushFont(UiBuilder.IconFont))
                 {
                     ImGui.TextUnformatted(FontAwesomeIcon.InfoCircle.ToIconString());
@@ -132,8 +136,7 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
                 if (ImGui.IsItemHovered())
                 {
                     string text = "";
-                    var groupedfiles = kvp.Value.Select(v => v.Value).GroupBy(f => f.FileType, StringComparer.Ordinal);
-                    text = string.Join(Environment.NewLine, groupedfiles.OrderBy(f => f.Key, StringComparer.Ordinal)
+                    text = string.Join(Environment.NewLine, groupedfiles
                         .Select(f => f.Key + ": " + f.Count() + " files, size: " + UiSharedService.ByteToString(f.Sum(v => v.OriginalSize))
                         + ", compressed: " + UiSharedService.ByteToString(f.Sum(v => v.CompressedSize))));
                     ImGui.SetTooltip(text);
@@ -146,99 +149,68 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
                 ImGui.TextUnformatted(UiSharedService.ByteToString(kvp.Value.Sum(c => c.Value.CompressedSize)));
 
                 ImGui.Separator();
-                if (_selectedTab != kvp.Key)
+                if (_selectedObjectTab != kvp.Key)
                 {
                     _selectedHash = string.Empty;
-                    _selectedTab = kvp.Key;
+                    _selectedObjectTab = kvp.Key;
+                    _selectedFileTypeTab = string.Empty;
                 }
 
-                using var table = ImRaii.Table("Analysis", 6, ImGuiTableFlags.Sortable | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit,
-                    new Vector2(0, 300));
-                if (!table.Success) continue;
-                ImGui.TableSetupColumn("Type");
-                ImGui.TableSetupColumn("Hash");
-                ImGui.TableSetupColumn("Filepaths");
-                ImGui.TableSetupColumn("Gamepaths");
-                ImGui.TableSetupColumn("Original Size");
-                ImGui.TableSetupColumn("Compressed Size");
-                ImGui.TableSetupScrollFreeze(0, 1);
-                ImGui.TableHeadersRow();
+                using var fileTabBar = ImRaii.TabBar("fileTabs");
 
-                var sortSpecs = ImGui.TableGetSortSpecs();
-                if (sortSpecs.SpecsDirty)
+                foreach (IGrouping<string, CharacterAnalyzer.FileDataEntry>? fileGroup in groupedfiles)
                 {
-                    var idx = sortSpecs.Specs.ColumnIndex;
-
-                    if (idx == 1 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
-                        _cachedAnalysis[kvp.Key] = kvp.Value.OrderBy(k => k.Value.FileType, StringComparer.Ordinal).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
-                    if (idx == 1 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Descending)
-                        _cachedAnalysis[kvp.Key] = kvp.Value.OrderByDescending(k => k.Value.FileType, StringComparer.Ordinal).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
-                    if (idx == 1 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
-                        _cachedAnalysis[kvp.Key] = kvp.Value.OrderBy(k => k.Key, StringComparer.Ordinal).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
-                    if (idx == 1 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Descending)
-                        _cachedAnalysis[kvp.Key] = kvp.Value.OrderByDescending(k => k.Key, StringComparer.Ordinal).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
-                    if (idx == 2 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
-                        _cachedAnalysis[kvp.Key] = kvp.Value.OrderBy(k => k.Value.FilePaths.Count).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
-                    if (idx == 2 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Descending)
-                        _cachedAnalysis[kvp.Key] = kvp.Value.OrderByDescending(k => k.Value.FilePaths.Count).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
-                    if (idx == 3 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
-                        _cachedAnalysis[kvp.Key] = kvp.Value.OrderBy(k => k.Value.GamePaths.Count).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
-                    if (idx == 3 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Descending)
-                        _cachedAnalysis[kvp.Key] = kvp.Value.OrderByDescending(k => k.Value.GamePaths.Count).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
-                    if (idx == 4 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
-                        _cachedAnalysis[kvp.Key] = kvp.Value.OrderBy(k => k.Value.OriginalSize).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
-                    if (idx == 4 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Descending)
-                        _cachedAnalysis[kvp.Key] = kvp.Value.OrderByDescending(k => k.Value.OriginalSize).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
-                    if (idx == 5 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
-                        _cachedAnalysis[kvp.Key] = kvp.Value.OrderBy(k => k.Value.CompressedSize).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
-                    if (idx == 5 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Descending)
-                        _cachedAnalysis[kvp.Key] = kvp.Value.OrderByDescending(k => k.Value.CompressedSize).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
-
-                    sortSpecs.SpecsDirty = false;
-                }
-
-                foreach (var item in kvp.Value)
-                {
-                    using var text = ImRaii.PushColor(ImGuiCol.Text, new Vector4(0, 0, 0, 1), string.Equals(item.Key, _selectedHash));
-                    using var text2 = ImRaii.PushColor(ImGuiCol.Text, new Vector4(1, 1, 1, 1), !item.Value.IsComputed);
-                    ImGui.TableNextColumn();
-                    if (!item.Value.IsComputed)
+                    string fileGroupText = fileGroup.Key + " [" + fileGroup.Count() + "]";
+                    var requiresCompute = fileGroup.Any(k => !k.IsComputed);
+                    using var tabcol = ImRaii.PushColor(ImGuiCol.Tab, UiSharedService.Color(ImGuiColors.DalamudYellow), requiresCompute);
+                    if (requiresCompute)
                     {
-                        ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg1, UiSharedService.Color(ImGuiColors.DalamudRed));
-                        ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, UiSharedService.Color(ImGuiColors.DalamudRed));
+                        fileGroupText += " (!)";
                     }
-                    if (string.Equals(_selectedHash, item.Key, StringComparison.Ordinal))
+                    ImRaii.IEndObject fileTab;
+                    using (var textcol = ImRaii.PushColor(ImGuiCol.Text, UiSharedService.Color(new(0, 0, 0, 1)), 
+                        requiresCompute && !string.Equals(_selectedFileTypeTab, fileGroup.Key, StringComparison.Ordinal)))
                     {
-                        ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg1, UiSharedService.Color(ImGuiColors.DalamudYellow));
-                        ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, UiSharedService.Color(ImGuiColors.DalamudYellow));
+                        fileTab = ImRaii.TabItem(fileGroupText + "###" + fileGroup.Key);
                     }
-                    ImGui.TextUnformatted(item.Value.FileType);
-                    if (ImGui.IsItemClicked()) _selectedHash = item.Key;
-                    ImGui.TableNextColumn();
-                    ImGui.TextUnformatted(item.Key);
-                    if (ImGui.IsItemClicked()) _selectedHash = item.Key;
-                    ImGui.TableNextColumn();
-                    ImGui.TextUnformatted(item.Value.FilePaths.Count.ToString());
-                    if (ImGui.IsItemClicked()) _selectedHash = item.Key;
-                    ImGui.TableNextColumn();
-                    ImGui.TextUnformatted(item.Value.GamePaths.Count.ToString());
-                    if (ImGui.IsItemClicked()) _selectedHash = item.Key;
-                    ImGui.TableNextColumn();
-                    ImGui.TextUnformatted(UiSharedService.ByteToString(item.Value.OriginalSize));
-                    if (ImGui.IsItemClicked()) _selectedHash = item.Key;
-                    ImGui.TableNextColumn();
-                    ImGui.TextUnformatted(UiSharedService.ByteToString(item.Value.CompressedSize));
-                    if (ImGui.IsItemClicked()) _selectedHash = item.Key;
+
+                    if (!fileTab) { fileTab.Dispose(); continue; }
+
+                    if (!string.Equals(fileGroup.Key, _selectedFileTypeTab, StringComparison.Ordinal))
+                    {
+                        _selectedFileTypeTab = fileGroup.Key;
+                        _selectedHash = string.Empty;
+                    }
+
+                    ImGui.TextUnformatted($"{fileGroup.Key} files");
+                    ImGui.SameLine();
+                    ImGui.TextUnformatted(fileGroup.Count().ToString());
+
+                    ImGui.TextUnformatted($"{fileGroup.Key} files size (uncompressed):");
+                    ImGui.SameLine();
+                    ImGui.TextUnformatted(UiSharedService.ByteToString(fileGroup.Sum(c => c.OriginalSize)));
+
+                    ImGui.TextUnformatted($"{fileGroup.Key} files size (compressed):");
+                    ImGui.SameLine();
+                    ImGui.TextUnformatted(UiSharedService.ByteToString(fileGroup.Sum(c => c.CompressedSize)));
+
+                    ImGui.Separator();
+                    DrawTable(fileGroup);
+
+                    fileTab.Dispose();
                 }
             }
         }
+
         ImGui.Separator();
+
         ImGui.Text("Selected file:");
         ImGui.SameLine();
         UiSharedService.ColorText(_selectedHash, ImGuiColors.DalamudYellow);
-        if (_cachedAnalysis[_selectedTab].ContainsKey(_selectedHash))
+
+        if (_cachedAnalysis[_selectedObjectTab].ContainsKey(_selectedHash))
         {
-            var filePaths = _cachedAnalysis[_selectedTab][_selectedHash].FilePaths;
+            var filePaths = _cachedAnalysis[_selectedObjectTab][_selectedHash].FilePaths;
             ImGui.TextUnformatted("Local file path:");
             ImGui.SameLine();
             UiSharedService.TextWrapped(filePaths[0]);
@@ -251,7 +223,7 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
                 UiSharedService.AttachToolTip(string.Join(Environment.NewLine, filePaths.Skip(1)));
             }
 
-            var gamepaths = _cachedAnalysis[_selectedTab][_selectedHash].GamePaths;
+            var gamepaths = _cachedAnalysis[_selectedObjectTab][_selectedHash].GamePaths;
             ImGui.TextUnformatted("Used by game path:");
             ImGui.SameLine();
             UiSharedService.TextWrapped(gamepaths[0]);
@@ -263,6 +235,80 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
                 UiSharedService.FontText(FontAwesomeIcon.InfoCircle.ToIconString(), UiBuilder.IconFont);
                 UiSharedService.AttachToolTip(string.Join(Environment.NewLine, gamepaths.Skip(1)));
             }
+        }
+    }
+
+    private void DrawTable(IGrouping<string, CharacterAnalyzer.FileDataEntry> fileGroup)
+    {
+        using var table = ImRaii.Table("Analysis", 5, ImGuiTableFlags.Sortable | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit,
+new Vector2(0, 300));
+        if (!table.Success) return;
+        ImGui.TableSetupColumn("Hash");
+        ImGui.TableSetupColumn("Filepaths");
+        ImGui.TableSetupColumn("Gamepaths");
+        ImGui.TableSetupColumn("Original Size");
+        ImGui.TableSetupColumn("Compressed Size");
+        ImGui.TableSetupScrollFreeze(0, 1);
+        ImGui.TableHeadersRow();
+
+        var sortSpecs = ImGui.TableGetSortSpecs();
+        if (sortSpecs.SpecsDirty)
+        {
+            var idx = sortSpecs.Specs.ColumnIndex;
+
+            if (idx == 0 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
+                _cachedAnalysis![_selectedObjectTab] = _cachedAnalysis[_selectedObjectTab].OrderBy(k => k.Key, StringComparer.Ordinal).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
+            if (idx == 0 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Descending)
+                _cachedAnalysis![_selectedObjectTab] = _cachedAnalysis[_selectedObjectTab].OrderByDescending(k => k.Key, StringComparer.Ordinal).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
+            if (idx == 1 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
+                _cachedAnalysis![_selectedObjectTab] = _cachedAnalysis[_selectedObjectTab].OrderBy(k => k.Value.FilePaths.Count).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
+            if (idx == 1 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Descending)
+                _cachedAnalysis![_selectedObjectTab] = _cachedAnalysis[_selectedObjectTab].OrderByDescending(k => k.Value.FilePaths.Count).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
+            if (idx == 2 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
+                _cachedAnalysis![_selectedObjectTab] = _cachedAnalysis[_selectedObjectTab].OrderBy(k => k.Value.GamePaths.Count).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
+            if (idx == 2 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Descending)
+                _cachedAnalysis![_selectedObjectTab] = _cachedAnalysis[_selectedObjectTab].OrderByDescending(k => k.Value.GamePaths.Count).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
+            if (idx == 3 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
+                _cachedAnalysis![_selectedObjectTab] = _cachedAnalysis[_selectedObjectTab].OrderBy(k => k.Value.OriginalSize).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
+            if (idx == 3 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Descending)
+                _cachedAnalysis![_selectedObjectTab] = _cachedAnalysis[_selectedObjectTab].OrderByDescending(k => k.Value.OriginalSize).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
+            if (idx == 4 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
+                _cachedAnalysis![_selectedObjectTab] = _cachedAnalysis[_selectedObjectTab].OrderBy(k => k.Value.CompressedSize).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
+            if (idx == 4 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Descending)
+                _cachedAnalysis![_selectedObjectTab] = _cachedAnalysis[_selectedObjectTab].OrderByDescending(k => k.Value.CompressedSize).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
+
+            sortSpecs.SpecsDirty = false;
+        }
+
+        foreach (var item in fileGroup)
+        {
+            using var text = ImRaii.PushColor(ImGuiCol.Text, new Vector4(0, 0, 0, 1), string.Equals(item.Hash, _selectedHash));
+            using var text2 = ImRaii.PushColor(ImGuiCol.Text, new Vector4(1, 1, 1, 1), !item.IsComputed);
+            ImGui.TableNextColumn();
+            if (!item.IsComputed)
+            {
+                ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg1, UiSharedService.Color(ImGuiColors.DalamudRed));
+                ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, UiSharedService.Color(ImGuiColors.DalamudRed));
+            }
+            if (string.Equals(_selectedHash, item.Hash, StringComparison.Ordinal))
+            {
+                ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg1, UiSharedService.Color(ImGuiColors.DalamudYellow));
+                ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, UiSharedService.Color(ImGuiColors.DalamudYellow));
+            }
+            ImGui.TextUnformatted(item.Hash);
+            if (ImGui.IsItemClicked()) _selectedHash = item.Hash;
+            ImGui.TableNextColumn();
+            ImGui.TextUnformatted(item.FilePaths.Count.ToString());
+            if (ImGui.IsItemClicked()) _selectedHash = item.Hash;
+            ImGui.TableNextColumn();
+            ImGui.TextUnformatted(item.GamePaths.Count.ToString());
+            if (ImGui.IsItemClicked()) _selectedHash = item.Hash;
+            ImGui.TableNextColumn();
+            ImGui.TextUnformatted(UiSharedService.ByteToString(item.OriginalSize));
+            if (ImGui.IsItemClicked()) _selectedHash = item.Hash;
+            ImGui.TableNextColumn();
+            ImGui.TextUnformatted(UiSharedService.ByteToString(item.CompressedSize));
+            if (ImGui.IsItemClicked()) _selectedHash = item.Hash;
         }
     }
 }

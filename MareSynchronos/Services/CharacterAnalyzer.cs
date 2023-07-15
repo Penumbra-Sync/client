@@ -83,7 +83,7 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
             Dictionary<string, FileDataEntry> data = new(StringComparer.OrdinalIgnoreCase);
             foreach (var fileEntry in obj.Value)
             {
-                var fileCacheEntries = _fileCacheManager.GetAllFileCachesByHash(fileEntry.Hash);
+                var fileCacheEntries = _fileCacheManager.GetAllFileCachesByHash(fileEntry.Hash).Where(c => !c.IsCacheEntry).ToList();
                 if (fileCacheEntries.Count == 0) continue;
 
                 var filePath = fileCacheEntries[0].ResolvedFilepath;

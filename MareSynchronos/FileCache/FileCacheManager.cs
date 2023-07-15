@@ -12,8 +12,8 @@ namespace MareSynchronos.FileCache;
 public sealed class FileCacheManager : IDisposable
 {
     public const string CsvSplit = "|";
-    private const string _cachePrefix = "{cache}";
-    private const string _penumbraPrefix = "{penumbra}";
+    public const string CachePrefix = "{cache}";
+    public const string PenumbraPrefix = "{penumbra}";
     private readonly MareConfigService _configService;
     private readonly string _csvPath;
     private readonly ConcurrentDictionary<string, List<FileCacheEntity>> _fileCaches = new(StringComparer.Ordinal);
@@ -96,7 +96,7 @@ public sealed class FileCacheManager : IDisposable
         if (!fi.Exists) return null;
         var fullName = fi.FullName.ToLowerInvariant();
         if (!fullName.Contains(_configService.Current.CacheFolder.ToLowerInvariant(), StringComparison.Ordinal)) return null;
-        string prefixedPath = fullName.Replace(_configService.Current.CacheFolder.ToLowerInvariant(), _cachePrefix + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
+        string prefixedPath = fullName.Replace(_configService.Current.CacheFolder.ToLowerInvariant(), CachePrefix + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
         return CreateFileCacheEntity(fi, prefixedPath);
     }
 
@@ -107,7 +107,7 @@ public sealed class FileCacheManager : IDisposable
         if (!fi.Exists) return null;
         var fullName = fi.FullName.ToLowerInvariant();
         if (!fullName.Contains(_ipcManager.PenumbraModDirectory!.ToLowerInvariant(), StringComparison.Ordinal)) return null;
-        string prefixedPath = fullName.Replace(_ipcManager.PenumbraModDirectory!.ToLowerInvariant(), _penumbraPrefix + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
+        string prefixedPath = fullName.Replace(_ipcManager.PenumbraModDirectory!.ToLowerInvariant(), PenumbraPrefix + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
         return CreateFileCacheEntity(fi, prefixedPath);
     }
 
@@ -302,13 +302,13 @@ public sealed class FileCacheManager : IDisposable
 
     private FileCacheEntity ReplacePathPrefixes(FileCacheEntity fileCache)
     {
-        if (fileCache.PrefixedFilePath.StartsWith(_penumbraPrefix, StringComparison.OrdinalIgnoreCase))
+        if (fileCache.PrefixedFilePath.StartsWith(PenumbraPrefix, StringComparison.OrdinalIgnoreCase))
         {
-            fileCache.SetResolvedFilePath(fileCache.PrefixedFilePath.Replace(_penumbraPrefix, _ipcManager.PenumbraModDirectory, StringComparison.Ordinal));
+            fileCache.SetResolvedFilePath(fileCache.PrefixedFilePath.Replace(PenumbraPrefix, _ipcManager.PenumbraModDirectory, StringComparison.Ordinal));
         }
-        else if (fileCache.PrefixedFilePath.StartsWith(_cachePrefix, StringComparison.OrdinalIgnoreCase))
+        else if (fileCache.PrefixedFilePath.StartsWith(CachePrefix, StringComparison.OrdinalIgnoreCase))
         {
-            fileCache.SetResolvedFilePath(fileCache.PrefixedFilePath.Replace(_cachePrefix, _configService.Current.CacheFolder, StringComparison.Ordinal));
+            fileCache.SetResolvedFilePath(fileCache.PrefixedFilePath.Replace(CachePrefix, _configService.Current.CacheFolder, StringComparison.Ordinal));
         }
 
         return fileCache;
