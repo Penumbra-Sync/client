@@ -621,7 +621,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.TextColored(glamourerColor, _glamourerExists ? "Available" : "Unavailable");
         ImGui.Text("Optional Addons");
         ImGui.SameLine();
-        ImGui.Text("Heels:");
+        ImGui.Text("SimpleHeels:");
         ImGui.SameLine();
         ImGui.TextColored(heelsColor, _heelsExists ? "Available" : "Unavailable");
         ImGui.SameLine();

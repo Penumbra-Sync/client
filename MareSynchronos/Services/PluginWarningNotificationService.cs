@@ -38,7 +38,7 @@ public class PluginWarningNotificationService
         List<string> missingPluginsForData = new();
         if (changes.Contains(PlayerChanges.Heels) && !warning.ShownHeelsWarning && !_ipcManager.CheckHeelsApi())
         {
-            missingPluginsForData.Add("Heels");
+            missingPluginsForData.Add("SimpleHeels");
             warning.ShownHeelsWarning = true;
         }
         if (changes.Contains(PlayerChanges.Customize) && !warning.ShownCustomizePlusWarning && !_ipcManager.CheckCustomizePlusApi())
