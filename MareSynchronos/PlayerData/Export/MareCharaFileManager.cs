@@ -64,7 +64,6 @@ public class MareCharaFileManager
                     }
                 }
                 var applicationId = Guid.NewGuid();
-                _ipcManager.ToggleGposeQueueMode(on: true);
                 await _ipcManager.PenumbraRemoveTemporaryCollectionAsync(_logger, applicationId, charaTarget.Name.TextValue).ConfigureAwait(false);
                 var coll = await _ipcManager.PenumbraCreateTemporaryCollectionAsync(_logger, charaTarget.Name.TextValue).ConfigureAwait(false);
                 await _ipcManager.PenumbraAssignTemporaryCollectionAsync(_logger, coll, charaTarget.ObjectTableIndex()!.Value).ConfigureAwait(false);
@@ -74,7 +73,22 @@ public class MareCharaFileManager
                 await _ipcManager.GlamourerApplyAllAsync(_logger, tempHandler, LoadedCharaFile.CharaFileData.GlamourerData, applicationId, disposeCts.Token).ConfigureAwait(false);
                 _dalamudUtil.WaitWhileGposeCharacterIsDrawing(charaTarget.Address, 30000);
                 await _ipcManager.PenumbraRemoveTemporaryCollectionAsync(_logger, applicationId, coll).ConfigureAwait(false);
-                _ipcManager.ToggleGposeQueueMode(on: false);
+                if (!string.IsNullOrEmpty(LoadedCharaFile.CharaFileData.CustomizePlusData))
+                {
+                    await _ipcManager.CustomizePlusSetBodyScaleAsync(tempHandler.Address, LoadedCharaFile.CharaFileData.CustomizePlusData).ConfigureAwait(false);
+                }
+                else
+                {
+                    await _ipcManager.CustomizePlusRevertAsync(tempHandler.Address).ConfigureAwait(false);
+                }
+                if (!string.IsNullOrEmpty(LoadedCharaFile.CharaFileData.PalettePlusData))
+                {
+                    await _ipcManager.PalettePlusSetPaletteAsync(tempHandler.Address, LoadedCharaFile.CharaFileData.PalettePlusData).ConfigureAwait(false);
+                }
+                else
+                {
+                    await _ipcManager.PalettePlusRemovePaletteAsync(tempHandler.Address).ConfigureAwait(false);
+                }
             }
         }
         finally

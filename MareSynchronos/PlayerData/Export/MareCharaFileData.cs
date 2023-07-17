@@ -26,7 +26,8 @@ public record MareCharaFileData
             GlamourerData = glamourerData;
         }
 
-        CustomizePlusData = dto.CustomizePlusData;
+        dto.CustomizePlusData.TryGetValue(ObjectKind.Player, out var customizePlusData);
+        CustomizePlusData = customizePlusData ?? string.Empty;
         PalettePlusData = dto.PalettePlusData;
         ManipulationData = dto.ManipulationData;
 

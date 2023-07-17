@@ -5,6 +5,7 @@ using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
+using System.Linq;
 
 namespace MareSynchronos.PlayerData.Services;
 
@@ -53,15 +54,20 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
                 Logger.LogTrace("Clearing cache for {obj}", msg.ObjectToCreateFor);
                 _playerData.FileReplacements.Remove(msg.ObjectToCreateFor.ObjectKind);
                 _playerData.GlamourerString.Remove(msg.ObjectToCreateFor.ObjectKind);
+                _playerData.CustomizePlusScale.Remove(msg.ObjectToCreateFor.ObjectKind);
                 Mediator.Publish(new CharacterDataCreatedMessage(_playerData.ToAPI()));
             });
         });
 
-        Mediator.Subscribe<CustomizePlusMessage>(this, async (_) =>
+        Mediator.Subscribe<CustomizePlusMessage>(this, async (msg) =>
         {
             if (_isZoning) return;
-            Logger.LogDebug("Received CustomizePlus change, updating player");
-            await AddPlayerCacheToCreate().ConfigureAwait(false);
+            foreach (var item in _playerRelatedObjects
+                .Where(item => string.Equals(item.Value.Name, msg.ProfileName, StringComparison.Ordinal)).Select(k => k.Key))
+            {
+                Logger.LogDebug("Received CustomizePlus change, updating {obj}", item);
+                await AddPlayerCacheToCreate(item).ConfigureAwait(false);
+            }
         });
         Mediator.Subscribe<HeelsOffsetMessage>(this, async (_) =>
         {
@@ -104,10 +110,10 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         _cts.Dispose();
     }
 
-    private async Task AddPlayerCacheToCreate()
+    private async Task AddPlayerCacheToCreate(ObjectKind kind = ObjectKind.Player)
     {
         await _cacheCreateLock.WaitAsync().ConfigureAwait(false);
-        _cachesToCreate[ObjectKind.Player] = _playerRelatedObjects[ObjectKind.Player];
+        _cachesToCreate[kind] = _playerRelatedObjects[kind];
         _cacheCreateLock.Release();
     }
 

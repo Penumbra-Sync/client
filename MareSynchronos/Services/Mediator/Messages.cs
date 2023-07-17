@@ -34,7 +34,7 @@ public record PenumbraDisposedMessage : MessageBase;
 public record PenumbraRedrawMessage(IntPtr Address, int ObjTblIdx, bool WasRequested) : SameThreadMessage;
 public record HeelsOffsetMessage : MessageBase;
 public record PenumbraResourceLoadMessage(IntPtr GameObject, string GamePath, string FilePath) : SameThreadMessage;
-public record CustomizePlusMessage : MessageBase;
+public record CustomizePlusMessage(string ProfileName) : MessageBase;
 public record PalettePlusMessage(Character Character) : MessageBase;
 public record HonorificMessage(string NewHonorificTitle) : MessageBase;
 public record HonorificReadyMessage : MessageBase;

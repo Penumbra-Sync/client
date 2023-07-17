@@ -52,7 +52,10 @@ public sealed class DtrEntry : IDisposable, IHostedService
         {
             await _runTask!.ConfigureAwait(false);
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        {
+            // ignore cancelled
+        }
         finally
         {
             _cancellationTokenSource.Dispose();
