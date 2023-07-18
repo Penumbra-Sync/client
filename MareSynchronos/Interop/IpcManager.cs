@@ -204,9 +204,9 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         }).ConfigureAwait(false);
     }
 
-    public async Task<string> GetCustomizePlusScaleAsync(IntPtr character)
+    public async Task<string?> GetCustomizePlusScaleAsync(IntPtr character)
     {
-        if (!CheckCustomizePlusApi()) return string.Empty;
+        if (!CheckCustomizePlusApi()) return null;
         var scale = await _dalamudUtil.RunOnFrameworkThread(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(character);

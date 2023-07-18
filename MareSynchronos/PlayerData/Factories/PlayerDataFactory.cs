@@ -376,12 +376,16 @@ public class PlayerDataFactory
         previousData.ManipulationString = _ipcManager.PenumbraGetMetaManipulations();
         Task<string> getHeelsOffset = _ipcManager.GetHeelsOffsetAsync();
         Task<string> getGlamourerData = _ipcManager.GlamourerGetCharacterCustomizationAsync(playerRelatedObject.Address);
-        Task<string> getCustomizeData = _ipcManager.GetCustomizePlusScaleAsync(playerRelatedObject.Address);
+        Task<string?> getCustomizeData = _ipcManager.GetCustomizePlusScaleAsync(playerRelatedObject.Address);
         Task<string> getPalettePlusData = _ipcManager.PalettePlusBuildPaletteAsync();
         previousData.GlamourerString[playerRelatedObject.ObjectKind] = await getGlamourerData.ConfigureAwait(false);
         _logger.LogDebug("Glamourer is now: {data}", previousData.GlamourerString[playerRelatedObject.ObjectKind]);
-        previousData.CustomizePlusScale[playerRelatedObject.ObjectKind] = await getCustomizeData.ConfigureAwait(false);
-        _logger.LogDebug("Customize is now: {data}", previousData.CustomizePlusScale[playerRelatedObject.ObjectKind]);
+        var customizeScale = await getCustomizeData.ConfigureAwait(false);
+        if (customizeScale != null)
+        {
+            previousData.CustomizePlusScale[playerRelatedObject.ObjectKind] = customizeScale;
+            _logger.LogDebug("Customize is now: {data}", previousData.CustomizePlusScale[playerRelatedObject.ObjectKind]);
+        }
         previousData.PalettePlusPalette = await getPalettePlusData.ConfigureAwait(false);
         _logger.LogDebug("Palette is now: {data}", previousData.PalettePlusPalette);
         previousData.HonorificData = _ipcManager.HonorificGetTitle();
