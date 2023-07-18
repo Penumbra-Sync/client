@@ -179,7 +179,6 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
                 if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
                 {
-                    await StopConnection(ServerState.VersionMisMatch).ConfigureAwait(false);
                     if (_connectionDto.CurrentClientVersion > currentClientVer)
                     {
                         Mediator.Publish(new NotificationMessage("Client incompatible",
@@ -188,6 +187,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                             $"This client version is incompatible and will not be able to connect. Please update your Mare Synchronos client.",
                             Dalamud.Interface.Internal.Notifications.NotificationType.Error));
                     }
+                    await StopConnection(ServerState.VersionMisMatch).ConfigureAwait(false);
                     return;
                 }
 
