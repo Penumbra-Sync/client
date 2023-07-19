@@ -79,6 +79,7 @@ public class PlayerDataFactory
 
         var previousFileReplacements = previousData.FileReplacements.ToDictionary(d => d.Key, d => d.Value);
         var previousGlamourerData = previousData.GlamourerString.ToDictionary(d => d.Key, d => d.Value);
+        var previousCustomize = previousData.CustomizePlusScale.ToDictionary(d => d.Key, d => d.Value);
 
         try
         {
@@ -100,6 +101,7 @@ public class PlayerDataFactory
 
         previousData.FileReplacements = previousFileReplacements;
         previousData.GlamourerString = previousGlamourerData;
+        previousData.CustomizePlusScale = previousCustomize;
     }
 
     private unsafe void AddPlayerSpecificReplacements(Human* human, HashSet<string> forwardResolve, HashSet<string> reverseResolve)
@@ -312,6 +314,11 @@ public class PlayerDataFactory
             previousData.FileReplacements[objectKind].Clear();
         }
 
+        if (previousData.CustomizePlusScale.ContainsKey(objectKind))
+        {
+            previousData.CustomizePlusScale.Remove(objectKind);
+        }
+
         // wait until chara is not drawing and present so nothing spontaneously explodes
         await _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, playerRelatedObject, Guid.NewGuid(), 30000, ct: token).ConfigureAwait(false);
         int totalWaitTime = 10000;
@@ -381,7 +388,7 @@ public class PlayerDataFactory
         previousData.GlamourerString[playerRelatedObject.ObjectKind] = await getGlamourerData.ConfigureAwait(false);
         _logger.LogDebug("Glamourer is now: {data}", previousData.GlamourerString[playerRelatedObject.ObjectKind]);
         var customizeScale = await getCustomizeData.ConfigureAwait(false);
-        if (customizeScale != null)
+        if (!string.IsNullOrEmpty(customizeScale))
         {
             previousData.CustomizePlusScale[playerRelatedObject.ObjectKind] = customizeScale;
             _logger.LogDebug("Customize is now: {data}", previousData.CustomizePlusScale[playerRelatedObject.ObjectKind]);

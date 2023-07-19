@@ -233,6 +233,10 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                         {
                             await _ipcManager.CustomizePlusSetBodyScaleAsync(handler.Address, customizePlusData).ConfigureAwait(false);
                         }
+                        else
+                        {
+                            await _ipcManager.CustomizePlusRevertAsync(handler.Address).ConfigureAwait(false);
+                        }
                         break;
 
                     case PlayerChanges.Heels:
@@ -533,6 +537,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             var minionOrMount = await _dalamudUtil.GetMinionOrMountAsync(address).ConfigureAwait(false);
             if (minionOrMount != nint.Zero)
             {
+                await _ipcManager.CustomizePlusRevertAsync(minionOrMount).ConfigureAwait(false);
                 using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => minionOrMount, false).ConfigureAwait(false);
                 await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
             }
@@ -542,6 +547,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             var pet = await _dalamudUtil.GetPetAsync(address).ConfigureAwait(false);
             if (pet != nint.Zero)
             {
+                await _ipcManager.CustomizePlusRevertAsync(pet).ConfigureAwait(false);
                 using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => pet, false).ConfigureAwait(false);
                 await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
             }
@@ -551,6 +557,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             var companion = await _dalamudUtil.GetCompanionAsync(address).ConfigureAwait(false);
             if (companion != nint.Zero)
             {
+                await _ipcManager.CustomizePlusRevertAsync(companion).ConfigureAwait(false);
                 using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => companion, false).ConfigureAwait(false);
                 await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
             }
