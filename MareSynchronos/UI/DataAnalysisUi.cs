@@ -240,7 +240,7 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
 
     private void DrawTable(IGrouping<string, CharacterAnalyzer.FileDataEntry> fileGroup)
     {
-        using var table = ImRaii.Table("Analysis", 6, ImGuiTableFlags.Sortable | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit,
+        using var table = ImRaii.Table("Analysis", fileGroup.Key == "tex" ? 6 : 5, ImGuiTableFlags.Sortable | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit,
 new Vector2(0, 300));
         if (!table.Success) return;
         ImGui.TableSetupColumn("Hash");
@@ -248,7 +248,7 @@ new Vector2(0, 300));
         ImGui.TableSetupColumn("Gamepaths");
         ImGui.TableSetupColumn("Original Size");
         ImGui.TableSetupColumn("Compressed Size");
-        ImGui.TableSetupColumn("Format");
+        if (fileGroup.Key == "tex") ImGui.TableSetupColumn("Format");
         ImGui.TableSetupScrollFreeze(0, 1);
         ImGui.TableHeadersRow();
 
@@ -277,9 +277,9 @@ new Vector2(0, 300));
                 _cachedAnalysis![_selectedObjectTab] = _cachedAnalysis[_selectedObjectTab].OrderBy(k => k.Value.CompressedSize).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
             if (idx == 4 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Descending)
                 _cachedAnalysis![_selectedObjectTab] = _cachedAnalysis[_selectedObjectTab].OrderByDescending(k => k.Value.CompressedSize).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
-            if (idx == 5 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
+            if (fileGroup.Key == "tex" && idx == 5 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Ascending)
                 _cachedAnalysis![_selectedObjectTab] = _cachedAnalysis[_selectedObjectTab].OrderBy(k => k.Value.Format).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
-            if (idx == 5 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Descending)
+            if (fileGroup.Key == "tex" && idx == 5 && sortSpecs.Specs.SortDirection == ImGuiSortDirection.Descending)
                 _cachedAnalysis![_selectedObjectTab] = _cachedAnalysis[_selectedObjectTab].OrderByDescending(k => k.Value.Format).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal);
 
             sortSpecs.SpecsDirty = false;
@@ -314,9 +314,12 @@ new Vector2(0, 300));
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(UiSharedService.ByteToString(item.CompressedSize));
             if (ImGui.IsItemClicked()) _selectedHash = item.Hash;
-            ImGui.TableNextColumn();
-            ImGui.TextUnformatted(item.Format);
-            if (ImGui.IsItemClicked()) _selectedHash = item.Hash;
+            if (fileGroup.Key == "tex")
+            {
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted(item.Format.Value);
+                if (ImGui.IsItemClicked()) _selectedHash = item.Hash;
+            }
         }
     }
 }
