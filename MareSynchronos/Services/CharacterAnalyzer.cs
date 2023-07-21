@@ -5,6 +5,8 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.UI;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
+using Lumina.Data;
+using Lumina.Data.Files;
 
 namespace MareSynchronos.Services;
 
@@ -176,5 +178,30 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
         }
         public long OriginalSize { get; private set; } = OriginalSize;
         public long CompressedSize { get; private set; } = CompressedSize;
+
+        public Lazy<string> Format = new(() =>
+        {
+            switch (FileType)
+            {
+                case "tex":
+                    {
+                        try
+                        {
+                            using var stream = new FileStream(FilePaths[0], FileMode.Open, FileAccess.Read, FileShare.Read);
+                            using var reader = new BinaryReader(stream);
+                            reader.BaseStream.Position = 4;
+                            var format = (TexFile.TextureFormat)reader.ReadInt32();
+                            return format.ToString();
+                        }
+                        catch
+                        {
+                            return "Unknown";
+                        }
+                       
+                    }
+                default:
+                    return string.Empty;
+            }
+        });
     }
 }
