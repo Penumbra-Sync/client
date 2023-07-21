@@ -195,7 +195,7 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
                         }
                         catch
                         {
-                            return "unknown";
+                            return "Unknown";
                         }
                        
                     }
