@@ -218,6 +218,8 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             else
             {
                 equipDiff = CompareAndUpdateEquipByteData((byte*)&chara->DrawData.Head);
+                if (equipDiff)
+                    Logger.LogTrace("Checking [{this}] equip data from game obj, result: {diff}", this, equipDiff);
             }
 
             if (equipDiff && !_isOwnedObject && !_ignoreSendAfterRedraw) // send the message out immediately and cancel out, no reason to continue if not self
@@ -238,7 +240,9 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             }
             else
             {
-                customizeDiff = CompareAndUpdateEquipByteData(chara->DrawData.CustomizeData.Data);
+                customizeDiff = CompareAndUpdateCustomizeData(chara->DrawData.CustomizeData.Data);
+                if (customizeDiff)
+                    Logger.LogTrace("Checking [{this}] customize data from game obj, result: {diff}", this, equipDiff);
             }
 
             if ((addrDiff || drawObjDiff || equipDiff || customizeDiff || nameChange) && _isOwnedObject)
