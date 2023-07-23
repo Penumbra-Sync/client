@@ -1,6 +1,7 @@
 ﻿using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
+using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
 using Penumbra.String;
 using System.Runtime.InteropServices;
@@ -74,7 +75,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             if (msg.Address == Address)
             {
                 _haltProcessing = false;
-                Task.Run(async () =>
+                _ = Task.Run(async () =>
                 {
                     _ignoreSendAfterRedraw = true;
                     await Task.Delay(500).ConfigureAwait(false);
@@ -195,14 +196,30 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             if (_clearCts != null)
             {
                 Logger.LogDebug("[{this}] Cancelling Clear Task", this);
-                _clearCts?.Cancel();
+                _clearCts?.CancelDispose();
                 _clearCts = null;
             }
             var chara = (FFXIVClientStructs.FFXIV.Client.Game.Character.Character*)Address;
             var name = new ByteString(chara->GameObject.Name).ToString();
             bool nameChange = !string.Equals(name, Name, StringComparison.Ordinal);
-            Name = name;
-            bool equipDiff = CompareAndUpdateEquipByteData(chara->EquipSlotData);
+            if (nameChange)
+            {
+                Name = name;
+            }
+            bool equipDiff = false;
+
+            if (((DrawObject*)DrawObjectAddress)->Object.GetObjectType() == ObjectType.CharacterBase
+                && ((CharacterBase*)DrawObjectAddress)->GetModelType() == CharacterBase.ModelType.Human)
+            {
+                equipDiff = CompareAndUpdateEquipByteData((byte*)&((Human*)DrawObjectAddress)->Head);
+                if (equipDiff)
+                    Logger.LogTrace("Checking [{this}] equip data as human from draw obj, result: {diff}", this, equipDiff);
+            }
+            else
+            {
+                equipDiff = CompareAndUpdateEquipByteData((byte*)&chara->DrawData.Head);
+            }
+
             if (equipDiff && !_isOwnedObject && !_ignoreSendAfterRedraw) // send the message out immediately and cancel out, no reason to continue if not self
             {
                 Logger.LogTrace("[{this}] Changed", this);
@@ -210,7 +227,19 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
                 return;
             }
 
-            var customizeDiff = CompareAndUpdateCustomizeData(chara->CustomizeData);
+            bool customizeDiff = false;
+
+            if (((DrawObject*)DrawObjectAddress)->Object.GetObjectType() == ObjectType.CharacterBase
+                && ((CharacterBase*)DrawObjectAddress)->GetModelType() == CharacterBase.ModelType.Human)
+            {
+                customizeDiff = CompareAndUpdateCustomizeData(((Human*)DrawObjectAddress)->Customize.Data);
+                if (customizeDiff)
+                    Logger.LogTrace("Checking [{this}] customize data as human from draw obj, result: {diff}", this, customizeDiff);
+            }
+            else
+            {
+                customizeDiff = CompareAndUpdateEquipByteData(chara->DrawData.CustomizeData.Data);
+            }
 
             if ((addrDiff || drawObjDiff || equipDiff || customizeDiff || nameChange) && _isOwnedObject)
             {
@@ -223,8 +252,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             Logger.LogTrace("[{this}] Changed", this);
             if (_isOwnedObject && ObjectKind != ObjectKind.Player)
             {
-                _clearCts?.Cancel();
-                _clearCts?.Dispose();
+                _clearCts?.CancelDispose();
                 _clearCts = new();
                 var token = _clearCts.Token;
                 _ = Task.Run(() => ClearAsync(token), token);
