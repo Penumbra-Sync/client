@@ -612,20 +612,11 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
             {
                 apiAvailable = true;
             }
-            _shownGlamourerUnavailable = _shownGlamourerUnavailable && !apiAvailable;
             return apiAvailable;
         }
         catch
         {
             return apiAvailable;
-        }
-        finally
-        {
-            if (!apiAvailable && !_shownGlamourerUnavailable)
-            {
-                _shownGlamourerUnavailable = true;
-                Mediator.Publish(new NotificationMessage("Glamourer inactive", "Your Glamourer installation is not active or out of date. Update Glamourer to continue to use Mare.", NotificationType.Error));
-            }
         }
     }
 
