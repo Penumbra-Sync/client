@@ -243,8 +243,15 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
             await PenumbraRedrawInternalAsync(logger, handler, applicationId, (chara) =>
             {
-                logger.LogDebug("[{appid}] Calling on IPC: GlamourerApplyAll", applicationId);
-                _glamourerApplyAll!.InvokeAction(customization, chara);
+                try
+                {
+                    logger.LogDebug("[{appid}] Calling on IPC: GlamourerApplyAll", applicationId);
+                    _glamourerApplyAll!.InvokeAction(customization, chara);
+                }
+                catch (Exception)
+                {
+                    logger.LogWarning("[{appid}] Failed to apply Glamourer data", applicationId);
+                }
                 if (_glamourerTestingAvailable)
                 {
                     logger.LogDebug("[{appid}] Calling on IPC: PenumbraRedraw", applicationId);
