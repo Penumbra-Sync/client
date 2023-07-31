@@ -63,7 +63,7 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         _scanCancellationTokenSource?.Cancel();
         _scanCancellationTokenSource = new CancellationTokenSource();
         var token = _scanCancellationTokenSource.Token;
-        Task.Run(async () =>
+        _ = Task.Run(async () =>
         {
             while (!token.IsCancellationRequested)
             {
