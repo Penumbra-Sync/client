@@ -59,6 +59,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
         Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) =>
         {
+            _downloadCancellationTokenSource?.CancelDispose();
             MediatorUnsubscribeFromCharacterChanged();
             _charaHandler?.Invalidate();
             IsVisible = false;
