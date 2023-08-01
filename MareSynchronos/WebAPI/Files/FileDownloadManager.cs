@@ -8,7 +8,6 @@ using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.WebAPI.Files.Models;
 using Microsoft.Extensions.Logging;
-using System;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
@@ -78,6 +77,29 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         base.Dispose(disposing);
     }
 
+    private static (string fileHash, long fileLengthBytes) ReadBlockFileHeader(FileStream fileBlockStream)
+    {
+        List<char> hashName = new();
+        List<char> fileLength = new();
+        var separator = (char)fileBlockStream.ReadByte();
+        if (separator != '#') throw new InvalidDataException("Data is invalid, first char is not #");
+
+        bool readHash = false;
+        while (true)
+        {
+            var readChar = (char)fileBlockStream.ReadByte();
+            if (readChar == ':')
+            {
+                readHash = true;
+                continue;
+            }
+            if (readChar == '#') break;
+            if (!readHash) hashName.Add(readChar);
+            else fileLength.Add(readChar);
+        }
+        return (string.Join("", hashName), long.Parse(string.Join("", fileLength)));
+    }
+
     private async Task DownloadFileHttpClient(string downloadGroup, Guid requestId, List<DownloadFileTransfer> fileTransfer, string tempPath, IProgress<long> progress, CancellationToken ct)
     {
         Logger.LogDebug("GUID {requestId} on server {uri} for files {files}", requestId, fileTransfer[0].DownloadUri, string.Join(", ", fileTransfer.Select(c => c.Hash).ToList()));
@@ -143,7 +165,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
 
     private async Task DownloadFilesInternal(GameObjectHandler gameObjectHandler, List<FileReplacementData> fileReplacement, CancellationToken ct)
     {
-        Logger.LogDebug("Downloading files for {id}", gameObjectHandler.Name);
+        Logger.LogDebug("Download start: {id}", gameObjectHandler.Name);
 
         List<DownloadFileDto> downloadFileInfoFromService = new();
         downloadFileInfoFromService.AddRange(await FilesGetSizes(fileReplacement.Select(f => f.Hash).ToList(), ct).ConfigureAwait(false));
@@ -155,7 +177,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
 
         foreach (var dto in downloadFileInfoFromService.Where(c => c.IsForbidden))
         {
-            if (!_orchestrator.ForbiddenTransfers.Any(f => string.Equals(f.Hash, dto.Hash, StringComparison.Ordinal)))
+            if (!_orchestrator.ForbiddenTransfers.Exists(f => string.Equals(f.Hash, dto.Hash, StringComparison.Ordinal)))
             {
                 _orchestrator.ForbiddenTransfers.Add(new DownloadFileTransfer(dto));
             }
@@ -194,7 +216,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
 
             Logger.LogDebug("GUID {requestId} for {n} files on server {uri}", requestId, fileGroup.Count(), fileGroup.First().DownloadUri);
 
-            var tempFilePath = _fileDbManager.GetCacheFilePath(requestId.ToString("N"), "blk", true);
+            var blockFile = _fileDbManager.GetCacheFilePath(requestId.ToString("N"), "blk", true);
             try
             {
                 _downloadStatus[fileGroup.Key].DownloadStatus = DownloadStatus.WaitingForSlot;
@@ -212,97 +234,69 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                         Logger.LogWarning(ex, "Could not set download progress");
                     }
                 });
-                await DownloadFileHttpClient(fileGroup.Key, requestId, fileGroup.ToList(), tempFilePath, progress, token).ConfigureAwait(false);
+                await DownloadFileHttpClient(fileGroup.Key, requestId, fileGroup.ToList(), blockFile, progress, token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
-                File.Delete(tempFilePath);
+                _orchestrator.ReleaseDownloadSlot();
+                File.Delete(blockFile);
                 Logger.LogDebug("Detected cancellation, removing {id}", gameObjectHandler);
                 CancelDownload();
                 return;
             }
             catch (Exception ex)
             {
+                _orchestrator.ReleaseDownloadSlot();
+                File.Delete(blockFile);
                 Logger.LogError(ex, "Error during download of {id}", requestId);
+                CancelDownload();
                 return;
+            }
+
+            FileStream? fileBlockStream = null;
+            try
+            {
+                _downloadStatus[fileGroup.Key].TransferredFiles = 1;
+                _downloadStatus[fileGroup.Key].DownloadStatus = DownloadStatus.Decompressing;
+                fileBlockStream = File.OpenRead(blockFile);
+                while (fileBlockStream.Position < fileBlockStream.Length)
+                {
+                    (string fileHash, long fileLengthBytes) = ReadBlockFileHeader(fileBlockStream);
+
+                    try
+                    {
+                        Logger.LogDebug("Found file {file} with length {le}, decompressing download", fileHash, fileLengthBytes);
+                        var fileExtension = fileReplacement.First(f => string.Equals(f.Hash, fileHash, StringComparison.OrdinalIgnoreCase)).GamePaths[0].Split(".").Last();
+
+                        byte[] compressedFileContent = new byte[fileLengthBytes];
+                        _ = await fileBlockStream.ReadAsync(compressedFileContent, token).ConfigureAwait(false);
+
+                        var decompressedFile = LZ4Codec.Unwrap(compressedFileContent);
+                        var filePath = _fileDbManager.GetCacheFilePath(fileHash, fileExtension, false);
+                        await File.WriteAllBytesAsync(filePath, decompressedFile, token).ConfigureAwait(false);
+
+                        PersistFileToStorage(fileHash, filePath);
+                    }
+                    catch (Exception e)
+                    {
+                        Logger.LogWarning(e, "Error during decompression");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error during block file read");
             }
             finally
             {
                 _orchestrator.ReleaseDownloadSlot();
+                fileBlockStream?.Dispose();
+                File.Delete(blockFile);
             }
-
-            _downloadStatus[fileGroup.Key].TransferredFiles = 1;
-            _downloadStatus[fileGroup.Key].DownloadStatus = DownloadStatus.Decompressing;
-            var fileStream = File.OpenRead(tempFilePath);
-            while (fileStream.Position < fileStream.Length)
-            {
-                List<char> hashName = new List<char>();
-                List<char> fileLength = new List<char>();
-                var separator = (char)fileStream.ReadByte();
-                if (separator != '#') throw new Exception("Some error occured, first char is not #");
-
-                bool readHash = false;
-                while (true)
-                {
-                    var readChar = (char)fileStream.ReadByte();
-                    if (readChar == ':')
-                    {
-                        readHash = true;
-                        continue;
-                    }
-                    if (readChar == '#') break;
-                    if (!readHash) hashName.Add(readChar);
-                    else fileLength.Add(readChar);
-                }
-                var fileHash = string.Join("", hashName);
-                var fileLengthBytes = long.Parse(string.Join("", fileLength));
-                try
-                {
-                    Logger.LogDebug("Found file {file} with length {le}, decompressing download", fileHash, fileLengthBytes);
-                    var ext = fileReplacement.First(f => string.Equals(f.Hash, fileHash, StringComparison.OrdinalIgnoreCase)).GamePaths[0].Split(".").Last();
-                    byte[] tempFileContent = new byte[fileLengthBytes];
-                    _ = await fileStream.ReadAsync(tempFileContent, token).ConfigureAwait(false);
-                    var extractedFile = LZ4Codec.Unwrap(tempFileContent);
-                    var filePath = _fileDbManager.GetCacheFilePath(fileHash, ext, false);
-                    await File.WriteAllBytesAsync(filePath, extractedFile, token).ConfigureAwait(false);
-                    var fi = new FileInfo(filePath);
-                    Func<DateTime> RandomDayInThePast()
-                    {
-                        DateTime start = new(1995, 1, 1);
-                        Random gen = new();
-                        int range = (DateTime.Today - start).Days;
-                        return () => start.AddDays(gen.Next(range));
-                    }
-
-                    fi.CreationTime = RandomDayInThePast().Invoke();
-                    fi.LastAccessTime = DateTime.Today;
-                    fi.LastWriteTime = RandomDayInThePast().Invoke();
-                    try
-                    {
-                        var entry = _fileDbManager.CreateCacheEntry(filePath);
-                        if (!string.Equals(entry?.Hash, fileHash, StringComparison.OrdinalIgnoreCase))
-                        {
-                            Logger.LogError("Hash mismatch after extracting, got {hash}, expected {expectedHash}, deleting file", entry?.Hash, fileHash);
-                            File.Delete(filePath);
-                            _fileDbManager.RemoveHashedFile(entry);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogWarning(ex, "Issue creating cache entry");
-                    }
-                }
-                catch (Exception e)
-                {
-                    Logger.LogWarning(e, "Error during decompression");
-                }
-            }
-
-            fileStream.Dispose();
-            File.Delete(tempFilePath);
         }).ConfigureAwait(false);
 
-        Logger.LogDebug("Download for {id} complete", gameObjectHandler);
+        Logger.LogDebug("Download end: {id}", gameObjectHandler);
+
         CancelDownload();
     }
 
@@ -311,6 +305,36 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         if (!_orchestrator.IsInitialized) throw new InvalidOperationException("FileTransferManager is not initialized");
         var response = await _orchestrator.SendRequestAsync(HttpMethod.Get, MareFiles.ServerFilesGetSizesFullPath(_orchestrator.FilesCdnUri!), hashes, ct).ConfigureAwait(false);
         return await response.Content.ReadFromJsonAsync<List<DownloadFileDto>>(cancellationToken: ct).ConfigureAwait(false) ?? new List<DownloadFileDto>();
+    }
+
+    private void PersistFileToStorage(string fileHash, string filePath)
+    {
+        var fi = new FileInfo(filePath);
+        Func<DateTime> RandomDayInThePast()
+        {
+            DateTime start = new(1995, 1, 1);
+            Random gen = new();
+            int range = (DateTime.Today - start).Days;
+            return () => start.AddDays(gen.Next(range));
+        }
+
+        fi.CreationTime = RandomDayInThePast().Invoke();
+        fi.LastAccessTime = DateTime.Today;
+        fi.LastWriteTime = RandomDayInThePast().Invoke();
+        try
+        {
+            var entry = _fileDbManager.CreateCacheEntry(filePath);
+            if (!string.Equals(entry?.Hash, fileHash, StringComparison.OrdinalIgnoreCase))
+            {
+                Logger.LogError("Hash mismatch after extracting, got {hash}, expected {expectedHash}, deleting file", entry?.Hash, fileHash);
+                File.Delete(filePath);
+                _fileDbManager.RemoveHashedFile(entry);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Error creating cache entry");
+        }
     }
 
     private async Task WaitForDownloadReady(List<DownloadFileTransfer> downloadFileTransfer, Guid requestId, CancellationToken downloadCt)
