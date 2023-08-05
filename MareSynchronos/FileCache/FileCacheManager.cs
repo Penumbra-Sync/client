@@ -120,9 +120,9 @@ public sealed class FileCacheManager : IDisposable
 
     public List<FileCacheEntity> GetAllFileCaches() => _fileCaches.Values.SelectMany(v => v).ToList();
 
-    public string GetCacheFilePath(string hash, string extension, bool isTemporaryFile)
+    public string GetCacheFilePath(string hash, string extension)
     {
-        return Path.Combine(_configService.Current.CacheFolder, hash + "." + extension + (isTemporaryFile ? ".tmp" : string.Empty));
+        return Path.Combine(_configService.Current.CacheFolder, hash + "." + extension);
     }
 
     public FileCacheEntity? GetFileCacheByHash(string hash)
