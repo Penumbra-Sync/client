@@ -580,7 +580,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private List<FileReplacementData> TryCalculateModdedDictionary(Guid applicationBase, CharacterData charaData, out Dictionary<string, string> moddedDictionary, CancellationToken token)
     {
         Stopwatch st = Stopwatch.StartNew();
-        List<FileReplacementData> missingFiles = new();
+        ConcurrentBag<FileReplacementData> missingFiles = new();
         moddedDictionary = new Dictionary<string, string>(StringComparer.Ordinal);
         ConcurrentDictionary<string, string> outputDict = new(StringComparer.Ordinal);
         bool hasMigrationChanges = false;
@@ -634,6 +634,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         if (hasMigrationChanges) _fileDbManager.WriteOutFullCsv();
         st.Stop();
         Logger.LogDebug("[BASE-{appBase}] ModdedPaths calculated in {time}ms, missing files: {count}, total files: {total}", applicationBase, st.ElapsedMilliseconds, missingFiles.Count, moddedDictionary.Keys.Count);
-        return missingFiles;
+        return missingFiles.ToList();
     }
 }
