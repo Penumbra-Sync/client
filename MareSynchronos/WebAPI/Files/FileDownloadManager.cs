@@ -77,17 +77,35 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         base.Dispose(disposing);
     }
 
+    private static byte MungeByte(int byteOrEof)
+    {
+        if (byteOrEof == -1)
+        {
+            throw new EndOfStreamException();
+        }
+
+        return (byte)(byteOrEof ^ 42);
+    }
+
+    private static void MungeBuffer(Span<byte> buffer)
+    {
+        for (int i = 0; i < buffer.Length; ++i)
+        {
+            buffer[i] ^= 42;
+        }
+    }
+
     private static (string fileHash, long fileLengthBytes) ReadBlockFileHeader(FileStream fileBlockStream)
     {
         List<char> hashName = new();
         List<char> fileLength = new();
-        var separator = (char)fileBlockStream.ReadByte();
+        var separator = (char)MungeByte(fileBlockStream.ReadByte());
         if (separator != '#') throw new InvalidDataException("Data is invalid, first char is not #");
 
         bool readHash = false;
         while (true)
         {
-            var readChar = (char)fileBlockStream.ReadByte();
+            var readChar = (char)MungeByte(fileBlockStream.ReadByte());
             if (readChar == ':')
             {
                 readHash = true;
@@ -100,7 +118,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         return (string.Join("", hashName), long.Parse(string.Join("", fileLength)));
     }
 
-    private async Task DownloadFileHttpClient(string downloadGroup, Guid requestId, List<DownloadFileTransfer> fileTransfer, string tempPath, IProgress<long> progress, CancellationToken ct)
+    private async Task DownloadAndMungeFileHttpClient(string downloadGroup, Guid requestId, List<DownloadFileTransfer> fileTransfer, string tempPath, IProgress<long> progress, CancellationToken ct)
     {
         Logger.LogDebug("GUID {requestId} on server {uri} for files {files}", requestId, fileTransfer[0].DownloadUri, string.Join(", ", fileTransfer.Select(c => c.Hash).ToList()));
 
@@ -138,6 +156,8 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                 while ((bytesRead = await (await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false)).ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
                 {
                     ct.ThrowIfCancellationRequested();
+
+                    MungeBuffer(buffer.AsSpan(0, bytesRead));
 
                     await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct).ConfigureAwait(false);
 
@@ -216,7 +236,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
 
             Logger.LogDebug("GUID {requestId} for {n} files on server {uri}", requestId, fileGroup.Count(), fileGroup.First().DownloadUri);
 
-            var blockFile = _fileDbManager.GetCacheFilePath(requestId.ToString("N"), "blk", true);
+            var blockFile = _fileDbManager.GetCacheFilePath(requestId.ToString("N"), "blk");
             try
             {
                 _downloadStatus[fileGroup.Key].DownloadStatus = DownloadStatus.WaitingForSlot;
@@ -234,7 +254,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                         Logger.LogWarning(ex, "Could not set download progress");
                     }
                 });
-                await DownloadFileHttpClient(fileGroup.Key, requestId, fileGroup.ToList(), blockFile, progress, token).ConfigureAwait(false);
+                await DownloadAndMungeFileHttpClient(fileGroup.Key, requestId, fileGroup.ToList(), blockFile, progress, token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -270,9 +290,10 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
 
                         byte[] compressedFileContent = new byte[fileLengthBytes];
                         _ = await fileBlockStream.ReadAsync(compressedFileContent, token).ConfigureAwait(false);
+                        MungeBuffer(compressedFileContent);
 
                         var decompressedFile = LZ4Codec.Unwrap(compressedFileContent);
-                        var filePath = _fileDbManager.GetCacheFilePath(fileHash, fileExtension, false);
+                        var filePath = _fileDbManager.GetCacheFilePath(fileHash, fileExtension);
                         await File.WriteAllBytesAsync(filePath, decompressedFile, token).ConfigureAwait(false);
 
                         PersistFileToStorage(fileHash, filePath);
