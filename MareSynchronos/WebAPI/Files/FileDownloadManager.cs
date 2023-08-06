@@ -77,8 +77,6 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         base.Dispose(disposing);
     }
 
-    // Being based on a XOR with a constant, this transform is its own inverse.
-    // It is not meant to be cryptographically strong, just to keep uninformed prying eyes out.
     private static byte MungeByte(int byteOrEof)
     {
         if (byteOrEof == -1)
@@ -120,7 +118,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         return (string.Join("", hashName), long.Parse(string.Join("", fileLength)));
     }
 
-    private async Task DownloadFileHttpClient(string downloadGroup, Guid requestId, List<DownloadFileTransfer> fileTransfer, string tempPath, IProgress<long> progress, bool mungeFile, CancellationToken ct)
+    private async Task DownloadAndMungeFileHttpClient(string downloadGroup, Guid requestId, List<DownloadFileTransfer> fileTransfer, string tempPath, IProgress<long> progress, CancellationToken ct)
     {
         Logger.LogDebug("GUID {requestId} on server {uri} for files {files}", requestId, fileTransfer[0].DownloadUri, string.Join(", ", fileTransfer.Select(c => c.Hash).ToList()));
 
@@ -159,10 +157,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    if (mungeFile)
-                    {
-                        MungeBuffer(buffer.AsSpan(0, bytesRead));
-                    }
+                    MungeBuffer(buffer.AsSpan(0, bytesRead));
 
                     await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct).ConfigureAwait(false);
 
@@ -259,7 +254,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                         Logger.LogWarning(ex, "Could not set download progress");
                     }
                 });
-                await DownloadFileHttpClient(fileGroup.Key, requestId, fileGroup.ToList(), blockFile, progress, mungeFile: true, token).ConfigureAwait(false);
+                await DownloadAndMungeFileHttpClient(fileGroup.Key, requestId, fileGroup.ToList(), blockFile, progress, token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
