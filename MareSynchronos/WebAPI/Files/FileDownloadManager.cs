@@ -77,6 +77,14 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         base.Dispose(disposing);
     }
 
+    private static void MungeBuffer(Span<byte> buffer)
+    {
+        for (int i = 0; i < buffer.Length; ++i)
+        {
+            buffer[i] ^= 42;
+        }
+    }
+
     private static byte MungeByte(int byteOrEof)
     {
         if (byteOrEof == -1)
@@ -85,14 +93,6 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         }
 
         return (byte)(byteOrEof ^ 42);
-    }
-
-    private static void MungeBuffer(Span<byte> buffer)
-    {
-        for (int i = 0; i < buffer.Length; ++i)
-        {
-            buffer[i] ^= 42;
-        }
     }
 
     private static (string fileHash, long fileLengthBytes) ReadBlockFileHeader(FileStream fileBlockStream)
