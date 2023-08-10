@@ -3,6 +3,7 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.WebAPI.Files.Models;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Reflection;
@@ -17,6 +18,7 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
     private readonly ServerConfigurationManager _serverManager;
     private int _availableDownloadSlots;
     private SemaphoreSlim _downloadSemaphore;
+    private readonly ConcurrentDictionary<Guid, bool> _downloadReady = new();
 
     public FileTransferOrchestrator(ILogger<FileTransferOrchestrator> logger, MareConfigService mareConfig, ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
     {
@@ -39,6 +41,10 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         {
             FilesCdnUri = null;
         });
+        Mediator.Subscribe<DownloadReadyMessage>(this, (msg) =>
+        {
+            _downloadReady[msg.RequestId] = true;
+        });
     }
 
     public Uri? FilesCdnUri { private set; get; }
@@ -48,6 +54,21 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
     public void ReleaseDownloadSlot()
     {
         _downloadSemaphore.Release();
+    }
+
+    public bool IsDownloadReady(Guid guid)
+    {
+        if (_downloadReady.TryGetValue(guid, out bool isReady) && isReady)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    public void ClearDownloadRequest(Guid guid)
+    {
+        _downloadReady.Remove(guid, out _);
     }
 
     public async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, Uri uri, CancellationToken? ct = null)

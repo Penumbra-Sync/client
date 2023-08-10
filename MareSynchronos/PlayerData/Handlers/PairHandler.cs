@@ -112,6 +112,8 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             return;
         }
 
+        _forceApplyMods |= forceApplyCustomization;
+
         var charaDataToUpdate = characterData.CheckUpdatedData(applicationBase, _cachedData?.DeepClone() ?? new(), Logger, this, forceApplyCustomization, _forceApplyMods);
 
         if (_charaHandler != null && _forceApplyMods)
@@ -451,8 +453,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         });
 
         _ipcManager.PenumbraAssignTemporaryCollectionAsync(Logger, _penumbraCollection, _charaHandler.GetGameObject()!.ObjectIndex).GetAwaiter().GetResult();
-
-        _downloadManager.Initialize();
     }
 
     private void IpcManagerOnPenumbraRedrawEvent(PenumbraRedrawMessage msg)

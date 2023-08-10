@@ -8,7 +8,6 @@ using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.WebAPI.Files.Models;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Http.Json;
 
@@ -16,7 +15,6 @@ namespace MareSynchronos.WebAPI.Files;
 
 public partial class FileDownloadManager : DisposableMediatorSubscriberBase
 {
-    private readonly ConcurrentDictionary<Guid, bool> _downloadReady = new();
     private readonly Dictionary<string, FileDownloadStatus> _downloadStatus;
     private readonly FileCacheManager _fileDbManager;
     private readonly FileTransferOrchestrator _orchestrator;
@@ -58,17 +56,6 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
             Mediator.Publish(new DownloadFinishedMessage(gameObject));
             Mediator.Publish(new ResumeScanMessage("Download"));
         }
-    }
-
-    public void Initialize()
-    {
-        Mediator.Subscribe<DownloadReadyMessage>(this, (msg) =>
-        {
-            if (_downloadReady.ContainsKey(msg.RequestId))
-            {
-                _downloadReady[msg.RequestId] = true;
-            }
-        });
     }
 
     protected override void Dispose(bool disposing)
@@ -232,7 +219,6 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
             Logger.LogDebug("Sent request for {n} files on server {uri} with result {result}", fileGroup.Count(), fileGroup.First().DownloadUri, requestIdResponse.Content.ReadAsStringAsync().Result);
 
             Guid requestId = Guid.Parse(requestIdResponse.Content.ReadAsStringAsync().Result.Trim('"'));
-            _downloadReady[requestId] = false;
 
             Logger.LogDebug("GUID {requestId} for {n} files on server {uri}", requestId, fileGroup.Count(), fileGroup.First().DownloadUri);
 
@@ -367,7 +353,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
             localTimeoutCts.CancelAfter(TimeSpan.FromSeconds(5));
             CancellationTokenSource composite = CancellationTokenSource.CreateLinkedTokenSource(downloadCt, localTimeoutCts.Token);
 
-            while (_downloadReady.TryGetValue(requestId, out bool isReady) && !isReady)
+            while (!_orchestrator.IsDownloadReady(requestId))
             {
                 try
                 {
@@ -420,7 +406,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                     // ignore whatever happens here
                 }
             }
-            _downloadReady.Remove(requestId, out _);
+            _orchestrator.ClearDownloadRequest(requestId);
         }
     }
 }
