@@ -49,7 +49,7 @@ public class CompactUi : WindowMediatorSubscriberBase
     private Vector2 _lastPosition = Vector2.One;
     private Vector2 _lastSize = Vector2.One;
     private string _pairToAdd = string.Empty;
-    private int _secretKeyIdx = 0;
+    private int _secretKeyIdx = -1;
     private bool _showModalForUserAddition;
     private bool _showSyncShells;
     private bool _wasOpen;
@@ -222,8 +222,9 @@ public class CompactUi : WindowMediatorSubscriberBase
     {
         ImGui.Dummy(new(10));
         var keys = _serverManager.CurrentServer!.SecretKeys;
-        if (keys.TryGetValue(_secretKeyIdx, out var secretKey))
+        if (keys.Any())
         {
+            if (_secretKeyIdx == -1) _secretKeyIdx = keys.First().Key;
             if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add current character with secret key"))
             {
                 _serverManager.CurrentServer!.Authentications.Add(new MareConfiguration.Models.Authentication()
