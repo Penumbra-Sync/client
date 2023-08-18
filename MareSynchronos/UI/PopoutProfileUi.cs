@@ -146,9 +146,11 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
             if (_pair.GroupPair.Any())
             {
                 ImGui.TextUnformatted("Paired through Syncshells:");
-                foreach (var groupPair in _pair.GroupPair)
+                foreach (var groupPair in _pair.GroupPair.Select(k => k.Key))
                 {
-                    ImGui.TextUnformatted("- " + groupPair.Key.GroupAliasOrGID);
+                    var groupNote = _serverManager.GetNoteForGid(groupPair.GID);
+                    var groupString = string.IsNullOrEmpty(groupNote) ? groupPair.GroupAliasOrGID : $"{groupNote} ({groupPair.GroupAliasOrGID})";
+                    ImGui.TextUnformatted("- " + groupString);
                 }
             }
 

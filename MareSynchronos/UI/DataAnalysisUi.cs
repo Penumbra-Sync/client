@@ -3,6 +3,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Enum;
+using MareSynchronos.Interop;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
@@ -14,16 +15,26 @@ namespace MareSynchronos.UI;
 public class DataAnalysisUi : WindowMediatorSubscriberBase
 {
     private readonly CharacterAnalyzer _characterAnalyzer;
+    private readonly IpcManager _ipcManager;
     private bool _hasUpdate = false;
     private Dictionary<ObjectKind, Dictionary<string, CharacterAnalyzer.FileDataEntry>>? _cachedAnalysis;
     private string _selectedHash = string.Empty;
     private ObjectKind _selectedObjectTab;
     private string _selectedFileTypeTab = string.Empty;
+    private bool _enableBc7ConversionMode = false;
+    private readonly Dictionary<string, string[]> _texturesToConvert = new(StringComparer.Ordinal);
+    private Task? _conversionTask;
+    private CancellationTokenSource _conversionCancellationTokenSource = new();
+    private readonly Progress<(string, int)> _conversionProgress = new();
+    private string _conversionCurrentFileName = string.Empty;
+    private int _conversionCurrentFileProgress = 0;
+    private bool _modalOpen = false;
+    private bool _showModal = false;
 
-    public DataAnalysisUi(ILogger<DataAnalysisUi> logger, MareMediator mediator, CharacterAnalyzer characterAnalyzer) : base(logger, mediator, "Mare Character Data Analysis")
+    public DataAnalysisUi(ILogger<DataAnalysisUi> logger, MareMediator mediator, CharacterAnalyzer characterAnalyzer, IpcManager ipcManager) : base(logger, mediator, "Mare Character Data Analysis")
     {
         _characterAnalyzer = characterAnalyzer;
-
+        _ipcManager = ipcManager;
         Mediator.Subscribe<CharacterDataAnalyzedMessage>(this, (_) =>
         {
             _hasUpdate = true;
@@ -42,16 +53,66 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
                 Y = 2160
             }
         };
+
+        _conversionProgress.ProgressChanged += ConversionProgress_ProgressChanged;
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        _conversionProgress.ProgressChanged -= ConversionProgress_ProgressChanged;
+    }
+
+    private void ConversionProgress_ProgressChanged(object? sender, (string, int) e)
+    {
+        _conversionCurrentFileName = e.Item1;
+        _conversionCurrentFileProgress = e.Item2;
     }
 
     public override void OnOpen()
     {
         _hasUpdate = true;
         _selectedHash = string.Empty;
+        _enableBc7ConversionMode = false;
+        _texturesToConvert.Clear();
     }
 
     public override void Draw()
     {
+        if (_conversionTask != null && !_conversionTask.IsCompleted)
+        {
+            _showModal = true;
+            if (ImGui.BeginPopupModal("BC7 Conversion in Progress"))
+            {
+                ImGui.Text("BC7 Conversion in progress: " + _conversionCurrentFileProgress + "/" + _texturesToConvert.Count);
+                UiSharedService.TextWrapped("Current file: " + _conversionCurrentFileName);
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.StopCircle, "Cancel conversion"))
+                {
+                    _conversionCancellationTokenSource.Cancel();
+                }
+                UiSharedService.SetScaledWindowSize(500);
+                ImGui.EndPopup();
+            }
+            else
+            {
+                _modalOpen = false;
+            }
+        }
+        else if (_conversionTask != null && _conversionTask.IsCompleted && _texturesToConvert.Count > 0)
+        {
+            _conversionTask = null;
+            _texturesToConvert.Clear();
+            _showModal = false;
+            _modalOpen = false;
+            _enableBc7ConversionMode = false;
+        }
+
+        if (_showModal && !_modalOpen)
+        {
+            ImGui.OpenPopup("BC7 Conversion in Progress");
+            _modalOpen = true;
+        }
+
         if (_hasUpdate)
         {
             _cachedAnalysis = _characterAnalyzer.LastAnalysis.DeepClone();
@@ -62,25 +123,32 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
 
         if (_cachedAnalysis!.Count == 0) return;
 
-        if (_cachedAnalysis!.Any(c => c.Value.Any(f => !f.Value.IsComputed)))
+        bool isAnalyzing = _characterAnalyzer.IsAnalysisRunning;
+        if (isAnalyzing)
         {
-            bool isAnalyzing = _characterAnalyzer.IsAnalysisRunning;
-            if (isAnalyzing)
+            UiSharedService.ColorTextWrapped($"Analyzing {_characterAnalyzer.CurrentFile}/{_characterAnalyzer.TotalFiles}",
+                ImGuiColors.DalamudYellow);
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.StopCircle, "Cancel analysis"))
             {
-                UiSharedService.ColorTextWrapped($"Analyzing {_characterAnalyzer.CurrentFile}/{_characterAnalyzer.TotalFiles}",
+                _characterAnalyzer.CancelAnalyze();
+            }
+        }
+        else
+        {
+            if (_cachedAnalysis!.Any(c => c.Value.Any(f => !f.Value.IsComputed)))
+            {
+                UiSharedService.ColorTextWrapped("Some entries in the analysis have file size not determined yet, press the button below to analyze your current data",
                     ImGuiColors.DalamudYellow);
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.StopCircle, "Cancel analysis"))
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.PlayCircle, "Start analysis (missing entries)"))
                 {
-                    _characterAnalyzer.CancelAnalyze();
+                    _ = _characterAnalyzer.ComputeAnalysis(false);
                 }
             }
             else
             {
-                UiSharedService.ColorTextWrapped("Some entries in the analysis have file size not determined yet, press the button below to analyze your current data",
-                    ImGuiColors.DalamudYellow);
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.PlayCircle, "Start analysis"))
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.PlayCircle, "Start analysis (recalculate all entries)"))
                 {
-                    _ = _characterAnalyzer.ComputeAnalysis(false);
+                    _ = _characterAnalyzer.ComputeAnalysis(false, true);
                 }
             }
         }
@@ -154,6 +222,8 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
                     _selectedHash = string.Empty;
                     _selectedObjectTab = kvp.Key;
                     _selectedFileTypeTab = string.Empty;
+                    _enableBc7ConversionMode = false;
+                    _texturesToConvert.Clear();
                 }
 
                 using var fileTabBar = ImRaii.TabBar("fileTabs");
@@ -168,7 +238,7 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
                         fileGroupText += " (!)";
                     }
                     ImRaii.IEndObject fileTab;
-                    using (var textcol = ImRaii.PushColor(ImGuiCol.Text, UiSharedService.Color(new(0, 0, 0, 1)), 
+                    using (var textcol = ImRaii.PushColor(ImGuiCol.Text, UiSharedService.Color(new(0, 0, 0, 1)),
                         requiresCompute && !string.Equals(_selectedFileTypeTab, fileGroup.Key, StringComparison.Ordinal)))
                     {
                         fileTab = ImRaii.TabItem(fileGroupText + "###" + fileGroup.Key);
@@ -180,6 +250,8 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
                     {
                         _selectedFileTypeTab = fileGroup.Key;
                         _selectedHash = string.Empty;
+                        _enableBc7ConversionMode = false;
+                        _texturesToConvert.Clear();
                     }
 
                     ImGui.TextUnformatted($"{fileGroup.Key} files");
@@ -193,6 +265,28 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
                     ImGui.TextUnformatted($"{fileGroup.Key} files size (compressed):");
                     ImGui.SameLine();
                     ImGui.TextUnformatted(UiSharedService.ByteToString(fileGroup.Sum(c => c.CompressedSize)));
+
+                    if (_selectedFileTypeTab == "tex")
+                    {
+                        ImGui.Checkbox("Enable BC7 Conversion Mode", ref _enableBc7ConversionMode);
+                        if (_enableBc7ConversionMode)
+                        {
+                            UiSharedService.ColorText("WARNING BC7 CONVERSION:", ImGuiColors.DalamudYellow);
+                            ImGui.SameLine();
+                            UiSharedService.ColorText("Converting textures to BC7 is irreversible!", ImGuiColors.DalamudRed);
+                            UiSharedService.ColorTextWrapped("- Converting textures to BC7 will reduce their size (compressed and uncompressed) drastically. It is recommended to be used for large (4k+) textures." +
+                            Environment.NewLine + "- Some textures, especially ones utilizing colorsets, might not be suited for BC7 conversion and might produce visual artifacts." +
+                            Environment.NewLine + "- Before converting textures, make sure to have the original files of the mod you are converting so you can reimport it in case of issues." +
+                            Environment.NewLine + "- Conversion will convert all found texture duplicates (entries with more than 1 file path) automatically." +
+                            Environment.NewLine + "- Converting textures to BC7 is a very expensive operation and, depending on the amount of textures to convert, will take a while to complete."
+                                , ImGuiColors.DalamudYellow);
+                            if (_texturesToConvert.Count > 0 && UiSharedService.IconTextButton(FontAwesomeIcon.PlayCircle, "Start conversion of " + _texturesToConvert.Count + " texture(s)"))
+                            {
+                                _conversionCancellationTokenSource = _conversionCancellationTokenSource.CancelRecreate();
+                                _conversionTask = _ipcManager.PenumbraConvertTextureFiles(_logger, _texturesToConvert, _conversionProgress, _conversionCancellationTokenSource.Token);
+                            }
+                        }
+                    }
 
                     ImGui.Separator();
                     DrawTable(fileGroup);
@@ -240,7 +334,7 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
 
     private void DrawTable(IGrouping<string, CharacterAnalyzer.FileDataEntry> fileGroup)
     {
-        using var table = ImRaii.Table("Analysis", fileGroup.Key == "tex" ? 6 : 5, ImGuiTableFlags.Sortable | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit,
+        using var table = ImRaii.Table("Analysis", fileGroup.Key == "tex" ? (_enableBc7ConversionMode ? 7 : 6) : 5, ImGuiTableFlags.Sortable | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit,
 new Vector2(0, 300));
         if (!table.Success) return;
         ImGui.TableSetupColumn("Hash");
@@ -248,7 +342,11 @@ new Vector2(0, 300));
         ImGui.TableSetupColumn("Gamepaths");
         ImGui.TableSetupColumn("Original Size");
         ImGui.TableSetupColumn("Compressed Size");
-        if (fileGroup.Key == "tex") ImGui.TableSetupColumn("Format");
+        if (fileGroup.Key == "tex")
+        {
+            ImGui.TableSetupColumn("Format");
+            if (_enableBc7ConversionMode) ImGui.TableSetupColumn("Convert to BC7");
+        }
         ImGui.TableSetupScrollFreeze(0, 1);
         ImGui.TableHeadersRow();
 
@@ -319,6 +417,28 @@ new Vector2(0, 300));
                 ImGui.TableNextColumn();
                 ImGui.TextUnformatted(item.Format.Value);
                 if (ImGui.IsItemClicked()) _selectedHash = item.Hash;
+                if (_enableBc7ConversionMode)
+                {
+                    ImGui.TableNextColumn();
+                    if (item.Format.Value == "BC7")
+                    {
+                        ImGui.Text("");
+                        continue;
+                    }
+                    var filePath = item.FilePaths[0];
+                    bool toConvert = _texturesToConvert.ContainsKey(filePath);
+                    if (ImGui.Checkbox("###convert" + item.Hash, ref toConvert))
+                    {
+                        if (toConvert && !_texturesToConvert.ContainsKey(filePath))
+                        {
+                            _texturesToConvert[filePath] = item.FilePaths.Skip(1).ToArray();
+                        }
+                        else if (!toConvert && _texturesToConvert.ContainsKey(filePath))
+                        {
+                            _texturesToConvert.Remove(filePath);
+                        }
+                    }
+                }
             }
         }
     }

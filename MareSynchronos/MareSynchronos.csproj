@@ -29,17 +29,17 @@
     <PackageReference Include="Dalamud.ContextMenu" Version="1.2.3" />
     <PackageReference Include="DalamudPackager" Version="2.1.11" />
     <PackageReference Include="lz4net" Version="1.0.15.93" />
-    <PackageReference Include="Meziantou.Analyzer" Version="2.0.52">
+    <PackageReference Include="Meziantou.Analyzer" Version="2.0.82">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="7.0.5" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="7.0.5" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="7.0.10" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="7.0.10" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
-    <PackageReference Include="Penumbra.Api" Version="1.0.8" />
+    <PackageReference Include="Penumbra.Api" Version="1.0.9" />
     <PackageReference Include="Penumbra.String" Version="1.0.4" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.0.1" />
-    <PackageReference Include="SonarAnalyzer.CSharp" Version="9.0.0.68202">
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="9.7.0.75501">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>

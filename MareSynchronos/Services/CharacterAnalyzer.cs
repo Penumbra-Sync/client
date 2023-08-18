@@ -37,7 +37,7 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
         _analysisCts = null;
     }
 
-    public async Task ComputeAnalysis(bool print = true)
+    public async Task ComputeAnalysis(bool print = true, bool recalculate = false)
     {
         Logger.LogDebug("=== Calculating Character Analysis ===");
 
@@ -46,9 +46,9 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
         var cancelToken = _analysisCts.Token;
 
         var allFiles = LastAnalysis.SelectMany(v => v.Value.Select(d => d.Value)).ToList();
-        if (allFiles.Exists(c => !c.IsComputed))
+        if (allFiles.Exists(c => !c.IsComputed || recalculate))
         {
-            var remaining = allFiles.Where(c => !c.IsComputed).ToList();
+            var remaining = allFiles.Where(c => !c.IsComputed || recalculate).ToList();
             TotalFiles = remaining.Count;
             CurrentFile = 1;
             Logger.LogDebug("=== Computing {amount} remaining files ===", remaining.Count);
@@ -57,6 +57,7 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
 
             foreach (var file in remaining)
             {
+                Logger.LogDebug("Computing file {file}", file.FilePaths[0]);
                 await file.ComputeSizes(_fileCacheManager, cancelToken).ConfigureAwait(false);
                 CurrentFile++;
             }
@@ -96,7 +97,7 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
                 {
                     data[fileEntry.Hash] = new FileDataEntry(fileEntry.Hash, ext,
                         fileEntry.GamePaths.ToList(),
-                        fileCacheEntries.Select(c => c.ResolvedFilepath).ToList(),
+                        fileCacheEntries.Select(c => c.ResolvedFilepath).Distinct().ToList(),
                         entry.Size > 0 ? entry.Size.Value : 0, entry.CompressedSize > 0 ? entry.CompressedSize.Value : 0);
                 }
             }
@@ -197,7 +198,7 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
                         {
                             return "Unknown";
                         }
-                       
+
                     }
                 default:
                     return string.Empty;

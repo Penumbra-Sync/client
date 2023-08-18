@@ -57,6 +57,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly FuncSubscriber<string> _penumbraGetMetaManipulations;
     private readonly EventSubscriber _penumbraInit;
     private readonly EventSubscriber<ModSettingChange, string, string, bool> _penumbraModSettingChanged;
+    private readonly FuncSubscriber<string, string, TextureType, bool, Task> _penumbraConvertTextureFile;
     private readonly EventSubscriber<nint, int> _penumbraObjectIsRedrawn;
     private readonly ActionSubscriber<string, RedrawType> _penumbraRedraw;
     private readonly ActionSubscriber<GameObject, RedrawType> _penumbraRedrawObject;
@@ -101,6 +102,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
             if (change == ModSettingChange.EnableState)
                 Mediator.Publish(new PenumbraModSettingChangedMessage());
         });
+        _penumbraConvertTextureFile = Penumbra.Api.Ipc.ConvertTextureFile.Subscriber(pi);
 
         _penumbraGameObjectResourcePathResolved = Penumbra.Api.Ipc.GameObjectResourcePathResolved.Subscriber(pi, ResourceLoaded);
 
@@ -553,6 +555,43 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         }).ConfigureAwait(false);
     }
 
+    public async Task PenumbraConvertTextureFiles(ILogger logger, Dictionary<string, string[]> textures, IProgress<(string, int)> progress, CancellationToken token)
+    {
+        if (!CheckPenumbraApi()) return;
+
+        Mediator.Publish(new HaltScanMessage("TextureConversion"));
+        int currentTexture = 0;
+        foreach (var texture in textures)
+        {
+            if (token.IsCancellationRequested) break;
+
+            progress.Report((texture.Key, ++currentTexture));
+
+            logger.LogInformation("Converting Texture {path} to {type}", texture.Key, TextureType.Bc7Tex);
+            var convertTask = _penumbraConvertTextureFile.Invoke(texture.Key, texture.Key, TextureType.Bc7Tex, true);
+            await convertTask.ConfigureAwait(false);
+            if (convertTask.IsCompletedSuccessfully && texture.Value.Any())
+            {
+                foreach (var duplicatedTexture in texture.Value)
+                {
+                    logger.LogInformation("Migrating duplicate {dup}", duplicatedTexture);
+                    try
+                    {
+                        File.Copy(texture.Key, duplicatedTexture, true);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Failed to copy duplicate {dup}", duplicatedTexture);
+                    }
+                }
+            }
+        }
+        Mediator.Publish(new ResumeScanMessage("TextureConversion"));
+
+        var gameObject = await _dalamudUtil.CreateGameObjectAsync(await _dalamudUtil.GetPlayerPointerAsync());
+        _penumbraRedrawObject.Invoke(gameObject!, RedrawType.Redraw);
+    }
+
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
@@ -668,7 +707,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         bool apiAvailable = false;
         try
         {
-            apiAvailable = _penumbraApiVersion.Invoke() is { Item1: 4, Item2: >= 19 } && _penumbraEnabled.Invoke();
+            apiAvailable = _penumbraApiVersion.Invoke() is { Item1: 4, Item2: >= 21 } && _penumbraEnabled.Invoke();
             _shownPenumbraUnavailable = _shownPenumbraUnavailable && !apiAvailable;
             return apiAvailable;
         }
