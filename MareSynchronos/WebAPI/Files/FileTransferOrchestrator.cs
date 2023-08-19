@@ -2,6 +2,7 @@
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.WebAPI.Files.Models;
+using MareSynchronos.WebAPI.SignalR;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Net.Http.Headers;
@@ -16,14 +17,17 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
     private readonly MareConfigService _mareConfig;
     private readonly object _semaphoreModificationLock = new();
     private readonly ServerConfigurationManager _serverManager;
+    private readonly TokenProvider _tokenProvider;
     private int _availableDownloadSlots;
     private SemaphoreSlim _downloadSemaphore;
     private readonly ConcurrentDictionary<Guid, bool> _downloadReady = new();
 
-    public FileTransferOrchestrator(ILogger<FileTransferOrchestrator> logger, MareConfigService mareConfig, ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
+    public FileTransferOrchestrator(ILogger<FileTransferOrchestrator> logger, MareConfigService mareConfig,
+        ServerConfigurationManager serverManager, MareMediator mediator, TokenProvider tokenProvider) : base(logger, mediator)
     {
         _mareConfig = mareConfig;
         _serverManager = serverManager;
+        _tokenProvider = tokenProvider;
         _httpClient = new();
         _httpClient.Timeout = TimeSpan.FromSeconds(3000);
         var ver = Assembly.GetExecutingAssembly().GetName().Version;
@@ -110,7 +114,7 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
 
     private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage, CancellationToken? ct = null)
     {
-        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _serverManager.GetToken());
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await _tokenProvider.GetOrUpdateToken().ConfigureAwait(false));
 
         if (requestMessage.Content != null && requestMessage.Content is not StreamContent && requestMessage.Content is not ByteArrayContent)
         {

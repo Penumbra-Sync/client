@@ -27,6 +27,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
     private readonly HubFactory _hubFactory;
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
+    private readonly TokenProvider _tokenProvider;
     private CancellationTokenSource _connectionCancellationTokenSource;
     private ConnectionDto? _connectionDto;
     private bool _doNotNotifyOnNextInfo = false;
@@ -34,14 +35,17 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
     private bool _initialized;
     private HubConnection? _mareHub;
     private ServerState _serverState;
+    private string? _lastUsedToken;
 
     public ApiController(ILogger<ApiController> logger, HubFactory hubFactory, DalamudUtilService dalamudUtil,
-        PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
+        PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator,
+        TokenProvider tokenProvider) : base(logger, mediator)
     {
         _hubFactory = hubFactory;
         _dalamudUtil = dalamudUtil;
         _pairManager = pairManager;
         _serverManager = serverManager;
+        _tokenProvider = tokenProvider;
         _connectionCancellationTokenSource = new CancellationTokenSource();
 
         Mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
@@ -94,7 +98,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         return await _mareHub!.InvokeAsync<bool>(nameof(CheckClientHealth)).ConfigureAwait(false);
     }
 
-    public async Task CreateConnections(bool forceGetToken = false)
+    public async Task CreateConnections()
     {
         Logger.LogDebug("CreateConnections called");
 
@@ -135,25 +139,14 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
             {
                 Logger.LogDebug("Building connection");
 
-                if (_serverManager.GetToken() == null || forceGetToken)
+                try
                 {
-                    Logger.LogDebug("Requesting new JWT");
-                    using HttpClient httpClient = new();
-                    var ver = Assembly.GetExecutingAssembly().GetName().Version;
-                    httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("MareSynchronos", ver!.Major + "." + ver!.Minor + "." + ver!.Build));
-                    var postUri = MareAuth.AuthFullPath(new Uri(_serverManager.CurrentApiUrl
-                        .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
-                        .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)));
-                    var auth = secretKey.GetHash256();
-                    var result = await httpClient.PostAsync(postUri, new FormUrlEncodedContent(new[]
-                    {
-                        new KeyValuePair<string, string>("auth", auth),
-                        new KeyValuePair<string, string>("charaIdent", await _dalamudUtil.GetPlayerNameHashedAsync().ConfigureAwait(false)),
-                    })).ConfigureAwait(false);
-                    AuthFailureMessage = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
-                    result.EnsureSuccessStatusCode();
-                    _serverManager.SaveToken(await result.Content.ReadAsStringAsync().ConfigureAwait(false));
-                    Logger.LogDebug("JWT Success");
+                    _lastUsedToken = await _tokenProvider.GetOrUpdateToken().ConfigureAwait(false);
+                }
+                catch (MareAuthFailureException ex)
+                {
+                    AuthFailureMessage = ex.Reason;
+                    throw new HttpRequestException("Error during authentication", ex, System.Net.HttpStatusCode.Unauthorized);
                 }
 
                 while (!await _dalamudUtil.GetIsPlayerPresentAsync().ConfigureAwait(false) && !token.IsCancellationRequested)
@@ -230,7 +223,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
     {
         CancellationTokenSource cts = new();
         cts.CancelAfter(TimeSpan.FromSeconds(5));
-        Task.Run(async () =>
+        _ = Task.Run(async () =>
         {
             var pair = _pairManager.GetOnlineUserPairs().Single(p => p.UserPair != null && p.UserData == userData);
             var perm = pair.UserPair!.OwnPermissions;
@@ -261,7 +254,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         base.Dispose(disposing);
 
         _healthCheckTokenSource?.Cancel();
-        Task.Run(async () => await StopConnection(ServerState.Disconnected).ConfigureAwait(false));
+        _ = Task.Run(async () => await StopConnection(ServerState.Disconnected).ConfigureAwait(false));
         _connectionCancellationTokenSource?.Cancel();
     }
 
@@ -270,19 +263,51 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         while (!ct.IsCancellationRequested && _mareHub != null)
         {
             await Task.Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
+            Logger.LogDebug("Checking Client Health State");
+
+            bool requireReconnect = await RefreshToken().ConfigureAwait(false);
+
+            if (requireReconnect) continue;
+
             _ = await CheckClientHealth().ConfigureAwait(false);
-            Logger.LogDebug("Checked Client Health State");
         }
+    }
+
+    private async Task<bool> RefreshToken()
+    {
+        Logger.LogDebug("Checking token");
+
+        bool requireReconnect = false;
+        try
+        {
+            var token = await _tokenProvider.GetOrUpdateToken().ConfigureAwait(false);
+            if (!string.Equals(token, _lastUsedToken, StringComparison.Ordinal))
+            {
+                Logger.LogDebug("Reconnecting due to updated token");
+
+                _doNotNotifyOnNextInfo = true;
+                await CreateConnections().ConfigureAwait(false);
+                requireReconnect = true;
+            }
+        }
+        catch (MareAuthFailureException ex)
+        {
+            AuthFailureMessage = ex.Reason;
+            await StopConnection(ServerState.Unauthorized).ConfigureAwait(false);
+            requireReconnect = true;
+        }
+
+        return requireReconnect;
     }
 
     private void DalamudUtilOnLogIn()
     {
-        Task.Run(() => CreateConnections(forceGetToken: true));
+        _ = Task.Run(() => CreateConnections());
     }
 
     private void DalamudUtilOnLogOut()
     {
-        Task.Run(async () => await StopConnection(ServerState.Disconnected).ConfigureAwait(false));
+        _ = Task.Run(async () => await StopConnection(ServerState.Disconnected).ConfigureAwait(false));
         ServerState = ServerState.Offline;
     }
 
@@ -291,28 +316,28 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         if (_mareHub == null) return;
 
         Logger.LogDebug("Initializing data");
-        OnDownloadReady((guid) => Client_DownloadReady(guid));
-        OnReceiveServerMessage((sev, msg) => Client_ReceiveServerMessage(sev, msg));
-        OnUpdateSystemInfo((dto) => Client_UpdateSystemInfo(dto));
+        OnDownloadReady((guid) => _ = Client_DownloadReady(guid));
+        OnReceiveServerMessage((sev, msg) => _ = Client_ReceiveServerMessage(sev, msg));
+        OnUpdateSystemInfo((dto) => _ = Client_UpdateSystemInfo(dto));
 
-        OnUserSendOffline((dto) => Client_UserSendOffline(dto));
-        OnUserAddClientPair((dto) => Client_UserAddClientPair(dto));
-        OnUserReceiveCharacterData((dto) => Client_UserReceiveCharacterData(dto));
-        OnUserRemoveClientPair(dto => Client_UserRemoveClientPair(dto));
-        OnUserSendOnline(dto => Client_UserSendOnline(dto));
-        OnUserUpdateOtherPairPermissions(dto => Client_UserUpdateOtherPairPermissions(dto));
-        OnUserUpdateSelfPairPermissions(dto => Client_UserUpdateSelfPairPermissions(dto));
-        OnUserReceiveUploadStatus(dto => Client_UserReceiveUploadStatus(dto));
-        OnUserUpdateProfile(dto => Client_UserUpdateProfile(dto));
+        OnUserSendOffline((dto) => _ = Client_UserSendOffline(dto));
+        OnUserAddClientPair((dto) => _ = Client_UserAddClientPair(dto));
+        OnUserReceiveCharacterData((dto) => _ = Client_UserReceiveCharacterData(dto));
+        OnUserRemoveClientPair(dto => _ = Client_UserRemoveClientPair(dto));
+        OnUserSendOnline(dto => _ = Client_UserSendOnline(dto));
+        OnUserUpdateOtherPairPermissions(dto => _ = Client_UserUpdateOtherPairPermissions(dto));
+        OnUserUpdateSelfPairPermissions(dto => _ = Client_UserUpdateSelfPairPermissions(dto));
+        OnUserReceiveUploadStatus(dto => _ = Client_UserReceiveUploadStatus(dto));
+        OnUserUpdateProfile(dto => _ = Client_UserUpdateProfile(dto));
 
-        OnGroupChangePermissions((dto) => Client_GroupChangePermissions(dto));
-        OnGroupDelete((dto) => Client_GroupDelete(dto));
-        OnGroupPairChangePermissions((dto) => Client_GroupPairChangePermissions(dto));
-        OnGroupPairChangeUserInfo((dto) => Client_GroupPairChangeUserInfo(dto));
-        OnGroupPairJoined((dto) => Client_GroupPairJoined(dto));
-        OnGroupPairLeft((dto) => Client_GroupPairLeft(dto));
-        OnGroupSendFullInfo((dto) => Client_GroupSendFullInfo(dto));
-        OnGroupSendInfo((dto) => Client_GroupSendInfo(dto));
+        OnGroupChangePermissions((dto) => _ = Client_GroupChangePermissions(dto));
+        OnGroupDelete((dto) => _ = Client_GroupDelete(dto));
+        OnGroupPairChangePermissions((dto) => _ = Client_GroupPairChangePermissions(dto));
+        OnGroupPairChangeUserInfo((dto) => _ = Client_GroupPairChangeUserInfo(dto));
+        OnGroupPairJoined((dto) => _ = Client_GroupPairJoined(dto));
+        OnGroupPairLeft((dto) => _ = Client_GroupPairLeft(dto));
+        OnGroupSendFullInfo((dto) => _ = Client_GroupSendFullInfo(dto));
+        OnGroupSendInfo((dto) => _ = Client_GroupSendInfo(dto));
 
         _healthCheckTokenSource?.Cancel();
         _healthCheckTokenSource?.Dispose();

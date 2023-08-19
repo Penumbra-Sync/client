@@ -17,13 +17,17 @@ public class HubFactory : MediatorSubscriberBase
 {
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly MareConfigService _configService;
+    private readonly TokenProvider _tokenProvider;
     private HubConnection? _instance;
     private bool _isDisposed = false;
 
-    public HubFactory(ILogger<HubFactory> logger, MareMediator mediator, ServerConfigurationManager serverConfigurationManager, MareConfigService configService) : base(logger, mediator)
+    public HubFactory(ILogger<HubFactory> logger, MareMediator mediator,
+        ServerConfigurationManager serverConfigurationManager, MareConfigService configService,
+        TokenProvider tokenProvider) : base(logger, mediator)
     {
         _serverConfigurationManager = serverConfigurationManager;
         _configService = configService;
+        _tokenProvider = tokenProvider;
     }
 
     private HubConnection BuildHubConnection()
@@ -33,7 +37,7 @@ public class HubFactory : MediatorSubscriberBase
         _instance = new HubConnectionBuilder()
             .WithUrl(_serverConfigurationManager.CurrentApiUrl + IMareHub.Path, options =>
             {
-                options.Headers.Add("Authorization", "Bearer " + _serverConfigurationManager.GetToken());
+                options.AccessTokenProvider = () => _tokenProvider.GetOrUpdateToken();
                 options.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling;
             })
             .AddMessagePackProtocol(opt =>

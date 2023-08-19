@@ -220,7 +220,7 @@ public class IntroUi : WindowMediatorSubscriberBase
                     });
                     _serverConfigurationManager.AddCurrentCharacterToServer(addLastSecretKey: true);
                     _secretKey = string.Empty;
-                    Task.Run(() => _uiShared.ApiController.CreateConnections(forceGetToken: true));
+                    Task.Run(() => _uiShared.ApiController.CreateConnections());
                 }
             }
         }

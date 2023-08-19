@@ -73,6 +73,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<PairHandlerFactory>();
             collection.AddSingleton<PairFactory>();
             collection.AddSingleton<CharacterAnalyzer>();
+            collection.AddSingleton<TokenProvider>();
             collection.AddSingleton<PluginWarningNotificationService>();
             collection.AddSingleton((s) => new DalamudUtilService(s.GetRequiredService<ILogger<DalamudUtilService>>(),
                 clientState, objectTable, framework, gameGui, condition, gameData,
@@ -118,7 +119,7 @@ public sealed class Plugin : IDalamudPlugin
                 s.GetRequiredService<WindowSystem>(), s.GetServices<WindowMediatorSubscriberBase>(), s.GetRequiredService<Func<Pair, StandaloneProfileUi>>(),
                 s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareMediator>()));
             collection.AddScoped((s) => new CommandManagerService(commandManager, s.GetRequiredService<PerformanceCollectorService>(), s.GetRequiredService<UiService>(),
-                s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<PeriodicFileScanner>(), s.GetRequiredService<ApiController>(), 
+                s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<PeriodicFileScanner>(), s.GetRequiredService<ApiController>(),
                 s.GetRequiredService<MareMediator>()));
             collection.AddScoped((s) => new NotificationService(s.GetRequiredService<ILogger<NotificationService>>(),
                 s.GetRequiredService<MareMediator>(), pluginInterface.UiBuilder, chatGui, s.GetRequiredService<MareConfigService>()));

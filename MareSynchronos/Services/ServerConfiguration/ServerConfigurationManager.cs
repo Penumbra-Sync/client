@@ -13,7 +13,6 @@ public class ServerConfigurationManager
     private readonly ILogger<ServerConfigurationManager> _logger;
     private readonly NotesConfigService _notesConfig;
     private readonly ServerTagConfigService _serverTagConfig;
-    private readonly Dictionary<JwtCache, string> _tokenDictionary = new();
 
     public ServerConfigurationManager(ILogger<ServerConfigurationManager> logger, ServerConfigService configService,
         ServerTagConfigService serverTagConfig, NotesConfigService notesConfig, DalamudUtilService dalamudUtil)
@@ -107,20 +106,6 @@ public class ServerConfigurationManager
         return _configService.Current.ServerStorage.Select(v => v.ServerName).ToArray();
     }
 
-    public string? GetToken()
-    {
-        var charaName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult();
-        var worldId = _dalamudUtil.GetWorldIdAsync().GetAwaiter().GetResult();
-        var secretKey = GetSecretKey();
-        if (secretKey == null) return null;
-        if (_tokenDictionary.TryGetValue(new JwtCache(CurrentApiUrl, charaName, worldId, secretKey), out var token))
-        {
-            return token;
-        }
-
-        return null;
-    }
-
     public bool HasValidConfig()
     {
         return CurrentServer != null;
@@ -131,15 +116,6 @@ public class ServerConfigurationManager
         var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
         _logger.LogDebug(caller + " Calling config save");
         _configService.Save();
-    }
-
-    public void SaveToken(string token)
-    {
-        var charaName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult();
-        var worldId = _dalamudUtil.GetWorldIdAsync().GetAwaiter().GetResult();
-        var secretKey = GetSecretKey();
-        if (string.IsNullOrEmpty(secretKey)) throw new InvalidOperationException("No secret key set");
-        _tokenDictionary[new JwtCache(CurrentApiUrl, charaName, worldId, secretKey)] = token;
     }
 
     public void SelectServer(int idx)
