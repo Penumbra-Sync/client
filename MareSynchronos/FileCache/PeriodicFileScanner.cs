@@ -13,18 +13,20 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
     private readonly FileCacheManager _fileDbManager;
     private readonly IpcManager _ipcManager;
     private readonly PerformanceCollectorService _performanceCollector;
+    private readonly DalamudUtilService _dalamudUtil;
     private long _currentFileProgress = 0;
     private bool _fileScanWasRunning = false;
     private CancellationTokenSource _scanCancellationTokenSource = new();
     private TimeSpan _timeUntilNextScan = TimeSpan.Zero;
 
     public PeriodicFileScanner(ILogger<PeriodicFileScanner> logger, IpcManager ipcManager, MareConfigService configService,
-        FileCacheManager fileDbManager, MareMediator mediator, PerformanceCollectorService performanceCollector) : base(logger, mediator)
+        FileCacheManager fileDbManager, MareMediator mediator, PerformanceCollectorService performanceCollector, DalamudUtilService dalamudUtil) : base(logger, mediator)
     {
         _ipcManager = ipcManager;
         _configService = configService;
         _fileDbManager = fileDbManager;
         _performanceCollector = performanceCollector;
+        _dalamudUtil = dalamudUtil;
         Mediator.Subscribe<PenumbraInitializedMessage>(this, (_) => StartScan());
         Mediator.Subscribe<HaltScanMessage>(this, (msg) => HaltScan(msg.Source));
         Mediator.Subscribe<ResumeScanMessage>(this, (msg) => ResumeScan(msg.Source));
@@ -58,6 +60,7 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
     public void InvokeScan(bool forced = false)
     {
         bool isForced = forced;
+        bool isForcedFromExternal = forced;
         TotalFiles = 0;
         _currentFileProgress = 0;
         _scanCancellationTokenSource?.Cancel();
@@ -67,7 +70,7 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         {
             while (!token.IsCancellationRequested)
             {
-                while (HaltScanLocks.Any(f => f.Value > 0) || !_ipcManager.CheckPenumbraApi())
+                while (HaltScanLocks.Any(f => f.Value > 0) || !_ipcManager.CheckPenumbraApi() || _dalamudUtil.IsOnFrameworkThread)
                 {
                     await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                 }
@@ -78,12 +81,19 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
                     isForced = false;
                     TotalFiles = 0;
                     _currentFileProgress = 0;
-                    _performanceCollector.LogPerformance(this, "PeriodicFileScan", () => PeriodicFileScan(token));
+                    while (_dalamudUtil.IsOnFrameworkThread)
+                    {
+                        Logger.LogWarning("Scanner is on framework, waiting for leaving thread before continuing");
+                        await Task.Delay(250, token).ConfigureAwait(false);
+                    }
+                    await _performanceCollector.LogPerformance(this, "PeriodicFileScan",
+                        async () => await PeriodicFileScan(isForcedFromExternal, token).ConfigureAwait(false)).ConfigureAwait(false);
+                    if (isForcedFromExternal) isForcedFromExternal = false;
                     TotalFiles = 0;
                     _currentFileProgress = 0;
                 }
                 _timeUntilNextScan = TimeSpan.FromSeconds(TimeBetweenScans);
-                while (_timeUntilNextScan.TotalSeconds >= 0)
+                while (_timeUntilNextScan.TotalSeconds >= 0 || _dalamudUtil.IsOnFrameworkThread)
                 {
                     await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
                     _timeUntilNextScan -= TimeSpan.FromSeconds(1);
@@ -156,7 +166,7 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         _scanCancellationTokenSource?.Cancel();
     }
 
-    private void PeriodicFileScan(CancellationToken ct)
+    private async Task PeriodicFileScan(bool noWaiting, CancellationToken ct)
     {
         TotalFiles = 1;
         var penumbraDir = _ipcManager.PenumbraModDirectory;
@@ -177,68 +187,82 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
             return;
         }
 
+        var previousThreadPriority = Thread.CurrentThread.Priority;
+        Thread.CurrentThread.Priority = ThreadPriority.Lowest;
         Logger.LogDebug("Getting files from {penumbra} and {storage}", penumbraDir, _configService.Current.CacheFolder);
         string[] ext = { ".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk" };
 
-        var scannedFiles = new ConcurrentDictionary<string, bool>(Directory.EnumerateFiles(penumbraDir!, "*.*", SearchOption.AllDirectories)
+        var scannedFilesTask = Task.Run(() => Directory.EnumerateFiles(penumbraDir!, "*.*", SearchOption.AllDirectories)
                             .Select(s => s.ToLowerInvariant())
                             .Where(f => ext.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase))
                                 && !f.Contains(@"\bg\", StringComparison.OrdinalIgnoreCase)
                                 && !f.Contains(@"\bgcommon\", StringComparison.OrdinalIgnoreCase)
-                                && !f.Contains(@"\ui\", StringComparison.OrdinalIgnoreCase))
-                            .Concat(Directory.EnumerateFiles(_configService.Current.CacheFolder, "*.*", SearchOption.TopDirectoryOnly)
-                                .Where(f => new FileInfo(f).Name.Length == 40)
-                                .Select(s => s.ToLowerInvariant()).ToList())
-                            .Select(c => new KeyValuePair<string, bool>(c, value: false)), StringComparer.OrdinalIgnoreCase);
+                                && !f.Contains(@"\ui\", StringComparison.OrdinalIgnoreCase)));
 
+        var scannedCacheTask = Task.Run(() => Directory.EnumerateFiles(_configService.Current.CacheFolder, "*.*", SearchOption.TopDirectoryOnly)
+                                .Where(f =>
+                                {
+                                    var val = f.Split('\\').Last();
+                                    return val.Length == 40 || (val.Split('.').FirstOrDefault()?.Length ?? 0) == 40;
+                                })
+                                .Select(s => s.ToLowerInvariant()));
+
+
+        var scannedFiles = (await scannedFilesTask.ConfigureAwait(true))
+            .Concat(await scannedCacheTask.ConfigureAwait(true))
+            .ToDictionary(t => t, t => false, StringComparer.OrdinalIgnoreCase);
         TotalFiles = scannedFiles.Count;
+        Thread.CurrentThread.Priority = previousThreadPriority;
+
+        await Task.Delay(TimeSpan.FromSeconds(2), ct).ConfigureAwait(false);
 
         // scan files from database
-        var cpuCount = (int)(Environment.ProcessorCount / 2.0f);
-        Task[] dbTasks = Enumerable.Range(0, cpuCount).Select(c => Task.CompletedTask).ToArray();
+        var cpuCount = Math.Clamp((int)(Environment.ProcessorCount / 2.0f), 2, 8);
 
-        ConcurrentBag<FileCacheEntity> entitiesToRemove = new();
-        ConcurrentBag<FileCacheEntity> entitiesToUpdate = new();
+        List<FileCacheEntity> entitiesToRemove = new();
+        List<FileCacheEntity> entitiesToUpdate = new();
+        object sync = new();
         try
         {
-            foreach (var cache in _fileDbManager.GetAllFileCaches())
+            Parallel.ForEach(_fileDbManager.GetAllFileCaches(), new ParallelOptions()
             {
-                var idx = Task.WaitAny(dbTasks, ct);
-                dbTasks[idx] = Task.Run(() =>
+                CancellationToken = ct,
+                MaxDegreeOfParallelism = cpuCount,
+            }, (cache) =>
+            {
+                try
                 {
-                    try
+                    if (ct.IsCancellationRequested) return;
+
+                    if (!_ipcManager.CheckPenumbraApi())
                     {
-                        var validatedCacheResult = _fileDbManager.ValidateFileCacheEntity(cache);
-                        if (validatedCacheResult.Item1 != FileState.RequireDeletion)
-                            scannedFiles[validatedCacheResult.Item2.ResolvedFilepath] = true;
-                        if (validatedCacheResult.Item1 == FileState.RequireUpdate)
-                        {
-                            Logger.LogTrace("To update: {path}", validatedCacheResult.Item2.ResolvedFilepath);
-                            entitiesToUpdate.Add(validatedCacheResult.Item2);
-                        }
-                        else if (validatedCacheResult.Item1 == FileState.RequireDeletion)
-                        {
-                            Logger.LogTrace("To delete: {path}", validatedCacheResult.Item2.ResolvedFilepath);
-                            entitiesToRemove.Add(validatedCacheResult.Item2);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogWarning(ex, "Failed validating {path}", cache.ResolvedFilepath);
+                        Logger.LogWarning("Penumbra not available");
+                        return;
                     }
 
-                    Interlocked.Increment(ref _currentFileProgress);
-                    Thread.Sleep(1);
-                }, ct);
-
-                if (!_ipcManager.CheckPenumbraApi())
+                    var validatedCacheResult = _fileDbManager.ValidateFileCacheEntity(cache);
+                    if (validatedCacheResult.State != FileState.RequireDeletion)
+                        scannedFiles[validatedCacheResult.FileCache.ResolvedFilepath] = true;
+                    if (validatedCacheResult.State == FileState.RequireUpdate)
+                    {
+                        Logger.LogTrace("To update: {path}", validatedCacheResult.FileCache.ResolvedFilepath);
+                        lock (sync) { entitiesToUpdate.Add(validatedCacheResult.FileCache); }
+                    }
+                    else if (validatedCacheResult.State == FileState.RequireDeletion)
+                    {
+                        Logger.LogTrace("To delete: {path}", validatedCacheResult.FileCache.ResolvedFilepath);
+                        lock (sync) { entitiesToRemove.Add(validatedCacheResult.FileCache); }
+                    }
+                }
+                catch (Exception ex)
                 {
-                    Logger.LogWarning("Penumbra not available");
-                    return;
+                    Logger.LogWarning(ex, "Failed validating {path}", cache.ResolvedFilepath);
                 }
 
-                if (ct.IsCancellationRequested) return;
-            }
+                Interlocked.Increment(ref _currentFileProgress);
+                if (!noWaiting) Thread.Sleep(5);
+            });
+
         }
         catch (OperationCanceledException)
         {
@@ -249,7 +273,8 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
             Logger.LogWarning(ex, "Error during enumerating FileCaches");
         }
 
-        Task.WaitAll(dbTasks, _scanCancellationTokenSource.Token);
+        if (ct.IsCancellationRequested) return;
+
 
         if (!_ipcManager.CheckPenumbraApi())
         {
@@ -283,44 +308,45 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         if (ct.IsCancellationRequested) return;
 
         // scan new files
-        foreach (var c in scannedFiles.Where(c => !c.Value))
+        if (scannedFiles.Any(c => !c.Value))
         {
-            var idx = Task.WaitAny(dbTasks, ct);
-            dbTasks[idx] = Task.Run(() =>
-            {
-                try
+            Parallel.ForEach(scannedFiles.Where(c => !c.Value).Select(c => c.Key),
+                new ParallelOptions()
                 {
-                    var entry = _fileDbManager.CreateFileEntry(c.Key);
-                    if (entry == null) _ = _fileDbManager.CreateCacheEntry(c.Key);
-                }
-                catch (Exception ex)
+                    MaxDegreeOfParallelism = cpuCount,
+                    CancellationToken = ct
+                }, (cachePath) =>
                 {
-                    Logger.LogWarning(ex, "Failed adding {file}", c.Key);
-                }
+                    if (ct.IsCancellationRequested) return;
 
-                Interlocked.Increment(ref _currentFileProgress);
-                Thread.Sleep(1);
-            }, ct);
+                    if (!_ipcManager.CheckPenumbraApi())
+                    {
+                        Logger.LogWarning("Penumbra not available");
+                        return;
+                    }
 
-            if (!_ipcManager.CheckPenumbraApi())
-            {
-                Logger.LogWarning("Penumbra not available");
-                return;
-            }
+                    try
+                    {
+                        var entry = _fileDbManager.CreateFileEntry(cachePath);
+                        if (entry == null) _ = _fileDbManager.CreateCacheEntry(cachePath);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogWarning(ex, "Failed adding {file}", cachePath);
+                    }
 
-            if (ct.IsCancellationRequested) return;
+                    Interlocked.Increment(ref _currentFileProgress);
+                    if (!noWaiting) Thread.Sleep(5);
+                });
+
+            Logger.LogTrace("Scanner added {notScanned} new files to db", scannedFiles.Count(c => !c.Value));
         }
-
-        Task.WaitAll(dbTasks, _scanCancellationTokenSource.Token);
-
-        Logger.LogTrace("Scanner added new files to db");
 
         Logger.LogDebug("Scan complete");
         TotalFiles = 0;
         _currentFileProgress = 0;
         entitiesToRemove.Clear();
         scannedFiles.Clear();
-        dbTasks = Array.Empty<Task>();
 
         if (!_configService.Current.InitialScanComplete)
         {

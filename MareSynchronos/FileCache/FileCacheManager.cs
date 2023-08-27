@@ -201,7 +201,7 @@ public sealed class FileCacheManager : IDisposable
         AddHashedFile(fileCache);
     }
 
-    public (FileState, FileCacheEntity) ValidateFileCacheEntity(FileCacheEntity fileCache)
+    public (FileState State, FileCacheEntity FileCache) ValidateFileCacheEntity(FileCacheEntity fileCache)
     {
         fileCache = ReplacePathPrefixes(fileCache);
         FileInfo fi = new(fileCache.ResolvedFilepath);

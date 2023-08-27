@@ -77,6 +77,8 @@ public class DalamudUtilService : IHostedService
         return await RunOnFrameworkThread(() => _objectTable.CreateObjectReference(reference)).ConfigureAwait(false);
     }
 
+    public bool IsOnFrameworkThread => _framework.IsInFrameworkUpdateThread;
+
     public void EnsureIsOnFramework()
     {
         if (!_framework.IsInFrameworkUpdateThread) throw new InvalidOperationException("Can only be run on Framework");

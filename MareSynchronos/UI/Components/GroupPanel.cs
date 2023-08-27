@@ -319,7 +319,7 @@ internal sealed class GroupPanel
                     ImGui.TableNextColumn();
                     UiSharedService.TextWrapped(bannedUser.Reason);
                     ImGui.TableNextColumn();
-                    if (UiSharedService.IconTextButton(FontAwesomeIcon.Check, "Unban"))
+                    if (UiSharedService.IconTextButton(FontAwesomeIcon.Check, "Unban#" + bannedUser.UID))
                     {
                         _ = ApiController.GroupUnbanUser(bannedUser);
                         _bannedUsers.RemoveAll(b => string.Equals(b.UID, bannedUser.UID, StringComparison.Ordinal));
