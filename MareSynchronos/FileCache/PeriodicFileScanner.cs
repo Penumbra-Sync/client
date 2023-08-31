@@ -210,6 +210,7 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
 
         var scannedFiles = (await scannedFilesTask.ConfigureAwait(true))
             .Concat(await scannedCacheTask.ConfigureAwait(true))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToDictionary(t => t, t => false, StringComparer.OrdinalIgnoreCase);
         TotalFiles = scannedFiles.Count;
         Thread.CurrentThread.Priority = previousThreadPriority;
