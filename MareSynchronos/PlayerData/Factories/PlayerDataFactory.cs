@@ -167,7 +167,7 @@ public class PlayerDataFactory
         }
 
         _logger.LogTrace("Checking File Replacement for Material {file}", fileName);
-        var mtrlPath = fileName.Split("|")[2];
+        var mtrlPath = fileName.Split("|")[^1];
 
         reverseResolve.Add(mtrlPath);
 
