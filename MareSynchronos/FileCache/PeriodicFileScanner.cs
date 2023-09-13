@@ -14,19 +14,22 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
     private readonly IpcManager _ipcManager;
     private readonly PerformanceCollectorService _performanceCollector;
     private readonly DalamudUtilService _dalamudUtil;
+    private readonly FileCompactor _fileCompactor;
     private long _currentFileProgress = 0;
     private bool _fileScanWasRunning = false;
     private CancellationTokenSource _scanCancellationTokenSource = new();
     private TimeSpan _timeUntilNextScan = TimeSpan.Zero;
 
     public PeriodicFileScanner(ILogger<PeriodicFileScanner> logger, IpcManager ipcManager, MareConfigService configService,
-        FileCacheManager fileDbManager, MareMediator mediator, PerformanceCollectorService performanceCollector, DalamudUtilService dalamudUtil) : base(logger, mediator)
+        FileCacheManager fileDbManager, MareMediator mediator, PerformanceCollectorService performanceCollector, DalamudUtilService dalamudUtil,
+        FileCompactor fileCompactor) : base(logger, mediator)
     {
         _ipcManager = ipcManager;
         _configService = configService;
         _fileDbManager = fileDbManager;
         _performanceCollector = performanceCollector;
         _dalamudUtil = dalamudUtil;
+        _fileCompactor = fileCompactor;
         Mediator.Subscribe<PenumbraInitializedMessage>(this, (_) => StartScan());
         Mediator.Subscribe<HaltScanMessage>(this, (msg) => HaltScan(msg.Source));
         Mediator.Subscribe<ResumeScanMessage>(this, (msg) => ResumeScan(msg.Source));
@@ -108,7 +111,7 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         {
             try
             {
-                return new FileInfo(f).Length;
+                return _fileCompactor.GetFileSizeOnDisk(f);
             }
             catch
             {
@@ -126,7 +129,7 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         while (FileCacheSize > maxCacheInBytes - (long)maxCacheBuffer)
         {
             var oldestFile = allFiles[0];
-            FileCacheSize -= oldestFile.Length;
+            FileCacheSize -= _fileCompactor.GetFileSizeOnDisk(oldestFile.FullName);
             File.Delete(oldestFile.FullName);
             allFiles.Remove(oldestFile);
         }

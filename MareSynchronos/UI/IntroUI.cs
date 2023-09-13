@@ -47,7 +47,11 @@ public class IntroUi : WindowMediatorSubscriberBase
         GetToSLocalization();
 
         Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = false);
-        Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) => IsOpen = true);
+        Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) =>
+        {
+            _configService.Current.UseCompactor = !Util.IsLinux();
+            IsOpen = true;
+        });
     }
 
     public override void Draw()
@@ -169,6 +173,17 @@ public class IntroUi : WindowMediatorSubscriberBase
             else
             {
                 _uiShared.DrawFileScanState();
+            }
+            if (!Util.IsLinux())
+            {
+                var useFileCompactor = _configService.Current.UseCompactor;
+                if (ImGui.Checkbox("Use File Compactor", ref useFileCompactor))
+                {
+                    _configService.Current.UseCompactor = useFileCompactor;
+                    _configService.Save();
+                }
+                UiSharedService.ColorTextWrapped("The File Compactor can save a tremendeous amount of space on the hard disk for downloads through Mare. It will incur a minor CPU penalty on download but can speed up " +
+                    "loading of other characters. It is recommended to keep it enabled. You can change this setting later anytime in the Mare settings.", ImGuiColors.DalamudYellow);
             }
         }
         else if (!_uiShared.ApiController.ServerAlive)
