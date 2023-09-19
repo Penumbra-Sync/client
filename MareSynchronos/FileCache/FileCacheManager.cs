@@ -275,7 +275,10 @@ public sealed class FileCacheManager : IDisposable
             _fileCaches[fileCache.Hash] = entries = new();
         }
 
-        entries.Add(fileCache);
+        if (!entries.Exists(u => string.Equals(u.PrefixedFilePath, fileCache.PrefixedFilePath, StringComparison.OrdinalIgnoreCase)))
+        {
+            entries.Add(fileCache);
+        }
     }
 
     private FileCacheEntity? CreateFileCacheEntity(FileInfo fileInfo, string prefixedPath, string? hash = null)

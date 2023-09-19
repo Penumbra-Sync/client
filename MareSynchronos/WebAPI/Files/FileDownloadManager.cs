@@ -66,7 +66,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         base.Dispose(disposing);
     }
 
-    private static void MungeBuffer(Span<byte> buffer)
+    public static void MungeBuffer(Span<byte> buffer)
     {
         for (int i = 0; i < buffer.Length; ++i)
         {
