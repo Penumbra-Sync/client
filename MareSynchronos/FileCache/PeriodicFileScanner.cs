@@ -91,7 +91,17 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
                         await Task.Delay(250, token).ConfigureAwait(false);
                     }
 
-                    Thread scanThread = new(() => _performanceCollector.LogPerformance(this, "PeriodicFileScan", () => PeriodicFileScan(isForcedFromExternal, token)))
+                    Thread scanThread = new(() =>
+                    {
+                        try
+                        {
+                            _performanceCollector.LogPerformance(this, "PeriodicFileScan", () => PeriodicFileScan(isForcedFromExternal, token));
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.LogError(ex, "Error during Periodic File Scan");
+                        }
+                    })
                     {
                         Priority = ThreadPriority.Lowest,
                         IsBackground = true
@@ -208,12 +218,19 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         Dictionary<string, string[]> penumbraFiles = new(StringComparer.Ordinal);
         foreach (var folder in Directory.EnumerateDirectories(penumbraDir!))
         {
-            penumbraFiles[folder] = Directory.GetFiles(folder, "*.*", SearchOption.AllDirectories)
-                    .AsParallel()
-                    .Where(f => ext.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase))
-                        && !f.Contains(@"\bg\", StringComparison.OrdinalIgnoreCase)
-                        && !f.Contains(@"\bgcommon\", StringComparison.OrdinalIgnoreCase)
-                        && !f.Contains(@"\ui\", StringComparison.OrdinalIgnoreCase)).ToArray();
+            try
+            {
+                penumbraFiles[folder] = Directory.GetFiles(folder, "*.*", SearchOption.AllDirectories)
+                        .AsParallel()
+                        .Where(f => ext.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase))
+                            && !f.Contains(@"\bg\", StringComparison.OrdinalIgnoreCase)
+                            && !f.Contains(@"\bgcommon\", StringComparison.OrdinalIgnoreCase)
+                            && !f.Contains(@"\ui\", StringComparison.OrdinalIgnoreCase)).ToArray();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Could not enumerate path {path}", folder);
+            }
             Thread.Sleep(50);
             if (ct.IsCancellationRequested) return;
         }
