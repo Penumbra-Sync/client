@@ -102,6 +102,8 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
     private byte[] CustomizeData { get; set; } = new byte[26];
     private IntPtr DrawObjectAddress { get; set; }
     private byte[] EquipSlotData { get; set; } = new byte[40];
+    private ushort[] MainHandData { get; set; } = new ushort[3];
+    private ushort[] OffHandData { get; set; } = new ushort[3];
 
     public async Task ActOnFrameworkAfterEnsureNoDrawAsync(Action<Dalamud.Game.ClientState.Objects.Types.Character> act, CancellationToken token)
     {
@@ -212,6 +214,9 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
                 && ((CharacterBase*)DrawObjectAddress)->GetModelType() == CharacterBase.ModelType.Human)
             {
                 equipDiff = CompareAndUpdateEquipByteData((byte*)&((Human*)DrawObjectAddress)->Head);
+                equipDiff |= CompareAndUpdateMainHand(*((Weapon**)&chara->DrawData.MainHand + 1));
+                equipDiff |= CompareAndUpdateOffHand(*((Weapon**)&chara->DrawData.OffHand + 1));
+
                 if (equipDiff)
                     Logger.LogTrace("Checking [{this}] equip data as human from draw obj, result: {diff}", this, equipDiff);
             }
@@ -221,6 +226,8 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
                 if (equipDiff)
                     Logger.LogTrace("Checking [{this}] equip data from game obj, result: {diff}", this, equipDiff);
             }
+
+
 
             if (equipDiff && !_isOwnedObject && !_ignoreSendAfterRedraw) // send the message out immediately and cancel out, no reason to continue if not self
             {
@@ -262,6 +269,32 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
                 _ = Task.Run(() => ClearAsync(token), token);
             }
         }
+    }
+
+    private unsafe bool CompareAndUpdateMainHand(Weapon* weapon)
+    {
+        if ((nint)weapon == nint.Zero) return false;
+        bool hasChanges = false;
+        hasChanges |= weapon->ModelSetId != MainHandData[0];
+        MainHandData[0] = weapon->ModelSetId;
+        hasChanges |= weapon->Variant != MainHandData[1];
+        MainHandData[1] = weapon->Variant;
+        hasChanges |= weapon->SecondaryId != MainHandData[2];
+        MainHandData[2] = weapon->SecondaryId;
+        return hasChanges;
+    }
+
+    private unsafe bool CompareAndUpdateOffHand(Weapon* weapon)
+    {
+        if ((nint)weapon == nint.Zero) return false;
+        bool hasChanges = false;
+        hasChanges |= weapon->ModelSetId != OffHandData[0];
+        OffHandData[0] = weapon->ModelSetId;
+        hasChanges |= weapon->Variant != OffHandData[1];
+        OffHandData[1] = weapon->Variant;
+        hasChanges |= weapon->SecondaryId != OffHandData[2];
+        OffHandData[2] = weapon->SecondaryId;
+        return hasChanges;
     }
 
     private async Task ClearAsync(CancellationToken token)

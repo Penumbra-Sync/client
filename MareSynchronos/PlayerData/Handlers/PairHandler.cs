@@ -33,8 +33,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private GameObjectHandler? _charaHandler;
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
     private bool _forceApplyMods = false;
-    private string _lastGlamourerData = string.Empty;
-    private string _originalGlamourerData = string.Empty;
     private string _penumbraCollection;
     private CancellationTokenSource _redrawCts = new();
 
@@ -60,7 +58,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) =>
         {
             _downloadCancellationTokenSource?.CancelDispose();
-            MediatorUnsubscribeFromCharacterChanged();
             _charaHandler?.Invalidate();
             IsVisible = false;
         });
@@ -413,9 +410,8 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             {
                 Logger.LogTrace("[BASE-{appBase}] {this} visibility changed, now: {visi}, cached data exists", appData, this, IsVisible);
 
-                _ = Task.Run(async () =>
+                _ = Task.Run(() =>
                 {
-                    _lastGlamourerData = await _ipcManager.GlamourerGetCharacterCustomizationAsync(PlayerCharacter).ConfigureAwait(false);
                     ApplyCharacterData(appData, _cachedData!, true);
                 });
             }
@@ -423,8 +419,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             {
                 Logger.LogTrace("{this} visibility changed, now: {visi}, no cached data exists", this, IsVisible);
             }
-
-            MediatorSubscribeToCharacterChanged();
         }
         else if (_charaHandler?.Address == nint.Zero && IsVisible)
         {
@@ -432,7 +426,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             _charaHandler?.Invalidate();
             _downloadCancellationTokenSource?.CancelDispose();
             _downloadCancellationTokenSource = null;
-            MediatorUnsubscribeFromCharacterChanged();
             Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);
         }
     }
@@ -442,8 +435,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         PlayerName = name;
         _charaHandler = _gameObjectHandlerFactory.Create(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromCachedTableByIdent(OnlineUser.Ident), false).GetAwaiter().GetResult();
 
-        _originalGlamourerData = _ipcManager.GlamourerGetCharacterCustomizationAsync(PlayerCharacter).ConfigureAwait(false).GetAwaiter().GetResult();
-        _lastGlamourerData = _originalGlamourerData;
         Mediator.Subscribe<PenumbraRedrawMessage>(this, IpcManagerOnPenumbraRedrawEvent);
         Mediator.Subscribe<HonorificReadyMessage>(this, async (_) =>
         {
@@ -477,33 +468,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         }, token);
     }
 
-    private void MediatorSubscribeToCharacterChanged()
-    {
-        Mediator.Subscribe<CharacterChangedMessage>(this, (msg) =>
-        {
-            if (msg.GameObjectHandler == _charaHandler && (_applicationTask?.IsCompleted ?? true))
-            {
-                Guid appBase = Guid.NewGuid();
-                var newGlamData = _ipcManager.GlamourerGetCharacterCustomizationAsync(PlayerCharacter).ConfigureAwait(false).GetAwaiter().GetResult();
-                if (!string.Equals(_lastGlamourerData, newGlamData, StringComparison.OrdinalIgnoreCase))
-                {
-                    Logger.LogTrace("[BASE-{appBase}] Saving new Glamourer Data for {this}", appBase, this);
-
-                    _lastGlamourerData = newGlamData;
-                    if (_cachedData != null)
-                    {
-                        ApplyCharacterData(appBase, _cachedData!, true);
-                    }
-                }
-            }
-        });
-    }
-
-    private void MediatorUnsubscribeFromCharacterChanged()
-    {
-        Mediator.Unsubscribe<CharacterChangedMessage>(this);
-    }
-
     private async Task RevertCustomizationDataAsync(ObjectKind objectKind, string name, Guid applicationId)
     {
         nint address = _dalamudUtil.GetPlayerCharacterFromCachedTableByIdent(OnlineUser.Ident);
@@ -518,15 +482,8 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         {
             using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Player, () => address, false).ConfigureAwait(false);
             tempHandler.CompareNameAndThrow(name);
-            Logger.LogDebug("[{applicationId}] Restoring Customization and Equipment for {alias}/{name}: {data}", applicationId, OnlineUser.User.AliasOrUID, name, _originalGlamourerData);
-            if (!_ipcManager.CheckGlamourerTestingApi())
-            {
-                await _ipcManager.GlamourerApplyCustomizationAndEquipmentAsync(Logger, tempHandler, _originalGlamourerData, _lastGlamourerData, applicationId, cancelToken.Token, fireAndForget: false).ConfigureAwait(false);
-            }
-            else
-            {
-                await _ipcManager.GlamourerRevert(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
-            }
+            Logger.LogDebug("[{applicationId}] Restoring Customization and Equipment for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
+            await _ipcManager.GlamourerRevert(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
             tempHandler.CompareNameAndThrow(name);
             Logger.LogDebug("[{applicationId}] Restoring Heels for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             await _ipcManager.HeelsRestoreOffsetForPlayerAsync(address).ConfigureAwait(false);

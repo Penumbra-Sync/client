@@ -92,6 +92,13 @@ public class DalamudUtilService : IHostedService
         return (Dalamud.Game.ClientState.Objects.Types.Character)objTableObj;
     }
 
+    public Dalamud.Game.ClientState.Objects.Types.Character? GetGposeCharacterFromObjectTableByName(string name, bool onlyGposeCharacters = false)
+    {
+        EnsureIsOnFramework();
+        return (Dalamud.Game.ClientState.Objects.Types.Character?)_objectTable.Where(i => !onlyGposeCharacters || i.ObjectIndex >= 200)
+            .FirstOrDefault(f => f.Name.ToString() == name);
+    }
+
     public unsafe IntPtr GetCompanion(IntPtr? playerPointer = null)
     {
         EnsureIsOnFramework();

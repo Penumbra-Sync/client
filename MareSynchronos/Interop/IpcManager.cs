@@ -17,19 +17,19 @@ namespace MareSynchronos.Interop;
 
 public sealed class IpcManager : DisposableMediatorSubscriberBase
 {
+    private readonly uint LockCode = 0x6D617265;
+
     private readonly ICallGateSubscriber<(int, int)> _customizePlusApiVersion;
     private readonly ICallGateSubscriber<Character?, string?> _customizePlusGetBodyScale;
     private readonly ICallGateSubscriber<string?, string?, object> _customizePlusOnScaleUpdate;
     private readonly ICallGateSubscriber<Character?, object> _customizePlusRevertCharacter;
     private readonly ICallGateSubscriber<string, Character?, object> _customizePlusSetBodyScaleToCharacter;
     private readonly DalamudUtilService _dalamudUtil;
-    private readonly ICallGateSubscriber<int> _glamourerApiVersion;
     private readonly ICallGateSubscriber<(int, int)> _glamourerApiVersions;
-    private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyAll;
-    private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyOnlyCustomization;
-    private readonly ICallGateSubscriber<string, GameObject?, object>? _glamourerApplyOnlyEquipment;
+    private readonly ICallGateSubscriber<string, GameObject?, uint, object>? _glamourerApplyAll;
     private readonly ICallGateSubscriber<GameObject?, string>? _glamourerGetAllCustomization;
-    private readonly ICallGateSubscriber<Character?, object?> _glamourerRevert;
+    private readonly ICallGateSubscriber<Character?, uint, object?> _glamourerRevert;
+    private readonly ICallGateSubscriber<Character?, uint, bool> _glamourerUnlock;
     private readonly ICallGateSubscriber<(int, int)> _heelsGetApiVersion;
     private readonly ICallGateSubscriber<string> _heelsGetOffset;
     private readonly ICallGateSubscriber<string, object?> _heelsOffsetUpdate;
@@ -70,7 +70,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private bool _customizePlusAvailable = false;
     private CancellationTokenSource _disposalCts = new();
     private bool _glamourerAvailable = false;
-    private bool _glamourerTestingAvailable = false;
     private bool _heelsAvailable = false;
     private bool _honorificAvailable = false;
     private bool _palettePlusAvailable = false;
@@ -106,13 +105,11 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
         _penumbraGameObjectResourcePathResolved = Penumbra.Api.Ipc.GameObjectResourcePathResolved.Subscriber(pi, ResourceLoaded);
 
-        _glamourerApiVersion = pi.GetIpcSubscriber<int>("Glamourer.ApiVersion");
         _glamourerApiVersions = pi.GetIpcSubscriber<(int, int)>("Glamourer.ApiVersions");
         _glamourerGetAllCustomization = pi.GetIpcSubscriber<GameObject?, string>("Glamourer.GetAllCustomizationFromCharacter");
-        _glamourerApplyAll = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyAllToCharacter");
-        _glamourerApplyOnlyCustomization = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyOnlyCustomizationToCharacter");
-        _glamourerApplyOnlyEquipment = pi.GetIpcSubscriber<string, GameObject?, object>("Glamourer.ApplyOnlyEquipmentToCharacter");
-        _glamourerRevert = pi.GetIpcSubscriber<Character?, object?>("Glamourer.RevertCharacter");
+        _glamourerApplyAll = pi.GetIpcSubscriber<string, GameObject?, uint, object>("Glamourer.ApplyAllToCharacterLock");
+        _glamourerRevert = pi.GetIpcSubscriber<Character?, uint, object?>("Glamourer.RevertCharacterLock");
+        _glamourerUnlock = pi.GetIpcSubscriber<Character?, uint, bool>("Glamourer.Unlock");
 
         _heelsGetApiVersion = pi.GetIpcSubscriber<(int, int)>("SimpleHeels.ApiVersion");
         _heelsGetOffset = pi.GetIpcSubscriber<string>("SimpleHeels.GetLocalPlayer");
@@ -166,8 +163,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public bool CheckCustomizePlusApi() => _customizePlusAvailable;
 
     public bool CheckGlamourerApi() => _glamourerAvailable;
-
-    public bool CheckGlamourerTestingApi() => _glamourerTestingAvailable;
 
     public bool CheckHeelsApi() => _heelsAvailable;
 
@@ -248,18 +243,15 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
                 try
                 {
                     logger.LogDebug("[{appid}] Calling on IPC: GlamourerApplyAll", applicationId);
-                    _glamourerApplyAll!.InvokeAction(customization, chara);
+                    _glamourerApplyAll!.InvokeAction(customization, chara, LockCode);
+                    logger.LogDebug("[{appid}] Calling on IPC: PenumbraRedraw", applicationId);
+                    _penumbraRedrawObject.Invoke(chara, RedrawType.Redraw);
                 }
                 catch (Exception)
                 {
                     logger.LogWarning("[{appid}] Failed to apply Glamourer data", applicationId);
                 }
-                if (_glamourerTestingAvailable)
-                {
-                    logger.LogDebug("[{appid}] Calling on IPC: PenumbraRedraw", applicationId);
 
-                    _penumbraRedrawObject.Invoke(chara, RedrawType.Redraw);
-                }
             }).ConfigureAwait(false);
         }
         finally
@@ -270,40 +262,18 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
     public async Task GlamourerRevert(ILogger logger, GameObjectHandler handler, Guid applicationId, CancellationToken token)
     {
-        if ((!CheckGlamourerApi() && !CheckGlamourerTestingApi()) || _dalamudUtil.IsZoning) return;
+        if ((!CheckGlamourerApi()) || _dalamudUtil.IsZoning) return;
         try
         {
             await _redrawSemaphore.WaitAsync(token).ConfigureAwait(false);
             await PenumbraRedrawInternalAsync(logger, handler, applicationId, (chara) =>
             {
                 logger.LogDebug("[{appid}] Calling On IPC: GlamourerRevert", applicationId);
-                _glamourerRevert.InvokeAction(chara);
+                _glamourerRevert.InvokeAction(chara, LockCode);
                 logger.LogDebug("[{appid}] Calling On IPC: PenumbraRedraw", applicationId);
-                _penumbraRedrawObject.Invoke(chara, RedrawType.Redraw);
+                _penumbraRedrawObject.Invoke(chara, RedrawType.AfterGPose);
+                _glamourerUnlock.InvokeFunc(chara, LockCode);
 
-            }).ConfigureAwait(false);
-        }
-        finally
-        {
-            _redrawSemaphore.Release();
-        }
-    }
-
-    public async Task GlamourerApplyCustomizationAndEquipmentAsync(ILogger logger, GameObjectHandler handler, string customization, string equipment, Guid applicationid, CancellationToken token, bool fireAndForget = false)
-    {
-        if (!CheckGlamourerApi() || string.IsNullOrEmpty(customization) || _dalamudUtil.IsZoning) return;
-        try
-        {
-            await _redrawSemaphore.WaitAsync(token).ConfigureAwait(false);
-            await PenumbraRedrawInternalAsync(logger, handler, applicationid, (chara) =>
-            {
-                logger.LogDebug("[{appid}] Calling on IPC: GlamourerApplyOnlyCustomization", applicationid);
-                _glamourerApplyOnlyCustomization!.InvokeAction(customization, chara);
-            }).ConfigureAwait(false);
-            await PenumbraRedrawInternalAsync(logger, handler, applicationid, (chara) =>
-            {
-                logger.LogDebug("[{appid}] Calling on IPC: GlamourerApplyOnlyEquipment", applicationid);
-                _glamourerApplyOnlyEquipment!.InvokeAction(equipment, chara);
             }).ConfigureAwait(false);
         }
         finally
@@ -630,8 +600,13 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         bool apiAvailable = false;
         try
         {
-            apiAvailable = _glamourerApiVersion.InvokeFunc() >= 0;
+            var version = _glamourerApiVersions.InvokeFunc();
+            if (version.Item1 == 0 && version.Item2 >= 1)
+            {
+                apiAvailable = true;
+            }
             _shownGlamourerUnavailable = _shownGlamourerUnavailable && !apiAvailable;
+
             return apiAvailable;
         }
         catch
@@ -645,24 +620,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
                 _shownGlamourerUnavailable = true;
                 Mediator.Publish(new NotificationMessage("Glamourer inactive", "Your Glamourer installation is not active or out of date. Update Glamourer to continue to use Mare.", NotificationType.Error));
             }
-        }
-    }
-
-    private bool CheckGlamourerTestingApiInternal()
-    {
-        bool apiAvailable = false;
-        try
-        {
-            var version = _glamourerApiVersions.InvokeFunc();
-            if (version.Item1 == 0 && version.Item2 >= 1)
-            {
-                apiAvailable = true;
-            }
-            return apiAvailable;
-        }
-        catch
-        {
-            return apiAvailable;
         }
     }
 
@@ -805,7 +762,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private void PeriodicApiStateCheck()
     {
         _glamourerAvailable = CheckGlamourerApiInternal();
-        _glamourerTestingAvailable = CheckGlamourerTestingApiInternal();
         _penumbraAvailable = CheckPenumbraApiInternal();
         _heelsAvailable = CheckHeelsApiInternal();
         _customizePlusAvailable = CheckCustomizePlusApiInternal();
