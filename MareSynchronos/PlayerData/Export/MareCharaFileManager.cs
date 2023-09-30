@@ -24,7 +24,7 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
     private readonly ILogger<MareCharaFileManager> _logger;
     private readonly FileCacheManager _manager;
     private int _globalFileCounter = 0;
-    private readonly List<GameObjectHandler> _gposeGameObjects;
+    private readonly Dictionary<string, GameObjectHandler> _gposeGameObjects;
     private bool _isInGpose = false;
 
     public MareCharaFileManager(ILogger<MareCharaFileManager> logger, GameObjectHandlerFactory gameObjectHandlerFactory,
@@ -46,8 +46,17 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
             CancellationTokenSource cts = new();
             foreach (var item in _gposeGameObjects)
             {
-                await _ipcManager.GlamourerRevert(logger, item, Guid.NewGuid(), cts.Token);
-                item.Dispose();
+                if ((await dalamudUtil.RunOnFrameworkThread(() => item.Value.CurrentAddress())) != nint.Zero)
+                {
+                    await _ipcManager.GlamourerRevert(logger, item.Value, Guid.NewGuid(), cts.Token);
+                }
+                else
+                {
+                    _logger.LogDebug("Reverting by name: {name}", item.Key);
+                    _ipcManager.GlamourerRevertByName(logger, item.Key, Guid.NewGuid());
+                }
+
+                item.Value.Dispose();
             }
             _gposeGameObjects.Clear();
         });
@@ -91,9 +100,9 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
 
                 GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Player,
                     () => _dalamudUtil.GetGposeCharacterFromObjectTableByName(charaTarget.Name.ToString(), _isInGpose)?.Address ?? IntPtr.Zero, false).ConfigureAwait(false);
-                
-                if (!_gposeGameObjects.Exists(o => o.Address == tempHandler.Address))
-                    _gposeGameObjects.Add(tempHandler);
+
+                if (!_gposeGameObjects.ContainsKey(charaTarget.Name.ToString()))
+                    _gposeGameObjects[charaTarget.Name.ToString()] = tempHandler;
 
                 await _ipcManager.GlamourerApplyAllAsync(_logger, tempHandler, LoadedCharaFile.CharaFileData.GlamourerData, applicationId, disposeCts.Token).ConfigureAwait(false);
                 _dalamudUtil.WaitWhileGposeCharacterIsDrawing(charaTarget.Address, 30000);

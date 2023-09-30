@@ -29,6 +29,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly ICallGateSubscriber<string, GameObject?, uint, object>? _glamourerApplyAll;
     private readonly ICallGateSubscriber<GameObject?, string>? _glamourerGetAllCustomization;
     private readonly ICallGateSubscriber<Character?, uint, object?> _glamourerRevert;
+    private readonly ICallGateSubscriber<string, uint, object?> _glamourerRevertByName;
     private readonly ICallGateSubscriber<Character?, uint, bool> _glamourerUnlock;
     private readonly ICallGateSubscriber<(int, int)> _heelsGetApiVersion;
     private readonly ICallGateSubscriber<string> _heelsGetOffset;
@@ -109,6 +110,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         _glamourerGetAllCustomization = pi.GetIpcSubscriber<GameObject?, string>("Glamourer.GetAllCustomizationFromCharacter");
         _glamourerApplyAll = pi.GetIpcSubscriber<string, GameObject?, uint, object>("Glamourer.ApplyAllToCharacterLock");
         _glamourerRevert = pi.GetIpcSubscriber<Character?, uint, object?>("Glamourer.RevertCharacterLock");
+        _glamourerRevertByName = pi.GetIpcSubscriber<string, uint, object?>("Glamourer.RevertLock");
         _glamourerUnlock = pi.GetIpcSubscriber<Character?, uint, bool>("Glamourer.Unlock");
 
         _heelsGetApiVersion = pi.GetIpcSubscriber<(int, int)>("SimpleHeels.ApiVersion");
@@ -279,6 +281,19 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         finally
         {
             _redrawSemaphore.Release();
+        }
+    }
+
+    public void GlamourerRevertByName(ILogger logger, string name, Guid applicationId)
+    {
+        if ((!CheckGlamourerApi()) || _dalamudUtil.IsZoning) return;
+        try
+        {
+            logger.LogDebug("[{appid}] Calling On IPC: GlamourerRevertByName", applicationId);
+            _glamourerRevertByName.InvokeAction(name, LockCode);
+        }
+        catch (Exception ex) {
+            Logger.LogWarning(ex, "Error during Glamourer RevertByName");
         }
     }
 
