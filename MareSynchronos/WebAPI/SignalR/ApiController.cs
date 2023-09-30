@@ -1,6 +1,4 @@
-﻿using MareSynchronos.API.Routes;
-using MareSynchronos.Utils;
-using Microsoft.AspNetCore.SignalR.Client;
+﻿using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
 using MareSynchronos.API.Dto;
 using MareSynchronos.API.SignalR;
@@ -14,7 +12,6 @@ using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Services;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Data;
-using System.Net.Http.Headers;
 
 namespace MareSynchronos.WebAPI;
 
@@ -329,10 +326,10 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         OnUserUpdateSelfPairPermissions(dto => _ = Client_UserUpdateSelfPairPermissions(dto));
         OnUserReceiveUploadStatus(dto => _ = Client_UserReceiveUploadStatus(dto));
         OnUserUpdateProfile(dto => _ = Client_UserUpdateProfile(dto));
+        OnUserDefaultPermissionUpdate(dto => _ = Client_UserUpdateDefaultPermissions(dto));
 
         OnGroupChangePermissions((dto) => _ = Client_GroupChangePermissions(dto));
         OnGroupDelete((dto) => _ = Client_GroupDelete(dto));
-        OnGroupPairChangePermissions((dto) => _ = Client_GroupPairChangePermissions(dto));
         OnGroupPairChangeUserInfo((dto) => _ = Client_GroupPairChangeUserInfo(dto));
         OnGroupPairJoined((dto) => _ = Client_GroupPairJoined(dto));
         OnGroupPairLeft((dto) => _ = Client_GroupPairLeft(dto));
@@ -349,24 +346,16 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
     private async Task LoadIninitialPairs()
     {
-        foreach (var userPair in await UserGetPairedClients().ConfigureAwait(false))
-        {
-            Logger.LogDebug("Individual Pair: {userPair}", userPair);
-            _pairManager.AddUserPair(userPair, addToLastAddedUser: false);
-        }
         foreach (var entry in await GroupsGetAll().ConfigureAwait(false))
         {
             Logger.LogDebug("Group: {entry}", entry);
             _pairManager.AddGroup(entry);
         }
-        foreach (var group in _pairManager.GroupPairs.Keys)
+
+        foreach (var userPair in await UserGetPairedClients().ConfigureAwait(false))
         {
-            var users = await GroupsGetUsersInGroup(group).ConfigureAwait(false);
-            foreach (var user in users)
-            {
-                Logger.LogDebug("Group Pair: {user}", user);
-                _pairManager.AddGroupPair(user);
-            }
+            Logger.LogDebug("Individual Pair: {userPair}", userPair);
+            _pairManager.AddUserPair(userPair, addToLastAddedUser: false);
         }
     }
 

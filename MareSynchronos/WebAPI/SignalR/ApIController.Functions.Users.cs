@@ -1,4 +1,5 @@
 ﻿using MareSynchronos.API.Data;
+using MareSynchronos.API.Dto;
 using MareSynchronos.API.Dto.User;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
@@ -104,5 +105,11 @@ public partial class ApiController
         }
         Logger.LogDebug("Chara data contained: {nl} {data}", Environment.NewLine, sb.ToString());
         await UserPushData(new(visibleCharacters, character)).ConfigureAwait(false);
+    }
+
+    public async Task UserUpdateDefaultPermissions(DefaultPermissionsDto dto)
+    {
+        CheckConnection();
+        await _mareHub.InvokeAsync(nameof(UserUpdateDefaultPermissions), dto).ConfigureAwait(false);
     }
 }

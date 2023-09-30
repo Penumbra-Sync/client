@@ -10,6 +10,7 @@ using System.Numerics;
 namespace MareSynchronos.Services.Mediator;
 
 #pragma warning disable MA0048 // File name must match type name
+#pragma warning disable S2094
 public record SwitchToIntroUiMessage : MessageBase;
 public record SwitchToMainUiMessage : MessageBase;
 public record OpenSettingsUiMessage : MessageBase;
@@ -69,4 +70,5 @@ public record ProfileOpenStandaloneMessage(Pair Pair) : MessageBase;
 public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : MessageBase;
 public record PairHandlerVisibleMessage(PairHandler Player) : MessageBase;
 
+#pragma warning restore S2094
 #pragma warning restore MA0048 // File name must match type name

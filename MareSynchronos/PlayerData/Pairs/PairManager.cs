@@ -259,33 +259,9 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         RecreateLazy();
     }
 
-    internal void SetGroupPairUserPermissions(GroupPairUserPermissionDto dto)
-    {
-        var group = _allGroups[dto.Group];
-        var prevPermissions = _allClientPairs[dto.User].GroupPair[group].GroupUserPermissions;
-        _allClientPairs[dto.User].GroupPair[group].GroupUserPermissions = dto.GroupPairPermissions;
-        if (prevPermissions.IsDisableAnimations() != dto.GroupPairPermissions.IsDisableAnimations()
-            || prevPermissions.IsDisableSounds() != dto.GroupPairPermissions.IsDisableSounds()
-            || prevPermissions.IsDisableVFX() != dto.GroupPairPermissions.IsDisableVFX())
-        {
-            _allClientPairs[dto.User].ApplyLastReceivedData();
-        }
-        RecreateLazy();
-    }
-
     internal void SetGroupPermissions(GroupPermissionDto dto)
     {
-        var prevPermissions = _allGroups[dto.Group].GroupPermissions;
         _allGroups[dto.Group].GroupPermissions = dto.Permissions;
-        if (prevPermissions.IsDisableAnimations() != dto.Permissions.IsDisableAnimations()
-            || prevPermissions.IsDisableSounds() != dto.Permissions.IsDisableSounds()
-            || prevPermissions.IsDisableVFX() != dto.Permissions.IsDisableVFX())
-        {
-            RecreateLazy();
-            var group = _allGroups[dto.Group];
-            GroupPairs[group].ForEach(p => p.ApplyLastReceivedData());
-        }
-        RecreateLazy();
     }
 
     internal void SetGroupStatusInfo(GroupPairUserInfoDto dto)

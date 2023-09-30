@@ -123,7 +123,8 @@ internal sealed class GroupPanel
             {
                 var shell = _syncShellToJoin;
                 var pw = _syncShellPassword;
-                _errorGroupJoin = !ApiController.GroupJoin(new(new GroupData(shell), pw)).Result;
+                // todo: handle group join in two stages
+                //_errorGroupJoin = !ApiController.GroupJoin(new(new GroupData(shell), pw)).Result;
                 if (!_errorGroupJoin)
                 {
                     _syncShellToJoin = string.Empty;
@@ -201,8 +202,9 @@ internal sealed class GroupPanel
         var pauseIcon = groupDto.GroupUserPermissions.IsPaused() ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
         if (ImGuiComponents.IconButton(pauseIcon))
         {
-            var userPerm = groupDto.GroupUserPermissions ^ GroupUserPermissions.Paused;
-            _ = ApiController.GroupChangeIndividualPermissionState(new GroupPairUserPermissionDto(groupDto.Group, new UserData(ApiController.UID), userPerm));
+            // todo: pause/unpause
+            //var userPerm = groupDto.GroupUserPermissions ^ GroupUserPermissions.Paused;
+            //_ = ApiController.GroupChangeIndividualPermissionState(new GroupPairUserPermissionDto(groupDto.Group, new UserData(ApiController.UID), userPerm));
         }
         UiSharedService.AttachToolTip((groupDto.GroupUserPermissions.IsPaused() ? "Resume" : "Pause") + " pairing with all users in this Syncshell");
         ImGui.SameLine();
@@ -467,9 +469,9 @@ internal sealed class GroupPanel
         var infoIcon = FontAwesomeIcon.InfoCircle;
 
         bool invitesEnabled = !groupDto.GroupPermissions.IsDisableInvites();
-        var soundsDisabled = groupDto.GroupPermissions.IsDisableSounds();
-        var animDisabled = groupDto.GroupPermissions.IsDisableAnimations();
-        var vfxDisabled = groupDto.GroupPermissions.IsDisableVFX();
+        var soundsDisabled = groupDto.GroupPermissions.IsPreferDisableSounds();
+        var animDisabled = groupDto.GroupPermissions.IsPreferDisableAnimations();
+        var vfxDisabled = groupDto.GroupPermissions.IsPreferDisableVFX();
 
         var userSoundsDisabled = groupDto.GroupUserPermissions.IsDisableSounds();
         var userAnimDisabled = groupDto.GroupUserPermissions.IsDisableAnimations();
@@ -681,7 +683,7 @@ internal sealed class GroupPanel
                 {
                     ImGui.CloseCurrentPopup();
                     var perm = groupDto.GroupPermissions;
-                    perm.SetDisableSounds(!perm.IsDisableSounds());
+                    perm.SetPreferDisableSounds(!perm.IsPreferDisableSounds());
                     _ = ApiController.GroupChangeGroupPermissionState(new(groupDto.Group, perm));
                 }
                 UiSharedService.AttachToolTip("Sets syncshell-wide allowance for sound synchronization for all users." + Environment.NewLine
@@ -693,7 +695,7 @@ internal sealed class GroupPanel
                 {
                     ImGui.CloseCurrentPopup();
                     var perm = groupDto.GroupPermissions;
-                    perm.SetDisableAnimations(!perm.IsDisableAnimations());
+                    perm.SetPreferDisableAnimations(!perm.IsPreferDisableAnimations());
                     _ = ApiController.GroupChangeGroupPermissionState(new(groupDto.Group, perm));
                 }
                 UiSharedService.AttachToolTip("Sets syncshell-wide allowance for animations synchronization for all users." + Environment.NewLine
@@ -705,7 +707,7 @@ internal sealed class GroupPanel
                 {
                     ImGui.CloseCurrentPopup();
                     var perm = groupDto.GroupPermissions;
-                    perm.SetDisableVFX(!perm.IsDisableVFX());
+                    perm.SetPreferDisableVFX(!perm.IsPreferDisableVFX());
                     _ = ApiController.GroupChangeGroupPermissionState(new(groupDto.Group, perm));
                 }
                 UiSharedService.AttachToolTip("Sets syncshell-wide allowance for VFX synchronization for all users." + Environment.NewLine

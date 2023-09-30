@@ -32,17 +32,6 @@ public partial class ApiController
         return Task.CompletedTask;
     }
 
-    public Task Client_GroupPairChangePermissions(GroupPairUserPermissionDto permissionDto)
-    {
-        Logger.LogTrace("Client_GroupPairChangePermissions: {perm}", permissionDto);
-        ExecuteSafely(() =>
-        {
-            if (string.Equals(permissionDto.UID, UID, StringComparison.Ordinal)) _pairManager.SetGroupUserPermissions(permissionDto);
-            else _pairManager.SetGroupPairUserPermissions(permissionDto);
-        });
-        return Task.CompletedTask;
-    }
-
     public Task Client_GroupPairChangeUserInfo(GroupPairUserInfoDto userInfo)
     {
         Logger.LogTrace("Client_GroupPairChangeUserInfo: {dto}", userInfo);
@@ -176,6 +165,12 @@ public partial class ApiController
         return Task.CompletedTask;
     }
 
+    public Task Client_UserUpdateDefaultPermissions(DefaultPermissionsDto dto)
+    {
+        // todo
+        throw new NotImplementedException();
+    }
+
     public void OnDownloadReady(Action<Guid> act)
     {
         if (_initialized) return;
@@ -192,12 +187,6 @@ public partial class ApiController
     {
         if (_initialized) return;
         _mareHub!.On(nameof(Client_GroupDelete), act);
-    }
-
-    public void OnGroupPairChangePermissions(Action<GroupPairUserPermissionDto> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_GroupPairChangePermissions), act);
     }
 
     public void OnGroupPairChangeUserInfo(Action<GroupPairUserInfoDto> act)
@@ -294,6 +283,12 @@ public partial class ApiController
     {
         if (_initialized) return;
         _mareHub!.On(nameof(Client_UserUpdateSelfPairPermissions), act);
+    }
+    
+    public void OnUserDefaultPermissionUpdate(Action<DefaultPermissionsDto> act)
+    {
+        if (!_initialized) return;
+        _mareHub!.On(nameof(Client_UserUpdateDefaultPermissions), act);
     }
 
     private void ExecuteSafely(Action act)
