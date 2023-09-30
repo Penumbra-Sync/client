@@ -138,18 +138,18 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     public void RemoveGroup(GroupData data)
     {
         _allGroups.TryRemove(data, out _);
+
         foreach (var item in _allClientPairs.ToList())
         {
-            foreach (var grpPair in item.Value.GroupPair.Select(k => k.Key).Where(grpPair => GroupDataComparer.Instance.Equals(grpPair.Group, data)).ToList())
-            {
-                _allClientPairs[item.Key].GroupPair.Remove(grpPair);
-            }
+            item.Value.UserPair.Groups.Remove(data.GID);
 
-            if (!_allClientPairs[item.Key].HasAnyConnection() && _allClientPairs.TryRemove(item.Key, out var pair))
+            if (!item.Value.HasAnyConnection())
             {
-                pair.MarkOffline();
+                item.Value.MarkOffline();
+                _allClientPairs.TryRemove(item.Key, out _);
             }
         }
+
         RecreateLazy();
     }
 
@@ -157,8 +157,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     {
         if (_allClientPairs.TryGetValue(dto.User, out var pair))
         {
-            var group = _allGroups[dto.Group];
-            pair.GroupPair.Remove(group);
+            pair.UserPair.Groups.Remove(dto.Group.GID);
 
             if (!pair.HasAnyConnection())
             {
@@ -174,15 +173,12 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     {
         if (_allClientPairs.TryGetValue(dto.User, out var pair))
         {
-            pair.UserPair = null;
+            pair.UserPair.Groups.Remove("//MARE//DIRECT");
+
             if (!pair.HasAnyConnection())
             {
                 pair.MarkOffline();
                 _allClientPairs.TryRemove(dto.User, out _);
-            }
-            else
-            {
-                pair.ApplyLastReceivedData();
             }
 
             RecreateLazy();
@@ -215,8 +211,12 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         pair.UserPair.OtherPermissions = dto.Permissions;
 
         Logger.LogTrace("Paired: {synced}, Paused: {paused}, Anims: {anims}, Sounds: {sounds}, VFX: {vfx}",
-            pair.UserPair.OwnPermissions.IsPaired(), pair.UserPair.OwnPermissions.IsPaused(), pair.UserPair.OwnPermissions.IsDisableAnimations(), pair.UserPair.OwnPermissions.IsDisableSounds(),
-            pair.UserPair.OwnPermissions.IsDisableVFX());
+            pair.UserPair.OtherPermissions.IsPaired(),
+            pair.UserPair.OtherPermissions.IsPaused(),
+            pair.UserPair.OtherPermissions.IsDisableAnimations(),
+            pair.UserPair.OtherPermissions.IsDisableSounds(),
+            pair.UserPair.OtherPermissions.IsDisableVFX());
+
         pair.ApplyLastReceivedData();
     }
 
@@ -236,7 +236,10 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         pair.UserPair.OwnPermissions = dto.Permissions;
 
         Logger.LogTrace("Paired: {synced}, Paused: {paused}, Anims: {anims}, Sounds: {sounds}, VFX: {vfx}",
-            pair.UserPair.OwnPermissions.IsPaired(), pair.UserPair.OwnPermissions.IsPaused(), pair.UserPair.OwnPermissions.IsDisableAnimations(), pair.UserPair.OwnPermissions.IsDisableSounds(),
+            pair.UserPair.OwnPermissions.IsPaired(),
+            pair.UserPair.OwnPermissions.IsPaused(),
+            pair.UserPair.OwnPermissions.IsDisableAnimations(),
+            pair.UserPair.OwnPermissions.IsDisableSounds(),
             pair.UserPair.OwnPermissions.IsDisableVFX());
 
         pair.ApplyLastReceivedData();
@@ -265,21 +268,6 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     internal void SetGroupStatusInfo(GroupPairUserInfoDto dto)
     {
         _allGroups[dto.Group].GroupUserInfo = dto.GroupUserInfo;
-    }
-
-    internal void SetGroupUserPermissions(GroupPairUserPermissionDto dto)
-    {
-        var prevPermissions = _allGroups[dto.Group].GroupUserPermissions;
-        _allGroups[dto.Group].GroupUserPermissions = dto.GroupPairPermissions;
-        if (prevPermissions.IsDisableAnimations() != dto.GroupPairPermissions.IsDisableAnimations()
-            || prevPermissions.IsDisableSounds() != dto.GroupPairPermissions.IsDisableSounds()
-            || prevPermissions.IsDisableVFX() != dto.GroupPairPermissions.IsDisableVFX())
-        {
-            RecreateLazy();
-            var group = _allGroups[dto.Group];
-            GroupPairs[group].ForEach(p => p.ApplyLastReceivedData());
-        }
-        RecreateLazy();
     }
 
     protected override void Dispose(bool disposing)
