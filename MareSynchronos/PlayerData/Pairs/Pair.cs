@@ -32,6 +32,7 @@ public class Pair
         _serverConfigurationManager = serverConfigurationManager;
     }
 
+    [Obsolete("No more grouppairs")]
     public Dictionary<GroupFullInfoDto, GroupPairFullInfoDto> GroupPair { get; set; } = new(GroupDtoComparer.Instance);
     public bool HasCachedPlayer => CachedPlayer != null && !string.IsNullOrEmpty(CachedPlayer.PlayerName) && _onlineUserIdentDto != null;
     public bool IsOnline => CachedPlayer != null;
@@ -42,9 +43,9 @@ public class Pair
     public CharacterData? LastReceivedCharacterData { get; set; }
     public string? PlayerName => CachedPlayer?.PlayerName ?? string.Empty;
 
-    public UserData UserData => UserPair?.User ?? GroupPair.First().Value.User;
+    public UserData UserData => UserPair.User;
 
-    public UserPairDto? UserPair { get; set; }
+    public UserPairDto UserPair { get; set; }
 
     private PairHandler? CachedPlayer { get; set; }
 
@@ -80,7 +81,7 @@ public class Pair
         if (CachedPlayer == null)
         {
             _logger.LogDebug("Received Data for {uid} but CachedPlayer does not exist, waiting", data.User.UID);
-            Task.Run(async () =>
+            _ = Task.Run(async () =>
             {
                 using var timeoutCts = new CancellationTokenSource();
                 timeoutCts.CancelAfter(TimeSpan.FromSeconds(120));
@@ -151,7 +152,7 @@ public class Pair
 
     public bool HasAnyConnection()
     {
-        return UserPair != null || GroupPair.Any();
+        return UserPair.Groups.Any();
     }
 
     public void MarkOffline()

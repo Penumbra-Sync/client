@@ -227,8 +227,6 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
             throw new InvalidOperationException("No such pair for " + dto);
         }
 
-        if (pair.UserPair == null) throw new InvalidOperationException("No direct pair for " + dto);
-
         if (pair.UserPair.OwnPermissions.IsPaused() != dto.Permissions.IsPaused()
             || pair.UserPair.OwnPermissions.IsPaired() != dto.Permissions.IsPaired())
         {
