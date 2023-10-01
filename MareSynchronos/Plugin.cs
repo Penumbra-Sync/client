@@ -97,7 +97,8 @@ public sealed class Plugin : IDalamudPlugin
                     s.GetRequiredService<MareMediator>(),
                     s.GetRequiredService<UiSharedService>(),
                     s.GetRequiredService<ServerConfigurationManager>(),
-                    s.GetRequiredService<MareProfileManager>(), pair)));
+                    s.GetRequiredService<MareProfileManager>(),
+                    s.GetRequiredService<PairManager>(), pair)));
 
             // add scoped services
             collection.AddScoped<PeriodicFileScanner>();

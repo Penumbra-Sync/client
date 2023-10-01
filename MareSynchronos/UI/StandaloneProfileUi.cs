@@ -9,12 +9,14 @@ using Microsoft.Extensions.Logging;
 using System.Numerics;
 using MareSynchronos.API.Data.Extensions;
 using Dalamud.Interface;
+using MareSynchronos.API.Data;
 
 namespace MareSynchronos.UI;
 
 public class StandaloneProfileUi : WindowMediatorSubscriberBase
 {
     private readonly MareProfileManager _mareProfileManager;
+    private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
     private readonly UiSharedService _uiSharedService;
     private bool _adjustedForScrollBars = false;
@@ -24,14 +26,14 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
     private TextureWrap? _textureWrap;
 
     public StandaloneProfileUi(ILogger<StandaloneProfileUi> logger, MareMediator mediator, UiSharedService uiBuilder,
-        ServerConfigurationManager serverManager, MareProfileManager mareProfileManager, Pair pair)
+        ServerConfigurationManager serverManager, MareProfileManager mareProfileManager, PairManager pairManager, Pair pair)
         : base(logger, mediator, "Mare Profile of " + pair.UserData.AliasOrUID + "##MareSynchronosStandaloneProfileUI" + pair.UserData.AliasOrUID)
     {
         _uiSharedService = uiBuilder;
         _serverManager = serverManager;
         _mareProfileManager = mareProfileManager;
         Pair = pair;
-
+        _pairManager = pairManager;
         Flags = ImGuiWindowFlags.NoResize | ImGuiWindowFlags.AlwaysAutoResize;
 
         var spacing = ImGui.GetStyle().ItemSpacing;
@@ -137,12 +139,16 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
                     UiSharedService.ColorText("They: paused", ImGuiColors.DalamudYellow);
                 }
             }
-            if (Pair.GroupPair.Any())
+
+            if (Pair.UserPair.Groups.Exists(e => !string.Equals(Constants.IndividualKeyword, e)))
             {
                 ImGui.TextUnformatted("Paired through Syncshells:");
-                foreach (var groupPair in Pair.GroupPair)
+                foreach (var group in Pair.UserPair.Groups)
                 {
-                    ImGui.TextUnformatted("- " + groupPair.Key.GroupAliasOrGID);
+                    var groupNote = _serverManager.GetNoteForGid(group);
+                    var groupName = _pairManager.GroupPairs.First(f => f.Key.GID == group).Key.GroupAliasOrGID;
+                    var groupString = string.IsNullOrEmpty(groupNote) ? groupName : $"{groupNote} ({groupName})";
+                    ImGui.TextUnformatted("- " + groupString);
                 }
             }
 

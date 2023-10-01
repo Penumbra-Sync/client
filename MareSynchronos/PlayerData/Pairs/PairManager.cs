@@ -52,7 +52,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
 
     public void AddGroupPair(GroupPairFullInfoDto dto)
     {
-        if (!_allClientPairs.ContainsKey(dto.User)) 
+        if (!_allClientPairs.ContainsKey(dto.User))
             _allClientPairs[dto.User] = _pairFactory.Create(new(dto.User, new List<string> { dto.Group.GID }, dto.SelfToOtherPermissions, dto.OtherToSelfPermissions));
         RecreateLazy();
     }
@@ -287,7 +287,8 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         }
     }
 
-    private Lazy<List<Pair>> DirectPairsLazy() => new(() => _allClientPairs.Select(k => k.Value).Where(k => k.UserPair != null).ToList());
+    private Lazy<List<Pair>> DirectPairsLazy() => new(() => _allClientPairs.Select(k => k.Value)
+        .Where(k => k.UserPair.Groups.Contains(Constants.IndividualKeyword)).ToList());
 
     private void DisposePairs()
     {

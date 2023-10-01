@@ -10,12 +10,14 @@ using System.Numerics;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.MareConfiguration;
 using Dalamud.Interface;
+using MareSynchronos.API.Data;
 
 namespace MareSynchronos.UI;
 
 public class PopoutProfileUi : WindowMediatorSubscriberBase
 {
     private readonly MareProfileManager _mareProfileManager;
+    private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
     private readonly UiSharedService _uiSharedService;
     private Vector2 _lastMainPos = Vector2.Zero;
@@ -28,12 +30,12 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
 
     public PopoutProfileUi(ILogger<PopoutProfileUi> logger, MareMediator mediator, UiSharedService uiBuilder,
         ServerConfigurationManager serverManager, MareConfigService mareConfigService,
-        MareProfileManager mareProfileManager) : base(logger, mediator, "###MareSynchronosPopoutProfileUI")
+        MareProfileManager mareProfileManager, PairManager pairManager) : base(logger, mediator, "###MareSynchronosPopoutProfileUI")
     {
         _uiSharedService = uiBuilder;
         _serverManager = serverManager;
         _mareProfileManager = mareProfileManager;
-
+        _pairManager = pairManager;
         Flags = ImGuiWindowFlags.NoDecoration;
 
         Mediator.Subscribe<ProfilePopoutToggle>(this, (msg) =>
@@ -142,13 +144,14 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
                     UiSharedService.ColorText("They: paused", ImGuiColors.DalamudYellow);
                 }
             }
-            if (_pair.GroupPair.Any())
+            if (_pair.UserPair.Groups.Exists(e => !string.Equals(Constants.IndividualKeyword, e)))
             {
                 ImGui.TextUnformatted("Paired through Syncshells:");
-                foreach (var groupPair in _pair.GroupPair.Select(k => k.Key))
+                foreach (var group in _pair.UserPair.Groups)
                 {
-                    var groupNote = _serverManager.GetNoteForGid(groupPair.GID);
-                    var groupString = string.IsNullOrEmpty(groupNote) ? groupPair.GroupAliasOrGID : $"{groupNote} ({groupPair.GroupAliasOrGID})";
+                    var groupNote = _serverManager.GetNoteForGid(group);
+                    var groupName = _pairManager.GroupPairs.First(f => f.Key.GID == group).Key.GroupAliasOrGID;
+                    var groupString = string.IsNullOrEmpty(groupNote) ? groupName : $"{groupNote} ({groupName})";
                     ImGui.TextUnformatted("- " + groupString);
                 }
             }

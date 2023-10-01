@@ -167,8 +167,9 @@ public partial class ApiController
 
     public Task Client_UserUpdateDefaultPermissions(DefaultPermissionsDto dto)
     {
-        // todo
-        throw new NotImplementedException();
+        Logger.LogDebug("Client_UserUpdateDefaultPermissions: {dto}", dto);
+        _connectionDto!.DefaultPreferredPermissions = dto;
+        return Task.CompletedTask;
     }
 
     public void OnDownloadReady(Action<Guid> act)
@@ -284,10 +285,10 @@ public partial class ApiController
         if (_initialized) return;
         _mareHub!.On(nameof(Client_UserUpdateSelfPairPermissions), act);
     }
-    
+
     public void OnUserDefaultPermissionUpdate(Action<DefaultPermissionsDto> act)
     {
-        if (!_initialized) return;
+        if (_initialized) return;
         _mareHub!.On(nameof(Client_UserUpdateDefaultPermissions), act);
     }
 

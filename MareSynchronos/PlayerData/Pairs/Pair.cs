@@ -1,8 +1,6 @@
 ﻿using Dalamud.ContextMenu;
 using MareSynchronos.API.Data;
-using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.API.Data.Extensions;
-using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.PlayerData.Factories;
 using MareSynchronos.PlayerData.Handlers;
@@ -33,12 +31,11 @@ public class Pair
         _serverConfigurationManager = serverConfigurationManager;
     }
 
-    [Obsolete("No more grouppairs")]
-    public Dictionary<GroupFullInfoDto, GroupPairFullInfoDto> GroupPair { get; set; } = new(GroupDtoComparer.Instance);
     public bool HasCachedPlayer => CachedPlayer != null && !string.IsNullOrEmpty(CachedPlayer.PlayerName) && _onlineUserIdentDto != null;
     public bool IsOnline => CachedPlayer != null;
 
     public bool IsPaused => UserPair.OtherPermissions.IsPaused() || UserPair.OwnPermissions.IsPaused();
+    public bool IsDirectlyPaired => UserPair.OwnPermissions.IsPaired() && UserPair.OtherPermissions.IsPaired();
 
     public bool IsVisible => CachedPlayer?.IsVisible ?? false;
     public CharacterData? LastReceivedCharacterData { get; set; }
@@ -202,7 +199,7 @@ public class Pair
 
         if (disableIndividualAnimations || disableIndividualSounds || disableIndividualVFX)
         {
-            _logger.LogTrace("Data cleaned up: Animations disabled: {disableAnimations}, Sounds disabled: {disableSounds}, VFX disabled: {disableVFX}", 
+            _logger.LogTrace("Data cleaned up: Animations disabled: {disableAnimations}, Sounds disabled: {disableSounds}, VFX disabled: {disableVFX}",
                 disableIndividualAnimations, disableIndividualSounds, disableIndividualVFX);
             foreach (var objectKind in data.FileReplacements.Select(k => k.Key))
             {
