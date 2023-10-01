@@ -33,7 +33,7 @@ public class CompactUi : WindowMediatorSubscriberBase
     private readonly MareConfigService _configService;
     private readonly ConcurrentDictionary<GameObjectHandler, Dictionary<string, FileDownloadStatus>> _currentDownloads = new();
     private readonly FileUploadManager _fileTransferManager;
-    private readonly GroupPanel _groupPanel;
+    //private readonly GroupPanel _groupPanel;
     private readonly PairGroupsUi _pairGroupsUi;
     private readonly PairManager _pairManager;
     private readonly SelectGroupForPairUi _selectGroupForPairUi;
@@ -66,7 +66,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         _uidDisplayHandler = uidDisplayHandler;
         var tagHandler = new TagHandler(_serverManager);
 
-        _groupPanel = new(this, uiShared, _pairManager, uidDisplayHandler, _serverManager);
+        //_groupPanel = new(this, uiShared, _pairManager, uidDisplayHandler, _serverManager);
         _selectGroupForPairUi = new(tagHandler, uidDisplayHandler);
         _selectPairsForGroupUi = new(tagHandler, uidDisplayHandler);
         _pairGroupsUi = new(configService, tagHandler, apiController, _selectPairsForGroupUi);
@@ -162,7 +162,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             }
             else
             {
-                UiSharedService.DrawWithID("syncshells", _groupPanel.DrawSyncshells);
+                //UiSharedService.DrawWithID("syncshells", _groupPanel.DrawSyncshells);
             }
             ImGui.Separator();
             UiSharedService.DrawWithID("transfers", DrawTransfers);

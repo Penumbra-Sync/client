@@ -37,7 +37,7 @@ public class PairGroupsUi
 
     private void DrawButtons(string tag, List<DrawUserPair> availablePairsInThisTag)
     {
-        var allArePaused = availablePairsInThisTag.All(pair => pair.UserPair!.OwnPermissions.IsPaused());
+        var allArePaused = availablePairsInThisTag.TrueForAll(pair => pair.UserPair!.OwnPermissions.IsPaused());
         var pauseButton = allArePaused ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
         var flyoutMenuX = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars).X;
         var pauseButtonX = UiSharedService.GetIconButtonSize(pauseButton).X;

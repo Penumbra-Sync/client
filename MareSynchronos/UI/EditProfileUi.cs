@@ -135,7 +135,7 @@ public class EditProfileUi : WindowMediatorSubscriberBase
             _fileDialogManager.OpenFileDialog("Select new Profile picture", ".png", (success, file) =>
             {
                 if (!success) return;
-                Task.Run(async () =>
+                _ = Task.Run(async () =>
                 {
                     var fileContent = File.ReadAllBytes(file);
                     using MemoryStream ms = new(fileContent);

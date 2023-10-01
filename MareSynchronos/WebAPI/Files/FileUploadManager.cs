@@ -221,7 +221,7 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
 
         foreach (var file in filesToUpload.Where(c => c.IsForbidden))
         {
-            if (_orchestrator.ForbiddenTransfers.All(f => !string.Equals(f.Hash, file.Hash, StringComparison.Ordinal)))
+            if (_orchestrator.ForbiddenTransfers.TrueForAll(f => !string.Equals(f.Hash, file.Hash, StringComparison.Ordinal)))
             {
                 _orchestrator.ForbiddenTransfers.Add(new UploadFileTransfer(file)
                 {

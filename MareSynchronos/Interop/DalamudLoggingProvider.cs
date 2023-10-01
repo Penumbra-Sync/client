@@ -29,7 +29,7 @@ public sealed class DalamudLoggingProvider : ILoggerProvider
             catName = string.Join("", Enumerable.Range(0, 15 - catName.Length).Select(_ => " ")) + catName;
         }
 
-        return _loggers.GetOrAdd(catName, name => new DalamudLogger(catName, _mareConfigService));
+        return _loggers.GetOrAdd(catName, name => new DalamudLogger(name, _mareConfigService));
     }
 
     public void Dispose()

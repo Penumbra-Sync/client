@@ -11,7 +11,7 @@ using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Data.Enum;
 
 namespace MareSynchronos.UI.Components;
-
+/*
 public class DrawGroupPair : DrawPairBase
 {
     private static string _banReason = string.Empty;
@@ -334,4 +334,4 @@ public class DrawGroupPair : DrawPairBase
 
         return pos - spacing;
     }
-}
+}*/

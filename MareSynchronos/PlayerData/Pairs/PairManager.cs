@@ -52,10 +52,8 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
 
     public void AddGroupPair(GroupPairFullInfoDto dto)
     {
-        if (!_allClientPairs.ContainsKey(dto.User)) _allClientPairs[dto.User] = _pairFactory.Create();
-
-        var group = _allGroups[dto.Group];
-        _allClientPairs[dto.User].GroupPair[group] = dto;
+        if (!_allClientPairs.ContainsKey(dto.User)) 
+            _allClientPairs[dto.User] = _pairFactory.Create(new(dto.User, new List<string> { dto.Group.GID }, dto.SelfToOtherPermissions, dto.OtherToSelfPermissions));
         RecreateLazy();
     }
 
@@ -63,7 +61,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     {
         if (!_allClientPairs.ContainsKey(dto.User))
         {
-            _allClientPairs[dto.User] = _pairFactory.Create();
+            _allClientPairs[dto.User] = _pairFactory.Create(dto);
         }
         else
         {
@@ -255,8 +253,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
 
     internal void SetGroupPairStatusInfo(GroupPairUserInfoDto dto)
     {
-        var group = _allGroups[dto.Group];
-        _allClientPairs[dto.User].GroupPair[group].GroupPairStatusInfo = dto.GroupUserInfo;
+        _allGroups[dto.Group].GroupPairUserInfos[dto.UID] = dto.GroupUserInfo;
         RecreateLazy();
     }
 
@@ -310,7 +307,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
             Dictionary<GroupFullInfoDto, List<Pair>> outDict = new();
             foreach (var group in _allGroups)
             {
-                outDict[group.Value] = _allClientPairs.Select(p => p.Value).Where(p => p.GroupPair.Any(g => GroupDataComparer.Instance.Equals(group.Key, g.Key.Group))).ToList();
+                outDict[group.Value] = _allClientPairs.Select(p => p.Value).Where(p => p.UserPair.Groups.Exists(g => GroupDataComparer.Instance.Equals(group.Key, new(g)))).ToList();
             }
             return outDict;
         });

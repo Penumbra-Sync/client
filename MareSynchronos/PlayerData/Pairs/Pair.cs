@@ -23,10 +23,11 @@ public class Pair
     private CancellationTokenSource _applicationCts = new CancellationTokenSource();
     private OnlineUserIdentDto? _onlineUserIdentDto = null;
 
-    public Pair(ILogger<Pair> logger, PairHandlerFactory cachedPlayerFactory,
+    public Pair(ILogger<Pair> logger, UserPairDto userPair, PairHandlerFactory cachedPlayerFactory,
         MareMediator mediator, ServerConfigurationManager serverConfigurationManager)
     {
         _logger = logger;
+        UserPair = userPair;
         _cachedPlayerFactory = cachedPlayerFactory;
         _mediator = mediator;
         _serverConfigurationManager = serverConfigurationManager;

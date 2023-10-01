@@ -16,17 +16,15 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
     private readonly HttpClient _httpClient;
     private readonly MareConfigService _mareConfig;
     private readonly object _semaphoreModificationLock = new();
-    private readonly ServerConfigurationManager _serverManager;
     private readonly TokenProvider _tokenProvider;
     private int _availableDownloadSlots;
     private SemaphoreSlim _downloadSemaphore;
     private readonly ConcurrentDictionary<Guid, bool> _downloadReady = new();
 
     public FileTransferOrchestrator(ILogger<FileTransferOrchestrator> logger, MareConfigService mareConfig,
-        ServerConfigurationManager serverManager, MareMediator mediator, TokenProvider tokenProvider) : base(logger, mediator)
+        MareMediator mediator, TokenProvider tokenProvider) : base(logger, mediator)
     {
         _mareConfig = mareConfig;
-        _serverManager = serverManager;
         _tokenProvider = tokenProvider;
         _httpClient = new();
         _httpClient.Timeout = TimeSpan.FromSeconds(3000);

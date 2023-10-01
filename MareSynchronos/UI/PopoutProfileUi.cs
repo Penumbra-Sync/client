@@ -54,7 +54,6 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
             {
                 var border = ImGui.GetStyle().WindowBorderSize;
                 var padding = ImGui.GetStyle().WindowPadding;
-                var spacing = ImGui.GetStyle().ItemSpacing;
                 Size = new(256 + (padding.X * 2) + border, msg.Size.Y / ImGuiHelpers.GlobalScale);
                 _lastMainSize = msg.Size;
             }

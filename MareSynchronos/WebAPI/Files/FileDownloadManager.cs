@@ -319,7 +319,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         var fi = new FileInfo(filePath);
         Func<DateTime> RandomDayInThePast()
         {
-            DateTime start = new(1995, 1, 1);
+            DateTime start = new(1995, 1, 1, 1, 1, 1, DateTimeKind.Local);
             Random gen = new();
             int range = (DateTime.Today - start).Days;
             return () => start.AddDays(gen.Next(range));

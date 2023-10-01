@@ -50,7 +50,7 @@ public class MareProfileManager : MediatorSubscriberBase
     {
         if (!_mareProfiles.TryGetValue(data, out var profile))
         {
-            Task.Run(() => GetMareProfileFromService(data));
+            _ = Task.Run(() => GetMareProfileFromService(data));
             return (LoadingProfileData);
         }
 

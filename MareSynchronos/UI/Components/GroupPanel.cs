@@ -16,7 +16,7 @@ using MareSynchronos.UI.Components;
 using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI;
-
+/*
 internal sealed class GroupPanel
 {
     private readonly Dictionary<string, bool> _expandedGroupState = new(StringComparer.Ordinal);
@@ -763,4 +763,4 @@ internal sealed class GroupPanel
         }
         ImGui.EndChild();
     }
-}
+}*/
