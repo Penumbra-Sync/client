@@ -8,6 +8,7 @@ using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.WebAPI;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.UI.Handlers;
+using Dalamud.Interface.Utility;
 
 namespace MareSynchronos.UI.Components;
 

@@ -2,10 +2,11 @@
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.GameFonts;
 using Dalamud.Interface.ImGuiFileDialog;
+using Dalamud.Interface.Internal;
+using Dalamud.Interface.Utility;
 using Dalamud.Plugin;
 using Dalamud.Utility;
 using ImGuiNET;
-using ImGuiScene;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
 using MareSynchronos.Localization;
@@ -578,7 +579,10 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             ImGui.SameLine();
             ImGui.Text(_cacheScanner.TotalFiles == 1
                 ? "Collecting files"
-                : $"Processing {_cacheScanner.CurrentFileProgress} / {_cacheScanner.TotalFiles} files");
+                : $"Processing {_cacheScanner.CurrentFileProgress}/{_cacheScanner.TotalFilesStorage} from storage ({_cacheScanner.TotalFiles} scanned in)");
+            AttachToolTip("Note: it is possible to have more files in storage than scanned in, " +
+                "this is due to the scanner normally ignoring those files but the game loading them in and using them on your character, so they get " +
+                "added to the local storage.");
         }
         else if (_configService.Current.FileScanPaused)
         {
@@ -778,7 +782,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return _pluginInterface.UiBuilder.GetGameFontHandle(new GameFontStyle(GameFontFamilyAndSize.Axis12)).ImFont;
     }
 
-    internal TextureWrap LoadImage(byte[] imageData)
+    internal IDalamudTextureWrap LoadImage(byte[] imageData)
     {
         return _pluginInterface.UiBuilder.LoadImage(imageData);
     }

@@ -1,4 +1,5 @@
 ﻿using Dalamud.Game.Gui.Dtr;
+using Dalamud.Plugin.Services;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Configurations;
 using MareSynchronos.PlayerData.Pairs;
@@ -13,14 +14,14 @@ public sealed class DtrEntry : IDisposable, IHostedService
     private readonly ApiController _apiController;
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly ILogger<DtrEntry> _logger;
-    private readonly DtrBar _dtrBar;
+    private readonly IDtrBar _dtrBar;
     private readonly ConfigurationServiceBase<MareConfig> _configService;
     private Lazy<DtrBarEntry> _entry;
     private readonly PairManager _pairManager;
     private Task? _runTask;
     private string? _text;
 
-    public DtrEntry(ILogger<DtrEntry> logger, DtrBar dtrBar, ConfigurationServiceBase<MareConfig> configService, PairManager pairManager, ApiController apiController)
+    public DtrEntry(ILogger<DtrEntry> logger, IDtrBar dtrBar, ConfigurationServiceBase<MareConfig> configService, PairManager pairManager, ApiController apiController)
     {
         _logger = logger;
         _dtrBar = dtrBar;

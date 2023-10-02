@@ -1,9 +1,6 @@
-﻿using Dalamud.Game;
-using Dalamud.Game.ClientState;
-using Dalamud.Game.ClientState.Conditions;
-using Dalamud.Game.ClientState.Objects;
+﻿using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.SubKinds;
-using Dalamud.Game.Gui;
+using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
@@ -21,13 +18,13 @@ namespace MareSynchronos.Services;
 public class DalamudUtilService : IHostedService
 {
     private readonly List<uint> _classJobIdsIgnoredForPets = new() { 30 };
-    private readonly ClientState _clientState;
-    private readonly Condition _condition;
-    private readonly Framework _framework;
-    private readonly GameGui _gameGui;
+    private readonly IClientState _clientState;
+    private readonly ICondition _condition;
+    private readonly IFramework _framework;
+    private readonly IGameGui _gameGui;
     private readonly ILogger<DalamudUtilService> _logger;
     private readonly MareMediator _mediator;
-    private readonly ObjectTable _objectTable;
+    private readonly IObjectTable _objectTable;
     private readonly PerformanceCollectorService _performanceCollector;
     private uint? _classJobId = 0;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
@@ -37,8 +34,8 @@ public class DalamudUtilService : IHostedService
     private Dictionary<string, (string Name, nint Address)> _playerCharas = new(StringComparer.Ordinal);
     private bool _sentBetweenAreas = false;
 
-    public DalamudUtilService(ILogger<DalamudUtilService> logger, ClientState clientState, ObjectTable objectTable, Framework framework,
-        GameGui gameGui, Condition condition, Dalamud.Data.DataManager gameData, MareMediator mediator, PerformanceCollectorService performanceCollector)
+    public DalamudUtilService(ILogger<DalamudUtilService> logger, IClientState clientState, IObjectTable objectTable, IFramework framework,
+        IGameGui gameGui, ICondition condition, IDataManager gameData, MareMediator mediator, PerformanceCollectorService performanceCollector)
     {
         _logger = logger;
         _clientState = clientState;
@@ -77,6 +74,8 @@ public class DalamudUtilService : IHostedService
         return await RunOnFrameworkThread(() => _objectTable.CreateObjectReference(reference)).ConfigureAwait(false);
     }
 
+    public bool IsOnFrameworkThread => _framework.IsInFrameworkUpdateThread;
+
     public void EnsureIsOnFramework()
     {
         if (!_framework.IsInFrameworkUpdateThread) throw new InvalidOperationException("Can only be run on Framework");
@@ -88,6 +87,13 @@ public class DalamudUtilService : IHostedService
         var objTableObj = _objectTable[index];
         if (objTableObj!.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) return null;
         return (Dalamud.Game.ClientState.Objects.Types.Character)objTableObj;
+    }
+
+    public Dalamud.Game.ClientState.Objects.Types.Character? GetGposeCharacterFromObjectTableByName(string name, bool onlyGposeCharacters = false)
+    {
+        EnsureIsOnFramework();
+        return (Dalamud.Game.ClientState.Objects.Types.Character?)_objectTable.Where(i => !onlyGposeCharacters || i.ObjectIndex >= 200)
+            .FirstOrDefault(f => f.Name.ToString() == name);
     }
 
     public unsafe IntPtr GetCompanion(IntPtr? playerPointer = null)
@@ -385,7 +391,7 @@ public class DalamudUtilService : IHostedService
         }
     }
 
-    private void FrameworkOnUpdate(Framework framework)
+    private void FrameworkOnUpdate(IFramework framework)
     {
         _performanceCollector.LogPerformance(this, "FrameworkOnUpdate", FrameworkOnUpdateInternal);
     }

@@ -1,6 +1,6 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
-using Dalamud.Interface.Raii;
+using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.Interop;

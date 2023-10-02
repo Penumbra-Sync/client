@@ -1,7 +1,7 @@
-﻿using Dalamud.Game.Gui;
-using Dalamud.Game.Text.SeStringHandling;
+﻿using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface;
 using Dalamud.Interface.Internal.Notifications;
+using Dalamud.Plugin.Services;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.Services.Mediator;
@@ -11,11 +11,11 @@ namespace MareSynchronos.Services;
 
 public class NotificationService : DisposableMediatorSubscriberBase
 {
-    private readonly ChatGui _chatGui;
+    private readonly IChatGui _chatGui;
     private readonly MareConfigService _configurationService;
     private readonly UiBuilder _uiBuilder;
 
-    public NotificationService(ILogger<NotificationService> logger, MareMediator mediator, UiBuilder uiBuilder, ChatGui chatGui, MareConfigService configurationService) : base(logger, mediator)
+    public NotificationService(ILogger<NotificationService> logger, MareMediator mediator, UiBuilder uiBuilder, IChatGui chatGui, MareConfigService configurationService) : base(logger, mediator)
     {
         _uiBuilder = uiBuilder;
         _chatGui = chatGui;

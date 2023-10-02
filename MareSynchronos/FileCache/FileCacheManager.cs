@@ -201,7 +201,7 @@ public sealed class FileCacheManager : IDisposable
         AddHashedFile(fileCache);
     }
 
-    public (FileState, FileCacheEntity) ValidateFileCacheEntity(FileCacheEntity fileCache)
+    public (FileState State, FileCacheEntity FileCache) ValidateFileCacheEntity(FileCacheEntity fileCache)
     {
         fileCache = ReplacePathPrefixes(fileCache);
         FileInfo fi = new(fileCache.ResolvedFilepath);
@@ -275,7 +275,10 @@ public sealed class FileCacheManager : IDisposable
             _fileCaches[fileCache.Hash] = entries = new();
         }
 
-        entries.Add(fileCache);
+        if (!entries.Exists(u => string.Equals(u.PrefixedFilePath, fileCache.PrefixedFilePath, StringComparison.OrdinalIgnoreCase)))
+        {
+            entries.Add(fileCache);
+        }
     }
 
     private FileCacheEntity? CreateFileCacheEntity(FileInfo fileInfo, string prefixedPath, string? hash = null)

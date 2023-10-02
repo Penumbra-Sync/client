@@ -17,15 +17,17 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
 {
     private readonly Dictionary<string, FileDownloadStatus> _downloadStatus;
     private readonly FileCacheManager _fileDbManager;
+    private readonly FileCompactor _fileCompactor;
     private readonly FileTransferOrchestrator _orchestrator;
 
     public FileDownloadManager(ILogger<FileDownloadManager> logger, MareMediator mediator,
         FileTransferOrchestrator orchestrator,
-        FileCacheManager fileCacheManager) : base(logger, mediator)
+        FileCacheManager fileCacheManager, FileCompactor fileCompactor) : base(logger, mediator)
     {
         _downloadStatus = new Dictionary<string, FileDownloadStatus>(StringComparer.Ordinal);
         _orchestrator = orchestrator;
         _fileDbManager = fileCacheManager;
+        _fileCompactor = fileCompactor;
     }
 
     public List<DownloadFileTransfer> CurrentDownloads { get; private set; } = new();
@@ -64,7 +66,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         base.Dispose(disposing);
     }
 
-    private static void MungeBuffer(Span<byte> buffer)
+    public static void MungeBuffer(Span<byte> buffer)
     {
         for (int i = 0; i < buffer.Length; ++i)
         {
@@ -280,7 +282,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
 
                         var decompressedFile = LZ4Codec.Unwrap(compressedFileContent);
                         var filePath = _fileDbManager.GetCacheFilePath(fileHash, fileExtension);
-                        await File.WriteAllBytesAsync(filePath, decompressedFile, token).ConfigureAwait(false);
+                        await _fileCompactor.WriteAllBytesAsync(filePath, decompressedFile, token).ConfigureAwait(false);
 
                         PersistFileToStorage(fileHash, filePath);
                     }

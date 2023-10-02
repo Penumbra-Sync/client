@@ -5,7 +5,6 @@ using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
-using System.Linq;
 
 namespace MareSynchronos.PlayerData.Services;
 

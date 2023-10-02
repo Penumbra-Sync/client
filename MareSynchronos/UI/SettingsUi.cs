@@ -22,6 +22,7 @@ using MareSynchronos.PlayerData.Handlers;
 using System.Collections.Concurrent;
 using MareSynchronos.Utils;
 using System.Diagnostics;
+using MareSynchronos.FileCache;
 
 namespace MareSynchronos.UI;
 
@@ -32,6 +33,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private readonly FileUploadManager _fileTransferManager;
     private readonly FileTransferOrchestrator _fileTransferOrchestrator;
     private readonly ApiController _apiController;
+    private readonly FileCompactor _fileCompactor;
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly PairManager _pairManager;
     private readonly PerformanceCollectorService _performanceCollector;
@@ -54,7 +56,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         MareMediator mediator, PerformanceCollectorService performanceCollector,
         FileUploadManager fileTransferManager,
         FileTransferOrchestrator fileTransferOrchestrator,
-        ApiController apiController) : base(logger, mediator, "Mare Synchronos Settings")
+        FileCompactor fileCompactor, ApiController apiController) : base(logger, mediator, "Mare Synchronos Settings")
     {
         _configService = configService;
         _mareCharaFileManager = mareCharaFileManager;
@@ -64,6 +66,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _fileTransferManager = fileTransferManager;
         _fileTransferOrchestrator = fileTransferOrchestrator;
         _apiController = apiController;
+        _fileCompactor = fileCompactor;
         _uiShared = uiShared;
 
         SizeConstraints = new WindowSizeConstraints()
@@ -438,6 +441,42 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _uiShared.DrawTimeSpanBetweenScansSetting();
         _uiShared.DrawCacheDirectorySetting();
         ImGui.Text($"Currently utilized local storage: {UiSharedService.ByteToString(_uiShared.FileCacheSize)}");
+        bool isLinux = Util.IsWine();
+        if (isLinux) ImGui.BeginDisabled();
+        bool useFileCompactor = _configService.Current.UseCompactor;
+        if (ImGui.Checkbox("Use file compactor", ref useFileCompactor))
+        {
+            _configService.Current.UseCompactor = useFileCompactor;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("The file compactor can massively reduce your saved files. It might incur a minor penalty on loading files on a slow CPU." + Environment.NewLine
+            + "It is recommended to leave it enabled to save on space.");
+        ImGui.SameLine();
+        if (!_fileCompactor.MassCompactRunning)
+        {
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.FileArchive, "Compact all files in storage"))
+            {
+                _ = Task.Run(() => _fileCompactor.CompactStorage(true));
+            }
+            UiSharedService.AttachToolTip("This will run compression on all files in your current Mare Storage." + Environment.NewLine
+                + "You do not need to run this manually if you keep the file compactor enabled.");
+            ImGui.SameLine();
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.File, "Decompact all files in storage"))
+            {
+                _ = Task.Run(() => _fileCompactor.CompactStorage(false));
+            }
+            UiSharedService.AttachToolTip("This will run decompression on all files in your current Mare Storage.");
+        }
+        else
+        {
+            UiSharedService.ColorText($"File compactor currently running ({_fileCompactor.Progress})", ImGuiColors.DalamudYellow);
+        }
+        if (isLinux)
+        {
+            ImGui.EndDisabled();
+            ImGui.Text("The file compactor is only available on Windows.");
+        }
+
         ImGui.Dummy(new Vector2(10, 10));
         ImGui.Text("To clear the local storage accept the following disclaimer");
         ImGui.Indent();

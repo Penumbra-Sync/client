@@ -5,7 +5,6 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.UI;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
-using Lumina.Data;
 using Lumina.Data.Files;
 
 namespace MareSynchronos.Services;
