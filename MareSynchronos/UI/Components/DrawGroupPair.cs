@@ -9,6 +9,7 @@ using MareSynchronos.API.Dto.User;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Data.Enum;
+using Dalamud.Interface.Utility;
 
 namespace MareSynchronos.UI.Components;
 

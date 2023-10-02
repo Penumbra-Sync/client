@@ -14,6 +14,7 @@ using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.UI.Components;
 using MareSynchronos.UI.Handlers;
+using Dalamud.Interface.Utility;
 
 namespace MareSynchronos.UI;
 

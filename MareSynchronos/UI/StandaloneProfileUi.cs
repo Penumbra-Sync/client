@@ -1,6 +1,5 @@
 ﻿using Dalamud.Interface.Colors;
 using ImGuiNET;
-using ImGuiScene;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
@@ -8,7 +7,8 @@ using MareSynchronos.Services.ServerConfiguration;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
 using MareSynchronos.API.Data.Extensions;
-using Dalamud.Interface;
+using Dalamud.Interface.Utility;
+using Dalamud.Interface.Internal;
 
 namespace MareSynchronos.UI;
 
@@ -20,8 +20,8 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
     private bool _adjustedForScrollBars = false;
     private byte[] _lastProfilePicture = Array.Empty<byte>();
     private byte[] _lastSupporterPicture = Array.Empty<byte>();
-    private TextureWrap? _supporterTextureWrap;
-    private TextureWrap? _textureWrap;
+    private IDalamudTextureWrap? _supporterTextureWrap;
+    private IDalamudTextureWrap? _textureWrap;
 
     public StandaloneProfileUi(ILogger<StandaloneProfileUi> logger, MareMediator mediator, UiSharedService uiBuilder,
         ServerConfigurationManager serverManager, MareProfileManager mareProfileManager, Pair pair)

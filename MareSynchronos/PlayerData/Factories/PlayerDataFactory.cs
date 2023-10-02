@@ -5,15 +5,14 @@ using FFXIVClientStructs.FFXIV.Client.System.Resource;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.Interop;
 using Object = FFXIVClientStructs.FFXIV.Client.Graphics.Scene.Object;
-using Penumbra.String;
 using Weapon = MareSynchronos.Interop.FFXIV.Weapon;
 using MareSynchronos.FileCache;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
 using MareSynchronos.PlayerData.Data;
 using MareSynchronos.PlayerData.Handlers;
-using MareSynchronos.Interop.FFXIV;
 using MareSynchronos.Services;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 
 namespace MareSynchronos.PlayerData.Factories;
 
@@ -112,7 +111,7 @@ public class PlayerDataFactory
         {
             var mainHandWeapon = weaponObject->WeaponRenderModel->RenderModel;
 
-            AddReplacementsFromRenderModel(mainHandWeapon, forwardResolve, reverseResolve);
+            AddReplacementsFromRenderModel((Model*)mainHandWeapon, forwardResolve, reverseResolve);
 
             foreach (var item in _transientResourceManager.GetTransientResources((IntPtr)weaponObject))
             {
@@ -124,7 +123,7 @@ public class PlayerDataFactory
             {
                 var offHandWeapon = ((Weapon*)weaponObject->NextSibling)->WeaponRenderModel->RenderModel;
 
-                AddReplacementsFromRenderModel(offHandWeapon, forwardResolve, reverseResolve);
+                AddReplacementsFromRenderModel((Model*)offHandWeapon, forwardResolve, reverseResolve);
 
                 foreach (var item in _transientResourceManager.GetTransientResources((IntPtr)offHandWeapon))
                 {
@@ -134,10 +133,10 @@ public class PlayerDataFactory
             }
         }
 
-        AddReplacementSkeleton(((HumanExt*)human)->Human.RaceSexId, forwardResolve);
+        AddReplacementSkeleton((human)->RaceSexId, forwardResolve);
         try
         {
-            AddReplacementsFromTexture(new ByteString(((HumanExt*)human)->Decal->FileName()).ToString(), forwardResolve, reverseResolve, doNotReverseResolve: false);
+            AddReplacementsFromTexture((human)->Decal->ResourceHandle.FileName.ToString(), forwardResolve, reverseResolve, doNotReverseResolve: false);
         }
         catch
         {
@@ -145,7 +144,7 @@ public class PlayerDataFactory
         }
         try
         {
-            AddReplacementsFromTexture(new ByteString(((HumanExt*)human)->LegacyBodyDecal->FileName()).ToString(), forwardResolve, reverseResolve, doNotReverseResolve: false);
+            AddReplacementsFromTexture((human)->LegacyBodyDecal->ResourceHandle.FileName.ToString(), forwardResolve, reverseResolve, doNotReverseResolve: false);
         }
         catch
         {
@@ -158,7 +157,7 @@ public class PlayerDataFactory
         string fileName;
         try
         {
-            fileName = new ByteString(mtrl->ResourceHandle->FileName()).ToString();
+            fileName = mtrl->MaterialResourceHandle->ResourceHandle.FileName.ToString();
         }
         catch
         {
@@ -171,13 +170,13 @@ public class PlayerDataFactory
 
         reverseResolve.Add(mtrlPath);
 
-        var mtrlResourceHandle = (MtrlResource*)mtrl->ResourceHandle;
-        for (var resIdx = 0; resIdx < mtrlResourceHandle->NumTex; resIdx++)
+        var mtrlResourceHandle = mtrl->MaterialResourceHandle;
+        for (var resIdx = 0; resIdx < mtrlResourceHandle->TextureCount; resIdx++)
         {
             string? texPath = null;
             try
             {
-                texPath = new ByteString(mtrlResourceHandle->TexString(resIdx)).ToString();
+                texPath = mtrlResourceHandle->TexturePathString(resIdx);
             }
             catch (Exception e)
             {
@@ -191,7 +190,7 @@ public class PlayerDataFactory
 
         try
         {
-            var shpkPath = "shader/sm5/shpk/" + new ByteString(mtrlResourceHandle->ShpkString).ToString();
+            var shpkPath = "shader/sm5/shpk/" + mtrlResourceHandle->ShpkNameString;
             _logger.LogTrace("Checking File Replacement for Shader {path}", shpkPath);
             forwardResolve.Add(shpkPath);
         }
@@ -201,9 +200,9 @@ public class PlayerDataFactory
         }
     }
 
-    private unsafe void AddReplacementsFromRenderModel(RenderModel* mdl, HashSet<string> forwardResolve, HashSet<string> reverseResolve)
+    private unsafe void AddReplacementsFromRenderModel(Model* mdl, HashSet<string> forwardResolve, HashSet<string> reverseResolve)
     {
-        if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
+        if (mdl == null || mdl->ModelResourceHandle == null || mdl->ModelResourceHandle->ResourceHandle.Category != ResourceCategory.Chara)
         {
             return;
         }
@@ -211,7 +210,7 @@ public class PlayerDataFactory
         string mdlPath;
         try
         {
-            mdlPath = new ByteString(mdl->ResourceHandle->FileName()).ToString();
+            mdlPath = mdl->ModelResourceHandle->ResourceHandle.FileName.ToString();
         }
         catch
         {
@@ -224,7 +223,7 @@ public class PlayerDataFactory
 
         for (var mtrlIdx = 0; mtrlIdx < mdl->MaterialCount; mtrlIdx++)
         {
-            var mtrl = (Material*)mdl->Materials[mtrlIdx];
+            var mtrl = mdl->Materials[mtrlIdx];
             if (mtrl == null) continue;
 
             AddReplacementsFromMaterial(mtrl, forwardResolve, reverseResolve);
@@ -269,8 +268,8 @@ public class PlayerDataFactory
         var human = (Human*)((Character*)charaPointer)->GameObject.GetDrawObject();
         for (var mdlIdx = 0; mdlIdx < human->CharacterBase.SlotCount; ++mdlIdx)
         {
-            var mdl = (RenderModel*)human->CharacterBase.ModelArray[mdlIdx];
-            if (mdl == null || mdl->ResourceHandle == null || mdl->ResourceHandle->Category != ResourceCategory.Chara)
+            var mdl = human->CharacterBase.Models[mdlIdx];
+            if (mdl == null || mdl->ModelResourceHandle == null || mdl->ModelResourceHandle->ResourceHandle.Category != ResourceCategory.Chara)
             {
                 continue;
             }

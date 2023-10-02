@@ -1,4 +1,4 @@
-﻿using Dalamud.Logging;
+﻿using Dalamud.Plugin.Services;
 using MareSynchronos.MareConfiguration;
 using Microsoft.Extensions.Logging;
 using System.Text;
@@ -8,12 +8,14 @@ namespace MareSynchronos.Interop;
 internal sealed class DalamudLogger : ILogger
 {
     private readonly MareConfigService _mareConfigService;
+    private readonly IPluginLog _pluginLog;
     private readonly string _name;
 
-    public DalamudLogger(string name, MareConfigService mareConfigService)
+    public DalamudLogger(string name, MareConfigService mareConfigService, IPluginLog pluginLog)
     {
         _name = name;
         _mareConfigService = mareConfigService;
+        _pluginLog = pluginLog;
     }
 
     public IDisposable BeginScope<TState>(TState state) => default!;
@@ -28,18 +30,18 @@ internal sealed class DalamudLogger : ILogger
         if (!IsEnabled(logLevel)) return;
 
         if ((int)logLevel <= (int)LogLevel.Information)
-            PluginLog.Information($"[{_name}]{{{(int)logLevel}}} {state}");
+            _pluginLog.Information($"[{_name}]{{{(int)logLevel}}} {state}");
         else
         {
             StringBuilder sb = new();
             sb.AppendLine($"[{_name}]{{{(int)logLevel}}} {state}: {exception?.Message}");
             sb.AppendLine(exception?.StackTrace);
             if (logLevel == LogLevel.Warning)
-                PluginLog.Warning(sb.ToString());
+                _pluginLog.Warning(sb.ToString());
             else if (logLevel == LogLevel.Error)
-                PluginLog.Error(sb.ToString());
+                _pluginLog.Error(sb.ToString());
             else
-                PluginLog.Fatal(sb.ToString());
+                _pluginLog.Fatal(sb.ToString());
         }
     }
 }

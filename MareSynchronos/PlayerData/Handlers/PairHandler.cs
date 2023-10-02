@@ -1,5 +1,4 @@
-﻿using Dalamud.Logging;
-using MareSynchronos.API.Data;
+﻿using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
@@ -586,7 +585,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         }
         catch (Exception ex)
         {
-            PluginLog.Error(ex, "[BASE-{appBase}] Something went wrong during calculation replacements", applicationBase);
+            Logger.LogError(ex, "[BASE-{appBase}] Something went wrong during calculation replacements", applicationBase);
         }
         if (hasMigrationChanges) _fileDbManager.WriteOutFullCsv();
         st.Stop();

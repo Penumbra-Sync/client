@@ -437,7 +437,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _uiShared.DrawTimeSpanBetweenScansSetting();
         _uiShared.DrawCacheDirectorySetting();
         ImGui.Text($"Currently utilized local storage: {UiSharedService.ByteToString(_uiShared.FileCacheSize)}");
-        bool isLinux = Util.IsLinux();
+        bool isLinux = Util.IsWine();
         if (isLinux) ImGui.BeginDisabled();
         bool useFileCompactor = _configService.Current.UseCompactor;
         if (ImGui.Checkbox("Use file compactor", ref useFileCompactor))

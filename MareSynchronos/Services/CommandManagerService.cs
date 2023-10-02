@@ -1,4 +1,5 @@
 ﻿using Dalamud.Game.Command;
+using Dalamud.Plugin.Services;
 using MareSynchronos.FileCache;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
@@ -12,14 +13,14 @@ public sealed class CommandManagerService : IDisposable
     private const string _commandName = "/mare";
 
     private readonly ApiController _apiController;
-    private readonly CommandManager _commandManager;
+    private readonly ICommandManager _commandManager;
     private readonly MareMediator _mediator;
     private readonly PerformanceCollectorService _performanceCollectorService;
     private readonly PeriodicFileScanner _periodicFileScanner;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly UiService _uiService;
 
-    public CommandManagerService(CommandManager commandManager, PerformanceCollectorService performanceCollectorService,
+    public CommandManagerService(ICommandManager commandManager, PerformanceCollectorService performanceCollectorService,
         UiService uiService, ServerConfigurationManager serverConfigurationManager, PeriodicFileScanner periodicFileScanner,
         ApiController apiController, MareMediator mediator)
     {

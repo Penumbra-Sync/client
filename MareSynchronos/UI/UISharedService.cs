@@ -2,10 +2,11 @@
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.GameFonts;
 using Dalamud.Interface.ImGuiFileDialog;
+using Dalamud.Interface.Internal;
+using Dalamud.Interface.Utility;
 using Dalamud.Plugin;
 using Dalamud.Utility;
 using ImGuiNET;
-using ImGuiScene;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
 using MareSynchronos.Localization;
@@ -781,7 +782,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return _pluginInterface.UiBuilder.GetGameFontHandle(new GameFontStyle(GameFontFamilyAndSize.Axis12)).ImFont;
     }
 
-    internal TextureWrap LoadImage(byte[] imageData)
+    internal IDalamudTextureWrap LoadImage(byte[] imageData)
     {
         return _pluginInterface.UiBuilder.LoadImage(imageData);
     }

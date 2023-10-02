@@ -1,15 +1,8 @@
 ﻿using Dalamud.ContextMenu;
-using Dalamud.Data;
-using Dalamud.Game;
-using Dalamud.Game.ClientState;
-using Dalamud.Game.ClientState.Conditions;
-using Dalamud.Game.ClientState.Objects;
-using Dalamud.Game.Command;
-using Dalamud.Game.Gui;
-using Dalamud.Game.Gui.Dtr;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
+using Dalamud.Plugin.Services;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
 using MareSynchronos.MareConfiguration;
@@ -35,16 +28,16 @@ public sealed class Plugin : IDalamudPlugin
 {
     private readonly CancellationTokenSource _pluginCts = new();
 
-    public Plugin(DalamudPluginInterface pluginInterface, CommandManager commandManager, DataManager gameData,
-        Framework framework, ObjectTable objectTable, ClientState clientState, Condition condition, ChatGui chatGui,
-        GameGui gameGui, DtrBar dtrBar)
+    public Plugin(DalamudPluginInterface pluginInterface, ICommandManager commandManager, IDataManager gameData,
+        IFramework framework, IObjectTable objectTable, IClientState clientState, ICondition condition, IChatGui chatGui,
+        IGameGui gameGui, IDtrBar dtrBar, IPluginLog pluginLog)
     {
         _ = new HostBuilder()
         .UseContentRoot(pluginInterface.ConfigDirectory.FullName)
         .ConfigureLogging(lb =>
         {
             lb.ClearProviders();
-            lb.AddDalamudLogging();
+            lb.AddDalamudLogging(pluginLog);
             lb.SetMinimumLevel(LogLevel.Trace);
         })
         .ConfigureServices(collection =>
@@ -119,7 +112,7 @@ public sealed class Plugin : IDalamudPlugin
                 s.GetRequiredService<WindowSystem>(), s.GetServices<WindowMediatorSubscriberBase>(), s.GetRequiredService<Func<Pair, StandaloneProfileUi>>(),
                 s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareMediator>()));
             collection.AddScoped((s) => new CommandManagerService(commandManager, s.GetRequiredService<PerformanceCollectorService>(), s.GetRequiredService<UiService>(),
-                s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<PeriodicFileScanner>(), s.GetRequiredService<ApiController>(), 
+                s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<PeriodicFileScanner>(), s.GetRequiredService<ApiController>(),
                 s.GetRequiredService<MareMediator>()));
             collection.AddScoped((s) => new NotificationService(s.GetRequiredService<ILogger<NotificationService>>(),
                 s.GetRequiredService<MareMediator>(), pluginInterface.UiBuilder, chatGui, s.GetRequiredService<MareConfigService>()));

@@ -1,5 +1,4 @@
-﻿using LZ4;
-using MareSynchronos.API.Data;
+﻿using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.Files;
 using MareSynchronos.API.Routes;
 using MareSynchronos.FileCache;

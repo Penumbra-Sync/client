@@ -1,6 +1,5 @@
 ﻿using Dalamud.Interface.Colors;
 using ImGuiNET;
-using ImGuiScene;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
@@ -9,7 +8,8 @@ using Microsoft.Extensions.Logging;
 using System.Numerics;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.MareConfiguration;
-using Dalamud.Interface;
+using Dalamud.Interface.Utility;
+using Dalamud.Interface.Internal;
 
 namespace MareSynchronos.UI;
 
@@ -23,8 +23,8 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
     private byte[] _lastProfilePicture = Array.Empty<byte>();
     private byte[] _lastSupporterPicture = Array.Empty<byte>();
     private Pair? _pair;
-    private TextureWrap? _supporterTextureWrap;
-    private TextureWrap? _textureWrap;
+    private IDalamudTextureWrap? _supporterTextureWrap;
+    private IDalamudTextureWrap? _textureWrap;
 
     public PopoutProfileUi(ILogger<PopoutProfileUi> logger, MareMediator mediator, UiSharedService uiBuilder,
         ServerConfigurationManager serverManager, MareConfigService mareConfigService,

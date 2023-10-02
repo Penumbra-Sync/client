@@ -1,5 +1,5 @@
-﻿using Dalamud.Interface;
-using Dalamud.Interface.Colors;
+﻿using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility;
 using Dalamud.Utility;
 using ImGuiNET;
 using MareSynchronos.FileCache;
@@ -49,7 +49,7 @@ public class IntroUi : WindowMediatorSubscriberBase
         Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => IsOpen = false);
         Mediator.Subscribe<SwitchToIntroUiMessage>(this, (_) =>
         {
-            _configService.Current.UseCompactor = !Util.IsLinux();
+            _configService.Current.UseCompactor = !Util.IsWine();
             IsOpen = true;
         });
     }
@@ -174,7 +174,7 @@ public class IntroUi : WindowMediatorSubscriberBase
             {
                 _uiShared.DrawFileScanState();
             }
-            if (!Util.IsLinux())
+            if (!Util.IsWine())
             {
                 var useFileCompactor = _configService.Current.UseCompactor;
                 if (ImGui.Checkbox("Use File Compactor", ref useFileCompactor))

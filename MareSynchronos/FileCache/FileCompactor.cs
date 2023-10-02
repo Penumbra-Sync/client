@@ -64,7 +64,7 @@ public sealed class FileCompactor
 
     public long GetFileSizeOnDisk(string filePath)
     {
-        if (Dalamud.Utility.Util.IsLinux()) return new FileInfo(filePath).Length;
+        if (Dalamud.Utility.Util.IsWine()) return new FileInfo(filePath).Length;
 
         var clusterSize = GetClusterSize(filePath);
         if (clusterSize == -1) return new FileInfo(filePath).Length;
@@ -75,9 +75,9 @@ public sealed class FileCompactor
 
     public async Task WriteAllBytesAsync(string filePath, byte[] decompressedFile, CancellationToken token)
     {
-        await File.WriteAllBytesAsync(filePath, decompressedFile, token);
+        await File.WriteAllBytesAsync(filePath, decompressedFile, token).ConfigureAwait(false);
 
-        if (Dalamud.Utility.Util.IsLinux() || !_mareConfigService.Current.UseCompactor)
+        if (Dalamud.Utility.Util.IsWine() || !_mareConfigService.Current.UseCompactor)
         {
             return;
         }

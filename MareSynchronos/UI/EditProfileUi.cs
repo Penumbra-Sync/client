@@ -2,8 +2,9 @@
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.GameFonts;
 using Dalamud.Interface.ImGuiFileDialog;
+using Dalamud.Interface.Internal;
+using Dalamud.Interface.Utility;
 using ImGuiNET;
-using ImGuiScene;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.Services;
@@ -23,7 +24,7 @@ public class EditProfileUi : WindowMediatorSubscriberBase
     private bool _adjustedForScollBarsLocalProfile = false;
     private bool _adjustedForScollBarsOnlineProfile = false;
     private string _descriptionText = string.Empty;
-    private TextureWrap? _pfpTextureWrap;
+    private IDalamudTextureWrap? _pfpTextureWrap;
     private string _profileDescription = string.Empty;
     private byte[] _profileImage = Array.Empty<byte>();
     private bool _showFileDialogError = false;
