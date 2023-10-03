@@ -4,6 +4,7 @@ using Dalamud.Interface.GameFonts;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Internal;
 using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
 using Dalamud.Plugin;
 using Dalamud.Utility;
 using ImGuiNET;
@@ -265,11 +266,11 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.PopID();
     }
 
-    public static void FontText(string text, ImFontPtr font)
+    public static void FontText(string text, ImFontPtr font, Vector4? color = null)
     {
-        ImGui.PushFont(font);
+        using var pushedFont = ImRaii.PushFont(font);
+        using var pushedColor = ImRaii.PushColor(ImGuiCol.Text, Color(color ?? new Vector4(1, 1, 1, 1)), color != null);
         ImGui.TextUnformatted(text);
-        ImGui.PopFont();
     }
 
     public static Vector4 GetBoolColor(bool input) => input ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
@@ -616,30 +617,58 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         var customizeColor = _customizePlusExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         var paletteColor = _palettePlusExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         var honorificColor = _honorificExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
-        ImGui.Text("Penumbra:");
+        var check = FontAwesomeIcon.Check.ToIconString();
+        var cross = FontAwesomeIcon.SquareXmark.ToIconString();
+        ImGui.Text("Mandatory Plugins:");
+
         ImGui.SameLine();
-        ImGui.TextColored(penumbraColor, _penumbraExists ? "Available" : "Unavailable");
+        ImGui.Text("Penumbra");
         ImGui.SameLine();
-        ImGui.Text("Glamourer:");
+        FontText(_penumbraExists ? check : cross, UiBuilder.IconFont, penumbraColor);
         ImGui.SameLine();
-        ImGui.TextColored(glamourerColor, _glamourerExists ? "Available" : "Unavailable");
-        ImGui.Text("Optional Addons");
+        AttachToolTip($"Penumbra is " + (_penumbraExists ? "available and up to date." : "unavailable or not up to date."));
+        ImGui.Spacing();
+
         ImGui.SameLine();
-        ImGui.Text("SimpleHeels:");
+        ImGui.Text("Glamourer");
         ImGui.SameLine();
-        ImGui.TextColored(heelsColor, _heelsExists ? "Available" : "Unavailable");
+        FontText(_glamourerExists ? check : cross, UiBuilder.IconFont, penumbraColor);
         ImGui.SameLine();
-        ImGui.Text("Customize+:");
+        AttachToolTip($"Glamourer is " + (_glamourerExists ? "available and up to date." : "unavailable or not up to date."));
+        ImGui.Spacing();
+
+        ImGui.Text("Optional Plugins:");
         ImGui.SameLine();
-        ImGui.TextColored(customizeColor, _customizePlusExists ? "Available" : "Unavailable");
+        ImGui.Text("SimpleHeels");
         ImGui.SameLine();
-        ImGui.Text("Palette+:");
+        FontText(_heelsExists ? check : cross, UiBuilder.IconFont, penumbraColor);
         ImGui.SameLine();
-        ImGui.TextColored(paletteColor, _palettePlusExists ? "Available" : "Unavailable");
+        AttachToolTip($"SimpleHeels is " + (_heelsExists ? "available and up to date." : "unavailable or not up to date."));
+        ImGui.Spacing();
+
         ImGui.SameLine();
-        ImGui.Text("Honorific:");
+        ImGui.Text("Customize+");
         ImGui.SameLine();
-        ImGui.TextColored(honorificColor, _honorificExists ? "Available" : "Unavailable");
+        FontText(_customizePlusExists ? check : cross, UiBuilder.IconFont, penumbraColor);
+        ImGui.SameLine();
+        AttachToolTip($"Customize+ is " + (_customizePlusExists ? "available and up to date." : "unavailable or not up to date."));
+        ImGui.Spacing();
+
+        ImGui.SameLine();
+        ImGui.Text("Palette+");
+        ImGui.SameLine();
+        FontText(_palettePlusExists ? check : cross, UiBuilder.IconFont, penumbraColor);
+        ImGui.SameLine();
+        AttachToolTip($"Palette+ is " + (_palettePlusExists ? "available and up to date." : "unavailable or not up to date."));
+        ImGui.Spacing();
+
+        ImGui.SameLine();
+        ImGui.Text("Honorific");
+        ImGui.SameLine();
+        FontText(_honorificExists ? check : cross, UiBuilder.IconFont, penumbraColor);
+        ImGui.SameLine();
+        AttachToolTip($"Honorific is " + (_honorificExists ? "available and up to date." : "unavailable or not up to date."));
+        ImGui.Spacing();
 
         if (!_penumbraExists || !_glamourerExists)
         {

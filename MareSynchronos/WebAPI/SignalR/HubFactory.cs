@@ -1,4 +1,5 @@
-﻿using MareSynchronos.API.SignalR;
+﻿using Dalamud.Plugin.Services;
+using MareSynchronos.API.SignalR;
 using MareSynchronos.Interop;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
@@ -17,13 +18,16 @@ public class HubFactory : MediatorSubscriberBase
 {
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly MareConfigService _configService;
+    private readonly IPluginLog _pluginLog;
     private HubConnection? _instance;
     private bool _isDisposed = false;
 
-    public HubFactory(ILogger<HubFactory> logger, MareMediator mediator, ServerConfigurationManager serverConfigurationManager, MareConfigService configService) : base(logger, mediator)
+    public HubFactory(ILogger<HubFactory> logger, MareMediator mediator, ServerConfigurationManager serverConfigurationManager, MareConfigService configService,
+        IPluginLog pluginLog) : base(logger, mediator)
     {
         _serverConfigurationManager = serverConfigurationManager;
         _configService = configService;
+        _pluginLog = pluginLog;
     }
 
     private HubConnection BuildHubConnection()
@@ -58,7 +62,7 @@ public class HubFactory : MediatorSubscriberBase
             .WithAutomaticReconnect(new ForeverRetryPolicy(Mediator))
             .ConfigureLogging(a =>
             {
-                a.ClearProviders().AddProvider(new DalamudLoggingProvider(_configService));
+                a.ClearProviders().AddProvider(new DalamudLoggingProvider(_configService, _pluginLog));
                 a.SetMinimumLevel(LogLevel.Information);
             })
             .Build();

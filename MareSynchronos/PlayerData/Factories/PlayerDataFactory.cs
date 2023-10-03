@@ -13,6 +13,7 @@ using MareSynchronos.PlayerData.Data;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
+using CharacterData = MareSynchronos.PlayerData.Data.CharacterData;
 
 namespace MareSynchronos.PlayerData.Factories;
 
