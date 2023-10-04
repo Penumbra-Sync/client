@@ -255,10 +255,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
                     case PlayerChanges.ModFiles:
                     case PlayerChanges.ModManip:
-                        if (!changes.Value.Contains(PlayerChanges.Glamourer))
-                        {
-                            await _ipcManager.PenumbraRedrawAsync(Logger, handler, applicationId, token).ConfigureAwait(false);
-                        }
+                        await _ipcManager.PenumbraRedrawAsync(Logger, handler, applicationId, token).ConfigureAwait(false);
                         break;
                 }
                 token.ThrowIfCancellationRequested();
