@@ -632,7 +632,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.SameLine();
         ImGui.Text("Glamourer");
         ImGui.SameLine();
-        FontText(_glamourerExists ? check : cross, UiBuilder.IconFont, penumbraColor);
+        FontText(_glamourerExists ? check : cross, UiBuilder.IconFont, glamourerColor);
         ImGui.SameLine();
         AttachToolTip($"Glamourer is " + (_glamourerExists ? "available and up to date." : "unavailable or not up to date."));
         ImGui.Spacing();
@@ -641,7 +641,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.SameLine();
         ImGui.Text("SimpleHeels");
         ImGui.SameLine();
-        FontText(_heelsExists ? check : cross, UiBuilder.IconFont, penumbraColor);
+        FontText(_heelsExists ? check : cross, UiBuilder.IconFont, heelsColor);
         ImGui.SameLine();
         AttachToolTip($"SimpleHeels is " + (_heelsExists ? "available and up to date." : "unavailable or not up to date."));
         ImGui.Spacing();
@@ -649,7 +649,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.SameLine();
         ImGui.Text("Customize+");
         ImGui.SameLine();
-        FontText(_customizePlusExists ? check : cross, UiBuilder.IconFont, penumbraColor);
+        FontText(_customizePlusExists ? check : cross, UiBuilder.IconFont, customizeColor);
         ImGui.SameLine();
         AttachToolTip($"Customize+ is " + (_customizePlusExists ? "available and up to date." : "unavailable or not up to date."));
         ImGui.Spacing();
@@ -657,7 +657,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.SameLine();
         ImGui.Text("Palette+");
         ImGui.SameLine();
-        FontText(_palettePlusExists ? check : cross, UiBuilder.IconFont, penumbraColor);
+        FontText(_palettePlusExists ? check : cross, UiBuilder.IconFont, paletteColor);
         ImGui.SameLine();
         AttachToolTip($"Palette+ is " + (_palettePlusExists ? "available and up to date." : "unavailable or not up to date."));
         ImGui.Spacing();
@@ -665,7 +665,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.SameLine();
         ImGui.Text("Honorific");
         ImGui.SameLine();
-        FontText(_honorificExists ? check : cross, UiBuilder.IconFont, penumbraColor);
+        FontText(_honorificExists ? check : cross, UiBuilder.IconFont, honorificColor);
         ImGui.SameLine();
         AttachToolTip($"Honorific is " + (_honorificExists ? "available and up to date." : "unavailable or not up to date."));
         ImGui.Spacing();

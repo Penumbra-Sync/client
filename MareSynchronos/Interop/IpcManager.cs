@@ -67,6 +67,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly FuncSubscriber<string, string, int, PenumbraApiEc> _penumbraRemoveTemporaryMod;
     private readonly FuncSubscriber<string> _penumbraResolveModDir;
     private readonly FuncSubscriber<string[], string[], (string[], string[][])> _penumbraResolvePaths;
+    private readonly ParamsFuncSubscriber<ushort, IReadOnlyDictionary<string, string[]>?[]> _penumbraResourcePaths;
     private readonly SemaphoreSlim _redrawSemaphore = new(2);
     private bool _customizePlusAvailable = false;
     private CancellationTokenSource _disposalCts = new();
@@ -103,6 +104,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
                 Mediator.Publish(new PenumbraModSettingChangedMessage());
         });
         _penumbraConvertTextureFile = Penumbra.Api.Ipc.ConvertTextureFile.Subscriber(pi);
+        _penumbraResourcePaths = Penumbra.Api.Ipc.GetGameObjectResourcePaths.Subscriber(pi);
 
         _penumbraGameObjectResourcePathResolved = Penumbra.Api.Ipc.GameObjectResourcePathResolved.Subscriber(pi, ResourceLoaded);
 
@@ -292,7 +294,8 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
             logger.LogDebug("[{appid}] Calling On IPC: GlamourerRevertByName", applicationId);
             _glamourerRevertByName.InvokeAction(name, LockCode);
         }
-        catch (Exception ex) {
+        catch (Exception ex)
+        {
             Logger.LogWarning(ex, "Error during Glamourer RevertByName");
         }
     }
@@ -573,8 +576,24 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         }
         Mediator.Publish(new ResumeScanMessage("TextureConversion"));
 
-        var gameObject = await _dalamudUtil.CreateGameObjectAsync(await _dalamudUtil.GetPlayerPointerAsync());
-        _penumbraRedrawObject.Invoke(gameObject!, RedrawType.Redraw);
+        await _dalamudUtil.RunOnFrameworkThread(async () =>
+        {
+            var gameObject = await _dalamudUtil.CreateGameObjectAsync(await _dalamudUtil.GetPlayerPointerAsync().ConfigureAwait(false)).ConfigureAwait(false);
+            _penumbraRedrawObject.Invoke(gameObject!, RedrawType.Redraw);
+        }).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyDictionary<string, string[]>?[]?> PenumbraGetCharacterData(ILogger logger, GameObjectHandler handler)
+    {
+        if (!CheckPenumbraApi()) return null;
+
+        return await _dalamudUtil.RunOnFrameworkThread(() =>
+        {
+            logger.LogTrace("Calling On IPC: Penumbra.GetGameObjectResourcePaths");
+            var idx = handler.GetGameObject()?.ObjectIndex;
+            if (idx == null) return null;
+            return _penumbraResourcePaths.Invoke(idx.Value);
+        }).ConfigureAwait(false);
     }
 
     protected override void Dispose(bool disposing)

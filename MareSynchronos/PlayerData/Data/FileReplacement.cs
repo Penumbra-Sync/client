@@ -8,7 +8,7 @@ public partial class FileReplacement
 {
     private readonly Lazy<string> _hashLazy;
 
-    public FileReplacement(List<string> gamePaths, string filePath, FileCacheManager fileDbManager)
+    public FileReplacement(string[] gamePaths, string filePath, FileCacheManager fileDbManager)
     {
         GamePaths = gamePaths.Select(g => g.Replace('\\', '/')).ToHashSet(StringComparer.Ordinal);
         ResolvedPath = filePath.Replace('\\', '/');

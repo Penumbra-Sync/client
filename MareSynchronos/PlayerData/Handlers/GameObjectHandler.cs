@@ -1,10 +1,12 @@
-﻿using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
+﻿using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
 using Penumbra.String;
 using System.Runtime.InteropServices;
+using static FFXIVClientStructs.FFXIV.Client.Game.Character.DrawDataContainer;
 using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;
 
 namespace MareSynchronos.PlayerData.Handlers;
@@ -201,7 +203,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
                 _clearCts?.CancelDispose();
                 _clearCts = null;
             }
-            var chara = (FFXIVClientStructs.FFXIV.Client.Game.Character.Character*)Address;
+            var chara = (Character*)Address;
             var name = new ByteString(chara->GameObject.Name).ToString();
             bool nameChange = !string.Equals(name, Name, StringComparison.Ordinal);
             if (nameChange)
@@ -214,8 +216,11 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
                 && ((CharacterBase*)DrawObjectAddress)->GetModelType() == CharacterBase.ModelType.Human)
             {
                 equipDiff = CompareAndUpdateEquipByteData((byte*)&((Human*)DrawObjectAddress)->Head);
-                equipDiff |= CompareAndUpdateMainHand(*((Weapon**)&chara->DrawData.MainHand + 1));
-                equipDiff |= CompareAndUpdateOffHand(*((Weapon**)&chara->DrawData.OffHand + 1));
+
+                ref var mh = ref chara->DrawData.Weapon(WeaponSlot.MainHand);
+                ref var oh = ref chara->DrawData.Weapon(WeaponSlot.OffHand);
+                equipDiff |= CompareAndUpdateMainHand((Weapon*)mh.DrawObject);
+                equipDiff |= CompareAndUpdateOffHand((Weapon*)oh.DrawObject);
 
                 if (equipDiff)
                     Logger.LogTrace("Checking [{this}] equip data as human from draw obj, result: {diff}", this, equipDiff);
@@ -226,8 +231,6 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
                 if (equipDiff)
                     Logger.LogTrace("Checking [{this}] equip data from game obj, result: {diff}", this, equipDiff);
             }
-
-
 
             if (equipDiff && !_isOwnedObject && !_ignoreSendAfterRedraw) // send the message out immediately and cancel out, no reason to continue if not self
             {
