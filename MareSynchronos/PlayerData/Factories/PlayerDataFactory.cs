@@ -20,6 +20,8 @@ public class PlayerDataFactory
     private readonly PerformanceCollectorService _performanceCollector;
     private readonly TransientResourceManager _transientResourceManager;
 
+    private static readonly string[] AllowedExtensionsForGamePaths = { ".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk" };
+
     public PlayerDataFactory(ILogger<PlayerDataFactory> logger, DalamudUtilService dalamudUtil, IpcManager ipcManager,
         TransientResourceManager transientResourceManager, FileCacheManager fileReplacementFactory,
         PerformanceCollectorService performanceCollector)
@@ -142,12 +144,13 @@ public class PlayerDataFactory
         Stopwatch st = Stopwatch.StartNew();
 
         // gather static replacements from render model
-        var data = await _ipcManager.PenumbraGetCharacterData(_logger, playerRelatedObject).ConfigureAwait(false);
+        var data = (await _ipcManager.PenumbraGetCharacterData(_logger, playerRelatedObject).ConfigureAwait(false))![0];
         if (data == null) throw new InvalidOperationException("Penumbra returned null data");
 
         previousData.FileReplacements[objectKind] =
-                new HashSet<FileReplacement>(data[0]!.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)), FileReplacementComparer.Instance)
+                new HashSet<FileReplacement>(data.Select(c => new FileReplacement(c.Value, c.Key, _fileCacheManager)), FileReplacementComparer.Instance)
                 .Where(p => p.HasFileReplacement).ToHashSet();
+        previousData.FileReplacements[objectKind].RemoveWhere(c => c.GamePaths.Any(g => !AllowedExtensionsForGamePaths.Any(e => g.EndsWith(e, StringComparison.OrdinalIgnoreCase))));
 
         _logger.LogDebug("== Static Replacements ==");
         foreach (var replacement in previousData.FileReplacements[objectKind].Where(i => i.HasFileReplacement).OrderBy(i => i.GamePaths.First(), StringComparer.OrdinalIgnoreCase))
