@@ -200,7 +200,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             if (_clearCts != null)
             {
                 Logger.LogDebug("[{this}] Cancelling Clear Task", this);
-                _clearCts?.CancelDispose();
+                _clearCts.CancelDispose();
                 _clearCts = null;
             }
             var chara = (Character*)Address;

@@ -33,7 +33,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
     private bool _forceApplyMods = false;
     private string _penumbraCollection;
-    private CancellationTokenSource _redrawCts = new();
 
     public PairHandler(ILogger<PairHandler> logger, OnlineUserIdentDto onlineUser,
         GameObjectHandlerFactory gameObjectHandlerFactory,
@@ -419,7 +418,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         else if (_charaHandler?.Address == nint.Zero && IsVisible)
         {
             IsVisible = false;
-            _charaHandler?.Invalidate();
+            _charaHandler.Invalidate();
             _downloadCancellationTokenSource?.CancelDispose();
             _downloadCancellationTokenSource = null;
             Logger.LogTrace("{this} visibility changed, now: {visi}", this, IsVisible);
@@ -431,7 +430,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         PlayerName = name;
         _charaHandler = _gameObjectHandlerFactory.Create(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromCachedTableByIdent(OnlineUser.Ident), false).GetAwaiter().GetResult();
 
-        Mediator.Subscribe<PenumbraRedrawMessage>(this, IpcManagerOnPenumbraRedrawEvent);
         Mediator.Subscribe<HonorificReadyMessage>(this, async (_) =>
         {
             if (string.IsNullOrEmpty(_cachedData?.HonorificData)) return;
@@ -440,28 +438,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         });
 
         _ipcManager.PenumbraAssignTemporaryCollectionAsync(Logger, _penumbraCollection, _charaHandler.GetGameObject()!.ObjectIndex).GetAwaiter().GetResult();
-    }
-
-    private void IpcManagerOnPenumbraRedrawEvent(PenumbraRedrawMessage msg)
-    {
-        var player = _dalamudUtil.GetCharacterFromObjectTableByIndex(msg.ObjTblIdx);
-        if (player == null || !string.Equals(player.Name.ToString(), PlayerName, StringComparison.OrdinalIgnoreCase)) return;
-        _redrawCts = _redrawCts.CancelRecreate();
-        _redrawCts.CancelAfter(TimeSpan.FromSeconds(30));
-        var token = _redrawCts.Token;
-
-        _ = Task.Run(async () =>
-        {
-            var applicationId = Guid.NewGuid();
-            await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, _charaHandler!, applicationId, ct: token).ConfigureAwait(false);
-            Logger.LogDebug("Unauthorized character change detected");
-            if (_cachedData != null)
-            {
-                await ApplyCustomizationDataAsync(applicationId, new(ObjectKind.Player,
-                    new HashSet<PlayerChanges>(new[] { PlayerChanges.Palette, PlayerChanges.Customize, PlayerChanges.Heels, PlayerChanges.Glamourer })),
-                    _cachedData, token).ConfigureAwait(false);
-            }
-        }, token);
     }
 
     private async Task RevertCustomizationDataAsync(ObjectKind objectKind, string name, Guid applicationId)

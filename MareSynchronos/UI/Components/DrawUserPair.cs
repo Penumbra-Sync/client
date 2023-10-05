@@ -1,25 +1,21 @@
 ﻿using Dalamud.Interface.Colors;
-using Dalamud.Interface.Components;
 using Dalamud.Interface;
 using ImGuiNET;
 using MareSynchronos.PlayerData.Pairs;
 using System.Numerics;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.WebAPI;
-using MareSynchronos.API.Dto.User;
 using MareSynchronos.UI.Handlers;
-using Dalamud.Interface.Utility;
 
 namespace MareSynchronos.UI.Components;
 
 public class DrawUserPair : DrawPairBase
 {
-    private readonly SelectGroupForPairUi _selectGroupForPairUi;
+    private readonly SelectTagForPairUi _selectGroupForPairUi;
 
-    public DrawUserPair(string id, Pair entry, UidDisplayHandler displayHandler, ApiController apiController, SelectGroupForPairUi selectGroupForPairUi)
+    public DrawUserPair(string id, Pair entry, UidDisplayHandler displayHandler, ApiController apiController, SelectTagForPairUi selectGroupForPairUi)
         : base(id, entry, apiController, displayHandler)
     {
-        if (_pair.UserPair == null) throw new ArgumentException("Pair must be UserPair", nameof(entry));
         _pair = entry;
         _selectGroupForPairUi = selectGroupForPairUi;
     }

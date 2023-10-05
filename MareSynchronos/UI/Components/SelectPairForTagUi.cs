@@ -7,7 +7,7 @@ using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI.Components;
 
-public class SelectPairForGroupUi
+public class SelectPairForTagUi
 {
     private readonly TagHandler _tagHandler;
     private readonly UidDisplayHandler _uidDisplayHandler;
@@ -17,7 +17,7 @@ public class SelectPairForGroupUi
     private bool _show = false;
     private string _tag = string.Empty;
 
-    public SelectPairForGroupUi(TagHandler tagHandler, UidDisplayHandler uidDisplayHandler)
+    public SelectPairForTagUi(TagHandler tagHandler, UidDisplayHandler uidDisplayHandler)
     {
         _tagHandler = tagHandler;
         _uidDisplayHandler = uidDisplayHandler;

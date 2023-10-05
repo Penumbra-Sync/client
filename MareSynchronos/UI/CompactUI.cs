@@ -35,10 +35,10 @@ public class CompactUi : WindowMediatorSubscriberBase
     private readonly ConcurrentDictionary<GameObjectHandler, Dictionary<string, FileDownloadStatus>> _currentDownloads = new();
     private readonly FileUploadManager _fileTransferManager;
     //private readonly GroupPanel _groupPanel;
-    private readonly PairGroupsUi _pairGroupsUi;
+    private readonly PairTagsUi _pairGroupsUi;
     private readonly PairManager _pairManager;
-    private readonly SelectGroupForPairUi _selectGroupForPairUi;
-    private readonly SelectPairForGroupUi _selectPairsForGroupUi;
+    private readonly SelectTagForPairUi _selectGroupForPairUi;
+    private readonly SelectPairForTagUi _selectPairsForGroupUi;
     private readonly ServerConfigurationManager _serverManager;
     private readonly Stopwatch _timeout = new();
     private readonly UidDisplayHandler _uidDisplayHandler;
@@ -52,7 +52,6 @@ public class CompactUi : WindowMediatorSubscriberBase
     private string _pairToAdd = string.Empty;
     private int _secretKeyIdx = -1;
     private bool _showModalForUserAddition;
-    private bool _showSyncShells;
     private bool _wasOpen;
 
     public CompactUi(ILogger<CompactUi> logger, UiSharedService uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
@@ -116,55 +115,12 @@ public class CompactUi : WindowMediatorSubscriberBase
         UiSharedService.DrawWithID("header", DrawUIDHeader);
         ImGui.Separator();
         UiSharedService.DrawWithID("serverstatus", DrawServerStatus);
+        ImGui.Separator();
 
         if (_apiController.ServerState is ServerState.Connected)
         {
-            var hasShownSyncShells = _showSyncShells;
+            UiSharedService.DrawWithID("pairlist", DrawPairList);
 
-            ImGui.PushFont(UiBuilder.IconFont);
-            if (!hasShownSyncShells)
-            {
-                ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonHovered]);
-            }
-            if (ImGui.Button(FontAwesomeIcon.User.ToIconString(), new Vector2((UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X) / 2, 30 * ImGuiHelpers.GlobalScale)))
-            {
-                _showSyncShells = false;
-            }
-            if (!hasShownSyncShells)
-            {
-                ImGui.PopStyleColor();
-            }
-            ImGui.PopFont();
-            UiSharedService.AttachToolTip("Individual pairs");
-
-            ImGui.SameLine();
-
-            ImGui.PushFont(UiBuilder.IconFont);
-            if (hasShownSyncShells)
-            {
-                ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonHovered]);
-            }
-            if (ImGui.Button(FontAwesomeIcon.UserFriends.ToIconString(), new Vector2((UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X) / 2, 30 * ImGuiHelpers.GlobalScale)))
-            {
-                _showSyncShells = true;
-            }
-            if (hasShownSyncShells)
-            {
-                ImGui.PopStyleColor();
-            }
-            ImGui.PopFont();
-
-            UiSharedService.AttachToolTip("Syncshells");
-
-            ImGui.Separator();
-            if (!hasShownSyncShells)
-            {
-                UiSharedService.DrawWithID("pairlist", DrawPairList);
-            }
-            else
-            {
-                //UiSharedService.DrawWithID("syncshells", _groupPanel.DrawSyncshells);
-            }
             ImGui.Separator();
             UiSharedService.DrawWithID("transfers", DrawTransfers);
             TransferPartHeight = ImGui.GetCursorPosY() - TransferPartHeight;

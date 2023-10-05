@@ -8,14 +8,14 @@ using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.UI.Components;
 
-public class PairGroupsUi
+public class PairTagsUi
 {
     private readonly ApiController _apiController;
     private readonly MareConfigService _mareConfig;
-    private readonly SelectPairForGroupUi _selectGroupForPairUi;
+    private readonly SelectPairForTagUi _selectGroupForPairUi;
     private readonly TagHandler _tagHandler;
 
-    public PairGroupsUi(MareConfigService mareConfig, TagHandler tagHandler, ApiController apiController, SelectPairForGroupUi selectGroupForPairUi)
+    public PairTagsUi(MareConfigService mareConfig, TagHandler tagHandler, ApiController apiController, SelectPairForTagUi selectGroupForPairUi)
     {
         _mareConfig = mareConfig;
         _tagHandler = tagHandler;
@@ -31,7 +31,8 @@ public class PairGroupsUi
         var allUsers = visibleUsers.Concat(onlineUsers).Concat(offlineUsers).ToList();
         if (typeof(T) == typeof(DrawUserPair))
         {
-            DrawUserPairs(tagsWithPairsInThem, allUsers.Cast<DrawUserPair>().ToList(), visibleUsers.Cast<DrawUserPair>(), onlineUsers.Cast<DrawUserPair>(), offlineUsers.Cast<DrawUserPair>());
+            DrawUserPairs(tagsWithPairsInThem, allUsers.Cast<DrawUserPair>().ToList(),
+                visibleUsers.Cast<DrawUserPair>(), onlineUsers.Cast<DrawUserPair>(), offlineUsers.Cast<DrawUserPair>());
         }
     }
 
@@ -153,7 +154,7 @@ public class PairGroupsUi
         string resultFolderName = !isSpecialTag ? $"{displayedName} ({visible}/{online}/{total} Pairs)" : $"{displayedName} ({online} Pairs)";
 
         //  FontAwesomeIcon.CaretSquareDown : FontAwesomeIcon.CaretSquareRight
-        var icon = _tagHandler.IsTagOpen(tag) ? FontAwesomeIcon.CaretSquareDown : FontAwesomeIcon.CaretSquareRight;
+        var icon = _tagHandler.IsTagOpen(tag) ? FontAwesomeIcon.CaretDown : FontAwesomeIcon.CaretRight;
         UiSharedService.FontText(icon.ToIconString(), UiBuilder.IconFont);
         if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
         {

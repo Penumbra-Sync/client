@@ -9,7 +9,7 @@ using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI.Components;
 
-public class SelectGroupForPairUi
+public class SelectTagForPairUi
 {
     private readonly TagHandler _tagHandler;
     private readonly UidDisplayHandler _uidDisplayHandler;
@@ -30,7 +30,7 @@ public class SelectGroupForPairUi
     /// </summary>
     private string _tagNameToAdd = "";
 
-    public SelectGroupForPairUi(TagHandler tagHandler, UidDisplayHandler uidDisplayHandler)
+    public SelectTagForPairUi(TagHandler tagHandler, UidDisplayHandler uidDisplayHandler)
     {
         _show = false;
         _pair = null;

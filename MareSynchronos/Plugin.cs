@@ -49,7 +49,6 @@ public sealed class Plugin : IDalamudPlugin
             // add mare related singletons
             collection.AddSingleton<MareMediator>();
             collection.AddSingleton<FileCacheManager>();
-            collection.AddSingleton<DalamudContextMenu>();
             collection.AddSingleton<ServerConfigurationManager>();
             collection.AddSingleton<PairManager>();
             collection.AddSingleton<ApiController>();
@@ -85,7 +84,8 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton((s) => new TransientConfigService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new ConfigurationMigrator(s.GetRequiredService<ILogger<ConfigurationMigrator>>(), pluginInterface));
             collection.AddSingleton((s) => new HubFactory(s.GetRequiredService<ILogger<HubFactory>>(), s.GetRequiredService<MareMediator>(),
-                s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<MareConfigService>(), pluginLog));
+                s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<MareConfigService>(), 
+                s.GetRequiredService<TokenProvider>(), pluginLog));
 
             // func factory method singletons
             collection.AddSingleton(s =>
