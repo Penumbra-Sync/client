@@ -109,12 +109,12 @@ public sealed class DtrEntry : IDisposable, IHostedService
         if (_apiController.IsConnected)
         {
             text = $"\uE044 {_pairManager.GetVisibleUserCount()}";
-            tooltip = $"Users:\n{string.Join('\n', _pairManager.GetOnlineUserPairs().Where(x => x.IsVisible).Select(x => x.PlayerName ?? x.UserData.AliasOrUID))}";
+            tooltip = $"Mare Synchronos: Connected{Environment.NewLine}----------{Environment.NewLine}{string.Join(Environment.NewLine, _pairManager.GetOnlineUserPairs().Where(x => x.IsVisible).Select(x => string.Format("{0} ({1})", x.PlayerName, x.UserData.AliasOrUID)))}";
         }
         else
         {
             text = "\uE044 \uE04C";
-            tooltip = "Not Connected";
+            tooltip = "Mare Synchronos: Not Connected";
         }
         if (!string.Equals(text, _text, StringComparison.Ordinal))
         {
