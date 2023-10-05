@@ -105,18 +105,22 @@ public sealed class DtrEntry : IDisposable, IHostedService
         }
 
         string text;
+        string userList;
         if (_apiController.IsConnected)
         {
             text = $"\uE044 {_pairManager.GetVisibleUserCount()}";
+            userList = $"Users:\n{string.Join('\n', _pairManager.GetOnlineUserPairs().Where(x => x.IsVisible).Select(x => x.PlayerName ?? x.UserData.AliasOrUID))}";
         }
         else
         {
             text = "\uE044 \uE04C";
+            userList = "Not Connected";
         }
         if (!string.Equals(text, _text, StringComparison.Ordinal))
         {
             _text = text;
             _entry.Value.Text = text;
+            _entry.Value.Tooltip = userList;
         }
     }
 }
