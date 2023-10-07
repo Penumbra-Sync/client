@@ -209,6 +209,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
         try
         {
+            bool alreadyRedrawn = false;
             if (handler.Address == nint.Zero)
             {
                 return;
@@ -248,13 +249,18 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                     case PlayerChanges.Glamourer:
                         if (charaData.GlamourerData.TryGetValue(changes.Key, out var glamourerData))
                         {
+                            alreadyRedrawn = true;
                             await _ipcManager.GlamourerApplyAllAsync(Logger, handler, glamourerData, applicationId, token).ConfigureAwait(false);
                         }
                         break;
 
                     case PlayerChanges.ModFiles:
                     case PlayerChanges.ModManip:
-                        await _ipcManager.PenumbraRedrawAsync(Logger, handler, applicationId, token).ConfigureAwait(false);
+                        if (!alreadyRedrawn)
+                        {
+                            alreadyRedrawn = true;
+                            await _ipcManager.PenumbraRedrawAsync(Logger, handler, applicationId, token).ConfigureAwait(false);
+                        }
                         break;
                 }
                 token.ThrowIfCancellationRequested();
@@ -513,6 +519,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         moddedDictionary = new Dictionary<string, string>(StringComparer.Ordinal);
         ConcurrentDictionary<string, string> outputDict = new(StringComparer.Ordinal);
         bool hasMigrationChanges = false;
+
         try
         {
             var replacementList = charaData.FileReplacements.SelectMany(k => k.Value.Where(v => string.IsNullOrEmpty(v.FileSwapPath))).ToList();
