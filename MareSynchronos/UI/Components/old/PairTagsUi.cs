@@ -6,7 +6,7 @@ using MareSynchronos.MareConfiguration;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
 
-namespace MareSynchronos.UI.Components;
+namespace MareSynchronos.UI.Components.old;
 
 public class PairTagsUi
 {

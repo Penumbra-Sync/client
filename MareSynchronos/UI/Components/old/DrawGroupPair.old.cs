@@ -11,7 +11,7 @@ using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Data.Enum;
 using Dalamud.Interface.Utility;
 
-namespace MareSynchronos.UI.Components;
+namespace MareSynchronos.UI.Components.old;
 /*
 public class DrawGroupPair : DrawPairBase
 {

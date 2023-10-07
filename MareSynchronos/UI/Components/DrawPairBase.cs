@@ -36,7 +36,7 @@ public abstract class DrawPairBase
 
     public void DrawPairedClient()
     {
-        using var id = ImRaii.PushId(GetType().Name + _id);
+        using var id = ImRaii.PushId(GetType() + _id);
         var originalY = ImGui.GetCursorPosY();
         var pauseIconSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars);
         var textSize = ImGui.CalcTextSize(_pair.UserData.AliasOrUID);
@@ -93,6 +93,7 @@ public abstract class DrawPairBase
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
         var windowEndX = ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth();
         var rightSideStart = 0f;
+        float infoIconDist = 0f;
 
         if (_pair.UserPair!.OwnPermissions.IsPaired() && _pair.UserPair!.OtherPermissions.IsPaired())
         {
@@ -106,7 +107,7 @@ public abstract class DrawPairBase
                 var icon = FontAwesomeIcon.ExclamationTriangle;
                 var iconwidth = UiSharedService.GetIconSize(icon);
 
-                rightSideStart = infoIconPosDist - iconwidth.X;
+                infoIconDist = iconwidth.X;
                 ImGui.SameLine(infoIconPosDist - iconwidth.X);
 
                 ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
@@ -156,7 +157,7 @@ public abstract class DrawPairBase
             }
         }
 
-        rightSideStart = windowEndX - barButtonSize.X - spacingX * 2 - pauseIconSize.X;
+        rightSideStart = windowEndX - barButtonSize.X - spacingX * 3 - pauseIconSize.X - infoIconDist;
         ImGui.SameLine(windowEndX - barButtonSize.X - spacingX - pauseIconSize.X);
         ImGui.SetCursorPosY(originalY);
         if (ImGuiComponents.IconButton(pauseIcon))

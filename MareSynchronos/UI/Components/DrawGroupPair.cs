@@ -7,6 +7,7 @@ using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.WebAPI;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.API.Dto.Group;
+using Dalamud.Interface.Utility.Raii;
 
 namespace MareSynchronos.UI.Components;
 
@@ -72,19 +73,19 @@ public class DrawGroupPair : DrawPairBase
         }
 
         ImGui.SetCursorPosY(textPosY);
-        ImGui.PushFont(UiBuilder.IconFont);
-        UiSharedService.ColorText(connectionIcon.ToIconString(), connectionColor);
-        ImGui.PopFont();
+        using (ImRaii.PushFont(UiBuilder.IconFont))
+            UiSharedService.ColorText(connectionIcon.ToIconString(), connectionColor);
         UiSharedService.AttachToolTip(connectionText);
         if (_pair.UserPair.OwnPermissions.IsSticky())
         {
             var x = ImGui.GetCursorPosX();
             ImGui.SetCursorPosY(textPosY);
-            ImGui.PushFont(UiBuilder.IconFont);
-            var iconsize = ImGui.CalcTextSize(FontAwesomeIcon.ArrowCircleUp.ToIconString()).X;
-            ImGui.SameLine(x + iconsize + (ImGui.GetStyle().ItemSpacing.X / 2));
-            ImGui.Text(FontAwesomeIcon.ArrowCircleUp.ToIconString());
-            ImGui.PopFont();
+            using (ImRaii.PushFont(UiBuilder.IconFont))
+            {
+                var iconsize = ImGui.CalcTextSize(FontAwesomeIcon.ArrowCircleUp.ToIconString()).X;
+                ImGui.SameLine(x + iconsize + (ImGui.GetStyle().ItemSpacing.X));
+                ImGui.Text(FontAwesomeIcon.ArrowCircleUp.ToIconString());
+            }
             UiSharedService.AttachToolTip(_pair.UserData.AliasOrUID + " has preferred permissions enabled");
         }
         if (_pair is { IsOnline: true, IsVisible: true })
@@ -92,7 +93,7 @@ public class DrawGroupPair : DrawPairBase
             var x = ImGui.GetCursorPosX();
             ImGui.SetCursorPosY(textPosY);
             var iconsize = ImGui.CalcTextSize(FontAwesomeIcon.Eye.ToIconString()).X;
-            ImGui.SameLine(x + iconsize + (ImGui.GetStyle().ItemSpacing.X / 2));
+            ImGui.SameLine(x + iconsize + (ImGui.GetStyle().ItemSpacing.X));
             ImGui.PushFont(UiBuilder.IconFont);
             UiSharedService.ColorText(FontAwesomeIcon.Eye.ToIconString(), ImGuiColors.ParsedGreen);
             ImGui.PopFont();
@@ -103,7 +104,7 @@ public class DrawGroupPair : DrawPairBase
     protected override void DrawPairedClientMenu()
     {
         bool selfIsOwner = string.Equals(_apiController.UID, _groupFullInfo.Owner.UID, StringComparison.Ordinal);
-        bool selfIsModerator = _groupFullInfo.GroupPairUserInfos[_apiController.UID].IsModerator();
+        bool selfIsModerator = _groupFullInfo.GroupPairUserInfos.TryGetValue(_apiController.UID, out var selfinfo) && selfinfo.IsModerator();
         if ((selfIsOwner || selfIsModerator) && (!IsModerator))
         {
             ImGui.Text("Syncshell Moderator Functions");
@@ -136,7 +137,7 @@ public class DrawGroupPair : DrawPairBase
 
         if (selfIsOwner)
         {
-            ImGui.Text("Syncshell Administrator Functions");
+            ImGui.Text("Syncshell Owner Functions");
             string modText = IsModerator ? "Demod user" : "Mod user";
             if (UiSharedService.IconTextButton(FontAwesomeIcon.UserShield, modText) && UiSharedService.CtrlPressed())
             {

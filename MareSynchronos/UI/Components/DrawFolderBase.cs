@@ -13,6 +13,7 @@ public abstract class DrawFolderBase
     protected readonly TagHandler _tagHandler;
 
     protected abstract bool RenderIfEmpty { get; }
+    protected abstract bool RenderMenu { get; }
 
     protected DrawFolderBase(string id, IEnumerable<DrawPairBase> drawPairs, TagHandler tagHandler)
     {
@@ -78,20 +79,23 @@ public abstract class DrawFolderBase
         var windowEndX = ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth();
 
         // Flyout Menu
-        var rightSideStart = windowEndX - barButtonSize.X - spacingX;
-        ImGui.SameLine(windowEndX - barButtonSize.X);
+        var rightSideStart = windowEndX - (RenderMenu ? (barButtonSize.X + spacingX) : spacingX);
 
-        if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
+        if (RenderMenu)
         {
-            ImGui.OpenPopup("User Flyout Menu");
-        }
-        if (ImGui.BeginPopup("User Flyout Menu"))
-        {
-            UiSharedService.DrawWithID($"buttons-{_id}", () =>
+            ImGui.SameLine(windowEndX - barButtonSize.X);
+            if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
             {
-                DrawMenu();
-            });
-            ImGui.EndPopup();
+                ImGui.OpenPopup("User Flyout Menu");
+            }
+            if (ImGui.BeginPopup("User Flyout Menu"))
+            {
+                UiSharedService.DrawWithID($"buttons-{_id}", () =>
+                {
+                    DrawMenu();
+                });
+                ImGui.EndPopup();
+            }
         }
 
         return DrawRightSide(originalY, rightSideStart);

@@ -21,6 +21,26 @@ public class DrawTagFolder : DrawFolderBase
         _ => true,
     };
 
+    protected override bool RenderMenu => _id switch
+    {
+        TagHandler.CustomUnpairedTag => false,
+        TagHandler.CustomOnlineTag => false,
+        TagHandler.CustomOfflineTag => false,
+        TagHandler.CustomVisibleTag => false,
+        TagHandler.CustomAllTag => false,
+        _ => true,
+    };
+
+    private bool RenderPause => _id switch
+    {
+        TagHandler.CustomUnpairedTag => false,
+        TagHandler.CustomOnlineTag => false,
+        TagHandler.CustomOfflineTag => false,
+        TagHandler.CustomVisibleTag => false,
+        TagHandler.CustomAllTag => false,
+        _ => true,
+    };
+
     public DrawTagFolder(string id, IEnumerable<DrawPairBase> drawPairs, TagHandler tagHandler, ApiController apiController)
         : base(id, drawPairs, tagHandler)
     {
@@ -71,6 +91,8 @@ public class DrawTagFolder : DrawFolderBase
 
     protected override float DrawRightSide(float originalY, float currentRightSideX)
     {
+        if (!RenderPause) return currentRightSideX;
+
         var allArePaused = _drawPairs.All(pair => pair.UserPair!.OwnPermissions.IsPaused());
         var pauseButton = allArePaused ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
         var pauseButtonX = UiSharedService.GetIconButtonSize(pauseButton).X;

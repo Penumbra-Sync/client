@@ -124,7 +124,13 @@ public class CompactUi : WindowMediatorSubscriberBase
             }
 
             DrawTagFolder visibleUsersFolder = new(TagHandler.CustomVisibleTag, visibleUsers
-                .Select(u => new DrawIndeterminatePair(u.Key.UserData.UID, u.Key, u.Value, _apiController, _uidDisplayHandler)),
+                .Select(u =>
+                {
+                    if (u.Key.IsDirectlyPaired)
+                        return (DrawPairBase)(new DrawUserPair(TagHandler.CustomOnlineTag + u.Key.UserData.UID, u.Key, _apiController, _uidDisplayHandler, _selectGroupForPairUi));
+                    else
+                        return (DrawPairBase)(new DrawIndeterminatePair(TagHandler.CustomOnlineTag + u.Key.UserData.UID, u.Key, _apiController, _uidDisplayHandler));
+                }),
                 _tagHandler, _apiController);
             drawFolders.Add(visibleUsersFolder);
         }
@@ -132,7 +138,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         foreach (var group in _pairManager.GroupPairs.OrderBy(g => g.Key.GroupAliasOrGID, StringComparer.Ordinal))
         {
             var groupUsers = group.Value.Where(v => users.ContainsKey(v)
-                    && (((v.IsOnline && _configService.Current.ShowOfflineUsersSeparately) || !_configService.Current.ShowOfflineUsersSeparately)
+                    && (v.IsOnline || (!v.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
                     || v.UserPair.OwnPermissions.IsPaused()))
                     .OrderBy(
                     u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
@@ -161,7 +167,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             allGroupUsersSorted.AddRange(groupUsers);
 
             DrawGroupFolder groupFolder = new(group.Key.GID, group.Key, _apiController,
-                allGroupUsersSorted.Select(u => new DrawGroupPair(u.UserData.UID, group.Key, u, _uidDisplayHandler, _apiController)),
+                allGroupUsersSorted.Select(u => new DrawGroupPair(group.Key.GID + u.UserData.UID, group.Key, u, _uidDisplayHandler, _apiController)),
                 _tagHandler, _uidDisplayHandler);
             drawFolders.Add(groupFolder);
         }
@@ -171,7 +177,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         foreach (var tag in tags)
         {
             IEnumerable<Pair> tagUsers = users.Select(k => k.Key).Where(u => u.IsDirectlyPaired && _tagHandler.HasTag(u.UserData.UID, tag)
-                && (((u.IsOnline && _configService.Current.ShowOfflineUsersSeparately) || !_configService.Current.ShowOfflineUsersSeparately)
+                && (u.IsOnline || (!u.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
                 || u.UserPair.OwnPermissions.IsPaused()))
             .OrderBy(
                     u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
@@ -187,14 +193,14 @@ public class CompactUi : WindowMediatorSubscriberBase
                 .Select(u =>
                 {
                     alreadyInTags.Add(u);
-                    return new DrawUserPair(u.UserData.UID, u, _apiController, _uidDisplayHandler, _selectGroupForPairUi);
+                    return new DrawUserPair(tag + u.UserData.UID, u, _apiController, _uidDisplayHandler, _selectGroupForPairUi);
                 }),
             _tagHandler, _apiController);
             drawFolders.Add(tagFolder);
         }
 
         var onlineDirectPairedUsersNotInTags = users.Where(u => u.Key.IsDirectlyPaired && !_tagHandler.HasAnyTag(u.Key.UserData.UID)
-            && (((u.Key.IsOnline && _configService.Current.ShowOfflineUsersSeparately) || !_configService.Current.ShowOfflineUsersSeparately)
+            && (u.Key.IsOnline || (!u.Key.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
                 || u.Key.UserPair.OwnPermissions.IsPaused()))
             .OrderBy(
                 u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
@@ -206,15 +212,31 @@ public class CompactUi : WindowMediatorSubscriberBase
             onlineDirectPairedUsersNotInTags = onlineDirectPairedUsersNotInTags.Reverse();
 
         DrawTagFolder onlineFolder = new((_configService.Current.ShowOfflineUsersSeparately ? TagHandler.CustomOnlineTag : TagHandler.CustomAllTag),
-            onlineDirectPairedUsersNotInTags.Select(u => new DrawUserPair(u.UserData.UID, u, _apiController, _uidDisplayHandler, _selectGroupForPairUi)),
+            onlineDirectPairedUsersNotInTags.Select(u =>
+                new DrawUserPair(TagHandler.CustomOnlineTag + u.UserData.UID, u, _apiController, _uidDisplayHandler, _selectGroupForPairUi)),
             _tagHandler, _apiController);
 
         drawFolders.Add(onlineFolder);
 
         if (_configService.Current.ShowOfflineUsersSeparately)
         {
-            DrawTagFolder offlineUsers = new(TagHandler.CustomOfflineTag, users.Where(u => !u.Key.IsOnline)
-                .Select(u => new DrawIndeterminatePair(u.Key.UserData.UID, u.Key, u.Value, _apiController, _uidDisplayHandler)), _tagHandler, _apiController);
+            var offlineUsersEntries = users.Where(u => !u.Key.IsOneSidedPair && !u.Key.IsOnline && !u.Key.UserPair.OwnPermissions.IsPaused()).OrderBy(
+                u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
+                    ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
+                    : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
+            .Select(k => k.Key);
+
+            if (_configService.Current.ReverseUserSort)
+                offlineUsersEntries = offlineUsersEntries.Reverse();
+
+            DrawTagFolder offlineUsers = new(TagHandler.CustomOfflineTag, offlineUsersEntries
+                .Select(u =>
+                {
+                    if (u.IsDirectlyPaired)
+                        return (DrawPairBase)(new DrawUserPair(TagHandler.CustomOfflineTag + u.UserData.UID, u, _apiController, _uidDisplayHandler, _selectGroupForPairUi));
+                    else
+                        return (DrawPairBase)(new DrawIndeterminatePair(TagHandler.CustomOfflineTag + u.UserData.UID, u, _apiController, _uidDisplayHandler));
+                }), _tagHandler, _apiController);
             drawFolders.Add(offlineUsers);
         }
 

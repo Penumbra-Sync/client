@@ -16,7 +16,7 @@ using MareSynchronos.UI.Components;
 using MareSynchronos.UI.Handlers;
 using Dalamud.Interface.Utility;
 
-namespace MareSynchronos.UI;
+namespace MareSynchronos.UI.Components.old;
 /*
 internal sealed class GroupPanel
 {

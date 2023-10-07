@@ -14,6 +14,7 @@ public class DrawGroupFolder : DrawFolderBase
     private readonly IdDisplayHandler _idDisplayHandler;
     private readonly GroupFullInfoDto _groupFullInfoDto;
     protected override bool RenderIfEmpty => true;
+    protected override bool RenderMenu => true;
 
     public DrawGroupFolder(string id, GroupFullInfoDto groupFullInfoDto, ApiController apiController,
         IEnumerable<DrawGroupPair> drawPairs, TagHandler tagHandler, IdDisplayHandler idDisplayHandler) :
