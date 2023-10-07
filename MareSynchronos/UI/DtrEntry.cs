@@ -119,8 +119,19 @@ public sealed class DtrEntry : IDisposable, IHostedService
         string tooltip;
         if (_apiController.IsConnected)
         {
-            text = $"\uE044 {_pairManager.GetVisibleUserCount()}";
-            tooltip = $"Mare Synchronos: Connected{Environment.NewLine}----------{Environment.NewLine}{string.Join(Environment.NewLine, _pairManager.GetOnlineUserPairs().Where(x => x.IsVisible).Select(x => string.Format("{0} ({1})", x.PlayerName, x.UserData.AliasOrUID)))}";
+            var pairCount = _pairManager.GetVisibleUserCount();
+            text = $"\uE044 {pairCount}";
+            if (pairCount > 0)
+            {
+                var visiblePairs = _pairManager.GetOnlineUserPairs()
+                    .Where(x => x.IsVisible)
+                    .Select(x => string.Format("{0} ({1})", x.PlayerName, x.UserData.AliasOrUID));
+                tooltip = $"Mare Synchronos: Connected{Environment.NewLine}----------{Environment.NewLine}{string.Join(Environment.NewLine, visiblePairs)}";
+            }
+            else
+            {
+                tooltip = "Mare Synchronos: Connected";
+            }
         }
         else
         {
