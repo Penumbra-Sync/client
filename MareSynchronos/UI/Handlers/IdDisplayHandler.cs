@@ -5,37 +5,92 @@ using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.MareConfiguration;
 using ImGuiScene;
 using MareSynchronos.Services.Mediator;
+using MareSynchronos.API.Dto.Group;
+using Dalamud.Interface.Utility.Raii;
 
 namespace MareSynchronos.UI.Handlers;
 
-public class UidDisplayHandler
+public class IdDisplayHandler
 {
     private readonly MareConfigService _mareConfigService;
     private readonly MareMediator _mediator;
-    private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
-    private readonly Dictionary<string, bool> _showUidForEntry = new(StringComparer.Ordinal);
-    private string _editNickEntry = string.Empty;
-    private string _editUserComment = string.Empty;
+    private readonly Dictionary<string, bool> _showIdForEntry = new(StringComparer.Ordinal);
+    private string _editEntry = string.Empty;
+    private string _editComment = string.Empty;
     private string _lastMouseOverUid = string.Empty;
+    private bool _editIsUid = false;
     private bool _popupShown = false;
     private DateTime? _popupTime;
     private TextureWrap? _textureWrap;
 
-    public UidDisplayHandler(MareMediator mediator, PairManager pairManager,
-        ServerConfigurationManager serverManager, MareConfigService mareConfigService)
+    public IdDisplayHandler(MareMediator mediator, ServerConfigurationManager serverManager, MareConfigService mareConfigService)
     {
         _mediator = mediator;
-        _pairManager = pairManager;
         _serverManager = serverManager;
         _mareConfigService = mareConfigService;
+    }
+
+    public void DrawGroupText(string id, GroupFullInfoDto group, float textPosX, float originalY, Func<float> editBoxWidth)
+    {
+        ImGui.SameLine(textPosX);
+        (bool textIsUid, string playerText) = GetGroupText(group);
+        if (!string.Equals(_editEntry, group.GID, StringComparison.Ordinal))
+        {
+            ImGui.SetCursorPosY(originalY);
+            using (ImRaii.PushFont(UiBuilder.MonoFont, textIsUid))
+                ImGui.TextUnformatted(playerText);
+
+            if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
+            {
+                var prevState = textIsUid;
+                if (_showIdForEntry.ContainsKey(group.GID))
+                {
+                    prevState = _showIdForEntry[group.GID];
+                }
+                _showIdForEntry[group.GID] = !prevState;
+            }
+
+            if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+            {
+                if (_editIsUid)
+                {
+                    _serverManager.SetNoteForUid(_editEntry, _editComment, true);
+                }
+                else
+                {
+                    _serverManager.SetNoteForGid(_editEntry, _editComment, true);
+                }
+
+                _editComment = _serverManager.GetNoteForGid(group.GID) ?? string.Empty;
+                _editEntry = group.GID;
+                _editIsUid = false;
+            }
+        }
+        else
+        {
+            ImGui.SetCursorPosY(originalY);
+
+            ImGui.SetNextItemWidth(editBoxWidth.Invoke());
+            if (ImGui.InputTextWithHint("", "Name/Notes", ref _editComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
+            {
+                _serverManager.SetNoteForGid(group.GID, _editComment, true);
+                _editEntry = string.Empty;
+            }
+
+            if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
+            {
+                _editEntry = string.Empty;
+            }
+            UiSharedService.AttachToolTip("Hit ENTER to save\nRight click to cancel");
+        }
     }
 
     public void DrawPairText(string id, Pair pair, float textPosX, float originalY, Func<float> editBoxWidth)
     {
         ImGui.SameLine(textPosX);
         (bool textIsUid, string playerText) = GetPlayerText(pair);
-        if (!string.Equals(_editNickEntry, pair.UserData.UID, StringComparison.Ordinal))
+        if (!string.Equals(_editEntry, pair.UserData.UID, StringComparison.Ordinal))
         {
             ImGui.SetCursorPosY(originalY);
             if (textIsUid) ImGui.PushFont(UiBuilder.MonoFont);
@@ -77,19 +132,27 @@ public class UidDisplayHandler
             if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
             {
                 var prevState = textIsUid;
-                if (_showUidForEntry.ContainsKey(pair.UserData.UID))
+                if (_showIdForEntry.ContainsKey(pair.UserData.UID))
                 {
-                    prevState = _showUidForEntry[pair.UserData.UID];
+                    prevState = _showIdForEntry[pair.UserData.UID];
                 }
-                _showUidForEntry[pair.UserData.UID] = !prevState;
+                _showIdForEntry[pair.UserData.UID] = !prevState;
             }
 
             if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
             {
-                var nickEntryPair = _pairManager.DirectPairs.Find(p => string.Equals(p.UserData.UID, _editNickEntry, StringComparison.Ordinal));
-                nickEntryPair?.SetNote(_editUserComment);
-                _editUserComment = pair.GetNote() ?? string.Empty;
-                _editNickEntry = pair.UserData.UID;
+                if (_editIsUid)
+                {
+                    _serverManager.SetNoteForUid(_editEntry, _editComment, true);
+                }
+                else
+                {
+                    _serverManager.SetNoteForGid(_editEntry, _editComment, true);
+                }
+
+                _editComment = pair.GetNote() ?? string.Empty;
+                _editEntry = pair.UserData.UID;
+                _editIsUid = true;
             }
 
             if (ImGui.IsItemClicked(ImGuiMouseButton.Middle))
@@ -102,16 +165,16 @@ public class UidDisplayHandler
             ImGui.SetCursorPosY(originalY);
 
             ImGui.SetNextItemWidth(editBoxWidth.Invoke());
-            if (ImGui.InputTextWithHint("", "Nick/Notes", ref _editUserComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
+            if (ImGui.InputTextWithHint("", "Nick/Notes", ref _editComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
             {
-                _serverManager.SetNoteForUid(pair.UserData.UID, _editUserComment);
+                _serverManager.SetNoteForUid(pair.UserData.UID, _editComment);
                 _serverManager.SaveNotes();
-                _editNickEntry = string.Empty;
+                _editEntry = string.Empty;
             }
 
             if (ImGui.IsItemClicked(ImGuiMouseButton.Right))
             {
-                _editNickEntry = string.Empty;
+                _editEntry = string.Empty;
             }
             UiSharedService.AttachToolTip("Hit ENTER to save\nRight click to cancel");
         }
@@ -155,10 +218,34 @@ public class UidDisplayHandler
         return (textIsUid, playerText!);
     }
 
+    public (bool isGid, string text) GetGroupText(GroupFullInfoDto group)
+    {
+        var textIsGid = true;
+        bool showUidInsteadOfName = ShowGidInsteadOfName(group);
+        string? groupText = _serverManager.GetNoteForGid(group.GID);
+        if (!showUidInsteadOfName && groupText != null)
+        {
+            if (string.IsNullOrEmpty(groupText))
+            {
+                groupText = group.GroupAliasOrGID;
+            }
+            else
+            {
+                textIsGid = false;
+            }
+        }
+        else
+        {
+            groupText = group.GroupAliasOrGID;
+        }
+
+        return (textIsGid, groupText!);
+    }
+
     internal void Clear()
     {
-        _editNickEntry = string.Empty;
-        _editUserComment = string.Empty;
+        _editEntry = string.Empty;
+        _editComment = string.Empty;
     }
 
     internal void OpenProfile(Pair entry)
@@ -168,8 +255,15 @@ public class UidDisplayHandler
 
     private bool ShowUidInsteadOfName(Pair pair)
     {
-        _showUidForEntry.TryGetValue(pair.UserData.UID, out var showUidInsteadOfName);
+        _showIdForEntry.TryGetValue(pair.UserData.UID, out var showidInsteadOfName);
 
-        return showUidInsteadOfName;
+        return showidInsteadOfName;
+    }
+
+    private bool ShowGidInsteadOfName(GroupFullInfoDto group)
+    {
+        _showIdForEntry.TryGetValue(group.GID, out var showidInsteadOfName);
+
+        return showidInsteadOfName;
     }
 }

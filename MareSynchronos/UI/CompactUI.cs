@@ -1,8 +1,10 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
+using System.Linq;
 using System.Numerics;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
@@ -10,6 +12,7 @@ using Dalamud.Interface.Utility;
 using Dalamud.Utility;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
+using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Handlers;
@@ -34,14 +37,13 @@ public class CompactUi : WindowMediatorSubscriberBase
     private readonly MareConfigService _configService;
     private readonly ConcurrentDictionary<GameObjectHandler, Dictionary<string, FileDownloadStatus>> _currentDownloads = new();
     private readonly FileUploadManager _fileTransferManager;
-    //private readonly GroupPanel _groupPanel;
-    private readonly PairTagsUi _pairGroupsUi;
     private readonly PairManager _pairManager;
     private readonly SelectTagForPairUi _selectGroupForPairUi;
     private readonly SelectPairForTagUi _selectPairsForGroupUi;
     private readonly ServerConfigurationManager _serverManager;
     private readonly Stopwatch _timeout = new();
-    private readonly UidDisplayHandler _uidDisplayHandler;
+    private readonly IdDisplayHandler _uidDisplayHandler;
+    private readonly TagHandler _tagHandler;
     private readonly UiSharedService _uiShared;
     private bool _buttonState;
     private string _characterOrCommentFilter = string.Empty;
@@ -53,9 +55,12 @@ public class CompactUi : WindowMediatorSubscriberBase
     private int _secretKeyIdx = -1;
     private bool _showModalForUserAddition;
     private bool _wasOpen;
+    private List<DrawFolderBase> _drawFolders;
 
     public CompactUi(ILogger<CompactUi> logger, UiSharedService uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
-        ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager, UidDisplayHandler uidDisplayHandler) : base(logger, mediator, "###MareSynchronosMainUI")
+        ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager, IdDisplayHandler uidDisplayHandler,
+        TagHandler tagHandler)
+        : base(logger, mediator, "###MareSynchronosMainUI")
     {
         _uiShared = uiShared;
         _configService = configService;
@@ -64,12 +69,12 @@ public class CompactUi : WindowMediatorSubscriberBase
         _serverManager = serverManager;
         _fileTransferManager = fileTransferManager;
         _uidDisplayHandler = uidDisplayHandler;
-        var tagHandler = new TagHandler(_serverManager);
+        _tagHandler = tagHandler;
 
-        //_groupPanel = new(this, uiShared, _pairManager, uidDisplayHandler, _serverManager);
         _selectGroupForPairUi = new(tagHandler, uidDisplayHandler);
         _selectPairsForGroupUi = new(tagHandler, uidDisplayHandler);
-        _pairGroupsUi = new(configService, tagHandler, apiController, _selectPairsForGroupUi);
+
+        _drawFolders = GetDrawFolders().ToList();
 
 #if DEBUG
         string dev = "Dev Build";
@@ -86,6 +91,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         Mediator.Subscribe<CutsceneEndMessage>(this, (_) => UiSharedService_GposeEnd());
         Mediator.Subscribe<DownloadStartedMessage>(this, (msg) => _currentDownloads[msg.DownloadId] = msg.DownloadStatus);
         Mediator.Subscribe<DownloadFinishedMessage>(this, (msg) => _currentDownloads.TryRemove(msg.DownloadId, out _));
+        Mediator.Subscribe<RebuildUiPairMessage>(this, (msg) => _drawFolders = GetDrawFolders().ToList());
 
         Flags |= ImGuiWindowFlags.NoDocking;
 
@@ -94,6 +100,129 @@ public class CompactUi : WindowMediatorSubscriberBase
             MinimumSize = new Vector2(350, 400),
             MaximumSize = new Vector2(350, 2000),
         };
+    }
+
+    private IEnumerable<DrawFolderBase> GetDrawFolders()
+    {
+        List<DrawFolderBase> drawFolders = new();
+
+        var users = GetFilteredGroupUsers()
+            .ToDictionary(g => g.Key, g => g.Value);
+
+        if (_configService.Current.ShowVisibleUsersSeparately)
+        {
+            var visibleUsers = users.Where(u => u.Key.IsVisible)
+            .OrderBy(
+                    u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
+                        ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
+                        : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(k => k.Key, k => k.Value);
+
+            if (_configService.Current.ReverseUserSort)
+            {
+                visibleUsers = visibleUsers.Reverse().ToDictionary(k => k.Key, k => k.Value);
+            }
+
+            DrawTagFolder visibleUsersFolder = new(TagHandler.CustomVisibleTag, visibleUsers
+                .Select(u => new DrawIndeterminatePair(u.Key.UserData.UID, u.Key, u.Value, _apiController, _uidDisplayHandler)),
+                _tagHandler, _apiController);
+            drawFolders.Add(visibleUsersFolder);
+        }
+
+        foreach (var group in _pairManager.GroupPairs.OrderBy(g => g.Key.GroupAliasOrGID, StringComparer.Ordinal))
+        {
+            var groupUsers = group.Value.Where(v => users.ContainsKey(v)
+                    && (((v.IsOnline && _configService.Current.ShowOfflineUsersSeparately) || !_configService.Current.ShowOfflineUsersSeparately)
+                    || v.UserPair.OwnPermissions.IsPaused()))
+                    .OrderBy(
+                    u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
+                        ? (_configService.Current.PreferNotesOverNamesForVisible ? u.GetNote() : u.PlayerName)
+                        : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+            var owner = groupUsers.SingleOrDefault(u => string.Equals(u.UserData.UID, group.Key.OwnerUID, StringComparison.Ordinal));
+            var moderators = groupUsers.Where(u => group.Key.GroupPairUserInfos.TryGetValue(u.UserData.UID, out var info) && info.IsModerator());
+            groupUsers.RemoveAll(u => moderators.Contains(u));
+
+            var pinned = groupUsers.Where(u => group.Key.GroupPairUserInfos.TryGetValue(u.UserData.UID, out var info) && info.IsPinned());
+            groupUsers.RemoveAll(u => pinned.Contains(u));
+
+            if (_configService.Current.ReverseUserSort)
+            {
+                moderators = moderators.Reverse();
+                pinned = pinned.Reverse();
+                groupUsers.Reverse();
+            }
+
+            List<Pair> allGroupUsersSorted = new();
+            if (owner != null) allGroupUsersSorted.Add(owner);
+            allGroupUsersSorted.AddRange(moderators);
+            allGroupUsersSorted.AddRange(pinned);
+            allGroupUsersSorted.AddRange(groupUsers);
+
+            DrawGroupFolder groupFolder = new(group.Key.GID, group.Key, _apiController,
+                allGroupUsersSorted.Select(u => new DrawGroupPair(u.UserData.UID, group.Key, u, _uidDisplayHandler, _apiController)),
+                _tagHandler, _uidDisplayHandler);
+            drawFolders.Add(groupFolder);
+        }
+
+        var tags = _tagHandler.GetAllTagsSorted();
+        HashSet<Pair> alreadyInTags = new HashSet<Pair>();
+        foreach (var tag in tags)
+        {
+            IEnumerable<Pair> tagUsers = users.Select(k => k.Key).Where(u => u.IsDirectlyPaired && _tagHandler.HasTag(u.UserData.UID, tag)
+                && (((u.IsOnline && _configService.Current.ShowOfflineUsersSeparately) || !_configService.Current.ShowOfflineUsersSeparately)
+                || u.UserPair.OwnPermissions.IsPaused()))
+            .OrderBy(
+                    u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
+                        ? (_configService.Current.PreferNotesOverNamesForVisible ? u.GetNote() : u.PlayerName)
+                        : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase);
+
+            if (_configService.Current.ReverseUserSort)
+            {
+                tagUsers = tagUsers.Reverse();
+            }
+
+            DrawTagFolder tagFolder = new(tag, tagUsers
+                .Select(u =>
+                {
+                    alreadyInTags.Add(u);
+                    return new DrawUserPair(u.UserData.UID, u, _apiController, _uidDisplayHandler, _selectGroupForPairUi);
+                }),
+            _tagHandler, _apiController);
+            drawFolders.Add(tagFolder);
+        }
+
+        var onlineDirectPairedUsersNotInTags = users.Where(u => u.Key.IsDirectlyPaired && !_tagHandler.HasAnyTag(u.Key.UserData.UID)
+            && (((u.Key.IsOnline && _configService.Current.ShowOfflineUsersSeparately) || !_configService.Current.ShowOfflineUsersSeparately)
+                || u.Key.UserPair.OwnPermissions.IsPaused()))
+            .OrderBy(
+                u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
+                    ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
+                    : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
+            .Select(k => k.Key);
+
+        if (_configService.Current.ReverseUserSort)
+            onlineDirectPairedUsersNotInTags = onlineDirectPairedUsersNotInTags.Reverse();
+
+        DrawTagFolder onlineFolder = new((_configService.Current.ShowOfflineUsersSeparately ? TagHandler.CustomOnlineTag : TagHandler.CustomAllTag),
+            onlineDirectPairedUsersNotInTags.Select(u => new DrawUserPair(u.UserData.UID, u, _apiController, _uidDisplayHandler, _selectGroupForPairUi)),
+            _tagHandler, _apiController);
+
+        drawFolders.Add(onlineFolder);
+
+        if (_configService.Current.ShowOfflineUsersSeparately)
+        {
+            DrawTagFolder offlineUsers = new(TagHandler.CustomOfflineTag, users.Where(u => !u.Key.IsOnline)
+                .Select(u => new DrawIndeterminatePair(u.Key.UserData.UID, u.Key, u.Value, _apiController, _uidDisplayHandler)), _tagHandler, _apiController);
+            drawFolders.Add(offlineUsers);
+        }
+
+        DrawTagFolder unpairedUsers = new(TagHandler.CustomUnpairedTag, users.Where(u => u.Key.IsOneSidedPair)
+            .Select(u => new DrawUserPair(u.Key.UserData.UID, u.Key, _apiController, _uidDisplayHandler, _selectGroupForPairUi)), _tagHandler, _apiController);
+        drawFolders.Add(unpairedUsers);
+
+        return drawFolders;
     }
 
     public override void Draw()
@@ -238,6 +367,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             {
                 _configService.Current.ReverseUserSort = true;
                 _configService.Save();
+                Mediator.Publish(new RebuildUiPairMessage());
             }
             UiSharedService.AttachToolTip("Sort by name descending");
         }
@@ -247,12 +377,13 @@ public class CompactUi : WindowMediatorSubscriberBase
             {
                 _configService.Current.ReverseUserSort = false;
                 _configService.Save();
+                Mediator.Publish(new RebuildUiPairMessage());
             }
             UiSharedService.AttachToolTip("Sort by name ascending");
         }
         ImGui.SameLine();
 
-        var users = GetFilteredUsers();
+        var users = GetFilteredDirectUsers();
         var userCount = users.Count;
 
         var spacing = userCount > 0
@@ -260,7 +391,10 @@ public class CompactUi : WindowMediatorSubscriberBase
             : ImGui.GetStyle().ItemSpacing.X;
 
         ImGui.SetNextItemWidth(WindowContentWidth - buttonSize.X - spacing);
-        ImGui.InputTextWithHint("##filter", "Filter for UID/notes", ref _characterOrCommentFilter, 255);
+        if (ImGui.InputTextWithHint("##filter", "Filter for UID/notes", ref _characterOrCommentFilter, 255))
+        {
+            Mediator.Publish(new RebuildUiPairMessage());
+        }
 
         if (userCount == 0) return;
 
@@ -330,24 +464,13 @@ public class CompactUi : WindowMediatorSubscriberBase
         var ySize = TransferPartHeight == 0
             ? 1
             : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - TransferPartHeight - ImGui.GetCursorPosY();
-        var users = GetFilteredUsers()
-            .OrderBy(
-                u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
-                    ? (_configService.Current.PreferNotesOverNamesForVisible ? u.GetNote() : u.PlayerName)
-                    : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase).ToList();
-
-        if (_configService.Current.ReverseUserSort)
-        {
-            users.Reverse();
-        }
-
-        var onlineUsers = users.Where(u => u.IsOnline || u.UserPair!.OwnPermissions.IsPaused()).Select(c => new DrawUserPair("Online" + c.UserData.UID, c, _uidDisplayHandler, _apiController, _selectGroupForPairUi)).ToList();
-        var visibleUsers = users.Where(u => u.IsVisible).Select(c => new DrawUserPair("Visible" + c.UserData.UID, c, _uidDisplayHandler, _apiController, _selectGroupForPairUi)).ToList();
-        var offlineUsers = users.Where(u => !u.IsOnline && !u.UserPair!.OwnPermissions.IsPaused()).Select(c => new DrawUserPair("Offline" + c.UserData.UID, c, _uidDisplayHandler, _apiController, _selectGroupForPairUi)).ToList();
 
         ImGui.BeginChild("list", new Vector2(WindowContentWidth, ySize), border: false);
 
-        _pairGroupsUi.Draw(visibleUsers, onlineUsers, offlineUsers);
+        foreach (var item in _drawFolders)
+        {
+            item.Draw();
+        }
 
         ImGui.EndChild();
     }
@@ -539,8 +662,10 @@ public class CompactUi : WindowMediatorSubscriberBase
         }
     }
 
-    private List<Pair> GetFilteredUsers()
+    private List<Pair> GetFilteredDirectUsers()
     {
+        if (string.IsNullOrEmpty(_characterOrCommentFilter)) return _pairManager.DirectPairs;
+
         return _pairManager.DirectPairs.Where(p =>
         {
             if (_characterOrCommentFilter.IsNullOrEmpty()) return true;
@@ -548,6 +673,19 @@ public class CompactUi : WindowMediatorSubscriberBase
                    (p.GetNote()?.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false) ||
                    (p.PlayerName?.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false);
         }).ToList();
+    }
+
+    private Dictionary<Pair, List<GroupFullInfoDto>> GetFilteredGroupUsers()
+    {
+        if (string.IsNullOrEmpty(_characterOrCommentFilter)) return _pairManager.PairsWithGroups;
+
+        return _pairManager.PairsWithGroups.Where(p =>
+        {
+            if (_characterOrCommentFilter.IsNullOrEmpty()) return true;
+            return p.Key.UserData.AliasOrUID.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ||
+                   (p.Key.GetNote()?.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                   (p.Key.PlayerName?.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false);
+        }).ToDictionary(k => k.Key, k => k.Value);
     }
 
     private string GetServerError()

@@ -35,7 +35,9 @@ public class Pair
     public bool IsOnline => CachedPlayer != null;
 
     public bool IsPaused => UserPair.OtherPermissions.IsPaused() || UserPair.OwnPermissions.IsPaused();
-    public bool IsDirectlyPaired => UserPair.OwnPermissions.IsPaired() && UserPair.OtherPermissions.IsPaired();
+    public bool IsDirectlyPaired => UserPair.Groups.Contains(Constants.IndividualKeyword, StringComparer.Ordinal) && UserPair.OwnPermissions.IsSynced();
+    public bool IsOneSidedPair => UserPair.Groups.Contains(Constants.IndividualKeyword, StringComparer.Ordinal) && UserPair.Groups.Count == 1 && !UserPair.OwnPermissions.IsSynced();
+    public bool IsSynced => UserPair.OwnPermissions.IsSynced() && UserPair.OtherPermissions.IsSynced();
 
     public bool IsVisible => CachedPlayer?.IsVisible ?? false;
     public CharacterData? LastReceivedCharacterData { get; set; }

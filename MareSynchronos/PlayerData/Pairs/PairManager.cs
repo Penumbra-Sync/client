@@ -22,6 +22,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     private readonly PairFactory _pairFactory;
     private Lazy<List<Pair>> _directPairsInternal;
     private Lazy<Dictionary<GroupFullInfoDto, List<Pair>>> _groupPairsInternal;
+    private Lazy<Dictionary<Pair, List<GroupFullInfoDto>>> _pairsWithGroupsInternal;
 
     public PairManager(ILogger<PairManager> logger, PairFactory pairFactory,
                 MareConfigService configurationService, MareMediator mediator,
@@ -34,11 +35,14 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         Mediator.Subscribe<CutsceneEndMessage>(this, (_) => ReapplyPairData());
         _directPairsInternal = DirectPairsLazy();
         _groupPairsInternal = GroupPairsLazy();
+        _pairsWithGroupsInternal = PairsWithGroupsLazy();
 
         _dalamudContextMenu.OnOpenGameObjectContextMenu += DalamudContextMenuOnOnOpenGameObjectContextMenu;
     }
 
     public List<Pair> DirectPairs => _directPairsInternal.Value;
+
+    public Dictionary<Pair, List<GroupFullInfoDto>> PairsWithGroups => _pairsWithGroupsInternal.Value;
 
     public Dictionary<GroupFullInfoDto, List<Pair>> GroupPairs => _groupPairsInternal.Value;
 
@@ -301,6 +305,21 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         RecreateLazy();
     }
 
+    private Lazy<Dictionary<Pair, List<GroupFullInfoDto>>> PairsWithGroupsLazy()
+    {
+        return new Lazy<Dictionary<Pair, List<GroupFullInfoDto>>>(() =>
+        {
+            Dictionary<Pair, List<GroupFullInfoDto>> outDict = new();
+
+            foreach (var pair in _allClientPairs.Select(k => k.Value))
+            {
+                outDict[pair] = _allGroups.Where(k => pair.UserPair.Groups.Contains(k.Key.GID, StringComparer.Ordinal)).Select(k => k.Value).ToList();
+            }
+
+            return outDict;
+        });
+    }
+
     private Lazy<Dictionary<GroupFullInfoDto, List<Pair>>> GroupPairsLazy()
     {
         return new Lazy<Dictionary<GroupFullInfoDto, List<Pair>>>(() =>
@@ -326,5 +345,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     {
         _directPairsInternal = DirectPairsLazy();
         _groupPairsInternal = GroupPairsLazy();
+        _pairsWithGroupsInternal = PairsWithGroupsLazy();
+        Mediator.Publish(new RebuildUiPairMessage());
     }
 }

@@ -13,7 +13,7 @@ public class DrawUserPair : DrawPairBase
 {
     private readonly SelectTagForPairUi _selectGroupForPairUi;
 
-    public DrawUserPair(string id, Pair entry, UidDisplayHandler displayHandler, ApiController apiController, SelectTagForPairUi selectGroupForPairUi)
+    public DrawUserPair(string id, Pair entry, ApiController apiController, IdDisplayHandler displayHandler, SelectTagForPairUi selectGroupForPairUi)
         : base(id, entry, apiController, displayHandler)
     {
         _pair = entry;
@@ -40,8 +40,9 @@ public class DrawUserPair : DrawPairBase
         else
         {
             connectionIcon = FontAwesomeIcon.User;
-            connectionText = "You are directly paired with " + _pair.UserData.AliasOrUID;
-            connectionColor = ImGuiColors.ParsedGreen;
+            connectionText = "You are directly paired with " + _pair.UserData.AliasOrUID + Environment.NewLine;
+            if (!_pair.IsOnline) connectionText += "The user is currently offline";
+            connectionColor = _pair.IsOnline ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         }
 
         ImGui.SetCursorPosY(textPosY);

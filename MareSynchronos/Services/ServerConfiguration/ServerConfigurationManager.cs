@@ -157,6 +157,17 @@ public class ServerConfigurationManager
         Save();
     }
 
+    internal void RenameTag(string oldName, string newName)
+    {
+        CurrentServerTagStorage().ServerAvailablePairTags.Remove(oldName);
+        CurrentServerTagStorage().ServerAvailablePairTags.Add(newName);
+        foreach (var existingTags in CurrentServerTagStorage().UidServerPairedUserTags.Select(k => k.Value))
+        {
+            if (existingTags.Remove(oldName))
+                existingTags.Add(newName);
+        }
+    }
+
     internal void AddTag(string tag)
     {
         CurrentServerTagStorage().ServerAvailablePairTags.Add(tag);
@@ -290,6 +301,8 @@ public class ServerConfigurationManager
 
     internal void SetNoteForGid(string gid, string note, bool save = true)
     {
+        if (string.IsNullOrEmpty(gid)) return;
+
         CurrentNotesStorage().GidServerComments[gid] = note;
         if (save)
             _notesConfig.Save();
@@ -297,6 +310,8 @@ public class ServerConfigurationManager
 
     internal void SetNoteForUid(string uid, string note, bool save = true)
     {
+        if (string.IsNullOrEmpty(uid)) return;
+
         CurrentNotesStorage().UidServerComments[uid] = note;
         if (save)
             _notesConfig.Save();

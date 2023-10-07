@@ -12,7 +12,7 @@ namespace MareSynchronos.UI.Components;
 public class SelectTagForPairUi
 {
     private readonly TagHandler _tagHandler;
-    private readonly UidDisplayHandler _uidDisplayHandler;
+    private readonly IdDisplayHandler _uidDisplayHandler;
 
     /// <summary>
     /// The group UI is always open for a specific pair. This defines which pair the UI is open for.
@@ -30,7 +30,7 @@ public class SelectTagForPairUi
     /// </summary>
     private string _tagNameToAdd = "";
 
-    public SelectTagForPairUi(TagHandler tagHandler, UidDisplayHandler uidDisplayHandler)
+    public SelectTagForPairUi(TagHandler tagHandler, IdDisplayHandler uidDisplayHandler)
     {
         _show = false;
         _pair = null;

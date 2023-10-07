@@ -13,12 +13,12 @@ namespace MareSynchronos.UI.Components;
 public class DrawGroupPair : DrawPairBase
 {
     private readonly GroupFullInfoDto _groupFullInfo;
-    private bool IsPinned => _groupFullInfo.GroupPairUserInfos[_pair.UserData.UID].IsPinned();
-    private bool IsModerator => _groupFullInfo.GroupPairUserInfos[_pair.UserData.UID].IsModerator();
+    private bool IsPinned => _groupFullInfo.GroupPairUserInfos.TryGetValue(_pair.UserData.UID, out var info) && info.IsPinned();
+    private bool IsModerator => _groupFullInfo.GroupPairUserInfos.TryGetValue(_pair.UserData.UID, out var info) && info.IsModerator();
     private bool IsOwner => string.Equals(_groupFullInfo.OwnerUID, _pair.UserData.UID, StringComparison.Ordinal);
 
     public DrawGroupPair(string id, GroupFullInfoDto groupFullInfo, Pair entry,
-        UidDisplayHandler displayHandler, ApiController apiController)
+        IdDisplayHandler displayHandler, ApiController apiController)
         : base(id, entry, apiController, displayHandler)
     {
         _pair = entry;
@@ -67,8 +67,8 @@ public class DrawGroupPair : DrawPairBase
         else
         {
             connectionIcon = FontAwesomeIcon.Users;
-            connectionText = "You share Syncshells with " + _pair.UserData.AliasOrUID + ":" + _groupFullInfo.GroupAliasOrGID;
-            connectionColor = ImGuiColors.ParsedGreen;
+            connectionText = _pair.IsOnline ? _pair.UserData.AliasOrUID + " is online" : _pair.UserData.AliasOrUID + " is offline";
+            connectionColor = _pair.IsOnline ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         }
 
         ImGui.SetCursorPosY(textPosY);
@@ -136,6 +136,7 @@ public class DrawGroupPair : DrawPairBase
 
         if (selfIsOwner)
         {
+            ImGui.Text("Syncshell Administrator Functions");
             string modText = IsModerator ? "Demod user" : "Mod user";
             if (UiSharedService.IconTextButton(FontAwesomeIcon.UserShield, modText) && UiSharedService.CtrlPressed())
             {

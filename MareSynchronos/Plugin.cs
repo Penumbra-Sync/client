@@ -59,7 +59,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<FileTransferOrchestrator>();
             collection.AddSingleton<MarePlugin>();
             collection.AddSingleton<MareProfileManager>();
-            collection.AddSingleton<UidDisplayHandler>();
+            collection.AddSingleton<IdDisplayHandler>();
             collection.AddSingleton<GameObjectHandlerFactory>();
             collection.AddSingleton<FileDownloadManagerFactory>();
             collection.AddSingleton<PairHandlerFactory>();
@@ -68,6 +68,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<TokenProvider>();
             collection.AddSingleton<PluginWarningNotificationService>();
             collection.AddSingleton<FileCompactor>();
+            collection.AddSingleton<TagHandler>();
             collection.AddSingleton((s) => new DalamudContextMenu(pluginInterface));
             collection.AddSingleton((s) => new DalamudUtilService(s.GetRequiredService<ILogger<DalamudUtilService>>(),
                 clientState, objectTable, framework, gameGui, condition, gameData,
@@ -84,7 +85,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton((s) => new TransientConfigService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new ConfigurationMigrator(s.GetRequiredService<ILogger<ConfigurationMigrator>>(), pluginInterface));
             collection.AddSingleton((s) => new HubFactory(s.GetRequiredService<ILogger<HubFactory>>(), s.GetRequiredService<MareMediator>(),
-                s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<MareConfigService>(), 
+                s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<MareConfigService>(),
                 s.GetRequiredService<TokenProvider>(), pluginLog));
 
             // func factory method singletons

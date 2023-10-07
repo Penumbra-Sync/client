@@ -8,21 +8,23 @@ using MareSynchronos.WebAPI;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.User;
 using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
 
 namespace MareSynchronos.UI.Components;
 
 public abstract class DrawPairBase
 {
+    // todo: not make this static
     protected bool _showModalReport = false;
     protected readonly ApiController _apiController;
-    protected readonly UidDisplayHandler _displayHandler;
+    protected readonly IdDisplayHandler _displayHandler;
     protected Pair _pair;
     private bool _reportPopupOpen = false;
     private string _reportReason = string.Empty;
     private readonly string _id;
     public UserPairDto UserPair => _pair.UserPair!;
 
-    protected DrawPairBase(string id, Pair entry, ApiController apiController, UidDisplayHandler uIDDisplayHandler)
+    protected DrawPairBase(string id, Pair entry, ApiController apiController, IdDisplayHandler uIDDisplayHandler)
     {
         _id = id;
         _pair = entry;
@@ -34,8 +36,9 @@ public abstract class DrawPairBase
 
     public void DrawPairedClient()
     {
+        using var id = ImRaii.PushId(GetType().Name + _id);
         var originalY = ImGui.GetCursorPosY();
-        var pauseIconSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Play);
+        var pauseIconSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars);
         var textSize = ImGui.CalcTextSize(_pair.UserData.AliasOrUID);
 
         var textPosY = originalY + pauseIconSize.Y / 2 - textSize.Y / 2;
@@ -151,23 +154,20 @@ public abstract class DrawPairBase
                     ImGui.EndTooltip();
                 }
             }
-
-            if (rightSideStart == 0f)
-            {
-                rightSideStart = windowEndX - barButtonSize.X - spacingX * 2 - pauseIconSize.X;
-            }
-            ImGui.SameLine(windowEndX - barButtonSize.X - spacingX - pauseIconSize.X);
-            ImGui.SetCursorPosY(originalY);
-            if (ImGuiComponents.IconButton(pauseIcon))
-            {
-                var perm = _pair.UserPair!.OwnPermissions;
-                perm.SetPaused(!perm.IsPaused());
-                _ = _apiController.UserSetPairPermissions(new(_pair.UserData, perm));
-            }
-            UiSharedService.AttachToolTip(!_pair.UserPair!.OwnPermissions.IsPaused()
-                ? "Pause pairing with " + entryUID
-                : "Resume pairing with " + entryUID);
         }
+
+        rightSideStart = windowEndX - barButtonSize.X - spacingX * 2 - pauseIconSize.X;
+        ImGui.SameLine(windowEndX - barButtonSize.X - spacingX - pauseIconSize.X);
+        ImGui.SetCursorPosY(originalY);
+        if (ImGuiComponents.IconButton(pauseIcon))
+        {
+            var perm = _pair.UserPair!.OwnPermissions;
+            perm.SetPaused(!perm.IsPaused());
+            _ = _apiController.UserSetPairPermissions(new(_pair.UserData, perm));
+        }
+        UiSharedService.AttachToolTip(!_pair.UserPair!.OwnPermissions.IsPaused()
+            ? "Pause pairing with " + entryUID
+            : "Resume pairing with " + entryUID);
 
         // Flyout Menu
         if (rightSideStart == 0f)

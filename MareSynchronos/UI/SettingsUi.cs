@@ -580,6 +580,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _configService.Current.ShowVisibleUsersSeparately = showVisibleSeparate;
             _configService.Save();
+            Mediator.Publish(new RebuildUiPairMessage());
         }
         UiSharedService.DrawHelpText("This will show all currently visible users in a special 'Visible' group in the main UI.");
 
@@ -587,6 +588,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _configService.Current.ShowOfflineUsersSeparately = showOfflineSeparate;
             _configService.Save();
+            Mediator.Publish(new RebuildUiPairMessage());
         }
         UiSharedService.DrawHelpText("This will show all currently offline users in a special 'Offline' group in the main UI.");
 
@@ -594,6 +596,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _configService.Current.ShowCharacterNameInsteadOfNotesForVisible = showNameInsteadOfNotes;
             _configService.Save();
+            Mediator.Publish(new RebuildUiPairMessage());
         }
         UiSharedService.DrawHelpText("This will show the character name instead of custom set note when a character is visible");
 
@@ -603,6 +606,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _configService.Current.PreferNotesOverNamesForVisible = preferNotesInsteadOfName;
             _configService.Save();
+            Mediator.Publish(new RebuildUiPairMessage());
         }
         UiSharedService.DrawHelpText("If you set a note for a player it will be shown instead of the player name");
         if (!_configService.Current.ShowCharacterNameInsteadOfNotesForVisible) ImGui.EndDisabled();
