@@ -71,10 +71,11 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         _downloadReady.Remove(guid, out _);
     }
 
-    public async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, Uri uri, CancellationToken? ct = null)
+    public async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, Uri uri, 
+        CancellationToken? ct = null, HttpCompletionOption httpCompletionOption = HttpCompletionOption.ResponseContentRead)
     {
         using var requestMessage = new HttpRequestMessage(method, uri);
-        return await SendRequestInternalAsync(requestMessage, ct).ConfigureAwait(false);
+        return await SendRequestInternalAsync(requestMessage, ct, httpCompletionOption).ConfigureAwait(false);
     }
 
     public async Task<HttpResponseMessage> SendRequestAsync<T>(HttpMethod method, Uri uri, T content, CancellationToken ct) where T : class
@@ -108,7 +109,8 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         await _downloadSemaphore.WaitAsync(token).ConfigureAwait(false);
     }
 
-    private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage, CancellationToken? ct = null)
+    private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage, 
+        CancellationToken? ct = null, HttpCompletionOption httpCompletionOption = HttpCompletionOption.ResponseContentRead)
     {
         requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _serverManager.GetToken());
 
@@ -125,8 +127,8 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         try
         {
             if (ct != null)
-                return await _httpClient.SendAsync(requestMessage, ct.Value).ConfigureAwait(false);
-            return await _httpClient.SendAsync(requestMessage).ConfigureAwait(false);
+                return await _httpClient.SendAsync(requestMessage, httpCompletionOption, ct.Value).ConfigureAwait(false);
+            return await _httpClient.SendAsync(requestMessage, httpCompletionOption).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

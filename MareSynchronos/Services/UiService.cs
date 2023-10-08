@@ -33,6 +33,7 @@ public sealed class UiService : DisposableMediatorSubscriberBase
         _dalamudPluginInterface.UiBuilder.DisableGposeUiHide = true;
         _dalamudPluginInterface.UiBuilder.Draw += Draw;
         _dalamudPluginInterface.UiBuilder.OpenConfigUi += ToggleUi;
+        _dalamudPluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
 
         foreach (var window in windows)
         {
@@ -59,6 +60,14 @@ public sealed class UiService : DisposableMediatorSubscriberBase
     }
 
     public void ToggleUi()
+    {
+        if (_mareConfigService.Current.HasValidSetup())
+            Mediator.Publish(new UiToggleMessage(typeof(SettingsUi)));
+        else
+            Mediator.Publish(new UiToggleMessage(typeof(IntroUi)));
+    }
+
+    public void ToggleMainUi()
     {
         if (_mareConfigService.Current.HasValidSetup())
             Mediator.Publish(new UiToggleMessage(typeof(CompactUi)));

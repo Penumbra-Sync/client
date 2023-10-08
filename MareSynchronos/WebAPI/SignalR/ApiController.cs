@@ -409,11 +409,12 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
             _initialized = false;
             _healthCheckTokenSource?.Cancel();
             Logger.LogInformation("Stopping existing connection");
-            await _hubFactory.DisposeHubAsync().ConfigureAwait(false);
             Mediator.Publish(new DisconnectedMessage());
             _mareHub = null;
             _connectionDto = null;
         }
+
+        await _hubFactory.DisposeHubAsync().ConfigureAwait(false);
 
         ServerState = state;
     }

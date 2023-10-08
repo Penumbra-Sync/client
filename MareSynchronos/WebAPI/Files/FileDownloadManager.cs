@@ -121,7 +121,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         Logger.LogDebug("Downloading {requestUrl} for request {id}", requestUrl, requestId);
         try
         {
-            response = await _orchestrator.SendRequestAsync(HttpMethod.Get, requestUrl, ct).ConfigureAwait(false);
+            response = await _orchestrator.SendRequestAsync(HttpMethod.Get, requestUrl, ct, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
         }
         catch (HttpRequestException ex)
@@ -142,7 +142,8 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                 var buffer = new byte[bufferSize];
 
                 var bytesRead = 0;
-                while ((bytesRead = await (await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false)).ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+                var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+                while ((bytesRead = await stream.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
                 {
                     ct.ThrowIfCancellationRequested();
 

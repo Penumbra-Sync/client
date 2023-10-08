@@ -49,7 +49,6 @@ public sealed class Plugin : IDalamudPlugin
             // add mare related singletons
             collection.AddSingleton<MareMediator>();
             collection.AddSingleton<FileCacheManager>();
-            collection.AddSingleton<DalamudContextMenu>();
             collection.AddSingleton<ServerConfigurationManager>();
             collection.AddSingleton<PairManager>();
             collection.AddSingleton<ApiController>();
