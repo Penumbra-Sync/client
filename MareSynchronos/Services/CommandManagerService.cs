@@ -49,7 +49,7 @@ public sealed class CommandManagerService : IDisposable
         if (splitArgs == null || splitArgs.Length == 0)
         {
             // Interpret this as toggling the UI
-            _uiService.ToggleUi();
+            _uiService.ToggleMainUi();
             return;
         }
 
