@@ -139,7 +139,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
                 try
                 {
-                    _lastUsedToken = await _tokenProvider.GetOrUpdateToken().ConfigureAwait(false);
+                    _lastUsedToken = await _tokenProvider.GetOrUpdateToken(token).ConfigureAwait(false);
                 }
                 catch (MareAuthFailureException ex)
                 {

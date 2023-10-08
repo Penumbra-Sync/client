@@ -34,7 +34,7 @@ public sealed class TokenProvider : IDisposable
         _httpClient.Dispose();
     }
 
-    public async Task<string?> GetOrUpdateToken(bool forceRenew = false)
+    public async Task<string?> GetOrUpdateToken(CancellationToken ct, bool forceRenew = false)
     {
         bool renewal = forceRenew;
         if (!forceRenew && _tokenCache.TryGetValue(CurrentIdentifier, out var token))
@@ -53,10 +53,10 @@ public sealed class TokenProvider : IDisposable
         }
 
         _logger.LogTrace("GetOrUpdate: Getting new token");
-        return await GetNewToken(renewal).ConfigureAwait(false);
+        return await GetNewToken(renewal, ct).ConfigureAwait(false);
     }
 
-    public async Task<string> GetNewToken(bool isRenewal)
+    public async Task<string> GetNewToken(bool isRenewal, CancellationToken token)
     {
         Uri tokenUri;
         string response = string.Empty;
@@ -77,7 +77,7 @@ public sealed class TokenProvider : IDisposable
                 {
                             new KeyValuePair<string, string>("auth", auth),
                             new KeyValuePair<string, string>("charaIdent", await _dalamudUtil.GetPlayerNameHashedAsync().ConfigureAwait(false)),
-                })).ConfigureAwait(false);
+                }), token).ConfigureAwait(false);
             }
             else
             {
@@ -88,7 +88,7 @@ public sealed class TokenProvider : IDisposable
                     .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)));
                 HttpRequestMessage request = new(HttpMethod.Get, tokenUri.ToString());
                 request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _tokenCache[CurrentIdentifier]);
-                result = await _httpClient.SendAsync(request).ConfigureAwait(false);
+                result = await _httpClient.SendAsync(request, token).ConfigureAwait(false);
             }
 
             response = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
