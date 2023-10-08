@@ -5,12 +5,14 @@ using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.WebAPI;
 using MareSynchronos.UI.Handlers;
 using Dalamud.Interface.Utility.Raii;
+using MareSynchronos.API.Dto.Group;
 
 namespace MareSynchronos.UI.Components;
 
-public class DrawIndeterminatePair : DrawPairBase
+public class DrawUngroupedGroupPair : DrawPairBase
 {
-    public DrawIndeterminatePair(string id, Pair entry, ApiController apiController, IdDisplayHandler idDisplayHandler)
+
+    public DrawUngroupedGroupPair(string id, Pair entry, ApiController apiController, IdDisplayHandler idDisplayHandler)
         : base(id, entry, apiController, idDisplayHandler)
     {
     }
@@ -21,16 +23,9 @@ public class DrawIndeterminatePair : DrawPairBase
 
         ImGui.SetCursorPosY(textPosY);
 
-        if (_pair.IsVisible)
-        {
-            using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ParsedGreen);
-            using var font = ImRaii.PushFont(UiBuilder.IconFont);
-            ImGui.Text(FontAwesomeIcon.Eye.ToIconString());
-            userPairText = "User is visible";
-        }
-
         if (_pair.IsPaused)
         {
+            ImGui.SetCursorPosY(textPosY);
             using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
             using var font = ImRaii.PushFont(UiBuilder.IconFont);
             ImGui.Text(FontAwesomeIcon.PauseCircle.ToIconString());
@@ -38,10 +33,30 @@ public class DrawIndeterminatePair : DrawPairBase
         }
         else if (!_pair.IsOnline)
         {
+            ImGui.SetCursorPosY(textPosY);
             using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
             using var font = ImRaii.PushFont(UiBuilder.IconFont);
             ImGui.Text(FontAwesomeIcon.Users.ToIconString());
             userPairText = "User is offline";
+        }
+        else
+        {
+            using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ParsedGreen);
+            using var font = ImRaii.PushFont(UiBuilder.IconFont);
+            ImGui.Text(FontAwesomeIcon.Users.ToIconString());
+            userPairText = "User is online";
+        }
+
+        ImGui.SetCursorPosY(textPosY);
+
+        if (_pair.IsVisible)
+        {
+            var x = ImGui.GetCursorPosX();
+            ImGui.SameLine();
+            using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ParsedGreen);
+            using var font = ImRaii.PushFont(UiBuilder.IconFont);
+            ImGui.Text(FontAwesomeIcon.Eye.ToIconString());
+            userPairText = "User is visible: " + _pair.PlayerName;
         }
         UiSharedService.AttachToolTip(userPairText);
     }

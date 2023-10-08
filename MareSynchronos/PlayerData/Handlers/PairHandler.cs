@@ -71,7 +71,19 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         });
     }
 
-    public bool IsVisible { get; private set; }
+    private bool _isVisible;
+    public bool IsVisible
+    {
+        get => _isVisible;
+        private set
+        {
+            if (_isVisible != value)
+            {
+                _isVisible = value;
+                Mediator.Publish(new RebuildUiPairMessage());
+            }
+        }
+    }
     public OnlineUserIdentDto OnlineUser { get; private set; }
     public nint PlayerCharacter => _charaHandler?.Address ?? nint.Zero;
     public unsafe uint PlayerCharacterId => (_charaHandler?.Address ?? nint.Zero) == nint.Zero

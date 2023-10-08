@@ -129,7 +129,7 @@ public class CompactUi : WindowMediatorSubscriberBase
                     if (u.Key.IsDirectlyPaired)
                         return (DrawPairBase)(new DrawUserPair(TagHandler.CustomOnlineTag + u.Key.UserData.UID, u.Key, _apiController, _uidDisplayHandler, _selectGroupForPairUi));
                     else
-                        return (DrawPairBase)(new DrawIndeterminatePair(TagHandler.CustomOnlineTag + u.Key.UserData.UID, u.Key, _apiController, _uidDisplayHandler));
+                        return (DrawPairBase)(new DrawUngroupedGroupPair(TagHandler.CustomOnlineTag + u.Key.UserData.UID, u.Key, _apiController, _uidDisplayHandler));
                 }),
                 _tagHandler, _apiController);
             drawFolders.Add(visibleUsersFolder);
@@ -235,7 +235,7 @@ public class CompactUi : WindowMediatorSubscriberBase
                     if (u.IsDirectlyPaired)
                         return (DrawPairBase)(new DrawUserPair(TagHandler.CustomOfflineTag + u.UserData.UID, u, _apiController, _uidDisplayHandler, _selectGroupForPairUi));
                     else
-                        return (DrawPairBase)(new DrawIndeterminatePair(TagHandler.CustomOfflineTag + u.UserData.UID, u, _apiController, _uidDisplayHandler));
+                        return (DrawPairBase)(new DrawUngroupedGroupPair(TagHandler.CustomOfflineTag + u.UserData.UID, u, _apiController, _uidDisplayHandler));
                 }), _tagHandler, _apiController);
             drawFolders.Add(offlineUsers);
         }

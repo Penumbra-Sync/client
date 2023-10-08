@@ -61,13 +61,14 @@ public class DrawUserPair : DrawPairBase
             ImGui.PopFont();
             UiSharedService.AttachToolTip(_pair.UserData.AliasOrUID + " has preferred permissions enabled");
         }
+
         if (_pair is { IsOnline: true, IsVisible: true })
         {
             var x = ImGui.GetCursorPosX();
             ImGui.SetCursorPosY(textPosY);
+            ImGui.PushFont(UiBuilder.IconFont);
             var iconsize = ImGui.CalcTextSize(FontAwesomeIcon.Eye.ToIconString()).X;
             ImGui.SameLine(x + iconsize + (ImGui.GetStyle().ItemSpacing.X / 2));
-            ImGui.PushFont(UiBuilder.IconFont);
             UiSharedService.ColorText(FontAwesomeIcon.Eye.ToIconString(), ImGuiColors.ParsedGreen);
             ImGui.PopFont();
             UiSharedService.AttachToolTip(_pair.UserData.AliasOrUID + " is visible: " + _pair.PlayerName!);
