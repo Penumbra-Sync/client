@@ -73,7 +73,7 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         _downloadReady.Remove(guid, out _);
     }
 
-    public async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, Uri uri, 
+    public async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, Uri uri,
         CancellationToken? ct = null, HttpCompletionOption httpCompletionOption = HttpCompletionOption.ResponseContentRead)
     {
         using var requestMessage = new HttpRequestMessage(method, uri);
@@ -111,10 +111,10 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         await _downloadSemaphore.WaitAsync(token).ConfigureAwait(false);
     }
 
-    private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage, 
+    private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage,
         CancellationToken? ct = null, HttpCompletionOption httpCompletionOption = HttpCompletionOption.ResponseContentRead)
     {
-        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await _tokenProvider.GetOrUpdateToken().ConfigureAwait(false));
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await _tokenProvider.GetOrUpdateToken(ct!.Value).ConfigureAwait(false));
 
         if (requestMessage.Content != null && requestMessage.Content is not StreamContent && requestMessage.Content is not ByteArrayContent)
         {

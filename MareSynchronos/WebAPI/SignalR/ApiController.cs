@@ -155,7 +155,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
                 if (token.IsCancellationRequested) break;
 
-                _mareHub = _hubFactory.GetOrCreate();
+                _mareHub = _hubFactory.GetOrCreate(token);
 
                 await _mareHub.StartAsync(token).ConfigureAwait(false);
 
@@ -268,7 +268,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
             await Task.Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
             Logger.LogDebug("Checking Client Health State");
 
-            bool requireReconnect = await RefreshToken().ConfigureAwait(false);
+            bool requireReconnect = await RefreshToken(ct).ConfigureAwait(false);
 
             if (requireReconnect) continue;
 
@@ -276,14 +276,14 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         }
     }
 
-    private async Task<bool> RefreshToken()
+    private async Task<bool> RefreshToken(CancellationToken ct)
     {
         Logger.LogDebug("Checking token");
 
         bool requireReconnect = false;
         try
         {
-            var token = await _tokenProvider.GetOrUpdateToken().ConfigureAwait(false);
+            var token = await _tokenProvider.GetOrUpdateToken(ct).ConfigureAwait(false);
             if (!string.Equals(token, _lastUsedToken, StringComparison.Ordinal))
             {
                 Logger.LogDebug("Reconnecting due to updated token");

@@ -33,14 +33,14 @@ public class HubFactory : MediatorSubscriberBase
         _pluginLog = pluginLog;
     }
 
-    private HubConnection BuildHubConnection()
+    private HubConnection BuildHubConnection(CancellationToken ct)
     {
         Logger.LogDebug("Building new HubConnection");
 
         _instance = new HubConnectionBuilder()
             .WithUrl(_serverConfigurationManager.CurrentApiUrl + IMareHub.Path, options =>
             {
-                options.AccessTokenProvider = () => _tokenProvider.GetOrUpdateToken();
+                options.AccessTokenProvider = () => _tokenProvider.GetOrUpdateToken(ct);
                 options.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling;
             })
             .AddMessagePackProtocol(opt =>
@@ -97,11 +97,11 @@ public class HubFactory : MediatorSubscriberBase
         return Task.CompletedTask;
     }
 
-    public HubConnection GetOrCreate()
+    public HubConnection GetOrCreate(CancellationToken ct)
     {
         if (!_isDisposed && _instance != null) return _instance;
 
-        return BuildHubConnection();
+        return BuildHubConnection(ct);
     }
 
     public async Task DisposeHubAsync()
