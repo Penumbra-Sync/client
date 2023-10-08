@@ -149,7 +149,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                     {
                         new KeyValuePair<string, string>("auth", auth),
                         new KeyValuePair<string, string>("charaIdent", await _dalamudUtil.GetPlayerNameHashedAsync().ConfigureAwait(false)),
-                    })).ConfigureAwait(false);
+                    }), token).ConfigureAwait(false);
                     AuthFailureMessage = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
                     result.EnsureSuccessStatusCode();
                     _serverManager.SaveToken(await result.Content.ReadAsStringAsync().ConfigureAwait(false));
@@ -202,6 +202,11 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
                 await LoadOnlinePairs().ConfigureAwait(false);
             }
+            catch (OperationCanceledException)
+            {
+                Logger.LogWarning("Connection attempt cancelled");
+                return;
+            }
             catch (HttpRequestException ex)
             {
                 Logger.LogWarning(ex, "HttpRequestException on Connection");
@@ -230,7 +235,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
     {
         CancellationTokenSource cts = new();
         cts.CancelAfter(TimeSpan.FromSeconds(5));
-        Task.Run(async () =>
+        _ = Task.Run(async () =>
         {
             var pair = _pairManager.GetOnlineUserPairs().Single(p => p.UserPair != null && p.UserData == userData);
             var perm = pair.UserPair!.OwnPermissions;
@@ -404,17 +409,18 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
     {
         ServerState = ServerState.Disconnecting;
 
+        Logger.LogInformation("Stopping existing connection");
+        await _hubFactory.DisposeHubAsync().ConfigureAwait(false);
+
         if (_mareHub is not null)
         {
             _initialized = false;
             _healthCheckTokenSource?.Cancel();
-            Logger.LogInformation("Stopping existing connection");
             Mediator.Publish(new DisconnectedMessage());
             _mareHub = null;
             _connectionDto = null;
         }
 
-        await _hubFactory.DisposeHubAsync().ConfigureAwait(false);
 
         ServerState = state;
     }
