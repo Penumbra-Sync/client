@@ -120,5 +120,7 @@ public class HubFactory : MediatorSubscriberBase
         await _instance.DisposeAsync().ConfigureAwait(false);
 
         _instance = null;
+
+        Logger.LogDebug("Current HubConnection disposed");
     }
 }

@@ -193,6 +193,11 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
                 await LoadOnlinePairs().ConfigureAwait(false);
             }
+            catch (OperationCanceledException)
+            {
+                Logger.LogWarning("Connection attempt cancelled");
+                return;
+            }
             catch (HttpRequestException ex)
             {
                 Logger.LogWarning(ex, "HttpRequestException on Connection");
@@ -419,16 +424,18 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
     {
         ServerState = ServerState.Disconnecting;
 
+        Logger.LogInformation("Stopping existing connection");
+        await _hubFactory.DisposeHubAsync().ConfigureAwait(false);
+
         if (_mareHub is not null)
         {
             _initialized = false;
             _healthCheckTokenSource?.Cancel();
-            Logger.LogInformation("Stopping existing connection");
-            await _hubFactory.DisposeHubAsync().ConfigureAwait(false);
             Mediator.Publish(new DisconnectedMessage());
             _mareHub = null;
             _connectionDto = null;
         }
+
 
         ServerState = state;
     }

@@ -30,7 +30,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly ICallGateSubscriber<GameObject?, string>? _glamourerGetAllCustomization;
     private readonly ICallGateSubscriber<Character?, uint, object?> _glamourerRevert;
     private readonly ICallGateSubscriber<string, uint, object?> _glamourerRevertByName;
-    private readonly ICallGateSubscriber<Character?, uint, bool> _glamourerUnlock;
+    private readonly ICallGateSubscriber<string, uint, bool> _glamourerUnlock;
     private readonly ICallGateSubscriber<(int, int)> _heelsGetApiVersion;
     private readonly ICallGateSubscriber<string> _heelsGetOffset;
     private readonly ICallGateSubscriber<string, object?> _heelsOffsetUpdate;
@@ -113,7 +113,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         _glamourerApplyAll = pi.GetIpcSubscriber<string, GameObject?, uint, object>("Glamourer.ApplyAllToCharacterLock");
         _glamourerRevert = pi.GetIpcSubscriber<Character?, uint, object?>("Glamourer.RevertCharacterLock");
         _glamourerRevertByName = pi.GetIpcSubscriber<string, uint, object?>("Glamourer.RevertLock");
-        _glamourerUnlock = pi.GetIpcSubscriber<Character?, uint, bool>("Glamourer.Unlock");
+        _glamourerUnlock = pi.GetIpcSubscriber<string, uint, bool>("Glamourer.UnlockName");
 
         _heelsGetApiVersion = pi.GetIpcSubscriber<(int, int)>("SimpleHeels.ApiVersion");
         _heelsGetOffset = pi.GetIpcSubscriber<string>("SimpleHeels.GetLocalPlayer");
@@ -248,8 +248,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
                 {
                     logger.LogDebug("[{appid}] Calling on IPC: GlamourerApplyAll", applicationId);
                     _glamourerApplyAll!.InvokeAction(customization, chara, LockCode);
-                    logger.LogDebug("[{appid}] Calling on IPC: PenumbraRedraw", applicationId);
-                    _penumbraRedrawObject.Invoke(chara, RedrawType.Redraw);
                 }
                 catch (Exception)
                 {
@@ -272,11 +270,19 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
             await _redrawSemaphore.WaitAsync(token).ConfigureAwait(false);
             await PenumbraRedrawInternalAsync(logger, handler, applicationId, (chara) =>
             {
-                logger.LogDebug("[{appid}] Calling On IPC: GlamourerRevert", applicationId);
-                _glamourerRevert.InvokeAction(chara, LockCode);
-                logger.LogDebug("[{appid}] Calling On IPC: PenumbraRedraw", applicationId);
-                _penumbraRedrawObject.Invoke(chara, RedrawType.AfterGPose);
-                _glamourerUnlock.InvokeFunc(chara, LockCode);
+                try
+                {
+                    logger.LogDebug("[{appid}] Calling On IPC: GlamourerUnlockName", applicationId);
+                    _glamourerUnlock.InvokeFunc(handler.Name, LockCode);
+                    logger.LogDebug("[{appid}] Calling On IPC: GlamourerRevert", applicationId);
+                    _glamourerRevert.InvokeAction(chara, LockCode);
+                    logger.LogDebug("[{appid}] Calling On IPC: PenumbraRedraw", applicationId);
+                    _penumbraRedrawObject.Invoke(chara, RedrawType.AfterGPose);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "[{appid}] Error during GlamourerRevert", applicationId);
+                }
 
             }).ConfigureAwait(false);
         }
@@ -293,6 +299,8 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         {
             logger.LogDebug("[{appid}] Calling On IPC: GlamourerRevertByName", applicationId);
             _glamourerRevertByName.InvokeAction(name, LockCode);
+            logger.LogDebug("[{appid}] Calling On IPC: GlamourerUnlockName", applicationId);
+            _glamourerUnlock.InvokeAction(name, LockCode);
         }
         catch (Exception ex)
         {

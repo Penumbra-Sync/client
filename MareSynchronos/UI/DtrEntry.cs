@@ -18,7 +18,7 @@ public sealed class DtrEntry : IDisposable, IHostedService
     private readonly IDtrBar _dtrBar;
     private readonly ConfigurationServiceBase<MareConfig> _configService;
     private readonly MareMediator _mareMediator;
-    private Lazy<DtrBarEntry> _entry;
+    private readonly Lazy<DtrBarEntry> _entry;
     private readonly PairManager _pairManager;
     private Task? _runTask;
     private string? _text;
@@ -40,6 +40,7 @@ public sealed class DtrEntry : IDisposable, IHostedService
         {
             _logger.LogDebug("Disposing DtrEntry");
             Clear();
+            _entry.Value.Dispose();
         }
     }
 
@@ -68,6 +69,7 @@ public sealed class DtrEntry : IDisposable, IHostedService
 
     private DtrBarEntry CreateEntry()
     {
+        _logger.LogTrace("Creating new DtrBar entry");
         var entry = _dtrBar.Get("Mare Synchronos");
         entry.OnClick = () => _mareMediator.Publish(new UiToggleMessage(typeof(CompactUi)));
 
@@ -77,13 +79,10 @@ public sealed class DtrEntry : IDisposable, IHostedService
     private void Clear()
     {
         if (!_entry.IsValueCreated) return;
-        _text = null;
         _logger.LogInformation("Clearing entry");
+        _text = null;
 
         _entry.Value.Shown = false;
-        _entry.Value.Text = null;
-        _entry.Value.Dispose();
-        _entry = new(CreateEntry);
     }
 
     private async Task RunAsync()
@@ -119,14 +118,26 @@ public sealed class DtrEntry : IDisposable, IHostedService
         string tooltip;
         if (_apiController.IsConnected)
         {
-            text = $"\uE044 {_pairManager.GetVisibleUserCount()}";
-            tooltip = $"Mare Synchronos: Connected{Environment.NewLine}----------{Environment.NewLine}{string.Join(Environment.NewLine, _pairManager.GetOnlineUserPairs().Where(x => x.IsVisible).Select(x => string.Format("{0} ({1})", x.PlayerName, x.UserData.AliasOrUID)))}";
+            var pairCount = _pairManager.GetVisibleUserCount();
+            text = $"\uE044 {pairCount}";
+            if (pairCount > 0)
+            {
+                var visiblePairs = _pairManager.GetOnlineUserPairs()
+                    .Where(x => x.IsVisible)
+                    .Select(x => string.Format("{0} ({1})", x.PlayerName, x.UserData.AliasOrUID));
+                tooltip = $"Mare Synchronos: Connected{Environment.NewLine}----------{Environment.NewLine}{string.Join(Environment.NewLine, visiblePairs)}";
+            }
+            else
+            {
+                tooltip = "Mare Synchronos: Connected";
+            }
         }
         else
         {
             text = "\uE044 \uE04C";
             tooltip = "Mare Synchronos: Not Connected";
         }
+
         if (!string.Equals(text, _text, StringComparison.Ordinal))
         {
             _text = text;

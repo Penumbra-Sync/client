@@ -218,7 +218,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             Logger.LogDebug("[{applicationId}] Applying Customization Data for {handler}", applicationId, handler);
             await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, handler, applicationId, 30000, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
-            foreach (var change in changes.Value)
+            foreach (var change in changes.Value.OrderBy(p => (int)p))
             {
                 Logger.LogDebug("[{applicationId}] Processing {change} for {handler}", applicationId, change, handler);
                 switch (change)
@@ -249,22 +249,20 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                     case PlayerChanges.Glamourer:
                         if (charaData.GlamourerData.TryGetValue(changes.Key, out var glamourerData))
                         {
-                            alreadyRedrawn = true;
                             await _ipcManager.GlamourerApplyAllAsync(Logger, handler, glamourerData, applicationId, token).ConfigureAwait(false);
                         }
                         break;
 
                     case PlayerChanges.ModFiles:
                     case PlayerChanges.ModManip:
-                        if (!alreadyRedrawn)
-                        {
-                            alreadyRedrawn = true;
-                            await _ipcManager.PenumbraRedrawAsync(Logger, handler, applicationId, token).ConfigureAwait(false);
-                        }
                         break;
                 }
                 token.ThrowIfCancellationRequested();
             }
+
+            if (changes.Value.Contains(PlayerChanges.ModFiles) || changes.Value.Contains(PlayerChanges.ModManip) || changes.Value.Contains(PlayerChanges.Glamourer))
+                await _ipcManager.PenumbraRedrawAsync(Logger, handler, applicationId, token).ConfigureAwait(false);
+
         }
         finally
         {
