@@ -9,7 +9,7 @@ using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
 
-namespace MareSynchronos.UI;
+namespace MareSynchronos.UI.Components.Popup;
 
 internal class ReportPopupHandler : PopupHandlerBase
 {
@@ -33,7 +33,7 @@ internal class ReportPopupHandler : PopupHandlerBase
     protected override void DrawContent()
     {
         using (ImRaii.PushFont(_uiSharedService.UidFont))
-            UiSharedService.TextWrapped("Report " + (_reportedPair!.UserData.AliasOrUID) + " Mare Profile");
+            UiSharedService.TextWrapped("Report " + _reportedPair!.UserData.AliasOrUID + " Mare Profile");
 
         ImGui.InputTextMultiline("##reportReason", ref _reportReason, 500, new Vector2(500 - ImGui.GetStyle().ItemSpacing.X * 2, 200));
         UiSharedService.TextWrapped($"Note: Sending a report will disable the offending profile globally.{Environment.NewLine}" +

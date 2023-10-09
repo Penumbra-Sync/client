@@ -29,7 +29,7 @@ public class DrawUngroupedGroupPair : DrawPairBase
             ImGui.SetCursorPosY(textPosY);
             using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
             using var font = ImRaii.PushFont(UiBuilder.IconFont);
-            ImGui.Text(FontAwesomeIcon.PauseCircle.ToIconString());
+            ImGui.TextUnformatted(FontAwesomeIcon.PauseCircle.ToIconString());
             userPairText = "User is paused";
         }
         else if (!_pair.IsOnline)
@@ -37,14 +37,14 @@ public class DrawUngroupedGroupPair : DrawPairBase
             ImGui.SetCursorPosY(textPosY);
             using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
             using var font = ImRaii.PushFont(UiBuilder.IconFont);
-            ImGui.Text(FontAwesomeIcon.Users.ToIconString());
+            ImGui.TextUnformatted(FontAwesomeIcon.Users.ToIconString());
             userPairText = "User is offline";
         }
         else
         {
             using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ParsedGreen);
             using var font = ImRaii.PushFont(UiBuilder.IconFont);
-            ImGui.Text(FontAwesomeIcon.Users.ToIconString());
+            ImGui.TextUnformatted(FontAwesomeIcon.Users.ToIconString());
             userPairText = "User is online";
         }
 
@@ -56,7 +56,7 @@ public class DrawUngroupedGroupPair : DrawPairBase
             ImGui.SameLine();
             using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ParsedGreen);
             using var font = ImRaii.PushFont(UiBuilder.IconFont);
-            ImGui.Text(FontAwesomeIcon.Eye.ToIconString());
+            ImGui.TextUnformatted(FontAwesomeIcon.Eye.ToIconString());
             userPairText = "User is visible: " + _pair.PlayerName;
         }
         UiSharedService.AttachToolTip(userPairText);

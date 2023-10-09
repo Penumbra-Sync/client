@@ -216,7 +216,7 @@ internal sealed class GroupPanel
         if (string.Equals(groupDto.OwnerUID, ApiController.UID, StringComparison.Ordinal))
         {
             ImGui.PushFont(UiBuilder.IconFont);
-            ImGui.Text(FontAwesomeIcon.Crown.ToIconString());
+            ImGui.TextUnformatted(FontAwesomeIcon.Crown.ToIconString());
             ImGui.PopFont();
             UiSharedService.AttachToolTip("You are the owner of Syncshell " + groupName);
             ImGui.SameLine();
@@ -224,7 +224,7 @@ internal sealed class GroupPanel
         else if (groupDto.GroupUserInfo.IsModerator())
         {
             ImGui.PushFont(UiBuilder.IconFont);
-            ImGui.Text(FontAwesomeIcon.UserShield.ToIconString());
+            ImGui.TextUnformatted(FontAwesomeIcon.UserShield.ToIconString());
             ImGui.PopFont();
             UiSharedService.AttachToolTip("You are a moderator of Syncshell " + groupName);
             ImGui.SameLine();
@@ -431,7 +431,7 @@ internal sealed class GroupPanel
 
             if (visibleUsers.Any())
             {
-                ImGui.Text("Visible");
+                ImGui.TextUnformatted("Visible");
                 ImGui.Separator();
                 foreach (var entry in visibleUsers)
                 {
@@ -441,7 +441,7 @@ internal sealed class GroupPanel
 
             if (onlineUsers.Any())
             {
-                ImGui.Text("Online");
+                ImGui.TextUnformatted("Online");
                 ImGui.Separator();
                 foreach (var entry in onlineUsers)
                 {
@@ -451,7 +451,7 @@ internal sealed class GroupPanel
 
             if (offlineUsers.Any())
             {
-                ImGui.Text("Offline/Unknown");
+                ImGui.TextUnformatted("Offline/Unknown");
                 ImGui.Separator();
                 foreach (var entry in offlineUsers)
                 {
@@ -502,14 +502,14 @@ internal sealed class GroupPanel
                 ImGui.BeginTooltip();
                 if (!invitesEnabled || soundsDisabled || animDisabled || vfxDisabled)
                 {
-                    ImGui.Text("Syncshell permissions");
+                    ImGui.TextUnformatted("Syncshell permissions");
 
                     if (!invitesEnabled)
                     {
                         var lockedText = "Syncshell is closed for joining";
                         UiSharedService.FontText(lockedIcon.ToIconString(), UiBuilder.IconFont);
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text(lockedText);
+                        ImGui.TextUnformatted(lockedText);
                     }
 
                     if (soundsDisabled)
@@ -517,7 +517,7 @@ internal sealed class GroupPanel
                         var soundsText = "Sound sync disabled through owner";
                         UiSharedService.FontText(soundsIcon.ToIconString(), UiBuilder.IconFont);
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text(soundsText);
+                        ImGui.TextUnformatted(soundsText);
                     }
 
                     if (animDisabled)
@@ -525,7 +525,7 @@ internal sealed class GroupPanel
                         var animText = "Animation sync disabled through owner";
                         UiSharedService.FontText(animIcon.ToIconString(), UiBuilder.IconFont);
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text(animText);
+                        ImGui.TextUnformatted(animText);
                     }
 
                     if (vfxDisabled)
@@ -533,7 +533,7 @@ internal sealed class GroupPanel
                         var vfxText = "VFX sync disabled through owner";
                         UiSharedService.FontText(vfxIcon.ToIconString(), UiBuilder.IconFont);
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text(vfxText);
+                        ImGui.TextUnformatted(vfxText);
                     }
                 }
 
@@ -542,14 +542,14 @@ internal sealed class GroupPanel
                     if (!invitesEnabled || soundsDisabled || animDisabled || vfxDisabled)
                         ImGui.Separator();
 
-                    ImGui.Text("Your permissions");
+                    ImGui.TextUnformatted("Your permissions");
 
                     if (userSoundsDisabled)
                     {
                         var userSoundsText = "Sound sync disabled through you";
                         UiSharedService.FontText(userSoundsIcon.ToIconString(), UiBuilder.IconFont);
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text(userSoundsText);
+                        ImGui.TextUnformatted(userSoundsText);
                     }
 
                     if (userAnimDisabled)
@@ -557,7 +557,7 @@ internal sealed class GroupPanel
                         var userAnimText = "Animation sync disabled through you";
                         UiSharedService.FontText(userAnimIcon.ToIconString(), UiBuilder.IconFont);
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text(userAnimText);
+                        ImGui.TextUnformatted(userAnimText);
                     }
 
                     if (userVFXDisabled)
@@ -565,7 +565,7 @@ internal sealed class GroupPanel
                         var userVFXText = "VFX sync disabled through you";
                         UiSharedService.FontText(userVFXIcon.ToIconString(), UiBuilder.IconFont);
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text(userVFXText);
+                        ImGui.TextUnformatted(userVFXText);
                     }
 
                     if (!invitesEnabled || soundsDisabled || animDisabled || vfxDisabled)

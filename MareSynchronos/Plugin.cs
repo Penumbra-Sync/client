@@ -14,6 +14,7 @@ using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.UI;
+using MareSynchronos.UI.Components.Popup;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files;
@@ -111,6 +112,9 @@ public sealed class Plugin : IDalamudPlugin
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<ApiController>(), pluginInterface.UiBuilder, s.GetRequiredService<UiSharedService>(),
                 s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareProfileManager>()));
             collection.AddScoped<WindowMediatorSubscriberBase, ReportPopupHandler>();
+            collection.AddScoped<WindowMediatorSubscriberBase, BanUserPopupHandler>();
+            collection.AddScoped<WindowMediatorSubscriberBase, BanListPopupHandler>();
+            collection.AddScoped<WindowMediatorSubscriberBase, CreateSyncshellPopupHandler>();
             collection.AddScoped<CacheCreationService>();
             collection.AddScoped<TransientResourceManager>();
             collection.AddScoped<PlayerDataFactory>();

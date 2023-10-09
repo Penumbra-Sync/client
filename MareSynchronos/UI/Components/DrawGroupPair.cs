@@ -86,7 +86,7 @@ public class DrawGroupPair : DrawPairBase
             {
                 var iconsize = ImGui.CalcTextSize(FontAwesomeIcon.ArrowCircleUp.ToIconString()).X;
                 ImGui.SameLine(x + iconsize + (ImGui.GetStyle().ItemSpacing.X));
-                ImGui.Text(FontAwesomeIcon.ArrowCircleUp.ToIconString());
+                ImGui.TextUnformatted(FontAwesomeIcon.ArrowCircleUp.ToIconString());
             }
             UiSharedService.AttachToolTip(_pair.UserData.AliasOrUID + " has preferred permissions enabled");
         }
@@ -109,7 +109,7 @@ public class DrawGroupPair : DrawPairBase
         bool selfIsModerator = _groupFullInfo.GroupPairUserInfos.TryGetValue(_apiController.UID, out var selfinfo) && selfinfo.IsModerator();
         if ((selfIsOwner || selfIsModerator) && (!IsModerator))
         {
-            ImGui.Text("Syncshell Moderator Functions");
+            ImGui.TextUnformatted("Syncshell Moderator Functions");
             var pinText = IsPinned ? "Unpin user" : "Pin user";
             if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Thumbtack, pinText))
             {
@@ -129,7 +129,7 @@ public class DrawGroupPair : DrawPairBase
 
             if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.UserSlash, "Ban User"))
             {
-                // todo: modal handler
+                _mediator.Publish(new BanUserPopupMessage(_pair, _groupFullInfo));
                 ImGui.CloseCurrentPopup();
             }
             UiSharedService.AttachToolTip("Ban user from this Syncshell");
@@ -139,7 +139,7 @@ public class DrawGroupPair : DrawPairBase
 
         if (selfIsOwner)
         {
-            ImGui.Text("Syncshell Owner Functions");
+            ImGui.TextUnformatted("Syncshell Owner Functions");
             string modText = IsModerator ? "Demod user" : "Mod user";
             if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.UserShield, modText) && UiSharedService.CtrlPressed())
             {

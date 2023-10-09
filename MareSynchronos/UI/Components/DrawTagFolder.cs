@@ -61,14 +61,14 @@ public class DrawTagFolder : DrawFolderBase
         };
 
         ImGui.SetCursorPosY(textPosY);
-        ImGui.Text(icon);
+        ImGui.TextUnformatted(icon);
         ImGui.SameLine();
         return ImGui.GetCursorPosX();
     }
 
     protected override void DrawMenu()
     {
-        ImGui.Text("Group Menu");
+        ImGui.TextUnformatted("Group Menu");
 
         // todo tag handler menu
     }

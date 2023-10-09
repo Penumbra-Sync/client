@@ -65,7 +65,7 @@ public abstract class DrawFolderBase
             }
             else
             {
-                ImGui.Text("No users (online)");
+                ImGui.TextUnformatted("No users (online)");
             }
 
             ImGui.Separator();

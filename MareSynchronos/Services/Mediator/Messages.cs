@@ -2,6 +2,7 @@
 using Dalamud.Interface.Internal.Notifications;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto;
+using MareSynchronos.API.Dto.Group;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.WebAPI.Files.Models;
@@ -71,6 +72,10 @@ public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : Message
 public record PairHandlerVisibleMessage(PairHandler Player) : MessageBase;
 public record RebuildUiPairMessage : MessageBase;
 public record OpenReportPopupMessage(Pair PairToReport) : MessageBase;
+public record BanUserPopupMessage(Pair PairToBan, GroupFullInfoDto GroupFullInfoDto) : MessageBase;
+public record BanListPopupMessage(GroupFullInfoDto GroupFullInfoDto) : MessageBase;
+public record JoinSyncshellPopupMessage() : MessageBase;
+public record CreateSyncshellPopupMessage() : MessageBase;
 
 #pragma warning restore S2094
 #pragma warning restore MA0048 // File name must match type name

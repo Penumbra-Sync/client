@@ -305,7 +305,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     }
 
     private Lazy<List<Pair>> DirectPairsLazy() => new(() => _allClientPairs.Select(k => k.Value)
-        .Where(k => k.UserPair.Groups.Contains(Constants.IndividualKeyword, StringComparer.Ordinal)).ToList());
+        .Where(k => k.IndividualPairStatus != API.Data.Enum.IndividualPairStatus.None).ToList());
 
     private void DisposePairs()
     {

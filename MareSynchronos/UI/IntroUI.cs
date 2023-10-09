@@ -214,7 +214,7 @@ public class IntroUi : WindowMediatorSubscriberBase
             var buttonWidth = _secretKey.Length != 64 ? 0 : ImGuiHelpers.GetButtonSize(buttonText).X + ImGui.GetStyle().ItemSpacing.X;
             var textSize = ImGui.CalcTextSize(text);
             ImGui.AlignTextToFramePadding();
-            ImGui.Text(text);
+            ImGui.TextUnformatted(text);
             ImGui.SameLine();
             ImGui.SetNextItemWidth(UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonWidth - textSize.X);
             ImGui.InputText("", ref _secretKey, 64);

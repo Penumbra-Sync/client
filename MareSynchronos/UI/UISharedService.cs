@@ -346,10 +346,10 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.SameLine();
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() - buttonSize.X - padding.X);
         ImGui.PushFont(UiBuilder.IconFont);
-        ImGui.Text(icon.ToIconString());
+        ImGui.TextUnformatted(icon.ToIconString());
         ImGui.PopFont();
         ImGui.SameLine();
-        ImGui.Text(text);
+        ImGui.TextUnformatted(text);
 
         return buttonClicked;
     }
@@ -572,14 +572,14 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public void DrawFileScanState()
     {
-        ImGui.Text("File Scanner Status");
+        ImGui.TextUnformatted("File Scanner Status");
         ImGui.SameLine();
         if (_cacheScanner.IsScanRunning)
         {
-            ImGui.Text("Scan is running");
-            ImGui.Text("Current Progress:");
+            ImGui.TextUnformatted("Scan is running");
+            ImGui.TextUnformatted("Current Progress:");
             ImGui.SameLine();
-            ImGui.Text(_cacheScanner.TotalFiles == 1
+            ImGui.TextUnformatted(_cacheScanner.TotalFiles == 1
                 ? "Collecting files"
                 : $"Processing {_cacheScanner.CurrentFileProgress}/{_cacheScanner.TotalFilesStorage} from storage ({_cacheScanner.TotalFiles} scanned in)");
             AttachToolTip("Note: it is possible to have more files in storage than scanned in, " +
@@ -588,7 +588,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         }
         else if (_configService.Current.FileScanPaused)
         {
-            ImGui.Text("File scanner is paused");
+            ImGui.TextUnformatted("File scanner is paused");
             ImGui.SameLine();
             if (ImGui.Button("Force Rescan##forcedrescan"))
             {
@@ -597,7 +597,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         }
         else if (_cacheScanner.HaltScanLocks.Any(f => f.Value > 0))
         {
-            ImGui.Text("Halted (" + string.Join(", ", _cacheScanner.HaltScanLocks.Where(f => f.Value > 0).Select(locker => locker.Key + ": " + locker.Value + " halt requests")) + ")");
+            ImGui.TextUnformatted("Halted (" + string.Join(", ", _cacheScanner.HaltScanLocks.Where(f => f.Value > 0).Select(locker => locker.Key + ": " + locker.Value + " halt requests")) + ")");
             ImGui.SameLine();
             if (ImGui.Button("Reset halt requests##clearlocks"))
             {
@@ -606,7 +606,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         }
         else
         {
-            ImGui.Text("Next scan in " + _cacheScanner.TimeUntilNextScan);
+            ImGui.TextUnformatted("Next scan in " + _cacheScanner.TimeUntilNextScan);
         }
     }
 
@@ -620,10 +620,10 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         var honorificColor = _honorificExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         var check = FontAwesomeIcon.Check.ToIconString();
         var cross = FontAwesomeIcon.SquareXmark.ToIconString();
-        ImGui.Text("Mandatory Plugins:");
+        ImGui.TextUnformatted("Mandatory Plugins:");
 
         ImGui.SameLine();
-        ImGui.Text("Penumbra");
+        ImGui.TextUnformatted("Penumbra");
         ImGui.SameLine();
         FontText(_penumbraExists ? check : cross, UiBuilder.IconFont, penumbraColor);
         ImGui.SameLine();
@@ -631,16 +631,16 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.Spacing();
 
         ImGui.SameLine();
-        ImGui.Text("Glamourer");
+        ImGui.TextUnformatted("Glamourer");
         ImGui.SameLine();
         FontText(_glamourerExists ? check : cross, UiBuilder.IconFont, glamourerColor);
         ImGui.SameLine();
         AttachToolTip($"Glamourer is " + (_glamourerExists ? "available and up to date." : "unavailable or not up to date."));
         ImGui.Spacing();
 
-        ImGui.Text("Optional Plugins:");
+        ImGui.TextUnformatted("Optional Plugins:");
         ImGui.SameLine();
-        ImGui.Text("SimpleHeels");
+        ImGui.TextUnformatted("SimpleHeels");
         ImGui.SameLine();
         FontText(_heelsExists ? check : cross, UiBuilder.IconFont, heelsColor);
         ImGui.SameLine();
@@ -648,7 +648,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.Spacing();
 
         ImGui.SameLine();
-        ImGui.Text("Customize+");
+        ImGui.TextUnformatted("Customize+");
         ImGui.SameLine();
         FontText(_customizePlusExists ? check : cross, UiBuilder.IconFont, customizeColor);
         ImGui.SameLine();
@@ -656,7 +656,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.Spacing();
 
         ImGui.SameLine();
-        ImGui.Text("Palette+");
+        ImGui.TextUnformatted("Palette+");
         ImGui.SameLine();
         FontText(_palettePlusExists ? check : cross, UiBuilder.IconFont, paletteColor);
         ImGui.SameLine();
@@ -664,7 +664,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.Spacing();
 
         ImGui.SameLine();
-        ImGui.Text("Honorific");
+        ImGui.TextUnformatted("Honorific");
         ImGui.SameLine();
         FontText(_honorificExists ? check : cross, UiBuilder.IconFont, honorificColor);
         ImGui.SameLine();
@@ -793,9 +793,9 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             ImGui.SameLine();
             ImGui.TextColored(ImGuiColors.ParsedGreen, _apiController.OnlineUsers.ToString(CultureInfo.InvariantCulture));
             ImGui.SameLine();
-            ImGui.Text("Users Online");
+            ImGui.TextUnformatted("Users Online");
             ImGui.SameLine();
-            ImGui.Text(")");
+            ImGui.TextUnformatted(")");
         }
     }
 

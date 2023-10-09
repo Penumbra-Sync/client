@@ -4,14 +4,14 @@ using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
 
-namespace MareSynchronos.UI;
+namespace MareSynchronos.UI.Components.Popup;
 
 public abstract class PopupHandlerBase : WindowMediatorSubscriberBase
 {
     protected readonly UiSharedService _uiSharedService;
     protected bool _openPopup = false;
     protected abstract Vector2 PopupSize { get; }
-    protected PopupHandlerBase(string title, ILogger logger, MareMediator mediator, UiSharedService uiSharedService) 
+    protected PopupHandlerBase(string title, ILogger logger, MareMediator mediator, UiSharedService uiSharedService)
         : base(logger, mediator, title)
     {
         _uiSharedService = uiSharedService;

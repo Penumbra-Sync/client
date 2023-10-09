@@ -85,7 +85,7 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
             _showModal = true;
             if (ImGui.BeginPopupModal("BC7 Conversion in Progress"))
             {
-                ImGui.Text("BC7 Conversion in progress: " + _conversionCurrentFileProgress + "/" + _texturesToConvert.Count);
+                ImGui.TextUnformatted("BC7 Conversion in progress: " + _conversionCurrentFileProgress + "/" + _texturesToConvert.Count);
                 UiSharedService.TextWrapped("Current file: " + _conversionCurrentFileName);
                 if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.StopCircle, "Cancel conversion"))
                 {
@@ -299,7 +299,7 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
 
         ImGui.Separator();
 
-        ImGui.Text("Selected file:");
+        ImGui.TextUnformatted("Selected file:");
         ImGui.SameLine();
         UiSharedService.ColorText(_selectedHash, ImGuiColors.DalamudYellow);
 
@@ -423,7 +423,7 @@ new Vector2(0, 300));
                     ImGui.TableNextColumn();
                     if (item.Format.Value == "BC7")
                     {
-                        ImGui.Text("");
+                        ImGui.TextUnformatted("");
                         continue;
                     }
                     var filePath = item.FilePaths[0];

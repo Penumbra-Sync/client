@@ -7,6 +7,7 @@ using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
 using Dalamud.Utility;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
@@ -166,7 +167,7 @@ public class CompactUi : WindowMediatorSubscriberBase
 
             DrawGroupFolder groupFolder = new(group.Key.GID, group.Key, _apiController,
                 allGroupUsersSorted.Select(u => new DrawGroupPair(group.Key.GID + u.UserData.UID, group.Key, u, _uidDisplayHandler, _apiController, Mediator)),
-                _tagHandler, _uidDisplayHandler);
+                _tagHandler, _uidDisplayHandler, Mediator);
             drawFolders.Add(groupFolder);
         }
 
@@ -355,23 +356,49 @@ public class CompactUi : WindowMediatorSubscriberBase
 
     private void DrawAddPair()
     {
-        var buttonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Plus);
-        ImGui.SetNextItemWidth(UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonSize.X);
+        var buttonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.UserPlus);
+        var usersButtonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Users);
+        ImGui.SetNextItemWidth(UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonSize.X - ImGui.GetStyle().ItemSpacing.X - usersButtonSize.X);
         ImGui.InputTextWithHint("##otheruid", "Other players UID/Alias", ref _pairToAdd, 20);
-        ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - buttonSize.X);
-        var canAdd = !_pairManager.DirectPairs.Any(p => string.Equals(p.UserData.UID, _pairToAdd, StringComparison.Ordinal) || string.Equals(p.UserData.Alias, _pairToAdd, StringComparison.Ordinal));
-        if (!canAdd)
+        ImGui.SameLine();
+        var alreadyExisting = _pairManager.DirectPairs.Any(p => string.Equals(p.UserData.UID, _pairToAdd, StringComparison.Ordinal) || string.Equals(p.UserData.Alias, _pairToAdd, StringComparison.Ordinal));
+        using (ImRaii.Disabled(alreadyExisting || string.IsNullOrEmpty(_pairToAdd)))
         {
-            ImGuiComponents.DisabledButton(FontAwesomeIcon.Plus);
-        }
-        else
-        {
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
+            if (ImGuiComponents.IconButton(FontAwesomeIcon.UserPlus))
             {
                 _ = _apiController.UserAddPair(new(new(_pairToAdd)));
                 _pairToAdd = string.Empty;
             }
             UiSharedService.AttachToolTip("Pair with " + (_pairToAdd.IsNullOrEmpty() ? "other user" : _pairToAdd));
+        }
+
+        ImGui.SameLine();
+        if (ImGuiComponents.IconButton(FontAwesomeIcon.Users))
+        {
+            ImGui.OpenPopup("Syncshell Menu");
+        }
+
+        if (ImGui.BeginPopup("Syncshell Menu"))
+        {
+            using (ImRaii.Disabled(_pairManager.GroupPairs.Select(k => k.Key).Distinct()
+                .Count(g => string.Equals(g.OwnerUID, _apiController.UID, StringComparison.Ordinal)) >= _apiController.ServerInfo.MaxGroupsCreatedByUser))
+            {
+                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Plus, "Create new Syncshell"))
+                {
+                    Mediator.Publish(new CreateSyncshellPopupMessage());
+                    ImGui.CloseCurrentPopup();
+                }
+            }
+
+            using (ImRaii.Disabled(_pairManager.GroupPairs.Select(k => k.Key).Distinct().Count() >= _apiController.ServerInfo.MaxGroupsJoinedByUser))
+            {
+                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Users, "Join existing Syncshell"))
+                {
+                    Mediator.Publish(new JoinSyncshellPopupMessage());
+                    ImGui.CloseCurrentPopup();
+                }
+            }
+            ImGui.EndPopup();
         }
 
         ImGuiHelpers.ScaledDummy(2);
@@ -516,7 +543,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             ImGui.TextColored(ImGuiColors.ParsedGreen, userCount);
             ImGui.SameLine();
             if (!printShard) ImGui.AlignTextToFramePadding();
-            ImGui.Text("Users Online");
+            ImGui.TextUnformatted("Users Online");
         }
         else
         {
@@ -573,7 +600,7 @@ public class CompactUi : WindowMediatorSubscriberBase
     {
         var currentUploads = _fileTransferManager.CurrentUploads.ToList();
         ImGui.PushFont(UiBuilder.IconFont);
-        ImGui.Text(FontAwesomeIcon.Upload.ToIconString());
+        ImGui.TextUnformatted(FontAwesomeIcon.Upload.ToIconString());
         ImGui.PopFont();
         ImGui.SameLine(35 * ImGuiHelpers.GlobalScale);
 
@@ -585,20 +612,20 @@ public class CompactUi : WindowMediatorSubscriberBase
             var totalUploaded = currentUploads.Sum(c => c.Transferred);
             var totalToUpload = currentUploads.Sum(c => c.Total);
 
-            ImGui.Text($"{doneUploads}/{totalUploads}");
+            ImGui.TextUnformatted($"{doneUploads}/{totalUploads}");
             var uploadText = $"({UiSharedService.ByteToString(totalUploaded)}/{UiSharedService.ByteToString(totalToUpload)})";
             var textSize = ImGui.CalcTextSize(uploadText);
             ImGui.SameLine(WindowContentWidth - textSize.X);
-            ImGui.Text(uploadText);
+            ImGui.TextUnformatted(uploadText);
         }
         else
         {
-            ImGui.Text("No uploads in progress");
+            ImGui.TextUnformatted("No uploads in progress");
         }
 
         var currentDownloads = _currentDownloads.SelectMany(d => d.Value.Values).ToList();
         ImGui.PushFont(UiBuilder.IconFont);
-        ImGui.Text(FontAwesomeIcon.Download.ToIconString());
+        ImGui.TextUnformatted(FontAwesomeIcon.Download.ToIconString());
         ImGui.PopFont();
         ImGui.SameLine(35 * ImGuiHelpers.GlobalScale);
 
@@ -609,16 +636,16 @@ public class CompactUi : WindowMediatorSubscriberBase
             var totalDownloaded = currentDownloads.Sum(c => c.TransferredBytes);
             var totalToDownload = currentDownloads.Sum(c => c.TotalBytes);
 
-            ImGui.Text($"{doneDownloads}/{totalDownloads}");
+            ImGui.TextUnformatted($"{doneDownloads}/{totalDownloads}");
             var downloadText =
                 $"({UiSharedService.ByteToString(totalDownloaded)}/{UiSharedService.ByteToString(totalToDownload)})";
             var textSize = ImGui.CalcTextSize(downloadText);
             ImGui.SameLine(WindowContentWidth - textSize.X);
-            ImGui.Text(downloadText);
+            ImGui.TextUnformatted(downloadText);
         }
         else
         {
-            ImGui.Text("No downloads in progress");
+            ImGui.TextUnformatted("No downloads in progress");
         }
 
         if (UiSharedService.IconTextButton(FontAwesomeIcon.PersonCircleQuestion, "Mare Character Data Analysis", WindowContentWidth))

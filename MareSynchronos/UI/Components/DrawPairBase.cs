@@ -17,7 +17,7 @@ public abstract class DrawPairBase
 {
     protected readonly ApiController _apiController;
     protected readonly IdDisplayHandler _displayHandler;
-    private readonly MareMediator _mareMediator;
+    protected readonly MareMediator _mediator;
     protected Pair _pair;
     private readonly string _id;
     public UserFullPairDto UserPair => _pair.UserPair!;
@@ -28,7 +28,7 @@ public abstract class DrawPairBase
         _pair = entry;
         _apiController = apiController;
         _displayHandler = uIDDisplayHandler;
-        _mareMediator = mareMediator;
+        _mediator = mareMediator;
     }
 
     public string UID => _pair.UserData.UID;
@@ -84,17 +84,17 @@ public abstract class DrawPairBase
                 {
                     ImGui.BeginTooltip();
 
-                    ImGui.Text("Individual User permissions");
+                    ImGui.TextUnformatted("Individual User permissions");
 
                     if (individualSoundsDisabled)
                     {
                         var userSoundsText = "Sound sync disabled with " + _pair.UserData.AliasOrUID;
                         UiSharedService.FontText(FontAwesomeIcon.VolumeOff.ToIconString(), UiBuilder.IconFont);
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text(userSoundsText);
+                        ImGui.TextUnformatted(userSoundsText);
                         ImGui.NewLine();
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text("You: " + (_pair.UserPair!.OwnPermissions.IsDisableSounds() ? "Disabled" : "Enabled") + ", They: " + (_pair.UserPair!.OtherPermissions.IsDisableSounds() ? "Disabled" : "Enabled"));
+                        ImGui.TextUnformatted("You: " + (_pair.UserPair!.OwnPermissions.IsDisableSounds() ? "Disabled" : "Enabled") + ", They: " + (_pair.UserPair!.OtherPermissions.IsDisableSounds() ? "Disabled" : "Enabled"));
                     }
 
                     if (individualAnimDisabled)
@@ -102,10 +102,10 @@ public abstract class DrawPairBase
                         var userAnimText = "Animation sync disabled with " + _pair.UserData.AliasOrUID;
                         UiSharedService.FontText(FontAwesomeIcon.Stop.ToIconString(), UiBuilder.IconFont);
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text(userAnimText);
+                        ImGui.TextUnformatted(userAnimText);
                         ImGui.NewLine();
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text("You: " + (_pair.UserPair!.OwnPermissions.IsDisableAnimations() ? "Disabled" : "Enabled") + ", They: " + (_pair.UserPair!.OtherPermissions.IsDisableAnimations() ? "Disabled" : "Enabled"));
+                        ImGui.TextUnformatted("You: " + (_pair.UserPair!.OwnPermissions.IsDisableAnimations() ? "Disabled" : "Enabled") + ", They: " + (_pair.UserPair!.OtherPermissions.IsDisableAnimations() ? "Disabled" : "Enabled"));
                     }
 
                     if (individualVFXDisabled)
@@ -113,10 +113,10 @@ public abstract class DrawPairBase
                         var userVFXText = "VFX sync disabled with " + _pair.UserData.AliasOrUID;
                         UiSharedService.FontText(FontAwesomeIcon.Circle.ToIconString(), UiBuilder.IconFont);
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text(userVFXText);
+                        ImGui.TextUnformatted(userVFXText);
                         ImGui.NewLine();
                         ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
-                        ImGui.Text("You: " + (_pair.UserPair!.OwnPermissions.IsDisableVFX() ? "Disabled" : "Enabled") + ", They: " + (_pair.UserPair!.OtherPermissions.IsDisableVFX() ? "Disabled" : "Enabled"));
+                        ImGui.TextUnformatted("You: " + (_pair.UserPair!.OwnPermissions.IsDisableVFX() ? "Disabled" : "Enabled") + ", They: " + (_pair.UserPair!.OtherPermissions.IsDisableVFX() ? "Disabled" : "Enabled"));
                     }
 
                     ImGui.EndTooltip();
@@ -153,7 +153,7 @@ public abstract class DrawPairBase
         {
             UiSharedService.DrawWithID($"buttons-{_pair.UserData.UID}", () =>
             {
-                ImGui.Text("Common Pair Functions");
+                ImGui.TextUnformatted("Common Pair Functions");
                 DrawCommonClientMenu();
                 ImGui.Separator();
                 DrawPairedClientMenu();
@@ -192,7 +192,7 @@ public abstract class DrawPairBase
         }
         ImGui.Separator();
 
-        ImGui.Text("Pair Permission Functions");
+        ImGui.TextUnformatted("Pair Permission Functions");
         var isSticky = _pair.UserPair!.OwnPermissions.IsSticky();
         string stickyText = isSticky ? "Disable Preferred Permissions" : "Enable Preferred Permissions";
         var stickyIcon = isSticky ? FontAwesomeIcon.ArrowCircleDown : FontAwesomeIcon.ArrowCircleUp;
@@ -237,11 +237,11 @@ public abstract class DrawPairBase
         if (!_pair.IsPaused)
         {
             ImGui.Separator();
-            ImGui.Text("Pair reporting");
+            ImGui.TextUnformatted("Pair reporting");
             if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.ExclamationTriangle, "Report Mare Profile"))
             {
                 ImGui.CloseCurrentPopup();
-                _mareMediator.Publish(new OpenReportPopupMessage(_pair));
+                _mediator.Publish(new OpenReportPopupMessage(_pair));
             }
             UiSharedService.AttachToolTip("Report this users Mare Profile to the administrative team");
         }

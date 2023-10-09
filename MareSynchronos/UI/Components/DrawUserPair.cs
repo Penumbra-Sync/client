@@ -76,7 +76,7 @@ public class DrawUserPair : DrawPairBase
             using (ImRaii.PushFont(UiBuilder.IconFont))
             {
                 ImGui.SameLine();
-                ImGui.Text(FontAwesomeIcon.ArrowCircleUp.ToIconString());
+                ImGui.TextUnformatted(FontAwesomeIcon.ArrowCircleUp.ToIconString());
             }
 
             UiSharedService.AttachToolTip(_pair.UserData.AliasOrUID + " has preferred permissions enabled");
@@ -85,7 +85,7 @@ public class DrawUserPair : DrawPairBase
 
     protected override void DrawPairedClientMenu()
     {
-        ImGui.Text("Individual Pair Functions");
+        ImGui.TextUnformatted("Individual Pair Functions");
         var entryUID = _pair.UserData.AliasOrUID;
         if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Folder, "Pair Groups"))
         {

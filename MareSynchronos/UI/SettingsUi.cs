@@ -122,14 +122,14 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 ImGui.TableNextColumn();
                 if (item is UploadFileTransfer transfer)
                 {
-                    ImGui.Text(transfer.LocalFile);
+                    ImGui.TextUnformatted(transfer.LocalFile);
                 }
                 else
                 {
-                    ImGui.Text(item.Hash);
+                    ImGui.TextUnformatted(item.Hash);
                 }
                 ImGui.TableNextColumn();
-                ImGui.Text(item.ForbiddenBy);
+                ImGui.TextUnformatted(item.ForbiddenBy);
             }
             ImGui.EndTable();
         }
@@ -253,11 +253,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         var color = UiSharedService.UploadColor((transfer.Transferred, transfer.Total));
                         ImGui.PushStyleColor(ImGuiCol.Text, color);
                         ImGui.TableNextColumn();
-                        ImGui.Text(transfer.Hash);
+                        ImGui.TextUnformatted(transfer.Hash);
                         ImGui.TableNextColumn();
-                        ImGui.Text(UiSharedService.ByteToString(transfer.Transferred));
+                        ImGui.TextUnformatted(UiSharedService.ByteToString(transfer.Transferred));
                         ImGui.TableNextColumn();
-                        ImGui.Text(UiSharedService.ByteToString(transfer.Total));
+                        ImGui.TextUnformatted(UiSharedService.ByteToString(transfer.Total));
                         ImGui.PopStyleColor();
                         ImGui.TableNextRow();
                     }
@@ -281,14 +281,14 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         {
                             var color = UiSharedService.UploadColor((entry.Value.TransferredBytes, entry.Value.TotalBytes));
                             ImGui.TableNextColumn();
-                            ImGui.Text(userName);
+                            ImGui.TextUnformatted(userName);
                             ImGui.TableNextColumn();
-                            ImGui.Text(entry.Key);
+                            ImGui.TextUnformatted(entry.Key);
                             ImGui.PushStyleColor(ImGuiCol.Text, color);
                             ImGui.TableNextColumn();
-                            ImGui.Text(entry.Value.TransferredFiles + "/" + entry.Value.TotalFiles);
+                            ImGui.TextUnformatted(entry.Value.TransferredFiles + "/" + entry.Value.TotalFiles);
                             ImGui.TableNextColumn();
-                            ImGui.Text(UiSharedService.ByteToString(entry.Value.TransferredBytes) + "/" + UiSharedService.ByteToString(entry.Value.TotalBytes));
+                            ImGui.TextUnformatted(UiSharedService.ByteToString(entry.Value.TransferredBytes) + "/" + UiSharedService.ByteToString(entry.Value.TotalBytes));
                             ImGui.TableNextColumn();
                             ImGui.PopStyleColor();
                             ImGui.TableNextRow();
@@ -321,7 +321,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             foreach (var l in JsonSerializer.Serialize(LastCreatedCharacterData, new JsonSerializerOptions() { WriteIndented = true }).Split('\n'))
             {
-                ImGui.Text($"{l}");
+                ImGui.TextUnformatted($"{l}");
             }
 
             ImGui.TreePop();
@@ -441,7 +441,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _uiShared.DrawFileScanState();
         _uiShared.DrawTimeSpanBetweenScansSetting();
         _uiShared.DrawCacheDirectorySetting();
-        ImGui.Text($"Currently utilized local storage: {UiSharedService.ByteToString(_uiShared.FileCacheSize)}");
+        ImGui.TextUnformatted($"Currently utilized local storage: {UiSharedService.ByteToString(_uiShared.FileCacheSize)}");
         bool isLinux = Util.IsWine();
         if (isLinux) ImGui.BeginDisabled();
         bool useFileCompactor = _configService.Current.UseCompactor;
@@ -475,11 +475,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
         if (isLinux)
         {
             ImGui.EndDisabled();
-            ImGui.Text("The file compactor is only available on Windows.");
+            ImGui.TextUnformatted("The file compactor is only available on Windows.");
         }
 
         ImGui.Dummy(new Vector2(10, 10));
-        ImGui.Text("To clear the local storage accept the following disclaimer");
+        ImGui.TextUnformatted("To clear the local storage accept the following disclaimer");
         ImGui.Indent();
         ImGui.Checkbox("##readClearCache", ref _readClearCache);
         ImGui.SameLine();
@@ -737,7 +737,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             {
                 UiSharedService.TextWrapped(
                     "All your own uploaded files on the service will be deleted.\nThis operation cannot be undone.");
-                ImGui.Text("Are you sure you want to continue?");
+                ImGui.TextUnformatted("Are you sure you want to continue?");
                 ImGui.Separator();
                 ImGui.Spacing();
 
@@ -774,7 +774,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 UiSharedService.TextWrapped(
                     "Your account and all associated files and data on the service will be deleted.");
                 UiSharedService.TextWrapped("Your UID will be removed from all pairing lists.");
-                ImGui.Text("Are you sure you want to continue?");
+                ImGui.TextUnformatted("Are you sure you want to continue?");
                 ImGui.Separator();
                 ImGui.Spacing();
 
@@ -1072,7 +1072,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
     {
         _uiShared.PrintServerState();
         ImGui.AlignTextToFramePadding();
-        ImGui.Text("Community and Support:");
+        ImGui.TextUnformatted("Community and Support:");
         ImGui.SameLine();
         if (ImGui.Button("Mare Synchronos Discord"))
         {
