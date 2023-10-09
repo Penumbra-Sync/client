@@ -7,7 +7,7 @@ using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.UI.Components.old;
-
+/*
 public class PairTagsUi
 {
     private readonly ApiController _apiController;
@@ -247,4 +247,4 @@ public class PairTagsUi
         bool open = !_tagHandler.IsTagOpen(tag);
         _tagHandler.SetTagOpen(tag, open);
     }
-}
+}*/

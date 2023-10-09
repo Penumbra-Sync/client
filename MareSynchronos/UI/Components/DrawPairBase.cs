@@ -22,7 +22,7 @@ public abstract class DrawPairBase
     private bool _reportPopupOpen = false;
     private string _reportReason = string.Empty;
     private readonly string _id;
-    public UserPairDto UserPair => _pair.UserPair!;
+    public UserFullPairDto UserPair => _pair.UserPair!;
 
     protected DrawPairBase(string id, Pair entry, ApiController apiController, IdDisplayHandler uIDDisplayHandler)
     {
@@ -95,7 +95,7 @@ public abstract class DrawPairBase
         var rightSideStart = 0f;
         float infoIconDist = 0f;
 
-        if (_pair.UserPair!.OwnPermissions.IsPaired() && _pair.UserPair!.OtherPermissions.IsPaired())
+        if (_pair.IsPaired)
         {
             var individualSoundsDisabled = (_pair.UserPair?.OwnPermissions.IsDisableSounds() ?? false) || (_pair.UserPair?.OtherPermissions.IsDisableSounds() ?? false);
             var individualAnimDisabled = (_pair.UserPair?.OwnPermissions.IsDisableAnimations() ?? false) || (_pair.UserPair?.OtherPermissions.IsDisableAnimations() ?? false);

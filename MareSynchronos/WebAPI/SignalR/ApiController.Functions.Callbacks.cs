@@ -105,7 +105,7 @@ public partial class ApiController
     public Task Client_UserAddClientPair(UserPairDto dto)
     {
         Logger.LogDebug("Client_UserAddClientPair: {dto}", dto);
-        ExecuteSafely(() => _pairManager.AddUserPair(dto));
+        ExecuteSafely(() => _pairManager.AddUserPair(dto, true));
         return Task.CompletedTask;
     }
 
@@ -170,6 +170,19 @@ public partial class ApiController
         Logger.LogDebug("Client_UserUpdateDefaultPermissions: {dto}", dto);
         _connectionDto!.DefaultPreferredPermissions = dto;
         return Task.CompletedTask;
+    }
+
+    public Task Client_UpdateUserIndividualPairStatusDto(UserIndividualPairStatusDto dto)
+    {
+        Logger.LogDebug("Client_UpdateUserIndividualPairStatusDto: {dto}", dto);
+        ExecuteSafely(() => _pairManager.UpdateIndividualPairStatus(dto));
+        return Task.CompletedTask;
+    }
+
+    public void OnUpdateUserIndividualPairStatusDto(Action<UserIndividualPairStatusDto> action)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_UpdateUserIndividualPairStatusDto), action);
     }
 
     public void OnDownloadReady(Action<Guid> act)

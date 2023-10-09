@@ -420,8 +420,8 @@ public class CompactUi : WindowMediatorSubscriberBase
 
         if (userCount == 0) return;
 
-        var pausedUsers = users.Where(u => u.UserPair!.OwnPermissions.IsPaused() && u.UserPair.OtherPermissions.IsPaired()).ToList();
-        var resumedUsers = users.Where(u => !u.UserPair!.OwnPermissions.IsPaused() && u.UserPair.OtherPermissions.IsPaired()).ToList();
+        var pausedUsers = users.Where(u => u.UserPair!.OwnPermissions.IsPaused() && u.IsPaired).ToList();
+        var resumedUsers = users.Where(u => !u.UserPair!.OwnPermissions.IsPaused() && u.IsPaired).ToList();
 
         if (!pausedUsers.Any() && !resumedUsers.Any()) return;
         ImGui.SameLine();

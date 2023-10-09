@@ -12,6 +12,7 @@ using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Services;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Data;
+using MareSynchronos.API.Dto.User;
 
 namespace MareSynchronos.WebAPI;
 
@@ -333,6 +334,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         OnUserReceiveUploadStatus(dto => _ = Client_UserReceiveUploadStatus(dto));
         OnUserUpdateProfile(dto => _ = Client_UserUpdateProfile(dto));
         OnUserDefaultPermissionUpdate(dto => _ = Client_UserUpdateDefaultPermissions(dto));
+        OnUpdateUserIndividualPairStatusDto(dto => _ = Client_UpdateUserIndividualPairStatusDto(dto));
 
         OnGroupChangePermissions((dto) => _ = Client_GroupChangePermissions(dto));
         OnGroupDelete((dto) => _ = Client_GroupDelete(dto));
@@ -361,7 +363,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         foreach (var userPair in await UserGetPairedClients().ConfigureAwait(false))
         {
             Logger.LogDebug("Individual Pair: {userPair}", userPair);
-            _pairManager.AddUserPair(userPair, addToLastAddedUser: false);
+            _pairManager.AddUserPair(userPair);
         }
     }
 

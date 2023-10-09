@@ -6,6 +6,7 @@ using System.Numerics;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.WebAPI;
 using MareSynchronos.UI.Handlers;
+using Dalamud.Interface.Utility.Raii;
 
 namespace MareSynchronos.UI.Components;
 
@@ -50,28 +51,33 @@ public class DrawUserPair : DrawPairBase
         UiSharedService.ColorText(connectionIcon.ToIconString(), connectionColor);
         ImGui.PopFont();
         UiSharedService.AttachToolTip(connectionText);
-        if (_pair.UserPair.OwnPermissions.IsSticky())
-        {
-            var x = ImGui.GetCursorPosX();
-            ImGui.SetCursorPosY(textPosY);
-            ImGui.PushFont(UiBuilder.IconFont);
-            var iconsize = ImGui.CalcTextSize(FontAwesomeIcon.ArrowCircleUp.ToIconString()).X;
-            ImGui.SameLine(x + iconsize + (ImGui.GetStyle().ItemSpacing.X / 2));
-            ImGui.Text(FontAwesomeIcon.ArrowCircleUp.ToIconString());
-            ImGui.PopFont();
-            UiSharedService.AttachToolTip(_pair.UserData.AliasOrUID + " has preferred permissions enabled");
-        }
 
         if (_pair is { IsOnline: true, IsVisible: true })
         {
-            var x = ImGui.GetCursorPosX();
             ImGui.SetCursorPosY(textPosY);
-            ImGui.PushFont(UiBuilder.IconFont);
-            var iconsize = ImGui.CalcTextSize(FontAwesomeIcon.Eye.ToIconString()).X;
-            ImGui.SameLine(x + iconsize + (ImGui.GetStyle().ItemSpacing.X / 2));
-            UiSharedService.ColorText(FontAwesomeIcon.Eye.ToIconString(), ImGuiColors.ParsedGreen);
-            ImGui.PopFont();
+
+            using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X * 3/4f }))
+            using (ImRaii.PushFont(UiBuilder.IconFont))
+            {
+                ImGui.SameLine();
+                UiSharedService.ColorText(FontAwesomeIcon.Eye.ToIconString(), ImGuiColors.ParsedGreen);
+            }
+
             UiSharedService.AttachToolTip(_pair.UserData.AliasOrUID + " is visible: " + _pair.PlayerName!);
+        }
+
+        if (_pair.UserPair.OwnPermissions.IsSticky())
+        {
+            ImGui.SetCursorPosY(textPosY);
+
+            using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X * 3/4f }))
+            using (ImRaii.PushFont(UiBuilder.IconFont))
+            {
+                ImGui.SameLine();
+                ImGui.Text(FontAwesomeIcon.ArrowCircleUp.ToIconString());
+            }
+
+            UiSharedService.AttachToolTip(_pair.UserData.AliasOrUID + " has preferred permissions enabled");
         }
     }
 

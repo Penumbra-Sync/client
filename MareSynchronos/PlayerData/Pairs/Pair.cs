@@ -1,5 +1,6 @@
 ﻿using Dalamud.ContextMenu;
 using MareSynchronos.API.Data;
+using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.PlayerData.Factories;
@@ -21,7 +22,7 @@ public class Pair
     private CancellationTokenSource _applicationCts = new CancellationTokenSource();
     private OnlineUserIdentDto? _onlineUserIdentDto = null;
 
-    public Pair(ILogger<Pair> logger, UserPairDto userPair, PairHandlerFactory cachedPlayerFactory,
+    public Pair(ILogger<Pair> logger, UserFullPairDto userPair, PairHandlerFactory cachedPlayerFactory,
         MareMediator mediator, ServerConfigurationManager serverConfigurationManager)
     {
         _logger = logger;
@@ -34,11 +35,10 @@ public class Pair
     public bool HasCachedPlayer => CachedPlayer != null && !string.IsNullOrEmpty(CachedPlayer.PlayerName) && _onlineUserIdentDto != null;
     public bool IsOnline => CachedPlayer != null;
 
+    public bool IsPaired => IndividualPairStatus == IndividualPairStatus.Bidirectional || UserPair.Groups.Any();
     public bool IsPaused => UserPair.OtherPermissions.IsPaused() || UserPair.OwnPermissions.IsPaused();
-    public bool IsDirectlyPaired => UserPair.Groups.Contains(Constants.IndividualKeyword, StringComparer.Ordinal) && UserPair.OwnPermissions.IsSynced();
-    public bool IsOneSidedPair => UserPair.Groups.Contains(Constants.IndividualKeyword, StringComparer.Ordinal) 
-        && UserPair.Groups.Count == 1 && !UserPair.OwnPermissions.IsSynced();
-    public bool IsSynced => UserPair.OwnPermissions.IsSynced() && UserPair.OtherPermissions.IsSynced();
+    public bool IsDirectlyPaired => IndividualPairStatus != IndividualPairStatus.None;
+    public bool IsOneSidedPair => IndividualPairStatus == IndividualPairStatus.OneSided;
 
     public bool IsVisible => CachedPlayer?.IsVisible ?? false;
     public CharacterData? LastReceivedCharacterData { get; set; }
@@ -46,32 +46,27 @@ public class Pair
 
     public UserData UserData => UserPair.User;
 
-    public UserPairDto UserPair { get; set; }
+    public UserFullPairDto UserPair { get; set; }
+    public IndividualPairStatus IndividualPairStatus => UserPair.IndividualPairStatus;
 
     private PairHandler? CachedPlayer { get; set; }
 
     public void AddContextMenu(GameObjectContextMenuOpenArgs args)
     {
-        if (CachedPlayer == null || args.ObjectId != CachedPlayer.PlayerCharacterId) return;
+        if (CachedPlayer == null || args.ObjectId != CachedPlayer.PlayerCharacterId || IsPaused) return;
 
-        if (!IsPaused)
+        args.AddCustomItem(new GameObjectContextMenuItem("[Mare] Open Profile", (a) =>
         {
-            args.AddCustomItem(new GameObjectContextMenuItem("[Mare] Open Profile", (a) =>
-            {
-                _mediator.Publish(new ProfileOpenStandaloneMessage(this));
-            }));
-        }
+            _mediator.Publish(new ProfileOpenStandaloneMessage(this));
+        }));
         args.AddCustomItem(new GameObjectContextMenuItem("[Mare] Reapply last data", (a) =>
         {
             ApplyLastReceivedData(true);
         }, false));
-        if (UserPair != null && UserPair.OtherPermissions.IsPaired() && UserPair.OwnPermissions.IsPaired())
+        args.AddCustomItem(new GameObjectContextMenuItem("[Mare] Cycle pause state", (a) =>
         {
-            args.AddCustomItem(new GameObjectContextMenuItem("[Mare] Cycle pause state", (a) =>
-            {
-                _mediator.Publish(new CyclePauseMessage(UserData));
-            }, false));
-        }
+            _mediator.Publish(new CyclePauseMessage(UserData));
+        }, false));
     }
 
     public void ApplyData(OnlineUserCharaDataDto data)
@@ -153,7 +148,7 @@ public class Pair
 
     public bool HasAnyConnection()
     {
-        return UserPair.Groups.Any();
+        return UserPair.Groups.Any() || UserPair.IndividualPairStatus != IndividualPairStatus.None;
     }
 
     public void MarkOffline()

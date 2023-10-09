@@ -22,8 +22,14 @@ public class PairFactory
         _serverConfigurationManager = serverConfigurationManager;
     }
 
-    public Pair Create(UserPairDto userPairDto)
+    public Pair Create(UserFullPairDto userPairDto)
     {
         return new Pair(_loggerFactory.CreateLogger<Pair>(), userPairDto, _cachedPlayerFactory, _mareMediator, _serverConfigurationManager);
+    }
+
+    public Pair Create(UserPairDto userPairDto)
+    {
+        return new Pair(_loggerFactory.CreateLogger<Pair>(), new(userPairDto.User, userPairDto.IndividualPairStatus, new List<string>(), userPairDto.OwnPermissions, userPairDto.OtherPermissions),
+            _cachedPlayerFactory, _mareMediator, _serverConfigurationManager);
     }
 }
