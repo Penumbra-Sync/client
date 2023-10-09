@@ -293,7 +293,7 @@ internal sealed class GroupPanel
 
         if (ImGui.BeginPopupModal("Manage Banlist for " + groupDto.GID, ref _showModalBanList, UiSharedService.PopupWindowFlags))
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Retweet, "Refresh Banlist from Server"))
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Retweet, "Refresh Banlist from Server"))
             {
                 _bannedUsers = ApiController.GroupGetBannedUsers(groupDto).Result;
             }
@@ -322,7 +322,7 @@ internal sealed class GroupPanel
                     ImGui.TableNextColumn();
                     UiSharedService.TextWrapped(bannedUser.Reason);
                     ImGui.TableNextColumn();
-                    if (UiSharedService.IconTextButton(FontAwesomeIcon.Check, "Unban#" + bannedUser.UID))
+                    if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Check, "Unban#" + bannedUser.UID))
                     {
                         _ = ApiController.GroupUnbanUser(bannedUser);
                         _bannedUsers.RemoveAll(b => string.Equals(b.UID, bannedUser.UID, StringComparison.Ordinal));
@@ -383,7 +383,7 @@ internal sealed class GroupPanel
             {
                 ImGui.SetNextItemWidth(-1);
                 ImGui.SliderInt("Amount##bulkinvites", ref _bulkInviteCount, 1, 100);
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.MailBulk, "Create invites"))
+                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.MailBulk, "Create invites"))
                 {
                     _bulkOneTimeInvites = ApiController.GroupCreateTempInvite(groupDto, _bulkInviteCount).Result;
                 }
@@ -391,7 +391,7 @@ internal sealed class GroupPanel
             else
             {
                 UiSharedService.TextWrapped("A total of " + _bulkOneTimeInvites.Count + " invites have been created.");
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.Copy, "Copy invites to clipboard"))
+                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Copy, "Copy invites to clipboard"))
                 {
                     ImGui.SetClipboardText(string.Join(Environment.NewLine, _bulkOneTimeInvites));
                 }
@@ -584,21 +584,21 @@ internal sealed class GroupPanel
 
         if (ImGui.BeginPopup("ShellPopup"))
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.ArrowCircleLeft, "Leave Syncshell") && UiSharedService.CtrlPressed())
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.ArrowCircleLeft, "Leave Syncshell") && UiSharedService.CtrlPressed())
             {
                 _ = ApiController.GroupLeave(groupDto);
             }
             UiSharedService.AttachToolTip("Hold CTRL and click to leave this Syncshell" + (!string.Equals(groupDto.OwnerUID, ApiController.UID, StringComparison.Ordinal) ? string.Empty : Environment.NewLine
                 + "WARNING: This action is irreversible" + Environment.NewLine + "Leaving an owned Syncshell will transfer the ownership to a random person in the Syncshell."));
 
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Copy, "Copy ID"))
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Copy, "Copy ID"))
             {
                 ImGui.CloseCurrentPopup();
                 ImGui.SetClipboardText(groupDto.GroupAliasOrGID);
             }
             UiSharedService.AttachToolTip("Copy Syncshell ID to Clipboard");
 
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.StickyNote, "Copy Notes"))
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.StickyNote, "Copy Notes"))
             {
                 ImGui.CloseCurrentPopup();
                 ImGui.SetClipboardText(UiSharedService.GetNotes(groupPairs));
@@ -606,7 +606,7 @@ internal sealed class GroupPanel
             UiSharedService.AttachToolTip("Copies all your notes for all users in this Syncshell to the clipboard." + Environment.NewLine + "They can be imported via Settings -> Privacy -> Import Notes from Clipboard");
 
             var soundsText = userSoundsDisabled ? "Enable sound sync" : "Disable sound sync";
-            if (UiSharedService.IconTextButton(userSoundsIcon, soundsText))
+            if (ImGuiComponents.IconButtonWithText(userSoundsIcon, soundsText))
             {
                 ImGui.CloseCurrentPopup();
                 var perm = groupDto.GroupUserPermissions;
@@ -619,7 +619,7 @@ internal sealed class GroupPanel
                 + Environment.NewLine + "Note: this setting does not apply to individual pairs that are also in the syncshell.");
 
             var animText = userAnimDisabled ? "Enable animations sync" : "Disable animations sync";
-            if (UiSharedService.IconTextButton(userAnimIcon, animText))
+            if (ImGuiComponents.IconButtonWithText(userAnimIcon, animText))
             {
                 ImGui.CloseCurrentPopup();
                 var perm = groupDto.GroupUserPermissions;
@@ -633,7 +633,7 @@ internal sealed class GroupPanel
                 + Environment.NewLine + "Note: this setting does not apply to individual pairs that are also in the syncshell.");
 
             var vfxText = userVFXDisabled ? "Enable VFX sync" : "Disable VFX sync";
-            if (UiSharedService.IconTextButton(userVFXIcon, vfxText))
+            if (ImGuiComponents.IconButtonWithText(userVFXIcon, vfxText))
             {
                 ImGui.CloseCurrentPopup();
                 var perm = groupDto.GroupUserPermissions;
@@ -651,7 +651,7 @@ internal sealed class GroupPanel
                 ImGui.Separator();
 
                 var changedToIcon = invitesEnabled ? FontAwesomeIcon.LockOpen : FontAwesomeIcon.Lock;
-                if (UiSharedService.IconTextButton(changedToIcon, invitesEnabled ? "Lock Syncshell" : "Unlock Syncshell"))
+                if (ImGuiComponents.IconButtonWithText(changedToIcon, invitesEnabled ? "Lock Syncshell" : "Unlock Syncshell"))
                 {
                     ImGui.CloseCurrentPopup();
                     var groupPerm = groupDto.GroupPermissions;
@@ -662,7 +662,7 @@ internal sealed class GroupPanel
 
                 if (isOwner)
                 {
-                    if (UiSharedService.IconTextButton(FontAwesomeIcon.Passport, "Change Password"))
+                    if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Passport, "Change Password"))
                     {
                         ImGui.CloseCurrentPopup();
                         _isPasswordValid = true;
@@ -671,7 +671,7 @@ internal sealed class GroupPanel
                     UiSharedService.AttachToolTip("Change Syncshell Password");
                 }
 
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.Broom, "Clear Syncshell") && UiSharedService.CtrlPressed())
+                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Broom, "Clear Syncshell") && UiSharedService.CtrlPressed())
                 {
                     ImGui.CloseCurrentPopup();
                     _ = ApiController.GroupClear(groupDto);
@@ -680,7 +680,7 @@ internal sealed class GroupPanel
                     + "Clearing the Syncshell will remove all not pinned users from it.");
 
                 var groupSoundsText = soundsDisabled ? "Enable syncshell sound sync" : "Disable syncshell sound sync";
-                if (UiSharedService.IconTextButton(soundsIcon, groupSoundsText))
+                if (ImGuiComponents.IconButtonWithText(soundsIcon, groupSoundsText))
                 {
                     ImGui.CloseCurrentPopup();
                     var perm = groupDto.GroupPermissions;
@@ -692,7 +692,7 @@ internal sealed class GroupPanel
                     + "Note: if the synchronization is enabled, users can individually override this setting to disabled.");
 
                 var groupAnimText = animDisabled ? "Enable syncshell animations sync" : "Disable syncshell animations sync";
-                if (UiSharedService.IconTextButton(animIcon, groupAnimText))
+                if (ImGuiComponents.IconButtonWithText(animIcon, groupAnimText))
                 {
                     ImGui.CloseCurrentPopup();
                     var perm = groupDto.GroupPermissions;
@@ -704,7 +704,7 @@ internal sealed class GroupPanel
                     + "Note: if the synchronization is enabled, users can individually override this setting to disabled.");
 
                 var groupVFXText = vfxDisabled ? "Enable syncshell VFX sync" : "Disable syncshell VFX sync";
-                if (UiSharedService.IconTextButton(vfxIcon, groupVFXText))
+                if (ImGuiComponents.IconButtonWithText(vfxIcon, groupVFXText))
                 {
                     ImGui.CloseCurrentPopup();
                     var perm = groupDto.GroupPermissions;
@@ -715,14 +715,14 @@ internal sealed class GroupPanel
                     + "Note: users that are individually paired with others in the syncshell will ignore this setting." + Environment.NewLine
                     + "Note: if the synchronization is enabled, users can individually override this setting to disabled.");
 
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.Envelope, "Single one-time invite"))
+                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Envelope, "Single one-time invite"))
                 {
                     ImGui.CloseCurrentPopup();
                     ImGui.SetClipboardText(ApiController.GroupCreateTempInvite(groupDto, 1).Result.FirstOrDefault() ?? string.Empty);
                 }
                 UiSharedService.AttachToolTip("Creates a single-use password for joining the syncshell which is valid for 24h and copies it to the clipboard.");
 
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.MailBulk, "Bulk one-time invites"))
+                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.MailBulk, "Bulk one-time invites"))
                 {
                     ImGui.CloseCurrentPopup();
                     _showModalBulkOneTimeInvites = true;
@@ -730,7 +730,7 @@ internal sealed class GroupPanel
                 }
                 UiSharedService.AttachToolTip("Opens a dialog to create up to 100 single-use passwords for joining the syncshell.");
 
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.Ban, "Manage Banlist"))
+                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Ban, "Manage Banlist"))
                 {
                     ImGui.CloseCurrentPopup();
                     _showModalBanList = true;
@@ -739,7 +739,7 @@ internal sealed class GroupPanel
 
                 if (isOwner)
                 {
-                    if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Syncshell") && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())
+                    if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Trash, "Delete Syncshell") && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())
                     {
                         ImGui.CloseCurrentPopup();
                         _ = ApiController.GroupDelete(groupDto);

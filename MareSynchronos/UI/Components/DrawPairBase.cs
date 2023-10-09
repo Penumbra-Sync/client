@@ -9,27 +9,26 @@ using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.User;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
+using MareSynchronos.Services.Mediator;
 
 namespace MareSynchronos.UI.Components;
 
 public abstract class DrawPairBase
 {
-    // todo: not make this static
-    protected bool _showModalReport = false;
     protected readonly ApiController _apiController;
     protected readonly IdDisplayHandler _displayHandler;
+    private readonly MareMediator _mareMediator;
     protected Pair _pair;
-    private bool _reportPopupOpen = false;
-    private string _reportReason = string.Empty;
     private readonly string _id;
     public UserFullPairDto UserPair => _pair.UserPair!;
 
-    protected DrawPairBase(string id, Pair entry, ApiController apiController, IdDisplayHandler uIDDisplayHandler)
+    protected DrawPairBase(string id, Pair entry, ApiController apiController, IdDisplayHandler uIDDisplayHandler, MareMediator mareMediator)
     {
         _id = id;
         _pair = entry;
         _apiController = apiController;
         _displayHandler = uIDDisplayHandler;
+        _mareMediator = mareMediator;
     }
 
     public string UID => _pair.UserData.UID;
@@ -47,38 +46,6 @@ public abstract class DrawPairBase
         var posX = ImGui.GetCursorPosX();
         var rightSide = DrawRightSide(originalY);
         DrawName(originalY, posX, rightSide);
-
-        if (_showModalReport && !_reportPopupOpen)
-        {
-            ImGui.OpenPopup("Report Profile");
-            _reportPopupOpen = true;
-        }
-
-        if (!_showModalReport) _reportPopupOpen = false;
-
-        if (ImGui.BeginPopupModal("Report Profile", ref _showModalReport, UiSharedService.PopupWindowFlags))
-        {
-            UiSharedService.TextWrapped("Report " + (_pair.UserData.AliasOrUID) + " Mare Profile");
-            ImGui.InputTextMultiline("##reportReason", ref _reportReason, 500, new System.Numerics.Vector2(500 - ImGui.GetStyle().ItemSpacing.X * 2, 200));
-            UiSharedService.TextWrapped($"Note: Sending a report will disable the offending profile globally.{Environment.NewLine}" +
-                $"The report will be sent to the team of your currently connected Mare Synchronos Service.{Environment.NewLine}" +
-                $"The report will include your user and your contact info (Discord User).{Environment.NewLine}" +
-                $"Depending on the severity of the offense the users Mare profile or account can be permanently disabled or banned.");
-            UiSharedService.ColorTextWrapped("Report spam and wrong reports will not be tolerated and can lead to permanent account suspension.", ImGuiColors.DalamudRed);
-            if (string.IsNullOrEmpty(_reportReason)) ImGui.BeginDisabled();
-            if (ImGui.Button("Send Report"))
-            {
-                ImGui.CloseCurrentPopup();
-                var reason = _reportReason;
-                _ = _apiController.UserReportProfile(new(_pair.UserData, reason));
-                _reportReason = string.Empty;
-                _showModalReport = false;
-                _reportPopupOpen = false;
-            }
-            if (string.IsNullOrEmpty(_reportReason)) ImGui.EndDisabled();
-            UiSharedService.SetScaledWindowSize(500);
-            ImGui.EndPopup();
-        }
     }
 
     protected abstract void DrawLeftSide(float textPosY, float originalY);
@@ -201,7 +168,7 @@ public abstract class DrawPairBase
     {
         if (!_pair.IsPaused)
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.User, "Open Profile"))
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.User, "Open Profile"))
             {
                 _displayHandler.OpenProfile(_pair);
                 ImGui.CloseCurrentPopup();
@@ -210,7 +177,7 @@ public abstract class DrawPairBase
         }
         if (_pair.IsVisible)
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Sync, "Reload last data"))
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Sync, "Reload last data"))
             {
                 _pair.ApplyLastReceivedData(forced: true);
                 ImGui.CloseCurrentPopup();
@@ -218,7 +185,7 @@ public abstract class DrawPairBase
             UiSharedService.AttachToolTip("This reapplies the last received character data to this character");
         }
 
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.PlayCircle, "Cycle pause state"))
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.PlayCircle, "Cycle pause state"))
         {
             _ = _apiController.CyclePause(_pair.UserData);
             ImGui.CloseCurrentPopup();
@@ -229,7 +196,7 @@ public abstract class DrawPairBase
         var isSticky = _pair.UserPair!.OwnPermissions.IsSticky();
         string stickyText = isSticky ? "Disable Preferred Permissions" : "Enable Preferred Permissions";
         var stickyIcon = isSticky ? FontAwesomeIcon.ArrowCircleDown : FontAwesomeIcon.ArrowCircleUp;
-        if (UiSharedService.IconTextButton(stickyIcon, stickyText))
+        if (ImGuiComponents.IconButtonWithText(stickyIcon, stickyText))
         {
             var permissions = _pair.UserPair.OwnPermissions;
             permissions.SetSticky(!isSticky);
@@ -240,7 +207,7 @@ public abstract class DrawPairBase
         var isDisableSounds = _pair.UserPair!.OwnPermissions.IsDisableSounds();
         string disableSoundsText = isDisableSounds ? "Enable sound sync" : "Disable sound sync";
         var disableSoundsIcon = isDisableSounds ? FontAwesomeIcon.VolumeUp : FontAwesomeIcon.VolumeMute;
-        if (UiSharedService.IconTextButton(disableSoundsIcon, disableSoundsText))
+        if (ImGuiComponents.IconButtonWithText(disableSoundsIcon, disableSoundsText))
         {
             var permissions = _pair.UserPair.OwnPermissions;
             permissions.SetDisableSounds(!isDisableSounds);
@@ -250,7 +217,7 @@ public abstract class DrawPairBase
         var isDisableAnims = _pair.UserPair!.OwnPermissions.IsDisableAnimations();
         string disableAnimsText = isDisableAnims ? "Enable animation sync" : "Disable animation sync";
         var disableAnimsIcon = isDisableAnims ? FontAwesomeIcon.Running : FontAwesomeIcon.Stop;
-        if (UiSharedService.IconTextButton(disableAnimsIcon, disableAnimsText))
+        if (ImGuiComponents.IconButtonWithText(disableAnimsIcon, disableAnimsText))
         {
             var permissions = _pair.UserPair.OwnPermissions;
             permissions.SetDisableAnimations(!isDisableAnims);
@@ -260,7 +227,7 @@ public abstract class DrawPairBase
         var isDisableVFX = _pair.UserPair!.OwnPermissions.IsDisableVFX();
         string disableVFXText = isDisableVFX ? "Enable VFX sync" : "Disable VFX sync";
         var disableVFXIcon = isDisableVFX ? FontAwesomeIcon.Sun : FontAwesomeIcon.Circle;
-        if (UiSharedService.IconTextButton(disableVFXIcon, disableVFXText))
+        if (ImGuiComponents.IconButtonWithText(disableVFXIcon, disableVFXText))
         {
             var permissions = _pair.UserPair.OwnPermissions;
             permissions.SetDisableVFX(!isDisableVFX);
@@ -271,10 +238,10 @@ public abstract class DrawPairBase
         {
             ImGui.Separator();
             ImGui.Text("Pair reporting");
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.ExclamationTriangle, "Report Mare Profile"))
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.ExclamationTriangle, "Report Mare Profile"))
             {
                 ImGui.CloseCurrentPopup();
-                _showModalReport = true;
+                _mareMediator.Publish(new OpenReportPopupMessage(_pair));
             }
             UiSharedService.AttachToolTip("Report this users Mare Profile to the administrative team");
         }

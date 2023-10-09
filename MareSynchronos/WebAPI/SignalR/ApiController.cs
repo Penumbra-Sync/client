@@ -12,7 +12,6 @@ using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Services;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Data;
-using MareSynchronos.API.Dto.User;
 
 namespace MareSynchronos.WebAPI;
 

@@ -8,6 +8,8 @@ using MareSynchronos.WebAPI;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.API.Dto.Group;
 using Dalamud.Interface.Utility.Raii;
+using MareSynchronos.Services.Mediator;
+using Dalamud.Interface.Components;
 
 namespace MareSynchronos.UI.Components;
 
@@ -19,8 +21,8 @@ public class DrawGroupPair : DrawPairBase
     private bool IsOwner => string.Equals(_groupFullInfo.OwnerUID, _pair.UserData.UID, StringComparison.Ordinal);
 
     public DrawGroupPair(string id, GroupFullInfoDto groupFullInfo, Pair entry,
-        IdDisplayHandler displayHandler, ApiController apiController)
-        : base(id, entry, apiController, displayHandler)
+        IdDisplayHandler displayHandler, ApiController apiController, MareMediator mareMediator)
+        : base(id, entry, apiController, displayHandler, mareMediator)
     {
         _pair = entry;
         _groupFullInfo = groupFullInfo;
@@ -109,7 +111,7 @@ public class DrawGroupPair : DrawPairBase
         {
             ImGui.Text("Syncshell Moderator Functions");
             var pinText = IsPinned ? "Unpin user" : "Pin user";
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Thumbtack, pinText))
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Thumbtack, pinText))
             {
                 ImGui.CloseCurrentPopup();
                 var userInfo = _groupFullInfo.GroupPairUserInfos[_pair.UserData.UID];
@@ -118,14 +120,14 @@ public class DrawGroupPair : DrawPairBase
             }
             UiSharedService.AttachToolTip("Pin this user to the Syncshell. Pinned users will not be deleted in case of a manually initiated Syncshell clean");
 
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Remove user") && UiSharedService.CtrlPressed())
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Trash, "Remove user") && UiSharedService.CtrlPressed())
             {
                 ImGui.CloseCurrentPopup();
                 _ = _apiController.GroupRemoveUser(new(_groupFullInfo.Group, _pair.UserData));
             }
             UiSharedService.AttachToolTip("Hold CTRL and click to remove user " + (_pair.UserData.AliasOrUID) + " from Syncshell");
 
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.UserSlash, "Ban User"))
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.UserSlash, "Ban User"))
             {
                 // todo: modal handler
                 ImGui.CloseCurrentPopup();
@@ -139,7 +141,7 @@ public class DrawGroupPair : DrawPairBase
         {
             ImGui.Text("Syncshell Owner Functions");
             string modText = IsModerator ? "Demod user" : "Mod user";
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.UserShield, modText) && UiSharedService.CtrlPressed())
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.UserShield, modText) && UiSharedService.CtrlPressed())
             {
                 ImGui.CloseCurrentPopup();
                 var userInfo = _groupFullInfo.GroupPairUserInfos[_pair.UserData.UID];
@@ -149,7 +151,7 @@ public class DrawGroupPair : DrawPairBase
             UiSharedService.AttachToolTip("Hold CTRL to change the moderator status for " + (_pair.UserData.AliasOrUID) + Environment.NewLine +
                 "Moderators can kick, ban/unban, pin/unpin users and clear the Syncshell.");
 
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Crown, "Transfer Ownership") && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Crown, "Transfer Ownership") && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())
             {
                 ImGui.CloseCurrentPopup();
                 _ = _apiController.GroupChangeOwnership(new(_groupFullInfo.Group, _pair.UserData));

@@ -7,6 +7,8 @@ using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.WebAPI;
 using MareSynchronos.UI.Handlers;
 using Dalamud.Interface.Utility.Raii;
+using MareSynchronos.Services.Mediator;
+using Dalamud.Interface.Components;
 
 namespace MareSynchronos.UI.Components;
 
@@ -14,8 +16,8 @@ public class DrawUserPair : DrawPairBase
 {
     private readonly SelectTagForPairUi _selectGroupForPairUi;
 
-    public DrawUserPair(string id, Pair entry, ApiController apiController, IdDisplayHandler displayHandler, SelectTagForPairUi selectGroupForPairUi)
-        : base(id, entry, apiController, displayHandler)
+    public DrawUserPair(string id, Pair entry, ApiController apiController, IdDisplayHandler displayHandler, SelectTagForPairUi selectGroupForPairUi, MareMediator mareMediator)
+        : base(id, entry, apiController, displayHandler, mareMediator)
     {
         _pair = entry;
         _selectGroupForPairUi = selectGroupForPairUi;
@@ -56,7 +58,7 @@ public class DrawUserPair : DrawPairBase
         {
             ImGui.SetCursorPosY(textPosY);
 
-            using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X * 3/4f }))
+            using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X * 3 / 4f }))
             using (ImRaii.PushFont(UiBuilder.IconFont))
             {
                 ImGui.SameLine();
@@ -70,7 +72,7 @@ public class DrawUserPair : DrawPairBase
         {
             ImGui.SetCursorPosY(textPosY);
 
-            using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X * 3/4f }))
+            using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X * 3 / 4f }))
             using (ImRaii.PushFont(UiBuilder.IconFont))
             {
                 ImGui.SameLine();
@@ -85,12 +87,12 @@ public class DrawUserPair : DrawPairBase
     {
         ImGui.Text("Individual Pair Functions");
         var entryUID = _pair.UserData.AliasOrUID;
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Folder, "Pair Groups"))
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Folder, "Pair Groups"))
         {
             _selectGroupForPairUi.Open(_pair);
         }
         UiSharedService.AttachToolTip("Choose pair groups for " + entryUID);
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Unpair Permanently") && UiSharedService.CtrlPressed())
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Trash, "Unpair Permanently") && UiSharedService.CtrlPressed())
         {
             _ = _apiController.UserRemovePair(new(_pair.UserData));
         }

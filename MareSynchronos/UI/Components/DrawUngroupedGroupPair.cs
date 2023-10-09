@@ -6,14 +6,15 @@ using MareSynchronos.WebAPI;
 using MareSynchronos.UI.Handlers;
 using Dalamud.Interface.Utility.Raii;
 using MareSynchronos.API.Dto.Group;
+using MareSynchronos.Services.Mediator;
 
 namespace MareSynchronos.UI.Components;
 
 public class DrawUngroupedGroupPair : DrawPairBase
 {
 
-    public DrawUngroupedGroupPair(string id, Pair entry, ApiController apiController, IdDisplayHandler idDisplayHandler)
-        : base(id, entry, apiController, idDisplayHandler)
+    public DrawUngroupedGroupPair(string id, Pair entry, ApiController apiController, IdDisplayHandler idDisplayHandler, MareMediator mareMediator)
+        : base(id, entry, apiController, idDisplayHandler, mareMediator)
     {
     }
 

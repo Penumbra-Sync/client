@@ -1,5 +1,6 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Enum;
@@ -86,7 +87,7 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
             {
                 ImGui.Text("BC7 Conversion in progress: " + _conversionCurrentFileProgress + "/" + _texturesToConvert.Count);
                 UiSharedService.TextWrapped("Current file: " + _conversionCurrentFileName);
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.StopCircle, "Cancel conversion"))
+                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.StopCircle, "Cancel conversion"))
                 {
                     _conversionCancellationTokenSource.Cancel();
                 }
@@ -128,7 +129,7 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
         {
             UiSharedService.ColorTextWrapped($"Analyzing {_characterAnalyzer.CurrentFile}/{_characterAnalyzer.TotalFiles}",
                 ImGuiColors.DalamudYellow);
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.StopCircle, "Cancel analysis"))
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.StopCircle, "Cancel analysis"))
             {
                 _characterAnalyzer.CancelAnalyze();
             }
@@ -139,14 +140,14 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
             {
                 UiSharedService.ColorTextWrapped("Some entries in the analysis have file size not determined yet, press the button below to analyze your current data",
                     ImGuiColors.DalamudYellow);
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.PlayCircle, "Start analysis (missing entries)"))
+                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.PlayCircle, "Start analysis (missing entries)"))
                 {
                     _ = _characterAnalyzer.ComputeAnalysis(false);
                 }
             }
             else
             {
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.PlayCircle, "Start analysis (recalculate all entries)"))
+                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.PlayCircle, "Start analysis (recalculate all entries)"))
                 {
                     _ = _characterAnalyzer.ComputeAnalysis(false, true);
                 }
@@ -280,7 +281,7 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
                             Environment.NewLine + "- Conversion will convert all found texture duplicates (entries with more than 1 file path) automatically." +
                             Environment.NewLine + "- Converting textures to BC7 is a very expensive operation and, depending on the amount of textures to convert, will take a while to complete."
                                 , ImGuiColors.DalamudYellow);
-                            if (_texturesToConvert.Count > 0 && UiSharedService.IconTextButton(FontAwesomeIcon.PlayCircle, "Start conversion of " + _texturesToConvert.Count + " texture(s)"))
+                            if (_texturesToConvert.Count > 0 && ImGuiComponents.IconButtonWithText(FontAwesomeIcon.PlayCircle, "Start conversion of " + _texturesToConvert.Count + " texture(s)"))
                             {
                                 _conversionCancellationTokenSource = _conversionCancellationTokenSource.CancelRecreate();
                                 _conversionTask = _ipcManager.PenumbraConvertTextureFiles(_logger, _texturesToConvert, _conversionProgress, _conversionCancellationTokenSource.Token);

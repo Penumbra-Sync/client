@@ -127,13 +127,13 @@ public class PairTagsUi
 
     private void DrawGroupMenu(string tag)
     {
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Users, "Add people to " + tag))
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Users, "Add people to " + tag))
         {
             _selectGroupForPairUi.Open(tag);
         }
         UiSharedService.AttachToolTip($"Add more users to Group {tag}");
 
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete " + tag) && UiSharedService.CtrlPressed())
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Trash, "Delete " + tag) && UiSharedService.CtrlPressed())
         {
             _tagHandler.RemoveTag(tag);
         }
