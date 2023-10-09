@@ -422,7 +422,14 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         _clearCts?.Cancel();
         _clearCts?.Dispose();
         _clearCts = null;
-        _zoningCts.CancelAfter(2500);
+        try
+        {
+            _zoningCts?.CancelAfter(2500);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Zoning CTS cancel issue");
+        }
     }
 
     private void ZoneSwitchStart()

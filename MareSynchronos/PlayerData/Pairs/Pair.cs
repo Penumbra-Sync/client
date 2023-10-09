@@ -81,7 +81,7 @@ public class Pair
         if (CachedPlayer == null)
         {
             _logger.LogDebug("Received Data for {uid} but CachedPlayer does not exist, waiting", data.User.UID);
-            Task.Run(async () =>
+            _ = Task.Run(async () =>
             {
                 using var timeoutCts = new CancellationTokenSource();
                 timeoutCts.CancelAfter(TimeSpan.FromSeconds(120));

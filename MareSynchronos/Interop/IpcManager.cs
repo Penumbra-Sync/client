@@ -300,7 +300,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
             logger.LogDebug("[{appid}] Calling On IPC: GlamourerRevertByName", applicationId);
             _glamourerRevertByName.InvokeAction(name, LockCode);
             logger.LogDebug("[{appid}] Calling On IPC: GlamourerUnlockName", applicationId);
-            _glamourerUnlock.InvokeAction(name, LockCode);
+            _glamourerUnlock.InvokeFunc(name, LockCode);
         }
         catch (Exception ex)
         {

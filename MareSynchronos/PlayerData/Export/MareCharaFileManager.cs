@@ -105,6 +105,7 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
                     _gposeGameObjects[charaTarget.Name.ToString()] = tempHandler;
 
                 await _ipcManager.GlamourerApplyAllAsync(_logger, tempHandler, LoadedCharaFile.CharaFileData.GlamourerData, applicationId, disposeCts.Token).ConfigureAwait(false);
+                await _ipcManager.PenumbraRedrawAsync(_logger, tempHandler, applicationId, disposeCts.Token).ConfigureAwait(false);
                 _dalamudUtil.WaitWhileGposeCharacterIsDrawing(charaTarget.Address, 30000);
                 await _ipcManager.PenumbraRemoveTemporaryCollectionAsync(_logger, applicationId, coll).ConfigureAwait(false);
                 if (!string.IsNullOrEmpty(LoadedCharaFile.CharaFileData.CustomizePlusData))
