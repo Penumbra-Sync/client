@@ -58,7 +58,7 @@ public class DrawGroupFolder : DrawFolderBase
         if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Ban, "Manage Banlist"))
         {
             ImGui.CloseCurrentPopup();
-            _mareMediator.Publish(new BanListPopupMessage(_groupFullInfoDto));
+            _mareMediator.Publish(new OpenBanListPopupMessage(_groupFullInfoDto));
         }
     }
 

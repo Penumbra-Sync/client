@@ -6,31 +6,31 @@ using ImGuiNET;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.WebAPI;
-using Microsoft.Extensions.Logging;
 using System.Numerics;
 
 namespace MareSynchronos.UI.Components.Popup;
 
-internal class ReportPopupHandler : PopupHandlerBase
+internal class ReportPopupHandler : IPopupHandler
 {
     private readonly ApiController _apiController;
+    private readonly UiSharedService _uiSharedService;
     private Pair? _reportedPair;
     private string _reportReason = string.Empty;
-    protected override Vector2 PopupSize => new(500, 500);
+    public Vector2 PopupSize => new(500, 500);
 
-    public ReportPopupHandler(ILogger<ReportPopupHandler> logger, MareMediator mareMediator, ApiController apiController, UiSharedService uiSharedService)
-        : base("ReportPopup", logger, mareMediator, uiSharedService)
+    public ReportPopupHandler(ApiController apiController, UiSharedService uiSharedService)
     {
-        Mediator.Subscribe<OpenReportPopupMessage>(this, (msg) =>
-        {
-            _openPopup = true;
-            _reportedPair = msg.PairToReport;
-            _reportReason = string.Empty;
-        });
         _apiController = apiController;
+        _uiSharedService = uiSharedService;
     }
 
-    protected override void DrawContent()
+    public void Open(OpenReportPopupMessage msg)
+    {
+        _reportedPair = msg.PairToReport;
+        _reportReason = string.Empty;
+    }
+
+    public void DrawContent()
     {
         using (ImRaii.PushFont(_uiSharedService.UidFont))
             UiSharedService.TextWrapped("Report " + _reportedPair!.UserData.AliasOrUID + " Mare Profile");

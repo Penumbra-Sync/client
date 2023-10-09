@@ -146,16 +146,16 @@ public class CompactUi : WindowMediatorSubscriberBase
                     .ToList();
 
             var owner = groupUsers.SingleOrDefault(u => string.Equals(u.UserData.UID, group.Key.OwnerUID, StringComparison.Ordinal));
-            var moderators = groupUsers.Where(u => group.Key.GroupPairUserInfos.TryGetValue(u.UserData.UID, out var info) && info.IsModerator());
+            var moderators = groupUsers.Where(u => group.Key.GroupPairUserInfos.TryGetValue(u.UserData.UID, out var info) && info.IsModerator()).ToList();
             groupUsers.RemoveAll(u => moderators.Contains(u));
 
-            var pinned = groupUsers.Where(u => group.Key.GroupPairUserInfos.TryGetValue(u.UserData.UID, out var info) && info.IsPinned());
+            var pinned = groupUsers.Where(u => group.Key.GroupPairUserInfos.TryGetValue(u.UserData.UID, out var info) && info.IsPinned()).ToList();
             groupUsers.RemoveAll(u => pinned.Contains(u));
 
             if (_configService.Current.ReverseUserSort)
             {
-                moderators = moderators.Reverse();
-                pinned = pinned.Reverse();
+                moderators.Reverse();
+                pinned.Reverse();
                 groupUsers.Reverse();
             }
 
@@ -385,7 +385,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             {
                 if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Plus, "Create new Syncshell"))
                 {
-                    Mediator.Publish(new CreateSyncshellPopupMessage());
+                    Mediator.Publish(new OpenCreateSyncshellPopupMessage());
                     ImGui.CloseCurrentPopup();
                 }
             }

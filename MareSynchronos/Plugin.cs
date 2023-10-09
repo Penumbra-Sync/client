@@ -111,10 +111,11 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddScoped<WindowMediatorSubscriberBase, EditProfileUi>((s) => new EditProfileUi(s.GetRequiredService<ILogger<EditProfileUi>>(),
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<ApiController>(), pluginInterface.UiBuilder, s.GetRequiredService<UiSharedService>(),
                 s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareProfileManager>()));
-            collection.AddScoped<WindowMediatorSubscriberBase, ReportPopupHandler>();
-            collection.AddScoped<WindowMediatorSubscriberBase, BanUserPopupHandler>();
-            collection.AddScoped<WindowMediatorSubscriberBase, BanListPopupHandler>();
-            collection.AddScoped<WindowMediatorSubscriberBase, CreateSyncshellPopupHandler>();
+            collection.AddScoped<WindowMediatorSubscriberBase, PopupHandler>();
+            collection.AddScoped<IPopupHandler, ReportPopupHandler>();
+            collection.AddScoped<IPopupHandler, BanListPopupHandler>();
+            collection.AddScoped<IPopupHandler, BanUserPopupHandler>();
+            collection.AddScoped<IPopupHandler, CreateSyncshellPopupHandler>();
             collection.AddScoped<CacheCreationService>();
             collection.AddScoped<TransientResourceManager>();
             collection.AddScoped<PlayerDataFactory>();

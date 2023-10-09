@@ -5,33 +5,31 @@ using MareSynchronos.API.Dto.Group;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.WebAPI;
-using Microsoft.Extensions.Logging;
 using System.Numerics;
 
 namespace MareSynchronos.UI.Components.Popup;
 
-internal class BanUserPopupHandler : PopupHandlerBase
+public class BanUserPopupHandler : IPopupHandler
 {
     private readonly ApiController _apiController;
     private Pair _reportedPair = null!;
     private GroupFullInfoDto _group = null!;
     private string _banReason = string.Empty;
-    protected override Vector2 PopupSize => new(500, 200);
+    public Vector2 PopupSize => new(500, 200);
 
-    public BanUserPopupHandler(ILogger<ReportPopupHandler> logger, MareMediator mareMediator, ApiController apiController, UiSharedService uiSharedService)
-        : base("BanUserPopup", logger, mareMediator, uiSharedService)
+    public BanUserPopupHandler(ApiController apiController)
     {
-        Mediator.Subscribe<BanUserPopupMessage>(this, (msg) =>
-        {
-            _openPopup = true;
-            _reportedPair = msg.PairToBan;
-            _group = msg.GroupFullInfoDto;
-            _banReason = string.Empty;
-        });
         _apiController = apiController;
     }
 
-    protected override void DrawContent()
+    public void Open(OpenBanUserPopupMessage message)
+    {
+        _reportedPair = message.PairToBan;
+        _group = message.GroupFullInfoDto;
+        _banReason = string.Empty;
+    }
+
+    public void DrawContent()
     {
         UiSharedService.TextWrapped("User " + (_reportedPair.UserData.AliasOrUID) + " will be banned and removed from this Syncshell.");
         ImGui.InputTextWithHint("##banreason", "Ban Reason", ref _banReason, 255);
@@ -51,4 +49,3 @@ internal class BanUserPopupHandler : PopupHandlerBase
         UiSharedService.TextWrapped("The reason will be displayed in the banlist. The current server-side alias if present (Vanity ID) will automatically be attached to the reason.");
     }
 }
-

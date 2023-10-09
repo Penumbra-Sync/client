@@ -4,32 +4,30 @@ using ImGuiNET;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.WebAPI;
-using Microsoft.Extensions.Logging;
 using System.Numerics;
 using System.Globalization;
 
 namespace MareSynchronos.UI.Components.Popup;
 
-internal class BanListPopupHandler : PopupHandlerBase
+internal class BanListPopupHandler : IPopupHandler
 {
     private readonly ApiController _apiController;
     private GroupFullInfoDto _groupFullInfo = null!;
     private List<BannedGroupUserDto> _bannedUsers = new();
 
-    protected override Vector2 PopupSize => new(700, 300);
+    public Vector2 PopupSize => new(700, 300);
 
-    public BanListPopupHandler(ILogger<ReportPopupHandler> logger, MareMediator mareMediator, ApiController apiController, UiSharedService uiSharedService)
-        : base("BanListPopup", logger, mareMediator, uiSharedService)
+    public BanListPopupHandler(ApiController apiController)
     {
-        Mediator.Subscribe<BanListPopupMessage>(this, (msg) =>
-        {
-            _openPopup = true;
-            _groupFullInfo = msg.GroupFullInfoDto;
-        });
         _apiController = apiController;
     }
 
-    protected override void DrawContent()
+    public void Open(OpenBanListPopupMessage message)
+    {
+        _groupFullInfo = message.GroupFullInfoDto;
+    }
+
+    public void DrawContent()
     {
         if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Retweet, "Refresh Banlist from Server"))
         {
@@ -78,4 +76,3 @@ internal class BanListPopupHandler : PopupHandlerBase
         }
     }
 }
-

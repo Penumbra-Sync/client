@@ -4,33 +4,32 @@ using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
-using MareSynchronos.Services.Mediator;
 using MareSynchronos.WebAPI;
-using Microsoft.Extensions.Logging;
 using System.Numerics;
 
 namespace MareSynchronos.UI.Components.Popup;
 
-internal class CreateSyncshellPopupHandler : PopupHandlerBase
+public class CreateSyncshellPopupHandler : IPopupHandler
 {
     private readonly ApiController _apiController;
+    private readonly UiSharedService _uiSharedService;
     private GroupJoinDto? _lastCreatedGroup;
     private bool _errorGroupCreate;
 
-    protected override Vector2 PopupSize => new(500, 300);
+    public Vector2 PopupSize => new(500, 300);
 
-    public CreateSyncshellPopupHandler(ILogger<ReportPopupHandler> logger, MareMediator mareMediator, ApiController apiController, UiSharedService uiSharedService)
-        : base("CreateSyncshellPopup", logger, mareMediator, uiSharedService)
+    public CreateSyncshellPopupHandler(ApiController apiController, UiSharedService uiSharedService)
     {
-        Mediator.Subscribe<CreateSyncshellPopupMessage>(this, (msg) =>
-        {
-            _openPopup = true;
-            _lastCreatedGroup = null;
-        });
         _apiController = apiController;
+        _uiSharedService = uiSharedService;
     }
 
-    protected override void DrawContent()
+    public void Open()
+    {
+        _lastCreatedGroup = null;
+    }
+
+    public void DrawContent()
     {
         using (ImRaii.PushFont(_uiSharedService.UidFont))
             ImGui.TextUnformatted("Create new Syncshell");

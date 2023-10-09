@@ -114,9 +114,15 @@ public class DrawGroupPair : DrawPairBase
             if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Thumbtack, pinText))
             {
                 ImGui.CloseCurrentPopup();
-                var userInfo = _groupFullInfo.GroupPairUserInfos[_pair.UserData.UID];
-                userInfo.SetPinned(!userInfo.IsPinned());
-                _ = _apiController.GroupSetUserInfo(new GroupPairUserInfoDto(_groupFullInfo.Group, _pair.UserData, userInfo));
+                if (!_groupFullInfo.GroupPairUserInfos.TryGetValue(_pair.UserData.UID, out var userinfo))
+                {
+                    userinfo = API.Data.Enum.GroupPairUserInfo.IsPinned;
+                }
+                else
+                {
+                    userinfo.SetPinned(!userinfo.IsPinned());
+                }
+                _ = _apiController.GroupSetUserInfo(new GroupPairUserInfoDto(_groupFullInfo.Group, _pair.UserData, userinfo));
             }
             UiSharedService.AttachToolTip("Pin this user to the Syncshell. Pinned users will not be deleted in case of a manually initiated Syncshell clean");
 
@@ -129,7 +135,7 @@ public class DrawGroupPair : DrawPairBase
 
             if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.UserSlash, "Ban User"))
             {
-                _mediator.Publish(new BanUserPopupMessage(_pair, _groupFullInfo));
+                _mediator.Publish(new OpenBanUserPopupMessage(_pair, _groupFullInfo));
                 ImGui.CloseCurrentPopup();
             }
             UiSharedService.AttachToolTip("Ban user from this Syncshell");
@@ -144,9 +150,16 @@ public class DrawGroupPair : DrawPairBase
             if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.UserShield, modText) && UiSharedService.CtrlPressed())
             {
                 ImGui.CloseCurrentPopup();
-                var userInfo = _groupFullInfo.GroupPairUserInfos[_pair.UserData.UID];
-                userInfo.SetModerator(!userInfo.IsModerator());
-                _ = _apiController.GroupSetUserInfo(new GroupPairUserInfoDto(_groupFullInfo.Group, _pair.UserData, userInfo));
+                if (!_groupFullInfo.GroupPairUserInfos.TryGetValue(_pair.UserData.UID, out var userinfo))
+                {
+                    userinfo = API.Data.Enum.GroupPairUserInfo.IsModerator;
+                }
+                else
+                {
+                    userinfo.SetModerator(!userinfo.IsModerator());
+                }
+
+                _ = _apiController.GroupSetUserInfo(new GroupPairUserInfoDto(_groupFullInfo.Group, _pair.UserData, userinfo));
             }
             UiSharedService.AttachToolTip("Hold CTRL to change the moderator status for " + (_pair.UserData.AliasOrUID) + Environment.NewLine +
                 "Moderators can kick, ban/unban, pin/unpin users and clear the Syncshell.");
