@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using System.Numerics;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.MareConfiguration;
-using Dalamud.Interface;
 using MareSynchronos.API.Data;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Internal;

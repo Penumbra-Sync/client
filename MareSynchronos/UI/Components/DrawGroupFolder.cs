@@ -3,7 +3,6 @@ using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
-using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.Services.Mediator;
@@ -36,20 +35,30 @@ public class DrawGroupFolder : DrawFolderBase
 
     protected override float DrawIcon(float textPosY, float originalY)
     {
-        using var font = ImRaii.PushFont(UiBuilder.IconFont);
         ImGui.SetCursorPosY(textPosY);
-        ImGui.TextUnformatted(FontAwesomeIcon.Users.ToIconString());
+        using (ImRaii.PushFont(UiBuilder.IconFont))
+            ImGui.TextUnformatted(_groupFullInfoDto.GroupPermissions.IsDisableInvites() ? FontAwesomeIcon.Lock.ToIconString() : FontAwesomeIcon.Users.ToIconString());
+        if (_groupFullInfoDto.GroupPermissions.IsDisableInvites())
+        {
+            UiSharedService.AttachToolTip("Syncshell " + _groupFullInfoDto.GroupAliasOrGID + " is closed for invites");
+        }
         if (string.Equals(_groupFullInfoDto.OwnerUID, _apiController.UID, StringComparison.Ordinal))
         {
             ImGui.SameLine();
             ImGui.SetCursorPosY(textPosY);
-            ImGui.TextUnformatted(FontAwesomeIcon.Crown.ToIconString());
+            using (ImRaii.PushFont(UiBuilder.IconFont))
+                ImGui.TextUnformatted(FontAwesomeIcon.Crown.ToIconString());
+            UiSharedService.AttachToolTip("You are the owner of " + _groupFullInfoDto.GroupAliasOrGID);
+
         }
         else if (_groupFullInfoDto.GroupPairUserInfos[_apiController.UID].IsModerator())
         {
             ImGui.SameLine();
             ImGui.SetCursorPosY(textPosY);
-            ImGui.TextUnformatted(FontAwesomeIcon.UserShield.ToIconString());
+            using (ImRaii.PushFont(UiBuilder.IconFont))
+                ImGui.TextUnformatted(FontAwesomeIcon.UserShield.ToIconString());
+            UiSharedService.AttachToolTip("You are a moderator in " + _groupFullInfoDto.GroupAliasOrGID);
+
         }
         ImGui.SameLine();
         return ImGui.GetCursorPosX();
@@ -130,8 +139,8 @@ public class DrawGroupFolder : DrawFolderBase
         FontAwesomeIcon pauseIcon = _groupFullInfoDto.GroupUserPermissions.IsPaused() ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
         var pauseButtonSize = UiSharedService.GetIconButtonSize(pauseIcon);
 
-        var userCog = FontAwesomeIcon.UsersCog;
-        var userCogButtonSize = UiSharedService.GetIconSize(userCog);
+        var folderIcon = FontAwesomeIcon.UsersCog;
+        var userCogButtonSize = UiSharedService.GetIconSize(folderIcon);
 
         var individualSoundsDisabled = _groupFullInfoDto.GroupUserPermissions.IsDisableSounds();
         var individualAnimDisabled = _groupFullInfoDto.GroupUserPermissions.IsDisableAnimations();
@@ -141,7 +150,7 @@ public class DrawGroupFolder : DrawFolderBase
 
         ImGui.SameLine(infoIconPosDist - userCogButtonSize.X);
 
-        UiSharedService.FontText(userCog.ToIconString(), UiBuilder.IconFont);
+        UiSharedService.FontText(folderIcon.ToIconString(), UiBuilder.IconFont);
         if (ImGui.IsItemHovered())
         {
             ImGui.BeginTooltip();

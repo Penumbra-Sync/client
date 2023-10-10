@@ -5,7 +5,6 @@ using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.WebAPI;
 using MareSynchronos.UI.Handlers;
 using Dalamud.Interface.Utility.Raii;
-using MareSynchronos.API.Dto.Group;
 using MareSynchronos.Services.Mediator;
 
 namespace MareSynchronos.UI.Components;

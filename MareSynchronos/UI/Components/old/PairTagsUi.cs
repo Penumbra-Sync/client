@@ -1,12 +1,4 @@
-﻿using Dalamud.Interface;
-using Dalamud.Interface.Components;
-using ImGuiNET;
-using MareSynchronos.API.Data.Extensions;
-using MareSynchronos.MareConfiguration;
-using MareSynchronos.UI.Handlers;
-using MareSynchronos.WebAPI;
-
-namespace MareSynchronos.UI.Components.old;
+﻿namespace MareSynchronos.UI.Components.old;
 /*
 public class PairTagsUi
 {

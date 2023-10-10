@@ -20,8 +20,6 @@ using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.Files.Models;
 using MareSynchronos.PlayerData.Handlers;
 using System.Collections.Concurrent;
-using MareSynchronos.Utils;
-using System.Diagnostics;
 using MareSynchronos.FileCache;
 using Dalamud.Interface.Components;
 

@@ -1,6 +1,5 @@
 ﻿using Dalamud.Plugin;
 using MareSynchronos.MareConfiguration.Configurations;
-using MareSynchronos.MareConfiguration.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;

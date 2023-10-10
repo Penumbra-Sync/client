@@ -1,5 +1,4 @@
-﻿using MareSynchronos.Services.Mediator;
-using System.Numerics;
+﻿using System.Numerics;
 
 namespace MareSynchronos.UI.Components.Popup;
 

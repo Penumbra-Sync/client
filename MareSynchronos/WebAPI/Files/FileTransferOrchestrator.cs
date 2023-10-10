@@ -1,6 +1,5 @@
 ﻿using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
-using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.WebAPI.Files.Models;
 using MareSynchronos.WebAPI.SignalR;
 using Microsoft.Extensions.Logging;
