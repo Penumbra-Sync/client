@@ -15,7 +15,7 @@ public class BanUserPopupHandler : IPopupHandler
     private Pair _reportedPair = null!;
     private GroupFullInfoDto _group = null!;
     private string _banReason = string.Empty;
-    public Vector2 PopupSize => new(500, 200);
+    public Vector2 PopupSize => new(500, 250);
 
     public BanUserPopupHandler(ApiController apiController)
     {
@@ -34,11 +34,6 @@ public class BanUserPopupHandler : IPopupHandler
         UiSharedService.TextWrapped("User " + (_reportedPair.UserData.AliasOrUID) + " will be banned and removed from this Syncshell.");
         ImGui.InputTextWithHint("##banreason", "Ban Reason", ref _banReason, 255);
 
-        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Times, "Cancel"))
-        {
-            ImGui.CloseCurrentPopup();
-        }
-        ImGui.SameLine();
         if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.UserSlash, "Ban User"))
         {
             ImGui.CloseCurrentPopup();

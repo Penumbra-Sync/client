@@ -172,6 +172,24 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return ret;
     }
 
+    public static void BooleanToColoredIcon(bool value, bool inline = true)
+    {
+        using var font = ImRaii.PushFont(UiBuilder.IconFont);
+        using var colorgreen = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.HealerGreen, value);
+        using var colorred = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed, !value);
+
+        if (inline) ImGui.SameLine();
+
+        if (value)
+        {
+            ImGui.TextUnformatted(FontAwesomeIcon.Check.ToIconString());
+        }
+        else
+        {
+            ImGui.TextUnformatted(FontAwesomeIcon.Times.ToIconString());
+        }
+    }
+
     public static void ColorText(string text, Vector4 color)
     {
         ImGui.PushStyleColor(ImGuiCol.Text, color);

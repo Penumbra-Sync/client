@@ -1,4 +1,6 @@
-﻿using Dalamud.Interface.Utility.Raii;
+﻿using Dalamud.Interface.Components;
+using Dalamud.Interface;
+using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
@@ -33,13 +35,6 @@ public class PopupHandler : WindowMediatorSubscriberBase
             ((ReportPopupHandler)_currentHandler).Open(msg);
         });
 
-        Mediator.Subscribe<OpenBanListPopupMessage>(this, (msg) =>
-        {
-            _openPopup = true;
-            _currentHandler = _handlers.OfType<BanListPopupHandler>().Single();
-            ((BanListPopupHandler)_currentHandler).Open(msg);
-        });
-
         Mediator.Subscribe<OpenCreateSyncshellPopupMessage>(this, (msg) =>
         {
             _openPopup = true;
@@ -52,6 +47,20 @@ public class PopupHandler : WindowMediatorSubscriberBase
             _openPopup = true;
             _currentHandler = _handlers.OfType<BanUserPopupHandler>().Single();
             ((BanUserPopupHandler)_currentHandler).Open(msg);
+        });
+
+        Mediator.Subscribe<JoinSyncshellPopupMessage>(this, (_) =>
+        {
+            _openPopup = true;
+            _currentHandler = _handlers.OfType<JoinSyncshellPopupHandler>().Single();
+            ((JoinSyncshellPopupHandler)_currentHandler).Open();
+        });
+
+        Mediator.Subscribe<OpenSyncshellAdminPanelPopupMessage>(this, (msg) =>
+        {
+            _openPopup = true;
+            _currentHandler = _handlers.OfType<SyncshellAdminPopupHandler>().Single();
+            ((SyncshellAdminPopupHandler)_currentHandler).Open(msg.GroupInfo);
         });
     }
 
@@ -71,5 +80,10 @@ public class PopupHandler : WindowMediatorSubscriberBase
         using var popup = ImRaii.Popup(WindowName, ImGuiWindowFlags.Modal);
         if (!popup) return;
         _currentHandler.DrawContent();
+        ImGui.Separator();
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Times, "Close"))
+        {
+            ImGui.CloseCurrentPopup();
+        }
     }
 }

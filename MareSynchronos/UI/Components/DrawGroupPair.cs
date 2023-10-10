@@ -30,6 +30,27 @@ public class DrawGroupPair : DrawPairBase
 
     protected override void DrawLeftSide(float textPosY, float originalY)
     {
+        FontAwesomeIcon connectionIcon;
+        Vector4 connectionColor;
+        string connectionText;
+        if (_pair.UserPair!.OwnPermissions.IsPaused() || _pair.UserPair!.OtherPermissions.IsPaused())
+        {
+            connectionIcon = FontAwesomeIcon.Pause;
+            connectionText = "Pairing status with " + _pair.UserData.AliasOrUID + " is paused";
+            connectionColor = ImGuiColors.DalamudYellow;
+        }
+        else
+        {
+            connectionIcon = FontAwesomeIcon.Users;
+            connectionText = _pair.IsOnline ? _pair.UserData.AliasOrUID + " is online" : _pair.UserData.AliasOrUID + " is offline";
+            connectionColor = _pair.IsOnline ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
+        }
+
+        ImGui.SetCursorPosY(textPosY);
+        using (ImRaii.PushFont(UiBuilder.IconFont))
+            UiSharedService.ColorText(connectionIcon.ToIconString(), connectionColor);
+        UiSharedService.AttachToolTip(connectionText);
+
         if (IsOwner)
         {
             ImGui.SameLine();
@@ -58,47 +79,26 @@ public class DrawGroupPair : DrawPairBase
             UiSharedService.AttachToolTip("Pinned in this Syncshell");
         }
 
-        FontAwesomeIcon connectionIcon;
-        Vector4 connectionColor;
-        string connectionText;
-        if (_pair.UserPair!.OwnPermissions.IsPaused() || _pair.UserPair!.OtherPermissions.IsPaused())
-        {
-            connectionIcon = FontAwesomeIcon.Pause;
-            connectionText = "Pairing status with " + _pair.UserData.AliasOrUID + " is paused";
-            connectionColor = ImGuiColors.DalamudYellow;
-        }
-        else
-        {
-            connectionIcon = FontAwesomeIcon.Users;
-            connectionText = _pair.IsOnline ? _pair.UserData.AliasOrUID + " is online" : _pair.UserData.AliasOrUID + " is offline";
-            connectionColor = _pair.IsOnline ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
-        }
-
-        ImGui.SetCursorPosY(textPosY);
-        using (ImRaii.PushFont(UiBuilder.IconFont))
-            UiSharedService.ColorText(connectionIcon.ToIconString(), connectionColor);
-        UiSharedService.AttachToolTip(connectionText);
         if (_pair.UserPair.OwnPermissions.IsSticky())
         {
-            var x = ImGui.GetCursorPosX();
             ImGui.SetCursorPosY(textPosY);
+            using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X * 3 / 4f }))
             using (ImRaii.PushFont(UiBuilder.IconFont))
             {
-                var iconsize = ImGui.CalcTextSize(FontAwesomeIcon.ArrowCircleUp.ToIconString()).X;
-                ImGui.SameLine(x + iconsize + (ImGui.GetStyle().ItemSpacing.X));
+                ImGui.SameLine();
                 ImGui.TextUnformatted(FontAwesomeIcon.ArrowCircleUp.ToIconString());
             }
             UiSharedService.AttachToolTip(_pair.UserData.AliasOrUID + " has preferred permissions enabled");
         }
+
         if (_pair is { IsOnline: true, IsVisible: true })
         {
-            var x = ImGui.GetCursorPosX();
-            ImGui.SetCursorPosY(textPosY);
-            var iconsize = ImGui.CalcTextSize(FontAwesomeIcon.Eye.ToIconString()).X;
-            ImGui.SameLine(x + iconsize + (ImGui.GetStyle().ItemSpacing.X));
-            ImGui.PushFont(UiBuilder.IconFont);
-            UiSharedService.ColorText(FontAwesomeIcon.Eye.ToIconString(), ImGuiColors.ParsedGreen);
-            ImGui.PopFont();
+            using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X * 3 / 4f }))
+            using (ImRaii.PushFont(UiBuilder.IconFont))
+            {
+                ImGui.SameLine();
+                UiSharedService.ColorText(FontAwesomeIcon.Eye.ToIconString(), ImGuiColors.ParsedGreen);
+            }
             UiSharedService.AttachToolTip(_pair.UserData.AliasOrUID + " is visible: " + _pair.PlayerName!);
         }
     }

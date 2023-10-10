@@ -53,10 +53,5 @@ internal class ReportPopupHandler : IPopupHandler
                 _ = _apiController.UserReportProfile(new(_reportedPair.UserData, reason));
             }
         }
-
-        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Times, "Cancel"))
-        {
-            ImGui.CloseCurrentPopup();
-        }
     }
 }

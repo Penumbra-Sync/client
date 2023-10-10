@@ -113,9 +113,10 @@ public sealed class Plugin : IDalamudPlugin
                 s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareProfileManager>()));
             collection.AddScoped<WindowMediatorSubscriberBase, PopupHandler>();
             collection.AddScoped<IPopupHandler, ReportPopupHandler>();
-            collection.AddScoped<IPopupHandler, BanListPopupHandler>();
             collection.AddScoped<IPopupHandler, BanUserPopupHandler>();
             collection.AddScoped<IPopupHandler, CreateSyncshellPopupHandler>();
+            collection.AddScoped<IPopupHandler, JoinSyncshellPopupHandler>();
+            collection.AddScoped<IPopupHandler, SyncshellAdminPopupHandler>();
             collection.AddScoped<CacheCreationService>();
             collection.AddScoped<TransientResourceManager>();
             collection.AddScoped<PlayerDataFactory>();

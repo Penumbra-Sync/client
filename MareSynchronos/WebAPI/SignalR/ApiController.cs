@@ -342,6 +342,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         OnGroupPairLeft((dto) => _ = Client_GroupPairLeft(dto));
         OnGroupSendFullInfo((dto) => _ = Client_GroupSendFullInfo(dto));
         OnGroupSendInfo((dto) => _ = Client_GroupSendInfo(dto));
+        OnGroupChangeUserPairPermissions((dto) => _ = Client_GroupChangeUserPairPermissions(dto));
 
         _healthCheckTokenSource?.Cancel();
         _healthCheckTokenSource?.Dispose();

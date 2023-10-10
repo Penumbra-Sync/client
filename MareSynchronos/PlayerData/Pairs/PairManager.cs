@@ -48,6 +48,8 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
 
     public Pair? LastAddedUser { get; internal set; }
 
+    public Dictionary<GroupData, GroupFullInfoDto> Groups => _allGroups.ToDictionary(k => k.Key, k => k.Value);
+
     public void AddGroup(GroupFullInfoDto dto)
     {
         _allGroups[dto.Group] = dto;
@@ -277,11 +279,13 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     internal void SetGroupPermissions(GroupPermissionDto dto)
     {
         _allGroups[dto.Group].GroupPermissions = dto.Permissions;
+        RecreateLazy();
     }
 
     internal void SetGroupStatusInfo(GroupPairUserInfoDto dto)
     {
         _allGroups[dto.Group].GroupUserInfo = dto.GroupUserInfo;
+        RecreateLazy();
     }
 
     protected override void Dispose(bool disposing)
@@ -369,5 +373,11 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
             pair.UserPair.IndividualPairStatus = dto.IndividualPairStatus;
             RecreateLazy();
         }
+    }
+
+    internal void UpdateGroupPairPermissions(GroupPairUserPermissionDto dto)
+    {
+        _allGroups[dto.Group].GroupUserPermissions = dto.GroupPairPermissions;
+        RecreateLazy();
     }
 }

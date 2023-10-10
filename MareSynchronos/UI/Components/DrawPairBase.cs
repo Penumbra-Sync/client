@@ -1,5 +1,4 @@
 ﻿using Dalamud.Interface;
-using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
 using ImGuiNET;
 using MareSynchronos.PlayerData.Pairs;
@@ -19,6 +18,8 @@ public abstract class DrawPairBase
     protected readonly IdDisplayHandler _displayHandler;
     protected readonly MareMediator _mediator;
     protected Pair _pair;
+    public Pair Pair => _pair;
+
     private readonly string _id;
     public UserFullPairDto UserPair => _pair.UserPair!;
 
@@ -71,15 +72,13 @@ public abstract class DrawPairBase
             if (individualAnimDisabled || individualSoundsDisabled || individualVFXDisabled)
             {
                 var infoIconPosDist = windowEndX - barButtonSize.X - spacingX - pauseIconSize.X - spacingX;
-                var icon = FontAwesomeIcon.ExclamationTriangle;
+                var icon = FontAwesomeIcon.InfoCircle;
                 var iconwidth = UiSharedService.GetIconSize(icon);
 
                 infoIconDist = iconwidth.X;
                 ImGui.SameLine(infoIconPosDist - iconwidth.X);
 
-                ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
                 UiSharedService.FontText(icon.ToIconString(), UiBuilder.IconFont);
-                ImGui.PopStyleColor();
                 if (ImGui.IsItemHovered())
                 {
                     ImGui.BeginTooltip();

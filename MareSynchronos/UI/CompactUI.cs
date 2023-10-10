@@ -117,11 +117,6 @@ public class CompactUi : WindowMediatorSubscriberBase
                         : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(k => k.Key, k => k.Value);
 
-            if (_configService.Current.ReverseUserSort)
-            {
-                visibleUsers = visibleUsers.Reverse().ToDictionary(k => k.Key, k => k.Value);
-            }
-
             DrawTagFolder visibleUsersFolder = new(TagHandler.CustomVisibleTag, visibleUsers
                 .Select(u =>
                 {
@@ -139,34 +134,25 @@ public class CompactUi : WindowMediatorSubscriberBase
             var groupUsers = group.Value.Where(v => users.ContainsKey(v)
                     && (v.IsOnline || (!v.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
                     || v.UserPair.OwnPermissions.IsPaused()))
-                    .OrderBy(
+                    .OrderByDescending(u => u.IsOnline)
+                    .ThenBy(u =>
+                    {
+                        if (string.Equals(u.UserData.UID, group.Key.OwnerUID, StringComparison.Ordinal)) return u.IsOnline ? 0 : 10;
+                        if (group.Key.GroupPairUserInfos.TryGetValue(u.UserData.UID, out var info))
+                        {
+                            if (info.IsModerator()) return u.IsOnline ? 1 : 11;
+                            if (info.IsPinned()) return u.IsOnline ? 2 : 12;
+                        }
+                        return u.IsOnline ? 3 : 13;
+                    })
+                    .ThenBy(
                     u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
                         ? (_configService.Current.PreferNotesOverNamesForVisible ? u.GetNote() : u.PlayerName)
-                        : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
+                        : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.Ordinal)
                     .ToList();
 
-            var owner = groupUsers.SingleOrDefault(u => string.Equals(u.UserData.UID, group.Key.OwnerUID, StringComparison.Ordinal));
-            var moderators = groupUsers.Where(u => group.Key.GroupPairUserInfos.TryGetValue(u.UserData.UID, out var info) && info.IsModerator()).ToList();
-            groupUsers.RemoveAll(u => moderators.Contains(u));
-
-            var pinned = groupUsers.Where(u => group.Key.GroupPairUserInfos.TryGetValue(u.UserData.UID, out var info) && info.IsPinned()).ToList();
-            groupUsers.RemoveAll(u => pinned.Contains(u));
-
-            if (_configService.Current.ReverseUserSort)
-            {
-                moderators.Reverse();
-                pinned.Reverse();
-                groupUsers.Reverse();
-            }
-
-            List<Pair> allGroupUsersSorted = new();
-            if (owner != null) allGroupUsersSorted.Add(owner);
-            allGroupUsersSorted.AddRange(moderators);
-            allGroupUsersSorted.AddRange(pinned);
-            allGroupUsersSorted.AddRange(groupUsers);
-
             DrawGroupFolder groupFolder = new(group.Key.GID, group.Key, _apiController,
-                allGroupUsersSorted.Select(u => new DrawGroupPair(group.Key.GID + u.UserData.UID, group.Key, u, _uidDisplayHandler, _apiController, Mediator)),
+                groupUsers.Select(u => new DrawGroupPair(group.Key.GID + u.UserData.UID, group.Key, u, _uidDisplayHandler, _apiController, Mediator)),
                 _tagHandler, _uidDisplayHandler, Mediator);
             drawFolders.Add(groupFolder);
         }
@@ -175,18 +161,14 @@ public class CompactUi : WindowMediatorSubscriberBase
         HashSet<Pair> alreadyInTags = new HashSet<Pair>();
         foreach (var tag in tags)
         {
-            IEnumerable<Pair> tagUsers = users.Select(k => k.Key).Where(u => u.IsDirectlyPaired && _tagHandler.HasTag(u.UserData.UID, tag)
+            IEnumerable<Pair> tagUsers = users.Select(k => k.Key).Where(u => u.IsDirectlyPaired && !u.IsOneSidedPair && _tagHandler.HasTag(u.UserData.UID, tag)
                 && (u.IsOnline || (!u.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
                 || u.UserPair.OwnPermissions.IsPaused()))
-            .OrderBy(
+                .OrderByDescending(u => u.IsOnline)
+                .ThenBy(
                     u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
                         ? (_configService.Current.PreferNotesOverNamesForVisible ? u.GetNote() : u.PlayerName)
                         : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase);
-
-            if (_configService.Current.ReverseUserSort)
-            {
-                tagUsers = tagUsers.Reverse();
-            }
 
             DrawTagFolder tagFolder = new(tag, tagUsers
                 .Select(u =>
@@ -198,17 +180,15 @@ public class CompactUi : WindowMediatorSubscriberBase
             drawFolders.Add(tagFolder);
         }
 
-        var onlineDirectPairedUsersNotInTags = users.Where(u => u.Key.IsDirectlyPaired && !_tagHandler.HasAnyTag(u.Key.UserData.UID)
+        var onlineDirectPairedUsersNotInTags = users.Where(u => u.Key.IsDirectlyPaired && !u.Key.IsOneSidedPair && !_tagHandler.HasAnyTag(u.Key.UserData.UID)
             && (u.Key.IsOnline || (!u.Key.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
                 || u.Key.UserPair.OwnPermissions.IsPaused()))
-            .OrderBy(
+            .OrderByDescending(u => u.Key.IsOnline)
+            .ThenBy(
                 u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
                     ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
                     : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
             .Select(k => k.Key);
-
-        if (_configService.Current.ReverseUserSort)
-            onlineDirectPairedUsersNotInTags = onlineDirectPairedUsersNotInTags.Reverse();
 
         DrawTagFolder onlineFolder = new((_configService.Current.ShowOfflineUsersSeparately ? TagHandler.CustomOnlineTag : TagHandler.CustomAllTag),
             onlineDirectPairedUsersNotInTags.Select(u =>
@@ -225,8 +205,6 @@ public class CompactUi : WindowMediatorSubscriberBase
                     : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
             .Select(k => k.Key);
 
-            if (_configService.Current.ReverseUserSort)
-                offlineUsersEntries = offlineUsersEntries.Reverse();
 
             DrawTagFolder offlineUsers = new(TagHandler.CustomOfflineTag, offlineUsersEntries
                 .Select(u =>
@@ -406,95 +384,10 @@ public class CompactUi : WindowMediatorSubscriberBase
 
     private void DrawFilter()
     {
-        var buttonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.ArrowUp);
-        var playButtonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Play);
-        if (!_configService.Current.ReverseUserSort)
-        {
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.ArrowDown))
-            {
-                _configService.Current.ReverseUserSort = true;
-                _configService.Save();
-                Mediator.Publish(new RebuildUiPairMessage());
-            }
-            UiSharedService.AttachToolTip("Sort by name descending");
-        }
-        else
-        {
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.ArrowUp))
-            {
-                _configService.Current.ReverseUserSort = false;
-                _configService.Save();
-                Mediator.Publish(new RebuildUiPairMessage());
-            }
-            UiSharedService.AttachToolTip("Sort by name ascending");
-        }
-        ImGui.SameLine();
-
-        var users = GetFilteredDirectUsers();
-        var userCount = users.Count;
-
-        var spacing = userCount > 0
-            ? playButtonSize.X + ImGui.GetStyle().ItemSpacing.X * 2
-            : ImGui.GetStyle().ItemSpacing.X;
-
-        ImGui.SetNextItemWidth(WindowContentWidth - buttonSize.X - spacing);
+        ImGui.SetNextItemWidth(WindowContentWidth);
         if (ImGui.InputTextWithHint("##filter", "Filter for UID/notes", ref _characterOrCommentFilter, 255))
         {
             Mediator.Publish(new RebuildUiPairMessage());
-        }
-
-        if (userCount == 0) return;
-
-        var pausedUsers = users.Where(u => u.UserPair!.OwnPermissions.IsPaused() && u.IsPaired).ToList();
-        var resumedUsers = users.Where(u => !u.UserPair!.OwnPermissions.IsPaused() && u.IsPaired).ToList();
-
-        if (!pausedUsers.Any() && !resumedUsers.Any()) return;
-        ImGui.SameLine();
-
-        switch (_buttonState)
-        {
-            case true when !pausedUsers.Any():
-                _buttonState = false;
-                break;
-
-            case false when !resumedUsers.Any():
-                _buttonState = true;
-                break;
-
-            case true:
-                users = pausedUsers;
-                break;
-
-            case false:
-                users = resumedUsers;
-                break;
-        }
-
-        var button = _buttonState ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
-
-        if (!_timeout.IsRunning || _timeout.ElapsedMilliseconds > 15000)
-        {
-            _timeout.Reset();
-
-            if (ImGuiComponents.IconButton(button) && UiSharedService.CtrlPressed())
-            {
-                foreach (var entry in users)
-                {
-                    var perm = entry.UserPair!.OwnPermissions;
-                    perm.SetPaused(!perm.IsPaused());
-                    _ = _apiController.UserSetPairPermissions(new UserPermissionsDto(entry.UserData, perm));
-                }
-
-                _timeout.Start();
-                _buttonState = !_buttonState;
-            }
-            UiSharedService.AttachToolTip($"Hold Control to {(button == FontAwesomeIcon.Play ? "resume" : "pause")} pairing with {users.Count} out of {userCount} displayed users.");
-        }
-        else
-        {
-            var availableAt = (15000 - _timeout.ElapsedMilliseconds) / 1000;
-            ImGuiComponents.DisabledButton(button);
-            UiSharedService.AttachToolTip($"Next execution is available at {availableAt} seconds");
         }
     }
 

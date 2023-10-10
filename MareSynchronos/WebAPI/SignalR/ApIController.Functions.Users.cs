@@ -110,6 +110,6 @@ public partial class ApiController
     public async Task UserUpdateDefaultPermissions(DefaultPermissionsDto dto)
     {
         CheckConnection();
-        await _mareHub.InvokeAsync(nameof(UserUpdateDefaultPermissions), dto).ConfigureAwait(false);
+        await _mareHub!.InvokeAsync(nameof(UserUpdateDefaultPermissions), dto).ConfigureAwait(false);
     }
 }

@@ -179,6 +179,13 @@ public partial class ApiController
         return Task.CompletedTask;
     }
 
+    public Task Client_GroupChangeUserPairPermissions(GroupPairUserPermissionDto dto)
+    {
+        Logger.LogDebug("Client_GroupChangeUserPairPermissions: {dto}", dto);
+        ExecuteSafely(() => _pairManager.UpdateGroupPairPermissions(dto));
+        return Task.CompletedTask;
+    }
+
     public void OnUpdateUserIndividualPairStatusDto(Action<UserIndividualPairStatusDto> action)
     {
         if (_initialized) return;
@@ -303,6 +310,12 @@ public partial class ApiController
     {
         if (_initialized) return;
         _mareHub!.On(nameof(Client_UserUpdateDefaultPermissions), act);
+    }
+
+    public void OnGroupChangeUserPairPermissions(Action<GroupPairUserPermissionDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupChangeUserPairPermissions), act);
     }
 
     private void ExecuteSafely(Action act)

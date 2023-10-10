@@ -1,5 +1,6 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Components;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data;
@@ -17,6 +18,8 @@ public class DrawGroupFolder : DrawFolderBase
     private readonly IdDisplayHandler _idDisplayHandler;
     private readonly MareMediator _mareMediator;
     private readonly GroupFullInfoDto _groupFullInfoDto;
+    private bool IsOwner => string.Equals(_groupFullInfoDto.OwnerUID, _apiController.UID, StringComparison.Ordinal);
+    private bool IsModerator => IsOwner || _groupFullInfoDto.GroupPairUserInfos.TryGetValue(_apiController.UID, out var info) && info.IsModerator();
     protected override bool RenderIfEmpty => true;
     protected override bool RenderMenu => true;
 
@@ -54,11 +57,64 @@ public class DrawGroupFolder : DrawFolderBase
 
     protected override void DrawMenu()
     {
-        ImGui.TextUnformatted("Syncshell Menu");
-        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Ban, "Manage Banlist"))
+        ImGui.TextUnformatted("Syncshell Menu (" + _groupFullInfoDto.GroupAliasOrGID + ")");
+        ImGui.Separator();
+
+        ImGui.TextUnformatted("General Syncshell Actions");
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Copy, "Copy ID"))
         {
             ImGui.CloseCurrentPopup();
-            _mareMediator.Publish(new OpenBanListPopupMessage(_groupFullInfoDto));
+            ImGui.SetClipboardText(_groupFullInfoDto.GroupAliasOrGID);
+        }
+        UiSharedService.AttachToolTip("Copy Syncshell ID to Clipboard");
+
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.StickyNote, "Copy Notes"))
+        {
+            ImGui.CloseCurrentPopup();
+            ImGui.SetClipboardText(UiSharedService.GetNotes(_drawPairs.Select(k => k.Pair).ToList()));
+        }
+        UiSharedService.AttachToolTip("Copies all your notes for all users in this Syncshell to the clipboard." + Environment.NewLine + "They can be imported via Settings -> Privacy -> Import Notes from Clipboard");
+
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.ArrowCircleLeft, "Leave Syncshell") && UiSharedService.CtrlPressed())
+        {
+            _ = _apiController.GroupLeave(_groupFullInfoDto);
+        }
+        UiSharedService.AttachToolTip("Hold CTRL and click to leave this Syncshell" + (!string.Equals(_groupFullInfoDto.OwnerUID, _apiController.UID, StringComparison.Ordinal)
+            ? string.Empty : Environment.NewLine + "WARNING: This action is irreversible" + Environment.NewLine + "Leaving an owned Syncshell will transfer the ownership to a random person in the Syncshell."));
+
+        ImGui.Separator();
+        ImGui.TextUnformatted("Permission Settings");
+        var perm = _groupFullInfoDto.GroupUserPermissions;
+        bool disableSounds = perm.IsDisableSounds();
+        bool disableAnims = perm.IsDisableAnimations();
+        bool disableVfx = perm.IsDisableVFX();
+        if (ImGuiComponents.IconButtonWithText(disableSounds ? FontAwesomeIcon.VolumeUp : FontAwesomeIcon.VolumeOff, disableSounds ? "Enable Sound Sync" : "Disable Sound Sync"))
+        {
+            perm.SetDisableSounds(!disableSounds);
+            _ = _apiController.GroupChangeIndividualPermissionState(new(_groupFullInfoDto.Group, new(_apiController.UID), perm));
+        }
+
+        if (ImGuiComponents.IconButtonWithText(disableAnims ? FontAwesomeIcon.Running : FontAwesomeIcon.Stop, disableAnims ? "Enable Animation Sync" : "Disable Animation Sync"))
+        {
+            perm.SetDisableAnimations(!disableAnims);
+            _ = _apiController.GroupChangeIndividualPermissionState(new(_groupFullInfoDto.Group, new(_apiController.UID), perm));
+        }
+
+        if (ImGuiComponents.IconButtonWithText(disableVfx ? FontAwesomeIcon.Sun : FontAwesomeIcon.Circle, disableVfx ? "Enable VFX Sync" : "Disable VFX Sync"))
+        {
+            perm.SetDisableVFX(!disableVfx);
+            _ = _apiController.GroupChangeIndividualPermissionState(new(_groupFullInfoDto.Group, new(_apiController.UID), perm));
+        }
+
+        if (IsModerator || IsOwner)
+        {
+            ImGui.Separator();
+            ImGui.TextUnformatted("Syncshell Admin Functions");
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Cog, "Open Admin Panel"))
+            {
+                ImGui.CloseCurrentPopup();
+                _mareMediator.Publish(new OpenSyncshellAdminPanelPopupMessage(_groupFullInfoDto));
+            }
         }
     }
 
@@ -69,7 +125,52 @@ public class DrawGroupFolder : DrawFolderBase
 
     protected override float DrawRightSide(float originalY, float currentRightSideX)
     {
-        // todo status icon, pause
+        var spacingX = ImGui.GetStyle().ItemSpacing.X;
+
+        FontAwesomeIcon pauseIcon = _groupFullInfoDto.GroupUserPermissions.IsPaused() ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
+        var pauseButtonSize = UiSharedService.GetIconButtonSize(pauseIcon);
+
+        var userCog = FontAwesomeIcon.UsersCog;
+        var userCogButtonSize = UiSharedService.GetIconSize(userCog);
+
+        var individualSoundsDisabled = _groupFullInfoDto.GroupUserPermissions.IsDisableSounds();
+        var individualAnimDisabled = _groupFullInfoDto.GroupUserPermissions.IsDisableAnimations();
+        var individualVFXDisabled = _groupFullInfoDto.GroupUserPermissions.IsDisableVFX();
+
+        var infoIconPosDist = currentRightSideX - pauseButtonSize.X - spacingX;
+
+        ImGui.SameLine(infoIconPosDist - userCogButtonSize.X);
+
+        UiSharedService.FontText(userCog.ToIconString(), UiBuilder.IconFont);
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.BeginTooltip();
+
+            ImGui.TextUnformatted("Syncshell Permissions");
+            ImGui.Separator();
+
+            UiSharedService.BooleanToColoredIcon(!individualSoundsDisabled, false);
+            ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+            ImGui.TextUnformatted("Sound Sync");
+
+            UiSharedService.BooleanToColoredIcon(!individualAnimDisabled, false);
+            ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+            ImGui.TextUnformatted("Animation Sync");
+
+            UiSharedService.BooleanToColoredIcon(!individualVFXDisabled, false);
+            ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+            ImGui.TextUnformatted("VFX Sync");
+
+            ImGui.EndTooltip();
+        }
+
+        ImGui.SameLine();
+        if (ImGuiComponents.IconButton(pauseIcon))
+        {
+            var perm = _groupFullInfoDto.GroupUserPermissions;
+            perm.SetPaused(!perm.IsPaused());
+            _ = _apiController.GroupChangeIndividualPermissionState(new GroupPairUserPermissionDto(_groupFullInfoDto.Group, new(_apiController.UID), perm));
+        }
         return currentRightSideX;
     }
 }

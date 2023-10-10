@@ -28,7 +28,7 @@ public class DrawUserPair : DrawPairBase
         FontAwesomeIcon connectionIcon;
         Vector4 connectionColor;
         string connectionText;
-        if (!_pair.IsDirectlyPaired)
+        if (_pair.IsOneSidedPair)
         {
             connectionIcon = FontAwesomeIcon.ArrowsLeftRight;
             connectionText = _pair.UserData.AliasOrUID + " has not added you back";

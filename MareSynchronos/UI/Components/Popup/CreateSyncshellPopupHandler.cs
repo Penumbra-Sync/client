@@ -51,11 +51,6 @@ public class CreateSyncshellPopupHandler : IPopupHandler
             ImGui.SameLine();
         }
 
-        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Times, "Close"))
-        {
-            ImGui.CloseCurrentPopup();
-        }
-
         ImGui.Separator();
 
         if (_lastCreatedGroup == null)
@@ -64,10 +59,14 @@ public class CreateSyncshellPopupHandler : IPopupHandler
                 "- You can own up to " + _apiController.ServerInfo.MaxGroupsCreatedByUser + " Syncshells on this server." + Environment.NewLine +
                 "- You can join up to " + _apiController.ServerInfo.MaxGroupsJoinedByUser + " Syncshells on this server (including your own)" + Environment.NewLine +
                 "- Syncshells on this server can have a maximum of " + _apiController.ServerInfo.MaxGroupUserCount + " users");
-            UiSharedService.TextWrapped("Your current Syncshell preferred permissions are:" + Environment.NewLine +
-                "- Animations disabled: " + _apiController.DefaultPermissions!.DisableGroupAnimations + Environment.NewLine +
-                "- Sounds disabled: " + _apiController.DefaultPermissions!.DisableGroupSounds + Environment.NewLine +
-                "- VFX disabled: " + _apiController.DefaultPermissions!.DisableGroupVFX);
+            ImGui.Dummy(new(2f));
+            ImGui.TextUnformatted("Your current Syncshell preferred permissions are:");
+            ImGui.TextUnformatted("- Animations");
+            UiSharedService.BooleanToColoredIcon(!_apiController.DefaultPermissions!.DisableGroupAnimations);
+            ImGui.TextUnformatted("- Sounds");
+            UiSharedService.BooleanToColoredIcon(!_apiController.DefaultPermissions!.DisableGroupSounds);
+            ImGui.TextUnformatted("- VFX");
+            UiSharedService.BooleanToColoredIcon(!_apiController.DefaultPermissions!.DisableGroupVFX);
             UiSharedService.TextWrapped("(Those preferred permissions can be changed anytime after Syncshell creation, your defaults can be changed anytime in the Mare Settings)");
         }
         else
@@ -84,9 +83,14 @@ public class CreateSyncshellPopupHandler : IPopupHandler
             UiSharedService.TextWrapped("You can change the Syncshell password later at any time.");
             ImGui.Separator();
             UiSharedService.TextWrapped("These settings were set based on your preferred syncshell permissions:");
-            UiSharedService.TextWrapped("Suggest disable Animations sync: " + _lastCreatedGroup.GroupUserPreferredPermissions.IsDisableAnimations());
-            UiSharedService.TextWrapped("Suggest disable Sounds sync: " + _lastCreatedGroup.GroupUserPreferredPermissions.IsDisableSounds());
-            UiSharedService.TextWrapped("Suggest disable VFX sync: " + _lastCreatedGroup.GroupUserPreferredPermissions.IsDisableVFX());
+            ImGui.Dummy(new(2f));
+            UiSharedService.TextWrapped("Suggest Animation sync:");
+            UiSharedService.BooleanToColoredIcon(!_lastCreatedGroup.GroupUserPreferredPermissions.IsDisableAnimations());
+            UiSharedService.TextWrapped("Suggest Sounds sync:");
+            UiSharedService.BooleanToColoredIcon(!_lastCreatedGroup.GroupUserPreferredPermissions.IsDisableSounds());
+            UiSharedService.TextWrapped("Suggest VFX sync:");
+            UiSharedService.BooleanToColoredIcon(!_lastCreatedGroup.GroupUserPreferredPermissions.IsDisableVFX());
+
         }
 
         if (_errorGroupCreate)
