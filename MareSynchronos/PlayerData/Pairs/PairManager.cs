@@ -237,6 +237,8 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
             pair.UserPair.OtherPermissions.IsDisableVFX());
 
         pair.ApplyLastReceivedData();
+
+        RecreateLazy();
     }
 
     public void UpdateSelfPairPermissions(UserPermissionsDto dto)
@@ -260,6 +262,8 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
             pair.UserPair.OwnPermissions.IsDisableVFX());
 
         pair.ApplyLastReceivedData();
+
+        RecreateLazy();
     }
 
     internal void ReceiveUploadStatus(UserDto dto)

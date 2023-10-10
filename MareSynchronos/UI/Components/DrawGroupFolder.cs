@@ -19,6 +19,7 @@ public class DrawGroupFolder : DrawFolderBase
     private readonly GroupFullInfoDto _groupFullInfoDto;
     private bool IsOwner => string.Equals(_groupFullInfoDto.OwnerUID, _apiController.UID, StringComparison.Ordinal);
     private bool IsModerator => IsOwner || _groupFullInfoDto.GroupPairUserInfos.TryGetValue(_apiController.UID, out var info) && info.IsModerator();
+    private bool IsPinned => _groupFullInfoDto.GroupPairUserInfos.TryGetValue(_apiController.UID, out var info) && info.IsPinned();
     protected override bool RenderIfEmpty => true;
     protected override bool RenderMenu => true;
 
@@ -42,7 +43,7 @@ public class DrawGroupFolder : DrawFolderBase
         {
             UiSharedService.AttachToolTip("Syncshell " + _groupFullInfoDto.GroupAliasOrGID + " is closed for invites");
         }
-        if (string.Equals(_groupFullInfoDto.OwnerUID, _apiController.UID, StringComparison.Ordinal))
+        if (IsOwner)
         {
             ImGui.SameLine();
             ImGui.SetCursorPosY(textPosY);
@@ -51,14 +52,21 @@ public class DrawGroupFolder : DrawFolderBase
             UiSharedService.AttachToolTip("You are the owner of " + _groupFullInfoDto.GroupAliasOrGID);
 
         }
-        else if (_groupFullInfoDto.GroupPairUserInfos[_apiController.UID].IsModerator())
+        else if (IsModerator)
         {
             ImGui.SameLine();
             ImGui.SetCursorPosY(textPosY);
             using (ImRaii.PushFont(UiBuilder.IconFont))
                 ImGui.TextUnformatted(FontAwesomeIcon.UserShield.ToIconString());
             UiSharedService.AttachToolTip("You are a moderator in " + _groupFullInfoDto.GroupAliasOrGID);
-
+        }
+        else if (IsPinned)
+        {
+            ImGui.SameLine();
+            ImGui.SetCursorPosY(textPosY);
+            using (ImRaii.PushFont(UiBuilder.IconFont))
+                ImGui.TextUnformatted(FontAwesomeIcon.Thumbtack.ToIconString());
+            UiSharedService.AttachToolTip("You are pinned in " + _groupFullInfoDto.GroupAliasOrGID);
         }
         ImGui.SameLine();
         return ImGui.GetCursorPosX();
