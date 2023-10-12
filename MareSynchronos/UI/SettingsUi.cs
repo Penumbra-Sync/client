@@ -579,7 +579,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _configService.Current.ShowVisibleUsersSeparately = showVisibleSeparate;
             _configService.Save();
-            Mediator.Publish(new RebuildUiPairMessage());
+            Mediator.Publish(new RefreshUiMessage());
         }
         UiSharedService.DrawHelpText("This will show all currently visible users in a special 'Visible' group in the main UI.");
 
@@ -587,7 +587,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _configService.Current.ShowOfflineUsersSeparately = showOfflineSeparate;
             _configService.Save();
-            Mediator.Publish(new RebuildUiPairMessage());
+            Mediator.Publish(new RefreshUiMessage());
         }
         UiSharedService.DrawHelpText("This will show all currently offline users in a special 'Offline' group in the main UI.");
 
@@ -595,7 +595,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _configService.Current.ShowCharacterNameInsteadOfNotesForVisible = showNameInsteadOfNotes;
             _configService.Save();
-            Mediator.Publish(new RebuildUiPairMessage());
+            Mediator.Publish(new RefreshUiMessage());
         }
         UiSharedService.DrawHelpText("This will show the character name instead of custom set note when a character is visible");
 
@@ -605,7 +605,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _configService.Current.PreferNotesOverNamesForVisible = preferNotesInsteadOfName;
             _configService.Save();
-            Mediator.Publish(new RebuildUiPairMessage());
+            Mediator.Publish(new RefreshUiMessage());
         }
         UiSharedService.DrawHelpText("If you set a note for a player it will be shown instead of the player name");
         if (!_configService.Current.ShowCharacterNameInsteadOfNotesForVisible) ImGui.EndDisabled();
@@ -987,7 +987,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     }
                     UiSharedService.DrawHelpText("Hold CTRL to delete this service");
                 }
-                ImGui.Separator();
+                ImGui.EndTabItem();
+            }
+
+            if (ImGui.BeginTabItem("Permission Settings"))
+            {
                 UiSharedService.FontText("Default Permission Settings", _uiShared.UidFont);
                 if (selectedServer == _serverConfigurationManager.CurrentServer && _apiController.IsConnected)
                 {
@@ -1060,6 +1064,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     UiSharedService.ColorTextWrapped("Default Permission Settings unavailable for this service. " +
                         "You need to connect to this service to change the default permissions since they are stored on the service.", ImGuiColors.DalamudYellow);
                 }
+
                 ImGui.EndTabItem();
             }
             ImGui.EndTabBar();

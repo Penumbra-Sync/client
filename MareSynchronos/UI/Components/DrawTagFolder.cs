@@ -11,6 +11,8 @@ namespace MareSynchronos.UI.Components;
 public class DrawTagFolder : DrawFolderBase
 {
     private readonly ApiController _apiController;
+    private readonly SelectPairForTagUi _selectPairForTagUi;
+
     protected override bool RenderIfEmpty => _id switch
     {
         TagHandler.CustomUnpairedTag => false,
@@ -41,10 +43,11 @@ public class DrawTagFolder : DrawFolderBase
         _ => true,
     };
 
-    public DrawTagFolder(string id, IEnumerable<DrawPairBase> drawPairs, TagHandler tagHandler, ApiController apiController)
+    public DrawTagFolder(string id, IEnumerable<DrawPairBase> drawPairs, TagHandler tagHandler, ApiController apiController, SelectPairForTagUi selectPairForTagUi)
         : base(id, drawPairs, tagHandler)
     {
         _apiController = apiController;
+        _selectPairForTagUi = selectPairForTagUi;
     }
 
     protected override float DrawIcon(float textPosY, float originalY)
@@ -69,8 +72,17 @@ public class DrawTagFolder : DrawFolderBase
     protected override void DrawMenu()
     {
         ImGui.TextUnformatted("Group Menu");
-
-        // todo tag handler menu
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Users, "Select Pairs"))
+        {
+            _selectPairForTagUi.Open(_id);
+        }
+        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Trash, "Delete Pair Group") && UiSharedService.CtrlPressed())
+        {
+            _tagHandler.RemoveTag(_id);
+            // deleet
+        }
+        UiSharedService.AttachToolTip("Hold CTRL to remove this Group permanently." + Environment.NewLine +
+            "Note: this will not unpair with users in this Group.");
     }
 
     protected override void DrawName(float originalY, float width)
@@ -80,7 +92,7 @@ public class DrawTagFolder : DrawFolderBase
         {
             TagHandler.CustomUnpairedTag => "Unpaired",
             TagHandler.CustomOnlineTag => "Online / Paused by you",
-            TagHandler.CustomOfflineTag => "Offline / Paused by them",
+            TagHandler.CustomOfflineTag => "Offline / Paused by other",
             TagHandler.CustomVisibleTag => "Visible",
             TagHandler.CustomAllTag => "All Users",
             _ => _id

@@ -33,6 +33,7 @@ public class PopupHandler : WindowMediatorSubscriberBase
             _openPopup = true;
             _currentHandler = _handlers.OfType<ReportPopupHandler>().Single();
             ((ReportPopupHandler)_currentHandler).Open(msg);
+            IsOpen = true;
         });
 
         Mediator.Subscribe<OpenCreateSyncshellPopupMessage>(this, (msg) =>
@@ -40,6 +41,7 @@ public class PopupHandler : WindowMediatorSubscriberBase
             _openPopup = true;
             _currentHandler = _handlers.OfType<CreateSyncshellPopupHandler>().Single();
             ((CreateSyncshellPopupHandler)_currentHandler).Open();
+            IsOpen = true;
         });
 
         Mediator.Subscribe<OpenBanUserPopupMessage>(this, (msg) =>
@@ -47,6 +49,7 @@ public class PopupHandler : WindowMediatorSubscriberBase
             _openPopup = true;
             _currentHandler = _handlers.OfType<BanUserPopupHandler>().Single();
             ((BanUserPopupHandler)_currentHandler).Open(msg);
+            IsOpen = true;
         });
 
         Mediator.Subscribe<JoinSyncshellPopupMessage>(this, (_) =>
@@ -54,13 +57,16 @@ public class PopupHandler : WindowMediatorSubscriberBase
             _openPopup = true;
             _currentHandler = _handlers.OfType<JoinSyncshellPopupHandler>().Single();
             ((JoinSyncshellPopupHandler)_currentHandler).Open();
+            IsOpen = true;
         });
 
         Mediator.Subscribe<OpenSyncshellAdminPanelPopupMessage>(this, (msg) =>
         {
+            IsOpen = true;
             _openPopup = true;
             _currentHandler = _handlers.OfType<SyncshellAdminPopupHandler>().Single();
             ((SyncshellAdminPopupHandler)_currentHandler).Open(msg.GroupInfo);
+            IsOpen = true;
         });
     }
 

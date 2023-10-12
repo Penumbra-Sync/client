@@ -121,8 +121,9 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         {
             Mediator.Publish(new ClearProfileDataMessage(pair.UserData));
             pair.MarkOffline();
-            RecreateLazy();
         }
+
+        RecreateLazy();
     }
 
     public void MarkPairOnline(OnlineUserIdentDto dto, bool sendNotif = true)
@@ -132,7 +133,11 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         Mediator.Publish(new ClearProfileDataMessage(dto.User));
 
         var pair = _allClientPairs[dto.User];
-        if (pair.HasCachedPlayer) return;
+        if (pair.HasCachedPlayer)
+        {
+            RecreateLazy();
+            return;
+        }
 
         if (sendNotif && _configurationService.Current.ShowOnlineNotifications
             && (_configurationService.Current.ShowOnlineNotificationsOnlyForIndividualPairs && pair.UserPair != null
@@ -148,6 +153,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         }
 
         pair.CreateCachedPlayer(dto);
+
         RecreateLazy();
     }
 
@@ -187,9 +193,9 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
                 pair.MarkOffline();
                 _allClientPairs.TryRemove(dto.User, out _);
             }
-
-            RecreateLazy();
         }
+
+        RecreateLazy();
     }
 
     public void RemoveUserPair(UserDto dto)
@@ -203,9 +209,9 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
                 pair.MarkOffline();
                 _allClientPairs.TryRemove(dto.User, out _);
             }
-
-            RecreateLazy();
         }
+
+        RecreateLazy();
     }
 
     public void SetGroupInfo(GroupInfoDto dto)
@@ -213,6 +219,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         _allGroups[dto.Group].Group = dto.Group;
         _allGroups[dto.Group].Owner = dto.Owner;
         _allGroups[dto.Group].GroupPermissions = dto.GroupPermissions;
+
         RecreateLazy();
     }
 
@@ -369,7 +376,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         _directPairsInternal = DirectPairsLazy();
         _groupPairsInternal = GroupPairsLazy();
         _pairsWithGroupsInternal = PairsWithGroupsLazy();
-        Mediator.Publish(new RebuildUiPairMessage());
+        Mediator.Publish(new RefreshUiMessage());
     }
 
     internal void UpdateIndividualPairStatus(UserIndividualPairStatusDto dto)

@@ -18,8 +18,8 @@ public class DrawGroupFolder : DrawFolderBase
     private readonly MareMediator _mareMediator;
     private readonly GroupFullInfoDto _groupFullInfoDto;
     private bool IsOwner => string.Equals(_groupFullInfoDto.OwnerUID, _apiController.UID, StringComparison.Ordinal);
-    private bool IsModerator => IsOwner || _groupFullInfoDto.GroupPairUserInfos.TryGetValue(_apiController.UID, out var info) && info.IsModerator();
-    private bool IsPinned => _groupFullInfoDto.GroupPairUserInfos.TryGetValue(_apiController.UID, out var info) && info.IsPinned();
+    private bool IsModerator => IsOwner || _groupFullInfoDto.GroupUserInfo.IsModerator();
+    private bool IsPinned => _groupFullInfoDto.GroupUserInfo.IsPinned();
     protected override bool RenderIfEmpty => true;
     protected override bool RenderMenu => true;
 

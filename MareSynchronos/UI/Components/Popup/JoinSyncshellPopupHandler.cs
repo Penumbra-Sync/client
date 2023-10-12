@@ -154,7 +154,7 @@ internal class JoinSyncshellPopupHandler : IPopupHandler
             {
                 GroupUserPreferredPermissions joinPermissions = GroupUserPreferredPermissions.NoneSet;
                 joinPermissions.SetDisableSounds(_ownPermissions.DisableGroupSounds);
-                joinPermissions.SetDisableAnimations(_ownPermissions.DisableGroupVFX);
+                joinPermissions.SetDisableAnimations(_ownPermissions.DisableGroupAnimations);
                 joinPermissions.SetDisableVFX(_ownPermissions.DisableGroupVFX);
                 _ = _apiController.GroupJoinFinalize(new GroupJoinDto(_groupJoinInfo.Group, _previousPassword, joinPermissions));
                 ImGui.CloseCurrentPopup();

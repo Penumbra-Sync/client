@@ -106,7 +106,7 @@ public class DrawGroupPair : DrawPairBase
     protected override void DrawPairedClientMenu()
     {
         bool selfIsOwner = string.Equals(_apiController.UID, _groupFullInfo.Owner.UID, StringComparison.Ordinal);
-        bool selfIsModerator = _groupFullInfo.GroupPairUserInfos.TryGetValue(_apiController.UID, out var selfinfo) && selfinfo.IsModerator();
+        bool selfIsModerator = _groupFullInfo.GroupUserInfo.IsModerator();
         if ((selfIsOwner || selfIsModerator) && (!IsModerator))
         {
             ImGui.TextUnformatted("Syncshell Moderator Functions");

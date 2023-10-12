@@ -60,7 +60,6 @@ public class TagHandler
 
     public void RemoveTag(string tag)
     {
-        // First remove the tag from teh available pair tags
         _serverConfigurationManager.RemoveTag(tag);
     }
 

@@ -37,7 +37,7 @@ internal class SyncshellAdminPopupHandler : IPopupHandler
     {
         _groupFullInfo = groupFullInfo;
         _isOwner = string.Equals(_groupFullInfo.OwnerUID, _apiController.UID, StringComparison.Ordinal);
-        _isModerator = _groupFullInfo.GroupPairUserInfos.TryGetValue(_apiController.UID, out var info) && info.IsModerator();
+        _isModerator = _groupFullInfo.GroupUserInfo.IsModerator();
         _newPassword = string.Empty;
         _bannedUsers.Clear();
         _oneTimeInvites.Clear();
@@ -45,7 +45,7 @@ internal class SyncshellAdminPopupHandler : IPopupHandler
         _pwChangeSuccess = true;
     }
 
-    public Vector2 PopupSize => new(600, 500);
+    public Vector2 PopupSize => new(700, 500);
 
     public void DrawContent()
     {

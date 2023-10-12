@@ -214,7 +214,12 @@ public abstract class DrawPairBase
             permissions.SetSticky(!isSticky);
             _ = _apiController.UserSetPairPermissions(new(_pair.UserData, permissions));
         }
-        UiSharedService.AttachToolTip("Preferred permissions means that this pair will not be affected by any syncshell permission changes through you.");
+        UiSharedService.AttachToolTip("Preferred permissions means that this pair will not" + Environment.NewLine + " be affected by any syncshell permission changes through you.");
+
+        string individualText = Environment.NewLine + Environment.NewLine + "Note: changing this permission will turn the permissions for this"
+            + Environment.NewLine + "user to preferred permissions. You can change this behavior"
+            + Environment.NewLine + "in the permission settings.";
+        bool individual = !_pair.IsDirectlyPaired && _apiController.DefaultPermissions!.IndividualIsSticky;
 
         var isDisableSounds = _pair.UserPair!.OwnPermissions.IsDisableSounds();
         string disableSoundsText = isDisableSounds ? "Enable sound sync" : "Disable sound sync";
@@ -225,6 +230,7 @@ public abstract class DrawPairBase
             permissions.SetDisableSounds(!isDisableSounds);
             _ = _apiController.UserSetPairPermissions(new UserPermissionsDto(_pair.UserData, permissions));
         }
+        UiSharedService.AttachToolTip("Changes sound sync permissions with this user." + (individual ? individualText : string.Empty));
 
         var isDisableAnims = _pair.UserPair!.OwnPermissions.IsDisableAnimations();
         string disableAnimsText = isDisableAnims ? "Enable animation sync" : "Disable animation sync";
@@ -235,6 +241,7 @@ public abstract class DrawPairBase
             permissions.SetDisableAnimations(!isDisableAnims);
             _ = _apiController.UserSetPairPermissions(new UserPermissionsDto(_pair.UserData, permissions));
         }
+        UiSharedService.AttachToolTip("Changes animation sync permissions with this user." + (individual ? individualText : string.Empty));
 
         var isDisableVFX = _pair.UserPair!.OwnPermissions.IsDisableVFX();
         string disableVFXText = isDisableVFX ? "Enable VFX sync" : "Disable VFX sync";
@@ -245,6 +252,7 @@ public abstract class DrawPairBase
             permissions.SetDisableVFX(!isDisableVFX);
             _ = _apiController.UserSetPairPermissions(new UserPermissionsDto(_pair.UserData, permissions));
         }
+        UiSharedService.AttachToolTip("Changes VFX sync permissions with this user." + (individual ? individualText : string.Empty));
 
         if (!_pair.IsPaused)
         {
@@ -255,7 +263,7 @@ public abstract class DrawPairBase
                 ImGui.CloseCurrentPopup();
                 _mediator.Publish(new OpenReportPopupMessage(_pair));
             }
-            UiSharedService.AttachToolTip("Report this users Mare Profile to the administrative team");
+            UiSharedService.AttachToolTip("Report this users Mare Profile to the administrative team.");
         }
     }
 
