@@ -38,8 +38,8 @@ public class CompactUi : WindowMediatorSubscriberBase
     private readonly SelectTagForPairUi _selectGroupForPairUi;
     private readonly SelectPairForTagUi _selectPairsForGroupUi;
     private readonly ServerConfigurationManager _serverManager;
-    private readonly IdDisplayHandler _uidDisplayHandler;
     private readonly TagHandler _tagHandler;
+    private readonly DrawEntityFactory _drawEntityFactory;
     private readonly UiSharedService _uiShared;
     private string _characterOrCommentFilter = string.Empty;
     private Pair? _lastAddedUser;
@@ -53,8 +53,8 @@ public class CompactUi : WindowMediatorSubscriberBase
     private List<DrawFolderBase> _drawFolders;
 
     public CompactUi(ILogger<CompactUi> logger, UiSharedService uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
-        ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager, IdDisplayHandler uidDisplayHandler,
-        TagHandler tagHandler)
+        ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager,
+        TagHandler tagHandler, DrawEntityFactory drawEntityFactory, SelectTagForPairUi selectTagForPairUi, SelectPairForTagUi selectPairForTagUi)
         : base(logger, mediator, "###MareSynchronosMainUI")
     {
         _uiShared = uiShared;
@@ -63,11 +63,10 @@ public class CompactUi : WindowMediatorSubscriberBase
         _pairManager = pairManager;
         _serverManager = serverManager;
         _fileTransferManager = fileTransferManager;
-        _uidDisplayHandler = uidDisplayHandler;
         _tagHandler = tagHandler;
-
-        _selectGroupForPairUi = new(tagHandler, uidDisplayHandler);
-        _selectPairsForGroupUi = new(tagHandler, uidDisplayHandler);
+        _drawEntityFactory = drawEntityFactory;
+        _selectGroupForPairUi = selectTagForPairUi;
+        _selectPairsForGroupUi = selectPairForTagUi;
 
         _drawFolders = GetDrawFolders().ToList();
 
@@ -113,16 +112,7 @@ public class CompactUi : WindowMediatorSubscriberBase
                         : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(k => k.Key, k => k.Value);
 
-            DrawTagFolder visibleUsersFolder = new(TagHandler.CustomVisibleTag, visibleUsers
-                .Select(u =>
-                {
-                    if (u.Key.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.Bidirectional)
-                        return (DrawPairBase)(new DrawUserPair(TagHandler.CustomOnlineTag + u.Key.UserData.UID, u.Key, _apiController, _uidDisplayHandler, _selectGroupForPairUi, Mediator));
-                    else
-                        return (DrawPairBase)(new DrawUngroupedGroupPair(TagHandler.CustomOnlineTag + u.Key.UserData.UID, u.Key, _apiController, _uidDisplayHandler, Mediator));
-                }),
-                _tagHandler, _apiController, _selectPairsForGroupUi);
-            drawFolders.Add(visibleUsersFolder);
+            drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomVisibleTag, visibleUsers.Select(k => k.Key).ToList()));
         }
 
         foreach (var group in _pairManager.GroupPairs.OrderBy(g => g.Key.GroupAliasOrGID, StringComparer.Ordinal))
@@ -147,10 +137,7 @@ public class CompactUi : WindowMediatorSubscriberBase
                         : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.Ordinal)
                     .ToList();
 
-            DrawGroupFolder groupFolder = new(group.Key.GID, group.Key, _apiController,
-                groupUsers.Select(u => new DrawGroupPair(group.Key.GID + u.UserData.UID, group.Key, u, _uidDisplayHandler, _apiController, Mediator)),
-                _tagHandler, _uidDisplayHandler, Mediator);
-            drawFolders.Add(groupFolder);
+            drawFolders.Add(_drawEntityFactory.CreateDrawGroupFolder(group.Key, groupUsers));
         }
 
         var tags = _tagHandler.GetAllTagsSorted();
@@ -166,14 +153,11 @@ public class CompactUi : WindowMediatorSubscriberBase
                         ? (_configService.Current.PreferNotesOverNamesForVisible ? u.GetNote() : u.PlayerName)
                         : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase);
 
-            DrawTagFolder tagFolder = new(tag, tagUsers
-                .Select(u =>
-                {
-                    alreadyInTags.Add(u);
-                    return new DrawUserPair(tag + u.UserData.UID, u, _apiController, _uidDisplayHandler, _selectGroupForPairUi, Mediator);
-                }),
-            _tagHandler, _apiController, _selectPairsForGroupUi);
-            drawFolders.Add(tagFolder);
+            drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(tag, tagUsers.Select(u =>
+            {
+                alreadyInTags.Add(u);
+                return u;
+            }).ToList()));
         }
 
         var onlineDirectPairedUsersNotInTags = users.Where(u => u.Key.IsDirectlyPaired && !u.Key.IsOneSidedPair && !_tagHandler.HasAnyTag(u.Key.UserData.UID)
@@ -184,14 +168,10 @@ public class CompactUi : WindowMediatorSubscriberBase
                 u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
                     ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
                     : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
-            .Select(k => k.Key);
+            .Select(k => k.Key).ToList();
 
-        DrawTagFolder onlineFolder = new((_configService.Current.ShowOfflineUsersSeparately ? TagHandler.CustomOnlineTag : TagHandler.CustomAllTag),
-            onlineDirectPairedUsersNotInTags.Select(u =>
-                new DrawUserPair(TagHandler.CustomOnlineTag + u.UserData.UID, u, _apiController, _uidDisplayHandler, _selectGroupForPairUi, Mediator)),
-            _tagHandler, _apiController, _selectPairsForGroupUi);
-
-        drawFolders.Add(onlineFolder);
+        drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder((_configService.Current.ShowOfflineUsersSeparately ? TagHandler.CustomOnlineTag : TagHandler.CustomAllTag),
+            onlineDirectPairedUsersNotInTags));
 
         if (_configService.Current.ShowOfflineUsersSeparately)
         {
@@ -199,24 +179,12 @@ public class CompactUi : WindowMediatorSubscriberBase
                 u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
                     ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
                     : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
-            .Select(k => k.Key);
+            .Select(k => k.Key).ToList();
 
-
-            DrawTagFolder offlineUsers = new(TagHandler.CustomOfflineTag, offlineUsersEntries
-                .Select(u =>
-                {
-                    if (u.IsDirectlyPaired)
-                        return (DrawPairBase)(new DrawUserPair(TagHandler.CustomOfflineTag + u.UserData.UID, u, _apiController, _uidDisplayHandler, _selectGroupForPairUi, Mediator));
-                    else
-                        return (DrawPairBase)(new DrawUngroupedGroupPair(TagHandler.CustomOfflineTag + u.UserData.UID, u, _apiController, _uidDisplayHandler, Mediator));
-                }), _tagHandler, _apiController, _selectPairsForGroupUi);
-            drawFolders.Add(offlineUsers);
+            drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomOfflineTag, offlineUsersEntries));
         }
 
-        DrawTagFolder unpairedUsers = new(TagHandler.CustomUnpairedTag, users.Where(u => u.Key.IsOneSidedPair)
-            .Select(u => new DrawUserPair(u.Key.UserData.UID, u.Key, _apiController, _uidDisplayHandler, _selectGroupForPairUi, Mediator)),
-            _tagHandler, _apiController, _selectPairsForGroupUi);
-        drawFolders.Add(unpairedUsers);
+        drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomUnpairedTag, users.Select(u => u.Key).Where(u => u.IsOneSidedPair).ToList()));
 
         return drawFolders;
     }
@@ -299,7 +267,6 @@ public class CompactUi : WindowMediatorSubscriberBase
 
     public override void OnClose()
     {
-        _uidDisplayHandler.Clear();
         base.OnClose();
     }
 

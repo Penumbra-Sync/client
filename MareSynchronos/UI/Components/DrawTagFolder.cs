@@ -41,7 +41,7 @@ public class DrawTagFolder : DrawFolderBase
         TagHandler.CustomVisibleTag => false,
         TagHandler.CustomAllTag => false,
         _ => true,
-    };
+    } && _drawPairs.Any();
 
     public DrawTagFolder(string id, IEnumerable<DrawPairBase> drawPairs, TagHandler tagHandler, ApiController apiController, SelectPairForTagUi selectPairForTagUi)
         : base(id, drawPairs, tagHandler)

@@ -14,6 +14,7 @@ using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.UI;
+using MareSynchronos.UI.Components;
 using MareSynchronos.UI.Components.Popup;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
@@ -60,7 +61,6 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<FileTransferOrchestrator>();
             collection.AddSingleton<MarePlugin>();
             collection.AddSingleton<MareProfileManager>();
-            collection.AddSingleton<IdDisplayHandler>();
             collection.AddSingleton<GameObjectHandlerFactory>();
             collection.AddSingleton<FileDownloadManagerFactory>();
             collection.AddSingleton<PairHandlerFactory>();
@@ -70,6 +70,8 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<PluginWarningNotificationService>();
             collection.AddSingleton<FileCompactor>();
             collection.AddSingleton<TagHandler>();
+            collection.AddSingleton<IdDisplayHandler>();
+            collection.AddSingleton<DrawEntityFactory>();
             collection.AddSingleton((s) => new DalamudContextMenu(pluginInterface));
             collection.AddSingleton((s) => new DalamudUtilService(s.GetRequiredService<ILogger<DalamudUtilService>>(),
                 clientState, objectTable, framework, gameGui, condition, gameData,
@@ -121,6 +123,8 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddScoped<TransientResourceManager>();
             collection.AddScoped<PlayerDataFactory>();
             collection.AddScoped<OnlinePlayerManager>();
+            collection.AddScoped<SelectPairForTagUi>();
+            collection.AddScoped<SelectTagForPairUi>();
             collection.AddScoped((s) => new UiService(s.GetRequiredService<ILogger<UiService>>(), pluginInterface, s.GetRequiredService<MareConfigService>(),
                 s.GetRequiredService<WindowSystem>(), s.GetServices<WindowMediatorSubscriberBase>(), s.GetRequiredService<Func<Pair, StandaloneProfileUi>>(),
                 s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareMediator>()));
