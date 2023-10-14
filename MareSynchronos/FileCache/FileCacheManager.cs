@@ -150,6 +150,32 @@ public sealed class FileCacheManager : IDisposable
         return output;
     }
 
+    public Dictionary<string, FileCacheEntity?> GetFileCachesByPaths(string[] paths)
+    {
+        var cleanedPaths = paths.Distinct(StringComparer.OrdinalIgnoreCase).ToDictionary(p => p,
+            p => p.Replace("/", "\\", StringComparison.OrdinalIgnoreCase).Replace(_ipcManager.PenumbraModDirectory!, PenumbraPrefix, StringComparison.OrdinalIgnoreCase),
+            StringComparer.OrdinalIgnoreCase);
+
+        Dictionary<string, FileCacheEntity?> result = new(StringComparer.OrdinalIgnoreCase);
+
+        var dict = _fileCaches.SelectMany(f => f.Value).Where(f => f.PrefixedFilePath.StartsWith(PenumbraPrefix, StringComparison.Ordinal))
+            .ToDictionary(d => d.PrefixedFilePath, d => d, StringComparer.Ordinal);
+
+        foreach (var entry in cleanedPaths)
+        {
+            if (dict.TryGetValue(entry.Value, out var entity))
+            {
+                result.Add(entry.Key, entity);
+            }
+            else
+            {
+                result.Add(entry.Key, null);
+            }
+        }
+
+        return result;
+    }
+
     public FileCacheEntity? GetFileCacheByPath(string path)
     {
         var cleanedPath = path.Replace("/", "\\", StringComparison.OrdinalIgnoreCase).ToLowerInvariant().Replace(_ipcManager.PenumbraModDirectory!.ToLowerInvariant(), "", StringComparison.OrdinalIgnoreCase);
