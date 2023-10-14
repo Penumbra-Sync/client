@@ -195,7 +195,7 @@ public sealed class FileCacheManager : IDisposable
             }
             else
             {
-                result.Add(entry.Key, null);
+                result.Add(entry.Key, CreateFileEntry(entry.Key));
             }
         }
 
