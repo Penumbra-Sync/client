@@ -54,7 +54,29 @@ public sealed class FileCacheManager : IDisposable
 
         if (File.Exists(_csvPath))
         {
-            var entries = File.ReadAllLines(_csvPath);
+            bool success = false;
+            string[] entries = Array.Empty<string>();
+            int attempts = 0;
+            while (!success && attempts < 10)
+            {
+                try
+                {
+                    entries = File.ReadAllLines(_csvPath);
+                    success = true;
+                }
+                catch (Exception ex)
+                {
+                    attempts++;
+                    _logger.LogWarning(ex, "Could not open {file}, trying again", _csvPath);
+                    Thread.Sleep(100);
+                }
+            }
+
+            if (!entries.Any())
+            {
+                _logger.LogWarning("Could not load entries from {path}, continuing with empty file cache", _csvPath);
+            }
+
             foreach (var entry in entries)
             {
                 var splittedEntry = entry.Split(CsvSplit, StringSplitOptions.None);
@@ -140,7 +162,7 @@ public sealed class FileCacheManager : IDisposable
         List<FileCacheEntity> output = new();
         if (_fileCaches.TryGetValue(hash, out var fileCacheEntities))
         {
-            foreach (var filecache in fileCacheEntities)
+            foreach (var filecache in fileCacheEntities.ToList())
             {
                 var validated = GetValidatedFileCache(filecache);
                 if (validated != null) output.Add(validated);
@@ -153,7 +175,10 @@ public sealed class FileCacheManager : IDisposable
     public Dictionary<string, FileCacheEntity?> GetFileCachesByPaths(string[] paths)
     {
         var cleanedPaths = paths.Distinct(StringComparer.OrdinalIgnoreCase).ToDictionary(p => p,
-            p => p.Replace("/", "\\", StringComparison.OrdinalIgnoreCase).Replace(_ipcManager.PenumbraModDirectory!, PenumbraPrefix, StringComparison.OrdinalIgnoreCase),
+            p => p.Replace("/", "\\", StringComparison.OrdinalIgnoreCase)
+            .Replace(_ipcManager.PenumbraModDirectory!,
+                _ipcManager.PenumbraModDirectory!.EndsWith('\\') ? (PenumbraPrefix + "\\") : PenumbraPrefix,
+                StringComparison.OrdinalIgnoreCase),
             StringComparer.OrdinalIgnoreCase);
 
         Dictionary<string, FileCacheEntity?> result = new(StringComparer.OrdinalIgnoreCase);
@@ -165,7 +190,8 @@ public sealed class FileCacheManager : IDisposable
         {
             if (dict.TryGetValue(entry.Value, out var entity))
             {
-                result.Add(entry.Key, entity);
+                var validatedCache = GetValidatedFileCache(entity);
+                result.Add(entry.Key, validatedCache);
             }
             else
             {
@@ -199,15 +225,14 @@ public sealed class FileCacheManager : IDisposable
             (int)new FileInfo(fileCache).Length));
     }
 
-    public void RemoveHashedFile(FileCacheEntity? fileCache)
+    public void RemoveHashedFile(string hash, string prefixedFilePath)
     {
-        if (fileCache == null) return;
-        if (_fileCaches.TryGetValue(fileCache.Hash, out var caches))
+        if (_fileCaches.TryGetValue(hash, out var caches))
         {
-            caches?.RemoveAll(c => string.Equals(c.PrefixedFilePath, fileCache.PrefixedFilePath, StringComparison.Ordinal));
-            if (_fileCaches.Count == 0)
+            caches?.RemoveAll(c => string.Equals(c.PrefixedFilePath, prefixedFilePath, StringComparison.Ordinal));
+            if (caches?.Count == 0)
             {
-                _fileCaches.Remove(fileCache.Hash, out _);
+                _fileCaches.Remove(hash, out _);
             }
         }
     }
@@ -215,6 +240,8 @@ public sealed class FileCacheManager : IDisposable
     public void UpdateHashedFile(FileCacheEntity fileCache, bool computeProperties = true)
     {
         _logger.LogTrace("Updating hash for {path}", fileCache.ResolvedFilepath);
+        var oldHash = fileCache.Hash;
+        var prefixedPath = fileCache.PrefixedFilePath;
         if (computeProperties)
         {
             var fi = new FileInfo(fileCache.ResolvedFilepath);
@@ -223,7 +250,7 @@ public sealed class FileCacheManager : IDisposable
             fileCache.Hash = Crypto.GetFileHash(fileCache.ResolvedFilepath);
             fileCache.LastModifiedDateTicks = fi.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture);
         }
-        RemoveHashedFile(fileCache);
+        RemoveHashedFile(oldHash, prefixedPath);
         AddHashedFile(fileCache);
     }
 
@@ -273,7 +300,7 @@ public sealed class FileCacheManager : IDisposable
     {
         try
         {
-            RemoveHashedFile(fileCache);
+            RemoveHashedFile(fileCache.Hash, fileCache.PrefixedFilePath);
             FileInfo oldCache = new(fileCache.ResolvedFilepath);
             var extensionPath = fileCache.ResolvedFilepath.ToUpper() + "." + ext;
             File.Move(fileCache.ResolvedFilepath, extensionPath, true);
@@ -348,7 +375,7 @@ public sealed class FileCacheManager : IDisposable
         var file = new FileInfo(fileCache.ResolvedFilepath);
         if (!file.Exists)
         {
-            RemoveHashedFile(fileCache);
+            RemoveHashedFile(fileCache.Hash, fileCache.PrefixedFilePath);
             return null;
         }
 

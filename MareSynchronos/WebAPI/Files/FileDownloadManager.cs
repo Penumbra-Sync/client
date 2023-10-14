@@ -338,7 +338,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
             {
                 Logger.LogError("Hash mismatch after extracting, got {hash}, expected {expectedHash}, deleting file", entry?.Hash, fileHash);
                 File.Delete(filePath);
-                _fileDbManager.RemoveHashedFile(entry);
+                _fileDbManager.RemoveHashedFile(entry.Hash, entry.PrefixedFilePath);
             }
         }
         catch (Exception ex)
