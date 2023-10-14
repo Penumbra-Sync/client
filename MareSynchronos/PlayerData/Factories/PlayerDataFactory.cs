@@ -341,7 +341,7 @@ public class PlayerDataFactory
         var (forwardResolve, reverseResolve) = await _dalamudUtil.RunOnFrameworkThread(() => BuildDataFromModel(objectKind, charaPointer, token)).ConfigureAwait(false);
         Dictionary<string, List<string>> resolvedPaths = await GetFileReplacementsFromPaths(forwardResolve, reverseResolve).ConfigureAwait(false);
         previousData.FileReplacements[objectKind] =
-                new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement(c.Value.ToArray(), c.Key, _fileCacheManager)), FileReplacementComparer.Instance)
+                new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement(c.Value.ToArray(), c.Key)), FileReplacementComparer.Instance)
                 .Where(p => p.HasFileReplacement).ToHashSet();
         previousData.FileReplacements[objectKind].RemoveWhere(c => c.GamePaths.Any(g => !AllowedExtensionsForGamePaths.Any(e => g.EndsWith(e, StringComparison.OrdinalIgnoreCase))));
 
@@ -371,7 +371,7 @@ public class PlayerDataFactory
         var resolvedTransientPaths = await GetFileReplacementsFromPaths(transientPaths, new HashSet<string>(StringComparer.Ordinal)).ConfigureAwait(false);
 
         _logger.LogDebug("== Transient Replacements ==");
-        foreach (var replacement in resolvedTransientPaths.Select(c => new FileReplacement(c.Value.ToArray(), c.Key, _fileCacheManager)).OrderBy(f => f.ResolvedPath, StringComparer.Ordinal))
+        foreach (var replacement in resolvedTransientPaths.Select(c => new FileReplacement(c.Value.ToArray(), c.Key)).OrderBy(f => f.ResolvedPath, StringComparer.Ordinal))
         {
             _logger.LogDebug("=> {repl}", replacement);
             previousData.FileReplacements[objectKind].Add(replacement);
@@ -406,6 +406,22 @@ public class PlayerDataFactory
         _logger.LogDebug("Honorific is now: {data}", previousData.HonorificData);
         previousData.HeelsData = await getHeelsOffset.ConfigureAwait(false);
         _logger.LogDebug("Heels is now: {heels}", previousData.HeelsData);
+
+        if (previousData.FileReplacements.ContainsKey(objectKind))
+        {
+            var toCompute = previousData.FileReplacements[objectKind].Where(f => !f.IsFileSwap).ToArray();
+            _logger.LogDebug("Getting Hashes for {amount} Files", toCompute.Length);
+            var computedPaths = _fileCacheManager.GetFileCachesByPaths(toCompute.Select(c => c.ResolvedPath).ToArray());
+            foreach (var file in toCompute)
+            {
+                file.Hash = computedPaths[file.ResolvedPath]?.Hash ?? string.Empty;
+            }
+            var removed = previousData.FileReplacements[objectKind].RemoveWhere(f => !f.IsFileSwap && string.IsNullOrEmpty(f.Hash));
+            if (removed > 0)
+            {
+                _logger.LogDebug("Removed {amount} of invalid files", removed);
+            }
+        }
 
         st.Stop();
         _logger.LogInformation("Building character data for {obj} took {time}ms", objectKind, TimeSpan.FromTicks(st.ElapsedTicks).TotalMilliseconds);

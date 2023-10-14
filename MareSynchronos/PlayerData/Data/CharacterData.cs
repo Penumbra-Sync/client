@@ -13,14 +13,15 @@ public class CharacterData
 
     public string HeelsData { get; set; } = string.Empty;
     public string HonorificData { get; set; } = string.Empty;
-    public bool IsReady => FileReplacements.SelectMany(k => k.Value).All(f => f.Computed);
-
     public string ManipulationString { get; set; } = string.Empty;
     public string PalettePlusPalette { get; set; } = string.Empty;
 
     public API.Data.CharacterData ToAPI()
     {
-        var fileReplacements = FileReplacements.ToDictionary(k => k.Key, k => k.Value.Where(f => f.HasFileReplacement && !f.IsFileSwap).GroupBy(f => f.Hash, StringComparer.OrdinalIgnoreCase).Select(g =>
+        Dictionary<ObjectKind, List<FileReplacementData>> fileReplacements =
+            FileReplacements.ToDictionary(k => k.Key, k => k.Value.Where(f => f.HasFileReplacement && !f.IsFileSwap)
+            .GroupBy(f => f.Hash, StringComparer.OrdinalIgnoreCase)
+            .Select(g =>
         {
             return new FileReplacementData()
             {

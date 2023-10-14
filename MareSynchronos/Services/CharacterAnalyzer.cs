@@ -90,7 +90,15 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
 
                 var filePath = fileCacheEntries[0].ResolvedFilepath;
                 FileInfo fi = new(filePath);
-                var ext = fi.Extension[1..];
+                string ext = "unk?";
+                try
+                {
+                    ext = fi.Extension[1..];
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "Could not identify extension for {path}", filePath);
+                }
 
                 foreach (var entry in fileCacheEntries)
                 {

@@ -1,27 +1,21 @@
 ﻿using System.Text.RegularExpressions;
-using MareSynchronos.FileCache;
 using MareSynchronos.API.Data;
 
 namespace MareSynchronos.PlayerData.Data;
 
 public partial class FileReplacement
 {
-    private readonly Lazy<string> _hashLazy;
-
-    public FileReplacement(string[] gamePaths, string filePath, FileCacheManager fileDbManager)
+    public FileReplacement(string[] gamePaths, string filePath)
     {
         GamePaths = gamePaths.Select(g => g.Replace('\\', '/').ToLowerInvariant()).ToHashSet(StringComparer.Ordinal);
         ResolvedPath = filePath.Replace('\\', '/');
-        _hashLazy = new(() => !IsFileSwap ? fileDbManager.GetFileCacheByPath(ResolvedPath)?.Hash ?? string.Empty : string.Empty);
     }
-
-    public bool Computed => IsFileSwap || !HasFileReplacement || !string.IsNullOrEmpty(Hash);
 
     public HashSet<string> GamePaths { get; init; }
 
     public bool HasFileReplacement => GamePaths.Count >= 1 && GamePaths.Any(p => !string.Equals(p, ResolvedPath, StringComparison.Ordinal));
 
-    public string Hash => _hashLazy.Value;
+    public string Hash { get; set; } = string.Empty;
     public bool IsFileSwap => !LocalPathRegex().IsMatch(ResolvedPath) && GamePaths.All(p => !LocalPathRegex().IsMatch(p));
     public string ResolvedPath { get; init; }
 

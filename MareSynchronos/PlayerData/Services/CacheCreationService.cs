@@ -165,14 +165,6 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
                         await _characterDataFactory.BuildCharacterData(_playerData, obj.Value, _cts.Token).ConfigureAwait(false);
                     }
 
-                    int maxWaitingTime = 10000;
-                    while (!_playerData.IsReady && maxWaitingTime > 0)
-                    {
-                        await Task.Delay(100).ConfigureAwait(false);
-                        maxWaitingTime -= 100;
-                        Logger.LogTrace("Waiting for Cache to be ready");
-                    }
-
                     Mediator.Publish(new CharacterDataCreatedMessage(_playerData.ToAPI()));
                 }
                 catch (Exception ex)
