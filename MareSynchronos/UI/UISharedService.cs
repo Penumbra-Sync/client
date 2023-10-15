@@ -362,7 +362,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         Vector2 buttonSize;
         var buttonSizeY = (iconSize.Y > textSize.Y ? iconSize.Y : textSize.Y) + padding.Y * 2;
 
-        if (width == null)
+        if (width == null || width <= 0)
         {
             var buttonSizeX = iconSize.X + textSize.X + padding.X * 2 + spacing.X;
             buttonSize = new Vector2(buttonSizeX, buttonSizeY);

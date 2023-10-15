@@ -1,4 +1,5 @@
 ﻿using Dalamud.Interface;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
@@ -95,6 +96,7 @@ public class DrawFolderGroup : DrawFolderBase
         if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.ArrowCircleLeft, "Leave Syncshell") && UiSharedService.CtrlPressed())
         {
             _ = _apiController.GroupLeave(_groupFullInfoDto);
+            ImGui.CloseCurrentPopup();
         }
         UiSharedService.AttachToolTip("Hold CTRL and click to leave this Syncshell" + (!string.Equals(_groupFullInfoDto.OwnerUID, _apiController.UID, StringComparison.Ordinal)
             ? string.Empty : Environment.NewLine + "WARNING: This action is irreversible" + Environment.NewLine + "Leaving an owned Syncshell will transfer the ownership to a random person in the Syncshell."));
@@ -105,6 +107,19 @@ public class DrawFolderGroup : DrawFolderBase
         bool disableSounds = perm.IsDisableSounds();
         bool disableAnims = perm.IsDisableAnimations();
         bool disableVfx = perm.IsDisableVFX();
+
+        if ((_groupFullInfoDto.GroupPermissions.IsPreferDisableAnimations() != disableAnims
+            || _groupFullInfoDto.GroupPermissions.IsPreferDisableSounds() != disableSounds
+            || _groupFullInfoDto.GroupPermissions.IsPreferDisableVFX() != disableVfx)
+            && ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Check, "Align with suggested permissions"))
+        {
+            perm.SetDisableVFX(_groupFullInfoDto.GroupPermissions.IsPreferDisableVFX());
+            perm.SetDisableSounds(_groupFullInfoDto.GroupPermissions.IsPreferDisableSounds());
+            perm.SetDisableAnimations(_groupFullInfoDto.GroupPermissions.IsPreferDisableAnimations());
+            _ = _apiController.GroupChangeIndividualPermissionState(new(_groupFullInfoDto.Group, new(_apiController.UID), perm));
+            ImGui.CloseCurrentPopup();
+        }
+
         if (ImGuiComponents.IconButtonWithText(disableSounds ? FontAwesomeIcon.VolumeUp : FontAwesomeIcon.VolumeOff, disableSounds ? "Enable Sound Sync" : "Disable Sound Sync"))
         {
             perm.SetDisableSounds(!disableSounds);
@@ -158,13 +173,17 @@ public class DrawFolderGroup : DrawFolderBase
 
         ImGui.SameLine(infoIconPosDist - userCogButtonSize.X);
 
-        UiSharedService.FontText(folderIcon.ToIconString(), UiBuilder.IconFont);
+        using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow,
+            _groupFullInfoDto.GroupPermissions.IsPreferDisableAnimations() != individualAnimDisabled
+            || _groupFullInfoDto.GroupPermissions.IsPreferDisableSounds() != individualSoundsDisabled
+            || _groupFullInfoDto.GroupPermissions.IsPreferDisableVFX() != individualVFXDisabled))
+            UiSharedService.FontText(folderIcon.ToIconString(), UiBuilder.IconFont);
         if (ImGui.IsItemHovered())
         {
             ImGui.BeginTooltip();
 
             ImGui.TextUnformatted("Syncshell Permissions");
-            ImGui.Separator();
+            ImGui.Dummy(new(2f));
 
             UiSharedService.BooleanToColoredIcon(!individualSoundsDisabled, inline: false);
             ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
@@ -175,6 +194,24 @@ public class DrawFolderGroup : DrawFolderBase
             ImGui.TextUnformatted("Animation Sync");
 
             UiSharedService.BooleanToColoredIcon(!individualVFXDisabled, inline: false);
+            ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+            ImGui.TextUnformatted("VFX Sync");
+
+            ImGui.Separator();
+
+            ImGui.Dummy(new(2f));
+            ImGui.TextUnformatted("Suggested Permissions");
+            ImGui.Dummy(new(2f));
+
+            UiSharedService.BooleanToColoredIcon(!_groupFullInfoDto.GroupPermissions.IsPreferDisableSounds(), inline: false);
+            ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+            ImGui.TextUnformatted("Sound Sync");
+
+            UiSharedService.BooleanToColoredIcon(!_groupFullInfoDto.GroupPermissions.IsPreferDisableAnimations(), inline: false);
+            ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
+            ImGui.TextUnformatted("Animation Sync");
+
+            UiSharedService.BooleanToColoredIcon(!_groupFullInfoDto.GroupPermissions.IsPreferDisableVFX(), inline: false);
             ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
             ImGui.TextUnformatted("VFX Sync");
 
