@@ -11,8 +11,8 @@ public class ServerConfigurationManager
 {
     private readonly ServerConfigService _configService;
     private readonly DalamudUtilService _dalamudUtil;
-    private readonly MareMediator _mareMediator;
     private readonly ILogger<ServerConfigurationManager> _logger;
+    private readonly MareMediator _mareMediator;
     private readonly NotesConfigService _notesConfig;
     private readonly ServerTagConfigService _serverTagConfig;
 
@@ -161,17 +161,6 @@ public class ServerConfigurationManager
         Save();
     }
 
-    internal void RenameTag(string oldName, string newName)
-    {
-        CurrentServerTagStorage().ServerAvailablePairTags.Remove(oldName);
-        CurrentServerTagStorage().ServerAvailablePairTags.Add(newName);
-        foreach (var existingTags in CurrentServerTagStorage().UidServerPairedUserTags.Select(k => k.Value))
-        {
-            if (existingTags.Remove(oldName))
-                existingTags.Add(newName);
-        }
-    }
-
     internal void AddTag(string tag)
     {
         CurrentServerTagStorage().ServerAvailablePairTags.Add(tag);
@@ -302,6 +291,17 @@ public class ServerConfigurationManager
                 _serverTagConfig.Save();
                 _mareMediator.Publish(new RefreshUiMessage());
             }
+        }
+    }
+
+    internal void RenameTag(string oldName, string newName)
+    {
+        CurrentServerTagStorage().ServerAvailablePairTags.Remove(oldName);
+        CurrentServerTagStorage().ServerAvailablePairTags.Add(newName);
+        foreach (var existingTags in CurrentServerTagStorage().UidServerPairedUserTags.Select(k => k.Value))
+        {
+            if (existingTags.Remove(oldName))
+                existingTags.Add(newName);
         }
     }
 

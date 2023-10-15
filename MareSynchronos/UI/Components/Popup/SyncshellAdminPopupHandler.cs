@@ -14,35 +14,23 @@ namespace MareSynchronos.UI.Components.Popup;
 
 internal class SyncshellAdminPopupHandler : IPopupHandler
 {
-    private GroupFullInfoDto _groupFullInfo = null!;
     private readonly ApiController _apiController;
-    private readonly UiSharedService _uiSharedService;
+    private readonly List<string> _oneTimeInvites = new();
     private readonly PairManager _pairManager;
-    private bool _isOwner = false;
+    private readonly UiSharedService _uiSharedService;
+    private List<BannedGroupUserDto> _bannedUsers = new();
+    private GroupFullInfoDto _groupFullInfo = null!;
     private bool _isModerator = false;
+    private bool _isOwner = false;
+    private int _multiInvites = 30;
     private string _newPassword = string.Empty;
     private bool _pwChangeSuccess = true;
-    private List<BannedGroupUserDto> _bannedUsers = new();
-    private readonly List<string> _oneTimeInvites = new();
-    private int _multiInvites = 30;
 
     public SyncshellAdminPopupHandler(ApiController apiController, UiSharedService uiSharedService, PairManager pairManager)
     {
         _apiController = apiController;
         _uiSharedService = uiSharedService;
         _pairManager = pairManager;
-    }
-
-    public void Open(GroupFullInfoDto groupFullInfo)
-    {
-        _groupFullInfo = groupFullInfo;
-        _isOwner = string.Equals(_groupFullInfo.OwnerUID, _apiController.UID, StringComparison.Ordinal);
-        _isModerator = _groupFullInfo.GroupUserInfo.IsModerator();
-        _newPassword = string.Empty;
-        _bannedUsers.Clear();
-        _oneTimeInvites.Clear();
-        _multiInvites = 30;
-        _pwChangeSuccess = true;
     }
 
     public Vector2 PopupSize => new(700, 500);
@@ -213,7 +201,6 @@ internal class SyncshellAdminPopupHandler : IPopupHandler
                     {
                         _pwChangeSuccess = _apiController.GroupChangePassword(new GroupPasswordDto(_groupFullInfo.Group, _newPassword)).Result;
                         _newPassword = string.Empty;
-
                     }
                 }
                 UiSharedService.AttachToolTip("Password requires to be at least 10 characters long. This action is irreversible.");
@@ -234,5 +221,17 @@ internal class SyncshellAdminPopupHandler : IPopupHandler
         }
 
         // todo rest
+    }
+
+    public void Open(GroupFullInfoDto groupFullInfo)
+    {
+        _groupFullInfo = groupFullInfo;
+        _isOwner = string.Equals(_groupFullInfo.OwnerUID, _apiController.UID, StringComparison.Ordinal);
+        _isModerator = _groupFullInfo.GroupUserInfo.IsModerator();
+        _newPassword = string.Empty;
+        _bannedUsers.Clear();
+        _oneTimeInvites.Clear();
+        _multiInvites = 30;
+        _pwChangeSuccess = true;
     }
 }

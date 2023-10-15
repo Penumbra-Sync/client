@@ -16,20 +16,20 @@ namespace MareSynchronos.UI;
 public class DataAnalysisUi : WindowMediatorSubscriberBase
 {
     private readonly CharacterAnalyzer _characterAnalyzer;
-    private readonly IpcManager _ipcManager;
-    private bool _hasUpdate = false;
-    private Dictionary<ObjectKind, Dictionary<string, CharacterAnalyzer.FileDataEntry>>? _cachedAnalysis;
-    private string _selectedHash = string.Empty;
-    private ObjectKind _selectedObjectTab;
-    private string _selectedFileTypeTab = string.Empty;
-    private bool _enableBc7ConversionMode = false;
-    private readonly Dictionary<string, string[]> _texturesToConvert = new(StringComparer.Ordinal);
-    private Task? _conversionTask;
-    private CancellationTokenSource _conversionCancellationTokenSource = new();
     private readonly Progress<(string, int)> _conversionProgress = new();
+    private readonly IpcManager _ipcManager;
+    private readonly Dictionary<string, string[]> _texturesToConvert = new(StringComparer.Ordinal);
+    private Dictionary<ObjectKind, Dictionary<string, CharacterAnalyzer.FileDataEntry>>? _cachedAnalysis;
+    private CancellationTokenSource _conversionCancellationTokenSource = new();
     private string _conversionCurrentFileName = string.Empty;
     private int _conversionCurrentFileProgress = 0;
+    private Task? _conversionTask;
+    private bool _enableBc7ConversionMode = false;
+    private bool _hasUpdate = false;
     private bool _modalOpen = false;
+    private string _selectedFileTypeTab = string.Empty;
+    private string _selectedHash = string.Empty;
+    private ObjectKind _selectedObjectTab;
     private bool _showModal = false;
 
     public DataAnalysisUi(ILogger<DataAnalysisUi> logger, MareMediator mediator, CharacterAnalyzer characterAnalyzer, IpcManager ipcManager) : base(logger, mediator, "Mare Character Data Analysis")
@@ -56,26 +56,6 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
         };
 
         _conversionProgress.ProgressChanged += ConversionProgress_ProgressChanged;
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-        _conversionProgress.ProgressChanged -= ConversionProgress_ProgressChanged;
-    }
-
-    private void ConversionProgress_ProgressChanged(object? sender, (string, int) e)
-    {
-        _conversionCurrentFileName = e.Item1;
-        _conversionCurrentFileProgress = e.Item2;
-    }
-
-    public override void OnOpen()
-    {
-        _hasUpdate = true;
-        _selectedHash = string.Empty;
-        _enableBc7ConversionMode = false;
-        _texturesToConvert.Clear();
     }
 
     public override void Draw()
@@ -331,6 +311,26 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
                 UiSharedService.AttachToolTip(string.Join(Environment.NewLine, gamepaths.Skip(1)));
             }
         }
+    }
+
+    public override void OnOpen()
+    {
+        _hasUpdate = true;
+        _selectedHash = string.Empty;
+        _enableBc7ConversionMode = false;
+        _texturesToConvert.Clear();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        _conversionProgress.ProgressChanged -= ConversionProgress_ProgressChanged;
+    }
+
+    private void ConversionProgress_ProgressChanged(object? sender, (string, int) e)
+    {
+        _conversionCurrentFileName = e.Item1;
+        _conversionCurrentFileProgress = e.Item2;
     }
 
     private void DrawTable(IGrouping<string, CharacterAnalyzer.FileDataEntry> fileGroup)

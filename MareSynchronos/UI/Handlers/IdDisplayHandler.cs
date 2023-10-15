@@ -1,12 +1,12 @@
 ﻿using Dalamud.Interface;
-using ImGuiNET;
-using MareSynchronos.PlayerData.Pairs;
-using MareSynchronos.Services.ServerConfiguration;
-using MareSynchronos.MareConfiguration;
-using ImGuiScene;
-using MareSynchronos.Services.Mediator;
-using MareSynchronos.API.Dto.Group;
 using Dalamud.Interface.Utility.Raii;
+using ImGuiNET;
+using ImGuiScene;
+using MareSynchronos.API.Dto.Group;
+using MareSynchronos.MareConfiguration;
+using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.Services.Mediator;
+using MareSynchronos.Services.ServerConfiguration;
 
 namespace MareSynchronos.UI.Handlers;
 
@@ -16,10 +16,10 @@ public class IdDisplayHandler
     private readonly MareMediator _mediator;
     private readonly ServerConfigurationManager _serverManager;
     private readonly Dictionary<string, bool> _showIdForEntry = new(StringComparer.Ordinal);
-    private string _editEntry = string.Empty;
     private string _editComment = string.Empty;
-    private string _lastMouseOverUid = string.Empty;
+    private string _editEntry = string.Empty;
     private bool _editIsUid = false;
+    private string _lastMouseOverUid = string.Empty;
     private bool _popupShown = false;
     private DateTime? _popupTime;
     private TextureWrap? _textureWrap;
@@ -180,6 +180,30 @@ public class IdDisplayHandler
         }
     }
 
+    public (bool isGid, string text) GetGroupText(GroupFullInfoDto group)
+    {
+        var textIsGid = true;
+        bool showUidInsteadOfName = ShowGidInsteadOfName(group);
+        string? groupText = _serverManager.GetNoteForGid(group.GID);
+        if (!showUidInsteadOfName && groupText != null)
+        {
+            if (string.IsNullOrEmpty(groupText))
+            {
+                groupText = group.GroupAliasOrGID;
+            }
+            else
+            {
+                textIsGid = false;
+            }
+        }
+        else
+        {
+            groupText = group.GroupAliasOrGID;
+        }
+
+        return (textIsGid, groupText!);
+    }
+
     public (bool isUid, string text) GetPlayerText(Pair pair)
     {
         var textIsUid = true;
@@ -218,30 +242,6 @@ public class IdDisplayHandler
         return (textIsUid, playerText!);
     }
 
-    public (bool isGid, string text) GetGroupText(GroupFullInfoDto group)
-    {
-        var textIsGid = true;
-        bool showUidInsteadOfName = ShowGidInsteadOfName(group);
-        string? groupText = _serverManager.GetNoteForGid(group.GID);
-        if (!showUidInsteadOfName && groupText != null)
-        {
-            if (string.IsNullOrEmpty(groupText))
-            {
-                groupText = group.GroupAliasOrGID;
-            }
-            else
-            {
-                textIsGid = false;
-            }
-        }
-        else
-        {
-            groupText = group.GroupAliasOrGID;
-        }
-
-        return (textIsGid, groupText!);
-    }
-
     internal void Clear()
     {
         _editEntry = string.Empty;
@@ -253,16 +253,16 @@ public class IdDisplayHandler
         _mediator.Publish(new ProfileOpenStandaloneMessage(entry));
     }
 
-    private bool ShowUidInsteadOfName(Pair pair)
+    private bool ShowGidInsteadOfName(GroupFullInfoDto group)
     {
-        _showIdForEntry.TryGetValue(pair.UserData.UID, out var showidInsteadOfName);
+        _showIdForEntry.TryGetValue(group.GID, out var showidInsteadOfName);
 
         return showidInsteadOfName;
     }
 
-    private bool ShowGidInsteadOfName(GroupFullInfoDto group)
+    private bool ShowUidInsteadOfName(Pair pair)
     {
-        _showIdForEntry.TryGetValue(group.GID, out var showidInsteadOfName);
+        _showIdForEntry.TryGetValue(pair.UserData.UID, out var showidInsteadOfName);
 
         return showidInsteadOfName;
     }

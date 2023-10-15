@@ -1,5 +1,5 @@
-﻿using Dalamud.Interface.Components;
-using Dalamud.Interface;
+﻿using Dalamud.Interface;
+using Dalamud.Interface.Components;
 using ImGuiNET;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.PlayerData.Pairs;
@@ -12,22 +12,16 @@ namespace MareSynchronos.UI.Components.Popup;
 public class BanUserPopupHandler : IPopupHandler
 {
     private readonly ApiController _apiController;
-    private Pair _reportedPair = null!;
-    private GroupFullInfoDto _group = null!;
     private string _banReason = string.Empty;
-    public Vector2 PopupSize => new(500, 250);
+    private GroupFullInfoDto _group = null!;
+    private Pair _reportedPair = null!;
 
     public BanUserPopupHandler(ApiController apiController)
     {
         _apiController = apiController;
     }
 
-    public void Open(OpenBanUserPopupMessage message)
-    {
-        _reportedPair = message.PairToBan;
-        _group = message.GroupFullInfoDto;
-        _banReason = string.Empty;
-    }
+    public Vector2 PopupSize => new(500, 250);
 
     public void DrawContent()
     {
@@ -42,5 +36,12 @@ public class BanUserPopupHandler : IPopupHandler
             _banReason = string.Empty;
         }
         UiSharedService.TextWrapped("The reason will be displayed in the banlist. The current server-side alias if present (Vanity ID) will automatically be attached to the reason.");
+    }
+
+    public void Open(OpenBanUserPopupMessage message)
+    {
+        _reportedPair = message.PairToBan;
+        _group = message.GroupFullInfoDto;
+        _banReason = string.Empty;
     }
 }

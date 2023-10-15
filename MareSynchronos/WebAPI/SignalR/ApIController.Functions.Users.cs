@@ -91,6 +91,12 @@ public partial class ApiController
         await _mareHub!.InvokeAsync(nameof(UserSetProfile), userDescription).ConfigureAwait(false);
     }
 
+    public async Task UserUpdateDefaultPermissions(DefaultPermissionsDto dto)
+    {
+        CheckConnection();
+        await _mareHub!.InvokeAsync(nameof(UserUpdateDefaultPermissions), dto).ConfigureAwait(false);
+    }
+
     private async Task PushCharacterDataInternal(CharacterData character, List<UserData> visibleCharacters)
     {
         Logger.LogInformation("Pushing character data for {hash} to {charas}", character.DataHash.Value, string.Join(", ", visibleCharacters.Select(c => c.AliasOrUID)));
@@ -105,11 +111,5 @@ public partial class ApiController
         }
         Logger.LogDebug("Chara data contained: {nl} {data}", Environment.NewLine, sb.ToString());
         await UserPushData(new(visibleCharacters, character)).ConfigureAwait(false);
-    }
-
-    public async Task UserUpdateDefaultPermissions(DefaultPermissionsDto dto)
-    {
-        CheckConnection();
-        await _mareHub!.InvokeAsync(nameof(UserUpdateDefaultPermissions), dto).ConfigureAwait(false);
     }
 }

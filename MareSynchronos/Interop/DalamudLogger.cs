@@ -8,8 +8,8 @@ namespace MareSynchronos.Interop;
 internal sealed class DalamudLogger : ILogger
 {
     private readonly MareConfigService _mareConfigService;
-    private readonly IPluginLog _pluginLog;
     private readonly string _name;
+    private readonly IPluginLog _pluginLog;
 
     public DalamudLogger(string name, MareConfigService mareConfigService, IPluginLog pluginLog)
     {

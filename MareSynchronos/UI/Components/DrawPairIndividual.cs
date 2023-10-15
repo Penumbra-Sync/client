@@ -1,22 +1,24 @@
-﻿using Dalamud.Interface.Colors;
-using Dalamud.Interface;
-using ImGuiNET;
-using MareSynchronos.PlayerData.Pairs;
-using System.Numerics;
-using MareSynchronos.API.Data.Extensions;
-using MareSynchronos.WebAPI;
-using MareSynchronos.UI.Handlers;
-using Dalamud.Interface.Utility.Raii;
-using MareSynchronos.Services.Mediator;
+﻿using Dalamud.Interface;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
+using Dalamud.Interface.Utility.Raii;
+using ImGuiNET;
+using MareSynchronos.API.Data.Extensions;
+using MareSynchronos.API.Dto.Group;
+using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.Services.Mediator;
+using MareSynchronos.UI.Handlers;
+using MareSynchronos.WebAPI;
+using System.Numerics;
 
 namespace MareSynchronos.UI.Components;
 
-public class DrawUserPair : DrawPairBase
+public class DrawPairIndividual : DrawPairBase
 {
     private readonly SelectTagForPairUi _selectGroupForPairUi;
 
-    public DrawUserPair(string id, Pair entry, ApiController apiController, IdDisplayHandler displayHandler, SelectTagForPairUi selectGroupForPairUi, MareMediator mareMediator)
+    public DrawPairIndividual(string id, List<GroupFullInfoDto> groups, Pair entry, ApiController apiController,
+        IdDisplayHandler displayHandler, SelectTagForPairUi selectGroupForPairUi, MareMediator mareMediator)
         : base(id, entry, apiController, displayHandler, mareMediator)
     {
         _pair = entry;
@@ -85,17 +87,34 @@ public class DrawUserPair : DrawPairBase
 
     protected override void DrawPairedClientMenu()
     {
+        IndividualMenu(_pair, _selectGroupForPairUi, _apiController);
+    }
+
+    public static void IndividualMenu(Pair _pair, SelectTagForPairUi selectGroupForPairUi, ApiController apiController)
+    {
         ImGui.TextUnformatted("Individual Pair Functions");
         var entryUID = _pair.UserData.AliasOrUID;
-        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Folder, "Pair Groups"))
+
+        if (_pair.IndividualPairStatus != API.Data.Enum.IndividualPairStatus.None)
         {
-            _selectGroupForPairUi.Open(_pair);
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Folder, "Pair Groups"))
+            {
+                selectGroupForPairUi.Open(_pair);
+            }
+            UiSharedService.AttachToolTip("Choose pair groups for " + entryUID);
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Trash, "Unpair Permanently") && UiSharedService.CtrlPressed())
+            {
+                _ = apiController.UserRemovePair(new(_pair.UserData));
+            }
+            UiSharedService.AttachToolTip("Hold CTRL and click to unpair permanently from " + entryUID);
         }
-        UiSharedService.AttachToolTip("Choose pair groups for " + entryUID);
-        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Trash, "Unpair Permanently") && UiSharedService.CtrlPressed())
+        else
         {
-            _ = _apiController.UserRemovePair(new(_pair.UserData));
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Plus, "Pair individually"))
+            {
+                _ = apiController.UserAddPair(new(_pair.UserData));
+            }
+            UiSharedService.AttachToolTip("Pair individually with " + entryUID);
         }
-        UiSharedService.AttachToolTip("Hold CTRL and click to unpair permanently from " + entryUID);
     }
 }

@@ -25,7 +25,6 @@ public unsafe struct RenderModel
     [FieldOffset(0x60)]
     public int BoneListCount;
 
-
     [FieldOffset(0x98)]
     public void** Materials;
 

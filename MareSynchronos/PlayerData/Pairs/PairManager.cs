@@ -42,13 +42,10 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
 
     public List<Pair> DirectPairs => _directPairsInternal.Value;
 
-    public Dictionary<Pair, List<GroupFullInfoDto>> PairsWithGroups => _pairsWithGroupsInternal.Value;
-
     public Dictionary<GroupFullInfoDto, List<Pair>> GroupPairs => _groupPairsInternal.Value;
-
-    public Pair? LastAddedUser { get; internal set; }
-
     public Dictionary<GroupData, GroupFullInfoDto> Groups => _allGroups.ToDictionary(k => k.Key, k => k.Value);
+    public Pair? LastAddedUser { get; internal set; }
+    public Dictionary<Pair, List<GroupFullInfoDto>> PairsWithGroups => _pairsWithGroupsInternal.Value;
 
     public void AddGroup(GroupFullInfoDto dto)
     {
@@ -111,9 +108,9 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
 
     public List<Pair> GetOnlineUserPairs() => _allClientPairs.Where(p => !string.IsNullOrEmpty(p.Value.GetPlayerNameHash())).Select(p => p.Value).ToList();
 
-    public List<UserData> GetVisibleUsers() => _allClientPairs.Where(p => p.Value.IsVisible).Select(p => p.Key).ToList();
-
     public int GetVisibleUserCount() => _allClientPairs.Count(p => p.Value.IsVisible);
+
+    public List<UserData> GetVisibleUsers() => _allClientPairs.Where(p => p.Value.IsVisible).Select(p => p.Key).ToList();
 
     public void MarkPairOffline(UserData user)
     {
@@ -301,6 +298,21 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         RecreateLazy();
     }
 
+    internal void UpdateGroupPairPermissions(GroupPairUserPermissionDto dto)
+    {
+        _allGroups[dto.Group].GroupUserPermissions = dto.GroupPairPermissions;
+        RecreateLazy();
+    }
+
+    internal void UpdateIndividualPairStatus(UserIndividualPairStatusDto dto)
+    {
+        if (_allClientPairs.TryGetValue(dto.User, out var pair))
+        {
+            pair.UserPair.IndividualPairStatus = dto.IndividualPairStatus;
+            RecreateLazy();
+        }
+    }
+
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
@@ -335,6 +347,19 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         RecreateLazy();
     }
 
+    private Lazy<Dictionary<GroupFullInfoDto, List<Pair>>> GroupPairsLazy()
+    {
+        return new Lazy<Dictionary<GroupFullInfoDto, List<Pair>>>(() =>
+        {
+            Dictionary<GroupFullInfoDto, List<Pair>> outDict = new();
+            foreach (var group in _allGroups)
+            {
+                outDict[group.Value] = _allClientPairs.Select(p => p.Value).Where(p => p.UserPair.Groups.Exists(g => GroupDataComparer.Instance.Equals(group.Key, new(g)))).ToList();
+            }
+            return outDict;
+        });
+    }
+
     private Lazy<Dictionary<Pair, List<GroupFullInfoDto>>> PairsWithGroupsLazy()
     {
         return new Lazy<Dictionary<Pair, List<GroupFullInfoDto>>>(() =>
@@ -346,19 +371,6 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
                 outDict[pair] = _allGroups.Where(k => pair.UserPair.Groups.Contains(k.Key.GID, StringComparer.Ordinal)).Select(k => k.Value).ToList();
             }
 
-            return outDict;
-        });
-    }
-
-    private Lazy<Dictionary<GroupFullInfoDto, List<Pair>>> GroupPairsLazy()
-    {
-        return new Lazy<Dictionary<GroupFullInfoDto, List<Pair>>>(() =>
-        {
-            Dictionary<GroupFullInfoDto, List<Pair>> outDict = new();
-            foreach (var group in _allGroups)
-            {
-                outDict[group.Value] = _allClientPairs.Select(p => p.Value).Where(p => p.UserPair.Groups.Exists(g => GroupDataComparer.Instance.Equals(group.Key, new(g)))).ToList();
-            }
             return outDict;
         });
     }
@@ -377,20 +389,5 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         _groupPairsInternal = GroupPairsLazy();
         _pairsWithGroupsInternal = PairsWithGroupsLazy();
         Mediator.Publish(new RefreshUiMessage());
-    }
-
-    internal void UpdateIndividualPairStatus(UserIndividualPairStatusDto dto)
-    {
-        if (_allClientPairs.TryGetValue(dto.User, out var pair))
-        {
-            pair.UserPair.IndividualPairStatus = dto.IndividualPairStatus;
-            RecreateLazy();
-        }
-    }
-
-    internal void UpdateGroupPairPermissions(GroupPairUserPermissionDto dto)
-    {
-        _allGroups[dto.Group].GroupUserPermissions = dto.GroupPairPermissions;
-        RecreateLazy();
     }
 }

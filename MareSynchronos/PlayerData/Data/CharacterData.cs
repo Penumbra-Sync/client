@@ -1,6 +1,8 @@
-﻿using System.Text;
+﻿using MareSynchronos.API.Data;
+
 using MareSynchronos.API.Data.Enum;
-using MareSynchronos.API.Data;
+
+using System.Text;
 
 namespace MareSynchronos.PlayerData.Data;
 

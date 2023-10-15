@@ -1,11 +1,12 @@
-﻿using System.Numerics;
-using Dalamud.Interface;
+﻿using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility;
 using Dalamud.Utility;
 using ImGuiNET;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.UI.Handlers;
+
+using System.Numerics;
 
 namespace MareSynchronos.UI.Components;
 

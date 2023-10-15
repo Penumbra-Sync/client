@@ -12,12 +12,11 @@ namespace MareSynchronos.WebAPI.SignalR;
 
 public sealed class TokenProvider : IDisposable
 {
-    private readonly ILogger<TokenProvider> _logger;
-    private readonly ServerConfigurationManager _serverManager;
     private readonly DalamudUtilService _dalamudUtil;
     private readonly HttpClient _httpClient;
+    private readonly ILogger<TokenProvider> _logger;
+    private readonly ServerConfigurationManager _serverManager;
     private readonly ConcurrentDictionary<JwtIdentifier, string> _tokenCache = new();
-    private JwtIdentifier CurrentIdentifier => new(_serverManager.CurrentApiUrl, _serverManager.GetSecretKey()!);
 
     public TokenProvider(ILogger<TokenProvider> logger, ServerConfigurationManager serverManager, DalamudUtilService dalamudUtil)
     {
@@ -29,31 +28,11 @@ public sealed class TokenProvider : IDisposable
         _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("MareSynchronos", ver!.Major + "." + ver!.Minor + "." + ver!.Build));
     }
 
+    private JwtIdentifier CurrentIdentifier => new(_serverManager.CurrentApiUrl, _serverManager.GetSecretKey()!);
+
     public void Dispose()
     {
         _httpClient.Dispose();
-    }
-
-    public async Task<string?> GetOrUpdateToken(CancellationToken ct, bool forceRenew = false)
-    {
-        bool renewal = forceRenew;
-        if (!forceRenew && _tokenCache.TryGetValue(CurrentIdentifier, out var token))
-        {
-            var handler = new JwtSecurityTokenHandler();
-            var jwtToken = handler.ReadJwtToken(token);
-            if (jwtToken.ValidTo == DateTime.MinValue || jwtToken.ValidTo.Subtract(TimeSpan.FromMinutes(5)) > DateTime.UtcNow)
-            {
-                _logger.LogTrace("GetOrUpdate: Returning token from cache");
-                return token;
-            }
-            else
-            {
-                renewal = true;
-            }
-        }
-
-        _logger.LogTrace("GetOrUpdate: Getting new token");
-        return await GetNewToken(renewal, ct).ConfigureAwait(false);
     }
 
     public async Task<string> GetNewToken(bool isRenewal, CancellationToken token)
@@ -94,7 +73,6 @@ public sealed class TokenProvider : IDisposable
             response = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
             result.EnsureSuccessStatusCode();
             _tokenCache[CurrentIdentifier] = response;
-
         }
         catch (HttpRequestException ex)
         {
@@ -116,5 +94,27 @@ public sealed class TokenProvider : IDisposable
         _logger.LogDebug("GetNewToken: Valid until {date}, ValidClaim until {date}", jwtToken.ValidTo,
                 new DateTime(long.Parse(jwtToken.Claims.Single(c => c.Type == "expiration_date").Value), DateTimeKind.Utc));
         return response;
+    }
+
+    public async Task<string?> GetOrUpdateToken(CancellationToken ct, bool forceRenew = false)
+    {
+        bool renewal = forceRenew;
+        if (!forceRenew && _tokenCache.TryGetValue(CurrentIdentifier, out var token))
+        {
+            var handler = new JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(token);
+            if (jwtToken.ValidTo == DateTime.MinValue || jwtToken.ValidTo.Subtract(TimeSpan.FromMinutes(5)) > DateTime.UtcNow)
+            {
+                _logger.LogTrace("GetOrUpdate: Returning token from cache");
+                return token;
+            }
+            else
+            {
+                renewal = true;
+            }
+        }
+
+        _logger.LogTrace("GetOrUpdate: Getting new token");
+        return await GetNewToken(renewal, ct).ConfigureAwait(false);
     }
 }

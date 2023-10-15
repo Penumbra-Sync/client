@@ -1,38 +1,38 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
-using ImGuiNET;
-using MareSynchronos.WebAPI;
-using System.Numerics;
+using Dalamud.Interface.Components;
 using Dalamud.Utility;
+using ImGuiNET;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Comparer;
+using MareSynchronos.FileCache;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Models;
-using Microsoft.Extensions.Logging;
-using MareSynchronos.WebAPI.SignalR.Utils;
-using MareSynchronos.PlayerData.Pairs;
-using System.Text.Json;
 using MareSynchronos.PlayerData.Export;
+using MareSynchronos.PlayerData.Handlers;
+using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
-using MareSynchronos.Services;
+using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.Files.Models;
-using MareSynchronos.PlayerData.Handlers;
+using MareSynchronos.WebAPI.SignalR.Utils;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
-using MareSynchronos.FileCache;
-using Dalamud.Interface.Components;
+using System.Numerics;
+using System.Text.Json;
 
 namespace MareSynchronos.UI;
 
 public class SettingsUi : WindowMediatorSubscriberBase
 {
+    private readonly ApiController _apiController;
     private readonly MareConfigService _configService;
     private readonly ConcurrentDictionary<GameObjectHandler, Dictionary<string, FileDownloadStatus>> _currentDownloads = new();
+    private readonly FileCompactor _fileCompactor;
     private readonly FileUploadManager _fileTransferManager;
     private readonly FileTransferOrchestrator _fileTransferOrchestrator;
-    private readonly ApiController _apiController;
-    private readonly FileCompactor _fileCompactor;
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly PairManager _pairManager;
     private readonly PerformanceCollectorService _performanceCollector;

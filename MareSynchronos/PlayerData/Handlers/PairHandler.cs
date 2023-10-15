@@ -32,6 +32,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private GameObjectHandler? _charaHandler;
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
     private bool _forceApplyMods = false;
+    private bool _isVisible;
     private string _penumbraCollection;
 
     public PairHandler(ILogger<PairHandler> logger, OnlineUserIdentDto onlineUser,
@@ -71,7 +72,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         });
     }
 
-    private bool _isVisible;
     public bool IsVisible
     {
         get => _isVisible;
@@ -274,7 +274,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
             if (changes.Value.Contains(PlayerChanges.ModFiles) || changes.Value.Contains(PlayerChanges.ModManip) || changes.Value.Contains(PlayerChanges.Glamourer))
                 await _ipcManager.PenumbraRedrawAsync(Logger, handler, applicationId, token).ConfigureAwait(false);
-
         }
         finally
         {

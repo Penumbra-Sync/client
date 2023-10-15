@@ -1,16 +1,17 @@
 ﻿using Dalamud.Interface.Colors;
+using Dalamud.Interface.Internal;
+
+using Dalamud.Interface.Utility;
 using ImGuiNET;
+using MareSynchronos.API.Data;
+using MareSynchronos.API.Data.Extensions;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
-using MareSynchronos.API.Data.Extensions;
-using MareSynchronos.MareConfiguration;
-using MareSynchronos.API.Data;
-using Dalamud.Interface.Utility;
-using Dalamud.Interface.Internal;
 
 namespace MareSynchronos.UI;
 
@@ -130,7 +131,7 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
                 ImGui.SameLine();
                 ImGui.TextUnformatted($"({_pair.PlayerName})");
             }
-            if (_pair.UserPair != null)
+            if (_pair.UserPair.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.Bidirectional)
             {
                 ImGui.TextUnformatted("Directly paired");
                 if (_pair.UserPair.OwnPermissions.IsPaused())

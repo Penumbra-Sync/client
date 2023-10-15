@@ -12,13 +12,13 @@ namespace MareSynchronos.WebAPI.Files;
 
 public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
 {
+    private readonly ConcurrentDictionary<Guid, bool> _downloadReady = new();
     private readonly HttpClient _httpClient;
     private readonly MareConfigService _mareConfig;
     private readonly object _semaphoreModificationLock = new();
     private readonly TokenProvider _tokenProvider;
     private int _availableDownloadSlots;
     private SemaphoreSlim _downloadSemaphore;
-    private readonly ConcurrentDictionary<Guid, bool> _downloadReady = new();
 
     public FileTransferOrchestrator(ILogger<FileTransferOrchestrator> logger, MareConfigService mareConfig,
         MareMediator mediator, TokenProvider tokenProvider) : base(logger, mediator)
@@ -52,9 +52,9 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
     public List<FileTransfer> ForbiddenTransfers { get; } = new();
     public bool IsInitialized => FilesCdnUri != null;
 
-    public void ReleaseDownloadSlot()
+    public void ClearDownloadRequest(Guid guid)
     {
-        _downloadSemaphore.Release();
+        _downloadReady.Remove(guid, out _);
     }
 
     public bool IsDownloadReady(Guid guid)
@@ -67,9 +67,9 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         return false;
     }
 
-    public void ClearDownloadRequest(Guid guid)
+    public void ReleaseDownloadSlot()
     {
-        _downloadReady.Remove(guid, out _);
+        _downloadSemaphore.Release();
     }
 
     public async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, Uri uri,

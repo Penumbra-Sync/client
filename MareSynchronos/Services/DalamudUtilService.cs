@@ -59,6 +59,7 @@ public class DalamudUtilService : IHostedService
     public bool IsInCutscene { get; private set; } = false;
     public bool IsInGpose { get; private set; } = false;
     public bool IsLoggedIn { get; private set; }
+    public bool IsOnFrameworkThread => _framework.IsInFrameworkUpdateThread;
     public bool IsZoning => _condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51];
 
     public Lazy<Dictionary<ushort, string>> WorldData { get; private set; }
@@ -74,8 +75,6 @@ public class DalamudUtilService : IHostedService
         return await RunOnFrameworkThread(() => _objectTable.CreateObjectReference(reference)).ConfigureAwait(false);
     }
 
-    public bool IsOnFrameworkThread => _framework.IsInFrameworkUpdateThread;
-
     public void EnsureIsOnFramework()
     {
         if (!_framework.IsInFrameworkUpdateThread) throw new InvalidOperationException("Can only be run on Framework");
@@ -87,13 +86,6 @@ public class DalamudUtilService : IHostedService
         var objTableObj = _objectTable[index];
         if (objTableObj!.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) return null;
         return (Dalamud.Game.ClientState.Objects.Types.Character)objTableObj;
-    }
-
-    public Dalamud.Game.ClientState.Objects.Types.Character? GetGposeCharacterFromObjectTableByName(string name, bool onlyGposeCharacters = false)
-    {
-        EnsureIsOnFramework();
-        return (Dalamud.Game.ClientState.Objects.Types.Character?)_objectTable.Where(i => !onlyGposeCharacters || i.ObjectIndex >= 200)
-            .FirstOrDefault(f => f.Name.ToString() == name);
     }
 
     public unsafe IntPtr GetCompanion(IntPtr? playerPointer = null)
@@ -108,6 +100,13 @@ public class DalamudUtilService : IHostedService
     public async Task<IntPtr> GetCompanionAsync(IntPtr? playerPointer = null)
     {
         return await RunOnFrameworkThread(() => GetCompanion(playerPointer)).ConfigureAwait(false);
+    }
+
+    public Dalamud.Game.ClientState.Objects.Types.Character? GetGposeCharacterFromObjectTableByName(string name, bool onlyGposeCharacters = false)
+    {
+        EnsureIsOnFramework();
+        return (Dalamud.Game.ClientState.Objects.Types.Character?)_objectTable.Where(i => !onlyGposeCharacters || i.ObjectIndex >= 200)
+            .FirstOrDefault(f => f.Name.ToString() == name);
     }
 
     public bool GetIsPlayerPresent()

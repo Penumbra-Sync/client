@@ -13,10 +13,8 @@ public class CreateSyncshellPopupHandler : IPopupHandler
 {
     private readonly ApiController _apiController;
     private readonly UiSharedService _uiSharedService;
-    private GroupJoinDto? _lastCreatedGroup;
     private bool _errorGroupCreate;
-
-    public Vector2 PopupSize => new(500, 300);
+    private GroupJoinDto? _lastCreatedGroup;
 
     public CreateSyncshellPopupHandler(ApiController apiController, UiSharedService uiSharedService)
     {
@@ -24,10 +22,7 @@ public class CreateSyncshellPopupHandler : IPopupHandler
         _uiSharedService = uiSharedService;
     }
 
-    public void Open()
-    {
-        _lastCreatedGroup = null;
-    }
+    public Vector2 PopupSize => new(500, 300);
 
     public void DrawContent()
     {
@@ -90,12 +85,16 @@ public class CreateSyncshellPopupHandler : IPopupHandler
             UiSharedService.BooleanToColoredIcon(!_lastCreatedGroup.GroupUserPreferredPermissions.IsDisableSounds());
             UiSharedService.TextWrapped("Suggest VFX sync:");
             UiSharedService.BooleanToColoredIcon(!_lastCreatedGroup.GroupUserPreferredPermissions.IsDisableVFX());
-
         }
 
         if (_errorGroupCreate)
         {
             UiSharedService.ColorTextWrapped("Something went wrong during creation of a new Syncshell", new Vector4(1, 0, 0, 1));
         }
+    }
+
+    public void Open()
+    {
+        _lastCreatedGroup = null;
     }
 }

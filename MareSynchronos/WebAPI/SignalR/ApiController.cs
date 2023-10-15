@@ -1,17 +1,17 @@
-﻿using Microsoft.AspNetCore.SignalR.Client;
-using Microsoft.Extensions.Logging;
+﻿using Dalamud.Utility;
+using MareSynchronos.API.Data;
+using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto;
 using MareSynchronos.API.SignalR;
-using Dalamud.Utility;
-using System.Reflection;
-using MareSynchronos.WebAPI.SignalR.Utils;
-using MareSynchronos.WebAPI.SignalR;
 using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
-using MareSynchronos.Services;
-using MareSynchronos.API.Data.Extensions;
-using MareSynchronos.API.Data;
+using MareSynchronos.WebAPI.SignalR;
+using MareSynchronos.WebAPI.SignalR.Utils;
+using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.Logging;
+using System.Reflection;
 
 namespace MareSynchronos.WebAPI;
 
@@ -30,9 +30,9 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
     private bool _doNotNotifyOnNextInfo = false;
     private CancellationTokenSource? _healthCheckTokenSource = new();
     private bool _initialized;
+    private string? _lastUsedToken;
     private HubConnection? _mareHub;
     private ServerState _serverState;
-    private string? _lastUsedToken;
 
     public ApiController(ILogger<ApiController> logger, HubFactory hubFactory, DalamudUtilService dalamudUtil,
         PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator,
@@ -64,6 +64,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
     public Version CurrentClientVersion => _connectionDto?.CurrentClientVersion ?? new Version(0, 0, 0);
 
+    public DefaultPermissionsDto? DefaultPermissions => _connectionDto?.DefaultPreferredPermissions ?? null;
     public string DisplayName => _connectionDto?.User.AliasOrUID ?? string.Empty;
 
     public bool IsConnected => ServerState == ServerState.Connected;
@@ -89,7 +90,6 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
     public SystemInfoDto SystemInfoDto { get; private set; } = new();
 
     public string UID => _connectionDto?.User.UID ?? string.Empty;
-    public DefaultPermissionsDto? DefaultPermissions => _connectionDto?.DefaultPreferredPermissions ?? null;
 
     public async Task<bool> CheckClientHealth()
     {
@@ -156,11 +156,9 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                 if (token.IsCancellationRequested) break;
 
                 _mareHub = _hubFactory.GetOrCreate(token);
+                InitializeApiHooks();
 
                 await _mareHub.StartAsync(token).ConfigureAwait(false);
-
-                InitializeApiHooks();
-                await LoadIninitialPairs().ConfigureAwait(false);
 
                 _connectionDto = await GetConnectionDto().ConfigureAwait(false);
 
@@ -191,6 +189,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                         Dalamud.Interface.Internal.Notifications.NotificationType.Error));
                 }
 
+                await LoadIninitialPairs().ConfigureAwait(false);
                 await LoadOnlinePairs().ConfigureAwait(false);
             }
             catch (OperationCanceledException)
@@ -274,33 +273,6 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
             _ = await CheckClientHealth().ConfigureAwait(false);
         }
-    }
-
-    private async Task<bool> RefreshToken(CancellationToken ct)
-    {
-        Logger.LogDebug("Checking token");
-
-        bool requireReconnect = false;
-        try
-        {
-            var token = await _tokenProvider.GetOrUpdateToken(ct).ConfigureAwait(false);
-            if (!string.Equals(token, _lastUsedToken, StringComparison.Ordinal))
-            {
-                Logger.LogDebug("Reconnecting due to updated token");
-
-                _doNotNotifyOnNextInfo = true;
-                await CreateConnections().ConfigureAwait(false);
-                requireReconnect = true;
-            }
-        }
-        catch (MareAuthFailureException ex)
-        {
-            AuthFailureMessage = ex.Reason;
-            await StopConnection(ServerState.Unauthorized).ConfigureAwait(false);
-            requireReconnect = true;
-        }
-
-        return requireReconnect;
     }
 
     private void DalamudUtilOnLogIn()
@@ -422,6 +394,33 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         Logger.LogWarning(arg, "Connection closed... Reconnecting");
     }
 
+    private async Task<bool> RefreshToken(CancellationToken ct)
+    {
+        Logger.LogDebug("Checking token");
+
+        bool requireReconnect = false;
+        try
+        {
+            var token = await _tokenProvider.GetOrUpdateToken(ct).ConfigureAwait(false);
+            if (!string.Equals(token, _lastUsedToken, StringComparison.Ordinal))
+            {
+                Logger.LogDebug("Reconnecting due to updated token");
+
+                _doNotNotifyOnNextInfo = true;
+                await CreateConnections().ConfigureAwait(false);
+                requireReconnect = true;
+            }
+        }
+        catch (MareAuthFailureException ex)
+        {
+            AuthFailureMessage = ex.Reason;
+            await StopConnection(ServerState.Unauthorized).ConfigureAwait(false);
+            requireReconnect = true;
+        }
+
+        return requireReconnect;
+    }
+
     private async Task StopConnection(ServerState state)
     {
         ServerState = ServerState.Disconnecting;
@@ -437,7 +436,6 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
             _mareHub = null;
             _connectionDto = null;
         }
-
 
         ServerState = state;
     }

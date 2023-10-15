@@ -1,7 +1,8 @@
-﻿using System.Collections.Concurrent;
-using Dalamud.Plugin.Services;
+﻿using Dalamud.Plugin.Services;
 using MareSynchronos.MareConfiguration;
 using Microsoft.Extensions.Logging;
+
+using System.Collections.Concurrent;
 
 namespace MareSynchronos.Interop;
 

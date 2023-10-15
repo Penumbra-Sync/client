@@ -1,5 +1,6 @@
-﻿using System.Text.RegularExpressions;
-using MareSynchronos.API.Data;
+﻿using MareSynchronos.API.Data;
+
+using System.Text.RegularExpressions;
 
 namespace MareSynchronos.PlayerData.Data;
 

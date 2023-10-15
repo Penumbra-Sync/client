@@ -1,4 +1,5 @@
 ﻿namespace MareSynchronos.UI.Components.old;
+
 /*
 public class PairTagsUi
 {

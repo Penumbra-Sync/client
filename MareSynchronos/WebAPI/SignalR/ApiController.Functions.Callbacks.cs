@@ -25,6 +25,13 @@ public partial class ApiController
         return Task.CompletedTask;
     }
 
+    public Task Client_GroupChangeUserPairPermissions(GroupPairUserPermissionDto dto)
+    {
+        Logger.LogDebug("Client_GroupChangeUserPairPermissions: {dto}", dto);
+        ExecuteSafely(() => _pairManager.UpdateGroupPairPermissions(dto));
+        return Task.CompletedTask;
+    }
+
     public Task Client_GroupDelete(GroupDto groupDto)
     {
         Logger.LogTrace("Client_GroupDelete: {dto}", groupDto);
@@ -102,6 +109,13 @@ public partial class ApiController
         return Task.CompletedTask;
     }
 
+    public Task Client_UpdateUserIndividualPairStatusDto(UserIndividualPairStatusDto dto)
+    {
+        Logger.LogDebug("Client_UpdateUserIndividualPairStatusDto: {dto}", dto);
+        ExecuteSafely(() => _pairManager.UpdateIndividualPairStatus(dto));
+        return Task.CompletedTask;
+    }
+
     public Task Client_UserAddClientPair(UserPairDto dto)
     {
         Logger.LogDebug("Client_UserAddClientPair: {dto}", dto);
@@ -144,6 +158,13 @@ public partial class ApiController
         return Task.CompletedTask;
     }
 
+    public Task Client_UserUpdateDefaultPermissions(DefaultPermissionsDto dto)
+    {
+        Logger.LogDebug("Client_UserUpdateDefaultPermissions: {dto}", dto);
+        _connectionDto!.DefaultPreferredPermissions = dto;
+        return Task.CompletedTask;
+    }
+
     public Task Client_UserUpdateOtherPairPermissions(UserPermissionsDto dto)
     {
         Logger.LogDebug("Client_UserUpdateOtherPairPermissions: {dto}", dto);
@@ -165,33 +186,6 @@ public partial class ApiController
         return Task.CompletedTask;
     }
 
-    public Task Client_UserUpdateDefaultPermissions(DefaultPermissionsDto dto)
-    {
-        Logger.LogDebug("Client_UserUpdateDefaultPermissions: {dto}", dto);
-        _connectionDto!.DefaultPreferredPermissions = dto;
-        return Task.CompletedTask;
-    }
-
-    public Task Client_UpdateUserIndividualPairStatusDto(UserIndividualPairStatusDto dto)
-    {
-        Logger.LogDebug("Client_UpdateUserIndividualPairStatusDto: {dto}", dto);
-        ExecuteSafely(() => _pairManager.UpdateIndividualPairStatus(dto));
-        return Task.CompletedTask;
-    }
-
-    public Task Client_GroupChangeUserPairPermissions(GroupPairUserPermissionDto dto)
-    {
-        Logger.LogDebug("Client_GroupChangeUserPairPermissions: {dto}", dto);
-        ExecuteSafely(() => _pairManager.UpdateGroupPairPermissions(dto));
-        return Task.CompletedTask;
-    }
-
-    public void OnUpdateUserIndividualPairStatusDto(Action<UserIndividualPairStatusDto> action)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_UpdateUserIndividualPairStatusDto), action);
-    }
-
     public void OnDownloadReady(Action<Guid> act)
     {
         if (_initialized) return;
@@ -202,6 +196,12 @@ public partial class ApiController
     {
         if (_initialized) return;
         _mareHub!.On(nameof(Client_GroupChangePermissions), act);
+    }
+
+    public void OnGroupChangeUserPairPermissions(Action<GroupPairUserPermissionDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GroupChangeUserPairPermissions), act);
     }
 
     public void OnGroupDelete(Action<GroupDto> act)
@@ -252,10 +252,22 @@ public partial class ApiController
         _mareHub!.On(nameof(Client_UpdateSystemInfo), act);
     }
 
+    public void OnUpdateUserIndividualPairStatusDto(Action<UserIndividualPairStatusDto> action)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_UpdateUserIndividualPairStatusDto), action);
+    }
+
     public void OnUserAddClientPair(Action<UserPairDto> act)
     {
         if (_initialized) return;
         _mareHub!.On(nameof(Client_UserAddClientPair), act);
+    }
+
+    public void OnUserDefaultPermissionUpdate(Action<DefaultPermissionsDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_UserUpdateDefaultPermissions), act);
     }
 
     public void OnUserReceiveCharacterData(Action<OnlineUserCharaDataDto> act)
@@ -304,18 +316,6 @@ public partial class ApiController
     {
         if (_initialized) return;
         _mareHub!.On(nameof(Client_UserUpdateSelfPairPermissions), act);
-    }
-
-    public void OnUserDefaultPermissionUpdate(Action<DefaultPermissionsDto> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_UserUpdateDefaultPermissions), act);
-    }
-
-    public void OnGroupChangeUserPairPermissions(Action<GroupPairUserPermissionDto> act)
-    {
-        if (_initialized) return;
-        _mareHub!.On(nameof(Client_GroupChangeUserPairPermissions), act);
     }
 
     private void ExecuteSafely(Action act)

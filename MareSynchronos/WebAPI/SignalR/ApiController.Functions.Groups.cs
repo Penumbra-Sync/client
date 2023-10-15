@@ -48,12 +48,6 @@ public partial class ApiController
         return await _mareHub!.InvokeAsync<GroupJoinDto>(nameof(GroupCreate)).ConfigureAwait(false);
     }
 
-    public async Task<bool> GroupJoinFinalize(GroupJoinDto passwordedGroup)
-    {
-        CheckConnection();
-        return await _mareHub!.InvokeAsync<bool>(nameof(GroupJoinFinalize), passwordedGroup).ConfigureAwait(false);
-    }
-
     public async Task<List<string>> GroupCreateTempInvite(GroupDto group, int amount)
     {
         CheckConnection();
@@ -76,6 +70,12 @@ public partial class ApiController
     {
         CheckConnection();
         return await _mareHub!.InvokeAsync<GroupJoinInfoDto>(nameof(GroupJoin), passwordedGroup).ConfigureAwait(false);
+    }
+
+    public async Task<bool> GroupJoinFinalize(GroupJoinDto passwordedGroup)
+    {
+        CheckConnection();
+        return await _mareHub!.InvokeAsync<bool>(nameof(GroupJoinFinalize), passwordedGroup).ConfigureAwait(false);
     }
 
     public async Task GroupLeave(GroupDto group)

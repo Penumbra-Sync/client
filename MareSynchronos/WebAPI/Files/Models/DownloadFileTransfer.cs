@@ -4,8 +4,11 @@ namespace MareSynchronos.WebAPI.Files.Models;
 
 public class DownloadFileTransfer : FileTransfer
 {
-    private DownloadFileDto Dto => (DownloadFileDto)TransferDto;
-    public DownloadFileTransfer(DownloadFileDto dto) : base(dto) { }
+    public DownloadFileTransfer(DownloadFileDto dto) : base(dto)
+    {
+    }
+
+    public override bool CanBeTransferred => Dto.FileExists && !Dto.IsForbidden && Dto.Size > 0;
     public Uri DownloadUri => new(Dto.Url);
     public override long Total
     {
@@ -15,6 +18,5 @@ public class DownloadFileTransfer : FileTransfer
         }
         get => Dto.Size;
     }
-
-    public override bool CanBeTransferred => Dto.FileExists && !Dto.IsForbidden && Dto.Size > 0;
+    private DownloadFileDto Dto => (DownloadFileDto)TransferDto;
 }

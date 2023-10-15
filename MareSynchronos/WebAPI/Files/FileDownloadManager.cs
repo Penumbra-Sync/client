@@ -16,8 +16,8 @@ namespace MareSynchronos.WebAPI.Files;
 public partial class FileDownloadManager : DisposableMediatorSubscriberBase
 {
     private readonly Dictionary<string, FileDownloadStatus> _downloadStatus;
-    private readonly FileCacheManager _fileDbManager;
     private readonly FileCompactor _fileCompactor;
+    private readonly FileCacheManager _fileDbManager;
     private readonly FileTransferOrchestrator _orchestrator;
 
     public FileDownloadManager(ILogger<FileDownloadManager> logger, MareMediator mediator,
@@ -35,6 +35,14 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
     public List<FileTransfer> ForbiddenTransfers => _orchestrator.ForbiddenTransfers;
 
     public bool IsDownloading => !CurrentDownloads.Any();
+
+    public static void MungeBuffer(Span<byte> buffer)
+    {
+        for (int i = 0; i < buffer.Length; ++i)
+        {
+            buffer[i] ^= 42;
+        }
+    }
 
     public void CancelDownload()
     {
@@ -64,14 +72,6 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
     {
         CancelDownload();
         base.Dispose(disposing);
-    }
-
-    public static void MungeBuffer(Span<byte> buffer)
-    {
-        for (int i = 0; i < buffer.Length; ++i)
-        {
-            buffer[i] ^= 42;
-        }
     }
 
     private static byte MungeByte(int byteOrEof)

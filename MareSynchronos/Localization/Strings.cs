@@ -4,11 +4,14 @@ namespace MareSynchronos.Localization;
 
 public static class Strings
 {
+    public static ToSStrings ToS { get; set; } = new();
+
     public class ToSStrings
     {
-        public readonly string LanguageLabel = Loc.Localize("LanguageLabel", "Language");
+        public readonly string AgreeLabel = Loc.Localize("AgreeLabel", "I agree");
         public readonly string AgreementLabel = Loc.Localize("AgreementLabel", "Agreement of Usage of Service");
-        public readonly string ReadLabel = Loc.Localize("ReadLabel", "READ THIS CAREFULLY");
+        public readonly string ButtonWillBeAvailableIn = Loc.Localize("ButtonWillBeAvailableIn", "'I agree' button will be available in");
+        public readonly string LanguageLabel = Loc.Localize("LanguageLabel", "Language");
 
         public readonly string Paragraph1 = Loc.Localize("Paragraph1",
             "All of the mod files currently active on your character as well as your current character state will be uploaded to the service you registered yourself at automatically. " +
@@ -36,10 +39,6 @@ public static class Strings
         public readonly string Paragraph6 = Loc.Localize("Paragraph6",
             "This service is provided as-is. In case of abuse join the Mare Synchronos Discord.");
 
-        public readonly string AgreeLabel = Loc.Localize("AgreeLabel", "I agree");
-
-        public readonly string ButtonWillBeAvailableIn = Loc.Localize("ButtonWillBeAvailableIn", "'I agree' button will be available in");
+        public readonly string ReadLabel = Loc.Localize("ReadLabel", "READ THIS CAREFULLY");
     }
-
-    public static ToSStrings ToS { get; set; } = new();
 }

@@ -1,5 +1,6 @@
-﻿using Dalamud.Interface.Components;
-using Dalamud.Interface;
+﻿using Dalamud.Interface;
+
+using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.Services.Mediator;
@@ -13,6 +14,7 @@ public class PopupHandler : WindowMediatorSubscriberBase
     protected bool _openPopup = false;
     private readonly HashSet<IPopupHandler> _handlers;
     private IPopupHandler? _currentHandler = null;
+
     public PopupHandler(ILogger<PopupHandler> logger, MareMediator mediator, IEnumerable<IPopupHandler> popupHandlers)
         : base(logger, mediator, "MarePopupHandler")
     {

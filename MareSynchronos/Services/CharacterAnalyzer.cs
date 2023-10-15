@@ -1,11 +1,11 @@
-﻿using MareSynchronos.API.Data;
+﻿using Lumina.Data.Files;
+using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.FileCache;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.UI;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
-using Lumina.Data.Files;
 
 namespace MareSynchronos.Services;
 
@@ -14,7 +14,6 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
     private readonly FileCacheManager _fileCacheManager;
     private CancellationTokenSource? _analysisCts;
     private string _lastDataHash = string.Empty;
-    internal Dictionary<ObjectKind, Dictionary<string, FileDataEntry>> LastAnalysis { get; } = new();
 
     public CharacterAnalyzer(ILogger<CharacterAnalyzer> logger, MareMediator mediator, FileCacheManager fileCacheManager) : base(logger, mediator)
     {
@@ -25,10 +24,10 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
         _fileCacheManager = fileCacheManager;
     }
 
-    public bool IsAnalysisRunning => _analysisCts != null;
-
     public int CurrentFile { get; internal set; }
+    public bool IsAnalysisRunning => _analysisCts != null;
     public int TotalFiles { get; internal set; }
+    internal Dictionary<ObjectKind, Dictionary<string, FileDataEntry>> LastAnalysis { get; } = new();
 
     public void CancelAnalyze()
     {
@@ -72,6 +71,11 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
         _analysisCts = null;
 
         if (print) PrintAnalysis();
+    }
+
+    public void Dispose()
+    {
+        _analysisCts.CancelDispose();
     }
 
     private void BaseAnalysis(CharacterData charaData)
@@ -163,11 +167,6 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
         Logger.LogInformation("IMPORTANT NOTES:\n\r- For Mare up- and downloads only the compressed size is relevant.\n\r- An unusually high total files count beyond 200 and up will also increase your download time to others significantly.");
     }
 
-    public void Dispose()
-    {
-        _analysisCts.CancelDispose();
-    }
-
     internal sealed record FileDataEntry(string Hash, string FileType, List<string> GamePaths, List<string> FilePaths, long OriginalSize, long CompressedSize)
     {
         public bool IsComputed => OriginalSize > 0 && CompressedSize > 0;
@@ -205,7 +204,6 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
                         {
                             return "Unknown";
                         }
-
                     }
                 default:
                     return string.Empty;

@@ -1,28 +1,26 @@
-﻿using ImGuiNET;
+﻿using Dalamud.Interface.Colors;
+using Dalamud.Interface.Components;
+using Dalamud.Interface.Utility.Raii;
+using ImGuiNET;
+using MareSynchronos.API.Data.Enum;
+using MareSynchronos.API.Data.Extensions;
+using MareSynchronos.API.Dto;
+using MareSynchronos.API.Dto.Group;
+using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using System.Numerics;
-using Dalamud.Interface.Utility.Raii;
-using MareSynchronos.API.Dto.Group;
-using Dalamud.Interface.Components;
-using Dalamud.Interface.Colors;
-using MareSynchronos.API.Data.Extensions;
-using MareSynchronos.Utils;
-using MareSynchronos.API.Dto;
-using MareSynchronos.API.Data.Enum;
 
 namespace MareSynchronos.UI.Components.Popup;
 
 internal class JoinSyncshellPopupHandler : IPopupHandler
 {
-    private readonly UiSharedService _uiSharedService;
     private readonly ApiController _apiController;
+    private readonly UiSharedService _uiSharedService;
     private string _desiredSyncshellToJoin = string.Empty;
-    private string _syncshellPassword = string.Empty;
-    private string _previousPassword = string.Empty;
     private GroupJoinInfoDto? _groupJoinInfo = null;
     private DefaultPermissionsDto _ownPermissions = null!;
-
-    public Vector2 PopupSize => new(700, 400);
+    private string _previousPassword = string.Empty;
+    private string _syncshellPassword = string.Empty;
 
     public JoinSyncshellPopupHandler(UiSharedService uiSharedService, ApiController apiController)
     {
@@ -30,14 +28,7 @@ internal class JoinSyncshellPopupHandler : IPopupHandler
         _apiController = apiController;
     }
 
-    public void Open()
-    {
-        _desiredSyncshellToJoin = string.Empty;
-        _syncshellPassword = string.Empty;
-        _previousPassword = string.Empty;
-        _groupJoinInfo = null;
-        _ownPermissions = _apiController.DefaultPermissions.DeepClone()!;
-    }
+    public Vector2 PopupSize => new(700, 400);
 
     public void DrawContent()
     {
@@ -160,5 +151,14 @@ internal class JoinSyncshellPopupHandler : IPopupHandler
                 ImGui.CloseCurrentPopup();
             }
         }
+    }
+
+    public void Open()
+    {
+        _desiredSyncshellToJoin = string.Empty;
+        _syncshellPassword = string.Empty;
+        _previousPassword = string.Empty;
+        _groupJoinInfo = null;
+        _ownPermissions = _apiController.DefaultPermissions.DeepClone()!;
     }
 }

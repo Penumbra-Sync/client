@@ -16,7 +16,6 @@ internal class ReportPopupHandler : IPopupHandler
     private readonly UiSharedService _uiSharedService;
     private Pair? _reportedPair;
     private string _reportReason = string.Empty;
-    public Vector2 PopupSize => new(500, 500);
 
     public ReportPopupHandler(ApiController apiController, UiSharedService uiSharedService)
     {
@@ -24,11 +23,7 @@ internal class ReportPopupHandler : IPopupHandler
         _uiSharedService = uiSharedService;
     }
 
-    public void Open(OpenReportPopupMessage msg)
-    {
-        _reportedPair = msg.PairToReport;
-        _reportReason = string.Empty;
-    }
+    public Vector2 PopupSize => new(500, 500);
 
     public void DrawContent()
     {
@@ -53,5 +48,11 @@ internal class ReportPopupHandler : IPopupHandler
                 _ = _apiController.UserReportProfile(new(_reportedPair.UserData, reason));
             }
         }
+    }
+
+    public void Open(OpenReportPopupMessage msg)
+    {
+        _reportedPair = msg.PairToReport;
+        _reportReason = string.Empty;
     }
 }

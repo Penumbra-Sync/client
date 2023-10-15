@@ -1,16 +1,16 @@
 ﻿using Dalamud.Game.ClientState.Objects.Types;
 using LZ4;
-using MareSynchronos.FileCache;
 using MareSynchronos.API.Data.Enum;
-using MareSynchronos.MareConfiguration;
-using CharacterData = MareSynchronos.API.Data.CharacterData;
-using Microsoft.Extensions.Logging;
-using MareSynchronos.PlayerData.Handlers;
+using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
-using MareSynchronos.Services;
-using MareSynchronos.Utils;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Factories;
+using MareSynchronos.PlayerData.Handlers;
+using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
+using MareSynchronos.Utils;
+using Microsoft.Extensions.Logging;
+using CharacterData = MareSynchronos.API.Data.CharacterData;
 
 namespace MareSynchronos.PlayerData.Export;
 
@@ -20,11 +20,11 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
     private readonly DalamudUtilService _dalamudUtil;
     private readonly MareCharaFileDataFactory _factory;
     private readonly GameObjectHandlerFactory _gameObjectHandlerFactory;
+    private readonly Dictionary<string, GameObjectHandler> _gposeGameObjects;
     private readonly IpcManager _ipcManager;
     private readonly ILogger<MareCharaFileManager> _logger;
     private readonly FileCacheManager _manager;
     private int _globalFileCounter = 0;
-    private readonly Dictionary<string, GameObjectHandler> _gposeGameObjects;
     private bool _isInGpose = false;
 
     public MareCharaFileManager(ILogger<MareCharaFileManager> logger, GameObjectHandlerFactory gameObjectHandlerFactory,
@@ -96,7 +96,6 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
                 await _ipcManager.PenumbraAssignTemporaryCollectionAsync(_logger, coll, charaTarget.ObjectTableIndex()!.Value).ConfigureAwait(false);
                 await _ipcManager.PenumbraSetTemporaryModsAsync(_logger, applicationId, coll, extractedFiles.Union(fileSwaps).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal)).ConfigureAwait(false);
                 await _ipcManager.PenumbraSetManipulationDataAsync(_logger, applicationId, coll, LoadedCharaFile.CharaFileData.ManipulationData).ConfigureAwait(false);
-
 
                 GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Player,
                     () => _dalamudUtil.GetGposeCharacterFromObjectTableByName(charaTarget.Name.ToString(), _isInGpose)?.Address ?? IntPtr.Zero, false).ConfigureAwait(false);

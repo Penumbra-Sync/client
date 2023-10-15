@@ -11,8 +11,8 @@ namespace MareSynchronos.FileCache;
 
 public sealed class FileCacheManager : IDisposable
 {
-    public const string CsvSplit = "|";
     public const string CachePrefix = "{cache}";
+    public const string CsvSplit = "|";
     public const string PenumbraPrefix = "{penumbra}";
     private readonly MareConfigService _configService;
     private readonly string _csvPath;
@@ -142,21 +142,6 @@ public sealed class FileCacheManager : IDisposable
 
     public List<FileCacheEntity> GetAllFileCaches() => _fileCaches.Values.SelectMany(v => v).ToList();
 
-    public string GetCacheFilePath(string hash, string extension)
-    {
-        return Path.Combine(_configService.Current.CacheFolder, hash + "." + extension);
-    }
-
-    public FileCacheEntity? GetFileCacheByHash(string hash)
-    {
-        if (_fileCaches.TryGetValue(hash, out var hashes))
-        {
-            var item = hashes.FirstOrDefault();
-            if (item != null) return GetValidatedFileCache(item);
-        }
-        return null;
-    }
-
     public List<FileCacheEntity> GetAllFileCachesByHash(string hash)
     {
         List<FileCacheEntity> output = new();
@@ -170,6 +155,44 @@ public sealed class FileCacheManager : IDisposable
         }
 
         return output;
+    }
+
+    public string GetCacheFilePath(string hash, string extension)
+    {
+        return Path.Combine(_configService.Current.CacheFolder, hash + "." + extension);
+    }
+
+    public async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)
+    {
+        var fileCache = GetFileCacheByHash(fileHash)!.ResolvedFilepath;
+        return (fileHash, LZ4Codec.WrapHC(await File.ReadAllBytesAsync(fileCache, uploadToken).ConfigureAwait(false), 0,
+            (int)new FileInfo(fileCache).Length));
+    }
+
+    public FileCacheEntity? GetFileCacheByHash(string hash)
+    {
+        if (_fileCaches.TryGetValue(hash, out var hashes))
+        {
+            var item = hashes.FirstOrDefault();
+            if (item != null) return GetValidatedFileCache(item);
+        }
+        return null;
+    }
+
+    public FileCacheEntity? GetFileCacheByPath(string path)
+    {
+        var cleanedPath = path.Replace("/", "\\", StringComparison.OrdinalIgnoreCase).ToLowerInvariant().Replace(_ipcManager.PenumbraModDirectory!.ToLowerInvariant(), "", StringComparison.OrdinalIgnoreCase);
+        var entry = _fileCaches.SelectMany(v => v.Value).FirstOrDefault(f => f.ResolvedFilepath.EndsWith(cleanedPath, StringComparison.OrdinalIgnoreCase));
+
+        if (entry == null)
+        {
+            _logger.LogDebug("Found no entries for {path}", cleanedPath);
+            return CreateFileEntry(path);
+        }
+
+        var validatedCacheEntry = GetValidatedFileCache(entry);
+
+        return validatedCacheEntry;
     }
 
     public Dictionary<string, FileCacheEntity?> GetFileCachesByPaths(string[] paths)
@@ -200,29 +223,6 @@ public sealed class FileCacheManager : IDisposable
         }
 
         return result;
-    }
-
-    public FileCacheEntity? GetFileCacheByPath(string path)
-    {
-        var cleanedPath = path.Replace("/", "\\", StringComparison.OrdinalIgnoreCase).ToLowerInvariant().Replace(_ipcManager.PenumbraModDirectory!.ToLowerInvariant(), "", StringComparison.OrdinalIgnoreCase);
-        var entry = _fileCaches.SelectMany(v => v.Value).FirstOrDefault(f => f.ResolvedFilepath.EndsWith(cleanedPath, StringComparison.OrdinalIgnoreCase));
-
-        if (entry == null)
-        {
-            _logger.LogDebug("Found no entries for {path}", cleanedPath);
-            return CreateFileEntry(path);
-        }
-
-        var validatedCacheEntry = GetValidatedFileCache(entry);
-
-        return validatedCacheEntry;
-    }
-
-    public async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)
-    {
-        var fileCache = GetFileCacheByHash(fileHash)!.ResolvedFilepath;
-        return (fileHash, LZ4Codec.WrapHC(await File.ReadAllBytesAsync(fileCache, uploadToken).ConfigureAwait(false), 0,
-            (int)new FileInfo(fileCache).Length));
     }
 
     public void RemoveHashedFile(string hash, string prefixedFilePath)

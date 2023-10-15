@@ -1,6 +1,7 @@
-﻿using System.Security.Cryptography;
+﻿using Dalamud.Game.ClientState.Objects.SubKinds;
+
+using System.Security.Cryptography;
 using System.Text;
-using Dalamud.Game.ClientState.Objects.SubKinds;
 
 namespace MareSynchronos.Utils;
 

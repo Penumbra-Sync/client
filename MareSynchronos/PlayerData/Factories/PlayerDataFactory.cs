@@ -1,32 +1,31 @@
-﻿using System.Diagnostics;
-using FFXIVClientStructs.FFXIV.Client.Game.Character;
+﻿using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Client.System.Resource;
 using MareSynchronos.API.Data.Enum;
-using MareSynchronos.Interop;
-using Object = FFXIVClientStructs.FFXIV.Client.Graphics.Scene.Object;
 using MareSynchronos.FileCache;
-using Microsoft.Extensions.Logging;
-using System.Globalization;
+using MareSynchronos.Interop;
 using MareSynchronos.PlayerData.Data;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using System.Globalization;
 using CharacterData = MareSynchronos.PlayerData.Data.CharacterData;
+using Object = FFXIVClientStructs.FFXIV.Client.Graphics.Scene.Object;
 using Weapon = MareSynchronos.Interop.Weapon;
 
 namespace MareSynchronos.PlayerData.Factories;
 
 public class PlayerDataFactory
 {
+    private static readonly string[] AllowedExtensionsForGamePaths = { ".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk" };
     private readonly DalamudUtilService _dalamudUtil;
     private readonly FileCacheManager _fileCacheManager;
     private readonly IpcManager _ipcManager;
     private readonly ILogger<PlayerDataFactory> _logger;
     private readonly PerformanceCollectorService _performanceCollector;
     private readonly TransientResourceManager _transientResourceManager;
-
-    private static readonly string[] AllowedExtensionsForGamePaths = { ".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk" };
 
     public PlayerDataFactory(ILogger<PlayerDataFactory> logger, DalamudUtilService dalamudUtil, IpcManager ipcManager,
         TransientResourceManager transientResourceManager, FileCacheManager fileReplacementFactory,

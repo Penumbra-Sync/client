@@ -1,8 +1,4 @@
-﻿using System.Collections.Concurrent;
-using System.Globalization;
-using System.Numerics;
-using System.Reflection;
-using Dalamud.Interface;
+﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility;
@@ -23,6 +19,10 @@ using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.Files.Models;
 using MareSynchronos.WebAPI.SignalR.Utils;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
+using System.Globalization;
+using System.Numerics;
+using System.Reflection;
 
 namespace MareSynchronos.UI;
 
@@ -33,15 +33,16 @@ public class CompactUi : WindowMediatorSubscriberBase
     private readonly ApiController _apiController;
     private readonly MareConfigService _configService;
     private readonly ConcurrentDictionary<GameObjectHandler, Dictionary<string, FileDownloadStatus>> _currentDownloads = new();
+    private readonly DrawEntityFactory _drawEntityFactory;
     private readonly FileUploadManager _fileTransferManager;
     private readonly PairManager _pairManager;
     private readonly SelectTagForPairUi _selectGroupForPairUi;
     private readonly SelectPairForTagUi _selectPairsForGroupUi;
     private readonly ServerConfigurationManager _serverManager;
     private readonly TagHandler _tagHandler;
-    private readonly DrawEntityFactory _drawEntityFactory;
     private readonly UiSharedService _uiShared;
     private string _characterOrCommentFilter = string.Empty;
+    private List<DrawFolderBase> _drawFolders;
     private Pair? _lastAddedUser;
     private string _lastAddedUserComment = string.Empty;
     private Vector2 _lastPosition = Vector2.One;
@@ -50,7 +51,6 @@ public class CompactUi : WindowMediatorSubscriberBase
     private int _secretKeyIdx = -1;
     private bool _showModalForUserAddition;
     private bool _wasOpen;
-    private List<DrawFolderBase> _drawFolders;
 
     public CompactUi(ILogger<CompactUi> logger, UiSharedService uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
         ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager,
@@ -94,99 +94,6 @@ public class CompactUi : WindowMediatorSubscriberBase
             MinimumSize = new Vector2(350, 400),
             MaximumSize = new Vector2(350, 2000),
         };
-    }
-
-    private IEnumerable<DrawFolderBase> GetDrawFolders()
-    {
-        List<DrawFolderBase> drawFolders = new();
-
-        var users = GetFilteredGroupUsers()
-            .ToDictionary(g => g.Key, g => g.Value);
-
-        if (_configService.Current.ShowVisibleUsersSeparately)
-        {
-            var visibleUsers = users.Where(u => u.Key.IsVisible)
-            .OrderBy(
-                    u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
-                        ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
-                        : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(k => k.Key, k => k.Value);
-
-            drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomVisibleTag, visibleUsers.Select(k => k.Key).ToList()));
-        }
-
-        foreach (var group in _pairManager.GroupPairs.OrderBy(g => g.Key.GroupAliasOrGID, StringComparer.Ordinal))
-        {
-            var groupUsers = group.Value.Where(v => users.ContainsKey(v)
-                    && (v.IsOnline || (!v.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
-                    || v.UserPair.OwnPermissions.IsPaused()))
-                    .OrderByDescending(u => u.IsOnline)
-                    .ThenBy(u =>
-                    {
-                        if (string.Equals(u.UserData.UID, group.Key.OwnerUID, StringComparison.Ordinal)) return u.IsOnline ? 0 : 10;
-                        if (group.Key.GroupPairUserInfos.TryGetValue(u.UserData.UID, out var info))
-                        {
-                            if (info.IsModerator()) return u.IsOnline ? 1 : 11;
-                            if (info.IsPinned()) return u.IsOnline ? 2 : 12;
-                        }
-                        return u.IsOnline ? 3 : 13;
-                    })
-                    .ThenBy(
-                    u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
-                        ? (_configService.Current.PreferNotesOverNamesForVisible ? u.GetNote() : u.PlayerName)
-                        : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.Ordinal)
-                    .ToList();
-
-            drawFolders.Add(_drawEntityFactory.CreateDrawGroupFolder(group.Key, groupUsers));
-        }
-
-        var tags = _tagHandler.GetAllTagsSorted();
-        HashSet<Pair> alreadyInTags = new HashSet<Pair>();
-        foreach (var tag in tags)
-        {
-            IEnumerable<Pair> tagUsers = users.Select(k => k.Key).Where(u => u.IsDirectlyPaired && !u.IsOneSidedPair && _tagHandler.HasTag(u.UserData.UID, tag)
-                && (u.IsOnline || (!u.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
-                || u.UserPair.OwnPermissions.IsPaused()))
-                .OrderByDescending(u => u.IsOnline)
-                .ThenBy(
-                    u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
-                        ? (_configService.Current.PreferNotesOverNamesForVisible ? u.GetNote() : u.PlayerName)
-                        : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase);
-
-            drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(tag, tagUsers.Select(u =>
-            {
-                alreadyInTags.Add(u);
-                return u;
-            }).ToList()));
-        }
-
-        var onlineDirectPairedUsersNotInTags = users.Where(u => u.Key.IsDirectlyPaired && !u.Key.IsOneSidedPair && !_tagHandler.HasAnyTag(u.Key.UserData.UID)
-            && (u.Key.IsOnline || (!u.Key.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
-                || u.Key.UserPair.OwnPermissions.IsPaused()))
-            .OrderByDescending(u => u.Key.IsOnline)
-            .ThenBy(
-                u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
-                    ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
-                    : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
-            .Select(k => k.Key).ToList();
-
-        drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder((_configService.Current.ShowOfflineUsersSeparately ? TagHandler.CustomOnlineTag : TagHandler.CustomAllTag),
-            onlineDirectPairedUsersNotInTags));
-
-        if (_configService.Current.ShowOfflineUsersSeparately)
-        {
-            var offlineUsersEntries = users.Where(u => (!u.Key.IsOneSidedPair || u.Value.Any()) && !u.Key.IsOnline && !u.Key.UserPair.OwnPermissions.IsPaused()).OrderBy(
-                u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
-                    ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
-                    : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
-            .Select(k => k.Key).ToList();
-
-            drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomOfflineTag, offlineUsersEntries));
-        }
-
-        drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomUnpairedTag, users.Select(u => u.Key).Where(u => u.IsOneSidedPair).ToList()));
-
-        return drawFolders;
     }
 
     public override void Draw()
@@ -263,11 +170,6 @@ public class CompactUi : WindowMediatorSubscriberBase
             _lastPosition = pos;
             Mediator.Publish(new CompactUiChange(_lastSize, _lastPosition));
         }
-    }
-
-    public override void OnClose()
-    {
-        base.OnClose();
     }
 
     private void DrawAddCharacter()
@@ -567,6 +469,100 @@ public class CompactUi : WindowMediatorSubscriberBase
                 DrawAddCharacter();
             }
         }
+    }
+
+    private IEnumerable<DrawFolderBase> GetDrawFolders()
+    {
+        List<DrawFolderBase> drawFolders = new();
+
+        var users = GetFilteredGroupUsers()
+            .ToDictionary(g => g.Key, g => g.Value);
+
+        if (_configService.Current.ShowVisibleUsersSeparately)
+        {
+            var visibleUsers = users.Where(u => u.Key.IsVisible)
+            .OrderBy(
+                    u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
+                        ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
+                        : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(k => k.Key, k => k.Value);
+
+            drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomVisibleTag, visibleUsers));
+        }
+
+        foreach (var group in _pairManager.GroupPairs.OrderBy(g => g.Key.GroupAliasOrGID, StringComparer.Ordinal))
+        {
+            var groupUsers = group.Value.Where(v => users.ContainsKey(v)
+                    && (v.IsOnline || (!v.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
+                    || v.UserPair.OwnPermissions.IsPaused()))
+                    .OrderByDescending(u => u.IsOnline)
+                    .ThenBy(u =>
+                    {
+                        if (string.Equals(u.UserData.UID, group.Key.OwnerUID, StringComparison.Ordinal)) return u.IsOnline ? 0 : 10;
+                        if (group.Key.GroupPairUserInfos.TryGetValue(u.UserData.UID, out var info))
+                        {
+                            if (info.IsModerator()) return u.IsOnline ? 1 : 11;
+                            if (info.IsPinned()) return u.IsOnline ? 2 : 12;
+                        }
+                        return u.IsOnline ? 3 : 13;
+                    })
+                    .ThenBy(
+                    u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
+                        ? (_configService.Current.PreferNotesOverNamesForVisible ? u.GetNote() : u.PlayerName)
+                        : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.Ordinal)
+                    .ToList();
+
+            drawFolders.Add(_drawEntityFactory.CreateDrawGroupFolder(group.Key, groupUsers));
+        }
+
+        var tags = _tagHandler.GetAllTagsSorted();
+        HashSet<Pair> alreadyInTags = new HashSet<Pair>();
+        foreach (var tag in tags)
+        {
+            var tagUsers = users.Where(u => u.Key.IsDirectlyPaired && !u.Key.IsOneSidedPair && _tagHandler.HasTag(u.Key.UserData.UID, tag)
+                && (u.Key.IsOnline || (!u.Key.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
+                || u.Key.UserPair.OwnPermissions.IsPaused()))
+                .OrderByDescending(u => u.Key.IsOnline)
+                .ThenBy(
+                    u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
+                        ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
+                        : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(u => u.Key, u => u.Value);
+
+            drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(tag, tagUsers.Select(u =>
+            {
+                alreadyInTags.Add(u.Key);
+                return (u.Key, u.Value);
+            }).ToDictionary(u => u.Key, u => u.Value)));
+        }
+
+        var onlineDirectPairedUsersNotInTags = users.Where(u => u.Key.IsDirectlyPaired && !u.Key.IsOneSidedPair && !_tagHandler.HasAnyTag(u.Key.UserData.UID)
+            && (u.Key.IsOnline || (!u.Key.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
+                || u.Key.UserPair.OwnPermissions.IsPaused()))
+            .OrderByDescending(u => u.Key.IsOnline)
+            .ThenBy(
+                u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
+                    ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
+                    : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(u => u.Key, u => u.Value);
+
+        drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder((_configService.Current.ShowOfflineUsersSeparately ? TagHandler.CustomOnlineTag : TagHandler.CustomAllTag),
+            onlineDirectPairedUsersNotInTags));
+
+        if (_configService.Current.ShowOfflineUsersSeparately)
+        {
+            var offlineUsersEntries = users.Where(u => (!u.Key.IsOneSidedPair || u.Value.Any()) && !u.Key.IsOnline && !u.Key.UserPair.OwnPermissions.IsPaused()).OrderBy(
+                u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
+                    ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
+                    : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(u => u.Key, u => u.Value);
+
+            drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomOfflineTag, offlineUsersEntries));
+        }
+
+        drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomUnpairedTag, users.Where(u => u.Key.IsOneSidedPair).ToDictionary(u => u.Key, u => u.Value)));
+
+        return drawFolders;
     }
 
     private Dictionary<Pair, List<GroupFullInfoDto>> GetFilteredGroupUsers()

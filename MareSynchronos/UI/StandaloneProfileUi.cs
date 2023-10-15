@@ -1,15 +1,16 @@
 ﻿using Dalamud.Interface.Colors;
+using Dalamud.Interface.Internal;
+
+using Dalamud.Interface.Utility;
 using ImGuiNET;
+using MareSynchronos.API.Data;
+using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
-using MareSynchronos.API.Data.Extensions;
-using MareSynchronos.API.Data;
-using Dalamud.Interface.Utility;
-using Dalamud.Interface.Internal;
 
 namespace MareSynchronos.UI;
 

@@ -8,12 +8,9 @@ namespace MareSynchronos.UI.Components;
 
 public abstract class DrawFolderBase
 {
-    protected readonly string _id;
     protected readonly IEnumerable<DrawPairBase> _drawPairs;
+    protected readonly string _id;
     protected readonly TagHandler _tagHandler;
-
-    protected abstract bool RenderIfEmpty { get; }
-    protected abstract bool RenderMenu { get; }
 
     protected DrawFolderBase(string id, IEnumerable<DrawPairBase> drawPairs, TagHandler tagHandler)
     {
@@ -21,6 +18,9 @@ public abstract class DrawFolderBase
         _drawPairs = drawPairs;
         _tagHandler = tagHandler;
     }
+
+    protected abstract bool RenderIfEmpty { get; }
+    protected abstract bool RenderMenu { get; }
 
     public void Draw()
     {
@@ -72,6 +72,14 @@ public abstract class DrawFolderBase
         }
     }
 
+    protected abstract float DrawIcon(float textPosY, float originalY);
+
+    protected abstract void DrawMenu();
+
+    protected abstract void DrawName(float originalY, float width);
+
+    protected abstract float DrawRightSide(float originalY, float currentRightSideX);
+
     private float DrawRightSide(float originalY)
     {
         var barButtonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars);
@@ -100,9 +108,4 @@ public abstract class DrawFolderBase
 
         return DrawRightSide(originalY, rightSideStart);
     }
-
-    protected abstract float DrawIcon(float textPosY, float originalY);
-    protected abstract float DrawRightSide(float originalY, float currentRightSideX);
-    protected abstract void DrawMenu();
-    protected abstract void DrawName(float originalY, float width);
 }

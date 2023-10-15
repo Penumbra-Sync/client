@@ -11,20 +11,15 @@ using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.UI.Components;
 
-public class DrawGroupFolder : DrawFolderBase
+public class DrawFolderGroup : DrawFolderBase
 {
     private readonly ApiController _apiController;
+    private readonly GroupFullInfoDto _groupFullInfoDto;
     private readonly IdDisplayHandler _idDisplayHandler;
     private readonly MareMediator _mareMediator;
-    private readonly GroupFullInfoDto _groupFullInfoDto;
-    private bool IsOwner => string.Equals(_groupFullInfoDto.OwnerUID, _apiController.UID, StringComparison.Ordinal);
-    private bool IsModerator => IsOwner || _groupFullInfoDto.GroupUserInfo.IsModerator();
-    private bool IsPinned => _groupFullInfoDto.GroupUserInfo.IsPinned();
-    protected override bool RenderIfEmpty => true;
-    protected override bool RenderMenu => true;
 
-    public DrawGroupFolder(string id, GroupFullInfoDto groupFullInfoDto, ApiController apiController,
-        IEnumerable<DrawGroupPair> drawPairs, TagHandler tagHandler, IdDisplayHandler idDisplayHandler,
+    public DrawFolderGroup(string id, GroupFullInfoDto groupFullInfoDto, ApiController apiController,
+        IEnumerable<DrawPairSingleGroup> drawPairs, TagHandler tagHandler, IdDisplayHandler idDisplayHandler,
         MareMediator mareMediator) :
         base(id, drawPairs, tagHandler)
     {
@@ -33,6 +28,12 @@ public class DrawGroupFolder : DrawFolderBase
         _idDisplayHandler = idDisplayHandler;
         _mareMediator = mareMediator;
     }
+
+    protected override bool RenderIfEmpty => true;
+    protected override bool RenderMenu => true;
+    private bool IsModerator => IsOwner || _groupFullInfoDto.GroupUserInfo.IsModerator();
+    private bool IsOwner => string.Equals(_groupFullInfoDto.OwnerUID, _apiController.UID, StringComparison.Ordinal);
+    private bool IsPinned => _groupFullInfoDto.GroupUserInfo.IsPinned();
 
     protected override float DrawIcon(float textPosY, float originalY)
     {
@@ -50,7 +51,6 @@ public class DrawGroupFolder : DrawFolderBase
             using (ImRaii.PushFont(UiBuilder.IconFont))
                 ImGui.TextUnformatted(FontAwesomeIcon.Crown.ToIconString());
             UiSharedService.AttachToolTip("You are the owner of " + _groupFullInfoDto.GroupAliasOrGID);
-
         }
         else if (IsModerator)
         {

@@ -1,24 +1,22 @@
-﻿using Dalamud.Plugin;
-using Dalamud.Plugin.Ipc;
-using Dalamud.Game.ClientState.Objects.SubKinds;
+﻿using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
-using System.Collections.Concurrent;
-using System.Text;
+using Dalamud.Interface.Internal.Notifications;
+using Dalamud.Plugin;
+using Dalamud.Plugin.Ipc;
+using Dalamud.Utility;
+using MareSynchronos.PlayerData.Handlers;
+using MareSynchronos.Services;
+using MareSynchronos.Services.Mediator;
+using Microsoft.Extensions.Logging;
 using Penumbra.Api.Enums;
 using Penumbra.Api.Helpers;
-using Dalamud.Interface.Internal.Notifications;
-using Microsoft.Extensions.Logging;
-using MareSynchronos.PlayerData.Handlers;
-using MareSynchronos.Services.Mediator;
-using MareSynchronos.Services;
-using Dalamud.Utility;
+using System.Collections.Concurrent;
+using System.Text;
 
 namespace MareSynchronos.Interop;
 
 public sealed class IpcManager : DisposableMediatorSubscriberBase
 {
-    private readonly uint LockCode = 0x6D617265;
-
     private readonly ICallGateSubscriber<(int, int)> _customizePlusApiVersion;
     private readonly ICallGateSubscriber<Character?, string?> _customizePlusGetBodyScale;
     private readonly ICallGateSubscriber<string?, string?, object> _customizePlusOnScaleUpdate;
@@ -51,6 +49,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly FuncSubscriber<string, string, Dictionary<string, string>, string, int, PenumbraApiEc> _penumbraAddTemporaryMod;
     private readonly FuncSubscriber<(int, int)> _penumbraApiVersion;
     private readonly FuncSubscriber<string, int, bool, PenumbraApiEc> _penumbraAssignTemporaryCollection;
+    private readonly FuncSubscriber<string, string, TextureType, bool, Task> _penumbraConvertTextureFile;
     private readonly FuncSubscriber<string, PenumbraApiEc> _penumbraCreateNamedTemporaryCollection;
     private readonly EventSubscriber _penumbraDispose;
     private readonly FuncSubscriber<bool> _penumbraEnabled;
@@ -58,7 +57,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly FuncSubscriber<string> _penumbraGetMetaManipulations;
     private readonly EventSubscriber _penumbraInit;
     private readonly EventSubscriber<ModSettingChange, string, string, bool> _penumbraModSettingChanged;
-    private readonly FuncSubscriber<string, string, TextureType, bool, Task> _penumbraConvertTextureFile;
     private readonly EventSubscriber<nint, int> _penumbraObjectIsRedrawn;
     private readonly ActionSubscriber<string, RedrawType> _penumbraRedraw;
     private readonly ActionSubscriber<GameObject, RedrawType> _penumbraRedrawObject;
@@ -69,6 +67,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly FuncSubscriber<string[], string[], (string[], string[][])> _penumbraResolvePaths;
     private readonly ParamsFuncSubscriber<ushort, IReadOnlyDictionary<string, string[]>?[]> _penumbraResourcePaths;
     private readonly SemaphoreSlim _redrawSemaphore = new(2);
+    private readonly uint LockCode = 0x6D617265;
     private bool _customizePlusAvailable = false;
     private CancellationTokenSource _disposalCts = new();
     private bool _glamourerAvailable = false;
@@ -253,58 +252,11 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
                 {
                     logger.LogWarning("[{appid}] Failed to apply Glamourer data", applicationId);
                 }
-
             }).ConfigureAwait(false);
         }
         finally
         {
             _redrawSemaphore.Release();
-        }
-    }
-
-    public async Task GlamourerRevert(ILogger logger, GameObjectHandler handler, Guid applicationId, CancellationToken token)
-    {
-        if ((!CheckGlamourerApi()) || _dalamudUtil.IsZoning) return;
-        try
-        {
-            await _redrawSemaphore.WaitAsync(token).ConfigureAwait(false);
-            await PenumbraRedrawInternalAsync(logger, handler, applicationId, (chara) =>
-            {
-                try
-                {
-                    logger.LogDebug("[{appid}] Calling On IPC: GlamourerUnlockName", applicationId);
-                    _glamourerUnlock.InvokeFunc(handler.Name, LockCode);
-                    logger.LogDebug("[{appid}] Calling On IPC: GlamourerRevert", applicationId);
-                    _glamourerRevert.InvokeAction(chara, LockCode);
-                    logger.LogDebug("[{appid}] Calling On IPC: PenumbraRedraw", applicationId);
-                    _penumbraRedrawObject.Invoke(chara, RedrawType.AfterGPose);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "[{appid}] Error during GlamourerRevert", applicationId);
-                }
-
-            }).ConfigureAwait(false);
-        }
-        finally
-        {
-            _redrawSemaphore.Release();
-        }
-    }
-
-    public void GlamourerRevertByName(ILogger logger, string name, Guid applicationId)
-    {
-        if ((!CheckGlamourerApi()) || _dalamudUtil.IsZoning) return;
-        try
-        {
-            logger.LogDebug("[{appid}] Calling On IPC: GlamourerRevertByName", applicationId);
-            _glamourerRevertByName.InvokeAction(name, LockCode);
-            logger.LogDebug("[{appid}] Calling On IPC: GlamourerUnlockName", applicationId);
-            _glamourerUnlock.InvokeFunc(name, LockCode);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(ex, "Error during Glamourer RevertByName");
         }
     }
 
@@ -331,6 +283,51 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         catch
         {
             return string.Empty;
+        }
+    }
+
+    public async Task GlamourerRevert(ILogger logger, GameObjectHandler handler, Guid applicationId, CancellationToken token)
+    {
+        if ((!CheckGlamourerApi()) || _dalamudUtil.IsZoning) return;
+        try
+        {
+            await _redrawSemaphore.WaitAsync(token).ConfigureAwait(false);
+            await PenumbraRedrawInternalAsync(logger, handler, applicationId, (chara) =>
+            {
+                try
+                {
+                    logger.LogDebug("[{appid}] Calling On IPC: GlamourerUnlockName", applicationId);
+                    _glamourerUnlock.InvokeFunc(handler.Name, LockCode);
+                    logger.LogDebug("[{appid}] Calling On IPC: GlamourerRevert", applicationId);
+                    _glamourerRevert.InvokeAction(chara, LockCode);
+                    logger.LogDebug("[{appid}] Calling On IPC: PenumbraRedraw", applicationId);
+                    _penumbraRedrawObject.Invoke(chara, RedrawType.AfterGPose);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "[{appid}] Error during GlamourerRevert", applicationId);
+                }
+            }).ConfigureAwait(false);
+        }
+        finally
+        {
+            _redrawSemaphore.Release();
+        }
+    }
+
+    public void GlamourerRevertByName(ILogger logger, string name, Guid applicationId)
+    {
+        if ((!CheckGlamourerApi()) || _dalamudUtil.IsZoning) return;
+        try
+        {
+            logger.LogDebug("[{appid}] Calling On IPC: GlamourerRevertByName", applicationId);
+            _glamourerRevertByName.InvokeAction(name, LockCode);
+            logger.LogDebug("[{appid}] Calling On IPC: GlamourerUnlockName", applicationId);
+            _glamourerUnlock.InvokeFunc(name, LockCode);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Error during Glamourer RevertByName");
         }
     }
 
@@ -469,6 +466,46 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         }).ConfigureAwait(false);
     }
 
+    public async Task PenumbraConvertTextureFiles(ILogger logger, Dictionary<string, string[]> textures, IProgress<(string, int)> progress, CancellationToken token)
+    {
+        if (!CheckPenumbraApi()) return;
+
+        Mediator.Publish(new HaltScanMessage("TextureConversion"));
+        int currentTexture = 0;
+        foreach (var texture in textures)
+        {
+            if (token.IsCancellationRequested) break;
+
+            progress.Report((texture.Key, ++currentTexture));
+
+            logger.LogInformation("Converting Texture {path} to {type}", texture.Key, TextureType.Bc7Tex);
+            var convertTask = _penumbraConvertTextureFile.Invoke(texture.Key, texture.Key, TextureType.Bc7Tex, true);
+            await convertTask.ConfigureAwait(false);
+            if (convertTask.IsCompletedSuccessfully && texture.Value.Any())
+            {
+                foreach (var duplicatedTexture in texture.Value)
+                {
+                    logger.LogInformation("Migrating duplicate {dup}", duplicatedTexture);
+                    try
+                    {
+                        File.Copy(texture.Key, duplicatedTexture, true);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Failed to copy duplicate {dup}", duplicatedTexture);
+                    }
+                }
+            }
+        }
+        Mediator.Publish(new ResumeScanMessage("TextureConversion"));
+
+        await _dalamudUtil.RunOnFrameworkThread(async () =>
+        {
+            var gameObject = await _dalamudUtil.CreateGameObjectAsync(await _dalamudUtil.GetPlayerPointerAsync().ConfigureAwait(false)).ConfigureAwait(false);
+            _penumbraRedrawObject.Invoke(gameObject!, RedrawType.Redraw);
+        }).ConfigureAwait(false);
+    }
+
     public async Task<string> PenumbraCreateTemporaryCollectionAsync(ILogger logger, string uid)
     {
         if (!CheckPenumbraApi()) return string.Empty;
@@ -479,6 +516,19 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
             var retCreate = _penumbraCreateNamedTemporaryCollection.Invoke(collName);
             logger.LogTrace("Creating Temp Collection {collName}, Success: {ret}", collName, retCreate);
             return collName;
+        }).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyDictionary<string, string[]>?[]?> PenumbraGetCharacterData(ILogger logger, GameObjectHandler handler)
+    {
+        if (!CheckPenumbraApi()) return null;
+
+        return await _dalamudUtil.RunOnFrameworkThread(() =>
+        {
+            logger.LogTrace("Calling On IPC: Penumbra.GetGameObjectResourcePaths");
+            var idx = handler.GetGameObject()?.ObjectIndex;
+            if (idx == null) return null;
+            return _penumbraResourcePaths.Invoke(idx.Value);
         }).ConfigureAwait(false);
     }
 
@@ -548,59 +598,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
             logger.LogTrace("[{applicationId}] Removing temp files mod for {collName}, Success: {ret}", applicationId, collName, retRemove);
             var retAdd = _penumbraAddTemporaryMod.Invoke("MareChara_Files", collName, modPaths, string.Empty, 0);
             logger.LogTrace("[{applicationId}] Setting temp files mod for {collName}, Success: {ret}", applicationId, collName, retAdd);
-        }).ConfigureAwait(false);
-    }
-
-    public async Task PenumbraConvertTextureFiles(ILogger logger, Dictionary<string, string[]> textures, IProgress<(string, int)> progress, CancellationToken token)
-    {
-        if (!CheckPenumbraApi()) return;
-
-        Mediator.Publish(new HaltScanMessage("TextureConversion"));
-        int currentTexture = 0;
-        foreach (var texture in textures)
-        {
-            if (token.IsCancellationRequested) break;
-
-            progress.Report((texture.Key, ++currentTexture));
-
-            logger.LogInformation("Converting Texture {path} to {type}", texture.Key, TextureType.Bc7Tex);
-            var convertTask = _penumbraConvertTextureFile.Invoke(texture.Key, texture.Key, TextureType.Bc7Tex, true);
-            await convertTask.ConfigureAwait(false);
-            if (convertTask.IsCompletedSuccessfully && texture.Value.Any())
-            {
-                foreach (var duplicatedTexture in texture.Value)
-                {
-                    logger.LogInformation("Migrating duplicate {dup}", duplicatedTexture);
-                    try
-                    {
-                        File.Copy(texture.Key, duplicatedTexture, true);
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError(ex, "Failed to copy duplicate {dup}", duplicatedTexture);
-                    }
-                }
-            }
-        }
-        Mediator.Publish(new ResumeScanMessage("TextureConversion"));
-
-        await _dalamudUtil.RunOnFrameworkThread(async () =>
-        {
-            var gameObject = await _dalamudUtil.CreateGameObjectAsync(await _dalamudUtil.GetPlayerPointerAsync().ConfigureAwait(false)).ConfigureAwait(false);
-            _penumbraRedrawObject.Invoke(gameObject!, RedrawType.Redraw);
-        }).ConfigureAwait(false);
-    }
-
-    public async Task<IReadOnlyDictionary<string, string[]>?[]?> PenumbraGetCharacterData(ILogger logger, GameObjectHandler handler)
-    {
-        if (!CheckPenumbraApi()) return null;
-
-        return await _dalamudUtil.RunOnFrameworkThread(() =>
-        {
-            logger.LogTrace("Calling On IPC: Penumbra.GetGameObjectResourcePaths");
-            var idx = handler.GetGameObject()?.ObjectIndex;
-            if (idx == null) return null;
-            return _penumbraResourcePaths.Invoke(idx.Value);
         }).ConfigureAwait(false);
     }
 

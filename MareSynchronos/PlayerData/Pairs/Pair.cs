@@ -33,13 +33,13 @@ public class Pair
     }
 
     public bool HasCachedPlayer => CachedPlayer != null && !string.IsNullOrEmpty(CachedPlayer.PlayerName) && _onlineUserIdentDto != null;
+    public IndividualPairStatus IndividualPairStatus => UserPair.IndividualPairStatus;
+    public bool IsDirectlyPaired => IndividualPairStatus != IndividualPairStatus.None;
+    public bool IsOneSidedPair => IndividualPairStatus == IndividualPairStatus.OneSided;
     public bool IsOnline => CachedPlayer != null;
 
     public bool IsPaired => IndividualPairStatus == IndividualPairStatus.Bidirectional || UserPair.Groups.Any();
     public bool IsPaused => UserPair.OtherPermissions.IsPaused() || UserPair.OwnPermissions.IsPaused();
-    public bool IsDirectlyPaired => IndividualPairStatus != IndividualPairStatus.None;
-    public bool IsOneSidedPair => IndividualPairStatus == IndividualPairStatus.OneSided;
-
     public bool IsVisible => CachedPlayer?.IsVisible ?? false;
     public CharacterData? LastReceivedCharacterData { get; set; }
     public string? PlayerName => CachedPlayer?.PlayerName ?? string.Empty;
@@ -47,8 +47,6 @@ public class Pair
     public UserData UserData => UserPair.User;
 
     public UserFullPairDto UserPair { get; set; }
-    public IndividualPairStatus IndividualPairStatus => UserPair.IndividualPairStatus;
-
     private PairHandler? CachedPlayer { get; set; }
 
     public void AddContextMenu(GameObjectContextMenuOpenArgs args)

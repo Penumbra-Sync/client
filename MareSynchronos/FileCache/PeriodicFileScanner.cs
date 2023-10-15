@@ -10,11 +10,11 @@ namespace MareSynchronos.FileCache;
 public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
 {
     private readonly MareConfigService _configService;
+    private readonly DalamudUtilService _dalamudUtil;
+    private readonly FileCompactor _fileCompactor;
     private readonly FileCacheManager _fileDbManager;
     private readonly IpcManager _ipcManager;
     private readonly PerformanceCollectorService _performanceCollector;
-    private readonly DalamudUtilService _dalamudUtil;
-    private readonly FileCompactor _fileCompactor;
     private long _currentFileProgress = 0;
     private bool _fileScanWasRunning = false;
     private CancellationTokenSource _scanCancellationTokenSource = new();
@@ -38,15 +38,12 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
     }
 
     public long CurrentFileProgress => _currentFileProgress;
-    public long TotalFilesStorage { get; private set; }
     public long FileCacheSize { get; set; }
     public ConcurrentDictionary<string, int> HaltScanLocks { get; set; } = new(StringComparer.Ordinal);
     public bool IsScanRunning => CurrentFileProgress > 0 || TotalFiles > 0;
-
     public string TimeUntilNextScan => _timeUntilNextScan.ToString(@"mm\:ss");
-
     public long TotalFiles { get; private set; }
-
+    public long TotalFilesStorage { get; private set; }
     private int TimeBetweenScans => _configService.Current.TimeSpanBetweenScansInSeconds;
 
     public void HaltScan(string source)

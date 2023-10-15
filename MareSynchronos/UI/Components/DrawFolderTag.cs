@@ -8,10 +8,17 @@ using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.UI.Components;
 
-public class DrawTagFolder : DrawFolderBase
+public class DrawFolderTag : DrawFolderBase
 {
     private readonly ApiController _apiController;
     private readonly SelectPairForTagUi _selectPairForTagUi;
+
+    public DrawFolderTag(string id, IEnumerable<DrawPairBase> drawPairs, TagHandler tagHandler, ApiController apiController, SelectPairForTagUi selectPairForTagUi)
+        : base(id, drawPairs, tagHandler)
+    {
+        _apiController = apiController;
+        _selectPairForTagUi = selectPairForTagUi;
+    }
 
     protected override bool RenderIfEmpty => _id switch
     {
@@ -42,13 +49,6 @@ public class DrawTagFolder : DrawFolderBase
         TagHandler.CustomAllTag => false,
         _ => true,
     } && _drawPairs.Any();
-
-    public DrawTagFolder(string id, IEnumerable<DrawPairBase> drawPairs, TagHandler tagHandler, ApiController apiController, SelectPairForTagUi selectPairForTagUi)
-        : base(id, drawPairs, tagHandler)
-    {
-        _apiController = apiController;
-        _selectPairForTagUi = selectPairForTagUi;
-    }
 
     protected override float DrawIcon(float textPosY, float originalY)
     {
@@ -90,11 +90,11 @@ public class DrawTagFolder : DrawFolderBase
         ImGui.SetCursorPosY(originalY);
         string name = _id switch
         {
-            TagHandler.CustomUnpairedTag => "Unpaired",
+            TagHandler.CustomUnpairedTag => "One-sided Pairs",
             TagHandler.CustomOnlineTag => "Online / Paused by you",
             TagHandler.CustomOfflineTag => "Offline / Paused by other",
             TagHandler.CustomVisibleTag => "Visible",
-            TagHandler.CustomAllTag => "All Users",
+            TagHandler.CustomAllTag => "Users",
             _ => _id
         };
 
