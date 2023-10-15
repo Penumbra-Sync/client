@@ -1,9 +1,11 @@
 ﻿using Dalamud.Interface;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
+using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.Mediator;
@@ -12,21 +14,27 @@ using MareSynchronos.WebAPI;
 
 namespace MareSynchronos.UI.Components;
 
-public abstract class DrawPairBase
+public class DrawUserPair
 {
     protected readonly ApiController _apiController;
     protected readonly IdDisplayHandler _displayHandler;
     protected readonly MareMediator _mediator;
+    protected readonly List<GroupFullInfoDto> _syncedGroups;
     protected Pair _pair;
     private readonly string _id;
+    private readonly SelectTagForPairUi _selectTagForPairUi;
 
-    protected DrawPairBase(string id, Pair entry, ApiController apiController, IdDisplayHandler uIDDisplayHandler, MareMediator mareMediator)
+    public DrawUserPair(string id, Pair entry, List<GroupFullInfoDto> syncedGroups,
+        ApiController apiController, IdDisplayHandler uIDDisplayHandler,
+        MareMediator mareMediator, SelectTagForPairUi selectTagForPairUi)
     {
         _id = id;
         _pair = entry;
+        _syncedGroups = syncedGroups;
         _apiController = apiController;
         _displayHandler = uIDDisplayHandler;
         _mediator = mareMediator;
+        _selectTagForPairUi = selectTagForPairUi;
     }
 
     public Pair Pair => _pair;
@@ -41,16 +49,12 @@ public abstract class DrawPairBase
         var textSize = ImGui.CalcTextSize(_pair.UserData.AliasOrUID);
 
         var textPosY = originalY + pauseIconSize.Y / 2 - textSize.Y / 2;
-        DrawLeftSide(textPosY, originalY);
+        DrawLeftSide(textPosY);
         ImGui.SameLine();
         var posX = ImGui.GetCursorPosX();
         var rightSide = DrawRightSide(originalY);
         DrawName(originalY, posX, rightSide);
     }
-
-    protected abstract void DrawLeftSide(float textPosY, float originalY);
-
-    protected abstract void DrawPairedClientMenu();
 
     private void DrawCommonClientMenu()
     {
@@ -143,9 +147,135 @@ public abstract class DrawPairBase
         }
     }
 
+    private void DrawIndividualMenu()
+    {
+        ImGui.TextUnformatted("Individual Pair Functions");
+        var entryUID = _pair.UserData.AliasOrUID;
+
+        if (_pair.IndividualPairStatus != API.Data.Enum.IndividualPairStatus.None)
+        {
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Folder, "Pair Groups"))
+            {
+                _selectTagForPairUi.Open(_pair);
+            }
+            UiSharedService.AttachToolTip("Choose pair groups for " + entryUID);
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Trash, "Unpair Permanently") && UiSharedService.CtrlPressed())
+            {
+                _ = _apiController.UserRemovePair(new(_pair.UserData));
+            }
+            UiSharedService.AttachToolTip("Hold CTRL and click to unpair permanently from " + entryUID);
+        }
+        else
+        {
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Plus, "Pair individually"))
+            {
+                _ = _apiController.UserAddPair(new(_pair.UserData));
+            }
+            UiSharedService.AttachToolTip("Pair individually with " + entryUID);
+        }
+    }
+
+    private void DrawLeftSide(float textPosY)
+    {
+        string userPairText = string.Empty;
+
+        ImGui.SetCursorPosY(textPosY);
+
+        if (_pair.IsPaused)
+        {
+            ImGui.SetCursorPosY(textPosY);
+            using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
+            using var font = ImRaii.PushFont(UiBuilder.IconFont);
+            ImGui.TextUnformatted(FontAwesomeIcon.PauseCircle.ToIconString());
+            userPairText = _pair.UserData.AliasOrUID + " is paused";
+        }
+        else if (!_pair.IsOnline)
+        {
+            ImGui.SetCursorPosY(textPosY);
+            using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
+            using var font = ImRaii.PushFont(UiBuilder.IconFont);
+            ImGui.TextUnformatted(_pair.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.Bidirectional
+                ? FontAwesomeIcon.User.ToIconString() : FontAwesomeIcon.Users.ToIconString());
+            userPairText = _pair.UserData.AliasOrUID + " is offline";
+        }
+        else
+        {
+            using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ParsedGreen);
+            using var font = ImRaii.PushFont(UiBuilder.IconFont);
+            ImGui.TextUnformatted(_pair.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.Bidirectional
+                ? FontAwesomeIcon.User.ToIconString() : FontAwesomeIcon.Users.ToIconString());
+            userPairText = _pair.UserData.AliasOrUID + " is online";
+        }
+
+        if (_pair.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.OneSided)
+        {
+            userPairText += UiSharedService.TooltipSeparator + "User has not added you back";
+        }
+        else if (_pair.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.Bidirectional)
+        {
+            userPairText += UiSharedService.TooltipSeparator + "You are directly Paired";
+        }
+
+        if (_syncedGroups.Any())
+        {
+            userPairText += UiSharedService.TooltipSeparator + string.Join(Environment.NewLine, _syncedGroups.Select(g => "Paired through " + g.GroupAliasOrGID));
+        }
+        UiSharedService.AttachToolTip(userPairText);
+
+        if (_pair.UserPair.OwnPermissions.IsSticky())
+        {
+            ImGui.SetCursorPosY(textPosY);
+
+            using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X * 3 / 4f }))
+            using (ImRaii.PushFont(UiBuilder.IconFont))
+            {
+                ImGui.SameLine();
+                ImGui.TextUnformatted(FontAwesomeIcon.ArrowCircleUp.ToIconString());
+            }
+
+            UiSharedService.AttachToolTip(_pair.UserData.AliasOrUID + " has preferred permissions enabled");
+        }
+
+        if (_pair.IsVisible)
+        {
+            ImGui.SetCursorPosY(textPosY);
+            using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X * 3 / 4f }))
+            using (ImRaii.PushFont(UiBuilder.IconFont))
+            {
+                ImGui.SameLine();
+                using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ParsedGreen);
+                ImGui.TextUnformatted(FontAwesomeIcon.Eye.ToIconString());
+            }
+
+            UiSharedService.AttachToolTip("User is visible: " + _pair.PlayerName);
+        }
+    }
+
     private void DrawName(float originalY, float leftSide, float rightSide)
     {
         _displayHandler.DrawPairText(_id, _pair, leftSide, originalY, () => rightSide - leftSide);
+    }
+
+    private void DrawPairedClientMenu()
+    {
+        DrawIndividualMenu();
+
+        if (_syncedGroups.Any()) ImGui.Separator();
+        foreach (var entry in _syncedGroups)
+        {
+            bool selfIsOwner = string.Equals(_apiController.UID, entry.Owner.UID, StringComparison.Ordinal);
+            bool selfIsModerator = entry.GroupUserInfo.IsModerator();
+            bool userIsModerator = entry.GroupPairUserInfos.TryGetValue(_pair.UserData.UID, out var modinfo) && modinfo.IsModerator();
+            bool userIsPinned = entry.GroupPairUserInfos.TryGetValue(_pair.UserData.UID, out var info) && info.IsPinned();
+            if (selfIsOwner || selfIsModerator)
+            {
+                if (ImGui.BeginMenu(entry.GroupAliasOrGID + " Moderation Functions"))
+                {
+                    DrawSyncshellMenu(entry, selfIsOwner, selfIsModerator, userIsPinned, userIsModerator);
+                    ImGui.EndMenu();
+                }
+            }
+        }
     }
 
     private float DrawRightSide(float originalY)
@@ -270,5 +400,76 @@ public abstract class DrawPairBase
         }
 
         return rightSideStart;
+    }
+
+    private void DrawSyncshellMenu(GroupFullInfoDto group, bool selfIsOwner, bool selfIsModerator, bool userIsPinned, bool userIsModerator)
+    {
+        if (selfIsOwner || ((selfIsModerator) && (!userIsModerator)))
+        {
+            ImGui.TextUnformatted("Syncshell Moderator Functions");
+            var pinText = userIsPinned ? "Unpin user" : "Pin user";
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Thumbtack, pinText))
+            {
+                ImGui.CloseCurrentPopup();
+                if (!group.GroupPairUserInfos.TryGetValue(_pair.UserData.UID, out var userinfo))
+                {
+                    userinfo = API.Data.Enum.GroupPairUserInfo.IsPinned;
+                }
+                else
+                {
+                    userinfo.SetPinned(!userinfo.IsPinned());
+                }
+                _ = _apiController.GroupSetUserInfo(new GroupPairUserInfoDto(group.Group, _pair.UserData, userinfo));
+            }
+            UiSharedService.AttachToolTip("Pin this user to the Syncshell. Pinned users will not be deleted in case of a manually initiated Syncshell clean");
+
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Trash, "Remove user") && UiSharedService.CtrlPressed())
+            {
+                ImGui.CloseCurrentPopup();
+                _ = _apiController.GroupRemoveUser(new(group.Group, _pair.UserData));
+            }
+            UiSharedService.AttachToolTip("Hold CTRL and click to remove user " + (_pair.UserData.AliasOrUID) + " from Syncshell");
+
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.UserSlash, "Ban User"))
+            {
+                _mediator.Publish(new OpenBanUserPopupMessage(_pair, group));
+                ImGui.CloseCurrentPopup();
+            }
+            UiSharedService.AttachToolTip("Ban user from this Syncshell");
+
+            ImGui.Separator();
+        }
+
+        if (selfIsOwner)
+        {
+            ImGui.TextUnformatted("Syncshell Owner Functions");
+            string modText = userIsModerator ? "Demod user" : "Mod user";
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.UserShield, modText) && UiSharedService.CtrlPressed())
+            {
+                ImGui.CloseCurrentPopup();
+                if (!group.GroupPairUserInfos.TryGetValue(_pair.UserData.UID, out var userinfo))
+                {
+                    userinfo = API.Data.Enum.GroupPairUserInfo.IsModerator;
+                }
+                else
+                {
+                    userinfo.SetModerator(!userinfo.IsModerator());
+                }
+
+                _ = _apiController.GroupSetUserInfo(new GroupPairUserInfoDto(group.Group, _pair.UserData, userinfo));
+            }
+            UiSharedService.AttachToolTip("Hold CTRL to change the moderator status for " + (_pair.UserData.AliasOrUID) + Environment.NewLine +
+                "Moderators can kick, ban/unban, pin/unpin users and clear the Syncshell.");
+
+            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Crown, "Transfer Ownership") && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())
+            {
+                ImGui.CloseCurrentPopup();
+                _ = _apiController.GroupChangeOwnership(new(group.Group, _pair.UserData));
+            }
+            UiSharedService.AttachToolTip("Hold CTRL and SHIFT and click to transfer ownership of this Syncshell to "
+                + (_pair.UserData.AliasOrUID) + Environment.NewLine + "WARNING: This action is irreversible.");
+
+            ImGui.Separator();
+        }
     }
 }

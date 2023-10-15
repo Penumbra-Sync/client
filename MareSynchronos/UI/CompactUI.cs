@@ -490,29 +490,29 @@ public class CompactUi : WindowMediatorSubscriberBase
             drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomVisibleTag, visibleUsers));
         }
 
-        foreach (var group in _pairManager.GroupPairs.OrderBy(g => g.Key.GroupAliasOrGID, StringComparer.Ordinal))
+        foreach (var group in _pairManager.GroupPairs.Select(g => g.Key).OrderBy(g => g.GroupAliasOrGID, StringComparer.Ordinal))
         {
-            var groupUsers = group.Value.Where(v => users.ContainsKey(v)
-                    && (v.IsOnline || (!v.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
-                    || v.UserPair.OwnPermissions.IsPaused()))
-                    .OrderByDescending(u => u.IsOnline)
+            var groupUsers2 = users.Where(v => v.Value.Exists(g => string.Equals(g.GID, group.GID, StringComparison.Ordinal))
+                    && (v.Key.IsOnline || (!v.Key.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
+                    || v.Key.UserPair.OwnPermissions.IsPaused()))
+                    .OrderByDescending(u => u.Key.IsOnline)
                     .ThenBy(u =>
                     {
-                        if (string.Equals(u.UserData.UID, group.Key.OwnerUID, StringComparison.Ordinal)) return u.IsOnline ? 0 : 10;
-                        if (group.Key.GroupPairUserInfos.TryGetValue(u.UserData.UID, out var info))
+                        if (string.Equals(u.Key.UserData.UID, group.OwnerUID, StringComparison.Ordinal)) return u.Key.IsOnline ? 0 : 10;
+                        if (group.GroupPairUserInfos.TryGetValue(u.Key.UserData.UID, out var info))
                         {
-                            if (info.IsModerator()) return u.IsOnline ? 1 : 11;
-                            if (info.IsPinned()) return u.IsOnline ? 2 : 12;
+                            if (info.IsModerator()) return u.Key.IsOnline ? 1 : 11;
+                            if (info.IsPinned()) return u.Key.IsOnline ? 2 : 12;
                         }
-                        return u.IsOnline ? 3 : 13;
+                        return u.Key.IsOnline ? 3 : 13;
                     })
                     .ThenBy(
-                    u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
-                        ? (_configService.Current.PreferNotesOverNamesForVisible ? u.GetNote() : u.PlayerName)
-                        : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.Ordinal)
-                    .ToList();
+                    u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
+                        ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
+                        : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.Ordinal)
+                    .ToDictionary(k => k.Key, k => k.Value);
 
-            drawFolders.Add(_drawEntityFactory.CreateDrawGroupFolder(group.Key, groupUsers));
+            drawFolders.Add(_drawEntityFactory.CreateDrawGroupFolder(group, groupUsers2));
         }
 
         var tags = _tagHandler.GetAllTagsSorted();

@@ -19,7 +19,7 @@ public class DrawFolderGroup : DrawFolderBase
     private readonly MareMediator _mareMediator;
 
     public DrawFolderGroup(string id, GroupFullInfoDto groupFullInfoDto, ApiController apiController,
-        IEnumerable<DrawPairSingleGroup> drawPairs, TagHandler tagHandler, IdDisplayHandler idDisplayHandler,
+        IEnumerable<DrawUserPair> drawPairs, TagHandler tagHandler, IdDisplayHandler idDisplayHandler,
         MareMediator mareMediator) :
         base(id, drawPairs, tagHandler)
     {

@@ -8,11 +8,11 @@ namespace MareSynchronos.UI.Components;
 
 public abstract class DrawFolderBase
 {
-    protected readonly IEnumerable<DrawPairBase> _drawPairs;
+    protected readonly IEnumerable<DrawUserPair> _drawPairs;
     protected readonly string _id;
     protected readonly TagHandler _tagHandler;
 
-    protected DrawFolderBase(string id, IEnumerable<DrawPairBase> drawPairs, TagHandler tagHandler)
+    protected DrawFolderBase(string id, IEnumerable<DrawUserPair> drawPairs, TagHandler tagHandler)
     {
         _id = id;
         _drawPairs = drawPairs;

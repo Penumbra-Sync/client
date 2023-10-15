@@ -130,11 +130,27 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public uint WorldId => _dalamudUtil.GetWorldId();
 
+    public const string TooltipSeparator = "--SEP--";
+
     public static void AttachToolTip(string text)
     {
         if (ImGui.IsItemHovered())
         {
-            ImGui.SetTooltip(text);
+            ImGui.BeginTooltip();
+            if (text.Contains(TooltipSeparator, StringComparison.Ordinal))
+            {
+                var splitText = text.Split(TooltipSeparator, StringSplitOptions.RemoveEmptyEntries);
+                for (int i = 0; i < splitText.Length; i++)
+                {
+                    ImGui.TextUnformatted(splitText[i]);
+                    if (i != splitText.Length - 1) ImGui.Separator();
+                }
+            }
+            else
+            {
+                ImGui.TextUnformatted(text);
+            }
+            ImGui.EndTooltip();
         }
     }
 

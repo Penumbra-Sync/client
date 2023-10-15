@@ -13,7 +13,7 @@ public class DrawFolderTag : DrawFolderBase
     private readonly ApiController _apiController;
     private readonly SelectPairForTagUi _selectPairForTagUi;
 
-    public DrawFolderTag(string id, IEnumerable<DrawPairBase> drawPairs, TagHandler tagHandler, ApiController apiController, SelectPairForTagUi selectPairForTagUi)
+    public DrawFolderTag(string id, IEnumerable<DrawUserPair> drawPairs, TagHandler tagHandler, ApiController apiController, SelectPairForTagUi selectPairForTagUi)
         : base(id, drawPairs, tagHandler)
     {
         _apiController = apiController;
@@ -76,10 +76,10 @@ public class DrawFolderTag : DrawFolderBase
         {
             _selectPairForTagUi.Open(_id);
         }
+        UiSharedService.AttachToolTip("Select Individual Pairs for this Pair Group");
         if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Trash, "Delete Pair Group") && UiSharedService.CtrlPressed())
         {
             _tagHandler.RemoveTag(_id);
-            // deleet
         }
         UiSharedService.AttachToolTip("Hold CTRL to remove this Group permanently." + Environment.NewLine +
             "Note: this will not unpair with users in this Group.");
@@ -90,7 +90,7 @@ public class DrawFolderTag : DrawFolderBase
         ImGui.SetCursorPosY(originalY);
         string name = _id switch
         {
-            TagHandler.CustomUnpairedTag => "One-sided Pairs",
+            TagHandler.CustomUnpairedTag => "One-sided Individual Pairs",
             TagHandler.CustomOnlineTag => "Online / Paused by you",
             TagHandler.CustomOfflineTag => "Offline / Paused by other",
             TagHandler.CustomVisibleTag => "Visible",
@@ -134,7 +134,7 @@ public class DrawFolderTag : DrawFolderBase
         return currentRightSideX;
     }
 
-    private void PauseRemainingPairs(IEnumerable<DrawPairBase> availablePairs)
+    private void PauseRemainingPairs(IEnumerable<DrawUserPair> availablePairs)
     {
         foreach (var pairToPause in availablePairs.Where(pair => !pair.UserPair!.OwnPermissions.IsPaused()))
         {
@@ -144,7 +144,7 @@ public class DrawFolderTag : DrawFolderBase
         }
     }
 
-    private void ResumeAllPairs(IEnumerable<DrawPairBase> availablePairs)
+    private void ResumeAllPairs(IEnumerable<DrawUserPair> availablePairs)
     {
         foreach (var pairToPause in availablePairs)
         {
