@@ -77,6 +77,7 @@ public sealed class FileCacheManager : IDisposable
                 _logger.LogWarning("Could not load entries from {path}, continuing with empty file cache", _csvPath);
             }
 
+            Dictionary<string, bool> processedFiles = new(StringComparer.OrdinalIgnoreCase);
             foreach (var entry in entries)
             {
                 var splittedEntry = entry.Split(CsvSplit, StringSplitOptions.None);
@@ -86,6 +87,15 @@ public sealed class FileCacheManager : IDisposable
                     if (hash.Length != 40) throw new InvalidOperationException("Expected Hash length of 40, received " + hash.Length);
                     var path = splittedEntry[1];
                     var time = splittedEntry[2];
+
+                    if (processedFiles.ContainsKey(path))
+                    {
+                        _logger.LogWarning("Already processed {file}, ignoring", path);
+                        continue;
+                    }
+
+                    processedFiles.Add(path, true);
+
                     long size = -1;
                     long compressed = -1;
                     if (splittedEntry.Length > 3)
@@ -105,6 +115,11 @@ public sealed class FileCacheManager : IDisposable
                 {
                     _logger.LogWarning(ex, "Failed to initialize entry {entry}, ignoring", entry);
                 }
+            }
+
+            if (processedFiles.Count != entries.Length)
+            {
+                WriteOutFullCsv();
             }
         }
     }
