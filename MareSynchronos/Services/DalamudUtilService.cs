@@ -17,7 +17,7 @@ namespace MareSynchronos.Services;
 
 public class DalamudUtilService : IHostedService
 {
-    private readonly List<uint> _classJobIdsIgnoredForPets = new() { 30 };
+    private readonly List<uint> _classJobIdsIgnoredForPets = [30];
     private readonly IClientState _clientState;
     private readonly ICondition _condition;
     private readonly IFramework _framework;
@@ -105,8 +105,8 @@ public class DalamudUtilService : IHostedService
     public Dalamud.Game.ClientState.Objects.Types.Character? GetGposeCharacterFromObjectTableByName(string name, bool onlyGposeCharacters = false)
     {
         EnsureIsOnFramework();
-        return (Dalamud.Game.ClientState.Objects.Types.Character?)_objectTable.Where(i => !onlyGposeCharacters || i.ObjectIndex >= 200)
-            .FirstOrDefault(f => f.Name.ToString() == name);
+        return (Dalamud.Game.ClientState.Objects.Types.Character?)_objectTable
+            .FirstOrDefault(i => (!onlyGposeCharacters || i.ObjectIndex >= 200) && string.Equals(i.Name.ToString(), name, StringComparison.Ordinal));
     }
 
     public bool GetIsPlayerPresent()
@@ -350,19 +350,18 @@ public class DalamudUtilService : IHostedService
                     if (!isDrawing)
                     {
                         isDrawing = ((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0;
-                        if (isDrawing)
+                        if (isDrawing && !string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal)
+                            && !string.Equals(_lastGlobalBlockReason, "HasModelFilesInSlotLoaded", StringComparison.Ordinal))
                         {
-                            if (!string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal) && !string.Equals(_lastGlobalBlockReason, "HasModelFilesInSlotLoaded"))
-                            {
-                                _lastGlobalBlockPlayer = playerName;
-                                _lastGlobalBlockReason = "HasModelFilesInSlotLoaded";
-                                isDrawingChanged = true;
-                            }
+                            _lastGlobalBlockPlayer = playerName;
+                            _lastGlobalBlockReason = "HasModelFilesInSlotLoaded";
+                            isDrawingChanged = true;
                         }
                     }
                     else
                     {
-                        if (!string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal) && !string.Equals(_lastGlobalBlockReason, "HasModelInSlotLoaded"))
+                        if (!string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal)
+                            && !string.Equals(_lastGlobalBlockReason, "HasModelInSlotLoaded", StringComparison.Ordinal))
                         {
                             _lastGlobalBlockPlayer = playerName;
                             _lastGlobalBlockReason = "HasModelInSlotLoaded";
@@ -372,7 +371,8 @@ public class DalamudUtilService : IHostedService
                 }
                 else
                 {
-                    if (!string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal) && !string.Equals(_lastGlobalBlockReason, "RenderFlags"))
+                    if (!string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal)
+                        && !string.Equals(_lastGlobalBlockReason, "RenderFlags", StringComparison.Ordinal))
                     {
                         _lastGlobalBlockPlayer = playerName;
                         _lastGlobalBlockReason = "RenderFlags";

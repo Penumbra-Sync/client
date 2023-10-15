@@ -30,7 +30,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         _fileCompactor = fileCompactor;
     }
 
-    public List<DownloadFileTransfer> CurrentDownloads { get; private set; } = new();
+    public List<DownloadFileTransfer> CurrentDownloads { get; private set; } = [];
 
     public List<FileTransfer> ForbiddenTransfers => _orchestrator.ForbiddenTransfers;
 
@@ -86,8 +86,8 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
 
     private static (string fileHash, long fileLengthBytes) ReadBlockFileHeader(FileStream fileBlockStream)
     {
-        List<char> hashName = new();
-        List<char> fileLength = new();
+        List<char> hashName = [];
+        List<char> fileLength = [];
         var separator = (char)MungeByte(fileBlockStream.ReadByte());
         if (separator != '#') throw new InvalidDataException("Data is invalid, first char is not #");
 
@@ -177,8 +177,10 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
     {
         Logger.LogDebug("Download start: {id}", gameObjectHandler.Name);
 
-        List<DownloadFileDto> downloadFileInfoFromService = new();
-        downloadFileInfoFromService.AddRange(await FilesGetSizes(fileReplacement.Select(f => f.Hash).Distinct(StringComparer.Ordinal).ToList(), ct).ConfigureAwait(false));
+        List<DownloadFileDto> downloadFileInfoFromService =
+        [
+            .. await FilesGetSizes(fileReplacement.Select(f => f.Hash).Distinct(StringComparer.Ordinal).ToList(), ct).ConfigureAwait(false),
+        ];
 
         Logger.LogDebug("Files with size 0 or less: {files}", string.Join(", ", downloadFileInfoFromService.Where(f => f.Size <= 0).Select(f => f.Hash)));
 
@@ -219,9 +221,10 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
             // let server predownload files
             var requestIdResponse = await _orchestrator.SendRequestAsync(HttpMethod.Post, MareFiles.RequestEnqueueFullPath(fileGroup.First().DownloadUri),
                 fileGroup.Select(c => c.Hash), token).ConfigureAwait(false);
-            Logger.LogDebug("Sent request for {n} files on server {uri} with result {result}", fileGroup.Count(), fileGroup.First().DownloadUri, requestIdResponse.Content.ReadAsStringAsync().Result);
+            Logger.LogDebug("Sent request for {n} files on server {uri} with result {result}", fileGroup.Count(), fileGroup.First().DownloadUri,
+                await requestIdResponse.Content.ReadAsStringAsync(token).ConfigureAwait(false));
 
-            Guid requestId = Guid.Parse(requestIdResponse.Content.ReadAsStringAsync().Result.Trim('"'));
+            Guid requestId = Guid.Parse((await requestIdResponse.Content.ReadAsStringAsync().ConfigureAwait(false)).Trim('"'));
 
             Logger.LogDebug("GUID {requestId} for {n} files on server {uri}", requestId, fileGroup.Count(), fileGroup.First().DownloadUri);
 
@@ -235,15 +238,15 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                 {
                     try
                     {
-                        if (!_downloadStatus.ContainsKey(fileGroup.Key)) return;
-                        _downloadStatus[fileGroup.Key].TransferredBytes += bytesDownloaded;
+                        if (!_downloadStatus.TryGetValue(fileGroup.Key, out FileDownloadStatus? value)) return;
+                        value.TransferredBytes += bytesDownloaded;
                     }
                     catch (Exception ex)
                     {
                         Logger.LogWarning(ex, "Could not set download progress");
                     }
                 });
-                await DownloadAndMungeFileHttpClient(fileGroup.Key, requestId, fileGroup.ToList(), blockFile, progress, token).ConfigureAwait(false);
+                await DownloadAndMungeFileHttpClient(fileGroup.Key, requestId, [.. fileGroup], blockFile, progress, token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -275,7 +278,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                     try
                     {
                         Logger.LogDebug("Found file {file} with length {le}, decompressing download", fileHash, fileLengthBytes);
-                        var fileExtension = fileReplacement.First(f => string.Equals(f.Hash, fileHash, StringComparison.OrdinalIgnoreCase)).GamePaths[0].Split(".").Last();
+                        var fileExtension = fileReplacement.First(f => string.Equals(f.Hash, fileHash, StringComparison.OrdinalIgnoreCase)).GamePaths[0].Split(".")[^1];
 
                         byte[] compressedFileContent = new byte[fileLengthBytes];
                         _ = await fileBlockStream.ReadAsync(compressedFileContent, token).ConfigureAwait(false);
@@ -300,7 +303,8 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
             finally
             {
                 _orchestrator.ReleaseDownloadSlot();
-                fileBlockStream?.Dispose();
+                if (fileBlockStream != null)
+                    await fileBlockStream.DisposeAsync().ConfigureAwait(false);
                 File.Delete(blockFile);
             }
         }).ConfigureAwait(false);
@@ -314,7 +318,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
     {
         if (!_orchestrator.IsInitialized) throw new InvalidOperationException("FileTransferManager is not initialized");
         var response = await _orchestrator.SendRequestAsync(HttpMethod.Get, MareFiles.ServerFilesGetSizesFullPath(_orchestrator.FilesCdnUri!), hashes, ct).ConfigureAwait(false);
-        return await response.Content.ReadFromJsonAsync<List<DownloadFileDto>>(cancellationToken: ct).ConfigureAwait(false) ?? new List<DownloadFileDto>();
+        return await response.Content.ReadFromJsonAsync<List<DownloadFileDto>>(cancellationToken: ct).ConfigureAwait(false) ?? [];
     }
 
     private void PersistFileToStorage(string fileHash, string filePath)
@@ -334,9 +338,9 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         try
         {
             var entry = _fileDbManager.CreateCacheEntry(filePath);
-            if (!string.Equals(entry?.Hash, fileHash, StringComparison.OrdinalIgnoreCase))
+            if (entry != null && !string.Equals(entry.Hash, fileHash, StringComparison.OrdinalIgnoreCase))
             {
-                Logger.LogError("Hash mismatch after extracting, got {hash}, expected {expectedHash}, deleting file", entry?.Hash, fileHash);
+                Logger.LogError("Hash mismatch after extracting, got {hash}, expected {expectedHash}, deleting file", entry.Hash, fileHash);
                 File.Delete(filePath);
                 _fileDbManager.RemoveHashedFile(entry.Hash, entry.PrefixedFilePath);
             }

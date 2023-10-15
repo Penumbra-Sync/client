@@ -3,7 +3,7 @@ using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using FFXIVClientStructs.FFXIV.Client.System.Resource.Handle;
 
 namespace MareSynchronos.Interop;
-
+#pragma warning disable MA0048
 [StructLayout(LayoutKind.Explicit)]
 public unsafe struct RenderModel
 {
@@ -46,3 +46,4 @@ public unsafe struct WeaponDrawObject
 {
     [FieldOffset(0x00)] public RenderModel* RenderModel;
 }
+#pragma warning restore MA0048

@@ -166,15 +166,15 @@ public class DrawFolderGroup : DrawFolderBase
             ImGui.TextUnformatted("Syncshell Permissions");
             ImGui.Separator();
 
-            UiSharedService.BooleanToColoredIcon(!individualSoundsDisabled, false);
+            UiSharedService.BooleanToColoredIcon(!individualSoundsDisabled, inline: false);
             ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
             ImGui.TextUnformatted("Sound Sync");
 
-            UiSharedService.BooleanToColoredIcon(!individualAnimDisabled, false);
+            UiSharedService.BooleanToColoredIcon(!individualAnimDisabled, inline: false);
             ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
             ImGui.TextUnformatted("Animation Sync");
 
-            UiSharedService.BooleanToColoredIcon(!individualVFXDisabled, false);
+            UiSharedService.BooleanToColoredIcon(!individualVFXDisabled, inline: false);
             ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
             ImGui.TextUnformatted("VFX Sync");
 

@@ -479,7 +479,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
             progress.Report((texture.Key, ++currentTexture));
 
             logger.LogInformation("Converting Texture {path} to {type}", texture.Key, TextureType.Bc7Tex);
-            var convertTask = _penumbraConvertTextureFile.Invoke(texture.Key, texture.Key, TextureType.Bc7Tex, true);
+            var convertTask = _penumbraConvertTextureFile.Invoke(texture.Key, texture.Key, TextureType.Bc7Tex, d: true);
             await convertTask.ConfigureAwait(false);
             if (convertTask.IsCompletedSuccessfully && texture.Value.Any())
             {
@@ -488,7 +488,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
                     logger.LogInformation("Migrating duplicate {dup}", duplicatedTexture);
                     try
                     {
-                        File.Copy(texture.Key, duplicatedTexture, true);
+                        File.Copy(texture.Key, duplicatedTexture, overwrite: true);
                     }
                     catch (Exception ex)
                     {
@@ -579,7 +579,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         await _dalamudUtil.RunOnFrameworkThread(() =>
         {
             logger.LogTrace("[{applicationId}] Manip: {data}", applicationId, manipulationData);
-            var retAdd = _penumbraAddTemporaryMod.Invoke("MareChara_Meta", collName, new Dictionary<string, string>(), manipulationData, 0);
+            var retAdd = _penumbraAddTemporaryMod.Invoke("MareChara_Meta", collName, [], manipulationData, 0);
             logger.LogTrace("[{applicationId}] Setting temp meta mod for {collName}, Success: {ret}", applicationId, collName, retAdd);
         }).ConfigureAwait(false);
     }

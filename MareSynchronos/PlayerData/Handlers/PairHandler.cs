@@ -99,14 +99,14 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             Logger.LogDebug("[BASE-{appBase}] Received data but player was in invalid state, charaHandlerIsNull: {charaIsNull}, playerPointerIsNull: {ptrIsNull}",
                 applicationBase, _charaHandler == null, PlayerCharacter == IntPtr.Zero);
             var hasDiffMods = characterData.CheckUpdatedData(applicationBase, _cachedData, Logger,
-                this, forceApplyCustomization, false).Any(p => p.Value.Contains(PlayerChanges.ModManip) || p.Value.Contains(PlayerChanges.ModFiles));
+                this, forceApplyCustomization, forceApplyMods: false).Any(p => p.Value.Contains(PlayerChanges.ModManip) || p.Value.Contains(PlayerChanges.ModFiles));
             _forceApplyMods = hasDiffMods || _forceApplyMods || (PlayerCharacter == IntPtr.Zero && _cachedData == null);
             _cachedData = characterData;
             Logger.LogDebug("[BASE-{appBase}] Setting data: {hash}, forceApplyMods: {force}", applicationBase, _cachedData.DataHash.Value, _forceApplyMods);
             return;
         }
 
-        SetUploading(false);
+        SetUploading(isUploading: false);
 
         Logger.LogDebug("[BASE-{appbase}] Applying data for {player}, forceApplyCustomization: {forced}, forceApplyMods: {forceMods}", applicationBase, this, forceApplyCustomization, _forceApplyMods);
         Logger.LogDebug("[BASE-{appbase}] Hash for data is {newHash}, current cache hash is {oldHash}", applicationBase, characterData.DataHash.Value, _cachedData?.DataHash.Value ?? "NODATA");
@@ -158,7 +158,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     {
         base.Dispose(disposing);
 
-        SetUploading(false);
+        SetUploading(isUploading: false);
         _downloadManager.Dispose();
         var name = PlayerName;
         Logger.LogDebug("Disposing {name} ({user})", name, OnlineUser);
@@ -179,7 +179,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                 Logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser);
                 _ipcManager.PenumbraRemoveTemporaryCollectionAsync(Logger, applicationId, _penumbraCollection).GetAwaiter().GetResult();
 
-                foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData?.FileReplacements ?? new())
+                foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData?.FileReplacements ?? [])
                 {
                     try
                     {
@@ -213,15 +213,14 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         var handler = changes.Key switch
         {
             ObjectKind.Player => _charaHandler!,
-            ObjectKind.Companion => await _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetCompanion(ptr), false).ConfigureAwait(false),
-            ObjectKind.MinionOrMount => await _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetMinionOrMount(ptr), false).ConfigureAwait(false),
-            ObjectKind.Pet => await _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetPet(ptr), false).ConfigureAwait(false),
+            ObjectKind.Companion => await _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetCompanion(ptr), isWatched: false).ConfigureAwait(false),
+            ObjectKind.MinionOrMount => await _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetMinionOrMount(ptr), isWatched: false).ConfigureAwait(false),
+            ObjectKind.Pet => await _gameObjectHandlerFactory.Create(changes.Key, () => _dalamudUtil.GetPet(ptr), isWatched: false).ConfigureAwait(false),
             _ => throw new NotSupportedException("ObjectKind not supported: " + changes.Key)
         };
 
         try
         {
-            bool alreadyRedrawn = false;
             if (handler.Address == nint.Zero)
             {
                 return;
@@ -323,7 +322,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
                     toDownloadReplacements = TryCalculateModdedDictionary(applicationBase, charaData, out moddedPaths, downloadToken);
 
-                    if (toDownloadReplacements.All(c => _downloadManager.ForbiddenTransfers.Any(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
+                    if (toDownloadReplacements.TrueForAll(c => _downloadManager.ForbiddenTransfers.Exists(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
                     {
                         break;
                     }
@@ -407,7 +406,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             var pc = _dalamudUtil.FindPlayerByNameHash(OnlineUser.Ident);
             if (pc == default((string, nint))) return;
             Logger.LogDebug("One-Time Initializing {this}", this);
-            Initialize(pc.Name.ToString());
+            Initialize(pc.Name);
             Logger.LogDebug("One-Time Initialized {this}", this);
         }
 
@@ -422,7 +421,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
                 _ = Task.Run(() =>
                 {
-                    ApplyCharacterData(appData, _cachedData!, true);
+                    ApplyCharacterData(appData, _cachedData!, forceApplyCustomization: true);
                 });
             }
             else
@@ -443,7 +442,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private void Initialize(string name)
     {
         PlayerName = name;
-        _charaHandler = _gameObjectHandlerFactory.Create(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromCachedTableByIdent(OnlineUser.Ident), false).GetAwaiter().GetResult();
+        _charaHandler = _gameObjectHandlerFactory.Create(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromCachedTableByIdent(OnlineUser.Ident), isWatched: false).GetAwaiter().GetResult();
 
         Mediator.Subscribe<HonorificReadyMessage>(this, async (_) =>
         {
@@ -467,7 +466,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
         if (objectKind == ObjectKind.Player)
         {
-            using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Player, () => address, false).ConfigureAwait(false);
+            using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Player, () => address, isWatched: false).ConfigureAwait(false);
             tempHandler.CompareNameAndThrow(name);
             Logger.LogDebug("[{applicationId}] Restoring Customization and Equipment for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             await _ipcManager.GlamourerRevert(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
@@ -490,7 +489,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             if (minionOrMount != nint.Zero)
             {
                 await _ipcManager.CustomizePlusRevertAsync(minionOrMount).ConfigureAwait(false);
-                using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => minionOrMount, false).ConfigureAwait(false);
+                using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => minionOrMount, isWatched: false).ConfigureAwait(false);
                 await _ipcManager.GlamourerRevert(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
                 await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
             }
@@ -501,7 +500,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             if (pet != nint.Zero)
             {
                 await _ipcManager.CustomizePlusRevertAsync(pet).ConfigureAwait(false);
-                using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => pet, false).ConfigureAwait(false);
+                using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => pet, isWatched: false).ConfigureAwait(false);
                 await _ipcManager.GlamourerRevert(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
                 await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
             }
@@ -512,7 +511,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             if (companion != nint.Zero)
             {
                 await _ipcManager.CustomizePlusRevertAsync(companion).ConfigureAwait(false);
-                using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => companion, false).ConfigureAwait(false);
+                using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => companion, isWatched: false).ConfigureAwait(false);
                 await _ipcManager.GlamourerRevert(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
                 await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
             }
@@ -524,7 +523,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private List<FileReplacementData> TryCalculateModdedDictionary(Guid applicationBase, CharacterData charaData, out Dictionary<string, string> moddedDictionary, CancellationToken token)
     {
         Stopwatch st = Stopwatch.StartNew();
-        ConcurrentBag<FileReplacementData> missingFiles = new();
+        ConcurrentBag<FileReplacementData> missingFiles = [];
         moddedDictionary = new Dictionary<string, string>(StringComparer.Ordinal);
         ConcurrentDictionary<string, string> outputDict = new(StringComparer.Ordinal);
         bool hasMigrationChanges = false;
@@ -546,7 +545,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                     if (string.IsNullOrEmpty(new FileInfo(fileCache.ResolvedFilepath).Extension))
                     {
                         hasMigrationChanges = true;
-                        fileCache = _fileDbManager.MigrateFileHashToExtension(fileCache, item.GamePaths[0].Split(".").Last());
+                        fileCache = _fileDbManager.MigrateFileHashToExtension(fileCache, item.GamePaths[0].Split(".")[^1]);
                     }
 
                     foreach (var gamePath in item.GamePaths)
@@ -579,6 +578,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         if (hasMigrationChanges) _fileDbManager.WriteOutFullCsv();
         st.Stop();
         Logger.LogDebug("[BASE-{appBase}] ModdedPaths calculated in {time}ms, missing files: {count}, total files: {total}", applicationBase, st.ElapsedMilliseconds, missingFiles.Count, moddedDictionary.Keys.Count);
-        return missingFiles.ToList();
+        return [.. missingFiles];
     }
 }

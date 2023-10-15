@@ -29,7 +29,7 @@ public class PairFactory
 
     public Pair Create(UserPairDto userPairDto)
     {
-        return new Pair(_loggerFactory.CreateLogger<Pair>(), new(userPairDto.User, userPairDto.IndividualPairStatus, new List<string>(), userPairDto.OwnPermissions, userPairDto.OtherPermissions),
+        return new Pair(_loggerFactory.CreateLogger<Pair>(), new(userPairDto.User, userPairDto.IndividualPairStatus, [], userPairDto.OwnPermissions, userPairDto.OtherPermissions),
             _cachedPlayerFactory, _mareMediator, _serverConfigurationManager);
     }
 }

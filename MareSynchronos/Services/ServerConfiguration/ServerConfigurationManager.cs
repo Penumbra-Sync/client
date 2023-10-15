@@ -95,7 +95,7 @@ public class ServerConfigurationManager
     {
         try
         {
-            return _configService.Current.ServerStorage.ElementAt(idx);
+            return _configService.Current.ServerStorage[idx];
         }
         catch
         {
@@ -118,7 +118,7 @@ public class ServerConfigurationManager
     public void Save()
     {
         var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
-        _logger.LogDebug(caller + " Calling config save");
+        _logger.LogDebug("{caller} Calling config save", caller);
         _configService.Save();
     }
 
@@ -177,7 +177,7 @@ public class ServerConfigurationManager
         }
         else
         {
-            CurrentServerTagStorage().UidServerPairedUserTags[uid] = new() { tagName };
+            CurrentServerTagStorage().UidServerPairedUserTags[uid] = [tagName];
         }
 
         _serverTagConfig.Save();

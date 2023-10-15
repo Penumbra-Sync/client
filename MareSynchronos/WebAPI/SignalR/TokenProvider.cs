@@ -92,7 +92,7 @@ public sealed class TokenProvider : IDisposable
         var jwtToken = handler.ReadJwtToken(response);
         _logger.LogTrace("GetNewToken: JWT {token}", response);
         _logger.LogDebug("GetNewToken: Valid until {date}, ValidClaim until {date}", jwtToken.ValidTo,
-                new DateTime(long.Parse(jwtToken.Claims.Single(c => c.Type == "expiration_date").Value), DateTimeKind.Utc));
+                new DateTime(long.Parse(jwtToken.Claims.Single(c => string.Equals(c.Type, "expiration_date", StringComparison.Ordinal)).Value), DateTimeKind.Utc));
         return response;
     }
 
@@ -108,10 +108,8 @@ public sealed class TokenProvider : IDisposable
                 _logger.LogTrace("GetOrUpdate: Returning token from cache");
                 return token;
             }
-            else
-            {
-                renewal = true;
-            }
+
+            renewal = true;
         }
 
         _logger.LogTrace("GetOrUpdate: Getting new token");

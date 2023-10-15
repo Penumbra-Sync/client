@@ -24,7 +24,7 @@ public partial class FileReplacement
     {
         return new FileReplacementData
         {
-            GamePaths = GamePaths.ToArray(),
+            GamePaths = [.. GamePaths],
             Hash = Hash,
             FileSwapPath = IsFileSwap ? ResolvedPath : string.Empty,
         };

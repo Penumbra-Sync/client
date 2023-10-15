@@ -208,7 +208,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         ImGui.SetNextItemWidth(UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonSize.X - ImGui.GetStyle().ItemSpacing.X - usersButtonSize.X);
         ImGui.InputTextWithHint("##otheruid", "Other players UID/Alias", ref _pairToAdd, 20);
         ImGui.SameLine();
-        var alreadyExisting = _pairManager.DirectPairs.Any(p => string.Equals(p.UserData.UID, _pairToAdd, StringComparison.Ordinal) || string.Equals(p.UserData.Alias, _pairToAdd, StringComparison.Ordinal));
+        var alreadyExisting = _pairManager.DirectPairs.Exists(p => string.Equals(p.UserData.UID, _pairToAdd, StringComparison.Ordinal) || string.Equals(p.UserData.Alias, _pairToAdd, StringComparison.Ordinal));
         using (ImRaii.Disabled(alreadyExisting || string.IsNullOrEmpty(_pairToAdd)))
         {
             if (ImGuiComponents.IconButton(FontAwesomeIcon.UserPlus))
@@ -473,7 +473,7 @@ public class CompactUi : WindowMediatorSubscriberBase
 
     private IEnumerable<DrawFolderBase> GetDrawFolders()
     {
-        List<DrawFolderBase> drawFolders = new();
+        List<DrawFolderBase> drawFolders = [];
 
         var users = GetFilteredGroupUsers()
             .ToDictionary(g => g.Key, g => g.Value);
@@ -516,7 +516,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         }
 
         var tags = _tagHandler.GetAllTagsSorted();
-        HashSet<Pair> alreadyInTags = new HashSet<Pair>();
+        HashSet<Pair> alreadyInTags = [];
         foreach (var tag in tags)
         {
             var tagUsers = users.Where(u => u.Key.IsDirectlyPaired && !u.Key.IsOneSidedPair && _tagHandler.HasTag(u.Key.UserData.UID, tag)

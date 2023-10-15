@@ -28,9 +28,12 @@ public class TagHandler
 
     public List<string> GetAllTagsSorted()
     {
-        return _serverConfigurationManager.GetServerAvailablePairTags()
-            .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        return
+        [
+            .. _serverConfigurationManager.GetServerAvailablePairTags()
+                        .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
+,
+        ];
     }
 
     public HashSet<string> GetOtherUidsForTag(string tag)

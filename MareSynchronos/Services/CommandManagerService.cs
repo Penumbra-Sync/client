@@ -5,6 +5,7 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.UI;
 using MareSynchronos.WebAPI;
+using System.Globalization;
 
 namespace MareSynchronos.Services;
 
@@ -18,15 +19,13 @@ public sealed class CommandManagerService : IDisposable
     private readonly PerformanceCollectorService _performanceCollectorService;
     private readonly PeriodicFileScanner _periodicFileScanner;
     private readonly ServerConfigurationManager _serverConfigurationManager;
-    private readonly UiService _uiService;
 
     public CommandManagerService(ICommandManager commandManager, PerformanceCollectorService performanceCollectorService,
-        UiService uiService, ServerConfigurationManager serverConfigurationManager, PeriodicFileScanner periodicFileScanner,
+        ServerConfigurationManager serverConfigurationManager, PeriodicFileScanner periodicFileScanner,
         ApiController apiController, MareMediator mediator)
     {
         _commandManager = commandManager;
         _performanceCollectorService = performanceCollectorService;
-        _uiService = uiService;
         _serverConfigurationManager = serverConfigurationManager;
         _periodicFileScanner = periodicFileScanner;
         _apiController = apiController;
@@ -49,7 +48,7 @@ public sealed class CommandManagerService : IDisposable
         if (splitArgs == null || splitArgs.Length == 0)
         {
             // Interpret this as toggling the UI
-            _uiService.ToggleMainUi();
+            _mediator.Publish(new UiToggleMessage(typeof(CompactUi)));
             return;
         }
 
@@ -86,7 +85,7 @@ public sealed class CommandManagerService : IDisposable
         }
         else if (string.Equals(splitArgs[0], "perf", StringComparison.OrdinalIgnoreCase))
         {
-            if (splitArgs.Length > 1 && int.TryParse(splitArgs[1], out var limitBySeconds))
+            if (splitArgs.Length > 1 && int.TryParse(splitArgs[1], CultureInfo.InvariantCulture, out var limitBySeconds))
             {
                 _performanceCollectorService.PrintPerformanceStats(limitBySeconds);
             }

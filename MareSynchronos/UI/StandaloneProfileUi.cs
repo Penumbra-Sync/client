@@ -21,8 +21,8 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
     private readonly ServerConfigurationManager _serverManager;
     private readonly UiSharedService _uiSharedService;
     private bool _adjustedForScrollBars = false;
-    private byte[] _lastProfilePicture = Array.Empty<byte>();
-    private byte[] _lastSupporterPicture = Array.Empty<byte>();
+    private byte[] _lastProfilePicture = [];
+    private byte[] _lastSupporterPicture = [];
     private IDalamudTextureWrap? _supporterTextureWrap;
     private IDalamudTextureWrap? _textureWrap;
 
@@ -91,12 +91,12 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
             var descriptionChildHeight = rectMax.Y - pos.Y - rectMin.Y - spacing.Y * 2;
             if (descriptionTextSize.Y > descriptionChildHeight && !_adjustedForScrollBars)
             {
-                Size = Size.Value with { X = Size.Value.X + ImGui.GetStyle().ScrollbarSize };
+                Size = Size!.Value with { X = Size.Value.X + ImGui.GetStyle().ScrollbarSize };
                 _adjustedForScrollBars = true;
             }
             else if (descriptionTextSize.Y < descriptionChildHeight && _adjustedForScrollBars)
             {
-                Size = Size.Value with { X = Size.Value.X - ImGui.GetStyle().ScrollbarSize };
+                Size = Size!.Value with { X = Size.Value.X - ImGui.GetStyle().ScrollbarSize };
                 _adjustedForScrollBars = false;
             }
             var childFrame = ImGuiHelpers.ScaledVector2(256 + ImGui.GetStyle().WindowPadding.X + ImGui.GetStyle().WindowBorderSize, descriptionChildHeight);
@@ -141,13 +141,13 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
                 }
             }
 
-            if (Pair.UserPair.Groups.Exists(e => !string.Equals(Constants.IndividualKeyword, e)))
+            if (Pair.UserPair.Groups.Any())
             {
                 ImGui.TextUnformatted("Paired through Syncshells:");
                 foreach (var group in Pair.UserPair.Groups)
                 {
                     var groupNote = _serverManager.GetNoteForGid(group);
-                    var groupName = _pairManager.GroupPairs.First(f => f.Key.GID == group).Key.GroupAliasOrGID;
+                    var groupName = _pairManager.GroupPairs.First(f => string.Equals(f.Key.GID, group, StringComparison.Ordinal)).Key.GroupAliasOrGID;
                     var groupString = string.IsNullOrEmpty(groupNote) ? groupName : $"{groupNote} ({groupName})";
                     ImGui.TextUnformatted("- " + groupString);
                 }

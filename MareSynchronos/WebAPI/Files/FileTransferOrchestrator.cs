@@ -25,8 +25,10 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
     {
         _mareConfig = mareConfig;
         _tokenProvider = tokenProvider;
-        _httpClient = new();
-        _httpClient.Timeout = TimeSpan.FromSeconds(3000);
+        _httpClient = new()
+        {
+            Timeout = TimeSpan.FromSeconds(3000)
+        };
         var ver = Assembly.GetExecutingAssembly().GetName().Version;
         _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("MareSynchronos", ver!.Major + "." + ver!.Minor + "." + ver!.Build));
 
@@ -49,7 +51,7 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
     }
 
     public Uri? FilesCdnUri { private set; get; }
-    public List<FileTransfer> ForbiddenTransfers { get; } = new();
+    public List<FileTransfer> ForbiddenTransfers { get; } = [];
     public bool IsInitialized => FilesCdnUri != null;
 
     public void ClearDownloadRequest(Guid guid)

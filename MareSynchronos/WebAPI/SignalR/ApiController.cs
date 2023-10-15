@@ -15,6 +15,7 @@ using System.Reflection;
 
 namespace MareSynchronos.WebAPI;
 
+#pragma warning disable MA0040
 public sealed partial class ApiController : DisposableMediatorSubscriberBase, IMareHubClient
 {
     public const string MainServer = "Lunae Crescere Incipientis (Central Server EU)";
@@ -50,7 +51,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         Mediator.Subscribe<HubClosedMessage>(this, (msg) => MareHubOnClosed(msg.Exception));
         Mediator.Subscribe<HubReconnectedMessage>(this, (msg) => _ = Task.Run(MareHubOnReconnected));
         Mediator.Subscribe<HubReconnectingMessage>(this, (msg) => MareHubOnReconnecting(msg.Exception));
-        Mediator.Subscribe<CyclePauseMessage>(this, (msg) => CyclePause(msg.UserData));
+        Mediator.Subscribe<CyclePauseMessage>(this, (msg) => _ = CyclePause(msg.UserData));
 
         ServerState = ServerState.Offline;
 
@@ -229,7 +230,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         {
             var pair = _pairManager.GetOnlineUserPairs().Single(p => p.UserPair != null && p.UserData == userData);
             var perm = pair.UserPair!.OwnPermissions;
-            perm.SetPaused(true);
+            perm.SetPaused(paused: true);
             await UserSetPairPermissions(new API.Dto.User.UserPermissionsDto(userData, perm)).ConfigureAwait(false);
             // wait until it's changed
             while (pair.UserPair!.OwnPermissions != perm)
@@ -237,7 +238,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                 await Task.Delay(250, cts.Token).ConfigureAwait(false);
                 Logger.LogTrace("Waiting for permissions change for {data}", userData);
             }
-            perm.SetPaused(false);
+            perm.SetPaused(paused: false);
             await UserSetPairPermissions(new API.Dto.User.UserPermissionsDto(userData, perm)).ConfigureAwait(false);
         }, cts.Token).ContinueWith((t) => cts.Dispose());
 
@@ -440,3 +441,4 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         ServerState = state;
     }
 }
+#pragma warning restore MA0040

@@ -455,14 +455,14 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.FileArchive, "Compact all files in storage"))
             {
-                _ = Task.Run(() => _fileCompactor.CompactStorage(true));
+                _ = Task.Run(() => _fileCompactor.CompactStorage(compress: true));
             }
             UiSharedService.AttachToolTip("This will run compression on all files in your current Mare Storage." + Environment.NewLine
                 + "You do not need to run this manually if you keep the file compactor enabled.");
             ImGui.SameLine();
             if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.File, "Decompact all files in storage"))
             {
-                _ = Task.Run(() => _fileCompactor.CompactStorage(false));
+                _ = Task.Run(() => _fileCompactor.CompactStorage(compress: false));
             }
             UiSharedService.AttachToolTip("This will run decompression on all files in your current Mare Storage.");
         }
@@ -781,7 +781,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
                 if (ImGui.Button("Delete account", new Vector2(buttonSize, 0)))
                 {
-                    Task.Run(ApiController.UserDelete);
+                    _ = Task.Run(ApiController.UserDelete);
                     _deleteAccountPopupModalShown = false;
                     Mediator.Publish(new SwitchToIntroUiMessage());
                 }
@@ -880,7 +880,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     }
 
                     ImGui.Separator();
-                    if (!selectedServer.Authentications.Any(c => string.Equals(c.CharacterName, _uiShared.PlayerName, StringComparison.Ordinal)
+                    if (!selectedServer.Authentications.Exists(c => string.Equals(c.CharacterName, _uiShared.PlayerName, StringComparison.Ordinal)
                         && c.WorldId == _uiShared.WorldId))
                     {
                         if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.User, "Add current character"))
@@ -921,7 +921,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                             item.Value.Key = key;
                             _serverConfigurationManager.Save();
                         }
-                        if (!selectedServer.Authentications.Any(p => p.SecretKeyIdx == item.Key))
+                        if (!selectedServer.Authentications.Exists(p => p.SecretKeyIdx == item.Key))
                         {
                             if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Trash, "Delete Secret Key") && UiSharedService.CtrlPressed())
                             {

@@ -210,19 +210,22 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         var previousThreadPriority = Thread.CurrentThread.Priority;
         Thread.CurrentThread.Priority = ThreadPriority.Lowest;
         Logger.LogDebug("Getting files from {penumbra} and {storage}", penumbraDir, _configService.Current.CacheFolder);
-        string[] ext = { ".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk" };
+        string[] ext = [".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk"];
 
         Dictionary<string, string[]> penumbraFiles = new(StringComparer.Ordinal);
         foreach (var folder in Directory.EnumerateDirectories(penumbraDir!))
         {
             try
             {
-                penumbraFiles[folder] = Directory.GetFiles(folder, "*.*", SearchOption.AllDirectories)
-                        .AsParallel()
-                        .Where(f => ext.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase))
-                            && !f.Contains(@"\bg\", StringComparison.OrdinalIgnoreCase)
-                            && !f.Contains(@"\bgcommon\", StringComparison.OrdinalIgnoreCase)
-                            && !f.Contains(@"\ui\", StringComparison.OrdinalIgnoreCase)).ToArray();
+                penumbraFiles[folder] =
+                [
+                    .. Directory.GetFiles(folder, "*.*", SearchOption.AllDirectories)
+                                            .AsParallel()
+                                            .Where(f => ext.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase))
+                                                && !f.Contains(@"\bg\", StringComparison.OrdinalIgnoreCase)
+                                                && !f.Contains(@"\bgcommon\", StringComparison.OrdinalIgnoreCase)
+                                                && !f.Contains(@"\ui\", StringComparison.OrdinalIgnoreCase)),
+                ];
             }
             catch (Exception ex)
             {
@@ -236,7 +239,7 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
                                 .AsParallel()
                                 .Where(f =>
                                 {
-                                    var val = f.Split('\\').Last();
+                                    var val = f.Split('\\')[^1];
                                     return val.Length == 40 || (val.Split('.').FirstOrDefault()?.Length ?? 0) == 40;
                                 });
 
@@ -257,8 +260,8 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         // scan files from database
         var threadCount = Math.Clamp((int)(Environment.ProcessorCount / 2.0f), 2, 8);
 
-        List<FileCacheEntity> entitiesToRemove = new();
-        List<FileCacheEntity> entitiesToUpdate = new();
+        List<FileCacheEntity> entitiesToRemove = [];
+        List<FileCacheEntity> entitiesToUpdate = [];
         object sync = new();
         Thread[] workerThreads = new Thread[threadCount];
 

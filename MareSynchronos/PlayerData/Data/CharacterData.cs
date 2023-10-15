@@ -8,10 +8,10 @@ namespace MareSynchronos.PlayerData.Data;
 
 public class CharacterData
 {
-    public Dictionary<ObjectKind, string> CustomizePlusScale { get; set; } = new();
-    public Dictionary<ObjectKind, HashSet<FileReplacement>> FileReplacements { get; set; } = new();
+    public Dictionary<ObjectKind, string> CustomizePlusScale { get; set; } = [];
+    public Dictionary<ObjectKind, HashSet<FileReplacement>> FileReplacements { get; set; } = [];
 
-    public Dictionary<ObjectKind, string> GlamourerString { get; set; } = new();
+    public Dictionary<ObjectKind, string> GlamourerString { get; set; } = [];
 
     public string HeelsData { get; set; } = string.Empty;
     public string HonorificData { get; set; } = string.Empty;

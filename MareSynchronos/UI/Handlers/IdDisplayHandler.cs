@@ -55,11 +55,11 @@ public class IdDisplayHandler
             {
                 if (_editIsUid)
                 {
-                    _serverManager.SetNoteForUid(_editEntry, _editComment, true);
+                    _serverManager.SetNoteForUid(_editEntry, _editComment, save: true);
                 }
                 else
                 {
-                    _serverManager.SetNoteForGid(_editEntry, _editComment, true);
+                    _serverManager.SetNoteForGid(_editEntry, _editComment, save: true);
                 }
 
                 _editComment = _serverManager.GetNoteForGid(group.GID) ?? string.Empty;
@@ -74,7 +74,7 @@ public class IdDisplayHandler
             ImGui.SetNextItemWidth(editBoxWidth.Invoke());
             if (ImGui.InputTextWithHint("", "Name/Notes", ref _editComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
             {
-                _serverManager.SetNoteForGid(group.GID, _editComment, true);
+                _serverManager.SetNoteForGid(group.GID, _editComment, save: true);
                 _editEntry = string.Empty;
             }
 
@@ -121,7 +121,7 @@ public class IdDisplayHandler
             {
                 if (string.Equals(_lastMouseOverUid, id))
                 {
-                    _mediator.Publish(new ProfilePopoutToggle(null));
+                    _mediator.Publish(new ProfilePopoutToggle(Pair: null));
                     _lastMouseOverUid = string.Empty;
                     _popupShown = false;
                     _textureWrap?.Dispose();
@@ -143,11 +143,11 @@ public class IdDisplayHandler
             {
                 if (_editIsUid)
                 {
-                    _serverManager.SetNoteForUid(_editEntry, _editComment, true);
+                    _serverManager.SetNoteForUid(_editEntry, _editComment, save: true);
                 }
                 else
                 {
-                    _serverManager.SetNoteForGid(_editEntry, _editComment, true);
+                    _serverManager.SetNoteForGid(_editEntry, _editComment, save: true);
                 }
 
                 _editComment = pair.GetNote() ?? string.Empty;

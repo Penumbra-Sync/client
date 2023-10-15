@@ -15,10 +15,10 @@ namespace MareSynchronos.UI.Components.Popup;
 internal class SyncshellAdminPopupHandler : IPopupHandler
 {
     private readonly ApiController _apiController;
-    private readonly List<string> _oneTimeInvites = new();
+    private readonly List<string> _oneTimeInvites = [];
     private readonly PairManager _pairManager;
     private readonly UiSharedService _uiSharedService;
-    private List<BannedGroupUserDto> _bannedUsers = new();
+    private List<BannedGroupUserDto> _bannedUsers = [];
     private GroupFullInfoDto _groupFullInfo = null!;
     private bool _isModerator = false;
     private bool _isOwner = false;
@@ -219,8 +219,6 @@ internal class SyncshellAdminPopupHandler : IPopupHandler
             }
             ownerNode.Dispose();
         }
-
-        // todo rest
     }
 
     public void Open(GroupFullInfoDto groupFullInfo)

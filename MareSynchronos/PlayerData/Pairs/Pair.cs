@@ -1,4 +1,5 @@
 ﻿using Dalamud.ContextMenu;
+using Dalamud.Game.Text.SeStringHandling;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Data.Extensions;
@@ -53,18 +54,24 @@ public class Pair
     {
         if (CachedPlayer == null || args.ObjectId != CachedPlayer.PlayerCharacterId || IsPaused) return;
 
-        args.AddCustomItem(new GameObjectContextMenuItem("[Mare] Open Profile", (a) =>
+        SeStringBuilder seStringBuilder = new();
+        SeStringBuilder seStringBuilder2 = new();
+        SeStringBuilder seStringBuilder3 = new();
+        var openProfileSeString = seStringBuilder.AddUiForeground(526).AddText(" ").AddUiForegroundOff().AddText("Open Profile").Build();
+        var reapplyDataSeString = seStringBuilder2.AddUiForeground(526).AddText(" ").AddUiForegroundOff().AddText("Reapply last data").Build();
+        var cyclePauseState = seStringBuilder3.AddUiForeground(526).AddText(" ").AddUiForegroundOff().AddText("Cycle pause state").Build();
+        args.AddCustomItem(new GameObjectContextMenuItem(openProfileSeString, (a) =>
         {
             _mediator.Publish(new ProfileOpenStandaloneMessage(this));
         }));
-        args.AddCustomItem(new GameObjectContextMenuItem("[Mare] Reapply last data", (a) =>
+        args.AddCustomItem(new GameObjectContextMenuItem(reapplyDataSeString, (a) =>
         {
-            ApplyLastReceivedData(true);
-        }, false));
-        args.AddCustomItem(new GameObjectContextMenuItem("[Mare] Cycle pause state", (a) =>
+            ApplyLastReceivedData(forced: true);
+        }, useDalamudIndicator: false));
+        args.AddCustomItem(new GameObjectContextMenuItem(cyclePauseState, (a) =>
         {
             _mediator.Publish(new CyclePauseMessage(UserData));
-        }, false));
+        }, useDalamudIndicator: false));
     }
 
     public void ApplyData(OnlineUserCharaDataDto data)

@@ -55,7 +55,7 @@ public sealed class FileCacheManager : IDisposable
         if (File.Exists(_csvPath))
         {
             bool success = false;
-            string[] entries = Array.Empty<string>();
+            string[] entries = [];
             int attempts = 0;
             while (!success && attempts < 10)
             {
@@ -94,7 +94,7 @@ public sealed class FileCacheManager : IDisposable
                         continue;
                     }
 
-                    processedFiles.Add(path, true);
+                    processedFiles.Add(path, value: true);
 
                     long size = -1;
                     long compressed = -1;
@@ -159,7 +159,7 @@ public sealed class FileCacheManager : IDisposable
 
     public List<FileCacheEntity> GetAllFileCachesByHash(string hash)
     {
-        List<FileCacheEntity> output = new();
+        List<FileCacheEntity> output = [];
         if (_fileCaches.TryGetValue(hash, out var fileCacheEntities))
         {
             foreach (var filecache in fileCacheEntities.ToList())
@@ -316,14 +316,12 @@ public sealed class FileCacheManager : IDisposable
         try
         {
             RemoveHashedFile(fileCache.Hash, fileCache.PrefixedFilePath);
-            FileInfo oldCache = new(fileCache.ResolvedFilepath);
-            var extensionPath = fileCache.ResolvedFilepath.ToUpper() + "." + ext;
-            File.Move(fileCache.ResolvedFilepath, extensionPath, true);
-            var newHashedEntity = new FileCacheEntity(fileCache.Hash, fileCache.PrefixedFilePath + "." + ext, DateTime.UtcNow.Ticks.ToString());
+            FileInfo fileInfo = new(fileCache.ResolvedFilepath);
+            FileInfo oldCache = fileInfo;
+            var extensionPath = fileCache.ResolvedFilepath.ToUpper(CultureInfo.InvariantCulture) + "." + ext;
+            File.Move(fileCache.ResolvedFilepath, extensionPath, overwrite: true);
+            var newHashedEntity = new FileCacheEntity(fileCache.Hash, fileCache.PrefixedFilePath + "." + ext, DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture));
             newHashedEntity.SetResolvedFilePath(extensionPath);
-            FileInfo newCache = new FileInfo(extensionPath);
-            newCache.LastAccessTime = oldCache.LastAccessTime;
-            newCache.LastWriteTime = oldCache.LastWriteTime;
             AddHashedFile(newHashedEntity);
             _logger.LogDebug("Migrated from {oldPath} to {newPath}", fileCache.ResolvedFilepath, newHashedEntity.ResolvedFilepath);
             return newHashedEntity;
@@ -340,7 +338,7 @@ public sealed class FileCacheManager : IDisposable
     {
         if (!_fileCaches.TryGetValue(fileCache.Hash, out var entries))
         {
-            _fileCaches[fileCache.Hash] = entries = new();
+            _fileCaches[fileCache.Hash] = entries = [];
         }
 
         if (!entries.Exists(u => string.Equals(u.PrefixedFilePath, fileCache.PrefixedFilePath, StringComparison.OrdinalIgnoreCase)))
@@ -394,7 +392,7 @@ public sealed class FileCacheManager : IDisposable
             return null;
         }
 
-        if (!string.Equals(file.LastWriteTimeUtc.Ticks.ToString(), fileCache.LastModifiedDateTicks, StringComparison.Ordinal))
+        if (!string.Equals(file.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture), fileCache.LastModifiedDateTicks, StringComparison.Ordinal))
         {
             UpdateHashedFile(fileCache);
         }

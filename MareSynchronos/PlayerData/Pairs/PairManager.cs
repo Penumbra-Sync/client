@@ -57,7 +57,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     {
         if (!_allClientPairs.ContainsKey(dto.User))
             _allClientPairs[dto.User] = _pairFactory.Create(new UserFullPairDto(dto.User, API.Data.Enum.IndividualPairStatus.None,
-                new List<string> { dto.Group.GID }, dto.SelfToOtherPermissions, dto.OtherToSelfPermissions));
+                [dto.Group.GID], dto.SelfToOtherPermissions, dto.OtherToSelfPermissions));
         else _allClientPairs[dto.User].UserPair.Groups.Add(dto.GID);
         RecreateLazy();
     }
@@ -351,7 +351,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     {
         return new Lazy<Dictionary<GroupFullInfoDto, List<Pair>>>(() =>
         {
-            Dictionary<GroupFullInfoDto, List<Pair>> outDict = new();
+            Dictionary<GroupFullInfoDto, List<Pair>> outDict = [];
             foreach (var group in _allGroups)
             {
                 outDict[group.Value] = _allClientPairs.Select(p => p.Value).Where(p => p.UserPair.Groups.Exists(g => GroupDataComparer.Instance.Equals(group.Key, new(g)))).ToList();
@@ -364,7 +364,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     {
         return new Lazy<Dictionary<Pair, List<GroupFullInfoDto>>>(() =>
         {
-            Dictionary<Pair, List<GroupFullInfoDto>> outDict = new();
+            Dictionary<Pair, List<GroupFullInfoDto>> outDict = [];
 
             foreach (var pair in _allClientPairs.Select(k => k.Value))
             {
@@ -379,7 +379,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
     {
         foreach (var pair in _allClientPairs.Select(k => k.Value))
         {
-            pair.ApplyLastReceivedData(true);
+            pair.ApplyLastReceivedData(forced: true);
         }
     }
 

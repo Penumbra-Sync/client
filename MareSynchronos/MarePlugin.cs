@@ -112,7 +112,7 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
     {
         Logger?.LogDebug("Client login");
 
-        Task.Run(WaitForPlayerAndLaunchCharacterManager);
+        _ = Task.Run(WaitForPlayerAndLaunchCharacterManager);
     }
 
     private void DalamudUtilOnLogOut()

@@ -38,7 +38,7 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
         _ipcManager = ipcManager;
         _configService = configService;
         _dalamudUtil = dalamudUtil;
-        _gposeGameObjects = new();
+        _gposeGameObjects = [];
         Mediator.Subscribe<GposeStartMessage>(this, _ => _isInGpose = true);
         Mediator.Subscribe<GposeEndMessage>(this, async _ =>
         {
@@ -46,9 +46,9 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
             CancellationTokenSource cts = new();
             foreach (var item in _gposeGameObjects)
             {
-                if ((await dalamudUtil.RunOnFrameworkThread(() => item.Value.CurrentAddress())) != nint.Zero)
+                if ((await dalamudUtil.RunOnFrameworkThread(() => item.Value.CurrentAddress()).ConfigureAwait(false)) != nint.Zero)
                 {
-                    await _ipcManager.GlamourerRevert(logger, item.Value, Guid.NewGuid(), cts.Token);
+                    await _ipcManager.GlamourerRevert(logger, item.Value, Guid.NewGuid(), cts.Token).ConfigureAwait(false);
                 }
                 else
                 {
@@ -98,7 +98,7 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
                 await _ipcManager.PenumbraSetManipulationDataAsync(_logger, applicationId, coll, LoadedCharaFile.CharaFileData.ManipulationData).ConfigureAwait(false);
 
                 GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Player,
-                    () => _dalamudUtil.GetGposeCharacterFromObjectTableByName(charaTarget.Name.ToString(), _isInGpose)?.Address ?? IntPtr.Zero, false).ConfigureAwait(false);
+                    () => _dalamudUtil.GetGposeCharacterFromObjectTableByName(charaTarget.Name.ToString(), _isInGpose)?.Address ?? IntPtr.Zero, isWatched: false).ConfigureAwait(false);
 
                 if (!_gposeGameObjects.ContainsKey(charaTarget.Name.ToString()))
                     _gposeGameObjects[charaTarget.Name.ToString()] = tempHandler;
@@ -151,21 +151,7 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
             using var lz4Stream = new LZ4Stream(unwrapped, LZ4StreamMode.Decompress, LZ4StreamFlags.HighCompression);
             using var reader = new BinaryReader(lz4Stream);
             LoadedCharaFile = MareCharaFileHeader.FromBinaryReader(filePath, reader);
-            /*using var unwrapped2 = File.OpenRead(filePath);
-            using var lz4Stream2 = new LZ4Stream(unwrapped2, LZ4StreamMode.Decompress, LZ4StreamFlags.HighCompression);
-            using var reader2 = new BinaryReader(lz4Stream2);
-            using var writer = File.OpenWrite(filePath + ".raw");
-            using var wr = new BinaryWriter(writer);
-            var bufferSize = 4 * 1024 * 1024;
-            var buffer = new byte[bufferSize];
-            int chunk = 0;
-            int length = 0;
-            while ((length = reader2.Read(buffer)) > 0)
-            {
-                if (length < bufferSize) bufferSize = (int)length;
-                _logger.LogTrace($"Reading chunk {chunk++} {bufferSize}/{length} of {filePath}");
-                wr.Write(length > bufferSize ? buffer : buffer.Take((int)length).ToArray());
-            }*/
+
             _logger.LogInformation("Read Mare Chara File");
             _logger.LogInformation("Version: {ver}", (LoadedCharaFile?.Version ?? -1));
             long expectedLength = 0;

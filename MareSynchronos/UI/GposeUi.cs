@@ -52,7 +52,7 @@ public class GposeUi : WindowMediatorSubscriberBase
                     _configService.Current.ExportFolder = Path.GetDirectoryName(path) ?? string.Empty;
                     _configService.Save();
 
-                    Task.Run(() => _mareCharaFileManager.LoadMareCharaFile(path));
+                    _ = Task.Run(() => _mareCharaFileManager.LoadMareCharaFile(path));
                 }, 1, Directory.Exists(_configService.Current.ExportFolder) ? _configService.Current.ExportFolder : null);
             }
             UiSharedService.AttachToolTip("Applies it to the currently selected GPose actor");
@@ -62,7 +62,7 @@ public class GposeUi : WindowMediatorSubscriberBase
                 UiSharedService.TextWrapped("File Description: " + _mareCharaFileManager.LoadedCharaFile.CharaFileData.Description);
                 if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Check, "Apply loaded MCDF"))
                 {
-                    Task.Run(async () => await _mareCharaFileManager.ApplyMareCharaFile(_dalamudUtil.GposeTargetGameObject).ConfigureAwait(false));
+                    _ = Task.Run(async () => await _mareCharaFileManager.ApplyMareCharaFile(_dalamudUtil.GposeTargetGameObject).ConfigureAwait(false));
                 }
                 UiSharedService.AttachToolTip("Applies it to the currently selected GPose actor");
                 UiSharedService.ColorTextWrapped("Warning: redrawing or changing the character will revert all applied mods.", ImGuiColors.DalamudYellow);
