@@ -37,7 +37,6 @@ public class DrawEntityFactory
 
     public DrawFolderGroup CreateDrawGroupFolder(GroupFullInfoDto groupFullInfoDto, Dictionary<Pair, List<GroupFullInfoDto>> pairs)
     {
-        _logger.LogTrace("Creating new DrawGroupFolder for {gid}", groupFullInfoDto.GID);
         return new DrawFolderGroup(groupFullInfoDto.Group.GID, groupFullInfoDto, _apiController,
             pairs.Select(p => CreateDrawPair(groupFullInfoDto.Group.GID + p.Key.UserData.UID, p.Key, p.Value)).ToList(),
             _tagHandler, _uidDisplayHandler, _mediator);
@@ -45,16 +44,12 @@ public class DrawEntityFactory
 
     public DrawFolderTag CreateDrawTagFolder(string tag, Dictionary<Pair, List<GroupFullInfoDto>> pairs)
     {
-        _logger.LogTrace("Creating new DrawTagFolder for {tag}", tag);
-
         return new(tag, pairs.Select(u => CreateDrawPair(tag, u.Key, u.Value)).ToList(),
             _tagHandler, _apiController, _selectPairForTagUi);
     }
 
     public DrawUserPair CreateDrawPair(string id, Pair user, List<GroupFullInfoDto> groups)
     {
-        _logger.LogTrace("Creating new DrawPair for {id}", id + user.UserData.UID);
-
         return new DrawUserPair(id + user.UserData.UID, user, groups, _apiController, _uidDisplayHandler,
             _mediator, _selectTagForPairUi, _serverConfigurationManager);
     }
