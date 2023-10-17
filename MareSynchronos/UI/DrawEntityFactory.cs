@@ -1,6 +1,7 @@
 ﻿using MareSynchronos.API.Dto.Group;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.Mediator;
+using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.UI.Components;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
@@ -14,12 +15,15 @@ public class DrawEntityFactory
     private readonly ApiController _apiController;
     private readonly MareMediator _mediator;
     private readonly SelectPairForTagUi _selectPairForTagUi;
+    private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly SelectTagForPairUi _selectTagForPairUi;
     private readonly TagHandler _tagHandler;
     private readonly IdDisplayHandler _uidDisplayHandler;
 
-    public DrawEntityFactory(ILogger<DrawEntityFactory> logger, ApiController apiController, IdDisplayHandler uidDisplayHandler, SelectTagForPairUi selectTagForPairUi, MareMediator mediator,
-        TagHandler tagHandler, SelectPairForTagUi selectPairForTagUi)
+    public DrawEntityFactory(ILogger<DrawEntityFactory> logger, ApiController apiController, IdDisplayHandler uidDisplayHandler,
+        SelectTagForPairUi selectTagForPairUi, MareMediator mediator,
+        TagHandler tagHandler, SelectPairForTagUi selectPairForTagUi,
+        ServerConfigurationManager serverConfigurationManager)
     {
         _logger = logger;
         _apiController = apiController;
@@ -28,6 +32,7 @@ public class DrawEntityFactory
         _mediator = mediator;
         _tagHandler = tagHandler;
         _selectPairForTagUi = selectPairForTagUi;
+        _serverConfigurationManager = serverConfigurationManager;
     }
 
     public DrawFolderGroup CreateDrawGroupFolder(GroupFullInfoDto groupFullInfoDto, Dictionary<Pair, List<GroupFullInfoDto>> pairs)
@@ -50,6 +55,7 @@ public class DrawEntityFactory
     {
         _logger.LogTrace("Creating new DrawPair for {id}", id + user.UserData.UID);
 
-        return new DrawUserPair(id + user.UserData.UID, user, groups, _apiController, _uidDisplayHandler, _mediator, _selectTagForPairUi);
+        return new DrawUserPair(id + user.UserData.UID, user, groups, _apiController, _uidDisplayHandler,
+            _mediator, _selectTagForPairUi, _serverConfigurationManager);
     }
 }

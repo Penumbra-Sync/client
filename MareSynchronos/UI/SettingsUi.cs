@@ -1,6 +1,5 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
-using Dalamud.Interface.Components;
 using Dalamud.Utility;
 using ImGuiNET;
 using MareSynchronos.API.Data;
@@ -560,6 +559,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var enableRightClickMenu = _configService.Current.EnableRightClickMenus;
         var enableDtrEntry = _configService.Current.EnableDtrEntry;
         var preferNotesInsteadOfName = _configService.Current.PreferNotesOverNamesForVisible;
+        var groupUpSyncshells = _configService.Current.GroupUpSyncshells;
 
         if (ImGui.Checkbox("Enable Game Right Click Menu Entries", ref enableRightClickMenu))
         {
@@ -590,6 +590,14 @@ public class SettingsUi : WindowMediatorSubscriberBase
             Mediator.Publish(new RefreshUiMessage());
         }
         UiSharedService.DrawHelpText("This will show all currently offline users in a special 'Offline' group in the main UI.");
+
+        if (ImGui.Checkbox("Group up all syncshells in one folder", ref groupUpSyncshells))
+        {
+            _configService.Current.GroupUpSyncshells = groupUpSyncshells;
+            _configService.Save();
+            Mediator.Publish(new RefreshUiMessage());
+        }
+        UiSharedService.DrawHelpText("This will group up all Syncshells in a special 'All Syncshells' folder in the main UI.");
 
         if (ImGui.Checkbox("Show player name for visible players", ref showNameInsteadOfNotes))
         {
@@ -1015,7 +1023,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         "  - All new individual pairs get their permissions defaulted to preferred permissions." + Environment.NewLine +
                         "  - All individually set permissions for any pair will also automatically become preferred permissions. This includes pairs in Syncshells." + Environment.NewLine + Environment.NewLine +
                         "It is possible to remove or set the preferred permission state for any pair at any time." + Environment.NewLine + Environment.NewLine +
-                        "If unsure, leave this setting on.");
+                        "If unsure, leave this setting off.");
                     ImGui.Dummy(new(3f));
 
                     if (ImGui.Checkbox("Disable individual pair sounds", ref disableIndividualSounds))

@@ -1,5 +1,4 @@
 ﻿using Dalamud.Interface;
-using Dalamud.Interface.Components;
 using ImGuiNET;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.PlayerData.Pairs;

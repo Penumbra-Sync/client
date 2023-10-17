@@ -9,6 +9,7 @@ using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.Mediator;
+using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
 
@@ -23,11 +24,13 @@ public class DrawUserPair
     protected Pair _pair;
     private readonly string _id;
     private readonly SelectTagForPairUi _selectTagForPairUi;
+    private readonly ServerConfigurationManager _serverConfigurationManager;
     private float _menuRenderWidth = -1;
 
     public DrawUserPair(string id, Pair entry, List<GroupFullInfoDto> syncedGroups,
         ApiController apiController, IdDisplayHandler uIDDisplayHandler,
-        MareMediator mareMediator, SelectTagForPairUi selectTagForPairUi)
+        MareMediator mareMediator, SelectTagForPairUi selectTagForPairUi,
+        ServerConfigurationManager serverConfigurationManager)
     {
         _id = id;
         _pair = entry;
@@ -36,6 +39,7 @@ public class DrawUserPair
         _displayHandler = uIDDisplayHandler;
         _mediator = mareMediator;
         _selectTagForPairUi = selectTagForPairUi;
+        _serverConfigurationManager = serverConfigurationManager;
     }
 
     public Pair Pair => _pair;
@@ -219,7 +223,13 @@ public class DrawUserPair
 
         if (_syncedGroups.Any())
         {
-            userPairText += UiSharedService.TooltipSeparator + string.Join(Environment.NewLine, _syncedGroups.Select(g => "Paired through " + g.GroupAliasOrGID));
+            userPairText += UiSharedService.TooltipSeparator + string.Join(Environment.NewLine,
+                _syncedGroups.Select(g =>
+                {
+                    var groupNote = _serverConfigurationManager.GetNoteForGid(g.GID);
+                    var groupString = string.IsNullOrEmpty(groupNote) ? g.GroupAliasOrGID : $"{groupNote} ({g.GroupAliasOrGID})";
+                    return "Paired through " + groupString;
+                }));
         }
         UiSharedService.AttachToolTip(userPairText);
 
@@ -270,7 +280,10 @@ public class DrawUserPair
             bool userIsPinned = entry.GroupPairUserInfos.TryGetValue(_pair.UserData.UID, out var info) && info.IsPinned();
             if (selfIsOwner || selfIsModerator)
             {
-                if (ImGui.BeginMenu(entry.GroupAliasOrGID + " Moderation Functions"))
+                var groupNote = _serverConfigurationManager.GetNoteForGid(entry.GID);
+                var groupString = string.IsNullOrEmpty(groupNote) ? entry.GroupAliasOrGID : $"{groupNote} ({entry.GroupAliasOrGID})";
+
+                if (ImGui.BeginMenu(groupString + " Moderation Functions"))
                 {
                     DrawSyncshellMenu(entry, selfIsOwner, selfIsModerator, userIsPinned, userIsModerator);
                     ImGui.EndMenu();

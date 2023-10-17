@@ -3,7 +3,6 @@ using Dalamud.Interface.Internal;
 
 using Dalamud.Interface.Utility;
 using ImGuiNET;
-using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;

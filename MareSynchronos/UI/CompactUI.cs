@@ -42,7 +42,7 @@ public class CompactUi : WindowMediatorSubscriberBase
     private readonly TagHandler _tagHandler;
     private readonly UiSharedService _uiShared;
     private string _characterOrCommentFilter = string.Empty;
-    private List<DrawFolderBase> _drawFolders;
+    private List<IDrawFolder> _drawFolders;
     private Pair? _lastAddedUser;
     private string _lastAddedUserComment = string.Empty;
     private Vector2 _lastPosition = Vector2.One;
@@ -475,9 +475,9 @@ public class CompactUi : WindowMediatorSubscriberBase
         }
     }
 
-    private IEnumerable<DrawFolderBase> GetDrawFolders()
+    private IEnumerable<IDrawFolder> GetDrawFolders()
     {
-        List<DrawFolderBase> drawFolders = [];
+        List<IDrawFolder> drawFolders = [];
 
         var users = GetFilteredGroupUsers()
             .ToDictionary(g => g.Key, g => g.Value);
@@ -494,6 +494,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomVisibleTag, visibleUsers));
         }
 
+        List<IDrawFolder> groupFolders = new();
         foreach (var group in _pairManager.GroupPairs.Select(g => g.Key).OrderBy(g => g.GroupAliasOrGID, StringComparer.Ordinal))
         {
             var groupUsers2 = users.Where(v => v.Value.Exists(g => string.Equals(g.GID, group.GID, StringComparison.Ordinal))
@@ -502,13 +503,13 @@ public class CompactUi : WindowMediatorSubscriberBase
                     .OrderByDescending(u => u.Key.IsOnline)
                     .ThenBy(u =>
                     {
-                        if (string.Equals(u.Key.UserData.UID, group.OwnerUID, StringComparison.Ordinal)) return u.Key.IsOnline ? 0 : 10;
+                        if (string.Equals(u.Key.UserData.UID, group.OwnerUID, StringComparison.Ordinal)) return 0;
                         if (group.GroupPairUserInfos.TryGetValue(u.Key.UserData.UID, out var info))
                         {
-                            if (info.IsModerator()) return u.Key.IsOnline ? 1 : 11;
-                            if (info.IsPinned()) return u.Key.IsOnline ? 2 : 12;
+                            if (info.IsModerator()) return 1;
+                            if (info.IsPinned()) return 2;
                         }
-                        return u.Key.IsOnline ? 3 : 13;
+                        return u.Key.IsVisible ? 3 : 4;
                     })
                     .ThenBy(
                     u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
@@ -516,8 +517,13 @@ public class CompactUi : WindowMediatorSubscriberBase
                         : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.Ordinal)
                     .ToDictionary(k => k.Key, k => k.Value);
 
-            drawFolders.Add(_drawEntityFactory.CreateDrawGroupFolder(group, groupUsers2));
+            groupFolders.Add(_drawEntityFactory.CreateDrawGroupFolder(group, groupUsers2));
         }
+
+        if (_configService.Current.GroupUpSyncshells)
+            drawFolders.Add(new DrawGroupedGroupFolder(groupFolders, _tagHandler));
+        else
+            drawFolders.AddRange(groupFolders);
 
         var tags = _tagHandler.GetAllTagsSorted();
         HashSet<Pair> alreadyInTags = [];
@@ -526,7 +532,8 @@ public class CompactUi : WindowMediatorSubscriberBase
             var tagUsers = users.Where(u => u.Key.IsDirectlyPaired && !u.Key.IsOneSidedPair && _tagHandler.HasTag(u.Key.UserData.UID, tag)
                 && (u.Key.IsOnline || (!u.Key.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
                 || u.Key.UserPair.OwnPermissions.IsPaused()))
-                .OrderByDescending(u => u.Key.IsOnline)
+                .OrderByDescending(u => u.Key.IsVisible)
+                .ThenByDescending(u => u.Key.IsOnline)
                 .ThenBy(
                     u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
                         ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
@@ -543,7 +550,8 @@ public class CompactUi : WindowMediatorSubscriberBase
         var onlineDirectPairedUsersNotInTags = users.Where(u => u.Key.IsDirectlyPaired && !u.Key.IsOneSidedPair && !_tagHandler.HasAnyTag(u.Key.UserData.UID)
             && (u.Key.IsOnline || (!u.Key.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
                 || u.Key.UserPair.OwnPermissions.IsPaused()))
-            .OrderByDescending(u => u.Key.IsOnline)
+            .OrderByDescending(u => u.Key.IsVisible)
+            .ThenByDescending(u => u.Key.IsOnline)
             .ThenBy(
                 u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
                     ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)

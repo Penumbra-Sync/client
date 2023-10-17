@@ -6,7 +6,7 @@ using MareSynchronos.UI.Handlers;
 
 namespace MareSynchronos.UI.Components;
 
-public abstract class DrawFolderBase
+public abstract class DrawFolderBase : IDrawFolder
 {
     protected readonly IEnumerable<DrawUserPair> _drawPairs;
     protected readonly string _id;
