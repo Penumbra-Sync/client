@@ -360,6 +360,8 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         var cursor = ImGui.GetCursorPos();
         var drawList = ImGui.GetWindowDrawList();
         var pos = ImGui.GetWindowPos();
+        var scrollPosY = ImGui.GetScrollY();
+        var scrollPosX = ImGui.GetScrollX();
 
         Vector2 buttonSize;
         var buttonSizeY = textSize.Y + padding.Y * 2;
@@ -370,7 +372,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
         if (width == null || width <= 0)
         {
-            var buttonSizeX = (iconScaling == 1 ? iconSize.Y : (iconSize.X * iconScaling)) 
+            var buttonSizeX = (iconScaling == 1 ? iconSize.Y : (iconSize.X * iconScaling))
                     + textSize.X + padding.X * 2 + spacing.X + (iconXoffset * 2);
             buttonSize = new Vector2(buttonSizeX + iconExtraSpacing, buttonSizeY);
         }
@@ -388,13 +390,13 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         }
 
         drawList.AddText(UiBuilder.IconFont, ImGui.GetFontSize() * iconScaling,
-            new(pos.X + cursor.X + iconXoffset + padding.X,
-                pos.Y + cursor.Y + (buttonSizeY - (iconSize.Y * iconScaling)) / 2f),
+            new(pos.X - scrollPosX + cursor.X + iconXoffset + padding.X,
+                pos.Y - scrollPosY + cursor.Y + (buttonSizeY - (iconSize.Y * iconScaling)) / 2f),
             ImGui.GetColorU32(ImGuiCol.Text), icon.ToIconString());
 
         drawList.AddText(UiBuilder.DefaultFont, ImGui.GetFontSize(),
-            new(pos.X + cursor.X + (padding.X) + spacing.X + (iconSize.X * iconScaling) + (iconXoffset * 2) + iconExtraSpacing,
-                pos.Y + cursor.Y + ((buttonSizeY - textSize.Y) / 2f)),
+            new(pos.X - scrollPosX + cursor.X + (padding.X) + spacing.X + (iconSize.X * iconScaling) + (iconXoffset * 2) + iconExtraSpacing,
+                pos.Y - scrollPosY + cursor.Y + ((buttonSizeY - textSize.Y) / 2f)),
             ImGui.GetColorU32(ImGuiCol.Text), text);
 
         return wasClicked;
