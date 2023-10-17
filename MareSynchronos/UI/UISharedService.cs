@@ -350,42 +350,55 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
     }
 
-    public static bool IconTextButton(FontAwesomeIcon icon, string text, float? width = null)
+    public static bool IconTextButton(FontAwesomeIcon icon, string text, float? width = null, bool isInPopup = false)
     {
-        var buttonClicked = false;
+        var wasClicked = false;
 
         var iconSize = GetIconSize(icon);
         var textSize = ImGui.CalcTextSize(text);
         var padding = ImGui.GetStyle().FramePadding;
         var spacing = ImGui.GetStyle().ItemSpacing;
+        var cursor = ImGui.GetCursorPos();
+        var drawList = ImGui.GetWindowDrawList();
+        var pos = ImGui.GetWindowPos();
 
         Vector2 buttonSize;
-        var buttonSizeY = (iconSize.Y > textSize.Y ? iconSize.Y : textSize.Y) + padding.Y * 2;
+        var buttonSizeY = textSize.Y + padding.Y * 2;
+        var iconExtraSpacing = isInPopup ? padding.X * 2 : 0;
+
+        var iconXoffset = iconSize.X <= iconSize.Y ? (iconSize.Y - iconSize.X) / 2f : 0;
+        var iconScaling = iconSize.X > iconSize.Y ? 1 / (iconSize.X / iconSize.Y) : 1;
 
         if (width == null || width <= 0)
         {
-            var buttonSizeX = iconSize.X + textSize.X + padding.X * 2 + spacing.X;
-            buttonSize = new Vector2(buttonSizeX, buttonSizeY);
+            var buttonSizeX = (iconScaling == 1 ? iconSize.Y : (iconSize.X * iconScaling)) 
+                    + textSize.X + padding.X * 2 + spacing.X + (iconXoffset * 2);
+            buttonSize = new Vector2(buttonSizeX + iconExtraSpacing, buttonSizeY);
         }
         else
         {
             buttonSize = new Vector2(width.Value, buttonSizeY);
         }
 
-        if (ImGui.Button("###" + icon.ToIconString() + text, buttonSize))
+        using (ImRaii.PushColor(ImGuiCol.Button, ImGui.GetColorU32(ImGuiCol.PopupBg), isInPopup))
         {
-            buttonClicked = true;
+            if (ImGui.Button("###" + icon.ToIconString() + text, buttonSize))
+            {
+                wasClicked = true;
+            }
         }
 
-        ImGui.SameLine();
-        ImGui.SetCursorPosX(ImGui.GetCursorPosX() - buttonSize.X - padding.X);
-        ImGui.PushFont(UiBuilder.IconFont);
-        ImGui.TextUnformatted(icon.ToIconString());
-        ImGui.PopFont();
-        ImGui.SameLine();
-        ImGui.TextUnformatted(text);
+        drawList.AddText(UiBuilder.IconFont, ImGui.GetFontSize() * iconScaling,
+            new(pos.X + cursor.X + iconXoffset + padding.X,
+                pos.Y + cursor.Y + (buttonSizeY - (iconSize.Y * iconScaling)) / 2f),
+            ImGui.GetColorU32(ImGuiCol.Text), icon.ToIconString());
 
-        return buttonClicked;
+        drawList.AddText(UiBuilder.DefaultFont, ImGui.GetFontSize(),
+            new(pos.X + cursor.X + (padding.X) + spacing.X + (iconSize.X * iconScaling) + (iconXoffset * 2) + iconExtraSpacing,
+                pos.Y + cursor.Y + ((buttonSizeY - textSize.Y) / 2f)),
+            ImGui.GetColorU32(ImGuiCol.Text), text);
+
+        return wasClicked;
     }
 
     public static bool IsDirectoryWritable(string dirPath, bool throwIfFails = false)
@@ -772,7 +785,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             ImGui.InputText("Custom Service URI", ref _customServerUri, 255);
             ImGui.SetNextItemWidth(250);
             ImGui.InputText("Custom Service Name", ref _customServerName, 255);
-            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Plus, "Add Custom Service")
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add Custom Service")
                 && !string.IsNullOrEmpty(_customServerUri)
                 && !string.IsNullOrEmpty(_customServerName))
             {

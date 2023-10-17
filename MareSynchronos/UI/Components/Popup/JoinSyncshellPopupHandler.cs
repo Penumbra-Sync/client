@@ -56,7 +56,7 @@ internal class JoinSyncshellPopupHandler : IPopupHandler
             ImGui.InputTextWithHint("##syncshellpw", "Password", ref _syncshellPassword, 20, ImGuiInputTextFlags.Password);
             using (ImRaii.Disabled(string.IsNullOrEmpty(_desiredSyncshellToJoin) || string.IsNullOrEmpty(_syncshellPassword)))
             {
-                if (ImGuiComponents.IconButtonWithText(Dalamud.Interface.FontAwesomeIcon.Plus, "Join Syncshell"))
+                if (UiSharedService.IconTextButton(Dalamud.Interface.FontAwesomeIcon.Plus, "Join Syncshell"))
                 {
                     _groupJoinInfo = _apiController.GroupJoin(new GroupPasswordDto(new API.Data.GroupData(_desiredSyncshellToJoin), _syncshellPassword)).Result;
                     _previousPassword = _syncshellPassword;
@@ -99,7 +99,7 @@ internal class JoinSyncshellPopupHandler : IPopupHandler
                     UiSharedService.BooleanToColoredIcon(!_groupJoinInfo.GroupPermissions.IsPreferDisableSounds());
                     ImGui.SameLine();
                     using var id = ImRaii.PushId("suggestedSounds");
-                    if (ImGuiComponents.IconButtonWithText(Dalamud.Interface.FontAwesomeIcon.ArrowRight, "Apply suggested"))
+                    if (UiSharedService.IconTextButton(Dalamud.Interface.FontAwesomeIcon.ArrowRight, "Apply suggested"))
                     {
                         _ownPermissions.DisableGroupSounds = _groupJoinInfo.GroupPermissions.IsPreferDisableSounds();
                     }
@@ -114,7 +114,7 @@ internal class JoinSyncshellPopupHandler : IPopupHandler
                     UiSharedService.BooleanToColoredIcon(!_groupJoinInfo.GroupPermissions.IsPreferDisableAnimations());
                     ImGui.SameLine();
                     using var id = ImRaii.PushId("suggestedAnims");
-                    if (ImGuiComponents.IconButtonWithText(Dalamud.Interface.FontAwesomeIcon.ArrowRight, "Apply suggested"))
+                    if (UiSharedService.IconTextButton(Dalamud.Interface.FontAwesomeIcon.ArrowRight, "Apply suggested"))
                     {
                         _ownPermissions.DisableGroupAnimations = _groupJoinInfo.GroupPermissions.IsPreferDisableAnimations();
                     }
@@ -129,7 +129,7 @@ internal class JoinSyncshellPopupHandler : IPopupHandler
                     UiSharedService.BooleanToColoredIcon(!_groupJoinInfo.GroupPermissions.IsPreferDisableVFX());
                     ImGui.SameLine();
                     using var id = ImRaii.PushId("suggestedVfx");
-                    if (ImGuiComponents.IconButtonWithText(Dalamud.Interface.FontAwesomeIcon.ArrowRight, "Apply suggested"))
+                    if (UiSharedService.IconTextButton(Dalamud.Interface.FontAwesomeIcon.ArrowRight, "Apply suggested"))
                     {
                         _ownPermissions.DisableGroupVFX = _groupJoinInfo.GroupPermissions.IsPreferDisableVFX();
                     }
@@ -141,7 +141,7 @@ internal class JoinSyncshellPopupHandler : IPopupHandler
                 UiSharedService.TextWrapped("Your default syncshell permissions on joining are in line with the suggested Syncshell permissions through the owner.");
             }
             ImGui.Dummy(new(2));
-            if (ImGuiComponents.IconButtonWithText(Dalamud.Interface.FontAwesomeIcon.Plus, "Finalize and join " + _groupJoinInfo.GroupAliasOrGID))
+            if (UiSharedService.IconTextButton(Dalamud.Interface.FontAwesomeIcon.Plus, "Finalize and join " + _groupJoinInfo.GroupAliasOrGID))
             {
                 GroupUserPreferredPermissions joinPermissions = GroupUserPreferredPermissions.NoneSet;
                 joinPermissions.SetDisableSounds(_ownPermissions.DisableGroupSounds);

@@ -11,7 +11,7 @@ public abstract class DrawFolderBase
     protected readonly IEnumerable<DrawUserPair> _drawPairs;
     protected readonly string _id;
     protected readonly TagHandler _tagHandler;
-
+    private float _menuWidth = -1;
     protected DrawFolderBase(string id, IEnumerable<DrawUserPair> drawPairs, TagHandler tagHandler)
     {
         _id = id;
@@ -74,7 +74,7 @@ public abstract class DrawFolderBase
 
     protected abstract float DrawIcon(float textPosY, float originalY);
 
-    protected abstract void DrawMenu();
+    protected abstract void DrawMenu(float menuWidth);
 
     protected abstract void DrawName(float originalY, float width);
 
@@ -100,9 +100,14 @@ public abstract class DrawFolderBase
             {
                 UiSharedService.DrawWithID($"buttons-{_id}", () =>
                 {
-                    DrawMenu();
+                    DrawMenu(_menuWidth);
                 });
+                _menuWidth = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
                 ImGui.EndPopup();
+            }
+            else
+            {
+                _menuWidth = 0;
             }
         }
 

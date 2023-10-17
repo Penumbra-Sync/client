@@ -31,7 +31,7 @@ public class CreateSyncshellPopupHandler : IPopupHandler
 
         if (_lastCreatedGroup == null)
         {
-            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Plus, "Create Syncshell"))
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Create Syncshell"))
             {
                 try
                 {

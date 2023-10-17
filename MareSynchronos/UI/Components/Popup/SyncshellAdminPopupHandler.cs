@@ -52,7 +52,7 @@ internal class SyncshellAdminPopupHandler : IPopupHandler
         {
             bool isInvitesDisabled = perm.IsDisableInvites();
 
-            if (ImGuiComponents.IconButtonWithText(isInvitesDisabled ? FontAwesomeIcon.Unlock : FontAwesomeIcon.Lock,
+            if (UiSharedService.IconTextButton(isInvitesDisabled ? FontAwesomeIcon.Unlock : FontAwesomeIcon.Lock,
                 isInvitesDisabled ? "Unlock Syncshell" : "Lock Syncshell"))
             {
                 perm.SetDisableInvites(!isInvitesDisabled);
@@ -62,7 +62,7 @@ internal class SyncshellAdminPopupHandler : IPopupHandler
             ImGui.Dummy(new(2f));
 
             UiSharedService.TextWrapped("One-time invites work as single-use passwords. Use those if you do not want to distribute your Syncshell password.");
-            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Envelope, "Single one-time invite"))
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.Envelope, "Single one-time invite"))
             {
                 ImGui.SetClipboardText(_apiController.GroupCreateTempInvite(new(_groupFullInfo.Group), 1).Result.FirstOrDefault() ?? string.Empty);
             }
@@ -71,7 +71,7 @@ internal class SyncshellAdminPopupHandler : IPopupHandler
             ImGui.SameLine();
             using (ImRaii.Disabled(_multiInvites <= 1 || _multiInvites > 100))
             {
-                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Envelope, "Generate " + _multiInvites + " one-time invites"))
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.Envelope, "Generate " + _multiInvites + " one-time invites"))
                 {
                     _oneTimeInvites.AddRange(_apiController.GroupCreateTempInvite(new(_groupFullInfo.Group), _multiInvites).Result);
                 }
@@ -81,7 +81,7 @@ internal class SyncshellAdminPopupHandler : IPopupHandler
             {
                 var invites = string.Join(Environment.NewLine, _oneTimeInvites);
                 ImGui.InputTextMultiline("Generated Multi Invites", ref invites, 5000, new(0, 0), ImGuiInputTextFlags.ReadOnly);
-                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Copy, "Copy Invites to clipboard"))
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.Copy, "Copy Invites to clipboard"))
                 {
                     ImGui.SetClipboardText(invites);
                 }
@@ -92,7 +92,7 @@ internal class SyncshellAdminPopupHandler : IPopupHandler
         var mgmtNode = ImRaii.TreeNode("User Management");
         if (mgmtNode)
         {
-            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Broom, "Clear Syncshell"))
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.Broom, "Clear Syncshell"))
             {
                 _ = _apiController.GroupClear(new(_groupFullInfo.Group));
             }
@@ -100,7 +100,7 @@ internal class SyncshellAdminPopupHandler : IPopupHandler
 
             ImGui.Dummy(new(2f));
 
-            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Retweet, "Refresh Banlist from Server"))
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.Retweet, "Refresh Banlist from Server"))
             {
                 _bannedUsers = _apiController.GroupGetBannedUsers(new GroupDto(_groupFullInfo.Group)).Result;
             }
@@ -129,7 +129,7 @@ internal class SyncshellAdminPopupHandler : IPopupHandler
                     ImGui.TableNextColumn();
                     UiSharedService.TextWrapped(bannedUser.Reason);
                     ImGui.TableNextColumn();
-                    if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Check, "Unban#" + bannedUser.UID))
+                    if (UiSharedService.IconTextButton(FontAwesomeIcon.Check, "Unban#" + bannedUser.UID))
                     {
                         _ = _apiController.GroupUnbanUser(bannedUser);
                         _bannedUsers.RemoveAll(b => string.Equals(b.UID, bannedUser.UID, StringComparison.Ordinal));
@@ -152,7 +152,7 @@ internal class SyncshellAdminPopupHandler : IPopupHandler
             ImGui.Text("Suggest Sound Sync");
             UiSharedService.BooleanToColoredIcon(!isDisableSounds);
             ImGui.SameLine(230);
-            if (ImGuiComponents.IconButtonWithText(isDisableSounds ? FontAwesomeIcon.VolumeUp : FontAwesomeIcon.VolumeMute,
+            if (UiSharedService.IconTextButton(isDisableSounds ? FontAwesomeIcon.VolumeUp : FontAwesomeIcon.VolumeMute,
                 isDisableSounds ? "Suggest to enable sound sync" : "Suggest to disable sound sync"))
             {
                 perm.SetPreferDisableSounds(!perm.IsPreferDisableSounds());
@@ -163,7 +163,7 @@ internal class SyncshellAdminPopupHandler : IPopupHandler
             ImGui.Text("Suggest Animation Sync");
             UiSharedService.BooleanToColoredIcon(!isDisableAnimations);
             ImGui.SameLine(230);
-            if (ImGuiComponents.IconButtonWithText(isDisableAnimations ? FontAwesomeIcon.Running : FontAwesomeIcon.Stop,
+            if (UiSharedService.IconTextButton(isDisableAnimations ? FontAwesomeIcon.Running : FontAwesomeIcon.Stop,
                 isDisableAnimations ? "Suggest to enable animation sync" : "Suggest to disable animation sync"))
             {
                 perm.SetPreferDisableAnimations(!perm.IsPreferDisableAnimations());
@@ -174,7 +174,7 @@ internal class SyncshellAdminPopupHandler : IPopupHandler
             ImGui.Text("Suggest VFX Sync");
             UiSharedService.BooleanToColoredIcon(!isDisableVfx);
             ImGui.SameLine(230);
-            if (ImGuiComponents.IconButtonWithText(isDisableVfx ? FontAwesomeIcon.Sun : FontAwesomeIcon.Circle,
+            if (UiSharedService.IconTextButton(isDisableVfx ? FontAwesomeIcon.Sun : FontAwesomeIcon.Circle,
                 isDisableVfx ? "Suggest to enable vfx sync" : "Suggest to disable vfx sync"))
             {
                 perm.SetPreferDisableVFX(!perm.IsPreferDisableVFX());
@@ -197,7 +197,7 @@ internal class SyncshellAdminPopupHandler : IPopupHandler
                 ImGui.SameLine();
                 using (ImRaii.Disabled(_newPassword.Length < 10))
                 {
-                    if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Passport, "Change Password"))
+                    if (UiSharedService.IconTextButton(FontAwesomeIcon.Passport, "Change Password"))
                     {
                         _pwChangeSuccess = _apiController.GroupChangePassword(new GroupPasswordDto(_groupFullInfo.Group, _newPassword)).Result;
                         _newPassword = string.Empty;
@@ -210,7 +210,7 @@ internal class SyncshellAdminPopupHandler : IPopupHandler
                     UiSharedService.ColorTextWrapped("Failed to change the password. Password requires to be at least 10 characters long.", ImGuiColors.DalamudYellow);
                 }
 
-                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Trash, "Delete Syncshell") && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Syncshell") && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())
                 {
                     ImGui.CloseCurrentPopup();
                     _ = _apiController.GroupDelete(new(_groupFullInfo.Group));

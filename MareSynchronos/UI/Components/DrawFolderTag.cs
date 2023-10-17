@@ -69,15 +69,15 @@ public class DrawFolderTag : DrawFolderBase
         return ImGui.GetCursorPosX();
     }
 
-    protected override void DrawMenu()
+    protected override void DrawMenu(float menuWidth)
     {
         ImGui.TextUnformatted("Group Menu");
-        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Users, "Select Pairs"))
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.Users, "Select Pairs", menuWidth, true))
         {
             _selectPairForTagUi.Open(_id);
         }
         UiSharedService.AttachToolTip("Select Individual Pairs for this Pair Group");
-        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Trash, "Delete Pair Group") && UiSharedService.CtrlPressed())
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Pair Group", menuWidth, true) && UiSharedService.CtrlPressed())
         {
             _tagHandler.RemoveTag(_id);
         }

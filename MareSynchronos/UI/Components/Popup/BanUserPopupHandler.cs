@@ -28,7 +28,7 @@ public class BanUserPopupHandler : IPopupHandler
         UiSharedService.TextWrapped("User " + (_reportedPair.UserData.AliasOrUID) + " will be banned and removed from this Syncshell.");
         ImGui.InputTextWithHint("##banreason", "Ban Reason", ref _banReason, 255);
 
-        if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.UserSlash, "Ban User"))
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.UserSlash, "Ban User"))
         {
             ImGui.CloseCurrentPopup();
             var reason = _banReason;

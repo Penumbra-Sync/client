@@ -150,7 +150,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             {
                 UiSharedService.TextWrapped($"You have successfully added {_lastAddedUser.UserData.AliasOrUID}. Set a local note for the user in the field below:");
                 ImGui.InputTextWithHint("##noteforuser", $"Note for {_lastAddedUser.UserData.AliasOrUID}", ref _lastAddedUserComment, 100);
-                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Save, "Save Note"))
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.Save, "Save Note"))
                 {
                     _serverManager.SetNoteForUid(_lastAddedUser.UserData.UID, _lastAddedUserComment);
                     _lastAddedUser = null;
@@ -179,7 +179,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         if (keys.Any())
         {
             if (_secretKeyIdx == -1) _secretKeyIdx = keys.First().Key;
-            if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Plus, "Add current character with secret key"))
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add current character with secret key"))
             {
                 _serverManager.CurrentServer!.Authentications.Add(new MareConfiguration.Models.Authentication()
                 {
@@ -224,13 +224,14 @@ public class CompactUi : WindowMediatorSubscriberBase
         {
             ImGui.OpenPopup("Syncshell Menu");
         }
+        UiSharedService.AttachToolTip("Syncshell Menu");
 
         if (ImGui.BeginPopup("Syncshell Menu"))
         {
             using (ImRaii.Disabled(_pairManager.GroupPairs.Select(k => k.Key).Distinct()
                 .Count(g => string.Equals(g.OwnerUID, _apiController.UID, StringComparison.Ordinal)) >= _apiController.ServerInfo.MaxGroupsCreatedByUser))
             {
-                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Plus, "Create new Syncshell"))
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Create new Syncshell", _syncshellMenuSize, true))
                 {
                     Mediator.Publish(new OpenCreateSyncshellPopupMessage());
                     ImGui.CloseCurrentPopup();
@@ -239,17 +240,20 @@ public class CompactUi : WindowMediatorSubscriberBase
 
             using (ImRaii.Disabled(_pairManager.GroupPairs.Select(k => k.Key).Distinct().Count() >= _apiController.ServerInfo.MaxGroupsJoinedByUser))
             {
-                if (ImGuiComponents.IconButtonWithText(FontAwesomeIcon.Users, "Join existing Syncshell"))
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.Users, "Join existing Syncshell", _syncshellMenuSize, true))
                 {
                     Mediator.Publish(new JoinSyncshellPopupMessage());
                     ImGui.CloseCurrentPopup();
                 }
             }
+            _syncshellMenuSize = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
             ImGui.EndPopup();
         }
 
         ImGuiHelpers.ScaledDummy(2);
     }
+
+    private float _syncshellMenuSize = 0;
 
     private void DrawFilter()
     {
