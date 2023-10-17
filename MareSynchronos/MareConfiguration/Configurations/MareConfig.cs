@@ -9,8 +9,8 @@ public class MareConfig : IMareConfiguration
     public bool AcceptedAgreement { get; set; } = false;
     public string CacheFolder { get; set; } = string.Empty;
     public bool DisableOptionalPluginWarnings { get; set; } = false;
-    public bool EnableRightClickMenus { get; set; } = true;
     public bool EnableDtrEntry { get; set; } = false;
+    public bool EnableRightClickMenus { get; set; } = true;
     public NotificationLocation ErrorNotification { get; set; } = NotificationLocation.Both;
     public string ExportFolder { get; set; } = string.Empty;
     public bool FileScanPaused { get; set; } = false;
@@ -22,15 +22,14 @@ public class MareConfig : IMareConfiguration
     public bool OpenGposeImportOnGposeStart { get; set; } = false;
     public bool OpenPopupOnAdd { get; set; } = true;
     public int ParallelDownloads { get; set; } = 10;
-    public bool UseCompactor { get; set; } = false;
+    public bool PreferNotesOverNamesForVisible { get; set; } = false;
     public float ProfileDelay { get; set; } = 1.5f;
     public bool ProfilePopoutRight { get; set; } = false;
     public bool ProfilesAllowNsfw { get; set; } = false;
     public bool ProfilesShow { get; set; } = true;
-    public bool ReverseUserSort { get; set; } = false;
     public bool ShowCharacterNameInsteadOfNotesForVisible { get; set; } = false;
-    public bool PreferNotesOverNamesForVisible { get; set; } = false;
     public bool ShowOfflineUsersSeparately { get; set; } = true;
+    public bool GroupUpSyncshells { get; set; } = true;
     public bool ShowOnlineNotifications { get; set; } = false;
     public bool ShowOnlineNotificationsOnlyForIndividualPairs { get; set; } = true;
     public bool ShowOnlineNotificationsOnlyForNamedPairs { get; set; } = false;
@@ -44,6 +43,7 @@ public class MareConfig : IMareConfiguration
     public bool TransferBarsShowText { get; set; } = true;
     public int TransferBarsWidth { get; set; } = 250;
     public bool UseAlternativeFileUpload { get; set; } = false;
+    public bool UseCompactor { get; set; } = false;
     public int Version { get; set; } = 1;
     public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;
 }

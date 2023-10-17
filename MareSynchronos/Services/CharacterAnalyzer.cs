@@ -1,11 +1,11 @@
-﻿using MareSynchronos.API.Data;
+﻿using Lumina.Data.Files;
+using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.FileCache;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.UI;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
-using Lumina.Data.Files;
 
 namespace MareSynchronos.Services;
 
@@ -14,7 +14,6 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
     private readonly FileCacheManager _fileCacheManager;
     private CancellationTokenSource? _analysisCts;
     private string _lastDataHash = string.Empty;
-    internal Dictionary<ObjectKind, Dictionary<string, FileDataEntry>> LastAnalysis { get; } = new();
 
     public CharacterAnalyzer(ILogger<CharacterAnalyzer> logger, MareMediator mediator, FileCacheManager fileCacheManager) : base(logger, mediator)
     {
@@ -25,10 +24,10 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
         _fileCacheManager = fileCacheManager;
     }
 
-    public bool IsAnalysisRunning => _analysisCts != null;
-
     public int CurrentFile { get; internal set; }
+    public bool IsAnalysisRunning => _analysisCts != null;
     public int TotalFiles { get; internal set; }
+    internal Dictionary<ObjectKind, Dictionary<string, FileDataEntry>> LastAnalysis { get; } = [];
 
     public void CancelAnalyze()
     {
@@ -74,6 +73,11 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
         if (print) PrintAnalysis();
     }
 
+    public void Dispose()
+    {
+        _analysisCts.CancelDispose();
+    }
+
     private void BaseAnalysis(CharacterData charaData)
     {
         if (string.Equals(charaData.DataHash.Value, _lastDataHash, StringComparison.Ordinal)) return;
@@ -103,7 +107,7 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
                 foreach (var entry in fileCacheEntries)
                 {
                     data[fileEntry.Hash] = new FileDataEntry(fileEntry.Hash, ext,
-                        fileEntry.GamePaths.ToList(),
+                        [.. fileEntry.GamePaths],
                         fileCacheEntries.Select(c => c.ResolvedFilepath).Distinct().ToList(),
                         entry.Size > 0 ? entry.Size.Value : 0, entry.CompressedSize > 0 ? entry.CompressedSize.Value : 0);
                 }
@@ -133,7 +137,7 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
                 {
                     Logger.LogInformation("  Game Path: {path}", path);
                 }
-                if (entry.Value.FilePaths.Count > 1) Logger.LogInformation("  Multiple fitting files detected", entry.Key);
+                if (entry.Value.FilePaths.Count > 1) Logger.LogInformation("  Multiple fitting files detected for {key}", entry.Key);
                 foreach (var filePath in entry.Value.FilePaths)
                 {
                     Logger.LogInformation("  File Path: {path}", filePath);
@@ -161,11 +165,6 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
             UiSharedService.ByteToString(LastAnalysis.Values.Sum(c => c.Values.Sum(v => v.OriginalSize))),
             UiSharedService.ByteToString(LastAnalysis.Values.Sum(c => c.Values.Sum(v => v.CompressedSize))));
         Logger.LogInformation("IMPORTANT NOTES:\n\r- For Mare up- and downloads only the compressed size is relevant.\n\r- An unusually high total files count beyond 200 and up will also increase your download time to others significantly.");
-    }
-
-    public void Dispose()
-    {
-        _analysisCts.CancelDispose();
     }
 
     internal sealed record FileDataEntry(string Hash, string FileType, List<string> GamePaths, List<string> FilePaths, long OriginalSize, long CompressedSize)
@@ -205,7 +204,6 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
                         {
                             return "Unknown";
                         }
-
                     }
                 default:
                     return string.Empty;

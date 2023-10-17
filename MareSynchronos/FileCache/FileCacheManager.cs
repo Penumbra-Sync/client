@@ -11,8 +11,8 @@ namespace MareSynchronos.FileCache;
 
 public sealed class FileCacheManager : IDisposable
 {
-    public const string CsvSplit = "|";
     public const string CachePrefix = "{cache}";
+    public const string CsvSplit = "|";
     public const string PenumbraPrefix = "{penumbra}";
     private readonly MareConfigService _configService;
     private readonly string _csvPath;
@@ -55,7 +55,7 @@ public sealed class FileCacheManager : IDisposable
         if (File.Exists(_csvPath))
         {
             bool success = false;
-            string[] entries = Array.Empty<string>();
+            string[] entries = [];
             int attempts = 0;
             while (!success && attempts < 10)
             {
@@ -94,7 +94,7 @@ public sealed class FileCacheManager : IDisposable
                         continue;
                     }
 
-                    processedFiles.Add(path, true);
+                    processedFiles.Add(path, value: true);
 
                     long size = -1;
                     long compressed = -1;
@@ -157,9 +157,31 @@ public sealed class FileCacheManager : IDisposable
 
     public List<FileCacheEntity> GetAllFileCaches() => _fileCaches.Values.SelectMany(v => v).ToList();
 
+    public List<FileCacheEntity> GetAllFileCachesByHash(string hash)
+    {
+        List<FileCacheEntity> output = [];
+        if (_fileCaches.TryGetValue(hash, out var fileCacheEntities))
+        {
+            foreach (var filecache in fileCacheEntities.ToList())
+            {
+                var validated = GetValidatedFileCache(filecache);
+                if (validated != null) output.Add(validated);
+            }
+        }
+
+        return output;
+    }
+
     public string GetCacheFilePath(string hash, string extension)
     {
         return Path.Combine(_configService.Current.CacheFolder, hash + "." + extension);
+    }
+
+    public async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)
+    {
+        var fileCache = GetFileCacheByHash(fileHash)!.ResolvedFilepath;
+        return (fileHash, LZ4Codec.WrapHC(await File.ReadAllBytesAsync(fileCache, uploadToken).ConfigureAwait(false), 0,
+            (int)new FileInfo(fileCache).Length));
     }
 
     public FileCacheEntity? GetFileCacheByHash(string hash)
@@ -172,19 +194,20 @@ public sealed class FileCacheManager : IDisposable
         return null;
     }
 
-    public List<FileCacheEntity> GetAllFileCachesByHash(string hash)
+    public FileCacheEntity? GetFileCacheByPath(string path)
     {
-        List<FileCacheEntity> output = new();
-        if (_fileCaches.TryGetValue(hash, out var fileCacheEntities))
+        var cleanedPath = path.Replace("/", "\\", StringComparison.OrdinalIgnoreCase).ToLowerInvariant().Replace(_ipcManager.PenumbraModDirectory!.ToLowerInvariant(), "", StringComparison.OrdinalIgnoreCase);
+        var entry = _fileCaches.SelectMany(v => v.Value).FirstOrDefault(f => f.ResolvedFilepath.EndsWith(cleanedPath, StringComparison.OrdinalIgnoreCase));
+
+        if (entry == null)
         {
-            foreach (var filecache in fileCacheEntities.ToList())
-            {
-                var validated = GetValidatedFileCache(filecache);
-                if (validated != null) output.Add(validated);
-            }
+            _logger.LogDebug("Found no entries for {path}", cleanedPath);
+            return CreateFileEntry(path);
         }
 
-        return output;
+        var validatedCacheEntry = GetValidatedFileCache(entry);
+
+        return validatedCacheEntry;
     }
 
     public Dictionary<string, FileCacheEntity?> GetFileCachesByPaths(string[] paths)
@@ -215,29 +238,6 @@ public sealed class FileCacheManager : IDisposable
         }
 
         return result;
-    }
-
-    public FileCacheEntity? GetFileCacheByPath(string path)
-    {
-        var cleanedPath = path.Replace("/", "\\", StringComparison.OrdinalIgnoreCase).ToLowerInvariant().Replace(_ipcManager.PenumbraModDirectory!.ToLowerInvariant(), "", StringComparison.OrdinalIgnoreCase);
-        var entry = _fileCaches.SelectMany(v => v.Value).FirstOrDefault(f => f.ResolvedFilepath.EndsWith(cleanedPath, StringComparison.OrdinalIgnoreCase));
-
-        if (entry == null)
-        {
-            _logger.LogDebug("Found no entries for {path}", cleanedPath);
-            return CreateFileEntry(path);
-        }
-
-        var validatedCacheEntry = GetValidatedFileCache(entry);
-
-        return validatedCacheEntry;
-    }
-
-    public async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)
-    {
-        var fileCache = GetFileCacheByHash(fileHash)!.ResolvedFilepath;
-        return (fileHash, LZ4Codec.WrapHC(await File.ReadAllBytesAsync(fileCache, uploadToken).ConfigureAwait(false), 0,
-            (int)new FileInfo(fileCache).Length));
     }
 
     public void RemoveHashedFile(string hash, string prefixedFilePath)
@@ -316,14 +316,12 @@ public sealed class FileCacheManager : IDisposable
         try
         {
             RemoveHashedFile(fileCache.Hash, fileCache.PrefixedFilePath);
-            FileInfo oldCache = new(fileCache.ResolvedFilepath);
-            var extensionPath = fileCache.ResolvedFilepath.ToUpper() + "." + ext;
-            File.Move(fileCache.ResolvedFilepath, extensionPath, true);
-            var newHashedEntity = new FileCacheEntity(fileCache.Hash, fileCache.PrefixedFilePath + "." + ext, DateTime.UtcNow.Ticks.ToString());
+            FileInfo fileInfo = new(fileCache.ResolvedFilepath);
+            FileInfo oldCache = fileInfo;
+            var extensionPath = fileCache.ResolvedFilepath.ToUpper(CultureInfo.InvariantCulture) + "." + ext;
+            File.Move(fileCache.ResolvedFilepath, extensionPath, overwrite: true);
+            var newHashedEntity = new FileCacheEntity(fileCache.Hash, fileCache.PrefixedFilePath + "." + ext, DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture));
             newHashedEntity.SetResolvedFilePath(extensionPath);
-            FileInfo newCache = new FileInfo(extensionPath);
-            newCache.LastAccessTime = oldCache.LastAccessTime;
-            newCache.LastWriteTime = oldCache.LastWriteTime;
             AddHashedFile(newHashedEntity);
             _logger.LogDebug("Migrated from {oldPath} to {newPath}", fileCache.ResolvedFilepath, newHashedEntity.ResolvedFilepath);
             return newHashedEntity;
@@ -340,7 +338,7 @@ public sealed class FileCacheManager : IDisposable
     {
         if (!_fileCaches.TryGetValue(fileCache.Hash, out var entries))
         {
-            _fileCaches[fileCache.Hash] = entries = new();
+            _fileCaches[fileCache.Hash] = entries = [];
         }
 
         if (!entries.Exists(u => string.Equals(u.PrefixedFilePath, fileCache.PrefixedFilePath, StringComparison.OrdinalIgnoreCase)))
@@ -394,7 +392,7 @@ public sealed class FileCacheManager : IDisposable
             return null;
         }
 
-        if (!string.Equals(file.LastWriteTimeUtc.Ticks.ToString(), fileCache.LastModifiedDateTicks, StringComparison.Ordinal))
+        if (!string.Equals(file.LastWriteTimeUtc.Ticks.ToString(CultureInfo.InvariantCulture), fileCache.LastModifiedDateTicks, StringComparison.Ordinal))
         {
             UpdateHashedFile(fileCache);
         }

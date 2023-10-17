@@ -1,17 +1,17 @@
-﻿using Dalamud.Plugin;
-using Dalamud.Interface.ImGuiFileDialog;
+﻿using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
-using MareSynchronos.UI;
+using Dalamud.Plugin;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.Services.Mediator;
-using Microsoft.Extensions.Logging;
 using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.Services.Mediator;
+using MareSynchronos.UI;
+using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Services;
 
 public sealed class UiService : DisposableMediatorSubscriberBase
 {
-    private readonly List<WindowMediatorSubscriberBase> _createdWindows = new();
+    private readonly List<WindowMediatorSubscriberBase> _createdWindows = [];
     private readonly DalamudPluginInterface _dalamudPluginInterface;
     private readonly FileDialogManager _fileDialogManager;
     private readonly ILogger<UiService> _logger;
@@ -42,8 +42,8 @@ public sealed class UiService : DisposableMediatorSubscriberBase
 
         Mediator.Subscribe<ProfileOpenStandaloneMessage>(this, (msg) =>
         {
-            if (!_createdWindows.Any(p => p is StandaloneProfileUi
-            && string.Equals(((StandaloneProfileUi)p).Pair.UserData.AliasOrUID, msg.Pair.UserData.AliasOrUID, StringComparison.Ordinal)))
+            if (!_createdWindows.Exists(p => p is StandaloneProfileUi ui
+                && string.Equals(ui.Pair.UserData.AliasOrUID, msg.Pair.UserData.AliasOrUID, StringComparison.Ordinal)))
             {
                 var window = standaloneProfileUiFactory(msg.Pair);
                 _createdWindows.Add(window);
@@ -59,18 +59,18 @@ public sealed class UiService : DisposableMediatorSubscriberBase
         });
     }
 
-    public void ToggleUi()
-    {
-        if (_mareConfigService.Current.HasValidSetup())
-            Mediator.Publish(new UiToggleMessage(typeof(SettingsUi)));
-        else
-            Mediator.Publish(new UiToggleMessage(typeof(IntroUi)));
-    }
-
     public void ToggleMainUi()
     {
         if (_mareConfigService.Current.HasValidSetup())
             Mediator.Publish(new UiToggleMessage(typeof(CompactUi)));
+        else
+            Mediator.Publish(new UiToggleMessage(typeof(IntroUi)));
+    }
+
+    public void ToggleUi()
+    {
+        if (_mareConfigService.Current.HasValidSetup())
+            Mediator.Publish(new UiToggleMessage(typeof(SettingsUi)));
         else
             Mediator.Publish(new UiToggleMessage(typeof(IntroUi)));
     }

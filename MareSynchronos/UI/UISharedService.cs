@@ -129,17 +129,51 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public uint WorldId => _dalamudUtil.GetWorldId();
 
+    public const string TooltipSeparator = "--SEP--";
+
     public static void AttachToolTip(string text)
     {
         if (ImGui.IsItemHovered())
         {
-            ImGui.SetTooltip(text);
+            ImGui.BeginTooltip();
+            if (text.Contains(TooltipSeparator, StringComparison.Ordinal))
+            {
+                var splitText = text.Split(TooltipSeparator, StringSplitOptions.RemoveEmptyEntries);
+                for (int i = 0; i < splitText.Length; i++)
+                {
+                    ImGui.TextUnformatted(splitText[i]);
+                    if (i != splitText.Length - 1) ImGui.Separator();
+                }
+            }
+            else
+            {
+                ImGui.TextUnformatted(text);
+            }
+            ImGui.EndTooltip();
+        }
+    }
+
+    public static void BooleanToColoredIcon(bool value, bool inline = true)
+    {
+        using var font = ImRaii.PushFont(UiBuilder.IconFont);
+        using var colorgreen = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.HealerGreen, value);
+        using var colorred = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed, !value);
+
+        if (inline) ImGui.SameLine();
+
+        if (value)
+        {
+            ImGui.TextUnformatted(FontAwesomeIcon.Check.ToIconString());
+        }
+        else
+        {
+            ImGui.TextUnformatted(FontAwesomeIcon.Times.ToIconString());
         }
     }
 
     public static string ByteToString(long bytes, bool addSuffix = true)
     {
-        string[] suffix = { "B", "KiB", "MiB", "GiB", "TiB" };
+        string[] suffix = ["B", "KiB", "MiB", "GiB", "TiB"];
         int i;
         double dblSByte = bytes;
         for (i = 0; i < suffix.Length && bytes >= 1024; i++, bytes /= 1024)
@@ -315,42 +349,55 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
     }
 
-    public static bool IconTextButton(FontAwesomeIcon icon, string text, float? width = null)
+    public static bool IconTextButton(FontAwesomeIcon icon, string text, float? width = null, bool isInPopup = false)
     {
-        var buttonClicked = false;
+        var wasClicked = false;
 
         var iconSize = GetIconSize(icon);
         var textSize = ImGui.CalcTextSize(text);
         var padding = ImGui.GetStyle().FramePadding;
         var spacing = ImGui.GetStyle().ItemSpacing;
+        var cursor = ImGui.GetCursorPos();
+        var drawList = ImGui.GetWindowDrawList();
+        var pos = ImGui.GetWindowPos();
 
         Vector2 buttonSize;
-        var buttonSizeY = (iconSize.Y > textSize.Y ? iconSize.Y : textSize.Y) + padding.Y * 2;
+        var buttonSizeY = textSize.Y + padding.Y * 2;
+        var iconExtraSpacing = isInPopup ? padding.X * 2 : 0;
 
-        if (width == null)
+        var iconXoffset = iconSize.X <= iconSize.Y ? (iconSize.Y - iconSize.X) / 2f : 0;
+        var iconScaling = iconSize.X > iconSize.Y ? 1 / (iconSize.X / iconSize.Y) : 1;
+
+        if (width == null || width <= 0)
         {
-            var buttonSizeX = iconSize.X + textSize.X + padding.X * 2 + spacing.X;
-            buttonSize = new Vector2(buttonSizeX, buttonSizeY);
+            var buttonSizeX = (iconScaling == 1 ? iconSize.Y : (iconSize.X * iconScaling)) 
+                    + textSize.X + padding.X * 2 + spacing.X + (iconXoffset * 2);
+            buttonSize = new Vector2(buttonSizeX + iconExtraSpacing, buttonSizeY);
         }
         else
         {
             buttonSize = new Vector2(width.Value, buttonSizeY);
         }
 
-        if (ImGui.Button("###" + icon.ToIconString() + text, buttonSize))
+        using (ImRaii.PushColor(ImGuiCol.Button, ImGui.GetColorU32(ImGuiCol.PopupBg), isInPopup))
         {
-            buttonClicked = true;
+            if (ImGui.Button("###" + icon.ToIconString() + text, buttonSize))
+            {
+                wasClicked = true;
+            }
         }
 
-        ImGui.SameLine();
-        ImGui.SetCursorPosX(ImGui.GetCursorPosX() - buttonSize.X - padding.X);
-        ImGui.PushFont(UiBuilder.IconFont);
-        ImGui.Text(icon.ToIconString());
-        ImGui.PopFont();
-        ImGui.SameLine();
-        ImGui.Text(text);
+        drawList.AddText(UiBuilder.IconFont, ImGui.GetFontSize() * iconScaling,
+            new(pos.X + cursor.X + iconXoffset + padding.X,
+                pos.Y + cursor.Y + (buttonSizeY - (iconSize.Y * iconScaling)) / 2f),
+            ImGui.GetColorU32(ImGuiCol.Text), icon.ToIconString());
 
-        return buttonClicked;
+        drawList.AddText(UiBuilder.DefaultFont, ImGui.GetFontSize(),
+            new(pos.X + cursor.X + (padding.X) + spacing.X + (iconSize.X * iconScaling) + (iconXoffset * 2) + iconExtraSpacing,
+                pos.Y + cursor.Y + ((buttonSizeY - textSize.Y) / 2f)),
+            ImGui.GetColorU32(ImGuiCol.Text), text);
+
+        return wasClicked;
     }
 
     public static bool IsDirectoryWritable(string dirPath, bool throwIfFails = false)
@@ -571,14 +618,14 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public void DrawFileScanState()
     {
-        ImGui.Text("File Scanner Status");
+        ImGui.TextUnformatted("File Scanner Status");
         ImGui.SameLine();
         if (_cacheScanner.IsScanRunning)
         {
-            ImGui.Text("Scan is running");
-            ImGui.Text("Current Progress:");
+            ImGui.TextUnformatted("Scan is running");
+            ImGui.TextUnformatted("Current Progress:");
             ImGui.SameLine();
-            ImGui.Text(_cacheScanner.TotalFiles == 1
+            ImGui.TextUnformatted(_cacheScanner.TotalFiles == 1
                 ? "Collecting files"
                 : $"Processing {_cacheScanner.CurrentFileProgress}/{_cacheScanner.TotalFilesStorage} from storage ({_cacheScanner.TotalFiles} scanned in)");
             AttachToolTip("Note: it is possible to have more files in storage than scanned in, " +
@@ -587,7 +634,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         }
         else if (_configService.Current.FileScanPaused)
         {
-            ImGui.Text("File scanner is paused");
+            ImGui.TextUnformatted("File scanner is paused");
             ImGui.SameLine();
             if (ImGui.Button("Force Rescan##forcedrescan"))
             {
@@ -596,7 +643,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         }
         else if (_cacheScanner.HaltScanLocks.Any(f => f.Value > 0))
         {
-            ImGui.Text("Halted (" + string.Join(", ", _cacheScanner.HaltScanLocks.Where(f => f.Value > 0).Select(locker => locker.Key + ": " + locker.Value + " halt requests")) + ")");
+            ImGui.TextUnformatted("Halted (" + string.Join(", ", _cacheScanner.HaltScanLocks.Where(f => f.Value > 0).Select(locker => locker.Key + ": " + locker.Value + " halt requests")) + ")");
             ImGui.SameLine();
             if (ImGui.Button("Reset halt requests##clearlocks"))
             {
@@ -605,7 +652,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         }
         else
         {
-            ImGui.Text("Next scan in " + _cacheScanner.TimeUntilNextScan);
+            ImGui.TextUnformatted("Next scan in " + _cacheScanner.TimeUntilNextScan);
         }
     }
 
@@ -619,10 +666,10 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         var honorificColor = _honorificExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         var check = FontAwesomeIcon.Check.ToIconString();
         var cross = FontAwesomeIcon.SquareXmark.ToIconString();
-        ImGui.Text("Mandatory Plugins:");
+        ImGui.TextUnformatted("Mandatory Plugins:");
 
         ImGui.SameLine();
-        ImGui.Text("Penumbra");
+        ImGui.TextUnformatted("Penumbra");
         ImGui.SameLine();
         FontText(_penumbraExists ? check : cross, UiBuilder.IconFont, penumbraColor);
         ImGui.SameLine();
@@ -630,16 +677,16 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.Spacing();
 
         ImGui.SameLine();
-        ImGui.Text("Glamourer");
+        ImGui.TextUnformatted("Glamourer");
         ImGui.SameLine();
         FontText(_glamourerExists ? check : cross, UiBuilder.IconFont, glamourerColor);
         ImGui.SameLine();
         AttachToolTip($"Glamourer is " + (_glamourerExists ? "available and up to date." : "unavailable or not up to date."));
         ImGui.Spacing();
 
-        ImGui.Text("Optional Plugins:");
+        ImGui.TextUnformatted("Optional Plugins:");
         ImGui.SameLine();
-        ImGui.Text("SimpleHeels");
+        ImGui.TextUnformatted("SimpleHeels");
         ImGui.SameLine();
         FontText(_heelsExists ? check : cross, UiBuilder.IconFont, heelsColor);
         ImGui.SameLine();
@@ -647,7 +694,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.Spacing();
 
         ImGui.SameLine();
-        ImGui.Text("Customize+");
+        ImGui.TextUnformatted("Customize+");
         ImGui.SameLine();
         FontText(_customizePlusExists ? check : cross, UiBuilder.IconFont, customizeColor);
         ImGui.SameLine();
@@ -655,7 +702,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.Spacing();
 
         ImGui.SameLine();
-        ImGui.Text("Palette+");
+        ImGui.TextUnformatted("Palette+");
         ImGui.SameLine();
         FontText(_palettePlusExists ? check : cross, UiBuilder.IconFont, paletteColor);
         ImGui.SameLine();
@@ -663,7 +710,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.Spacing();
 
         ImGui.SameLine();
-        ImGui.Text("Honorific");
+        ImGui.TextUnformatted("Honorific");
         ImGui.SameLine();
         FontText(_honorificExists ? check : cross, UiBuilder.IconFont, honorificColor);
         ImGui.SameLine();
@@ -792,9 +839,9 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             ImGui.SameLine();
             ImGui.TextColored(ImGuiColors.ParsedGreen, _apiController.OnlineUsers.ToString(CultureInfo.InvariantCulture));
             ImGui.SameLine();
-            ImGui.Text("Users Online");
+            ImGui.TextUnformatted("Users Online");
             ImGui.SameLine();
-            ImGui.Text(")");
+            ImGui.TextUnformatted(")");
         }
     }
 

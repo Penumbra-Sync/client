@@ -1,5 +1,4 @@
-﻿using System.Numerics;
-using Dalamud.Interface;
+﻿using Dalamud.Interface;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility;
 using Dalamud.Utility;
@@ -7,12 +6,14 @@ using ImGuiNET;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.UI.Handlers;
 
+using System.Numerics;
+
 namespace MareSynchronos.UI.Components;
 
-public class SelectGroupForPairUi
+public class SelectTagForPairUi
 {
     private readonly TagHandler _tagHandler;
-    private readonly UidDisplayHandler _uidDisplayHandler;
+    private readonly IdDisplayHandler _uidDisplayHandler;
 
     /// <summary>
     /// The group UI is always open for a specific pair. This defines which pair the UI is open for.
@@ -30,7 +31,7 @@ public class SelectGroupForPairUi
     /// </summary>
     private string _tagNameToAdd = "";
 
-    public SelectGroupForPairUi(TagHandler tagHandler, UidDisplayHandler uidDisplayHandler)
+    public SelectTagForPairUi(TagHandler tagHandler, IdDisplayHandler uidDisplayHandler)
     {
         _show = false;
         _pair = null;

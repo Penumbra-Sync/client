@@ -121,7 +121,7 @@ public sealed class PerformanceCollectorService : IHostedService
                 DrawSeparator(sb, longestCounterName);
             }
 
-            var pastEntries = limitBySeconds > 0 ? entry.Value.Where(e => e.Item1.AddMinutes(limitBySeconds / 60.0d) >= TimeOnly.FromDateTime(DateTime.Now)).ToList() : entry.Value.ToList();
+            var pastEntries = limitBySeconds > 0 ? entry.Value.Where(e => e.Item1.AddMinutes(limitBySeconds / 60.0d) >= TimeOnly.FromDateTime(DateTime.Now)).ToList() : [.. entry.Value];
 
             if (pastEntries.Any())
             {

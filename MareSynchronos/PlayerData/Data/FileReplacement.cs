@@ -1,5 +1,6 @@
-﻿using System.Text.RegularExpressions;
-using MareSynchronos.API.Data;
+﻿using MareSynchronos.API.Data;
+
+using System.Text.RegularExpressions;
 
 namespace MareSynchronos.PlayerData.Data;
 
@@ -23,7 +24,7 @@ public partial class FileReplacement
     {
         return new FileReplacementData
         {
-            GamePaths = GamePaths.ToArray(),
+            GamePaths = [.. GamePaths],
             Hash = Hash,
             FileSwapPath = IsFileSwap ? ResolvedPath : string.Empty,
         };

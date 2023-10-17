@@ -27,7 +27,7 @@ public abstract class WindowMediatorSubscriberBase : Window, IMediatorSubscriber
 
     public void Dispose()
     {
-        Dispose(true);
+        Dispose(disposing: true);
         GC.SuppressFinalize(this);
     }
 

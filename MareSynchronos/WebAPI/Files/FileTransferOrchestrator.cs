@@ -1,7 +1,7 @@
 ﻿using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
-using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.WebAPI.Files.Models;
+using MareSynchronos.WebAPI.SignalR;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Net.Http.Headers;
@@ -12,20 +12,23 @@ namespace MareSynchronos.WebAPI.Files;
 
 public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
 {
+    private readonly ConcurrentDictionary<Guid, bool> _downloadReady = new();
     private readonly HttpClient _httpClient;
     private readonly MareConfigService _mareConfig;
     private readonly object _semaphoreModificationLock = new();
-    private readonly ServerConfigurationManager _serverManager;
+    private readonly TokenProvider _tokenProvider;
     private int _availableDownloadSlots;
     private SemaphoreSlim _downloadSemaphore;
-    private readonly ConcurrentDictionary<Guid, bool> _downloadReady = new();
 
-    public FileTransferOrchestrator(ILogger<FileTransferOrchestrator> logger, MareConfigService mareConfig, ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
+    public FileTransferOrchestrator(ILogger<FileTransferOrchestrator> logger, MareConfigService mareConfig,
+        MareMediator mediator, TokenProvider tokenProvider) : base(logger, mediator)
     {
         _mareConfig = mareConfig;
-        _serverManager = serverManager;
-        _httpClient = new();
-        _httpClient.Timeout = TimeSpan.FromSeconds(3000);
+        _tokenProvider = tokenProvider;
+        _httpClient = new()
+        {
+            Timeout = TimeSpan.FromSeconds(3000)
+        };
         var ver = Assembly.GetExecutingAssembly().GetName().Version;
         _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("MareSynchronos", ver!.Major + "." + ver!.Minor + "." + ver!.Build));
 
@@ -48,12 +51,12 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
     }
 
     public Uri? FilesCdnUri { private set; get; }
-    public List<FileTransfer> ForbiddenTransfers { get; } = new();
+    public List<FileTransfer> ForbiddenTransfers { get; } = [];
     public bool IsInitialized => FilesCdnUri != null;
 
-    public void ReleaseDownloadSlot()
+    public void ClearDownloadRequest(Guid guid)
     {
-        _downloadSemaphore.Release();
+        _downloadReady.Remove(guid, out _);
     }
 
     public bool IsDownloadReady(Guid guid)
@@ -66,12 +69,12 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         return false;
     }
 
-    public void ClearDownloadRequest(Guid guid)
+    public void ReleaseDownloadSlot()
     {
-        _downloadReady.Remove(guid, out _);
+        _downloadSemaphore.Release();
     }
 
-    public async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, Uri uri, 
+    public async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, Uri uri,
         CancellationToken? ct = null, HttpCompletionOption httpCompletionOption = HttpCompletionOption.ResponseContentRead)
     {
         using var requestMessage = new HttpRequestMessage(method, uri);
@@ -109,10 +112,10 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         await _downloadSemaphore.WaitAsync(token).ConfigureAwait(false);
     }
 
-    private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage, 
+    private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage,
         CancellationToken? ct = null, HttpCompletionOption httpCompletionOption = HttpCompletionOption.ResponseContentRead)
     {
-        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _serverManager.GetToken());
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await _tokenProvider.GetOrUpdateToken(ct!.Value).ConfigureAwait(false));
 
         if (requestMessage.Content != null && requestMessage.Content is not StreamContent && requestMessage.Content is not ByteArrayContent)
         {

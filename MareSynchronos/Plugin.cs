@@ -14,6 +14,8 @@ using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.UI;
+using MareSynchronos.UI.Components;
+using MareSynchronos.UI.Components.Popup;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files;
@@ -59,14 +61,19 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<FileTransferOrchestrator>();
             collection.AddSingleton<MarePlugin>();
             collection.AddSingleton<MareProfileManager>();
-            collection.AddSingleton<UidDisplayHandler>();
             collection.AddSingleton<GameObjectHandlerFactory>();
             collection.AddSingleton<FileDownloadManagerFactory>();
             collection.AddSingleton<PairHandlerFactory>();
             collection.AddSingleton<PairFactory>();
             collection.AddSingleton<CharacterAnalyzer>();
+            collection.AddSingleton<TokenProvider>();
             collection.AddSingleton<PluginWarningNotificationService>();
             collection.AddSingleton<FileCompactor>();
+            collection.AddSingleton<TagHandler>();
+            collection.AddSingleton<IdDisplayHandler>();
+            collection.AddSingleton<DrawEntityFactory>();
+            collection.AddSingleton<SelectPairForTagUi>();
+            collection.AddSingleton<SelectTagForPairUi>();
             collection.AddSingleton((s) => new DalamudContextMenu(pluginInterface));
             collection.AddSingleton((s) => new DalamudUtilService(s.GetRequiredService<ILogger<DalamudUtilService>>(),
                 clientState, objectTable, framework, gameGui, condition, gameData,
@@ -83,7 +90,8 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton((s) => new TransientConfigService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new ConfigurationMigrator(s.GetRequiredService<ILogger<ConfigurationMigrator>>(), pluginInterface));
             collection.AddSingleton((s) => new HubFactory(s.GetRequiredService<ILogger<HubFactory>>(), s.GetRequiredService<MareMediator>(),
-                s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<MareConfigService>(), pluginLog));
+                s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<MareConfigService>(),
+                s.GetRequiredService<TokenProvider>(), pluginLog));
 
             // func factory method singletons
             collection.AddSingleton(s =>
@@ -92,7 +100,8 @@ public sealed class Plugin : IDalamudPlugin
                     s.GetRequiredService<MareMediator>(),
                     s.GetRequiredService<UiSharedService>(),
                     s.GetRequiredService<ServerConfigurationManager>(),
-                    s.GetRequiredService<MareProfileManager>(), pair)));
+                    s.GetRequiredService<MareProfileManager>(),
+                    s.GetRequiredService<PairManager>(), pair)));
 
             // add scoped services
             collection.AddScoped<PeriodicFileScanner>();
@@ -106,6 +115,12 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddScoped<WindowMediatorSubscriberBase, EditProfileUi>((s) => new EditProfileUi(s.GetRequiredService<ILogger<EditProfileUi>>(),
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<ApiController>(), pluginInterface.UiBuilder, s.GetRequiredService<UiSharedService>(),
                 s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareProfileManager>()));
+            collection.AddScoped<WindowMediatorSubscriberBase, PopupHandler>();
+            collection.AddScoped<IPopupHandler, ReportPopupHandler>();
+            collection.AddScoped<IPopupHandler, BanUserPopupHandler>();
+            collection.AddScoped<IPopupHandler, CreateSyncshellPopupHandler>();
+            collection.AddScoped<IPopupHandler, JoinSyncshellPopupHandler>();
+            collection.AddScoped<IPopupHandler, SyncshellAdminPopupHandler>();
             collection.AddScoped<CacheCreationService>();
             collection.AddScoped<TransientResourceManager>();
             collection.AddScoped<PlayerDataFactory>();
@@ -113,7 +128,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddScoped((s) => new UiService(s.GetRequiredService<ILogger<UiService>>(), pluginInterface, s.GetRequiredService<MareConfigService>(),
                 s.GetRequiredService<WindowSystem>(), s.GetServices<WindowMediatorSubscriberBase>(), s.GetRequiredService<Func<Pair, StandaloneProfileUi>>(),
                 s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareMediator>()));
-            collection.AddScoped((s) => new CommandManagerService(commandManager, s.GetRequiredService<PerformanceCollectorService>(), s.GetRequiredService<UiService>(),
+            collection.AddScoped((s) => new CommandManagerService(commandManager, s.GetRequiredService<PerformanceCollectorService>(),
                 s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<PeriodicFileScanner>(), s.GetRequiredService<ApiController>(),
                 s.GetRequiredService<MareMediator>()));
             collection.AddScoped((s) => new NotificationService(s.GetRequiredService<ILogger<NotificationService>>(),
@@ -132,8 +147,6 @@ public sealed class Plugin : IDalamudPlugin
         .Build()
         .RunAsync(_pluginCts.Token);
     }
-
-    public string Name => "Mare Synchronos";
 
     public void Dispose()
     {

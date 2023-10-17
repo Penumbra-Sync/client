@@ -36,7 +36,7 @@ public static class VariousExtensions
         var charaDataToUpdate = new Dictionary<ObjectKind, HashSet<PlayerChanges>>();
         foreach (ObjectKind objectKind in Enum.GetValues<ObjectKind>())
         {
-            charaDataToUpdate[objectKind] = new();
+            charaDataToUpdate[objectKind] = [];
             oldData.FileReplacements.TryGetValue(objectKind, out var existingFileReplacements);
             newData.FileReplacements.TryGetValue(objectKind, out var newFileReplacements);
             oldData.GlamourerData.TryGetValue(objectKind, out var existingGlamourerData);
@@ -127,7 +127,7 @@ public static class VariousExtensions
         foreach (KeyValuePair<ObjectKind, HashSet<PlayerChanges>> data in charaDataToUpdate.ToList())
         {
             if (!data.Value.Any()) charaDataToUpdate.Remove(data.Key);
-            else charaDataToUpdate[data.Key] = data.Value.OrderByDescending(p => (int)p).ToHashSet();
+            else charaDataToUpdate[data.Key] = [.. data.Value.OrderByDescending(p => (int)p)];
         }
 
         return charaDataToUpdate;

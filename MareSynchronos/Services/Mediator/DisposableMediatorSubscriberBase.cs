@@ -10,7 +10,7 @@ public abstract class DisposableMediatorSubscriberBase : MediatorSubscriberBase,
 
     public void Dispose()
     {
-        Dispose(true);
+        Dispose(disposing: true);
         GC.SuppressFinalize(this);
     }
 

@@ -2,6 +2,7 @@
 using Dalamud.Interface.Internal.Notifications;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto;
+using MareSynchronos.API.Dto.Group;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.WebAPI.Files.Models;
@@ -10,6 +11,7 @@ using System.Numerics;
 namespace MareSynchronos.Services.Mediator;
 
 #pragma warning disable MA0048 // File name must match type name
+#pragma warning disable S2094
 public record SwitchToIntroUiMessage : MessageBase;
 public record SwitchToMainUiMessage : MessageBase;
 public record OpenSettingsUiMessage : MessageBase;
@@ -68,5 +70,12 @@ public record CompactUiChange(Vector2 Size, Vector2 Position) : MessageBase;
 public record ProfileOpenStandaloneMessage(Pair Pair) : MessageBase;
 public record RemoveWindowMessage(WindowMediatorSubscriberBase Window) : MessageBase;
 public record PairHandlerVisibleMessage(PairHandler Player) : MessageBase;
+public record RefreshUiMessage : MessageBase;
+public record OpenReportPopupMessage(Pair PairToReport) : MessageBase;
+public record OpenBanUserPopupMessage(Pair PairToBan, GroupFullInfoDto GroupFullInfoDto) : MessageBase;
+public record JoinSyncshellPopupMessage() : MessageBase;
+public record OpenCreateSyncshellPopupMessage() : MessageBase;
+public record OpenSyncshellAdminPanelPopupMessage(GroupFullInfoDto GroupInfo) : MessageBase;
 
+#pragma warning restore S2094
 #pragma warning restore MA0048 // File name must match type name

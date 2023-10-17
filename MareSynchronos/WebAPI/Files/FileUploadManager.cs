@@ -39,7 +39,7 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
         });
     }
 
-    public List<FileTransfer> CurrentUploads { get; } = new();
+    public List<FileTransfer> CurrentUploads { get; } = [];
     public bool IsUploading => CurrentUploads.Count > 0;
 
     public bool CancelUpload()
@@ -81,7 +81,7 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
 
         foreach (var kvp in data.FileReplacements)
         {
-            data.FileReplacements[kvp.Key].RemoveAll(i => _orchestrator.ForbiddenTransfers.Any(f => string.Equals(f.Hash, i.Hash, StringComparison.OrdinalIgnoreCase)));
+            data.FileReplacements[kvp.Key].RemoveAll(i => _orchestrator.ForbiddenTransfers.Exists(f => string.Equals(f.Hash, i.Hash, StringComparison.OrdinalIgnoreCase)));
         }
 
         return data;
@@ -102,7 +102,7 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
             UIDs = uids
         };
         var response = await _orchestrator.SendRequestAsync(HttpMethod.Post, MareFiles.ServerFilesFilesSendFullPath(_orchestrator.FilesCdnUri!), filesSendDto, ct).ConfigureAwait(false);
-        return await response.Content.ReadFromJsonAsync<List<UploadFileDto>>(cancellationToken: ct).ConfigureAwait(false) ?? new List<UploadFileDto>();
+        return await response.Content.ReadFromJsonAsync<List<UploadFileDto>>(cancellationToken: ct).ConfigureAwait(false) ?? [];
     }
 
     private HashSet<string> GetUnverifiedFiles(CharacterData data)
@@ -152,7 +152,7 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
             if (!_mareConfigService.Current.UseAlternativeFileUpload && ex is not OperationCanceledException)
             {
                 Logger.LogWarning(ex, "[{hash}] Error during file upload, trying alternative file upload", fileHash);
-                await UploadFileStream(compressedFile, fileHash, true, uploadToken).ConfigureAwait(false);
+                await UploadFileStream(compressedFile, fileHash, munged: true, uploadToken).ConfigureAwait(false);
             }
             else
             {
@@ -196,7 +196,7 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
         unverifiedUploadHashes = unverifiedUploadHashes.Where(h => _fileDbManager.GetFileCacheByHash(h) != null).ToHashSet(StringComparer.Ordinal);
 
         Logger.LogDebug("Verifying {count} files", unverifiedUploadHashes.Count);
-        var filesToUpload = await FilesSend(unverifiedUploadHashes.ToList(), visiblePlayers.Select(p => p.UID).ToList(), uploadToken).ConfigureAwait(false);
+        var filesToUpload = await FilesSend([.. unverifiedUploadHashes], visiblePlayers.Select(p => p.UID).ToList(), uploadToken).ConfigureAwait(false);
 
         foreach (var file in filesToUpload.Where(f => !f.IsForbidden))
         {
@@ -215,7 +215,7 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
 
         foreach (var file in filesToUpload.Where(c => c.IsForbidden))
         {
-            if (_orchestrator.ForbiddenTransfers.All(f => !string.Equals(f.Hash, file.Hash, StringComparison.Ordinal)))
+            if (_orchestrator.ForbiddenTransfers.TrueForAll(f => !string.Equals(f.Hash, file.Hash, StringComparison.Ordinal)))
             {
                 _orchestrator.ForbiddenTransfers.Add(new UploadFileTransfer(file)
                 {
@@ -248,7 +248,7 @@ public sealed class FileUploadManager : DisposableMediatorSubscriberBase
             Logger.LogDebug("Upload complete, compressed {size} to {compressed}", UiSharedService.ByteToString(totalSize), UiSharedService.ByteToString(compressedSize));
         }
 
-        foreach (var file in unverifiedUploadHashes.Where(c => !CurrentUploads.Any(u => string.Equals(u.Hash, c, StringComparison.Ordinal))))
+        foreach (var file in unverifiedUploadHashes.Where(c => !CurrentUploads.Exists(u => string.Equals(u.Hash, c, StringComparison.Ordinal))))
         {
             _verifiedUploadedHashes[file] = DateTime.UtcNow;
         }

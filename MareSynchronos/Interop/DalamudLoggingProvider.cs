@@ -1,7 +1,8 @@
-﻿using System.Collections.Concurrent;
-using Dalamud.Plugin.Services;
+﻿using Dalamud.Plugin.Services;
 using MareSynchronos.MareConfiguration;
 using Microsoft.Extensions.Logging;
+
+using System.Collections.Concurrent;
 
 namespace MareSynchronos.Interop;
 
@@ -32,7 +33,7 @@ public sealed class DalamudLoggingProvider : ILoggerProvider
             catName = string.Join("", Enumerable.Range(0, 15 - catName.Length).Select(_ => " ")) + catName;
         }
 
-        return _loggers.GetOrAdd(catName, name => new DalamudLogger(catName, _mareConfigService, _pluginLog));
+        return _loggers.GetOrAdd(catName, name => new DalamudLogger(name, _mareConfigService, _pluginLog));
     }
 
     public void Dispose()

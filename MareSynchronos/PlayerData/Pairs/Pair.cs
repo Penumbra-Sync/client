@@ -1,8 +1,8 @@
 ﻿using Dalamud.ContextMenu;
+using Dalamud.Game.Text.SeStringHandling;
 using MareSynchronos.API.Data;
-using MareSynchronos.API.Data.Comparer;
+using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Data.Extensions;
-using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.PlayerData.Factories;
 using MareSynchronos.PlayerData.Handlers;
@@ -23,54 +23,55 @@ public class Pair
     private CancellationTokenSource _applicationCts = new CancellationTokenSource();
     private OnlineUserIdentDto? _onlineUserIdentDto = null;
 
-    public Pair(ILogger<Pair> logger, PairHandlerFactory cachedPlayerFactory,
+    public Pair(ILogger<Pair> logger, UserFullPairDto userPair, PairHandlerFactory cachedPlayerFactory,
         MareMediator mediator, ServerConfigurationManager serverConfigurationManager)
     {
         _logger = logger;
+        UserPair = userPair;
         _cachedPlayerFactory = cachedPlayerFactory;
         _mediator = mediator;
         _serverConfigurationManager = serverConfigurationManager;
     }
 
-    public Dictionary<GroupFullInfoDto, GroupPairFullInfoDto> GroupPair { get; set; } = new(GroupDtoComparer.Instance);
     public bool HasCachedPlayer => CachedPlayer != null && !string.IsNullOrEmpty(CachedPlayer.PlayerName) && _onlineUserIdentDto != null;
+    public IndividualPairStatus IndividualPairStatus => UserPair.IndividualPairStatus;
+    public bool IsDirectlyPaired => IndividualPairStatus != IndividualPairStatus.None;
+    public bool IsOneSidedPair => IndividualPairStatus == IndividualPairStatus.OneSided;
     public bool IsOnline => CachedPlayer != null;
 
-    public bool IsPaused => UserPair != null && UserPair.OtherPermissions.IsPaired() ? UserPair.OtherPermissions.IsPaused() || UserPair.OwnPermissions.IsPaused()
-            : GroupPair.All(p => p.Key.GroupUserPermissions.IsPaused() || p.Value.GroupUserPermissions.IsPaused());
-
+    public bool IsPaired => IndividualPairStatus == IndividualPairStatus.Bidirectional || UserPair.Groups.Any();
+    public bool IsPaused => UserPair.OtherPermissions.IsPaused() || UserPair.OwnPermissions.IsPaused();
     public bool IsVisible => CachedPlayer?.IsVisible ?? false;
     public CharacterData? LastReceivedCharacterData { get; set; }
     public string? PlayerName => CachedPlayer?.PlayerName ?? string.Empty;
 
-    public UserData UserData => UserPair?.User ?? GroupPair.First().Value.User;
+    public UserData UserData => UserPair.User;
 
-    public UserPairDto? UserPair { get; set; }
-
+    public UserFullPairDto UserPair { get; set; }
     private PairHandler? CachedPlayer { get; set; }
 
     public void AddContextMenu(GameObjectContextMenuOpenArgs args)
     {
-        if (CachedPlayer == null || args.ObjectId != CachedPlayer.PlayerCharacterId) return;
+        if (CachedPlayer == null || args.ObjectId != CachedPlayer.PlayerCharacterId || IsPaused) return;
 
-        if (!IsPaused)
+        SeStringBuilder seStringBuilder = new();
+        SeStringBuilder seStringBuilder2 = new();
+        SeStringBuilder seStringBuilder3 = new();
+        var openProfileSeString = seStringBuilder.AddUiForeground(526).AddText(" ").AddUiForegroundOff().AddText("Open Profile").Build();
+        var reapplyDataSeString = seStringBuilder2.AddUiForeground(526).AddText(" ").AddUiForegroundOff().AddText("Reapply last data").Build();
+        var cyclePauseState = seStringBuilder3.AddUiForeground(526).AddText(" ").AddUiForegroundOff().AddText("Cycle pause state").Build();
+        args.AddCustomItem(new GameObjectContextMenuItem(openProfileSeString, (a) =>
         {
-            args.AddCustomItem(new GameObjectContextMenuItem("[Mare] Open Profile", (a) =>
-            {
-                _mediator.Publish(new ProfileOpenStandaloneMessage(this));
-            }));
-        }
-        args.AddCustomItem(new GameObjectContextMenuItem("[Mare] Reapply last data", (a) =>
+            _mediator.Publish(new ProfileOpenStandaloneMessage(this));
+        }));
+        args.AddCustomItem(new GameObjectContextMenuItem(reapplyDataSeString, (a) =>
         {
-            ApplyLastReceivedData(true);
-        }, false));
-        if (UserPair != null && UserPair.OtherPermissions.IsPaired() && UserPair.OwnPermissions.IsPaired())
+            ApplyLastReceivedData(forced: true);
+        }, useDalamudIndicator: false));
+        args.AddCustomItem(new GameObjectContextMenuItem(cyclePauseState, (a) =>
         {
-            args.AddCustomItem(new GameObjectContextMenuItem("[Mare] Cycle pause state", (a) =>
-            {
-                _mediator.Publish(new CyclePauseMessage(UserData));
-            }, false));
-        }
+            _mediator.Publish(new CyclePauseMessage(UserData));
+        }, useDalamudIndicator: false));
     }
 
     public void ApplyData(OnlineUserCharaDataDto data)
@@ -152,7 +153,7 @@ public class Pair
 
     public bool HasAnyConnection()
     {
-        return UserPair != null || GroupPair.Any();
+        return UserPair.Groups.Any() || UserPair.IndividualPairStatus != IndividualPairStatus.None;
     }
 
     public void MarkOffline()
@@ -191,37 +192,29 @@ public class Pair
             return data;
         }
 
-        bool disableIndividualAnimations = UserPair != null && (UserPair.OtherPermissions.IsDisableAnimations() || UserPair.OwnPermissions.IsDisableAnimations());
-        bool disableIndividualVFX = UserPair != null && (UserPair.OtherPermissions.IsDisableVFX() || UserPair.OwnPermissions.IsDisableVFX());
-        bool disableGroupAnimations = GroupPair.All(pair => pair.Value.GroupUserPermissions.IsDisableAnimations() || pair.Key.GroupPermissions.IsDisableAnimations() || pair.Key.GroupUserPermissions.IsDisableAnimations());
+        bool disableIndividualAnimations = (UserPair.OtherPermissions.IsDisableAnimations() || UserPair.OwnPermissions.IsDisableAnimations());
+        bool disableIndividualVFX = (UserPair.OtherPermissions.IsDisableVFX() || UserPair.OwnPermissions.IsDisableVFX());
+        bool disableIndividualSounds = (UserPair.OtherPermissions.IsDisableSounds() || UserPair.OwnPermissions.IsDisableSounds());
 
-        bool disableAnimations = (UserPair != null && disableIndividualAnimations) || (UserPair == null && disableGroupAnimations);
+        _logger.LogTrace("Disable: Sounds: {disableIndividualSounds}, Anims: {disableIndividualAnims}; " +
+            "VFX: {disableGroupSounds}",
+            disableIndividualSounds, disableIndividualAnimations, disableIndividualVFX);
 
-        bool disableIndividualSounds = UserPair != null && (UserPair.OtherPermissions.IsDisableSounds() || UserPair.OwnPermissions.IsDisableSounds());
-        bool disableGroupSounds = GroupPair.All(pair => pair.Value.GroupUserPermissions.IsDisableSounds() || pair.Key.GroupPermissions.IsDisableSounds() || pair.Key.GroupUserPermissions.IsDisableSounds());
-        bool disableGroupVFX = GroupPair.All(pair => pair.Value.GroupUserPermissions.IsDisableVFX() || pair.Key.GroupPermissions.IsDisableVFX() || pair.Key.GroupUserPermissions.IsDisableVFX());
-
-        bool disableSounds = (UserPair != null && disableIndividualSounds) || (UserPair == null && disableGroupSounds);
-        bool disableVFX = (UserPair != null && disableIndividualVFX) || (UserPair == null && disableGroupVFX);
-
-        _logger.LogTrace("Individual Sounds: {disableIndividualSounds}, Individual Anims: {disableIndividualAnims}; " +
-            "Group Sounds: {disableGroupSounds}, Group Anims: {disableGroupAnims} => Disable Sounds: {disableSounds}, Disable Anims: {disableAnims}",
-            disableIndividualSounds, disableIndividualAnimations, disableGroupSounds, disableGroupAnimations, disableSounds, disableAnimations);
-
-        if (disableAnimations || disableSounds)
+        if (disableIndividualAnimations || disableIndividualSounds || disableIndividualVFX)
         {
-            _logger.LogTrace("Data cleaned up: Animations disabled: {disableAnimations}, Sounds disabled: {disableSounds}, VFX disabled: {disableVFX}", disableAnimations, disableSounds, disableVFX);
+            _logger.LogTrace("Data cleaned up: Animations disabled: {disableAnimations}, Sounds disabled: {disableSounds}, VFX disabled: {disableVFX}",
+                disableIndividualAnimations, disableIndividualSounds, disableIndividualVFX);
             foreach (var objectKind in data.FileReplacements.Select(k => k.Key))
             {
-                if (disableSounds)
+                if (disableIndividualSounds)
                     data.FileReplacements[objectKind] = data.FileReplacements[objectKind]
                         .Where(f => !f.GamePaths.Any(p => p.EndsWith("scd", StringComparison.OrdinalIgnoreCase)))
                         .ToList();
-                if (disableAnimations)
+                if (disableIndividualAnimations)
                     data.FileReplacements[objectKind] = data.FileReplacements[objectKind]
                         .Where(f => !f.GamePaths.Any(p => p.EndsWith("tmb", StringComparison.OrdinalIgnoreCase) || p.EndsWith("pap", StringComparison.OrdinalIgnoreCase)))
                         .ToList();
-                if (disableVFX)
+                if (disableIndividualVFX)
                     data.FileReplacements[objectKind] = data.FileReplacements[objectKind]
                         .Where(f => !f.GamePaths.Any(p => p.EndsWith("atex", StringComparison.OrdinalIgnoreCase) || p.EndsWith("avfx", StringComparison.OrdinalIgnoreCase)))
                         .ToList();

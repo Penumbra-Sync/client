@@ -13,14 +13,14 @@ public class FileCacheEntity
         LastModifiedDateTicks = lastModifiedDateTicks;
     }
 
-    public bool IsCacheEntry => PrefixedFilePath.StartsWith(FileCacheManager.CachePrefix, StringComparison.OrdinalIgnoreCase);
+    public long? CompressedSize { get; set; }
     public string CsvEntry => $"{Hash}{FileCacheManager.CsvSplit}{PrefixedFilePath}{FileCacheManager.CsvSplit}{LastModifiedDateTicks}|{Size ?? -1}|{CompressedSize ?? -1}";
     public string Hash { get; set; }
+    public bool IsCacheEntry => PrefixedFilePath.StartsWith(FileCacheManager.CachePrefix, StringComparison.OrdinalIgnoreCase);
     public string LastModifiedDateTicks { get; set; }
     public string PrefixedFilePath { get; init; }
     public string ResolvedFilepath { get; private set; } = string.Empty;
     public long? Size { get; set; }
-    public long? CompressedSize { get; set; }
 
     public void SetResolvedFilePath(string filePath)
     {

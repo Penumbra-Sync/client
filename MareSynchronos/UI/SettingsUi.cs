@@ -1,36 +1,37 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
-using ImGuiNET;
-using MareSynchronos.WebAPI;
-using System.Numerics;
 using Dalamud.Utility;
+using ImGuiNET;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Comparer;
+using MareSynchronos.FileCache;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Models;
-using Microsoft.Extensions.Logging;
-using MareSynchronos.WebAPI.SignalR.Utils;
-using MareSynchronos.PlayerData.Pairs;
-using System.Text.Json;
 using MareSynchronos.PlayerData.Export;
+using MareSynchronos.PlayerData.Handlers;
+using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
-using MareSynchronos.Services;
+using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.Files.Models;
-using MareSynchronos.PlayerData.Handlers;
+using MareSynchronos.WebAPI.SignalR.Utils;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
-using MareSynchronos.FileCache;
+using System.Numerics;
+using System.Text.Json;
 
 namespace MareSynchronos.UI;
 
 public class SettingsUi : WindowMediatorSubscriberBase
 {
+    private readonly ApiController _apiController;
     private readonly MareConfigService _configService;
     private readonly ConcurrentDictionary<GameObjectHandler, Dictionary<string, FileDownloadStatus>> _currentDownloads = new();
+    private readonly FileCompactor _fileCompactor;
     private readonly FileUploadManager _fileTransferManager;
     private readonly FileTransferOrchestrator _fileTransferOrchestrator;
-    private readonly FileCompactor _fileCompactor;
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly PairManager _pairManager;
     private readonly PerformanceCollectorService _performanceCollector;
@@ -53,7 +54,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         MareMediator mediator, PerformanceCollectorService performanceCollector,
         FileUploadManager fileTransferManager,
         FileTransferOrchestrator fileTransferOrchestrator,
-        FileCompactor fileCompactor) : base(logger, mediator, "Mare Synchronos Settings")
+        FileCompactor fileCompactor, ApiController apiController) : base(logger, mediator, "Mare Synchronos Settings")
     {
         _configService = configService;
         _mareCharaFileManager = mareCharaFileManager;
@@ -62,6 +63,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _performanceCollector = performanceCollector;
         _fileTransferManager = fileTransferManager;
         _fileTransferOrchestrator = fileTransferOrchestrator;
+        _apiController = apiController;
         _fileCompactor = fileCompactor;
         _uiShared = uiShared;
 
@@ -117,14 +119,14 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 ImGui.TableNextColumn();
                 if (item is UploadFileTransfer transfer)
                 {
-                    ImGui.Text(transfer.LocalFile);
+                    ImGui.TextUnformatted(transfer.LocalFile);
                 }
                 else
                 {
-                    ImGui.Text(item.Hash);
+                    ImGui.TextUnformatted(item.Hash);
                 }
                 ImGui.TableNextColumn();
-                ImGui.Text(item.ForbiddenBy);
+                ImGui.TextUnformatted(item.ForbiddenBy);
             }
             ImGui.EndTable();
         }
@@ -248,11 +250,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         var color = UiSharedService.UploadColor((transfer.Transferred, transfer.Total));
                         ImGui.PushStyleColor(ImGuiCol.Text, color);
                         ImGui.TableNextColumn();
-                        ImGui.Text(transfer.Hash);
+                        ImGui.TextUnformatted(transfer.Hash);
                         ImGui.TableNextColumn();
-                        ImGui.Text(UiSharedService.ByteToString(transfer.Transferred));
+                        ImGui.TextUnformatted(UiSharedService.ByteToString(transfer.Transferred));
                         ImGui.TableNextColumn();
-                        ImGui.Text(UiSharedService.ByteToString(transfer.Total));
+                        ImGui.TextUnformatted(UiSharedService.ByteToString(transfer.Total));
                         ImGui.PopStyleColor();
                         ImGui.TableNextRow();
                     }
@@ -276,14 +278,14 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         {
                             var color = UiSharedService.UploadColor((entry.Value.TransferredBytes, entry.Value.TotalBytes));
                             ImGui.TableNextColumn();
-                            ImGui.Text(userName);
+                            ImGui.TextUnformatted(userName);
                             ImGui.TableNextColumn();
-                            ImGui.Text(entry.Key);
+                            ImGui.TextUnformatted(entry.Key);
                             ImGui.PushStyleColor(ImGuiCol.Text, color);
                             ImGui.TableNextColumn();
-                            ImGui.Text(entry.Value.TransferredFiles + "/" + entry.Value.TotalFiles);
+                            ImGui.TextUnformatted(entry.Value.TransferredFiles + "/" + entry.Value.TotalFiles);
                             ImGui.TableNextColumn();
-                            ImGui.Text(UiSharedService.ByteToString(entry.Value.TransferredBytes) + "/" + UiSharedService.ByteToString(entry.Value.TotalBytes));
+                            ImGui.TextUnformatted(UiSharedService.ByteToString(entry.Value.TransferredBytes) + "/" + UiSharedService.ByteToString(entry.Value.TotalBytes));
                             ImGui.TableNextColumn();
                             ImGui.PopStyleColor();
                             ImGui.TableNextRow();
@@ -316,7 +318,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             foreach (var l in JsonSerializer.Serialize(LastCreatedCharacterData, new JsonSerializerOptions() { WriteIndented = true }).Split('\n'))
             {
-                ImGui.Text($"{l}");
+                ImGui.TextUnformatted($"{l}");
             }
 
             ImGui.TreePop();
@@ -436,7 +438,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _uiShared.DrawFileScanState();
         _uiShared.DrawTimeSpanBetweenScansSetting();
         _uiShared.DrawCacheDirectorySetting();
-        ImGui.Text($"Currently utilized local storage: {UiSharedService.ByteToString(_uiShared.FileCacheSize)}");
+        ImGui.TextUnformatted($"Currently utilized local storage: {UiSharedService.ByteToString(_uiShared.FileCacheSize)}");
         bool isLinux = Util.IsWine();
         if (isLinux) ImGui.BeginDisabled();
         bool useFileCompactor = _configService.Current.UseCompactor;
@@ -452,14 +454,14 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             if (UiSharedService.IconTextButton(FontAwesomeIcon.FileArchive, "Compact all files in storage"))
             {
-                _ = Task.Run(() => _fileCompactor.CompactStorage(true));
+                _ = Task.Run(() => _fileCompactor.CompactStorage(compress: true));
             }
             UiSharedService.AttachToolTip("This will run compression on all files in your current Mare Storage." + Environment.NewLine
                 + "You do not need to run this manually if you keep the file compactor enabled.");
             ImGui.SameLine();
             if (UiSharedService.IconTextButton(FontAwesomeIcon.File, "Decompact all files in storage"))
             {
-                _ = Task.Run(() => _fileCompactor.CompactStorage(false));
+                _ = Task.Run(() => _fileCompactor.CompactStorage(compress: false));
             }
             UiSharedService.AttachToolTip("This will run decompression on all files in your current Mare Storage.");
         }
@@ -470,11 +472,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
         if (isLinux)
         {
             ImGui.EndDisabled();
-            ImGui.Text("The file compactor is only available on Windows.");
+            ImGui.TextUnformatted("The file compactor is only available on Windows.");
         }
 
         ImGui.Dummy(new Vector2(10, 10));
-        ImGui.Text("To clear the local storage accept the following disclaimer");
+        ImGui.TextUnformatted("To clear the local storage accept the following disclaimer");
         ImGui.Indent();
         ImGui.Checkbox("##readClearCache", ref _readClearCache);
         ImGui.SameLine();
@@ -557,6 +559,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var enableRightClickMenu = _configService.Current.EnableRightClickMenus;
         var enableDtrEntry = _configService.Current.EnableDtrEntry;
         var preferNotesInsteadOfName = _configService.Current.PreferNotesOverNamesForVisible;
+        var groupUpSyncshells = _configService.Current.GroupUpSyncshells;
 
         if (ImGui.Checkbox("Enable Game Right Click Menu Entries", ref enableRightClickMenu))
         {
@@ -576,6 +579,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _configService.Current.ShowVisibleUsersSeparately = showVisibleSeparate;
             _configService.Save();
+            Mediator.Publish(new RefreshUiMessage());
         }
         UiSharedService.DrawHelpText("This will show all currently visible users in a special 'Visible' group in the main UI.");
 
@@ -583,13 +587,23 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _configService.Current.ShowOfflineUsersSeparately = showOfflineSeparate;
             _configService.Save();
+            Mediator.Publish(new RefreshUiMessage());
         }
         UiSharedService.DrawHelpText("This will show all currently offline users in a special 'Offline' group in the main UI.");
+
+        if (ImGui.Checkbox("Group up all syncshells in one folder", ref groupUpSyncshells))
+        {
+            _configService.Current.GroupUpSyncshells = groupUpSyncshells;
+            _configService.Save();
+            Mediator.Publish(new RefreshUiMessage());
+        }
+        UiSharedService.DrawHelpText("This will group up all Syncshells in a special 'All Syncshells' folder in the main UI.");
 
         if (ImGui.Checkbox("Show player name for visible players", ref showNameInsteadOfNotes))
         {
             _configService.Current.ShowCharacterNameInsteadOfNotesForVisible = showNameInsteadOfNotes;
             _configService.Save();
+            Mediator.Publish(new RefreshUiMessage());
         }
         UiSharedService.DrawHelpText("This will show the character name instead of custom set note when a character is visible");
 
@@ -599,6 +613,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             _configService.Current.PreferNotesOverNamesForVisible = preferNotesInsteadOfName;
             _configService.Save();
+            Mediator.Publish(new RefreshUiMessage());
         }
         UiSharedService.DrawHelpText("If you set a note for a player it will be shown instead of the player name");
         if (!_configService.Current.ShowCharacterNameInsteadOfNotesForVisible) ImGui.EndDisabled();
@@ -728,7 +743,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             {
                 UiSharedService.TextWrapped(
                     "All your own uploaded files on the service will be deleted.\nThis operation cannot be undone.");
-                ImGui.Text("Are you sure you want to continue?");
+                ImGui.TextUnformatted("Are you sure you want to continue?");
                 ImGui.Separator();
                 ImGui.Spacing();
 
@@ -737,7 +752,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
                 if (ImGui.Button("Delete everything", new Vector2(buttonSize, 0)))
                 {
-                    Task.Run(_fileTransferManager.DeleteAllFiles);
+                    _ = Task.Run(_fileTransferManager.DeleteAllFiles);
                     _deleteFilesPopupModalShown = false;
                 }
 
@@ -765,7 +780,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 UiSharedService.TextWrapped(
                     "Your account and all associated files and data on the service will be deleted.");
                 UiSharedService.TextWrapped("Your UID will be removed from all pairing lists.");
-                ImGui.Text("Are you sure you want to continue?");
+                ImGui.TextUnformatted("Are you sure you want to continue?");
                 ImGui.Separator();
                 ImGui.Spacing();
 
@@ -774,7 +789,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
                 if (ImGui.Button("Delete account", new Vector2(buttonSize, 0)))
                 {
-                    Task.Run(ApiController.UserDelete);
+                    _ = Task.Run(ApiController.UserDelete);
                     _deleteAccountPopupModalShown = false;
                     Mediator.Publish(new SwitchToIntroUiMessage());
                 }
@@ -873,7 +888,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     }
 
                     ImGui.Separator();
-                    if (!selectedServer.Authentications.Any(c => string.Equals(c.CharacterName, _uiShared.PlayerName, StringComparison.Ordinal)
+                    if (!selectedServer.Authentications.Exists(c => string.Equals(c.CharacterName, _uiShared.PlayerName, StringComparison.Ordinal)
                         && c.WorldId == _uiShared.WorldId))
                     {
                         if (UiSharedService.IconTextButton(FontAwesomeIcon.User, "Add current character"))
@@ -914,7 +929,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                             item.Value.Key = key;
                             _serverConfigurationManager.Save();
                         }
-                        if (!selectedServer.Authentications.Any(p => p.SecretKeyIdx == item.Key))
+                        if (!selectedServer.Authentications.Exists(p => p.SecretKeyIdx == item.Key))
                         {
                             if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Secret Key") && UiSharedService.CtrlPressed())
                             {
@@ -982,6 +997,84 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 }
                 ImGui.EndTabItem();
             }
+
+            if (ImGui.BeginTabItem("Permission Settings"))
+            {
+                UiSharedService.FontText("Default Permission Settings", _uiShared.UidFont);
+                if (selectedServer == _serverConfigurationManager.CurrentServer && _apiController.IsConnected)
+                {
+                    UiSharedService.TextWrapped("Note: The default permissions settings here are not applied retroactively to existing pairs or joined Syncshells.");
+                    UiSharedService.TextWrapped("Note: The default permissions settings here are sent and stored on the connected service.");
+                    ImGui.Dummy(new(5f));
+                    var perms = _apiController.DefaultPermissions!;
+                    bool individualIsSticky = perms.IndividualIsSticky;
+                    bool disableIndividualSounds = perms.DisableIndividualSounds;
+                    bool disableIndividualAnimations = perms.DisableIndividualAnimations;
+                    bool disableIndividualVFX = perms.DisableIndividualVFX;
+                    if (ImGui.Checkbox("Individually set permissions become preferred permissions", ref individualIsSticky))
+                    {
+                        perms.IndividualIsSticky = individualIsSticky;
+                        _ = _apiController.UserUpdateDefaultPermissions(perms);
+                    }
+                    UiSharedService.DrawHelpText("The preferred attribute means that the permissions to that user will never change through any of your permission changes to Syncshells " +
+                        "(i.e. if you have paused one specific user in a Syncshell and they become preferred permissions, then pause and unpause the same Syncshell, the user will remain paused - " +
+                        "if a user does not have preferred permissions, it will follow the permissions of the Syncshell and be unpaused)." + Environment.NewLine + Environment.NewLine +
+                        "This setting means:" + Environment.NewLine +
+                        "  - All new individual pairs get their permissions defaulted to preferred permissions." + Environment.NewLine +
+                        "  - All individually set permissions for any pair will also automatically become preferred permissions. This includes pairs in Syncshells." + Environment.NewLine + Environment.NewLine +
+                        "It is possible to remove or set the preferred permission state for any pair at any time." + Environment.NewLine + Environment.NewLine +
+                        "If unsure, leave this setting off.");
+                    ImGui.Dummy(new(3f));
+
+                    if (ImGui.Checkbox("Disable individual pair sounds", ref disableIndividualSounds))
+                    {
+                        perms.DisableIndividualSounds = disableIndividualSounds;
+                        _ = _apiController.UserUpdateDefaultPermissions(perms);
+                    }
+                    UiSharedService.DrawHelpText("This setting will disable sound sync for all new individual pairs.");
+                    if (ImGui.Checkbox("Disable individual pair animations", ref disableIndividualAnimations))
+                    {
+                        perms.DisableIndividualAnimations = disableIndividualAnimations;
+                        _ = _apiController.UserUpdateDefaultPermissions(perms);
+                    }
+                    UiSharedService.DrawHelpText("This setting will disable animation sync for all new individual pairs.");
+                    if (ImGui.Checkbox("Disable individual pair VFX", ref disableIndividualVFX))
+                    {
+                        perms.DisableIndividualVFX = disableIndividualVFX;
+                        _ = _apiController.UserUpdateDefaultPermissions(perms);
+                    }
+                    UiSharedService.DrawHelpText("This setting will disable VFX sync for all new individual pairs.");
+                    ImGui.Dummy(new(5f));
+                    bool disableGroundSounds = perms.DisableGroupSounds;
+                    bool disableGroupAnimations = perms.DisableGroupAnimations;
+                    bool disableGroupVFX = perms.DisableGroupVFX;
+                    if (ImGui.Checkbox("Disable Syncshell pair sounds", ref disableGroundSounds))
+                    {
+                        perms.DisableGroupSounds = disableGroundSounds;
+                        _ = _apiController.UserUpdateDefaultPermissions(perms);
+                    }
+                    UiSharedService.DrawHelpText("This setting will disable sound sync for all non-sticky pairs in newly joined syncshells.");
+                    if (ImGui.Checkbox("Disable Syncshell pair animations", ref disableGroupAnimations))
+                    {
+                        perms.DisableGroupAnimations = disableGroupAnimations;
+                        _ = _apiController.UserUpdateDefaultPermissions(perms);
+                    }
+                    UiSharedService.DrawHelpText("This setting will disable animation sync for all non-sticky pairs in newly joined syncshells.");
+                    if (ImGui.Checkbox("Disable Syncshell pair VFX", ref disableGroupVFX))
+                    {
+                        perms.DisableGroupVFX = disableGroupVFX;
+                        _ = _apiController.UserUpdateDefaultPermissions(perms);
+                    }
+                    UiSharedService.DrawHelpText("This setting will disable VFX sync for all non-sticky pairs in newly joined syncshells.");
+                }
+                else
+                {
+                    UiSharedService.ColorTextWrapped("Default Permission Settings unavailable for this service. " +
+                        "You need to connect to this service to change the default permissions since they are stored on the service.", ImGuiColors.DalamudYellow);
+                }
+
+                ImGui.EndTabItem();
+            }
             ImGui.EndTabBar();
         }
     }
@@ -990,7 +1083,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
     {
         _uiShared.PrintServerState();
         ImGui.AlignTextToFramePadding();
-        ImGui.Text("Community and Support:");
+        ImGui.TextUnformatted("Community and Support:");
         ImGui.SameLine();
         if (ImGui.Button("Mare Synchronos Discord"))
         {

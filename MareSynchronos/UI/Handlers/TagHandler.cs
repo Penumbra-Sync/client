@@ -4,6 +4,7 @@ namespace MareSynchronos.UI.Handlers;
 
 public class TagHandler
 {
+    public const string CustomAllTag = "Mare_All";
     public const string CustomOfflineTag = "Mare_Offline";
     public const string CustomOnlineTag = "Mare_Online";
     public const string CustomUnpairedTag = "Mare_Unpaired";
@@ -27,9 +28,12 @@ public class TagHandler
 
     public List<string> GetAllTagsSorted()
     {
-        return _serverConfigurationManager.GetServerAvailablePairTags()
-            .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        return
+        [
+            .. _serverConfigurationManager.GetServerAvailablePairTags()
+                        .OrderBy(s => s, StringComparer.OrdinalIgnoreCase)
+,
+        ];
     }
 
     public HashSet<string> GetOtherUidsForTag(string tag)
@@ -59,7 +63,6 @@ public class TagHandler
 
     public void RemoveTag(string tag)
     {
-        // First remove the tag from teh available pair tags
         _serverConfigurationManager.RemoveTag(tag);
     }
 

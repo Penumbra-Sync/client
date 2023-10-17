@@ -14,7 +14,7 @@ public class OnlinePlayerManager : DisposableMediatorSubscriberBase
     private readonly ApiController _apiController;
     private readonly DalamudUtilService _dalamudUtil;
     private readonly FileUploadManager _fileTransferManager;
-    private readonly HashSet<PairHandler> _newVisiblePlayers = new();
+    private readonly HashSet<PairHandler> _newVisiblePlayers = [];
     private readonly PairManager _pairManager;
     private CharacterData? _lastSentData;
 

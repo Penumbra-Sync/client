@@ -1,16 +1,12 @@
-﻿using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.Globalization;
-using System.Numerics;
-using System.Reflection;
-using Dalamud.Interface;
+﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
 using Dalamud.Utility;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
-using MareSynchronos.API.Dto.User;
+using MareSynchronos.API.Dto.Group;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.PlayerData.Pairs;
@@ -23,6 +19,10 @@ using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.Files.Models;
 using MareSynchronos.WebAPI.SignalR.Utils;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
+using System.Globalization;
+using System.Numerics;
+using System.Reflection;
 
 namespace MareSynchronos.UI;
 
@@ -33,18 +33,16 @@ public class CompactUi : WindowMediatorSubscriberBase
     private readonly ApiController _apiController;
     private readonly MareConfigService _configService;
     private readonly ConcurrentDictionary<GameObjectHandler, Dictionary<string, FileDownloadStatus>> _currentDownloads = new();
+    private readonly DrawEntityFactory _drawEntityFactory;
     private readonly FileUploadManager _fileTransferManager;
-    private readonly GroupPanel _groupPanel;
-    private readonly PairGroupsUi _pairGroupsUi;
     private readonly PairManager _pairManager;
-    private readonly SelectGroupForPairUi _selectGroupForPairUi;
-    private readonly SelectPairForGroupUi _selectPairsForGroupUi;
+    private readonly SelectTagForPairUi _selectGroupForPairUi;
+    private readonly SelectPairForTagUi _selectPairsForGroupUi;
     private readonly ServerConfigurationManager _serverManager;
-    private readonly Stopwatch _timeout = new();
-    private readonly UidDisplayHandler _uidDisplayHandler;
+    private readonly TagHandler _tagHandler;
     private readonly UiSharedService _uiShared;
-    private bool _buttonState;
     private string _characterOrCommentFilter = string.Empty;
+    private List<IDrawFolder> _drawFolders;
     private Pair? _lastAddedUser;
     private string _lastAddedUserComment = string.Empty;
     private Vector2 _lastPosition = Vector2.One;
@@ -52,11 +50,12 @@ public class CompactUi : WindowMediatorSubscriberBase
     private string _pairToAdd = string.Empty;
     private int _secretKeyIdx = -1;
     private bool _showModalForUserAddition;
-    private bool _showSyncShells;
     private bool _wasOpen;
 
     public CompactUi(ILogger<CompactUi> logger, UiSharedService uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
-        ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager, UidDisplayHandler uidDisplayHandler) : base(logger, mediator, "###MareSynchronosMainUI")
+        ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager,
+        TagHandler tagHandler, DrawEntityFactory drawEntityFactory, SelectTagForPairUi selectTagForPairUi, SelectPairForTagUi selectPairForTagUi)
+        : base(logger, mediator, "###MareSynchronosMainUI")
     {
         _uiShared = uiShared;
         _configService = configService;
@@ -64,13 +63,12 @@ public class CompactUi : WindowMediatorSubscriberBase
         _pairManager = pairManager;
         _serverManager = serverManager;
         _fileTransferManager = fileTransferManager;
-        _uidDisplayHandler = uidDisplayHandler;
-        var tagHandler = new TagHandler(_serverManager);
+        _tagHandler = tagHandler;
+        _drawEntityFactory = drawEntityFactory;
+        _selectGroupForPairUi = selectTagForPairUi;
+        _selectPairsForGroupUi = selectPairForTagUi;
 
-        _groupPanel = new(this, uiShared, _pairManager, uidDisplayHandler, _serverManager);
-        _selectGroupForPairUi = new(tagHandler, uidDisplayHandler);
-        _selectPairsForGroupUi = new(tagHandler, uidDisplayHandler);
-        _pairGroupsUi = new(configService, tagHandler, apiController, _selectPairsForGroupUi);
+        _drawFolders = GetDrawFolders().ToList();
 
 #if DEBUG
         string dev = "Dev Build";
@@ -87,6 +85,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         Mediator.Subscribe<CutsceneEndMessage>(this, (_) => UiSharedService_GposeEnd());
         Mediator.Subscribe<DownloadStartedMessage>(this, (msg) => _currentDownloads[msg.DownloadId] = msg.DownloadStatus);
         Mediator.Subscribe<DownloadFinishedMessage>(this, (msg) => _currentDownloads.TryRemove(msg.DownloadId, out _));
+        Mediator.Subscribe<RefreshUiMessage>(this, (msg) => _drawFolders = GetDrawFolders().ToList());
 
         Flags |= ImGuiWindowFlags.NoDocking;
 
@@ -107,8 +106,11 @@ public class CompactUi : WindowMediatorSubscriberBase
             var unsupported = "UNSUPPORTED VERSION";
             var uidTextSize = ImGui.CalcTextSize(unsupported);
             ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMax().X + ImGui.GetWindowContentRegionMin().X) / 2 - uidTextSize.X / 2);
-            ImGui.TextColored(ImGuiColors.DalamudRed, unsupported);
-            if (_uiShared.UidFontBuilt) ImGui.PopFont();
+            using (ImRaii.PushFont(_uiShared.UidFont, _uiShared.UidFontBuilt))
+            {
+                ImGui.AlignTextToFramePadding();
+                ImGui.TextColored(ImGuiColors.DalamudRed, unsupported);
+            }
             UiSharedService.ColorTextWrapped($"Your Mare Synchronos installation is out of date, the current version is {ver.Major}.{ver.Minor}.{ver.Build}. " +
                 $"It is highly recommended to keep Mare Synchronos up to date. Open /xlplugins and update the plugin.", ImGuiColors.DalamudRed);
         }
@@ -116,55 +118,12 @@ public class CompactUi : WindowMediatorSubscriberBase
         UiSharedService.DrawWithID("header", DrawUIDHeader);
         ImGui.Separator();
         UiSharedService.DrawWithID("serverstatus", DrawServerStatus);
+        ImGui.Separator();
 
         if (_apiController.ServerState is ServerState.Connected)
         {
-            var hasShownSyncShells = _showSyncShells;
+            UiSharedService.DrawWithID("pairlist", DrawPairList);
 
-            ImGui.PushFont(UiBuilder.IconFont);
-            if (!hasShownSyncShells)
-            {
-                ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonHovered]);
-            }
-            if (ImGui.Button(FontAwesomeIcon.User.ToIconString(), new Vector2((UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X) / 2, 30 * ImGuiHelpers.GlobalScale)))
-            {
-                _showSyncShells = false;
-            }
-            if (!hasShownSyncShells)
-            {
-                ImGui.PopStyleColor();
-            }
-            ImGui.PopFont();
-            UiSharedService.AttachToolTip("Individual pairs");
-
-            ImGui.SameLine();
-
-            ImGui.PushFont(UiBuilder.IconFont);
-            if (hasShownSyncShells)
-            {
-                ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonHovered]);
-            }
-            if (ImGui.Button(FontAwesomeIcon.UserFriends.ToIconString(), new Vector2((UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X) / 2, 30 * ImGuiHelpers.GlobalScale)))
-            {
-                _showSyncShells = true;
-            }
-            if (hasShownSyncShells)
-            {
-                ImGui.PopStyleColor();
-            }
-            ImGui.PopFont();
-
-            UiSharedService.AttachToolTip("Syncshells");
-
-            ImGui.Separator();
-            if (!hasShownSyncShells)
-            {
-                UiSharedService.DrawWithID("pairlist", DrawPairList);
-            }
-            else
-            {
-                UiSharedService.DrawWithID("syncshells", _groupPanel.DrawSyncshells);
-            }
             ImGui.Separator();
             UiSharedService.DrawWithID("transfers", DrawTransfers);
             TransferPartHeight = ImGui.GetCursorPosY() - TransferPartHeight;
@@ -213,12 +172,6 @@ public class CompactUi : WindowMediatorSubscriberBase
         }
     }
 
-    public override void OnClose()
-    {
-        _uidDisplayHandler.Clear();
-        base.OnClose();
-    }
-
     private void DrawAddCharacter()
     {
         ImGui.Dummy(new(10));
@@ -237,7 +190,7 @@ public class CompactUi : WindowMediatorSubscriberBase
 
                 _serverManager.Save();
 
-                _ = _apiController.CreateConnections(forceGetToken: true);
+                _ = _apiController.CreateConnections();
             }
 
             _uiShared.DrawCombo("Secret Key##addCharacterSecretKey", keys, (f) => f.Value.FriendlyName, (f) => _secretKeyIdx = f.Key);
@@ -250,18 +203,15 @@ public class CompactUi : WindowMediatorSubscriberBase
 
     private void DrawAddPair()
     {
-        var buttonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Plus);
-        ImGui.SetNextItemWidth(UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonSize.X);
+        var buttonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.UserPlus);
+        var usersButtonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Users);
+        ImGui.SetNextItemWidth(UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonSize.X - ImGui.GetStyle().ItemSpacing.X - usersButtonSize.X);
         ImGui.InputTextWithHint("##otheruid", "Other players UID/Alias", ref _pairToAdd, 20);
-        ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - buttonSize.X);
-        var canAdd = !_pairManager.DirectPairs.Any(p => string.Equals(p.UserData.UID, _pairToAdd, StringComparison.Ordinal) || string.Equals(p.UserData.Alias, _pairToAdd, StringComparison.Ordinal));
-        if (!canAdd)
+        ImGui.SameLine();
+        var alreadyExisting = _pairManager.DirectPairs.Exists(p => string.Equals(p.UserData.UID, _pairToAdd, StringComparison.Ordinal) || string.Equals(p.UserData.Alias, _pairToAdd, StringComparison.Ordinal));
+        using (ImRaii.Disabled(alreadyExisting || string.IsNullOrEmpty(_pairToAdd)))
         {
-            ImGuiComponents.DisabledButton(FontAwesomeIcon.Plus);
-        }
-        else
-        {
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
+            if (ImGuiComponents.IconButton(FontAwesomeIcon.UserPlus))
             {
                 _ = _apiController.UserAddPair(new(new(_pairToAdd)));
                 _pairToAdd = string.Empty;
@@ -269,95 +219,48 @@ public class CompactUi : WindowMediatorSubscriberBase
             UiSharedService.AttachToolTip("Pair with " + (_pairToAdd.IsNullOrEmpty() ? "other user" : _pairToAdd));
         }
 
+        ImGui.SameLine();
+        if (ImGuiComponents.IconButton(FontAwesomeIcon.Users))
+        {
+            ImGui.OpenPopup("Syncshell Menu");
+        }
+        UiSharedService.AttachToolTip("Syncshell Menu");
+
+        if (ImGui.BeginPopup("Syncshell Menu"))
+        {
+            using (ImRaii.Disabled(_pairManager.GroupPairs.Select(k => k.Key).Distinct()
+                .Count(g => string.Equals(g.OwnerUID, _apiController.UID, StringComparison.Ordinal)) >= _apiController.ServerInfo.MaxGroupsCreatedByUser))
+            {
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Create new Syncshell", _syncshellMenuSize, true))
+                {
+                    Mediator.Publish(new OpenCreateSyncshellPopupMessage());
+                    ImGui.CloseCurrentPopup();
+                }
+            }
+
+            using (ImRaii.Disabled(_pairManager.GroupPairs.Select(k => k.Key).Distinct().Count() >= _apiController.ServerInfo.MaxGroupsJoinedByUser))
+            {
+                if (UiSharedService.IconTextButton(FontAwesomeIcon.Users, "Join existing Syncshell", _syncshellMenuSize, true))
+                {
+                    Mediator.Publish(new JoinSyncshellPopupMessage());
+                    ImGui.CloseCurrentPopup();
+                }
+            }
+            _syncshellMenuSize = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
+            ImGui.EndPopup();
+        }
+
         ImGuiHelpers.ScaledDummy(2);
     }
 
+    private float _syncshellMenuSize = 0;
+
     private void DrawFilter()
     {
-        var buttonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.ArrowUp);
-        var playButtonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Play);
-        if (!_configService.Current.ReverseUserSort)
+        ImGui.SetNextItemWidth(WindowContentWidth);
+        if (ImGui.InputTextWithHint("##filter", "Filter for UID/notes", ref _characterOrCommentFilter, 255))
         {
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.ArrowDown))
-            {
-                _configService.Current.ReverseUserSort = true;
-                _configService.Save();
-            }
-            UiSharedService.AttachToolTip("Sort by name descending");
-        }
-        else
-        {
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.ArrowUp))
-            {
-                _configService.Current.ReverseUserSort = false;
-                _configService.Save();
-            }
-            UiSharedService.AttachToolTip("Sort by name ascending");
-        }
-        ImGui.SameLine();
-
-        var users = GetFilteredUsers();
-        var userCount = users.Count;
-
-        var spacing = userCount > 0
-            ? playButtonSize.X + ImGui.GetStyle().ItemSpacing.X * 2
-            : ImGui.GetStyle().ItemSpacing.X;
-
-        ImGui.SetNextItemWidth(WindowContentWidth - buttonSize.X - spacing);
-        ImGui.InputTextWithHint("##filter", "Filter for UID/notes", ref _characterOrCommentFilter, 255);
-
-        if (userCount == 0) return;
-
-        var pausedUsers = users.Where(u => u.UserPair!.OwnPermissions.IsPaused() && u.UserPair.OtherPermissions.IsPaired()).ToList();
-        var resumedUsers = users.Where(u => !u.UserPair!.OwnPermissions.IsPaused() && u.UserPair.OtherPermissions.IsPaired()).ToList();
-
-        if (!pausedUsers.Any() && !resumedUsers.Any()) return;
-        ImGui.SameLine();
-
-        switch (_buttonState)
-        {
-            case true when !pausedUsers.Any():
-                _buttonState = false;
-                break;
-
-            case false when !resumedUsers.Any():
-                _buttonState = true;
-                break;
-
-            case true:
-                users = pausedUsers;
-                break;
-
-            case false:
-                users = resumedUsers;
-                break;
-        }
-
-        var button = _buttonState ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
-
-        if (!_timeout.IsRunning || _timeout.ElapsedMilliseconds > 15000)
-        {
-            _timeout.Reset();
-
-            if (ImGuiComponents.IconButton(button) && UiSharedService.CtrlPressed())
-            {
-                foreach (var entry in users)
-                {
-                    var perm = entry.UserPair!.OwnPermissions;
-                    perm.SetPaused(!perm.IsPaused());
-                    _ = _apiController.UserSetPairPermissions(new UserPermissionsDto(entry.UserData, perm));
-                }
-
-                _timeout.Start();
-                _buttonState = !_buttonState;
-            }
-            UiSharedService.AttachToolTip($"Hold Control to {(button == FontAwesomeIcon.Play ? "resume" : "pause")} pairing with {users.Count} out of {userCount} displayed users.");
-        }
-        else
-        {
-            var availableAt = (15000 - _timeout.ElapsedMilliseconds) / 1000;
-            ImGuiComponents.DisabledButton(button);
-            UiSharedService.AttachToolTip($"Next execution is available at {availableAt} seconds");
+            Mediator.Publish(new RefreshUiMessage());
         }
     }
 
@@ -374,24 +277,13 @@ public class CompactUi : WindowMediatorSubscriberBase
         var ySize = TransferPartHeight == 0
             ? 1
             : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y) - TransferPartHeight - ImGui.GetCursorPosY();
-        var users = GetFilteredUsers()
-            .OrderBy(
-                u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.PlayerName)
-                    ? (_configService.Current.PreferNotesOverNamesForVisible ? u.GetNote() : u.PlayerName)
-                    : (u.GetNote() ?? u.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase).ToList();
-
-        if (_configService.Current.ReverseUserSort)
-        {
-            users.Reverse();
-        }
-
-        var onlineUsers = users.Where(u => u.IsOnline || u.UserPair!.OwnPermissions.IsPaused()).Select(c => new DrawUserPair("Online" + c.UserData.UID, c, _uidDisplayHandler, _apiController, _selectGroupForPairUi)).ToList();
-        var visibleUsers = users.Where(u => u.IsVisible).Select(c => new DrawUserPair("Visible" + c.UserData.UID, c, _uidDisplayHandler, _apiController, _selectGroupForPairUi)).ToList();
-        var offlineUsers = users.Where(u => !u.IsOnline && !u.UserPair!.OwnPermissions.IsPaused()).Select(c => new DrawUserPair("Offline" + c.UserData.UID, c, _uidDisplayHandler, _apiController, _selectGroupForPairUi)).ToList();
 
         ImGui.BeginChild("list", new Vector2(WindowContentWidth, ySize), border: false);
 
-        _pairGroupsUi.Draw(visibleUsers, onlineUsers, offlineUsers);
+        foreach (var item in _drawFolders)
+        {
+            item.Draw();
+        }
 
         ImGui.EndChild();
     }
@@ -417,7 +309,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             ImGui.TextColored(ImGuiColors.ParsedGreen, userCount);
             ImGui.SameLine();
             if (!printShard) ImGui.AlignTextToFramePadding();
-            ImGui.Text("Users Online");
+            ImGui.TextUnformatted("Users Online");
         }
         else
         {
@@ -474,7 +366,7 @@ public class CompactUi : WindowMediatorSubscriberBase
     {
         var currentUploads = _fileTransferManager.CurrentUploads.ToList();
         ImGui.PushFont(UiBuilder.IconFont);
-        ImGui.Text(FontAwesomeIcon.Upload.ToIconString());
+        ImGui.TextUnformatted(FontAwesomeIcon.Upload.ToIconString());
         ImGui.PopFont();
         ImGui.SameLine(35 * ImGuiHelpers.GlobalScale);
 
@@ -486,20 +378,20 @@ public class CompactUi : WindowMediatorSubscriberBase
             var totalUploaded = currentUploads.Sum(c => c.Transferred);
             var totalToUpload = currentUploads.Sum(c => c.Total);
 
-            ImGui.Text($"{doneUploads}/{totalUploads}");
+            ImGui.TextUnformatted($"{doneUploads}/{totalUploads}");
             var uploadText = $"({UiSharedService.ByteToString(totalUploaded)}/{UiSharedService.ByteToString(totalToUpload)})";
             var textSize = ImGui.CalcTextSize(uploadText);
             ImGui.SameLine(WindowContentWidth - textSize.X);
-            ImGui.Text(uploadText);
+            ImGui.TextUnformatted(uploadText);
         }
         else
         {
-            ImGui.Text("No uploads in progress");
+            ImGui.TextUnformatted("No uploads in progress");
         }
 
         var currentDownloads = _currentDownloads.SelectMany(d => d.Value.Values).ToList();
         ImGui.PushFont(UiBuilder.IconFont);
-        ImGui.Text(FontAwesomeIcon.Download.ToIconString());
+        ImGui.TextUnformatted(FontAwesomeIcon.Download.ToIconString());
         ImGui.PopFont();
         ImGui.SameLine(35 * ImGuiHelpers.GlobalScale);
 
@@ -510,16 +402,16 @@ public class CompactUi : WindowMediatorSubscriberBase
             var totalDownloaded = currentDownloads.Sum(c => c.TransferredBytes);
             var totalToDownload = currentDownloads.Sum(c => c.TotalBytes);
 
-            ImGui.Text($"{doneDownloads}/{totalDownloads}");
+            ImGui.TextUnformatted($"{doneDownloads}/{totalDownloads}");
             var downloadText =
                 $"({UiSharedService.ByteToString(totalDownloaded)}/{UiSharedService.ByteToString(totalToDownload)})";
             var textSize = ImGui.CalcTextSize(downloadText);
             ImGui.SameLine(WindowContentWidth - textSize.X);
-            ImGui.Text(downloadText);
+            ImGui.TextUnformatted(downloadText);
         }
         else
         {
-            ImGui.Text("No downloads in progress");
+            ImGui.TextUnformatted("No downloads in progress");
         }
 
         if (UiSharedService.IconTextButton(FontAwesomeIcon.PersonCircleQuestion, "Mare Character Data Analysis", WindowContentWidth))
@@ -583,15 +475,119 @@ public class CompactUi : WindowMediatorSubscriberBase
         }
     }
 
-    private List<Pair> GetFilteredUsers()
+    private IEnumerable<IDrawFolder> GetDrawFolders()
     {
-        return _pairManager.DirectPairs.Where(p =>
+        List<IDrawFolder> drawFolders = [];
+
+        var users = GetFilteredGroupUsers()
+            .ToDictionary(g => g.Key, g => g.Value);
+
+        if (_configService.Current.ShowVisibleUsersSeparately)
+        {
+            var visibleUsers = users.Where(u => u.Key.IsVisible)
+            .OrderBy(
+                    u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
+                        ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
+                        : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(k => k.Key, k => k.Value);
+
+            drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomVisibleTag, visibleUsers));
+        }
+
+        List<IDrawFolder> groupFolders = new();
+        foreach (var group in _pairManager.GroupPairs.Select(g => g.Key).OrderBy(g => g.GroupAliasOrGID, StringComparer.Ordinal))
+        {
+            var groupUsers2 = users.Where(v => v.Value.Exists(g => string.Equals(g.GID, group.GID, StringComparison.Ordinal))
+                    && (v.Key.IsOnline || (!v.Key.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
+                    || v.Key.UserPair.OwnPermissions.IsPaused()))
+                    .OrderByDescending(u => u.Key.IsOnline)
+                    .ThenBy(u =>
+                    {
+                        if (string.Equals(u.Key.UserData.UID, group.OwnerUID, StringComparison.Ordinal)) return 0;
+                        if (group.GroupPairUserInfos.TryGetValue(u.Key.UserData.UID, out var info))
+                        {
+                            if (info.IsModerator()) return 1;
+                            if (info.IsPinned()) return 2;
+                        }
+                        return u.Key.IsVisible ? 3 : 4;
+                    })
+                    .ThenBy(
+                    u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
+                        ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
+                        : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.Ordinal)
+                    .ToDictionary(k => k.Key, k => k.Value);
+
+            groupFolders.Add(_drawEntityFactory.CreateDrawGroupFolder(group, groupUsers2));
+        }
+
+        if (_configService.Current.GroupUpSyncshells)
+            drawFolders.Add(new DrawGroupedGroupFolder(groupFolders, _tagHandler));
+        else
+            drawFolders.AddRange(groupFolders);
+
+        var tags = _tagHandler.GetAllTagsSorted();
+        HashSet<Pair> alreadyInTags = [];
+        foreach (var tag in tags)
+        {
+            var tagUsers = users.Where(u => u.Key.IsDirectlyPaired && !u.Key.IsOneSidedPair && _tagHandler.HasTag(u.Key.UserData.UID, tag)
+                && (u.Key.IsOnline || (!u.Key.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
+                || u.Key.UserPair.OwnPermissions.IsPaused()))
+                .OrderByDescending(u => u.Key.IsVisible)
+                .ThenByDescending(u => u.Key.IsOnline)
+                .ThenBy(
+                    u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
+                        ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
+                        : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(u => u.Key, u => u.Value);
+
+            drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(tag, tagUsers.Select(u =>
+            {
+                alreadyInTags.Add(u.Key);
+                return (u.Key, u.Value);
+            }).ToDictionary(u => u.Key, u => u.Value)));
+        }
+
+        var onlineDirectPairedUsersNotInTags = users.Where(u => u.Key.IsDirectlyPaired && !u.Key.IsOneSidedPair && !_tagHandler.HasAnyTag(u.Key.UserData.UID)
+            && (u.Key.IsOnline || (!u.Key.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
+                || u.Key.UserPair.OwnPermissions.IsPaused()))
+            .OrderByDescending(u => u.Key.IsVisible)
+            .ThenByDescending(u => u.Key.IsOnline)
+            .ThenBy(
+                u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
+                    ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
+                    : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(u => u.Key, u => u.Value);
+
+        drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder((_configService.Current.ShowOfflineUsersSeparately ? TagHandler.CustomOnlineTag : TagHandler.CustomAllTag),
+            onlineDirectPairedUsersNotInTags));
+
+        if (_configService.Current.ShowOfflineUsersSeparately)
+        {
+            var offlineUsersEntries = users.Where(u => (!u.Key.IsOneSidedPair || u.Value.Any()) && !u.Key.IsOnline && !u.Key.UserPair.OwnPermissions.IsPaused()).OrderBy(
+                u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
+                    ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
+                    : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(u => u.Key, u => u.Value);
+
+            drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomOfflineTag, offlineUsersEntries));
+        }
+
+        drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomUnpairedTag, users.Where(u => u.Key.IsOneSidedPair).ToDictionary(u => u.Key, u => u.Value)));
+
+        return drawFolders;
+    }
+
+    private Dictionary<Pair, List<GroupFullInfoDto>> GetFilteredGroupUsers()
+    {
+        if (string.IsNullOrEmpty(_characterOrCommentFilter)) return _pairManager.PairsWithGroups;
+
+        return _pairManager.PairsWithGroups.Where(p =>
         {
             if (_characterOrCommentFilter.IsNullOrEmpty()) return true;
-            return p.UserData.AliasOrUID.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ||
-                   (p.GetNote()?.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false) ||
-                   (p.PlayerName?.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false);
-        }).ToList();
+            return p.Key.UserData.AliasOrUID.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ||
+                   (p.Key.GetNote()?.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                   (p.Key.PlayerName?.Contains(_characterOrCommentFilter, StringComparison.OrdinalIgnoreCase) ?? false);
+        }).ToDictionary(k => k.Key, k => k.Value);
     }
 
     private string GetServerError()

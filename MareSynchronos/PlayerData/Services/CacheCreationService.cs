@@ -8,14 +8,16 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.PlayerData.Services;
 
+#pragma warning disable MA0040
+
 public sealed class CacheCreationService : DisposableMediatorSubscriberBase
 {
     private readonly SemaphoreSlim _cacheCreateLock = new(1);
-    private readonly Dictionary<ObjectKind, GameObjectHandler> _cachesToCreate = new();
+    private readonly Dictionary<ObjectKind, GameObjectHandler> _cachesToCreate = [];
     private readonly PlayerDataFactory _characterDataFactory;
     private readonly CancellationTokenSource _cts = new();
     private readonly CharacterData _playerData = new();
-    private readonly Dictionary<ObjectKind, GameObjectHandler> _playerRelatedObjects = new();
+    private readonly Dictionary<ObjectKind, GameObjectHandler> _playerRelatedObjects = [];
     private Task? _cacheCreationTask;
     private CancellationTokenSource _honorificCts = new();
     private bool _isZoning = false;
@@ -37,13 +39,13 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         Mediator.Subscribe<ZoneSwitchStartMessage>(this, (msg) => _isZoning = true);
         Mediator.Subscribe<ZoneSwitchEndMessage>(this, (msg) => _isZoning = false);
 
-        _playerRelatedObjects[ObjectKind.Player] = gameObjectHandlerFactory.Create(ObjectKind.Player, dalamudUtil.GetPlayerPointer, true)
+        _playerRelatedObjects[ObjectKind.Player] = gameObjectHandlerFactory.Create(ObjectKind.Player, dalamudUtil.GetPlayerPointer, isWatched: true)
             .GetAwaiter().GetResult();
-        _playerRelatedObjects[ObjectKind.MinionOrMount] = gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => dalamudUtil.GetMinionOrMount(), true)
+        _playerRelatedObjects[ObjectKind.MinionOrMount] = gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => dalamudUtil.GetMinionOrMount(), isWatched: true)
             .GetAwaiter().GetResult();
-        _playerRelatedObjects[ObjectKind.Pet] = gameObjectHandlerFactory.Create(ObjectKind.Pet, () => dalamudUtil.GetPet(), true)
+        _playerRelatedObjects[ObjectKind.Pet] = gameObjectHandlerFactory.Create(ObjectKind.Pet, () => dalamudUtil.GetPet(), isWatched: true)
             .GetAwaiter().GetResult();
-        _playerRelatedObjects[ObjectKind.Companion] = gameObjectHandlerFactory.Create(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), true)
+        _playerRelatedObjects[ObjectKind.Companion] = gameObjectHandlerFactory.Create(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), isWatched: true)
             .GetAwaiter().GetResult();
 
         Mediator.Subscribe<ClearCacheForObjectMessage>(this, (msg) =>
@@ -62,7 +64,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         {
             if (_isZoning) return;
             foreach (var item in _playerRelatedObjects
-                .Where(item => string.IsNullOrEmpty(msg.ProfileName) 
+                .Where(item => string.IsNullOrEmpty(msg.ProfileName)
                 || string.Equals(item.Value.Name, msg.ProfileName, StringComparison.Ordinal)).Select(k => k.Key))
             {
                 Logger.LogDebug("Received CustomizePlus change, updating {obj}", item);
@@ -183,3 +185,4 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         }
     }
 }
+#pragma warning restore MA0040

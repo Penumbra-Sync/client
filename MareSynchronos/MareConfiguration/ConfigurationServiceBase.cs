@@ -14,8 +14,8 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
     {
         ConfigurationDirectory = configurationDirectory;
 
-        Task.Run(CheckForConfigUpdatesInternal, _periodicCheckCts.Token);
-        Task.Run(CheckForDirtyConfigInternal, _periodicCheckCts.Token);
+        _ = Task.Run(CheckForConfigUpdatesInternal, _periodicCheckCts.Token);
+        _ = Task.Run(CheckForDirtyConfigInternal, _periodicCheckCts.Token);
 
         _currentConfigInternal = LazyConfig();
     }

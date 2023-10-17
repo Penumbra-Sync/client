@@ -1,5 +1,6 @@
 ﻿using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Models;
+using MareSynchronos.Services.Mediator;
 using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
@@ -11,18 +12,20 @@ public class ServerConfigurationManager
     private readonly ServerConfigService _configService;
     private readonly DalamudUtilService _dalamudUtil;
     private readonly ILogger<ServerConfigurationManager> _logger;
+    private readonly MareMediator _mareMediator;
     private readonly NotesConfigService _notesConfig;
     private readonly ServerTagConfigService _serverTagConfig;
-    private readonly Dictionary<JwtCache, string> _tokenDictionary = new();
 
     public ServerConfigurationManager(ILogger<ServerConfigurationManager> logger, ServerConfigService configService,
-        ServerTagConfigService serverTagConfig, NotesConfigService notesConfig, DalamudUtilService dalamudUtil)
+        ServerTagConfigService serverTagConfig, NotesConfigService notesConfig, DalamudUtilService dalamudUtil,
+        MareMediator mareMediator)
     {
         _logger = logger;
         _configService = configService;
         _serverTagConfig = serverTagConfig;
         _notesConfig = notesConfig;
         _dalamudUtil = dalamudUtil;
+        _mareMediator = mareMediator;
         EnsureMainExists();
     }
 
@@ -92,7 +95,7 @@ public class ServerConfigurationManager
     {
         try
         {
-            return _configService.Current.ServerStorage.ElementAt(idx);
+            return _configService.Current.ServerStorage[idx];
         }
         catch
         {
@@ -107,20 +110,6 @@ public class ServerConfigurationManager
         return _configService.Current.ServerStorage.Select(v => v.ServerName).ToArray();
     }
 
-    public string? GetToken()
-    {
-        var charaName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult();
-        var worldId = _dalamudUtil.GetWorldIdAsync().GetAwaiter().GetResult();
-        var secretKey = GetSecretKey();
-        if (secretKey == null) return null;
-        if (_tokenDictionary.TryGetValue(new JwtCache(CurrentApiUrl, charaName, worldId, secretKey), out var token))
-        {
-            return token;
-        }
-
-        return null;
-    }
-
     public bool HasValidConfig()
     {
         return CurrentServer != null;
@@ -129,17 +118,8 @@ public class ServerConfigurationManager
     public void Save()
     {
         var caller = new StackTrace().GetFrame(1)?.GetMethod()?.ReflectedType?.Name ?? "Unknown";
-        _logger.LogDebug(caller + " Calling config save");
+        _logger.LogDebug("{caller} Calling config save", caller);
         _configService.Save();
-    }
-
-    public void SaveToken(string token)
-    {
-        var charaName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult();
-        var worldId = _dalamudUtil.GetWorldIdAsync().GetAwaiter().GetResult();
-        var secretKey = GetSecretKey();
-        if (string.IsNullOrEmpty(secretKey)) throw new InvalidOperationException("No secret key set");
-        _tokenDictionary[new JwtCache(CurrentApiUrl, charaName, worldId, secretKey)] = token;
     }
 
     public void SelectServer(int idx)
@@ -185,6 +165,7 @@ public class ServerConfigurationManager
     {
         CurrentServerTagStorage().ServerAvailablePairTags.Add(tag);
         _serverTagConfig.Save();
+        _mareMediator.Publish(new RefreshUiMessage());
     }
 
     internal void AddTagForUid(string uid, string tagName)
@@ -192,10 +173,11 @@ public class ServerConfigurationManager
         if (CurrentServerTagStorage().UidServerPairedUserTags.TryGetValue(uid, out var tags))
         {
             tags.Add(tagName);
+            _mareMediator.Publish(new RefreshUiMessage());
         }
         else
         {
-            CurrentServerTagStorage().UidServerPairedUserTags[uid] = new() { tagName };
+            CurrentServerTagStorage().UidServerPairedUserTags[uid] = [tagName];
         }
 
         _serverTagConfig.Save();
@@ -295,6 +277,7 @@ public class ServerConfigurationManager
             RemoveTagForUid(uid, tag, save: false);
         }
         _serverTagConfig.Save();
+        _mareMediator.Publish(new RefreshUiMessage());
     }
 
     internal void RemoveTagForUid(string uid, string tagName, bool save = true)
@@ -302,8 +285,23 @@ public class ServerConfigurationManager
         if (CurrentServerTagStorage().UidServerPairedUserTags.TryGetValue(uid, out var tags))
         {
             tags.Remove(tagName);
+
             if (save)
+            {
                 _serverTagConfig.Save();
+                _mareMediator.Publish(new RefreshUiMessage());
+            }
+        }
+    }
+
+    internal void RenameTag(string oldName, string newName)
+    {
+        CurrentServerTagStorage().ServerAvailablePairTags.Remove(oldName);
+        CurrentServerTagStorage().ServerAvailablePairTags.Add(newName);
+        foreach (var existingTags in CurrentServerTagStorage().UidServerPairedUserTags.Select(k => k.Value))
+        {
+            if (existingTags.Remove(oldName))
+                existingTags.Add(newName);
         }
     }
 
@@ -314,6 +312,8 @@ public class ServerConfigurationManager
 
     internal void SetNoteForGid(string gid, string note, bool save = true)
     {
+        if (string.IsNullOrEmpty(gid)) return;
+
         CurrentNotesStorage().GidServerComments[gid] = note;
         if (save)
             _notesConfig.Save();
@@ -321,6 +321,8 @@ public class ServerConfigurationManager
 
     internal void SetNoteForUid(string uid, string note, bool save = true)
     {
+        if (string.IsNullOrEmpty(uid)) return;
+
         CurrentNotesStorage().UidServerComments[uid] = note;
         if (save)
             _notesConfig.Save();

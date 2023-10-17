@@ -13,8 +13,8 @@ public record MareCharaFileData
     public string CustomizePlusData { get; set; } = string.Empty;
     public string PalettePlusData { get; set; } = string.Empty;
     public string ManipulationData { get; set; } = string.Empty;
-    public List<FileData> Files { get; set; } = new();
-    public List<FileSwap> FileSwaps { get; set; } = new();
+    public List<FileData> Files { get; set; } = [];
+    public List<FileSwap> FileSwaps { get; set; } = [];
 
     public MareCharaFileData() { }
     public MareCharaFileData(FileCacheManager manager, string description, CharacterData dto)

@@ -214,7 +214,7 @@ public class IntroUi : WindowMediatorSubscriberBase
             var buttonWidth = _secretKey.Length != 64 ? 0 : ImGuiHelpers.GetButtonSize(buttonText).X + ImGui.GetStyle().ItemSpacing.X;
             var textSize = ImGui.CalcTextSize(text);
             ImGui.AlignTextToFramePadding();
-            ImGui.Text(text);
+            ImGui.TextUnformatted(text);
             ImGui.SameLine();
             ImGui.SetNextItemWidth(UiSharedService.GetWindowContentRegionWidth() - ImGui.GetWindowContentRegionMin().X - buttonWidth - textSize.X);
             ImGui.InputText("", ref _secretKey, 64);
@@ -235,7 +235,7 @@ public class IntroUi : WindowMediatorSubscriberBase
                     });
                     _serverConfigurationManager.AddCurrentCharacterToServer(addLastSecretKey: true);
                     _secretKey = string.Empty;
-                    Task.Run(() => _uiShared.ApiController.CreateConnections(forceGetToken: true));
+                    _ = Task.Run(() => _uiShared.ApiController.CreateConnections());
                 }
             }
         }
@@ -253,6 +253,6 @@ public class IntroUi : WindowMediatorSubscriberBase
             _uiShared.LoadLocalization(_languages.ElementAt(changeLanguageTo).Value);
         }
 
-        _tosParagraphs = new[] { Strings.ToS.Paragraph1, Strings.ToS.Paragraph2, Strings.ToS.Paragraph3, Strings.ToS.Paragraph4, Strings.ToS.Paragraph5, Strings.ToS.Paragraph6 };
+        _tosParagraphs = [Strings.ToS.Paragraph1, Strings.ToS.Paragraph2, Strings.ToS.Paragraph3, Strings.ToS.Paragraph4, Strings.ToS.Paragraph5, Strings.ToS.Paragraph6];
     }
 }

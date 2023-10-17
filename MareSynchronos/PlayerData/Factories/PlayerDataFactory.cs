@@ -1,32 +1,31 @@
-﻿using System.Diagnostics;
-using FFXIVClientStructs.FFXIV.Client.Game.Character;
+﻿using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using FFXIVClientStructs.FFXIV.Client.System.Resource;
 using MareSynchronos.API.Data.Enum;
-using MareSynchronos.Interop;
-using Object = FFXIVClientStructs.FFXIV.Client.Graphics.Scene.Object;
 using MareSynchronos.FileCache;
-using Microsoft.Extensions.Logging;
-using System.Globalization;
+using MareSynchronos.Interop;
 using MareSynchronos.PlayerData.Data;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services;
-using FFXIVClientStructs.FFXIV.Client.Graphics.Render;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using System.Globalization;
 using CharacterData = MareSynchronos.PlayerData.Data.CharacterData;
+using Object = FFXIVClientStructs.FFXIV.Client.Graphics.Scene.Object;
 using Weapon = MareSynchronos.Interop.Weapon;
 
 namespace MareSynchronos.PlayerData.Factories;
 
 public class PlayerDataFactory
 {
+    private static readonly string[] _allowedExtensionsForGamePaths = [".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk"];
     private readonly DalamudUtilService _dalamudUtil;
     private readonly FileCacheManager _fileCacheManager;
     private readonly IpcManager _ipcManager;
     private readonly ILogger<PlayerDataFactory> _logger;
     private readonly PerformanceCollectorService _performanceCollector;
     private readonly TransientResourceManager _transientResourceManager;
-
-    private static readonly string[] AllowedExtensionsForGamePaths = { ".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk" };
 
     public PlayerDataFactory(ILogger<PlayerDataFactory> logger, DalamudUtilService dalamudUtil, IpcManager ipcManager,
         TransientResourceManager transientResourceManager, FileCacheManager fileReplacementFactory,
@@ -307,19 +306,16 @@ public class PlayerDataFactory
 
         _logger.LogDebug("Building character data for {obj}", playerRelatedObject);
 
-        if (!previousData.FileReplacements.ContainsKey(objectKind))
+        if (!previousData.FileReplacements.TryGetValue(objectKind, out HashSet<FileReplacement>? value))
         {
             previousData.FileReplacements[objectKind] = new(FileReplacementComparer.Instance);
         }
         else
         {
-            previousData.FileReplacements[objectKind].Clear();
+            value.Clear();
         }
 
-        if (previousData.CustomizePlusScale.ContainsKey(objectKind))
-        {
-            previousData.CustomizePlusScale.Remove(objectKind);
-        }
+        previousData.CustomizePlusScale.Remove(objectKind);
 
         // wait until chara is not drawing and present so nothing spontaneously explodes
         await _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, playerRelatedObject, Guid.NewGuid(), 30000, ct: token).ConfigureAwait(false);
@@ -341,9 +337,9 @@ public class PlayerDataFactory
         var (forwardResolve, reverseResolve) = await _dalamudUtil.RunOnFrameworkThread(() => BuildDataFromModel(objectKind, charaPointer, token)).ConfigureAwait(false);
         Dictionary<string, List<string>> resolvedPaths = await GetFileReplacementsFromPaths(forwardResolve, reverseResolve).ConfigureAwait(false);
         previousData.FileReplacements[objectKind] =
-                new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement(c.Value.ToArray(), c.Key)), FileReplacementComparer.Instance)
+                new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement([.. c.Value], c.Key)), FileReplacementComparer.Instance)
                 .Where(p => p.HasFileReplacement).ToHashSet();
-        previousData.FileReplacements[objectKind].RemoveWhere(c => c.GamePaths.Any(g => !AllowedExtensionsForGamePaths.Any(e => g.EndsWith(e, StringComparison.OrdinalIgnoreCase))));
+        previousData.FileReplacements[objectKind].RemoveWhere(c => c.GamePaths.Any(g => !_allowedExtensionsForGamePaths.Any(e => g.EndsWith(e, StringComparison.OrdinalIgnoreCase))));
 
         _logger.LogDebug("== Static Replacements ==");
         foreach (var replacement in previousData.FileReplacements[objectKind].Where(i => i.HasFileReplacement).OrderBy(i => i.GamePaths.First(), StringComparer.OrdinalIgnoreCase))
@@ -371,14 +367,14 @@ public class PlayerDataFactory
         var resolvedTransientPaths = await GetFileReplacementsFromPaths(transientPaths, new HashSet<string>(StringComparer.Ordinal)).ConfigureAwait(false);
 
         _logger.LogDebug("== Transient Replacements ==");
-        foreach (var replacement in resolvedTransientPaths.Select(c => new FileReplacement(c.Value.ToArray(), c.Key)).OrderBy(f => f.ResolvedPath, StringComparer.Ordinal))
+        foreach (var replacement in resolvedTransientPaths.Select(c => new FileReplacement([.. c.Value], c.Key)).OrderBy(f => f.ResolvedPath, StringComparer.Ordinal))
         {
             _logger.LogDebug("=> {repl}", replacement);
             previousData.FileReplacements[objectKind].Add(replacement);
         }
 
         // clean up all semi transient resources that don't have any file replacement (aka null resolve)
-        _transientResourceManager.CleanUpSemiTransientResources(objectKind, previousData.FileReplacements[objectKind].ToList());
+        _transientResourceManager.CleanUpSemiTransientResources(objectKind, [.. previousData.FileReplacements[objectKind]]);
 
         // make sure we only return data that actually has file replacements
         foreach (var item in previousData.FileReplacements)
@@ -407,16 +403,16 @@ public class PlayerDataFactory
         previousData.HeelsData = await getHeelsOffset.ConfigureAwait(false);
         _logger.LogDebug("Heels is now: {heels}", previousData.HeelsData);
 
-        if (previousData.FileReplacements.ContainsKey(objectKind))
+        if (previousData.FileReplacements.TryGetValue(objectKind, out HashSet<FileReplacement>? fileReplacements))
         {
-            var toCompute = previousData.FileReplacements[objectKind].Where(f => !f.IsFileSwap).ToArray();
+            var toCompute = fileReplacements.Where(f => !f.IsFileSwap).ToArray();
             _logger.LogDebug("Getting Hashes for {amount} Files", toCompute.Length);
             var computedPaths = _fileCacheManager.GetFileCachesByPaths(toCompute.Select(c => c.ResolvedPath).ToArray());
             foreach (var file in toCompute)
             {
                 file.Hash = computedPaths[file.ResolvedPath]?.Hash ?? string.Empty;
             }
-            var removed = previousData.FileReplacements[objectKind].RemoveWhere(f => !f.IsFileSwap && string.IsNullOrEmpty(f.Hash));
+            var removed = fileReplacements.RemoveWhere(f => !f.IsFileSwap && string.IsNullOrEmpty(f.Hash));
             if (removed > 0)
             {
                 _logger.LogDebug("Removed {amount} of invalid files", removed);
@@ -444,7 +440,7 @@ public class PlayerDataFactory
             }
             else
             {
-                resolvedPaths[filePath] = new List<string> { forwardPaths[i].ToLowerInvariant() };
+                resolvedPaths[filePath] = [forwardPaths[i].ToLowerInvariant()];
             }
         }
 

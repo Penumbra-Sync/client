@@ -200,7 +200,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             if (_clearCts != null)
             {
                 Logger.LogDebug("[{this}] Cancelling Clear Task", this);
-                _clearCts?.CancelDispose();
+                _clearCts.CancelDispose();
                 _clearCts = null;
             }
             var chara = (Character*)Address;
@@ -274,32 +274,6 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         }
     }
 
-    private unsafe bool CompareAndUpdateMainHand(Weapon* weapon)
-    {
-        if ((nint)weapon == nint.Zero) return false;
-        bool hasChanges = false;
-        hasChanges |= weapon->ModelSetId != MainHandData[0];
-        MainHandData[0] = weapon->ModelSetId;
-        hasChanges |= weapon->Variant != MainHandData[1];
-        MainHandData[1] = weapon->Variant;
-        hasChanges |= weapon->SecondaryId != MainHandData[2];
-        MainHandData[2] = weapon->SecondaryId;
-        return hasChanges;
-    }
-
-    private unsafe bool CompareAndUpdateOffHand(Weapon* weapon)
-    {
-        if ((nint)weapon == nint.Zero) return false;
-        bool hasChanges = false;
-        hasChanges |= weapon->ModelSetId != OffHandData[0];
-        OffHandData[0] = weapon->ModelSetId;
-        hasChanges |= weapon->Variant != OffHandData[1];
-        OffHandData[1] = weapon->Variant;
-        hasChanges |= weapon->SecondaryId != OffHandData[2];
-        OffHandData[2] = weapon->SecondaryId;
-        return hasChanges;
-    }
-
     private async Task ClearAsync(CancellationToken token)
     {
         Logger.LogDebug("[{this}] Running Clear Task", this);
@@ -339,6 +313,32 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             }
         }
 
+        return hasChanges;
+    }
+
+    private unsafe bool CompareAndUpdateMainHand(Weapon* weapon)
+    {
+        if ((nint)weapon == nint.Zero) return false;
+        bool hasChanges = false;
+        hasChanges |= weapon->ModelSetId != MainHandData[0];
+        MainHandData[0] = weapon->ModelSetId;
+        hasChanges |= weapon->Variant != MainHandData[1];
+        MainHandData[1] = weapon->Variant;
+        hasChanges |= weapon->SecondaryId != MainHandData[2];
+        MainHandData[2] = weapon->SecondaryId;
+        return hasChanges;
+    }
+
+    private unsafe bool CompareAndUpdateOffHand(Weapon* weapon)
+    {
+        if ((nint)weapon == nint.Zero) return false;
+        bool hasChanges = false;
+        hasChanges |= weapon->ModelSetId != OffHandData[0];
+        OffHandData[0] = weapon->ModelSetId;
+        hasChanges |= weapon->Variant != OffHandData[1];
+        OffHandData[1] = weapon->Variant;
+        hasChanges |= weapon->SecondaryId != OffHandData[2];
+        OffHandData[2] = weapon->SecondaryId;
         return hasChanges;
     }
 
