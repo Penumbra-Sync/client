@@ -1,5 +1,6 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility.Raii;
 using Dalamud.Utility;
 using ImGuiNET;
 using MareSynchronos.API.Data;
@@ -560,6 +561,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var enableDtrEntry = _configService.Current.EnableDtrEntry;
         var preferNotesInsteadOfName = _configService.Current.PreferNotesOverNamesForVisible;
         var groupUpSyncshells = _configService.Current.GroupUpSyncshells;
+        var groupInVisible = _configService.Current.ShowSyncshellUsersInVisible;
+        var syncshellOfflineSeparate = _configService.Current.ShowSyncshellOfflineUsersSeparately;
 
         if (ImGui.Checkbox("Enable Game Right Click Menu Entries", ref enableRightClickMenu))
         {
@@ -583,6 +586,17 @@ public class SettingsUi : WindowMediatorSubscriberBase
         }
         UiSharedService.DrawHelpText("This will show all currently visible users in a special 'Visible' group in the main UI.");
 
+        using (ImRaii.Disabled(!showVisibleSeparate))
+        {
+            using var indent = ImRaii.PushIndent();
+            if (ImGui.Checkbox("Show Syncshell Users in Visible Group", ref groupInVisible))
+            {
+                _configService.Current.ShowSyncshellUsersInVisible = groupInVisible;
+                _configService.Save();
+                Mediator.Publish(new RefreshUiMessage());
+            }
+        }
+
         if (ImGui.Checkbox("Show separate Offline group", ref showOfflineSeparate))
         {
             _configService.Current.ShowOfflineUsersSeparately = showOfflineSeparate;
@@ -590,6 +604,17 @@ public class SettingsUi : WindowMediatorSubscriberBase
             Mediator.Publish(new RefreshUiMessage());
         }
         UiSharedService.DrawHelpText("This will show all currently offline users in a special 'Offline' group in the main UI.");
+
+        using (ImRaii.Disabled(!showOfflineSeparate))
+        {
+            using var indent = ImRaii.PushIndent();
+            if (ImGui.Checkbox("Show separate Offline group for Syncshell users", ref syncshellOfflineSeparate))
+            {
+                _configService.Current.ShowSyncshellOfflineUsersSeparately = syncshellOfflineSeparate;
+                _configService.Save();
+                Mediator.Publish(new RefreshUiMessage());
+            }
+        }
 
         if (ImGui.Checkbox("Group up all syncshells in one folder", ref groupUpSyncshells))
         {

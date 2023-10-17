@@ -137,7 +137,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         }
 
         if (sendNotif && _configurationService.Current.ShowOnlineNotifications
-            && (_configurationService.Current.ShowOnlineNotificationsOnlyForIndividualPairs && pair.UserPair != null
+            && (_configurationService.Current.ShowOnlineNotificationsOnlyForIndividualPairs && pair.IsDirectlyPaired && !pair.IsOneSidedPair
             || !_configurationService.Current.ShowOnlineNotificationsOnlyForIndividualPairs)
             && (_configurationService.Current.ShowOnlineNotificationsOnlyForNamedPairs && !string.IsNullOrEmpty(pair.GetNote())
             || !_configurationService.Current.ShowOnlineNotificationsOnlyForNamedPairs))

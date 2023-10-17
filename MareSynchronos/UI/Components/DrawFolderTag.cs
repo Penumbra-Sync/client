@@ -27,6 +27,7 @@ public class DrawFolderTag : DrawFolderBase
         TagHandler.CustomOfflineTag => false,
         TagHandler.CustomVisibleTag => false,
         TagHandler.CustomAllTag => true,
+        TagHandler.CustomOfflineSyncshellTag => false,
         _ => true,
     };
 
@@ -37,6 +38,7 @@ public class DrawFolderTag : DrawFolderBase
         TagHandler.CustomOfflineTag => false,
         TagHandler.CustomVisibleTag => false,
         TagHandler.CustomAllTag => false,
+        TagHandler.CustomOfflineSyncshellTag => false,
         _ => true,
     };
 
@@ -47,6 +49,7 @@ public class DrawFolderTag : DrawFolderBase
         TagHandler.CustomOfflineTag => false,
         TagHandler.CustomVisibleTag => false,
         TagHandler.CustomAllTag => false,
+        TagHandler.CustomOfflineSyncshellTag => false,
         _ => true,
     } && _drawPairs.Any();
 
@@ -58,6 +61,7 @@ public class DrawFolderTag : DrawFolderBase
             TagHandler.CustomUnpairedTag => FontAwesomeIcon.ArrowsLeftRight.ToIconString(),
             TagHandler.CustomOnlineTag => FontAwesomeIcon.Link.ToIconString(),
             TagHandler.CustomOfflineTag => FontAwesomeIcon.Unlink.ToIconString(),
+            TagHandler.CustomOfflineSyncshellTag => FontAwesomeIcon.Unlink.ToIconString(),
             TagHandler.CustomVisibleTag => FontAwesomeIcon.Eye.ToIconString(),
             TagHandler.CustomAllTag => FontAwesomeIcon.User.ToIconString(),
             _ => FontAwesomeIcon.Folder.ToIconString()
@@ -93,6 +97,7 @@ public class DrawFolderTag : DrawFolderBase
             TagHandler.CustomUnpairedTag => "One-sided Individual Pairs",
             TagHandler.CustomOnlineTag => "Online / Paused by you",
             TagHandler.CustomOfflineTag => "Offline / Paused by other",
+            TagHandler.CustomOfflineSyncshellTag => "Offline Syncshell Users",
             TagHandler.CustomVisibleTag => "Visible",
             TagHandler.CustomAllTag => "Users",
             _ => _id

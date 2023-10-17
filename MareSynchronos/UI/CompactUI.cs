@@ -484,7 +484,8 @@ public class CompactUi : WindowMediatorSubscriberBase
 
         if (_configService.Current.ShowVisibleUsersSeparately)
         {
-            var visibleUsers = users.Where(u => u.Key.IsVisible)
+            var visibleUsers = users.Where(u => u.Key.IsVisible &&
+                (_configService.Current.ShowSyncshellUsersInVisible || !(!_configService.Current.ShowSyncshellUsersInVisible && !u.Key.IsDirectlyPaired)))
             .OrderBy(
                     u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
                         ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
@@ -563,13 +564,23 @@ public class CompactUi : WindowMediatorSubscriberBase
 
         if (_configService.Current.ShowOfflineUsersSeparately)
         {
-            var offlineUsersEntries = users.Where(u => (!u.Key.IsOneSidedPair || u.Value.Any()) && !u.Key.IsOnline && !u.Key.UserPair.OwnPermissions.IsPaused()).OrderBy(
+            var offlineUsersEntries = users.Where(u =>
+            ((u.Key.IsDirectlyPaired && _configService.Current.ShowSyncshellOfflineUsersSeparately) || !_configService.Current.ShowSyncshellOfflineUsersSeparately)
+             && (!u.Key.IsOneSidedPair || u.Value.Any()) && !u.Key.IsOnline && !u.Key.UserPair.OwnPermissions.IsPaused()).OrderBy(
                 u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
                     ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
                     : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(u => u.Key, u => u.Value);
 
             drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomOfflineTag, offlineUsersEntries));
+            if (_configService.Current.ShowSyncshellOfflineUsersSeparately)
+            {
+                var offlineSyncshellUsers = users.Where(u => !u.Key.IsDirectlyPaired && !u.Key.IsOnline && !u.Key.UserPair.OwnPermissions.IsPaused()).OrderBy(
+                u => _configService.Current.ShowCharacterNameInsteadOfNotesForVisible && !string.IsNullOrEmpty(u.Key.PlayerName)
+                    ? (_configService.Current.PreferNotesOverNamesForVisible ? u.Key.GetNote() : u.Key.PlayerName)
+                    : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.OrdinalIgnoreCase);
+                drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomOfflineSyncshellTag, offlineSyncshellUsers.ToDictionary(k => k.Key, k => k.Value)));
+            }
         }
 
         drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomUnpairedTag, users.Where(u => u.Key.IsOneSidedPair).ToDictionary(u => u.Key, u => u.Value)));
