@@ -39,16 +39,26 @@ public class DrawFolderGroup : DrawFolderBase
     protected override float DrawIcon(float textPosY, float originalY)
     {
         ImGui.SetCursorPosY(textPosY);
+
         using (ImRaii.PushFont(UiBuilder.IconFont))
             ImGui.TextUnformatted(_groupFullInfoDto.GroupPermissions.IsDisableInvites() ? FontAwesomeIcon.Lock.ToIconString() : FontAwesomeIcon.Users.ToIconString());
         if (_groupFullInfoDto.GroupPermissions.IsDisableInvites())
         {
             UiSharedService.AttachToolTip("Syncshell " + _groupFullInfoDto.GroupAliasOrGID + " is closed for invites");
         }
-        if (IsOwner)
+
+        using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X / 2f }))
         {
             ImGui.SameLine();
             ImGui.SetCursorPosY(textPosY);
+            ImGui.TextUnformatted("[" + OnlinePairs.ToString() + "]");
+        }
+        UiSharedService.AttachToolTip(OnlinePairs + " online in this syncshell");
+
+        ImGui.SameLine();
+        if (IsOwner)
+        {
+            ImGui.SameLine();
             using (ImRaii.PushFont(UiBuilder.IconFont))
                 ImGui.TextUnformatted(FontAwesomeIcon.Crown.ToIconString());
             UiSharedService.AttachToolTip("You are the owner of " + _groupFullInfoDto.GroupAliasOrGID);
@@ -136,7 +146,7 @@ public class DrawFolderGroup : DrawFolderBase
             ImGui.CloseCurrentPopup();
         }
 
-        if (UiSharedService.IconTextButton(disableVfx ? FontAwesomeIcon.Sun : FontAwesomeIcon.Circle, disableVfx ? "Enable VFX Sync" : "Disable VFX Sync", 
+        if (UiSharedService.IconTextButton(disableVfx ? FontAwesomeIcon.Sun : FontAwesomeIcon.Circle, disableVfx ? "Enable VFX Sync" : "Disable VFX Sync",
             menuWidth, true))
         {
             perm.SetDisableVFX(!disableVfx);

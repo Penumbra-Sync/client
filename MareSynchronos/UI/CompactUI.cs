@@ -91,8 +91,8 @@ public class CompactUi : WindowMediatorSubscriberBase
 
         SizeConstraints = new WindowSizeConstraints()
         {
-            MinimumSize = new Vector2(350, 400),
-            MaximumSize = new Vector2(350, 2000),
+            MinimumSize = new Vector2(375, 400),
+            MaximumSize = new Vector2(375, 2000),
         };
     }
 

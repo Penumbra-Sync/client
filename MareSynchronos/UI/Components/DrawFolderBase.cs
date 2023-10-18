@@ -12,6 +12,7 @@ public abstract class DrawFolderBase : IDrawFolder
     protected readonly string _id;
     protected readonly TagHandler _tagHandler;
     private float _menuWidth = -1;
+    public int OnlinePairs => _drawPairs.Count(u => u.Pair.IsOnline);
     protected DrawFolderBase(string id, IEnumerable<DrawUserPair> drawPairs, TagHandler tagHandler)
     {
         _id = id;

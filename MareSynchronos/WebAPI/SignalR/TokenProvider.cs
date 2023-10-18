@@ -1,5 +1,6 @@
 ﻿using MareSynchronos.API.Routes;
 using MareSynchronos.Services;
+using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
@@ -10,7 +11,7 @@ using System.Reflection;
 
 namespace MareSynchronos.WebAPI.SignalR;
 
-public sealed class TokenProvider : IDisposable
+public sealed class TokenProvider : IDisposable, IMediatorSubscriber
 {
     private readonly DalamudUtilService _dalamudUtil;
     private readonly HttpClient _httpClient;
@@ -18,20 +19,26 @@ public sealed class TokenProvider : IDisposable
     private readonly ServerConfigurationManager _serverManager;
     private readonly ConcurrentDictionary<JwtIdentifier, string> _tokenCache = new();
 
-    public TokenProvider(ILogger<TokenProvider> logger, ServerConfigurationManager serverManager, DalamudUtilService dalamudUtil)
+    public TokenProvider(ILogger<TokenProvider> logger, ServerConfigurationManager serverManager, DalamudUtilService dalamudUtil, MareMediator mareMediator)
     {
         _logger = logger;
         _serverManager = serverManager;
         _dalamudUtil = dalamudUtil;
         _httpClient = new();
         var ver = Assembly.GetExecutingAssembly().GetName().Version;
+        Mediator = mareMediator;
+        Mediator.Subscribe<DalamudLogoutMessage>(this, (_) => _tokenCache.Clear());
+        Mediator.Subscribe<DalamudLoginMessage>(this, (_) => _tokenCache.Clear());
         _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("MareSynchronos", ver!.Major + "." + ver!.Minor + "." + ver!.Build));
     }
+
+    public MareMediator Mediator { get; }
 
     private JwtIdentifier CurrentIdentifier => new(_serverManager.CurrentApiUrl, _serverManager.GetSecretKey()!);
 
     public void Dispose()
     {
+        Mediator.UnsubscribeAll(this);
         _httpClient.Dispose();
     }
 

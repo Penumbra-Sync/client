@@ -53,22 +53,42 @@ public class DrawFolderTag : DrawFolderBase
         _ => true,
     } && _drawPairs.Any();
 
+    private bool RenderCount => _id switch
+    {
+        TagHandler.CustomOfflineSyncshellTag => false,
+        TagHandler.CustomOfflineTag => false,
+        TagHandler.CustomUnpairedTag => false,
+        _ => true
+    };
+
     protected override float DrawIcon(float textPosY, float originalY)
     {
-        using var font = ImRaii.PushFont(UiBuilder.IconFont);
-        var icon = _id switch
+        using (ImRaii.PushFont(UiBuilder.IconFont))
         {
-            TagHandler.CustomUnpairedTag => FontAwesomeIcon.ArrowsLeftRight.ToIconString(),
-            TagHandler.CustomOnlineTag => FontAwesomeIcon.Link.ToIconString(),
-            TagHandler.CustomOfflineTag => FontAwesomeIcon.Unlink.ToIconString(),
-            TagHandler.CustomOfflineSyncshellTag => FontAwesomeIcon.Unlink.ToIconString(),
-            TagHandler.CustomVisibleTag => FontAwesomeIcon.Eye.ToIconString(),
-            TagHandler.CustomAllTag => FontAwesomeIcon.User.ToIconString(),
-            _ => FontAwesomeIcon.Folder.ToIconString()
-        };
+            var icon = _id switch
+            {
+                TagHandler.CustomUnpairedTag => FontAwesomeIcon.ArrowsLeftRight.ToIconString(),
+                TagHandler.CustomOnlineTag => FontAwesomeIcon.Link.ToIconString(),
+                TagHandler.CustomOfflineTag => FontAwesomeIcon.Unlink.ToIconString(),
+                TagHandler.CustomOfflineSyncshellTag => FontAwesomeIcon.Unlink.ToIconString(),
+                TagHandler.CustomVisibleTag => FontAwesomeIcon.Eye.ToIconString(),
+                TagHandler.CustomAllTag => FontAwesomeIcon.User.ToIconString(),
+                _ => FontAwesomeIcon.Folder.ToIconString()
+            };
 
-        ImGui.SetCursorPosY(textPosY);
-        ImGui.TextUnformatted(icon);
+            ImGui.SetCursorPosY(textPosY);
+            ImGui.TextUnformatted(icon);
+        }
+        if (RenderCount)
+        {
+            using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X / 2f }))
+            {
+                ImGui.SameLine();
+                ImGui.SetCursorPosY(textPosY);
+                ImGui.TextUnformatted("[" + OnlinePairs.ToString() + "]");
+            }
+            UiSharedService.AttachToolTip(OnlinePairs + " online in this group");
+        }
         ImGui.SameLine();
         return ImGui.GetCursorPosX();
     }

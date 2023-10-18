@@ -9,6 +9,7 @@ public class DrawGroupedGroupFolder : IDrawFolder
 {
     private readonly IEnumerable<IDrawFolder> _groups;
     private readonly TagHandler _tagHandler;
+    public int OnlinePairs => _groups.Sum(g => g.OnlinePairs);
 
     public DrawGroupedGroupFolder(IEnumerable<IDrawFolder> groups, TagHandler tagHandler)
     {
@@ -33,6 +34,12 @@ public class DrawGroupedGroupFolder : IDrawFolder
         ImGui.SameLine();
         using (ImRaii.PushFont(UiBuilder.IconFont))
             ImGui.TextUnformatted(FontAwesomeIcon.UsersRectangle.ToIconString());
+        using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X / 2f }))
+        {
+            ImGui.SameLine();
+            ImGui.TextUnformatted("[" + OnlinePairs.ToString() + "]");
+        }
+        UiSharedService.AttachToolTip(OnlinePairs + " online all of your syncshells");
         ImGui.SameLine();
         ImGui.TextUnformatted("All Syncshells");
         ImGui.Separator();

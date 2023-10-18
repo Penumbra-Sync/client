@@ -2,5 +2,6 @@
 
 public interface IDrawFolder
 {
+    int OnlinePairs { get; }
     void Draw();
 }
