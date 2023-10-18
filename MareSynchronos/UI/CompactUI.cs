@@ -102,7 +102,6 @@ public class CompactUi : WindowMediatorSubscriberBase
         if (!_apiController.IsCurrentVersion)
         {
             var ver = _apiController.CurrentClientVersion;
-            if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
             var unsupported = "UNSUPPORTED VERSION";
             var uidTextSize = ImGui.CalcTextSize(unsupported);
             ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMax().X + ImGui.GetWindowContentRegionMin().X) / 2 - uidTextSize.X / 2);
