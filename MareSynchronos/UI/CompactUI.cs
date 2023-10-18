@@ -103,10 +103,10 @@ public class CompactUi : WindowMediatorSubscriberBase
         {
             var ver = _apiController.CurrentClientVersion;
             var unsupported = "UNSUPPORTED VERSION";
-            var uidTextSize = ImGui.CalcTextSize(unsupported);
-            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMax().X + ImGui.GetWindowContentRegionMin().X) / 2 - uidTextSize.X / 2);
             using (ImRaii.PushFont(_uiShared.UidFont, _uiShared.UidFontBuilt))
             {
+                var uidTextSize = ImGui.CalcTextSize(unsupported);
+                ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMax().X + ImGui.GetWindowContentRegionMin().X) / 2 - uidTextSize.X / 2);
                 ImGui.AlignTextToFramePadding();
                 ImGui.TextColored(ImGuiColors.DalamudRed, unsupported);
             }
