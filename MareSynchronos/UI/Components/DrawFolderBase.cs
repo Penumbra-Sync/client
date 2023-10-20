@@ -13,11 +13,13 @@ public abstract class DrawFolderBase : IDrawFolder
     protected readonly TagHandler _tagHandler;
     private float _menuWidth = -1;
     public int OnlinePairs => _drawPairs.Count(u => u.Pair.IsOnline);
-    protected DrawFolderBase(string id, IEnumerable<DrawUserPair> drawPairs, TagHandler tagHandler)
+    public int TotalPairs { get; }
+    protected DrawFolderBase(string id, IEnumerable<DrawUserPair> drawPairs, TagHandler tagHandler, int totalPairs)
     {
         _id = id;
         _drawPairs = drawPairs;
         _tagHandler = tagHandler;
+        TotalPairs = totalPairs;
     }
 
     protected abstract bool RenderIfEmpty { get; }

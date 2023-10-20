@@ -232,7 +232,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             {
                 if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Create new Syncshell", _syncshellMenuSize, true))
                 {
-                    Mediator.Publish(new OpenCreateSyncshellPopupMessage());
+                    Mediator.Publish(new UiToggleMessage(typeof(CreateSyncshellUI)));
                     ImGui.CloseCurrentPopup();
                 }
             }
@@ -241,7 +241,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             {
                 if (UiSharedService.IconTextButton(FontAwesomeIcon.Users, "Join existing Syncshell", _syncshellMenuSize, true))
                 {
-                    Mediator.Publish(new JoinSyncshellPopupMessage());
+                    Mediator.Publish(new UiToggleMessage(typeof(JoinSyncshellUI)));
                     ImGui.CloseCurrentPopup();
                 }
             }
@@ -517,7 +517,8 @@ public class CompactUi : WindowMediatorSubscriberBase
                         : (u.Key.GetNote() ?? u.Key.UserData.AliasOrUID), StringComparer.Ordinal)
                     .ToDictionary(k => k.Key, k => k.Value);
 
-            groupFolders.Add(_drawEntityFactory.CreateDrawGroupFolder(group, groupUsers2));
+            groupFolders.Add(_drawEntityFactory.CreateDrawGroupFolder(group, groupUsers2,
+                users.Count(v => v.Value.Exists(g => string.Equals(g.GID, group.GID, StringComparison.Ordinal)))));
         }
 
         if (_configService.Current.GroupUpSyncshells)
@@ -544,7 +545,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             {
                 alreadyInTags.Add(u.Key);
                 return (u.Key, u.Value);
-            }).ToDictionary(u => u.Key, u => u.Value)));
+            }).ToDictionary(u => u.Key, u => u.Value), users.Count(u => _tagHandler.HasTag(u.Key.UserData.UID, tag))));
         }
 
         var onlineDirectPairedUsersNotInTags = users.Where(u => u.Key.IsDirectlyPaired && !u.Key.IsOneSidedPair && !_tagHandler.HasAnyTag(u.Key.UserData.UID)

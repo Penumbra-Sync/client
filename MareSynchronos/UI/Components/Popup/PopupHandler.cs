@@ -36,27 +36,11 @@ public class PopupHandler : WindowMediatorSubscriberBase
             IsOpen = true;
         });
 
-        Mediator.Subscribe<OpenCreateSyncshellPopupMessage>(this, (msg) =>
-        {
-            _openPopup = true;
-            _currentHandler = _handlers.OfType<CreateSyncshellPopupHandler>().Single();
-            ((CreateSyncshellPopupHandler)_currentHandler).Open();
-            IsOpen = true;
-        });
-
         Mediator.Subscribe<OpenBanUserPopupMessage>(this, (msg) =>
         {
             _openPopup = true;
             _currentHandler = _handlers.OfType<BanUserPopupHandler>().Single();
             ((BanUserPopupHandler)_currentHandler).Open(msg);
-            IsOpen = true;
-        });
-
-        Mediator.Subscribe<JoinSyncshellPopupMessage>(this, (_) =>
-        {
-            _openPopup = true;
-            _currentHandler = _handlers.OfType<JoinSyncshellPopupHandler>().Single();
-            ((JoinSyncshellPopupHandler)_currentHandler).Open();
             IsOpen = true;
         });
 

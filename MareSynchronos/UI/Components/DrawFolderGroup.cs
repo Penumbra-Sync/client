@@ -21,8 +21,8 @@ public class DrawFolderGroup : DrawFolderBase
 
     public DrawFolderGroup(string id, GroupFullInfoDto groupFullInfoDto, ApiController apiController,
         IEnumerable<DrawUserPair> drawPairs, TagHandler tagHandler, IdDisplayHandler idDisplayHandler,
-        MareMediator mareMediator) :
-        base(id, drawPairs, tagHandler)
+        MareMediator mareMediator, int totalPairs) :
+        base(id, drawPairs, tagHandler, totalPairs)
     {
         _groupFullInfoDto = groupFullInfoDto;
         _apiController = apiController;
@@ -53,7 +53,7 @@ public class DrawFolderGroup : DrawFolderBase
             ImGui.SetCursorPosY(textPosY);
             ImGui.TextUnformatted("[" + OnlinePairs.ToString() + "]");
         }
-        UiSharedService.AttachToolTip(OnlinePairs + " online in this syncshell");
+        UiSharedService.AttachToolTip(OnlinePairs + " online" + Environment.NewLine + TotalPairs + " total");
 
         ImGui.SameLine();
         if (IsOwner)

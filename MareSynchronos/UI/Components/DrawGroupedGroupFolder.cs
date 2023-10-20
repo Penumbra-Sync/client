@@ -10,6 +10,7 @@ public class DrawGroupedGroupFolder : IDrawFolder
     private readonly IEnumerable<IDrawFolder> _groups;
     private readonly TagHandler _tagHandler;
     public int OnlinePairs => _groups.Sum(g => g.OnlinePairs);
+    public int TotalPairs => _groups.Sum(g => g.TotalPairs);
 
     public DrawGroupedGroupFolder(IEnumerable<IDrawFolder> groups, TagHandler tagHandler)
     {
@@ -39,7 +40,8 @@ public class DrawGroupedGroupFolder : IDrawFolder
             ImGui.SameLine();
             ImGui.TextUnformatted("[" + OnlinePairs.ToString() + "]");
         }
-        UiSharedService.AttachToolTip(OnlinePairs + " online all of your syncshells");
+        UiSharedService.AttachToolTip(OnlinePairs + " online in all of your joined syncshells" + Environment.NewLine +
+            TotalPairs + " pairs combined in all of your joined syncshells");
         ImGui.SameLine();
         ImGui.TextUnformatted("All Syncshells");
         ImGui.Separator();

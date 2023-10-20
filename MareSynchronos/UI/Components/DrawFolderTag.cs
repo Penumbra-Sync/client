@@ -13,8 +13,8 @@ public class DrawFolderTag : DrawFolderBase
     private readonly ApiController _apiController;
     private readonly SelectPairForTagUi _selectPairForTagUi;
 
-    public DrawFolderTag(string id, IEnumerable<DrawUserPair> drawPairs, TagHandler tagHandler, ApiController apiController, SelectPairForTagUi selectPairForTagUi)
-        : base(id, drawPairs, tagHandler)
+    public DrawFolderTag(string id, IEnumerable<DrawUserPair> drawPairs, TagHandler tagHandler, ApiController apiController, SelectPairForTagUi selectPairForTagUi, int totalPairs)
+        : base(id, drawPairs, tagHandler, totalPairs)
     {
         _apiController = apiController;
         _selectPairForTagUi = selectPairForTagUi;
@@ -55,9 +55,12 @@ public class DrawFolderTag : DrawFolderBase
 
     private bool RenderCount => _id switch
     {
-        TagHandler.CustomOfflineSyncshellTag => false,
-        TagHandler.CustomOfflineTag => false,
         TagHandler.CustomUnpairedTag => false,
+        TagHandler.CustomOnlineTag => false,
+        TagHandler.CustomOfflineTag => false,
+        TagHandler.CustomVisibleTag => false,
+        TagHandler.CustomAllTag => false,
+        TagHandler.CustomOfflineSyncshellTag => false,
         _ => true
     };
 
@@ -87,7 +90,7 @@ public class DrawFolderTag : DrawFolderBase
                 ImGui.SetCursorPosY(textPosY);
                 ImGui.TextUnformatted("[" + OnlinePairs.ToString() + "]");
             }
-            UiSharedService.AttachToolTip(OnlinePairs + " online in this group");
+            UiSharedService.AttachToolTip(OnlinePairs + " online" + Environment.NewLine + TotalPairs + " total");
         }
         ImGui.SameLine();
         return ImGui.GetCursorPosX();

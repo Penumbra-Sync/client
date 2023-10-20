@@ -35,17 +35,17 @@ public class DrawEntityFactory
         _serverConfigurationManager = serverConfigurationManager;
     }
 
-    public DrawFolderGroup CreateDrawGroupFolder(GroupFullInfoDto groupFullInfoDto, Dictionary<Pair, List<GroupFullInfoDto>> pairs)
+    public DrawFolderGroup CreateDrawGroupFolder(GroupFullInfoDto groupFullInfoDto, Dictionary<Pair, List<GroupFullInfoDto>> pairs, int totalPairs = -1)
     {
         return new DrawFolderGroup(groupFullInfoDto.Group.GID, groupFullInfoDto, _apiController,
             pairs.Select(p => CreateDrawPair(groupFullInfoDto.Group.GID + p.Key.UserData.UID, p.Key, p.Value)).ToList(),
-            _tagHandler, _uidDisplayHandler, _mediator);
+            _tagHandler, _uidDisplayHandler, _mediator, totalPairs);
     }
 
-    public DrawFolderTag CreateDrawTagFolder(string tag, Dictionary<Pair, List<GroupFullInfoDto>> pairs)
+    public DrawFolderTag CreateDrawTagFolder(string tag, Dictionary<Pair, List<GroupFullInfoDto>> pairs, int totalPairs = -1)
     {
         return new(tag, pairs.Select(u => CreateDrawPair(tag, u.Key, u.Value)).ToList(),
-            _tagHandler, _apiController, _selectPairForTagUi);
+            _tagHandler, _apiController, _selectPairForTagUi, totalPairs);
     }
 
     public DrawUserPair CreateDrawPair(string id, Pair user, List<GroupFullInfoDto> groups)

@@ -5,13 +5,14 @@ using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto;
 using MareSynchronos.API.Dto.Group;
+using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
-using System.Numerics;
+using Microsoft.Extensions.Logging;
 
-namespace MareSynchronos.UI.Components.Popup;
+namespace MareSynchronos.UI;
 
-internal class JoinSyncshellPopupHandler : IPopupHandler
+internal class JoinSyncshellUI : WindowMediatorSubscriberBase
 {
     private readonly ApiController _apiController;
     private readonly UiSharedService _uiSharedService;
@@ -21,18 +22,35 @@ internal class JoinSyncshellPopupHandler : IPopupHandler
     private string _previousPassword = string.Empty;
     private string _syncshellPassword = string.Empty;
 
-    public JoinSyncshellPopupHandler(UiSharedService uiSharedService, ApiController apiController)
+    public JoinSyncshellUI(ILogger<JoinSyncshellUI> logger, MareMediator mediator,
+        UiSharedService uiSharedService, ApiController apiController) : base(logger, mediator, "Join existing Syncshell###MareSynchronosJoinSyncshell")
     {
         _uiSharedService = uiSharedService;
         _apiController = apiController;
+        SizeConstraints = new()
+        {
+            MinimumSize = new(700, 400),
+            MaximumSize = new(700, 400)
+        };
+
+        Mediator.Subscribe<DisconnectedMessage>(this, (_) => IsOpen = false);
+
+        Flags = ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize;
     }
 
-    public Vector2 PopupSize => new(700, 400);
+    public override void OnOpen()
+    {
+        _desiredSyncshellToJoin = string.Empty;
+        _syncshellPassword = string.Empty;
+        _previousPassword = string.Empty;
+        _groupJoinInfo = null;
+        _ownPermissions = _apiController.DefaultPermissions.DeepClone()!;
+    }
 
-    public void DrawContent()
+    public override void Draw()
     {
         using (ImRaii.PushFont(_uiSharedService.UidFont))
-            ImGui.TextUnformatted((_groupJoinInfo == null || !_groupJoinInfo.Success) ? "Join Syncshell" : ("Finalize join Syncshell " + _groupJoinInfo.GroupAliasOrGID));
+            ImGui.TextUnformatted(_groupJoinInfo == null || !_groupJoinInfo.Success ? "Join Syncshell" : "Finalize join Syncshell " + _groupJoinInfo.GroupAliasOrGID);
         ImGui.Separator();
 
         if (_groupJoinInfo == null || !_groupJoinInfo.Success)
@@ -147,17 +165,8 @@ internal class JoinSyncshellPopupHandler : IPopupHandler
                 joinPermissions.SetDisableAnimations(_ownPermissions.DisableGroupAnimations);
                 joinPermissions.SetDisableVFX(_ownPermissions.DisableGroupVFX);
                 _ = _apiController.GroupJoinFinalize(new GroupJoinDto(_groupJoinInfo.Group, _previousPassword, joinPermissions));
-                ImGui.CloseCurrentPopup();
+                IsOpen = false;
             }
         }
-    }
-
-    public void Open()
-    {
-        _desiredSyncshellToJoin = string.Empty;
-        _syncshellPassword = string.Empty;
-        _previousPassword = string.Empty;
-        _groupJoinInfo = null;
-        _ownPermissions = _apiController.DefaultPermissions.DeepClone()!;
     }
 }
