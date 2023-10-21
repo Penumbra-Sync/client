@@ -492,7 +492,7 @@ public class TopTabMenu
             {
                 _ = GlobalControlCountdown(10);
                 var bulkIndividualPairs = _pairManager.PairsWithGroups.Keys
-                    .Where(g => g.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.Bidirectional)
+                    .Where(g => g.IndividualPairStatus == IndividualPairStatus.Bidirectional)
                     .ToDictionary(g => g.UserPair.User.UID, g =>
                     {
                         return actEnable(g.UserPair.OwnPermissions);
@@ -530,6 +530,7 @@ public class TopTabMenu
             {
                 _ = GlobalControlCountdown(10);
                 var bulkSyncshells = _pairManager.GroupPairs.Keys
+                    .OrderBy(u => u.GroupAliasOrGID, StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(g => g.Group.GID, g =>
                     {
                         return actEnable(g.GroupUserPermissions);
@@ -543,6 +544,7 @@ public class TopTabMenu
             {
                 _ = GlobalControlCountdown(10);
                 var bulkSyncshells = _pairManager.GroupPairs.Keys
+                    .OrderBy(u => u.GroupAliasOrGID, StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(g => g.Group.GID, g =>
                     {
                         return actDisable(g.GroupUserPermissions);
