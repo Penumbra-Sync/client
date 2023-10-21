@@ -506,7 +506,7 @@ public class TopTabMenu
             {
                 _ = GlobalControlCountdown(10);
                 var bulkIndividualPairs = _pairManager.PairsWithGroups.Keys
-                    .Where(g => g.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.Bidirectional)
+                    .Where(g => g.IndividualPairStatus == IndividualPairStatus.Bidirectional)
                     .ToDictionary(g => g.UserPair.User.UID, g =>
                     {
                         return actDisable(g.UserPair.OwnPermissions);
