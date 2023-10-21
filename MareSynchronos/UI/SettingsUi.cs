@@ -559,6 +559,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var profileOnRight = _configService.Current.ProfilePopoutRight;
         var enableRightClickMenu = _configService.Current.EnableRightClickMenus;
         var enableDtrEntry = _configService.Current.EnableDtrEntry;
+        var showUidInDtrTooltip = _configService.Current.ShowUidInDtrTooltip;
+        var preferNoteInDtrTooltip = _configService.Current.PreferNoteInDtrTooltip;
         var preferNotesInsteadOfName = _configService.Current.PreferNotesOverNamesForVisible;
         var groupUpSyncshells = _configService.Current.GroupUpSyncshells;
         var groupInVisible = _configService.Current.ShowSyncshellUsersInVisible;
@@ -577,6 +579,22 @@ public class SettingsUi : WindowMediatorSubscriberBase
             _configService.Save();
         }
         UiSharedService.DrawHelpText("This will add Mare connection status and visible pair count in the Server Info Bar.\nYou can further configure this through your Dalamud Settings.");
+
+        using (ImRaii.Disabled(!enableDtrEntry))
+        {
+            using var indent = ImRaii.PushIndent();
+            if (ImGui.Checkbox("Show visible character's UID in tooltip", ref showUidInDtrTooltip))
+            {
+                _configService.Current.ShowUidInDtrTooltip = showUidInDtrTooltip;
+                _configService.Save();
+            }
+
+            if (ImGui.Checkbox("Prefer notes over player names in tooltip", ref preferNoteInDtrTooltip))
+            {
+                _configService.Current.PreferNoteInDtrTooltip = preferNoteInDtrTooltip;
+                _configService.Save();
+            }
+        }
 
         if (ImGui.Checkbox("Show separate Visible group", ref showVisibleSeparate))
         {
