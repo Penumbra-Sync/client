@@ -15,7 +15,6 @@ namespace MareSynchronos.Services.Mediator;
 public record SwitchToIntroUiMessage : MessageBase;
 public record SwitchToMainUiMessage : MessageBase;
 public record OpenSettingsUiMessage : MessageBase;
-public record OpenDataAnalysisUiMessage : MessageBase;
 public record DalamudLoginMessage : MessageBase;
 public record DalamudLogoutMessage : MessageBase;
 public record FrameworkUpdateMessage : SameThreadMessage;

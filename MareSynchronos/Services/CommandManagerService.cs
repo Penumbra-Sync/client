@@ -100,7 +100,7 @@ public sealed class CommandManagerService : IDisposable
         }
         else if (string.Equals(splitArgs[0], "analyze", StringComparison.OrdinalIgnoreCase))
         {
-            _mediator.Publish(new OpenDataAnalysisUiMessage());
+            _mediator.Publish(new UiToggleMessage(typeof(DataAnalysisUi)));
         }
     }
 }

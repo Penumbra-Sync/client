@@ -164,21 +164,25 @@ public class DrawFolderTag : DrawFolderBase
 
     private void PauseRemainingPairs(IEnumerable<DrawUserPair> availablePairs)
     {
-        foreach (var pairToPause in availablePairs.Where(pair => !pair.UserPair!.OwnPermissions.IsPaused()))
+        _ = _apiController.SetBulkPermissions(new(availablePairs
+            .ToDictionary(g => g.UID, g =>
         {
-            var perm = pairToPause.UserPair!.OwnPermissions;
+            var perm = g.UserPair.OwnPermissions;
             perm.SetPaused(paused: true);
-            _ = _apiController.UserSetPairPermissions(new(new(pairToPause.UID), perm));
-        }
+            return perm;
+        }, StringComparer.Ordinal), new(StringComparer.Ordinal)))
+            .ConfigureAwait(false);
     }
 
     private void ResumeAllPairs(IEnumerable<DrawUserPair> availablePairs)
     {
-        foreach (var pairToPause in availablePairs)
-        {
-            var perm = pairToPause.UserPair!.OwnPermissions;
-            perm.SetPaused(paused: false);
-            _ = _apiController.UserSetPairPermissions(new(new(pairToPause.UID), perm));
-        }
+        _ = _apiController.SetBulkPermissions(new(availablePairs
+            .ToDictionary(g => g.UID, g =>
+            {
+                var perm = g.UserPair.OwnPermissions;
+                perm.SetPaused(paused: false);
+                return perm;
+            }, StringComparer.Ordinal), new(StringComparer.Ordinal)))
+            .ConfigureAwait(false);
     }
 }

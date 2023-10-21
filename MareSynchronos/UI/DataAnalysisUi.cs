@@ -39,7 +39,6 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
         {
             _hasUpdate = true;
         });
-        Mediator.Subscribe<OpenDataAnalysisUiMessage>(this, (_) => Toggle());
         SizeConstraints = new()
         {
             MinimumSize = new()

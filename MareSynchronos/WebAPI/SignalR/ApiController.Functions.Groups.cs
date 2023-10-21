@@ -21,7 +21,10 @@ public partial class ApiController
     public async Task GroupChangeIndividualPermissionState(GroupPairUserPermissionDto dto)
     {
         CheckConnection();
-        await _mareHub!.SendAsync(nameof(GroupChangeIndividualPermissionState), dto).ConfigureAwait(false);
+        await SetBulkPermissions(new(new(StringComparer.Ordinal),
+            new(StringComparer.Ordinal) {
+                { dto.Group.GID, dto.GroupPairPermissions }
+            })).ConfigureAwait(false);
     }
 
     public async Task GroupChangeOwnership(GroupPairDto groupPair)

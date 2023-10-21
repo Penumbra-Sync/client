@@ -133,7 +133,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public static void AttachToolTip(string text)
     {
-        if (ImGui.IsItemHovered())
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
         {
             ImGui.BeginTooltip();
             if (text.Contains(TooltipSeparator, StringComparison.Ordinal))
@@ -347,6 +347,31 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     public static float GetWindowContentRegionWidth()
     {
         return ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
+    }
+
+    public static Vector2 GetIconTextButtonSize(FontAwesomeIcon icon, string text, float? width = null, bool isInPopup = false)
+    {
+        var iconSize = GetIconSize(icon);
+        var textSize = ImGui.CalcTextSize(text);
+        var padding = ImGui.GetStyle().FramePadding;
+        var spacing = ImGui.GetStyle().ItemSpacing;
+
+        var buttonSizeY = textSize.Y + padding.Y * 2;
+        var iconExtraSpacing = isInPopup ? padding.X * 2 : 0;
+
+        var iconXoffset = iconSize.X <= iconSize.Y ? (iconSize.Y - iconSize.X) / 2f : 0;
+        var iconScaling = iconSize.X > iconSize.Y ? 1 / (iconSize.X / iconSize.Y) : 1;
+
+        if (width == null || width <= 0)
+        {
+            var buttonSizeX = (iconScaling == 1 ? iconSize.Y : (iconSize.X * iconScaling))
+                    + textSize.X + padding.X * 2 + spacing.X + (iconXoffset * 2);
+            return new Vector2(buttonSizeX + iconExtraSpacing, buttonSizeY);
+        }
+        else
+        {
+            return new Vector2(width.Value, buttonSizeY);
+        }
     }
 
     public static bool IconTextButton(FontAwesomeIcon icon, string text, float? width = null, bool isInPopup = false)

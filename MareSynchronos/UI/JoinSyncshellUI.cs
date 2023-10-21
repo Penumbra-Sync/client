@@ -70,7 +70,7 @@ internal class JoinSyncshellUI : WindowMediatorSubscriberBase
             ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted("Syncshell Password");
             ImGui.SameLine(200);
-            ImGui.InputTextWithHint("##syncshellpw", "Password", ref _syncshellPassword, 20, ImGuiInputTextFlags.Password);
+            ImGui.InputTextWithHint("##syncshellpw", "Password", ref _syncshellPassword, 50, ImGuiInputTextFlags.Password);
             using (ImRaii.Disabled(string.IsNullOrEmpty(_desiredSyncshellToJoin) || string.IsNullOrEmpty(_syncshellPassword)))
             {
                 if (UiSharedService.IconTextButton(Dalamud.Interface.FontAwesomeIcon.Plus, "Join Syncshell"))

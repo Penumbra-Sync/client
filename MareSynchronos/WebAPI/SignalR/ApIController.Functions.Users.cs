@@ -69,6 +69,20 @@ public partial class ApiController
         }
     }
 
+    public async Task SetBulkPermissions(BulkPermissionsDto dto)
+    {
+        CheckConnection();
+
+        try
+        {
+            await _mareHub!.InvokeAsync(nameof(SetBulkPermissions), dto).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to set permissions");
+        }
+    }
+
     public async Task UserRemovePair(UserDto userDto)
     {
         if (!IsConnected) return;
@@ -83,7 +97,10 @@ public partial class ApiController
 
     public async Task UserSetPairPermissions(UserPermissionsDto userPermissions)
     {
-        await _mareHub!.SendAsync(nameof(UserSetPairPermissions), userPermissions).ConfigureAwait(false);
+        await SetBulkPermissions(new(new(StringComparer.Ordinal)
+        {
+                { userPermissions.User.UID, userPermissions.Permissions }
+            }, new(StringComparer.Ordinal))).ConfigureAwait(false);
     }
 
     public async Task UserSetProfile(UserProfileDto userDescription)
