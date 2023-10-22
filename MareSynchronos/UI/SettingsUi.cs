@@ -678,13 +678,6 @@ public class SettingsUi : WindowMediatorSubscriberBase
             Mediator.Publish(new CompactUiChange(Vector2.Zero, Vector2.Zero));
         }
         UiSharedService.DrawHelpText("Will show profiles on the right side of the main UI");
-        if (ImGui.Checkbox("Show profiles marked as NSFW", ref showNsfwProfiles))
-        {
-            Mediator.Publish(new ClearProfileDataMessage());
-            _configService.Current.ProfilesAllowNsfw = showNsfwProfiles;
-            _configService.Save();
-        }
-        UiSharedService.DrawHelpText("Will show profiles that have the NSFW tag enabled");
         if (ImGui.SliderFloat("Hover Delay", ref profileDelay, 1, 10))
         {
             _configService.Current.ProfileDelay = profileDelay;
@@ -693,6 +686,13 @@ public class SettingsUi : WindowMediatorSubscriberBase
         UiSharedService.DrawHelpText("Delay until the profile should be displayed");
         if (!showProfiles) ImGui.EndDisabled();
         ImGui.Unindent();
+        if (ImGui.Checkbox("Show profiles marked as NSFW", ref showNsfwProfiles))
+        {
+            Mediator.Publish(new ClearProfileDataMessage());
+            _configService.Current.ProfilesAllowNsfw = showNsfwProfiles;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("Will show profiles that have the NSFW tag enabled");
 
         ImGui.Separator();
 

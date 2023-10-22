@@ -39,7 +39,7 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="7.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="7.0.11" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
-    <PackageReference Include="Penumbra.Api" Version="1.0.11" />
+    <PackageReference Include="Penumbra.Api" Version="1.0.12" />
     <PackageReference Include="Penumbra.String" Version="1.0.4" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.0.2" />
     <PackageReference Include="SonarAnalyzer.CSharp" Version="9.11.0.78383">

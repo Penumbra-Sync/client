@@ -20,12 +20,12 @@ public class TopTabMenu
 
     private readonly PairManager _pairManager;
 
+    private string _filter = string.Empty;
     private int _globalControlCountdown = 0;
 
     private string _pairToAdd = string.Empty;
 
     private SelectedTab _selectedTab = SelectedTab.None;
-
     public TopTabMenu(MareMediator mareMediator, ApiController apiController, PairManager pairManager)
     {
         _mareMediator = mareMediator;
@@ -41,8 +41,32 @@ public class TopTabMenu
         Filter,
         UserConfig
     }
-    public string Filter { get; private set; } = string.Empty;
 
+    public string Filter
+    {
+        get => _filter;
+        private set
+        {
+            if (!string.Equals(_filter, value, StringComparison.OrdinalIgnoreCase))
+            {
+                _mareMediator.Publish(new RefreshUiMessage());
+            }
+
+            _filter = value;
+        }
+    }
+    private SelectedTab TabSelection
+    {
+        get => _selectedTab; set
+        {
+            if (_selectedTab == SelectedTab.Filter && value != SelectedTab.Filter)
+            {
+                Filter = string.Empty;
+            }
+
+            _selectedTab = value;
+        }
+    }
     public void Draw()
     {
         var availableWidth = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
@@ -61,11 +85,11 @@ public class TopTabMenu
             var x = ImGui.GetCursorScreenPos();
             if (ImGui.Button(FontAwesomeIcon.User.ToIconString(), buttonSize))
             {
-                _selectedTab = _selectedTab == SelectedTab.Individual ? SelectedTab.None : SelectedTab.Individual;
+                TabSelection = TabSelection == SelectedTab.Individual ? SelectedTab.None : SelectedTab.Individual;
             }
             ImGui.SameLine();
             var xAfter = ImGui.GetCursorScreenPos();
-            if (_selectedTab == SelectedTab.Individual)
+            if (TabSelection == SelectedTab.Individual)
                 drawList.AddLine(x with { Y = x.Y + buttonSize.Y + spacing.Y },
                     xAfter with { Y = xAfter.Y + buttonSize.Y + spacing.Y, X = xAfter.X - spacing.X },
                     underlineColor, 2);
@@ -77,11 +101,11 @@ public class TopTabMenu
             var x = ImGui.GetCursorScreenPos();
             if (ImGui.Button(FontAwesomeIcon.Users.ToIconString(), buttonSize))
             {
-                _selectedTab = _selectedTab == SelectedTab.Syncshell ? SelectedTab.None : SelectedTab.Syncshell;
+                TabSelection = TabSelection == SelectedTab.Syncshell ? SelectedTab.None : SelectedTab.Syncshell;
             }
             ImGui.SameLine();
             var xAfter = ImGui.GetCursorScreenPos();
-            if (_selectedTab == SelectedTab.Syncshell)
+            if (TabSelection == SelectedTab.Syncshell)
                 drawList.AddLine(x with { Y = x.Y + buttonSize.Y + spacing.Y },
                     xAfter with { Y = xAfter.Y + buttonSize.Y + spacing.Y, X = xAfter.X - spacing.X },
                     underlineColor, 2);
@@ -94,12 +118,12 @@ public class TopTabMenu
             var x = ImGui.GetCursorScreenPos();
             if (ImGui.Button(FontAwesomeIcon.Filter.ToIconString(), buttonSize))
             {
-                _selectedTab = _selectedTab == SelectedTab.Filter ? SelectedTab.None : SelectedTab.Filter;
+                TabSelection = TabSelection == SelectedTab.Filter ? SelectedTab.None : SelectedTab.Filter;
             }
 
             ImGui.SameLine();
             var xAfter = ImGui.GetCursorScreenPos();
-            if (_selectedTab == SelectedTab.Filter)
+            if (TabSelection == SelectedTab.Filter)
                 drawList.AddLine(x with { Y = x.Y + buttonSize.Y + spacing.Y },
                     xAfter with { Y = xAfter.Y + buttonSize.Y + spacing.Y, X = xAfter.X - spacing.X },
                     underlineColor, 2);
@@ -112,12 +136,12 @@ public class TopTabMenu
             var x = ImGui.GetCursorScreenPos();
             if (ImGui.Button(FontAwesomeIcon.UserCog.ToIconString(), buttonSize))
             {
-                _selectedTab = _selectedTab == SelectedTab.UserConfig ? SelectedTab.None : SelectedTab.UserConfig;
+                TabSelection = TabSelection == SelectedTab.UserConfig ? SelectedTab.None : SelectedTab.UserConfig;
             }
 
             ImGui.SameLine();
             var xAfter = ImGui.GetCursorScreenPos();
-            if (_selectedTab == SelectedTab.UserConfig)
+            if (TabSelection == SelectedTab.UserConfig)
                 drawList.AddLine(x with { Y = x.Y + buttonSize.Y + spacing.Y },
                     xAfter with { Y = xAfter.Y + buttonSize.Y + spacing.Y, X = xAfter.X - spacing.X },
                     underlineColor, 2);
@@ -129,26 +153,26 @@ public class TopTabMenu
 
         ImGuiHelpers.ScaledDummy(spacing);
 
-        if (_selectedTab == SelectedTab.Individual)
+        if (TabSelection == SelectedTab.Individual)
         {
             DrawAddPair(availableWidth, spacing.X);
             DrawGlobalIndividualButtons(availableWidth, spacing.X);
         }
-        else if (_selectedTab == SelectedTab.Syncshell)
+        else if (TabSelection == SelectedTab.Syncshell)
         {
             DrawSyncshellMenu(availableWidth, spacing.X);
             DrawGlobalSyncshellButtons(availableWidth, spacing.X);
         }
-        else if (_selectedTab == SelectedTab.Filter)
+        else if (TabSelection == SelectedTab.Filter)
         {
-            DrawFilter(availableWidth);
+            DrawFilter(availableWidth, spacing.X);
         }
-        else if (_selectedTab == SelectedTab.UserConfig)
+        else if (TabSelection == SelectedTab.UserConfig)
         {
             DrawUserConfig(availableWidth, spacing.X);
         }
 
-        if (_selectedTab != SelectedTab.None) ImGuiHelpers.ScaledDummy(3f);
+        if (TabSelection != SelectedTab.None) ImGuiHelpers.ScaledDummy(3f);
         ImGui.Separator();
         ImGuiHelpers.ScaledDummy(1f);
     }
@@ -171,14 +195,20 @@ public class TopTabMenu
         UiSharedService.AttachToolTip("Pair with " + (_pairToAdd.IsNullOrEmpty() ? "other user" : _pairToAdd));
     }
 
-    private void DrawFilter(float availableWidth)
+    private void DrawFilter(float availableWidth, float spacingX)
     {
-        ImGui.SetNextItemWidth(availableWidth);
+        var buttonSize = UiSharedService.GetIconTextButtonSize(FontAwesomeIcon.Ban, "Clear");
+        ImGui.SetNextItemWidth(availableWidth - buttonSize.X - spacingX);
         string filter = Filter;
         if (ImGui.InputTextWithHint("##filter", "Filter for UID/notes", ref filter, 255))
         {
             Filter = filter;
-            _mareMediator.Publish(new RefreshUiMessage());
+        }
+        ImGui.SameLine();
+        using var disabled = ImRaii.Disabled(string.IsNullOrEmpty(Filter));
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.Ban, "Clear"))
+        {
+            Filter = string.Empty;
         }
     }
 
@@ -404,7 +434,7 @@ public class TopTabMenu
         ImGui.SameLine();
         using (ImRaii.PushFont(UiBuilder.IconFont))
         {
-            using var disabled = ImRaii.Disabled(_globalControlCountdown > 0);
+            using var disabled = ImRaii.Disabled(_globalControlCountdown > 0 || !UiSharedService.CtrlPressed());
 
             if (ImGui.Button(FontAwesomeIcon.Check.ToIconString(), buttonSize))
             {
@@ -425,7 +455,8 @@ public class TopTabMenu
         UiSharedService.AttachToolTip("Globally align syncshell permissions to suggested syncshell permissions." + UiSharedService.TooltipSeparator
             + "Note: This will not affect users with preferred permissions in syncshells." + Environment.NewLine
             + "Note: If multiple users share one syncshell the permissions to that user will be set to " + Environment.NewLine
-            + "the ones of the last applied syncshell in alphabetical order."
+            + "the ones of the last applied syncshell in alphabetical order." + UiSharedService.TooltipSeparator
+            + "Hold CTRL to enable this button"
             + (_globalControlCountdown > 0 ? UiSharedService.TooltipSeparator + "Available again in " + _globalControlCountdown + " seconds." : string.Empty));
     }
 

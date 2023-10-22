@@ -22,6 +22,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly ICallGateSubscriber<string?, string?, object> _customizePlusOnScaleUpdate;
     private readonly ICallGateSubscriber<Character?, object> _customizePlusRevertCharacter;
     private readonly ICallGateSubscriber<string, Character?, object> _customizePlusSetBodyScaleToCharacter;
+    private readonly DalamudPluginInterface _pi;
     private readonly DalamudUtilService _dalamudUtil;
     private readonly ICallGateSubscriber<(int, int)> _glamourerApiVersions;
     private readonly ICallGateSubscriber<string, GameObject?, uint, object>? _glamourerApplyAll;
@@ -47,7 +48,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly ICallGateSubscriber<Character, object> _palettePlusRemoveCharaPalette;
     private readonly ICallGateSubscriber<Character, string, object> _palettePlusSetCharaPalette;
     private readonly FuncSubscriber<string, string, Dictionary<string, string>, string, int, PenumbraApiEc> _penumbraAddTemporaryMod;
-    private readonly FuncSubscriber<(int, int)> _penumbraApiVersion;
     private readonly FuncSubscriber<string, int, bool, PenumbraApiEc> _penumbraAssignTemporaryCollection;
     private readonly FuncSubscriber<string, string, TextureType, bool, Task> _penumbraConvertTextureFile;
     private readonly FuncSubscriber<string, PenumbraApiEc> _penumbraCreateNamedTemporaryCollection;
@@ -64,7 +64,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly FuncSubscriber<string, PenumbraApiEc> _penumbraRemoveTemporaryCollection;
     private readonly FuncSubscriber<string, string, int, PenumbraApiEc> _penumbraRemoveTemporaryMod;
     private readonly FuncSubscriber<string> _penumbraResolveModDir;
-    private readonly FuncSubscriber<string[], string[], (string[], string[][])> _penumbraResolvePaths;
+    private readonly FuncSubscriber<string[], string[], Task<(string[], string[][])>> _penumbraResolvePaths;
     private readonly ParamsFuncSubscriber<ushort, IReadOnlyDictionary<string, string[]>?[]> _penumbraResourcePaths;
     private readonly SemaphoreSlim _redrawSemaphore = new(2);
     private readonly uint LockCode = 0x6D617265;
@@ -80,6 +80,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
     public IpcManager(ILogger<IpcManager> logger, DalamudPluginInterface pi, DalamudUtilService dalamudUtil, MareMediator mediator) : base(logger, mediator)
     {
+        _pi = pi;
         _dalamudUtil = dalamudUtil;
 
         _penumbraInit = Penumbra.Api.Ipc.Initialized.Subscriber(pi, PenumbraInit);
@@ -87,7 +88,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         _penumbraResolveModDir = Penumbra.Api.Ipc.GetModDirectory.Subscriber(pi);
         _penumbraRedraw = Penumbra.Api.Ipc.RedrawObjectByName.Subscriber(pi);
         _penumbraRedrawObject = Penumbra.Api.Ipc.RedrawObject.Subscriber(pi);
-        _penumbraApiVersion = Penumbra.Api.Ipc.ApiVersions.Subscriber(pi);
         _penumbraObjectIsRedrawn = Penumbra.Api.Ipc.GameObjectRedrawn.Subscriber(pi, RedrawEvent);
         _penumbraGetMetaManipulations = Penumbra.Api.Ipc.GetPlayerMetaManipulations.Subscriber(pi);
         _penumbraRemoveTemporaryMod = Penumbra.Api.Ipc.RemoveTemporaryMod.Subscriber(pi);
@@ -95,7 +95,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         _penumbraCreateNamedTemporaryCollection = Penumbra.Api.Ipc.CreateNamedTemporaryCollection.Subscriber(pi);
         _penumbraRemoveTemporaryCollection = Penumbra.Api.Ipc.RemoveTemporaryCollectionByName.Subscriber(pi);
         _penumbraAssignTemporaryCollection = Penumbra.Api.Ipc.AssignTemporaryCollection.Subscriber(pi);
-        _penumbraResolvePaths = Penumbra.Api.Ipc.ResolvePlayerPaths.Subscriber(pi);
+        _penumbraResolvePaths = Penumbra.Api.Ipc.ResolvePlayerPathsAsync.Subscriber(pi);
         _penumbraEnabled = Penumbra.Api.Ipc.GetEnabledState.Subscriber(pi);
         _penumbraModSettingChanged = Penumbra.Api.Ipc.ModSettingChanged.Subscriber(pi, (change, arg1, arg, b) =>
         {
@@ -569,7 +569,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
     public async Task<(string[] forward, string[][] reverse)> PenumbraResolvePathsAsync(string[] forward, string[] reverse)
     {
-        return await _dalamudUtil.RunOnFrameworkThread(() => _penumbraResolvePaths.Invoke(forward, reverse)).ConfigureAwait(false);
+        return await _penumbraResolvePaths.Invoke(forward, reverse).ConfigureAwait(false);
     }
 
     public async Task PenumbraSetManipulationDataAsync(ILogger logger, Guid applicationId, string collName, string manipulationData)
@@ -700,20 +700,23 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
     private bool CheckPenumbraApiInternal()
     {
-        bool apiAvailable = false;
+        bool penumbraAvailable = false;
         try
         {
-            apiAvailable = _penumbraApiVersion.Invoke() is { Item1: 4, Item2: >= 21 } && _penumbraEnabled.Invoke();
-            _shownPenumbraUnavailable = _shownPenumbraUnavailable && !apiAvailable;
-            return apiAvailable;
+            penumbraAvailable = (_pi.InstalledPlugins
+                .FirstOrDefault(p => string.Equals(p.InternalName, "Penumbra", StringComparison.OrdinalIgnoreCase))
+                ?.Version ?? new Version(0, 0, 0, 0)) >= new Version(0, 8, 1, 6);
+            penumbraAvailable &= _penumbraEnabled.Invoke();
+            _shownPenumbraUnavailable = _shownPenumbraUnavailable && !penumbraAvailable;
+            return penumbraAvailable;
         }
         catch
         {
-            return apiAvailable;
+            return penumbraAvailable;
         }
         finally
         {
-            if (!apiAvailable && !_shownPenumbraUnavailable)
+            if (!penumbraAvailable && !_shownPenumbraUnavailable)
             {
                 _shownPenumbraUnavailable = true;
                 Mediator.Publish(new NotificationMessage("Penumbra inactive", "Your Penumbra installation is not active or out of date. Update Penumbra and/or the Enable Mods setting in Penumbra to continue to use Mare.", NotificationType.Error));
