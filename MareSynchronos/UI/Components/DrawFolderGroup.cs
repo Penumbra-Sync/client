@@ -98,7 +98,7 @@ public class DrawFolderGroup : DrawFolderBase
         if (UiSharedService.IconTextButton(FontAwesomeIcon.StickyNote, "Copy Notes", menuWidth, true))
         {
             ImGui.CloseCurrentPopup();
-            ImGui.SetClipboardText(UiSharedService.GetNotes(_drawPairs.Select(k => k.Pair).ToList()));
+            ImGui.SetClipboardText(UiSharedService.GetNotes(DrawPairs.Select(k => k.Pair).ToList()));
         }
         UiSharedService.AttachToolTip("Copies all your notes for all users in this Syncshell to the clipboard." + Environment.NewLine + "They can be imported via Settings -> Privacy -> Import Notes from Clipboard");
 

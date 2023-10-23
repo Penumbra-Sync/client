@@ -8,16 +8,16 @@ namespace MareSynchronos.UI.Components;
 
 public abstract class DrawFolderBase : IDrawFolder
 {
-    protected readonly IEnumerable<DrawUserPair> _drawPairs;
+    public IEnumerable<DrawUserPair> DrawPairs { get; private set; }
     protected readonly string _id;
     protected readonly TagHandler _tagHandler;
     private float _menuWidth = -1;
-    public int OnlinePairs => _drawPairs.Count(u => u.Pair.IsOnline);
+    public int OnlinePairs => DrawPairs.Count(u => u.Pair.IsOnline);
     public int TotalPairs { get; }
     protected DrawFolderBase(string id, IEnumerable<DrawUserPair> drawPairs, TagHandler tagHandler, int totalPairs)
     {
         _id = id;
-        _drawPairs = drawPairs;
+        DrawPairs = drawPairs;
         _tagHandler = tagHandler;
         TotalPairs = totalPairs;
     }
@@ -27,7 +27,7 @@ public abstract class DrawFolderBase : IDrawFolder
 
     public void Draw()
     {
-        if (!RenderIfEmpty && !_drawPairs.Any()) return;
+        if (!RenderIfEmpty && !DrawPairs.Any()) return;
 
         using var id = ImRaii.PushId("folder_" + _id);
 
@@ -57,9 +57,9 @@ public abstract class DrawFolderBase : IDrawFolder
         if (_tagHandler.IsTagOpen(_id))
         {
             using var indent = ImRaii.PushIndent(20f);
-            if (_drawPairs.Any())
+            if (DrawPairs.Any())
             {
-                foreach (var item in _drawPairs)
+                foreach (var item in DrawPairs)
                 {
                     item.DrawPairedClient();
                 }

@@ -51,7 +51,7 @@ public class DrawFolderTag : DrawFolderBase
         TagHandler.CustomAllTag => false,
         TagHandler.CustomOfflineSyncshellTag => false,
         _ => true,
-    } && _drawPairs.Any();
+    } && DrawPairs.Any();
 
     private bool RenderCount => _id switch
     {
@@ -135,7 +135,7 @@ public class DrawFolderTag : DrawFolderBase
     {
         if (!RenderPause) return currentRightSideX;
 
-        var allArePaused = _drawPairs.All(pair => pair.UserPair!.OwnPermissions.IsPaused());
+        var allArePaused = DrawPairs.All(pair => pair.UserPair!.OwnPermissions.IsPaused());
         var pauseButton = allArePaused ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
         var pauseButtonX = UiSharedService.GetIconButtonSize(pauseButton).X;
 
@@ -145,11 +145,11 @@ public class DrawFolderTag : DrawFolderBase
         {
             if (allArePaused)
             {
-                ResumeAllPairs(_drawPairs);
+                ResumeAllPairs(DrawPairs);
             }
             else
             {
-                PauseRemainingPairs(_drawPairs);
+                PauseRemainingPairs(DrawPairs);
             }
         }
         if (allArePaused)

@@ -9,7 +9,8 @@ public class DrawGroupedGroupFolder : IDrawFolder
 {
     private readonly IEnumerable<IDrawFolder> _groups;
     private readonly TagHandler _tagHandler;
-    public int OnlinePairs => _groups.Sum(g => g.OnlinePairs);
+    public IEnumerable<DrawUserPair> DrawPairs => throw new NotSupportedException();
+    public int OnlinePairs => _groups.SelectMany(g => g.DrawPairs).Where(g => g.Pair.IsOnline).DistinctBy(g => g.UID).Count();
     public int TotalPairs => _groups.Sum(g => g.TotalPairs);
 
     public DrawGroupedGroupFolder(IEnumerable<IDrawFolder> groups, TagHandler tagHandler)
