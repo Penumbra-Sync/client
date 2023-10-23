@@ -30,14 +30,12 @@ public abstract class DrawFolderBase : IDrawFolder
         if (!RenderIfEmpty && !_drawPairs.Any()) return;
 
         using var id = ImRaii.PushId("folder_" + _id);
-        var originalY = ImGui.GetCursorPosY();
-        var pauseIconSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars);
-        var textSize = ImGui.CalcTextSize(_id);
-        var textPosY = originalY + pauseIconSize.Y / 2 - textSize.Y / 2;
 
         // draw opener
         var icon = _tagHandler.IsTagOpen(_id) ? FontAwesomeIcon.CaretDown : FontAwesomeIcon.CaretRight;
-        ImGui.SetCursorPosY(textPosY);
+
+        ImGui.AlignTextToFramePadding();
+
         UiSharedService.FontText(icon.ToIconString(), UiBuilder.IconFont);
         if (ImGui.IsItemClicked())
         {
@@ -45,14 +43,14 @@ public abstract class DrawFolderBase : IDrawFolder
         }
 
         ImGui.SameLine();
-        var leftSideEnd = DrawIcon(textPosY, originalY);
+        var leftSideEnd = DrawIcon();
 
         ImGui.SameLine();
-        var rightSideStart = DrawRightSide(originalY);
+        var rightSideStart = DrawRightSideInternal();
 
         // draw name
         ImGui.SameLine(leftSideEnd);
-        DrawName(textPosY, rightSideStart - leftSideEnd);
+        DrawName(rightSideStart - leftSideEnd);
         ImGui.Separator();
 
         // if opened draw content
@@ -75,15 +73,15 @@ public abstract class DrawFolderBase : IDrawFolder
         }
     }
 
-    protected abstract float DrawIcon(float textPosY, float originalY);
+    protected abstract float DrawIcon();
 
     protected abstract void DrawMenu(float menuWidth);
 
-    protected abstract void DrawName(float originalY, float width);
+    protected abstract void DrawName(float width);
 
-    protected abstract float DrawRightSide(float originalY, float currentRightSideX);
+    protected abstract float DrawRightSide(float currentRightSideX);
 
-    private float DrawRightSide(float originalY)
+    private float DrawRightSideInternal()
     {
         var barButtonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars);
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
@@ -114,6 +112,6 @@ public abstract class DrawFolderBase : IDrawFolder
             }
         }
 
-        return DrawRightSide(originalY, rightSideStart);
+        return DrawRightSide(rightSideStart);
     }
 }

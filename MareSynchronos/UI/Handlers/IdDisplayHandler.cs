@@ -31,13 +31,14 @@ public class IdDisplayHandler
         _mareConfigService = mareConfigService;
     }
 
-    public void DrawGroupText(string id, GroupFullInfoDto group, float textPosX, float originalY, Func<float> editBoxWidth)
+    public void DrawGroupText(string id, GroupFullInfoDto group, float textPosX, Func<float> editBoxWidth)
     {
         ImGui.SameLine(textPosX);
         (bool textIsUid, string playerText) = GetGroupText(group);
         if (!string.Equals(_editEntry, group.GID, StringComparison.Ordinal))
         {
-            ImGui.SetCursorPosY(originalY);
+            ImGui.AlignTextToFramePadding();
+
             using (ImRaii.PushFont(UiBuilder.MonoFont, textIsUid))
                 ImGui.TextUnformatted(playerText);
 
@@ -69,7 +70,7 @@ public class IdDisplayHandler
         }
         else
         {
-            ImGui.SetCursorPosY(originalY);
+            ImGui.AlignTextToFramePadding();
 
             ImGui.SetNextItemWidth(editBoxWidth.Invoke());
             if (ImGui.InputTextWithHint("", "Name/Notes", ref _editComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
@@ -86,13 +87,14 @@ public class IdDisplayHandler
         }
     }
 
-    public void DrawPairText(string id, Pair pair, float textPosX, float originalY, Func<float> editBoxWidth)
+    public void DrawPairText(string id, Pair pair, float textPosX, Func<float> editBoxWidth)
     {
         ImGui.SameLine(textPosX);
         (bool textIsUid, string playerText) = GetPlayerText(pair);
         if (!string.Equals(_editEntry, pair.UserData.UID, StringComparison.Ordinal))
         {
-            ImGui.SetCursorPosY(originalY);
+            ImGui.AlignTextToFramePadding();
+
             if (textIsUid) ImGui.PushFont(UiBuilder.MonoFont);
             ImGui.TextUnformatted(playerText);
             if (textIsUid) ImGui.PopFont();
@@ -162,7 +164,7 @@ public class IdDisplayHandler
         }
         else
         {
-            ImGui.SetCursorPosY(originalY);
+            ImGui.AlignTextToFramePadding();
 
             ImGui.SetNextItemWidth(editBoxWidth.Invoke());
             if (ImGui.InputTextWithHint("", "Nick/Notes", ref _editComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))

@@ -53,12 +53,11 @@ public class DrawUserPair
         var pauseIconSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars);
         var textSize = ImGui.CalcTextSize(_pair.UserData.AliasOrUID);
 
-        var textPosY = originalY + pauseIconSize.Y / 2 - textSize.Y / 2;
-        DrawLeftSide(textPosY);
+        DrawLeftSide();
         ImGui.SameLine();
         var posX = ImGui.GetCursorPosX();
-        var rightSide = DrawRightSide(originalY);
-        DrawName(originalY, posX, rightSide);
+        var rightSide = DrawRightSide();
+        DrawName(posX, rightSide);
     }
 
     private void DrawCommonClientMenu()
@@ -180,15 +179,16 @@ public class DrawUserPair
         }
     }
 
-    private void DrawLeftSide(float textPosY)
+    private void DrawLeftSide()
     {
         string userPairText = string.Empty;
 
-        ImGui.SetCursorPosY(textPosY);
+        ImGui.AlignTextToFramePadding();
 
         if (_pair.IsPaused)
         {
-            ImGui.SetCursorPosY(textPosY);
+            ImGui.AlignTextToFramePadding();
+
             using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
             using var font = ImRaii.PushFont(UiBuilder.IconFont);
             ImGui.TextUnformatted(FontAwesomeIcon.PauseCircle.ToIconString());
@@ -196,7 +196,7 @@ public class DrawUserPair
         }
         else if (!_pair.IsOnline)
         {
-            ImGui.SetCursorPosY(textPosY);
+            ImGui.AlignTextToFramePadding();
             using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
             using var font = ImRaii.PushFont(UiBuilder.IconFont);
             ImGui.TextUnformatted(_pair.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.Bidirectional
@@ -205,7 +205,8 @@ public class DrawUserPair
         }
         else
         {
-            using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ParsedGreen);
+            ImGui.AlignTextToFramePadding();
+
             using var font = ImRaii.PushFont(UiBuilder.IconFont);
             ImGui.TextUnformatted(_pair.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.Bidirectional
                 ? FontAwesomeIcon.User.ToIconString() : FontAwesomeIcon.Users.ToIconString());
@@ -235,7 +236,7 @@ public class DrawUserPair
 
         if (_pair.UserPair.OwnPermissions.IsSticky())
         {
-            ImGui.SetCursorPosY(textPosY);
+            ImGui.AlignTextToFramePadding();
 
             using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X * 3 / 4f }))
             using (ImRaii.PushFont(UiBuilder.IconFont))
@@ -249,7 +250,8 @@ public class DrawUserPair
 
         if (_pair.IsVisible)
         {
-            ImGui.SetCursorPosY(textPosY);
+            ImGui.AlignTextToFramePadding();
+
             using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X * 3 / 4f }))
             using (ImRaii.PushFont(UiBuilder.IconFont))
             {
@@ -262,9 +264,9 @@ public class DrawUserPair
         }
     }
 
-    private void DrawName(float originalY, float leftSide, float rightSide)
+    private void DrawName(float leftSide, float rightSide)
     {
-        _displayHandler.DrawPairText(_id, _pair, leftSide, originalY, () => rightSide - leftSide);
+        _displayHandler.DrawPairText(_id, _pair, leftSide, () => rightSide - leftSide);
     }
 
     private void DrawPairedClientMenu()
@@ -292,7 +294,7 @@ public class DrawUserPair
         }
     }
 
-    private float DrawRightSide(float originalY)
+    private float DrawRightSide()
     {
         var pauseIcon = _pair.UserPair!.OwnPermissions.IsPaused() ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
         var pauseIconSize = UiSharedService.GetIconButtonSize(pauseIcon);
@@ -317,6 +319,8 @@ public class DrawUserPair
 
                 infoIconDist = iconwidth.X;
                 ImGui.SameLine(infoIconPosDist - iconwidth.X);
+
+                ImGui.AlignTextToFramePadding();
 
                 UiSharedService.FontText(icon.ToIconString(), UiBuilder.IconFont);
                 if (ImGui.IsItemHovered())
@@ -378,7 +382,6 @@ public class DrawUserPair
 
         rightSideStart = windowEndX - barButtonSize.X - spacingX * 3 - pauseIconSize.X - infoIconDist;
         ImGui.SameLine(windowEndX - barButtonSize.X - spacingX - pauseIconSize.X);
-        ImGui.SetCursorPosY(originalY);
         if (ImGuiComponents.IconButton(pauseIcon))
         {
             var perm = _pair.UserPair!.OwnPermissions;
@@ -395,8 +398,7 @@ public class DrawUserPair
             rightSideStart = windowEndX - barButtonSize.X;
         }
         ImGui.SameLine(windowEndX - barButtonSize.X);
-        ImGui.SetCursorPosY(originalY);
-
+        ImGui.AlignTextToFramePadding();
         if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
         {
             ImGui.OpenPopup("User Flyout Menu");

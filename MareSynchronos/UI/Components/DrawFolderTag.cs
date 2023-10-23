@@ -64,7 +64,7 @@ public class DrawFolderTag : DrawFolderBase
         _ => true
     };
 
-    protected override float DrawIcon(float textPosY, float originalY)
+    protected override float DrawIcon()
     {
         using (ImRaii.PushFont(UiBuilder.IconFont))
         {
@@ -79,7 +79,7 @@ public class DrawFolderTag : DrawFolderBase
                 _ => FontAwesomeIcon.Folder.ToIconString()
             };
 
-            ImGui.SetCursorPosY(textPosY);
+            ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted(icon);
         }
         if (RenderCount)
@@ -87,7 +87,8 @@ public class DrawFolderTag : DrawFolderBase
             using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X / 2f }))
             {
                 ImGui.SameLine();
-                ImGui.SetCursorPosY(textPosY);
+                ImGui.AlignTextToFramePadding();
+
                 ImGui.TextUnformatted("[" + OnlinePairs.ToString() + "]");
             }
             UiSharedService.AttachToolTip(OnlinePairs + " online" + Environment.NewLine + TotalPairs + " total");
@@ -112,9 +113,10 @@ public class DrawFolderTag : DrawFolderBase
             "Note: this will not unpair with users in this Group.");
     }
 
-    protected override void DrawName(float originalY, float width)
+    protected override void DrawName(float width)
     {
-        ImGui.SetCursorPosY(originalY);
+        ImGui.AlignTextToFramePadding();
+
         string name = _id switch
         {
             TagHandler.CustomUnpairedTag => "One-sided Individual Pairs",
@@ -129,7 +131,7 @@ public class DrawFolderTag : DrawFolderBase
         ImGui.TextUnformatted(name);
     }
 
-    protected override float DrawRightSide(float originalY, float currentRightSideX)
+    protected override float DrawRightSide(float currentRightSideX)
     {
         if (!RenderPause) return currentRightSideX;
 

@@ -36,9 +36,9 @@ public class DrawFolderGroup : DrawFolderBase
     private bool IsOwner => string.Equals(_groupFullInfoDto.OwnerUID, _apiController.UID, StringComparison.Ordinal);
     private bool IsPinned => _groupFullInfoDto.GroupUserInfo.IsPinned();
 
-    protected override float DrawIcon(float textPosY, float originalY)
+    protected override float DrawIcon()
     {
-        ImGui.SetCursorPosY(textPosY);
+        ImGui.AlignTextToFramePadding();
 
         using (ImRaii.PushFont(UiBuilder.IconFont))
             ImGui.TextUnformatted(_groupFullInfoDto.GroupPermissions.IsDisableInvites() ? FontAwesomeIcon.Lock.ToIconString() : FontAwesomeIcon.Users.ToIconString());
@@ -50,7 +50,8 @@ public class DrawFolderGroup : DrawFolderBase
         using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X / 2f }))
         {
             ImGui.SameLine();
-            ImGui.SetCursorPosY(textPosY);
+            ImGui.AlignTextToFramePadding();
+
             ImGui.TextUnformatted("[" + OnlinePairs.ToString() + "]");
         }
         UiSharedService.AttachToolTip(OnlinePairs + " online" + Environment.NewLine + TotalPairs + " total");
@@ -58,23 +59,21 @@ public class DrawFolderGroup : DrawFolderBase
         ImGui.SameLine();
         if (IsOwner)
         {
-            ImGui.SameLine();
+            ImGui.AlignTextToFramePadding();
             using (ImRaii.PushFont(UiBuilder.IconFont))
                 ImGui.TextUnformatted(FontAwesomeIcon.Crown.ToIconString());
             UiSharedService.AttachToolTip("You are the owner of " + _groupFullInfoDto.GroupAliasOrGID);
         }
         else if (IsModerator)
         {
-            ImGui.SameLine();
-            ImGui.SetCursorPosY(textPosY);
+            ImGui.AlignTextToFramePadding();
             using (ImRaii.PushFont(UiBuilder.IconFont))
                 ImGui.TextUnformatted(FontAwesomeIcon.UserShield.ToIconString());
             UiSharedService.AttachToolTip("You are a moderator in " + _groupFullInfoDto.GroupAliasOrGID);
         }
         else if (IsPinned)
         {
-            ImGui.SameLine();
-            ImGui.SetCursorPosY(textPosY);
+            ImGui.AlignTextToFramePadding();
             using (ImRaii.PushFont(UiBuilder.IconFont))
                 ImGui.TextUnformatted(FontAwesomeIcon.Thumbtack.ToIconString());
             UiSharedService.AttachToolTip("You are pinned in " + _groupFullInfoDto.GroupAliasOrGID);
@@ -166,12 +165,12 @@ public class DrawFolderGroup : DrawFolderBase
         }
     }
 
-    protected override void DrawName(float originalY, float width)
+    protected override void DrawName(float width)
     {
-        _idDisplayHandler.DrawGroupText(_id, _groupFullInfoDto, ImGui.GetCursorPosX(), originalY, () => width);
+        _idDisplayHandler.DrawGroupText(_id, _groupFullInfoDto, ImGui.GetCursorPosX(), () => width);
     }
 
-    protected override float DrawRightSide(float originalY, float currentRightSideX)
+    protected override float DrawRightSide(float currentRightSideX)
     {
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
 
@@ -188,6 +187,8 @@ public class DrawFolderGroup : DrawFolderBase
         var infoIconPosDist = currentRightSideX - pauseButtonSize.X - spacingX;
 
         ImGui.SameLine(infoIconPosDist - userCogButtonSize.X);
+
+        ImGui.AlignTextToFramePadding();
 
         using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow,
             _groupFullInfoDto.GroupPermissions.IsPreferDisableAnimations() != individualAnimDisabled
