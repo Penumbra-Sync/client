@@ -336,7 +336,7 @@ public sealed class FileCacheManager : IDisposable
 
     private void AddHashedFile(FileCacheEntity fileCache)
     {
-        if (!_fileCaches.TryGetValue(fileCache.Hash, out var entries))
+        if (!_fileCaches.TryGetValue(fileCache.Hash, out var entries) || entries is null)
         {
             _fileCaches[fileCache.Hash] = entries = [];
         }

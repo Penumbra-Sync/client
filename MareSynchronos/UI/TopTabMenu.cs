@@ -406,7 +406,7 @@ public class TopTabMenu
                 perm.SetDisableSounds(true);
                 return perm;
             });
-        PopupSyncshellSetting("Syncshell Animations", "Enable sounds for all syncshells", "Disable sounds for all syncshells",
+        PopupSyncshellSetting("Syncshell Animations", "Enable animations for all syncshells", "Disable animations for all syncshells",
             FontAwesomeIcon.Running, FontAwesomeIcon.Stop,
             (perm) =>
             {
