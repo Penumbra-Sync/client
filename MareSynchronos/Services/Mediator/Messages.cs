@@ -54,9 +54,9 @@ public record CharacterDataCreatedMessage(CharacterData CharacterData) : SameThr
 public record CharacterDataAnalyzedMessage : MessageBase;
 public record PenumbraStartRedrawMessage(IntPtr Address) : MessageBase;
 public record PenumbraEndRedrawMessage(IntPtr Address) : MessageBase;
-public record HubReconnectingMessage(Exception? Exception) : MessageBase;
-public record HubReconnectedMessage(string? Arg) : MessageBase;
-public record HubClosedMessage(Exception? Exception) : MessageBase;
+public record HubReconnectingMessage(Exception? Exception) : SameThreadMessage;
+public record HubReconnectedMessage(string? Arg) : SameThreadMessage;
+public record HubClosedMessage(Exception? Exception) : SameThreadMessage;
 public record DownloadReadyMessage(Guid RequestId) : MessageBase;
 public record DownloadStartedMessage(GameObjectHandler DownloadId, Dictionary<string, FileDownloadStatus> DownloadStatus) : MessageBase;
 public record DownloadFinishedMessage(GameObjectHandler DownloadId) : MessageBase;

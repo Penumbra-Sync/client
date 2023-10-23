@@ -49,7 +49,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         Mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
         Mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
         Mediator.Subscribe<HubClosedMessage>(this, (msg) => MareHubOnClosed(msg.Exception));
-        Mediator.Subscribe<HubReconnectedMessage>(this, (msg) => _ = Task.Run(MareHubOnReconnected));
+        Mediator.Subscribe<HubReconnectedMessage>(this, async (msg) => await MareHubOnReconnected().ConfigureAwait(false));
         Mediator.Subscribe<HubReconnectingMessage>(this, (msg) => MareHubOnReconnecting(msg.Exception));
         Mediator.Subscribe<CyclePauseMessage>(this, (msg) => _ = CyclePause(msg.UserData));
 
@@ -187,7 +187,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                         $"Your client is outdated ({currentClientVer.Major}.{currentClientVer.Minor}.{currentClientVer.Build}), current is: " +
                         $"{_connectionDto.CurrentClientVersion.Major}.{_connectionDto.CurrentClientVersion.Minor}.{_connectionDto.CurrentClientVersion.Build}. " +
                         $"Please keep your Mare Synchronos client up-to-date.",
-                        Dalamud.Interface.Internal.Notifications.NotificationType.Error));
+                        Dalamud.Interface.Internal.Notifications.NotificationType.Warning));
                 }
 
                 await LoadIninitialPairs().ConfigureAwait(false);
@@ -370,13 +370,13 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         try
         {
             InitializeApiHooks();
-            await LoadIninitialPairs().ConfigureAwait(false);
             _connectionDto = await GetConnectionDto().ConfigureAwait(false);
             if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
             {
                 await StopConnection(ServerState.VersionMisMatch).ConfigureAwait(false);
                 return;
             }
+            await LoadIninitialPairs().ConfigureAwait(false);
             await LoadOnlinePairs().ConfigureAwait(false);
             ServerState = ServerState.Connected;
         }
@@ -416,6 +416,13 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         {
             AuthFailureMessage = ex.Reason;
             await StopConnection(ServerState.Unauthorized).ConfigureAwait(false);
+            requireReconnect = true;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not refresh token, forcing reconnect");
+            _doNotNotifyOnNextInfo = true;
+            await CreateConnections().ConfigureAwait(false);
             requireReconnect = true;
         }
 
