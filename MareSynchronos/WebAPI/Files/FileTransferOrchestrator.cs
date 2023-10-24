@@ -115,7 +115,7 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
     private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage,
         CancellationToken? ct = null, HttpCompletionOption httpCompletionOption = HttpCompletionOption.ResponseContentRead)
     {
-        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await _tokenProvider.GetOrUpdateToken(ct!.Value).ConfigureAwait(false));
+        requestMessage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _tokenProvider.GetToken());
 
         if (requestMessage.Content != null && requestMessage.Content is not StreamContent && requestMessage.Content is not ByteArrayContent)
         {

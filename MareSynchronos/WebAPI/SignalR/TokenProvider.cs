@@ -89,6 +89,9 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
 
             if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
+                Mediator.Publish(new NotificationMessage("Error refreshing token", "Your authentication token could not be renewed. Try reconnecting to Mare manually.",
+                    Dalamud.Interface.Internal.Notifications.NotificationType.Error));
+                Mediator.Publish(new DisconnectedMessage());
                 throw new MareAuthFailureException(response);
             }
 
@@ -101,6 +104,16 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         _logger.LogDebug("GetNewToken: Valid until {date}, ValidClaim until {date}", jwtToken.ValidTo,
                 new DateTime(long.Parse(jwtToken.Claims.Single(c => string.Equals(c.Type, "expiration_date", StringComparison.Ordinal)).Value), DateTimeKind.Utc));
         return response;
+    }
+
+    public string? GetToken()
+    {
+        if (_tokenCache.TryGetValue(CurrentIdentifier, out var token))
+        {
+            return token;
+        }
+
+        throw new InvalidOperationException("No token present");
     }
 
     public async Task<string?> GetOrUpdateToken(CancellationToken ct, bool forceRenew = false)
