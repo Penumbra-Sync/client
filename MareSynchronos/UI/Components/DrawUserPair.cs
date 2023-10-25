@@ -199,8 +199,10 @@ public class DrawUserPair
             ImGui.AlignTextToFramePadding();
             using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
             using var font = ImRaii.PushFont(UiBuilder.IconFont);
-            ImGui.TextUnformatted(_pair.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.Bidirectional
-                ? FontAwesomeIcon.User.ToIconString() : FontAwesomeIcon.Users.ToIconString());
+            ImGui.TextUnformatted(_pair.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.OneSided
+                ? FontAwesomeIcon.ArrowsLeftRight.ToIconString()
+                : (_pair.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.Bidirectional
+                    ? FontAwesomeIcon.User.ToIconString() : FontAwesomeIcon.Users.ToIconString()));
             userPairText = _pair.UserData.AliasOrUID + " is offline";
         }
         else
@@ -208,6 +210,7 @@ public class DrawUserPair
             ImGui.AlignTextToFramePadding();
 
             using var font = ImRaii.PushFont(UiBuilder.IconFont);
+            using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.HealerGreen);
             ImGui.TextUnformatted(_pair.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.Bidirectional
                 ? FontAwesomeIcon.User.ToIconString() : FontAwesomeIcon.Users.ToIconString());
             userPairText = _pair.UserData.AliasOrUID + " is online";

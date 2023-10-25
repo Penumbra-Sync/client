@@ -215,7 +215,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
             catch (InvalidOperationException ex)
             {
                 Logger.LogWarning(ex, "InvalidOperationException on connection");
-                ServerState = ServerState.Disconnected;
+                await StopConnection(ServerState.Disconnected).ConfigureAwait(false);
                 return;
             }
             catch (Exception ex)

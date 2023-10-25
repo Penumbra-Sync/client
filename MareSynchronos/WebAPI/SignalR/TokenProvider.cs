@@ -106,11 +106,10 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         if (jwtToken.ValidTo.Subtract(TimeSpan.FromHours(6).Add(TimeSpan.FromMinutes(1))) > DateTime.UtcNow)
         {
             _tokenCache.TryRemove(CurrentIdentifier, out _);
-            Mediator.Publish(new NotificationMessage("Invalid timezone", "The time zone of your computer is invalid. " +
+            Mediator.Publish(new NotificationMessage("Invalid system clock", "The clock of your computer is invalid. " +
                 "Mare will not function properly if the time zone is not set correctly. " +
-                "Please set your computers time zone correctly and keep it synchronized with the internet.",
+                "Please set your computers time zone correctly and keep your clock synchronized with the internet.",
                 Dalamud.Interface.Internal.Notifications.NotificationType.Error));
-            Mediator.Publish(new DisconnectedMessage());
             throw new InvalidOperationException($"JwtToken is behind DateTime.UtcNow, DateTime.UtcNow is possibly wrong. DateTime.UtcNow is {DateTime.UtcNow}, JwtToken.ValidTo is {jwtToken.ValidTo}");
         }
         return response;
