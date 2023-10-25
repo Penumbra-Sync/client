@@ -116,10 +116,10 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         throw new InvalidOperationException("No token present");
     }
 
-    public async Task<string?> GetOrUpdateToken(CancellationToken ct, bool forceRenew = false)
+    public async Task<string?> GetOrUpdateToken(CancellationToken ct)
     {
-        bool renewal = forceRenew;
-        if (!forceRenew && _tokenCache.TryGetValue(CurrentIdentifier, out var token))
+        bool renewal = false;
+        if (_tokenCache.TryGetValue(CurrentIdentifier, out var token))
         {
             var handler = new JwtSecurityTokenHandler();
             var jwtToken = handler.ReadJwtToken(token);

@@ -270,7 +270,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
             bool requireReconnect = await RefreshToken(ct).ConfigureAwait(false);
 
-            if (requireReconnect) continue;
+            if (requireReconnect) break;
 
             _ = await CheckClientHealth().ConfigureAwait(false);
         }
