@@ -515,6 +515,18 @@ public class SettingsUi : WindowMediatorSubscriberBase
         }
 
         _lastTab = "General";
+        UiSharedService.FontText("General Settings", _uiShared.UidFont);
+        bool lessRedraws = _configService.Current.UseLessRedraws;
+        if (ImGui.Checkbox("[Experimental] Use less redraws", ref lessRedraws))
+        {
+            _configService.Current.UseLessRedraws = lessRedraws;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("This will attempt to use less redraws. Changes that solely affect the players body appearance (i.e. clothes) should not cause a redraw anymore." + Environment.NewLine +
+            "Some changes, especially to hair, face, tail or any vfx, animation or skeleton changes, or class changes will still force a redraw." + Environment.NewLine + Environment.NewLine +
+            "WARNING: this is an experimental, little tested feature and can potentially lead to issues with animation state or crashes. Use at your own risk.");
+        ImGui.Separator();
+
         UiSharedService.FontText("Notes", _uiShared.UidFont);
         if (UiSharedService.IconTextButton(FontAwesomeIcon.StickyNote, "Export all your user notes to clipboard"))
         {

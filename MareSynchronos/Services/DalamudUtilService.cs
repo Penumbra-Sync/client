@@ -494,17 +494,6 @@ public class DalamudUtilService : IHostedService
             _mediator.Publish(new DalamudLogoutMessage());
         }
 
-        if (_clientState.LocalPlayer != null && _clientState.LocalPlayer.IsValid())
-        {
-            var newclassJobId = _clientState.LocalPlayer.ClassJob.Id;
-
-            if (_classJobId != newclassJobId)
-            {
-                _classJobId = newclassJobId;
-                _mediator.Publish(new ClassJobChangedMessage(_classJobId));
-            }
-        }
-
         _mediator.Publish(new DelayedFrameworkUpdateMessage());
 
         _delayedFrameworkUpdateCheck = DateTime.Now;

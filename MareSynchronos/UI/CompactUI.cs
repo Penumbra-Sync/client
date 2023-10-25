@@ -183,8 +183,8 @@ public class CompactUi : WindowMediatorSubscriberBase
     {
         var ySize = TransferPartHeight == 0
             ? 1
-            : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y 
-                + ImGui.GetTextLineHeight() - ImGui.GetStyle().WindowBorderSize) - TransferPartHeight - ImGui.GetCursorPosY();
+            : (ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y
+                + ImGui.GetTextLineHeight() - ImGui.GetStyle().WindowPadding.Y - ImGui.GetStyle().WindowBorderSize) - TransferPartHeight - ImGui.GetCursorPosY();
 
         ImGui.BeginChild("list", new Vector2(WindowContentWidth, ySize), border: false);
 

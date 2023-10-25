@@ -22,6 +22,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
     private bool _haltProcessing = false;
     private bool _ignoreSendAfterRedraw = false;
     private int _ptrNullCounter = 0;
+    private byte _classJob = 0;
     private CancellationTokenSource _zoningCts = new();
 
     public GameObjectHandler(ILogger<GameObjectHandler> logger, PerformanceCollectorService performanceCollector,
@@ -215,6 +216,14 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             if (((DrawObject*)DrawObjectAddress)->Object.GetObjectType() == ObjectType.CharacterBase
                 && ((CharacterBase*)DrawObjectAddress)->GetModelType() == CharacterBase.ModelType.Human)
             {
+                var classJob = chara->CharacterData.ClassJob;
+                if (classJob != _classJob)
+                {
+                    Logger.LogTrace("[{this}] classjob changed from {old} to {new}", this, _classJob, classJob);
+                    _classJob = classJob;
+                    Mediator.Publish(new ClassJobChangedMessage(this));
+                }
+
                 equipDiff = CompareAndUpdateEquipByteData((byte*)&((Human*)DrawObjectAddress)->Head);
 
                 ref var mh = ref chara->DrawData.Weapon(WeaponSlot.MainHand);

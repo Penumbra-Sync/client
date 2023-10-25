@@ -2,11 +2,12 @@
 
 public enum PlayerChanges
 {
-    Heels = 1,
-    Customize = 2,
-    Palette = 3,
-    Honorific = 4,
-    ModFiles = 5,
-    ModManip = 6,
-    Glamourer = 7
+    ModFiles = 1,
+    ModManip = 2,
+    Glamourer = 3,
+    Customize = 4,
+    Heels = 5,
+    Palette = 6,
+    Honorific = 7,
+    ForcedRedraw = 8,
 }

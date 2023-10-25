@@ -18,7 +18,7 @@ public record OpenSettingsUiMessage : MessageBase;
 public record DalamudLoginMessage : MessageBase;
 public record DalamudLogoutMessage : MessageBase;
 public record FrameworkUpdateMessage : SameThreadMessage;
-public record ClassJobChangedMessage(uint? ClassJob) : MessageBase;
+public record ClassJobChangedMessage(GameObjectHandler gameObjectHandler) : MessageBase;
 public record DelayedFrameworkUpdateMessage : SameThreadMessage;
 public record ZoneSwitchStartMessage : MessageBase;
 public record ZoneSwitchEndMessage : MessageBase;

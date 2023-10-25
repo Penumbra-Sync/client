@@ -51,7 +51,13 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         Mediator.Subscribe<PenumbraResourceLoadMessage>(this, Manager_PenumbraResourceLoadEvent);
         Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, (_) => Manager_PenumbraModSettingChanged());
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => DalamudUtil_FrameworkUpdate());
-        Mediator.Subscribe<ClassJobChangedMessage>(this, (_) => DalamudUtil_ClassJobChanged());
+        Mediator.Subscribe<ClassJobChangedMessage>(this, (msg) =>
+        {
+            if (_playerRelatedPointers.Contains(msg.gameObjectHandler))
+            {
+                DalamudUtil_ClassJobChanged();
+            }
+        });
         Mediator.Subscribe<AddWatchedGameObjectHandler>(this, (msg) =>
         {
             _playerRelatedPointers.Add(msg.Handler);

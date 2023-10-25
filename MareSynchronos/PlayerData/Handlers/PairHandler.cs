@@ -2,6 +2,7 @@
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Factories;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
@@ -21,6 +22,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private readonly DalamudUtilService _dalamudUtil;
     private readonly FileDownloadManager _downloadManager;
     private readonly FileCacheManager _fileDbManager;
+    private readonly MareConfigService _mareConfigService;
     private readonly GameObjectHandlerFactory _gameObjectHandlerFactory;
     private readonly IpcManager _ipcManager;
     private readonly IHostApplicationLifetime _lifetime;
@@ -34,13 +36,15 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private bool _forceApplyMods = false;
     private bool _isVisible;
     private string _penumbraCollection;
+    private bool _redrawOnNextApplication = false;
 
     public PairHandler(ILogger<PairHandler> logger, OnlineUserIdentDto onlineUser,
         GameObjectHandlerFactory gameObjectHandlerFactory,
         IpcManager ipcManager, FileDownloadManager transferManager,
         PluginWarningNotificationService pluginWarningNotificationManager,
         DalamudUtilService dalamudUtil, IHostApplicationLifetime lifetime,
-        FileCacheManager fileDbManager, MareMediator mediator) : base(logger, mediator)
+        FileCacheManager fileDbManager, MareMediator mediator,
+        MareConfigService mareConfigService) : base(logger, mediator)
     {
         OnlineUser = onlineUser;
         _gameObjectHandlerFactory = gameObjectHandlerFactory;
@@ -50,7 +54,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         _dalamudUtil = dalamudUtil;
         _lifetime = lifetime;
         _fileDbManager = fileDbManager;
-
+        _mareConfigService = mareConfigService;
         _penumbraCollection = _ipcManager.PenumbraCreateTemporaryCollectionAsync(logger, OnlineUser.User.UID).ConfigureAwait(false).GetAwaiter().GetResult();
 
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
@@ -68,6 +72,13 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                 PlayerName = string.Empty;
                 _charaHandler.Dispose();
                 _charaHandler = null;
+            }
+        });
+        Mediator.Subscribe<ClassJobChangedMessage>(this, (msg) =>
+        {
+            if (_mareConfigService.Current.UseLessRedraws && msg.gameObjectHandler == _charaHandler)
+            {
+                _redrawOnNextApplication = true;
             }
         });
     }
@@ -126,6 +137,12 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         if (_charaHandler != null && _forceApplyMods)
         {
             _forceApplyMods = false;
+        }
+
+        if (_redrawOnNextApplication && charaDataToUpdate.TryGetValue(ObjectKind.Player, out var player))
+        {
+            player.Add(PlayerChanges.ForcedRedraw);
+            _redrawOnNextApplication = false;
         }
 
         if (charaDataToUpdate.TryGetValue(ObjectKind.Player, out var playerChanges))
@@ -229,6 +246,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             Logger.LogDebug("[{applicationId}] Applying Customization Data for {handler}", applicationId, handler);
             await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, handler, applicationId, 30000, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
+            if (!_mareConfigService.Current.UseLessRedraws) changes.Value.Remove(PlayerChanges.ForcedRedraw);
             foreach (var change in changes.Value.OrderBy(p => (int)p))
             {
                 Logger.LogDebug("[{applicationId}] Processing {change} for {handler}", applicationId, change, handler);
@@ -264,15 +282,20 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                         }
                         break;
 
-                    case PlayerChanges.ModFiles:
-                    case PlayerChanges.ModManip:
+                    case PlayerChanges.ForcedRedraw:
+                        await _ipcManager.PenumbraRedrawAsync(Logger, handler, applicationId, token).ConfigureAwait(false);
+                        break;
+
+                    default:
                         break;
                 }
                 token.ThrowIfCancellationRequested();
             }
 
-            if (changes.Value.Contains(PlayerChanges.ModFiles) || changes.Value.Contains(PlayerChanges.ModManip) || changes.Value.Contains(PlayerChanges.Glamourer))
+            if (!_mareConfigService.Current.UseLessRedraws && (changes.Value.Contains(PlayerChanges.ModFiles) || changes.Value.Contains(PlayerChanges.ModManip) || changes.Value.Contains(PlayerChanges.Glamourer)))
+            {
                 await _ipcManager.PenumbraRedrawAsync(Logger, handler, applicationId, token).ConfigureAwait(false);
+            }
         }
         finally
         {
