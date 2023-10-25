@@ -103,6 +103,16 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         _logger.LogTrace("GetNewToken: JWT {token}", response);
         _logger.LogDebug("GetNewToken: Valid until {date}, ValidClaim until {date}", jwtToken.ValidTo,
                 new DateTime(long.Parse(jwtToken.Claims.Single(c => string.Equals(c.Type, "expiration_date", StringComparison.Ordinal)).Value), DateTimeKind.Utc));
+        if (jwtToken.ValidTo.Subtract(TimeSpan.FromHours(6).Add(TimeSpan.FromMinutes(1))) > DateTime.UtcNow)
+        {
+            _tokenCache.TryRemove(CurrentIdentifier, out _);
+            Mediator.Publish(new NotificationMessage("Invalid timezone", "The time zone of your computer is invalid. " +
+                "Mare will not function properly if the time zone is not set correctly. " +
+                "Please set your computers time zone correctly and keep it synchronized with the internet.",
+                Dalamud.Interface.Internal.Notifications.NotificationType.Error));
+            Mediator.Publish(new DisconnectedMessage());
+            throw new InvalidOperationException($"JwtToken is behind DateTime.UtcNow, DateTime.UtcNow is possibly wrong. DateTime.UtcNow is {DateTime.UtcNow}, JwtToken.ValidTo is {jwtToken.ValidTo}");
+        }
         return response;
     }
 
@@ -122,14 +132,19 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         if (_tokenCache.TryGetValue(CurrentIdentifier, out var token))
         {
             var handler = new JwtSecurityTokenHandler();
-            var jwtToken = handler.ReadJwtToken(token);
-            if (jwtToken.ValidTo == DateTime.MinValue || jwtToken.ValidTo.Subtract(TimeSpan.FromMinutes(5)) > DateTime.UtcNow)
+            var jwt = handler.ReadJwtToken(token);
+            if (jwt.ValidTo == DateTime.MinValue || jwt.ValidTo.Subtract(TimeSpan.FromMinutes(5)) > DateTime.UtcNow)
             {
                 _logger.LogTrace("GetOrUpdate: Returning token from cache");
                 return token;
             }
 
+            _logger.LogDebug("GetOrUpdate: Cached token requires renewal, token valid to: {valid}, UtcTime is {utcTime}", jwt.ValidTo, DateTime.UtcNow);
             renewal = true;
+        }
+        else
+        {
+            _logger.LogDebug("GetOrUpdate: Did not find token in cache, requesting a new one");
         }
 
         _logger.LogTrace("GetOrUpdate: Getting new token");

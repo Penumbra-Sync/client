@@ -212,6 +212,12 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                 Logger.LogInformation("Failed to establish connection, retrying");
                 await Task.Delay(TimeSpan.FromSeconds(new Random().Next(5, 20)), token).ConfigureAwait(false);
             }
+            catch (InvalidOperationException ex)
+            {
+                Logger.LogWarning(ex, "InvalidOperationException on connection");
+                ServerState = ServerState.Disconnected;
+                return;
+            }
             catch (Exception ex)
             {
                 Logger.LogWarning(ex, "Exception on Connection");
