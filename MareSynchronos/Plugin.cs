@@ -29,12 +29,13 @@ namespace MareSynchronos;
 public sealed class Plugin : IDalamudPlugin
 {
     private readonly CancellationTokenSource _pluginCts = new();
+    private Task _hostBuilderRunTask;
 
     public Plugin(DalamudPluginInterface pluginInterface, ICommandManager commandManager, IDataManager gameData,
         IFramework framework, IObjectTable objectTable, IClientState clientState, ICondition condition, IChatGui chatGui,
         IGameGui gameGui, IDtrBar dtrBar, IPluginLog pluginLog)
     {
-        _ = new HostBuilder()
+        _hostBuilderRunTask = new HostBuilder()
         .UseContentRoot(pluginInterface.ConfigDirectory.FullName)
         .ConfigureLogging(lb =>
         {
@@ -153,5 +154,6 @@ public sealed class Plugin : IDalamudPlugin
     {
         _pluginCts.Cancel();
         _pluginCts.Dispose();
+        Task.WaitAny(_hostBuilderRunTask);
     }
 }
