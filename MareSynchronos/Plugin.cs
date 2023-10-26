@@ -29,7 +29,7 @@ namespace MareSynchronos;
 public sealed class Plugin : IDalamudPlugin
 {
     private readonly CancellationTokenSource _pluginCts = new();
-    private Task _hostBuilderRunTask;
+    private readonly Task _hostBuilderRunTask;
 
     public Plugin(DalamudPluginInterface pluginInterface, ICommandManager commandManager, IDataManager gameData,
         IFramework framework, IObjectTable objectTable, IClientState clientState, ICondition condition, IChatGui chatGui,
