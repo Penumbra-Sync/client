@@ -37,6 +37,8 @@ public class IntroUi : WindowMediatorSubscriberBase
         _serverConfigurationManager = serverConfigurationManager;
 
         IsOpen = false;
+        ShowCloseButton = false;
+        RespectCloseHotkey = false;
 
         SizeConstraints = new WindowSizeConstraints()
         {
