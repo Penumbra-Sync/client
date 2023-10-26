@@ -1,6 +1,7 @@
 ﻿using Dalamud.Game.Command;
 using Dalamud.Plugin.Services;
 using MareSynchronos.FileCache;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.UI;
@@ -16,13 +17,14 @@ public sealed class CommandManagerService : IDisposable
     private readonly ApiController _apiController;
     private readonly ICommandManager _commandManager;
     private readonly MareMediator _mediator;
+    private readonly MareConfigService _mareConfigService;
     private readonly PerformanceCollectorService _performanceCollectorService;
     private readonly PeriodicFileScanner _periodicFileScanner;
     private readonly ServerConfigurationManager _serverConfigurationManager;
 
     public CommandManagerService(ICommandManager commandManager, PerformanceCollectorService performanceCollectorService,
         ServerConfigurationManager serverConfigurationManager, PeriodicFileScanner periodicFileScanner,
-        ApiController apiController, MareMediator mediator)
+        ApiController apiController, MareMediator mediator, MareConfigService mareConfigService)
     {
         _commandManager = commandManager;
         _performanceCollectorService = performanceCollectorService;
@@ -30,6 +32,7 @@ public sealed class CommandManagerService : IDisposable
         _periodicFileScanner = periodicFileScanner;
         _apiController = apiController;
         _mediator = mediator;
+        _mareConfigService = mareConfigService;
         _commandManager.AddHandler(_commandName, new CommandInfo(OnCommand)
         {
             HelpMessage = "Opens the Mare Synchronos UI"
@@ -48,7 +51,10 @@ public sealed class CommandManagerService : IDisposable
         if (splitArgs == null || splitArgs.Length == 0)
         {
             // Interpret this as toggling the UI
-            _mediator.Publish(new UiToggleMessage(typeof(CompactUi)));
+            if (_mareConfigService.Current.HasValidSetup())
+                _mediator.Publish(new UiToggleMessage(typeof(CompactUi)));
+            else
+                _mediator.Publish(new UiToggleMessage(typeof(IntroUi)));
             return;
         }
 

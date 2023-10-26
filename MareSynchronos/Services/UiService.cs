@@ -90,6 +90,7 @@ public sealed class UiService : DisposableMediatorSubscriberBase
 
         _dalamudPluginInterface.UiBuilder.Draw -= Draw;
         _dalamudPluginInterface.UiBuilder.OpenConfigUi -= ToggleUi;
+        _dalamudPluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
     }
 
     private void Draw()
