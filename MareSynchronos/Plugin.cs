@@ -3,6 +3,7 @@ using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using MareSynchronos.API.Dto.Group;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
 using MareSynchronos.MareConfiguration;
@@ -103,6 +104,14 @@ public sealed class Plugin : IDalamudPlugin
                     s.GetRequiredService<ServerConfigurationManager>(),
                     s.GetRequiredService<MareProfileManager>(),
                     s.GetRequiredService<PairManager>(), pair)));
+            collection.AddSingleton(s =>
+            new Func<GroupFullInfoDto, SyncshellAdminUI>((dto) =>
+            new SyncshellAdminUI(s.GetRequiredService<ILogger<SyncshellAdminUI>>(),
+                s.GetRequiredService<MareMediator>(),
+                dto,
+                s.GetRequiredService<ApiController>(),
+                s.GetRequiredService<UiSharedService>(),
+                s.GetRequiredService<PairManager>())));
 
             // add scoped services
             collection.AddScoped<PeriodicFileScanner>();
@@ -122,17 +131,18 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddScoped<WindowMediatorSubscriberBase, PopupHandler>();
             collection.AddScoped<IPopupHandler, ReportPopupHandler>();
             collection.AddScoped<IPopupHandler, BanUserPopupHandler>();
-            collection.AddScoped<IPopupHandler, SyncshellAdminPopupHandler>();
             collection.AddScoped<CacheCreationService>();
             collection.AddScoped<TransientResourceManager>();
             collection.AddScoped<PlayerDataFactory>();
             collection.AddScoped<OnlinePlayerManager>();
             collection.AddScoped((s) => new UiService(s.GetRequiredService<ILogger<UiService>>(), pluginInterface, s.GetRequiredService<MareConfigService>(),
-                s.GetRequiredService<WindowSystem>(), s.GetServices<WindowMediatorSubscriberBase>(), s.GetRequiredService<Func<Pair, StandaloneProfileUi>>(),
+                s.GetRequiredService<WindowSystem>(), s.GetServices<WindowMediatorSubscriberBase>(), 
+                s.GetRequiredService<Func<Pair, StandaloneProfileUi>>(),
+                s.GetRequiredService<Func<GroupFullInfoDto, SyncshellAdminUI>>(),
                 s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareMediator>()));
             collection.AddScoped((s) => new CommandManagerService(commandManager, s.GetRequiredService<PerformanceCollectorService>(),
                 s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<PeriodicFileScanner>(), s.GetRequiredService<ApiController>(),
-                s.GetRequiredService<MareMediator>()));
+                s.GetRequiredService<MareMediator>(), s.GetRequiredService<MareConfigService>()));
             collection.AddScoped((s) => new NotificationService(s.GetRequiredService<ILogger<NotificationService>>(),
                 s.GetRequiredService<MareMediator>(), pluginInterface.UiBuilder, chatGui, s.GetRequiredService<MareConfigService>()));
             collection.AddScoped((s) => new UiSharedService(s.GetRequiredService<ILogger<UiSharedService>>(), s.GetRequiredService<IpcManager>(), s.GetRequiredService<ApiController>(),

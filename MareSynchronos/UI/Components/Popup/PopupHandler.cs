@@ -1,4 +1,5 @@
 ﻿using Dalamud.Interface;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.Services.Mediator;
@@ -43,15 +44,6 @@ public class PopupHandler : WindowMediatorSubscriberBase
             ((BanUserPopupHandler)_currentHandler).Open(msg);
             IsOpen = true;
         });
-
-        Mediator.Subscribe<OpenSyncshellAdminPanelPopupMessage>(this, (msg) =>
-        {
-            IsOpen = true;
-            _openPopup = true;
-            _currentHandler = _handlers.OfType<SyncshellAdminPopupHandler>().Single();
-            ((SyncshellAdminPopupHandler)_currentHandler).Open(msg.GroupInfo);
-            IsOpen = true;
-        });
     }
 
     public override void Draw()
@@ -65,7 +57,7 @@ public class PopupHandler : WindowMediatorSubscriberBase
         }
 
         var viewportSize = ImGui.GetWindowViewport().Size;
-        ImGui.SetNextWindowSize(_currentHandler!.PopupSize);
+        ImGui.SetNextWindowSize(_currentHandler!.PopupSize * ImGuiHelpers.GlobalScale);
         ImGui.SetNextWindowPos(viewportSize / 2, ImGuiCond.Always, new Vector2(0.5f));
         using var popup = ImRaii.Popup(WindowName, ImGuiWindowFlags.Modal);
         if (!popup) return;

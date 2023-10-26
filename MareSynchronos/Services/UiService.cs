@@ -1,10 +1,12 @@
 ﻿using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
+using MareSynchronos.API.Dto.Group;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.UI;
+using MareSynchronos.UI.Components.Popup;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Services;
@@ -17,10 +19,13 @@ public sealed class UiService : DisposableMediatorSubscriberBase
     private readonly ILogger<UiService> _logger;
     private readonly MareConfigService _mareConfigService;
     private readonly WindowSystem _windowSystem;
+    private readonly Func<GroupFullInfoDto, SyncshellAdminUI> _syncshellAdminUiFactory;
 
     public UiService(ILogger<UiService> logger, DalamudPluginInterface dalamudPluginInterface,
         MareConfigService mareConfigService, WindowSystem windowSystem,
-        IEnumerable<WindowMediatorSubscriberBase> windows, Func<Pair, StandaloneProfileUi> standaloneProfileUiFactory,
+        IEnumerable<WindowMediatorSubscriberBase> windows,
+        Func<Pair, StandaloneProfileUi> standaloneProfileUiFactory,
+        Func<GroupFullInfoDto, SyncshellAdminUI> syncshellAdminUiFactory,
         FileDialogManager fileDialogManager, MareMediator mareMediator) : base(logger, mareMediator)
     {
         _logger = logger;
@@ -28,6 +33,7 @@ public sealed class UiService : DisposableMediatorSubscriberBase
         _dalamudPluginInterface = dalamudPluginInterface;
         _mareConfigService = mareConfigService;
         _windowSystem = windowSystem;
+        _syncshellAdminUiFactory = syncshellAdminUiFactory;
         _fileDialogManager = fileDialogManager;
 
         _dalamudPluginInterface.UiBuilder.DisableGposeUiHide = true;
@@ -46,6 +52,17 @@ public sealed class UiService : DisposableMediatorSubscriberBase
                 && string.Equals(ui.Pair.UserData.AliasOrUID, msg.Pair.UserData.AliasOrUID, StringComparison.Ordinal)))
             {
                 var window = standaloneProfileUiFactory(msg.Pair);
+                _createdWindows.Add(window);
+                _windowSystem.AddWindow(window);
+            }
+        });
+
+        Mediator.Subscribe<OpenSyncshellAdminPanel>(this, (msg) =>
+        {
+            if (!_createdWindows.Exists(p => p is SyncshellAdminUI ui
+                && string.Equals(ui.GroupFullInfo.GID, msg.GroupInfo.GID, StringComparison.Ordinal)))
+            {
+                var window = _syncshellAdminUiFactory(msg.GroupInfo);
                 _createdWindows.Add(window);
                 _windowSystem.AddWindow(window);
             }

@@ -160,7 +160,7 @@ public class DrawFolderGroup : DrawFolderBase
             if (UiSharedService.IconTextButton(FontAwesomeIcon.Cog, "Open Admin Panel", menuWidth, true))
             {
                 ImGui.CloseCurrentPopup();
-                _mareMediator.Publish(new OpenSyncshellAdminPanelPopupMessage(_groupFullInfoDto));
+                _mareMediator.Publish(new OpenSyncshellAdminPanel(_groupFullInfoDto));
             }
         }
     }
