@@ -36,18 +36,20 @@ public class DrawEntityFactory
         _serverConfigurationManager = serverConfigurationManager;
     }
 
-    public DrawFolderGroup CreateDrawGroupFolder(GroupFullInfoDto groupFullInfoDto, IImmutableDictionary<Pair, List<GroupFullInfoDto>> pairs,
+    public DrawFolderGroup CreateDrawGroupFolder(GroupFullInfoDto groupFullInfoDto,
+        Dictionary<Pair, List<GroupFullInfoDto>> filteredPairs,
         IImmutableList<Pair> allPairs)
     {
         return new DrawFolderGroup(groupFullInfoDto.Group.GID, groupFullInfoDto, _apiController,
-            pairs.Select(p => CreateDrawPair(groupFullInfoDto.Group.GID + p.Key.UserData.UID, p.Key, p.Value)).ToImmutableList(),
+            filteredPairs.Select(p => CreateDrawPair(groupFullInfoDto.Group.GID + p.Key.UserData.UID, p.Key, p.Value)).ToImmutableList(),
             allPairs, _tagHandler, _uidDisplayHandler, _mediator);
     }
 
-    public DrawFolderTag CreateDrawTagFolder(string tag, IImmutableDictionary<Pair, List<GroupFullInfoDto>> pairs,
+    public DrawFolderTag CreateDrawTagFolder(string tag,
+        Dictionary<Pair, List<GroupFullInfoDto>> filteredPairs,
         IImmutableList<Pair> allPairs)
     {
-        return new(tag, pairs.Select(u => CreateDrawPair(tag, u.Key, u.Value)).ToImmutableList(),
+        return new(tag, filteredPairs.Select(u => CreateDrawPair(tag, u.Key, u.Value)).ToImmutableList(),
             allPairs, _tagHandler, _apiController, _selectPairForTagUi);
     }
 
