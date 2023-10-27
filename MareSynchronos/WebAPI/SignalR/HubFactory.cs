@@ -16,21 +16,19 @@ namespace MareSynchronos.WebAPI.SignalR;
 
 public class HubFactory : MediatorSubscriberBase
 {
-    private readonly MareConfigService _configService;
-    private readonly IPluginLog _pluginLog;
+    private readonly ILoggerProvider _loggingProvider;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly TokenProvider _tokenProvider;
     private HubConnection? _instance;
     private bool _isDisposed = false;
 
     public HubFactory(ILogger<HubFactory> logger, MareMediator mediator,
-        ServerConfigurationManager serverConfigurationManager, MareConfigService configService,
-        TokenProvider tokenProvider, IPluginLog pluginLog) : base(logger, mediator)
+        ServerConfigurationManager serverConfigurationManager,
+        TokenProvider tokenProvider, ILoggerProvider pluginLog) : base(logger, mediator)
     {
         _serverConfigurationManager = serverConfigurationManager;
-        _configService = configService;
         _tokenProvider = tokenProvider;
-        _pluginLog = pluginLog;
+        _loggingProvider = pluginLog;
     }
 
     public async Task DisposeHubAsync()
@@ -92,7 +90,7 @@ public class HubFactory : MediatorSubscriberBase
             .WithAutomaticReconnect(new ForeverRetryPolicy(Mediator))
             .ConfigureLogging(a =>
             {
-                a.ClearProviders().AddProvider(new DalamudLoggingProvider(_configService, _pluginLog));
+                a.ClearProviders().AddProvider(_loggingProvider);
                 a.SetMinimumLevel(LogLevel.Information);
             })
             .Build();

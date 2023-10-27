@@ -95,9 +95,8 @@ public class IdDisplayHandler
         {
             ImGui.AlignTextToFramePadding();
 
-            if (textIsUid) ImGui.PushFont(UiBuilder.MonoFont);
-            ImGui.TextUnformatted(playerText);
-            if (textIsUid) ImGui.PopFont();
+            using (ImRaii.PushFont(UiBuilder.MonoFont, textIsUid)) ImGui.TextUnformatted(playerText);
+
             if (ImGui.IsItemHovered())
             {
                 if (!string.Equals(_lastMouseOverUid, id))

@@ -115,21 +115,22 @@ public class CompactUi : WindowMediatorSubscriberBase
                 $"It is highly recommended to keep Mare Synchronos up to date. Open /xlplugins and update the plugin.", ImGuiColors.DalamudRed);
         }
 
-        UiSharedService.DrawWithID("header", DrawUIDHeader);
+        using (ImRaii.PushId("header")) DrawUIDHeader();
         ImGui.Separator();
-        UiSharedService.DrawWithID("serverstatus", DrawServerStatus);
+        using (ImRaii.PushId("serverstatus")) DrawServerStatus();
         ImGui.Separator();
 
         if (_apiController.ServerState is ServerState.Connected)
         {
-            UiSharedService.DrawWithID("global-topmenu", () => _tabMenu.Draw());
-            UiSharedService.DrawWithID("pairlist", DrawPairList);
+            using (ImRaii.PushId("global-topmenu")) _tabMenu.Draw();
+            using (ImRaii.PushId("pairlist")) DrawPairs();
+            TransferPartHeight = ImGui.GetCursorPosY();
 
             ImGui.Separator();
-            UiSharedService.DrawWithID("transfers", DrawTransfers);
+            using (ImRaii.PushId("transfers")) DrawTransfers();
             TransferPartHeight = ImGui.GetCursorPosY() - TransferPartHeight - ImGui.GetTextLineHeight();
-            UiSharedService.DrawWithID("group-user-popup", () => _selectPairsForGroupUi.Draw(_pairManager.DirectPairs));
-            UiSharedService.DrawWithID("grouping-popup", () => _selectGroupForPairUi.Draw());
+            using (ImRaii.PushId("group-user-popup")) _selectPairsForGroupUi.Draw(_pairManager.DirectPairs);
+            using (ImRaii.PushId("grouping-popup")) _selectGroupForPairUi.Draw();
         }
 
         if (_configService.Current.OpenPopupOnAdd && _pairManager.LastAddedUser != null)
@@ -171,12 +172,6 @@ public class CompactUi : WindowMediatorSubscriberBase
             _lastPosition = pos;
             Mediator.Publish(new CompactUiChange(_lastSize, _lastPosition));
         }
-    }
-
-    private void DrawPairList()
-    {
-        UiSharedService.DrawWithID("pairs", DrawPairs);
-        TransferPartHeight = ImGui.GetCursorPosY();
     }
 
     private void DrawPairs()
@@ -277,14 +272,16 @@ public class CompactUi : WindowMediatorSubscriberBase
 
         if (_apiController.ServerState is not (ServerState.Reconnecting or ServerState.Disconnecting))
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, color);
-            if (ImGuiComponents.IconButton(connectedIcon))
+            using (ImRaii.PushColor(ImGuiCol.Text, color))
             {
-                _serverManager.CurrentServer.FullPause = !_serverManager.CurrentServer.FullPause;
-                _serverManager.Save();
-                _ = _apiController.CreateConnections();
+                if (ImGuiComponents.IconButton(connectedIcon))
+                {
+                    _serverManager.CurrentServer.FullPause = !_serverManager.CurrentServer.FullPause;
+                    _serverManager.Save();
+                    _ = _apiController.CreateConnections();
+                }
             }
-            ImGui.PopStyleColor();
+
             UiSharedService.AttachToolTip(!_serverManager.CurrentServer.FullPause ? "Disconnect from " + _serverManager.CurrentServer.ServerName : "Connect to " + _serverManager.CurrentServer.ServerName);
         }
     }
@@ -292,9 +289,7 @@ public class CompactUi : WindowMediatorSubscriberBase
     private void DrawTransfers()
     {
         var currentUploads = _fileTransferManager.CurrentUploads.ToList();
-        ImGui.PushFont(UiBuilder.IconFont);
-        ImGui.TextUnformatted(FontAwesomeIcon.Upload.ToIconString());
-        ImGui.PopFont();
+        UiSharedService.FontText(FontAwesomeIcon.Upload.ToIconString(), UiBuilder.IconFont);
         ImGui.SameLine(35 * ImGuiHelpers.GlobalScale);
 
         if (currentUploads.Any())
@@ -317,9 +312,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         }
 
         var currentDownloads = _currentDownloads.SelectMany(d => d.Value.Values).ToList();
-        ImGui.PushFont(UiBuilder.IconFont);
-        ImGui.TextUnformatted(FontAwesomeIcon.Download.ToIconString());
-        ImGui.PopFont();
+        UiSharedService.FontText(FontAwesomeIcon.Download.ToIconString(), UiBuilder.IconFont);
         ImGui.SameLine(35 * ImGuiHelpers.GlobalScale);
 
         if (currentDownloads.Any())

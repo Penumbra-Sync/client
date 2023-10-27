@@ -2,6 +2,7 @@
 using Dalamud.Interface.Internal;
 
 using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.MareConfiguration;
@@ -110,9 +111,9 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
             var rectMin = drawList.GetClipRectMin();
             var rectMax = drawList.GetClipRectMax();
 
-            if (_uiSharedService.UidFontBuilt) ImGui.PushFont(_uiSharedService.UidFont);
-            UiSharedService.ColorText(_pair.UserData.AliasOrUID, ImGuiColors.HealerGreen);
-            if (_uiSharedService.UidFontBuilt) ImGui.PopFont();
+            using (ImRaii.PushFont(_uiSharedService.UidFont, _uiSharedService.UidFontBuilt)) 
+                UiSharedService.ColorText(_pair.UserData.AliasOrUID, ImGuiColors.HealerGreen);
+
             ImGui.Dummy(new(spacing.Y, spacing.Y));
             var textPos = ImGui.GetCursorPosY();
             ImGui.Separator();

@@ -99,10 +99,7 @@ public abstract class DrawFolderBase : IDrawFolder
             }
             if (ImGui.BeginPopup("User Flyout Menu"))
             {
-                UiSharedService.DrawWithID($"buttons-{_id}", () =>
-                {
-                    DrawMenu(_menuWidth);
-                });
+                using (ImRaii.PushId($"buttons-{_id}")) DrawMenu(_menuWidth);
                 _menuWidth = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
                 ImGui.EndPopup();
             }

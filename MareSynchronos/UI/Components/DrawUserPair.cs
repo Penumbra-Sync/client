@@ -408,7 +408,7 @@ public class DrawUserPair
         }
         if (ImGui.BeginPopup("User Flyout Menu"))
         {
-            UiSharedService.DrawWithID($"buttons-{_pair.UserData.UID}", () =>
+            using (ImRaii.PushId($"buttons-{_pair.UserData.UID}"))
             {
                 ImGui.TextUnformatted("Common Pair Functions");
                 DrawCommonClientMenu();
@@ -418,7 +418,7 @@ public class DrawUserPair
                 {
                     _menuRenderWidth = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
                 }
-            });
+            }
 
             ImGui.EndPopup();
         }

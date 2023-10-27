@@ -1,9 +1,7 @@
-﻿using Dalamud.Interface.ImGuiFileDialog;
+﻿using Dalamud.Interface;
+using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Windowing;
-using Dalamud.Plugin;
-using MareSynchronos.API.Dto.Group;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.UI;
 using MareSynchronos.UI.Components.Popup;
@@ -14,32 +12,31 @@ namespace MareSynchronos.Services;
 public sealed class UiService : DisposableMediatorSubscriberBase
 {
     private readonly List<WindowMediatorSubscriberBase> _createdWindows = [];
-    private readonly DalamudPluginInterface _dalamudPluginInterface;
+    private readonly UiBuilder _uiBuilder;
     private readonly FileDialogManager _fileDialogManager;
     private readonly ILogger<UiService> _logger;
     private readonly MareConfigService _mareConfigService;
     private readonly WindowSystem _windowSystem;
-    private readonly Func<GroupFullInfoDto, SyncshellAdminUI> _syncshellAdminUiFactory;
+    private readonly UiFactory _uiFactory;
 
-    public UiService(ILogger<UiService> logger, DalamudPluginInterface dalamudPluginInterface,
+    public UiService(ILogger<UiService> logger, UiBuilder uiBuilder,
         MareConfigService mareConfigService, WindowSystem windowSystem,
         IEnumerable<WindowMediatorSubscriberBase> windows,
-        Func<Pair, StandaloneProfileUi> standaloneProfileUiFactory,
-        Func<GroupFullInfoDto, SyncshellAdminUI> syncshellAdminUiFactory,
-        FileDialogManager fileDialogManager, MareMediator mareMediator) : base(logger, mareMediator)
+        UiFactory uiFactory, FileDialogManager fileDialogManager,
+        MareMediator mareMediator) : base(logger, mareMediator)
     {
         _logger = logger;
         _logger.LogTrace("Creating {type}", GetType().Name);
-        _dalamudPluginInterface = dalamudPluginInterface;
+        _uiBuilder = uiBuilder;
         _mareConfigService = mareConfigService;
         _windowSystem = windowSystem;
-        _syncshellAdminUiFactory = syncshellAdminUiFactory;
+        _uiFactory = uiFactory;
         _fileDialogManager = fileDialogManager;
 
-        _dalamudPluginInterface.UiBuilder.DisableGposeUiHide = true;
-        _dalamudPluginInterface.UiBuilder.Draw += Draw;
-        _dalamudPluginInterface.UiBuilder.OpenConfigUi += ToggleUi;
-        _dalamudPluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
+        _uiBuilder.DisableGposeUiHide = true;
+        _uiBuilder.Draw += Draw;
+        _uiBuilder.OpenConfigUi += ToggleUi;
+        _uiBuilder.OpenMainUi += ToggleMainUi;
 
         foreach (var window in windows)
         {
@@ -51,7 +48,7 @@ public sealed class UiService : DisposableMediatorSubscriberBase
             if (!_createdWindows.Exists(p => p is StandaloneProfileUi ui
                 && string.Equals(ui.Pair.UserData.AliasOrUID, msg.Pair.UserData.AliasOrUID, StringComparison.Ordinal)))
             {
-                var window = standaloneProfileUiFactory(msg.Pair);
+                var window = _uiFactory.CreateStandaloneProfileUi(msg.Pair);
                 _createdWindows.Add(window);
                 _windowSystem.AddWindow(window);
             }
@@ -62,7 +59,7 @@ public sealed class UiService : DisposableMediatorSubscriberBase
             if (!_createdWindows.Exists(p => p is SyncshellAdminUI ui
                 && string.Equals(ui.GroupFullInfo.GID, msg.GroupInfo.GID, StringComparison.Ordinal)))
             {
-                var window = _syncshellAdminUiFactory(msg.GroupInfo);
+                var window = _uiFactory.CreateSyncshellAdminUi(msg.GroupInfo);
                 _createdWindows.Add(window);
                 _windowSystem.AddWindow(window);
             }
@@ -105,9 +102,9 @@ public sealed class UiService : DisposableMediatorSubscriberBase
             window.Dispose();
         }
 
-        _dalamudPluginInterface.UiBuilder.Draw -= Draw;
-        _dalamudPluginInterface.UiBuilder.OpenConfigUi -= ToggleUi;
-        _dalamudPluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
+        _uiBuilder.Draw -= Draw;
+        _uiBuilder.OpenConfigUi -= ToggleUi;
+        _uiBuilder.OpenMainUi -= ToggleMainUi;
     }
 
     private void Draw()

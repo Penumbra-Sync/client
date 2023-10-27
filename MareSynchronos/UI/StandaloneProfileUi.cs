@@ -2,6 +2,7 @@
 using Dalamud.Interface.Internal;
 
 using Dalamud.Interface.Utility;
+using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.PlayerData.Pairs;
@@ -76,9 +77,9 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
             var rectMax = drawList.GetClipRectMax();
             var headerSize = ImGui.GetCursorPosY() - ImGui.GetStyle().WindowPadding.Y;
 
-            if (_uiSharedService.UidFontBuilt) ImGui.PushFont(_uiSharedService.UidFont);
-            UiSharedService.ColorText(Pair.UserData.AliasOrUID, ImGuiColors.HealerGreen);
-            if (_uiSharedService.UidFontBuilt) ImGui.PopFont();
+            using (ImRaii.PushFont(_uiSharedService.UidFont, _uiSharedService.UidFontBuilt))
+                UiSharedService.ColorText(Pair.UserData.AliasOrUID, ImGuiColors.HealerGreen);
+
             ImGuiHelpers.ScaledDummy(new Vector2(spacing.Y, spacing.Y));
             var textPos = ImGui.GetCursorPosY() - headerSize;
             ImGui.Separator();

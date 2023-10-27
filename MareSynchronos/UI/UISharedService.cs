@@ -207,16 +207,14 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public static void ColorText(string text, Vector4 color)
     {
-        ImGui.PushStyleColor(ImGuiCol.Text, color);
+        using var raiicolor = ImRaii.PushColor(ImGuiCol.Text, color);
         ImGui.TextUnformatted(text);
-        ImGui.PopStyleColor();
     }
 
     public static void ColorTextWrapped(string text, Vector4 color)
     {
-        ImGui.PushStyleColor(ImGuiCol.Text, color);
+        using var raiicolor = ImRaii.PushColor(ImGuiCol.Text, color);
         TextWrapped(text);
-        ImGui.PopStyleColor();
     }
 
     public static bool CtrlPressed() => (GetKeyState(0xA2) & 0x8000) != 0 || (GetKeyState(0xA3) & 0x8000) != 0;
@@ -224,18 +222,19 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     public static void DrawHelpText(string helpText)
     {
         ImGui.SameLine();
-        ImGui.PushFont(UiBuilder.IconFont);
-        ImGui.SetWindowFontScale(0.8f);
-        ImGui.TextDisabled(FontAwesomeIcon.Question.ToIconString());
-        ImGui.SetWindowFontScale(1.0f);
-        ImGui.PopFont();
+        using (ImRaii.PushFont(UiBuilder.IconFont))
+        {
+            ImGui.SetWindowFontScale(0.8f);
+            ImGui.TextDisabled(FontAwesomeIcon.Question.ToIconString());
+            ImGui.SetWindowFontScale(1.0f);
+        }
+
         if (ImGui.IsItemHovered())
         {
-            ImGui.BeginTooltip();
+            using var tooltip = ImRaii.Tooltip();
             ImGui.PushTextWrapPos(ImGui.GetFontSize() * 35.0f);
             ImGui.TextUnformatted(helpText);
             ImGui.PopTextWrapPos();
-            ImGui.EndTooltip();
         }
     }
 
@@ -243,31 +242,34 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     {
         var original = ImGui.GetCursorPos();
 
-        ImGui.PushStyleColor(ImGuiCol.Text, outlineColor);
-        ImGui.SetCursorPos(original with { Y = original.Y - thickness });
-        ImGui.TextUnformatted(text);
-        ImGui.SetCursorPos(original with { X = original.X - thickness });
-        ImGui.TextUnformatted(text);
-        ImGui.SetCursorPos(original with { Y = original.Y + thickness });
-        ImGui.TextUnformatted(text);
-        ImGui.SetCursorPos(original with { X = original.X + thickness });
-        ImGui.TextUnformatted(text);
-        ImGui.SetCursorPos(original with { X = original.X - thickness, Y = original.Y - thickness });
-        ImGui.TextUnformatted(text);
-        ImGui.SetCursorPos(original with { X = original.X + thickness, Y = original.Y + thickness });
-        ImGui.TextUnformatted(text);
-        ImGui.SetCursorPos(original with { X = original.X - thickness, Y = original.Y + thickness });
-        ImGui.TextUnformatted(text);
-        ImGui.SetCursorPos(original with { X = original.X + thickness, Y = original.Y - thickness });
-        ImGui.TextUnformatted(text);
-        ImGui.PopStyleColor();
+        using (ImRaii.PushColor(ImGuiCol.Text, outlineColor))
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text, outlineColor);
+            ImGui.SetCursorPos(original with { Y = original.Y - thickness });
+            ImGui.TextUnformatted(text);
+            ImGui.SetCursorPos(original with { X = original.X - thickness });
+            ImGui.TextUnformatted(text);
+            ImGui.SetCursorPos(original with { Y = original.Y + thickness });
+            ImGui.TextUnformatted(text);
+            ImGui.SetCursorPos(original with { X = original.X + thickness });
+            ImGui.TextUnformatted(text);
+            ImGui.SetCursorPos(original with { X = original.X - thickness, Y = original.Y - thickness });
+            ImGui.TextUnformatted(text);
+            ImGui.SetCursorPos(original with { X = original.X + thickness, Y = original.Y + thickness });
+            ImGui.TextUnformatted(text);
+            ImGui.SetCursorPos(original with { X = original.X - thickness, Y = original.Y + thickness });
+            ImGui.TextUnformatted(text);
+            ImGui.SetCursorPos(original with { X = original.X + thickness, Y = original.Y - thickness });
+            ImGui.TextUnformatted(text);
+        }
 
-        ImGui.PushStyleColor(ImGuiCol.Text, fontColor);
-        ImGui.SetCursorPos(original);
-        ImGui.TextUnformatted(text);
-        ImGui.SetCursorPos(original);
-        ImGui.TextUnformatted(text);
-        ImGui.PopStyleColor();
+        using (ImRaii.PushColor(ImGuiCol.Text, fontColor))
+        {
+            ImGui.SetCursorPos(original);
+            ImGui.TextUnformatted(text);
+            ImGui.SetCursorPos(original);
+            ImGui.TextUnformatted(text);
+        }
     }
 
     public static void DrawOutlinedFont(ImDrawListPtr drawList, string text, Vector2 textPos, uint fontColor, uint outlineColor, int thickness)
@@ -293,13 +295,6 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         drawList.AddText(textPos, fontColor, text);
     }
 
-    public static void DrawWithID(string id, Action drawSubSection)
-    {
-        ImGui.PushID(id);
-        drawSubSection.Invoke();
-        ImGui.PopID();
-    }
-
     public static void FontText(string text, ImFontPtr font, Vector4? color = null)
     {
         using var pushedFont = ImRaii.PushFont(font);
@@ -309,22 +304,17 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public static Vector4 GetBoolColor(bool input) => input ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
 
-    public static Vector4 GetCpuLoadColor(double input) => input < 50 ? ImGuiColors.ParsedGreen :
-        input < 90 ? ImGuiColors.DalamudYellow : ImGuiColors.DalamudRed;
-
     public static Vector2 GetIconButtonSize(FontAwesomeIcon icon)
     {
-        ImGui.PushFont(UiBuilder.IconFont);
+        using var font = ImRaii.PushFont(UiBuilder.IconFont);
         var buttonSize = ImGuiHelpers.GetButtonSize(icon.ToIconString());
-        ImGui.PopFont();
         return buttonSize;
     }
 
     public static Vector2 GetIconSize(FontAwesomeIcon icon)
     {
-        ImGui.PushFont(UiBuilder.IconFont);
+        using var font = ImRaii.PushFont(UiBuilder.IconFont);
         var iconSize = ImGui.CalcTextSize(icon.ToIconString());
-        ImGui.PopFont();
         return iconSize;
     }
 
@@ -449,23 +439,6 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         }
     }
 
-    public static void OutlineTextWrapped(string text, Vector4 textcolor, Vector4 outlineColor, float dist = 3)
-    {
-        var cursorPos = ImGui.GetCursorPos();
-        ColorTextWrapped(text, outlineColor);
-        ImGui.SetCursorPos(new(cursorPos.X, cursorPos.Y + dist));
-        ColorTextWrapped(text, outlineColor);
-        ImGui.SetCursorPos(new(cursorPos.X + dist, cursorPos.Y));
-        ColorTextWrapped(text, outlineColor);
-        ImGui.SetCursorPos(new(cursorPos.X + dist, cursorPos.Y + dist));
-        ColorTextWrapped(text, outlineColor);
-
-        ImGui.SetCursorPos(new(cursorPos.X + dist / 2, cursorPos.Y + dist / 2));
-        ColorTextWrapped(text, textcolor);
-        ImGui.SetCursorPos(new(cursorPos.X + dist / 2, cursorPos.Y + dist / 2));
-        ColorTextWrapped(text, textcolor);
-    }
-
     public static void SetScaledWindowSize(float width, bool centerWindow = true)
     {
         var newLineHeight = ImGui.GetCursorPosY();
@@ -537,9 +510,8 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public void BigText(string text)
     {
-        if (UidFontBuilt) ImGui.PushFont(UidFont);
+        using var font = ImRaii.PushFont(UidFont, UidFontBuilt);
         ImGui.TextUnformatted(text);
-        if (UidFontBuilt) ImGui.PopFont();
     }
 
     public void DrawCacheDirectorySetting()
@@ -854,24 +826,6 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         Strings.ToS = new Strings.ToSStrings();
     }
 
-    public void PrintServerState()
-    {
-        if (_apiController.ServerState is ServerState.Connected)
-        {
-            ImGui.TextUnformatted("Service " + _serverConfigurationManager.CurrentServer!.ServerName + ":");
-            ImGui.SameLine();
-            ImGui.TextColored(ImGuiColors.ParsedGreen, "Available");
-            ImGui.SameLine();
-            ImGui.TextUnformatted("(");
-            ImGui.SameLine();
-            ImGui.TextColored(ImGuiColors.ParsedGreen, _apiController.OnlineUsers.ToString(CultureInfo.InvariantCulture));
-            ImGui.SameLine();
-            ImGui.TextUnformatted("Users Online");
-            ImGui.SameLine();
-            ImGui.TextUnformatted(")");
-        }
-    }
-
     public void RecalculateFileCacheSize()
     {
         _cacheScanner.InvokeScan(forced: true);
@@ -903,7 +857,9 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.SetWindowPos(new Vector2(center.X - width / 2, center.Y - height / 2), cond);
     }
 
+#pragma warning disable MA0009 // Add regex evaluation timeout
     [GeneratedRegex(@"^(?:[a-zA-Z]:\\[\w\s\-\\]+?|\/(?:[\w\s\-\/])+?)$", RegexOptions.ECMAScript)]
+#pragma warning restore MA0009 // Add regex evaluation timeout
     private static partial Regex PathRegex();
 
     private void BuildFont()

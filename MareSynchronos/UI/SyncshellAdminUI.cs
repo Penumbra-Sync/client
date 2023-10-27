@@ -24,7 +24,8 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
     private int _multiInvites;
     private string _newPassword;
     private bool _pwChangeSuccess;
-    public SyncshellAdminUI(ILogger<SyncshellAdminUI> logger, MareMediator mediator, GroupFullInfoDto groupFullInfo, ApiController apiController, UiSharedService uiSharedService, PairManager pairManager)
+    public SyncshellAdminUI(ILogger<SyncshellAdminUI> logger, MareMediator mediator, ApiController apiController,
+        UiSharedService uiSharedService, PairManager pairManager, GroupFullInfoDto groupFullInfo)
         : base(logger, mediator, "Syncshell Admin Panel (" + groupFullInfo.GID + ")")
     {
         GroupFullInfo = groupFullInfo;
