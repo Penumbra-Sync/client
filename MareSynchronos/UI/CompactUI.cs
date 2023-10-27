@@ -409,22 +409,36 @@ public class CompactUi : WindowMediatorSubscriberBase
         bool FilterOnlineOrPausedSelf(KeyValuePair<Pair, List<GroupFullInfoDto>> u)
             => (u.Key.IsOnline || (!u.Key.IsOnline && !_configService.Current.ShowOfflineUsersSeparately)
                     || u.Key.UserPair.OwnPermissions.IsPaused());
+        Dictionary<Pair, List<GroupFullInfoDto>> BasicSortedDictionary(IEnumerable<KeyValuePair<Pair, List<GroupFullInfoDto>>> u)
+            => u.OrderByDescending(u => u.Key.IsVisible)
+                .ThenByDescending(u => u.Key.IsOnline)
+                .ThenBy(AlphabeticalSort, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(u => u.Key, u => u.Value);
+        ImmutableList<Pair> ImmutablePairList(IEnumerable<KeyValuePair<Pair, List<GroupFullInfoDto>>> u)
+            => u.Select(k => k.Key).ToImmutableList();
+        bool FilterVisibleUsers(KeyValuePair<Pair, List<GroupFullInfoDto>> u)
+            => u.Key.IsVisible
+                && (_configService.Current.ShowSyncshellUsersInVisible || !(!_configService.Current.ShowSyncshellUsersInVisible && !u.Key.IsDirectlyPaired));
+        bool FilterTagusers(KeyValuePair<Pair, List<GroupFullInfoDto>> u, string tag)
+            => u.Key.IsDirectlyPaired && !u.Key.IsOneSidedPair && _tagHandler.HasTag(u.Key.UserData.UID, tag);
+        bool FilterGroupUsers(KeyValuePair<Pair, List<GroupFullInfoDto>> u, GroupFullInfoDto group)
+            => u.Value.Exists(g => string.Equals(g.GID, group.GID, StringComparison.Ordinal));
+        bool FilterNotTaggedUsers(KeyValuePair<Pair, List<GroupFullInfoDto>> u)
+            => u.Key.IsDirectlyPaired && !u.Key.IsOneSidedPair && !_tagHandler.HasAnyTag(u.Key.UserData.UID);
+        bool FilterOfflineUsers(KeyValuePair<Pair, List<GroupFullInfoDto>> u)
+            => ((u.Key.IsDirectlyPaired && _configService.Current.ShowSyncshellOfflineUsersSeparately)
+                || !_configService.Current.ShowSyncshellOfflineUsersSeparately)
+                && (!u.Key.IsOneSidedPair || u.Value.Any()) && !u.Key.IsOnline && !u.Key.UserPair.OwnPermissions.IsPaused();
+        bool FilterOfflineSyncshellUsers(KeyValuePair<Pair, List<GroupFullInfoDto>> u)
+            => (!u.Key.IsDirectlyPaired && !u.Key.IsOnline && !u.Key.UserPair.OwnPermissions.IsPaused());
+
 
         if (_configService.Current.ShowVisibleUsersSeparately)
         {
-            bool BaseFilterVisibleUsers(KeyValuePair<Pair, List<GroupFullInfoDto>> u) =>
-                    u.Key.IsVisible
-                    && (_configService.Current.ShowSyncshellUsersInVisible || !(!_configService.Current.ShowSyncshellUsersInVisible && !u.Key.IsDirectlyPaired));
-
-            var allVisiblePairs = allPairs
-                .Where(BaseFilterVisibleUsers)
-                .Select(k => k.Key)
-                .ToImmutableList();
-
-            var filteredVisiblePairs = filteredPairs
-                .Where(BaseFilterVisibleUsers)
-                .OrderBy(AlphabeticalSort, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(k => k.Key, k => k.Value);
+            var allVisiblePairs = ImmutablePairList(allPairs
+                .Where(FilterVisibleUsers));
+            var filteredVisiblePairs = BasicSortedDictionary(filteredPairs
+                .Where(FilterVisibleUsers));
 
             drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomVisibleTag, filteredVisiblePairs, allVisiblePairs));
         }
@@ -432,16 +446,11 @@ public class CompactUi : WindowMediatorSubscriberBase
         List<IDrawFolder> groupFolders = new();
         foreach (var group in _pairManager.GroupPairs.Select(g => g.Key).OrderBy(g => g.GroupAliasOrGID, StringComparer.OrdinalIgnoreCase))
         {
-            bool BaseFilterGroupUsers(KeyValuePair<Pair, List<GroupFullInfoDto>> u, GroupFullInfoDto group) =>
-                u.Value.Exists(g => string.Equals(g.GID, group.GID, StringComparison.Ordinal));
-
-            var allGroupPairs = allPairs
-                .Where(u => BaseFilterGroupUsers(u, group))
-                .Select(k => k.Key)
-                .ToImmutableList();
+            var allGroupPairs = ImmutablePairList(allPairs
+                .Where(u => FilterGroupUsers(u, group)));
 
             var filteredGroupPairs = filteredPairs
-                .Where(u => BaseFilterGroupUsers(u, group) && FilterOnlineOrPausedSelf(u))
+                .Where(u => FilterGroupUsers(u, group) && FilterOnlineOrPausedSelf(u))
                 .OrderByDescending(u => u.Key.IsOnline)
                 .ThenBy(u =>
                 {
@@ -465,80 +474,38 @@ public class CompactUi : WindowMediatorSubscriberBase
             drawFolders.AddRange(groupFolders);
 
         var tags = _tagHandler.GetAllTagsSorted();
-        HashSet<Pair> alreadyInTags = [];
         foreach (var tag in tags)
         {
-            bool BaseFilterTagUsers(KeyValuePair<Pair, List<GroupFullInfoDto>> u, string tag) =>
-                u.Key.IsDirectlyPaired && !u.Key.IsOneSidedPair && _tagHandler.HasTag(u.Key.UserData.UID, tag);
+            var allTagPairs = ImmutablePairList(allPairs
+                .Where(u => FilterTagusers(u, tag)));
+            var filteredTagPairs = BasicSortedDictionary(filteredPairs
+                .Where(u => FilterTagusers(u, tag) && FilterOnlineOrPausedSelf(u)));
 
-            var allTagPairs = allPairs
-                .Where(u => BaseFilterTagUsers(u, tag))
-                .Select(k => k.Key)
-                .ToImmutableList();
-
-            var filteredTagPairs = filteredPairs
-                .Where(u => BaseFilterTagUsers(u, tag) && FilterOnlineOrPausedSelf(u))
-                .OrderByDescending(u => u.Key.IsVisible)
-                .ThenByDescending(u => u.Key.IsOnline)
-                .ThenBy(AlphabeticalSort, StringComparer.OrdinalIgnoreCase);
-
-            drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(tag, filteredTagPairs.Select(u =>
-            {
-                alreadyInTags.Add(u.Key);
-                return (u.Key, u.Value);
-            }).ToDictionary(u => u.Key, u => u.Value), allTagPairs));
+            drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(tag, filteredTagPairs, allTagPairs));
         }
 
-        bool BaseFilterNotTaggedUsers(KeyValuePair<Pair, List<GroupFullInfoDto>> u) =>
-            u.Key.IsDirectlyPaired && !u.Key.IsOneSidedPair && !_tagHandler.HasAnyTag(u.Key.UserData.UID);
-
-        var allOnlineNotTaggedPairs = allPairs
-            .Where(BaseFilterNotTaggedUsers)
-            .Select(k => k.Key)
-            .ToImmutableList();
-
-        var onlineNotTaggedPairs = filteredPairs
-            .Where(u => BaseFilterNotTaggedUsers(u) && FilterOnlineOrPausedSelf(u))
-            .OrderByDescending(u => u.Key.IsVisible)
-            .ThenByDescending(u => u.Key.IsOnline)
-            .ThenBy(AlphabeticalSort, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(u => u.Key, u => u.Value);
+        var allOnlineNotTaggedPairs = ImmutablePairList(allPairs
+            .Where(FilterNotTaggedUsers));
+        var onlineNotTaggedPairs = BasicSortedDictionary(filteredPairs
+            .Where(u => FilterNotTaggedUsers(u) && FilterOnlineOrPausedSelf(u)));
 
         drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder((_configService.Current.ShowOfflineUsersSeparately ? TagHandler.CustomOnlineTag : TagHandler.CustomAllTag),
             onlineNotTaggedPairs, allOnlineNotTaggedPairs));
 
         if (_configService.Current.ShowOfflineUsersSeparately)
         {
-            bool BaseFilterOfflineUsers(KeyValuePair<Pair, List<GroupFullInfoDto>> u) =>
-                ((u.Key.IsDirectlyPaired && _configService.Current.ShowSyncshellOfflineUsersSeparately)
-                    || !_configService.Current.ShowSyncshellOfflineUsersSeparately)
-                    && (!u.Key.IsOneSidedPair || u.Value.Any()) && !u.Key.IsOnline && !u.Key.UserPair.OwnPermissions.IsPaused();
-
-            var allOfflinePairs = allPairs
-                .Where(BaseFilterOfflineUsers)
-                .Select(k => k.Key)
-                .ToImmutableList();
-
-            var filteredOfflinePairs = filteredPairs
-                .Where(BaseFilterOfflineUsers)
-                .OrderBy(AlphabeticalSort, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(u => u.Key, u => u.Value);
+            var allOfflinePairs = ImmutablePairList(allPairs
+                .Where(FilterOfflineUsers));
+            var filteredOfflinePairs = BasicSortedDictionary(filteredPairs
+                .Where(FilterOfflineUsers));
 
             drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomOfflineTag, filteredOfflinePairs, allOfflinePairs));
             if (_configService.Current.ShowSyncshellOfflineUsersSeparately)
             {
-                bool BaseFilterOfflineSyncshellUsers(KeyValuePair<Pair, List<GroupFullInfoDto>> u) =>
-                    (!u.Key.IsDirectlyPaired && !u.Key.IsOnline && !u.Key.UserPair.OwnPermissions.IsPaused());
-
-                var allOfflineSyncshellUsers = allPairs
-                    .Where(BaseFilterOfflineSyncshellUsers)
-                    .Select(k => k.Key)
-                    .ToImmutableList();
-
-                var filteredOfflineSyncshellUsers = filteredPairs
-                    .Where(BaseFilterOfflineSyncshellUsers)
-                    .OrderBy(AlphabeticalSort, StringComparer.OrdinalIgnoreCase)
-                    .ToDictionary(k => k.Key, k => k.Value);
+                var allOfflineSyncshellUsers = ImmutablePairList(allPairs
+                    .Where(FilterOfflineSyncshellUsers));
+                var filteredOfflineSyncshellUsers = BasicSortedDictionary(filteredPairs
+                    .Where(FilterOfflineSyncshellUsers));
 
                 drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomOfflineSyncshellTag,
                     filteredOfflineSyncshellUsers,
@@ -547,8 +514,8 @@ public class CompactUi : WindowMediatorSubscriberBase
         }
 
         drawFolders.Add(_drawEntityFactory.CreateDrawTagFolder(TagHandler.CustomUnpairedTag,
-            filteredPairs.Where(u => u.Key.IsOneSidedPair).ToDictionary(u => u.Key, u => u.Value),
-            allPairs.Where(u => u.Key.IsOneSidedPair).Select(k => k.Key).ToImmutableList()));
+            BasicSortedDictionary(filteredPairs.Where(u => u.Key.IsOneSidedPair)),
+            ImmutablePairList(allPairs.Where(u => u.Key.IsOneSidedPair))));
 
         return drawFolders;
     }
