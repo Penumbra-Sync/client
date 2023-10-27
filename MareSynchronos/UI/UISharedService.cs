@@ -244,7 +244,6 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
         using (ImRaii.PushColor(ImGuiCol.Text, outlineColor))
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, outlineColor);
             ImGui.SetCursorPos(original with { Y = original.Y - thickness });
             ImGui.TextUnformatted(text);
             ImGui.SetCursorPos(original with { X = original.X - thickness });
