@@ -21,6 +21,7 @@ public class DrawUserPair
     protected readonly IdDisplayHandler _displayHandler;
     protected readonly MareMediator _mediator;
     protected readonly List<GroupFullInfoDto> _syncedGroups;
+    private readonly GroupFullInfoDto? _currentGroup;
     protected Pair _pair;
     private readonly string _id;
     private readonly SelectTagForPairUi _selectTagForPairUi;
@@ -28,6 +29,7 @@ public class DrawUserPair
     private float _menuRenderWidth = -1;
 
     public DrawUserPair(string id, Pair entry, List<GroupFullInfoDto> syncedGroups,
+        GroupFullInfoDto? currentGroup,
         ApiController apiController, IdDisplayHandler uIDDisplayHandler,
         MareMediator mareMediator, SelectTagForPairUi selectTagForPairUi,
         ServerConfigurationManager serverConfigurationManager)
@@ -35,6 +37,7 @@ public class DrawUserPair
         _id = id;
         _pair = entry;
         _syncedGroups = syncedGroups;
+        _currentGroup = currentGroup;
         _apiController = apiController;
         _displayHandler = uIDDisplayHandler;
         _mediator = mareMediator;
@@ -232,6 +235,41 @@ public class DrawUserPair
                 }));
         }
         UiSharedService.AttachToolTip(userPairText);
+
+        if (_currentGroup != null)
+        {
+            ImGui.AlignTextToFramePadding();
+            if (string.Equals(_currentGroup.OwnerUID, _pair.UserData.UID, StringComparison.Ordinal))
+            {
+                using (ImRaii.PushFont(UiBuilder.IconFont))
+                {
+                    ImGui.SameLine();
+                    ImGui.TextUnformatted(FontAwesomeIcon.Crown.ToIconString());
+                }
+                UiSharedService.AttachToolTip("User is owner of this syncshell");
+            }
+            else if (_currentGroup.GroupPairUserInfos.TryGetValue(_pair.UserData.UID, out var userinfo))
+            {
+                if (userinfo.IsModerator())
+                {
+                    using (ImRaii.PushFont(UiBuilder.IconFont))
+                    {
+                        ImGui.SameLine();
+                        ImGui.TextUnformatted(FontAwesomeIcon.UserShield.ToIconString());
+                    }
+                    UiSharedService.AttachToolTip("User is moderator in this syncshell");
+                }
+                else if (userinfo.IsPinned())
+                {
+                    using (ImRaii.PushFont(UiBuilder.IconFont))
+                    {
+                        ImGui.SameLine();
+                        ImGui.TextUnformatted(FontAwesomeIcon.Thumbtack.ToIconString());
+                    }
+                    UiSharedService.AttachToolTip("User is pinned in this syncshell");
+                }
+            }
+        }
 
         if (_pair.UserPair.OwnPermissions.IsSticky())
         {
