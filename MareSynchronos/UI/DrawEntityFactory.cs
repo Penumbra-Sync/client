@@ -6,6 +6,7 @@ using MareSynchronos.UI.Components;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;
+using System.Collections.Immutable;
 
 namespace MareSynchronos.UI;
 
@@ -35,17 +36,19 @@ public class DrawEntityFactory
         _serverConfigurationManager = serverConfigurationManager;
     }
 
-    public DrawFolderGroup CreateDrawGroupFolder(GroupFullInfoDto groupFullInfoDto, Dictionary<Pair, List<GroupFullInfoDto>> pairs, int totalPairs = -1)
+    public DrawFolderGroup CreateDrawGroupFolder(GroupFullInfoDto groupFullInfoDto, IImmutableDictionary<Pair, List<GroupFullInfoDto>> pairs,
+        IImmutableList<Pair> allPairs)
     {
         return new DrawFolderGroup(groupFullInfoDto.Group.GID, groupFullInfoDto, _apiController,
-            pairs.Select(p => CreateDrawPair(groupFullInfoDto.Group.GID + p.Key.UserData.UID, p.Key, p.Value)).ToList(),
-            _tagHandler, _uidDisplayHandler, _mediator, totalPairs);
+            pairs.Select(p => CreateDrawPair(groupFullInfoDto.Group.GID + p.Key.UserData.UID, p.Key, p.Value)).ToImmutableList(),
+            allPairs, _tagHandler, _uidDisplayHandler, _mediator);
     }
 
-    public DrawFolderTag CreateDrawTagFolder(string tag, Dictionary<Pair, List<GroupFullInfoDto>> pairs, int totalPairs = -1)
+    public DrawFolderTag CreateDrawTagFolder(string tag, IImmutableDictionary<Pair, List<GroupFullInfoDto>> pairs,
+        IImmutableList<Pair> allPairs)
     {
-        return new(tag, pairs.Select(u => CreateDrawPair(tag, u.Key, u.Value)).ToList(),
-            _tagHandler, _apiController, _selectPairForTagUi, totalPairs);
+        return new(tag, pairs.Select(u => CreateDrawPair(tag, u.Key, u.Value)).ToImmutableList(),
+            allPairs, _tagHandler, _apiController, _selectPairForTagUi);
     }
 
     public DrawUserPair CreateDrawPair(string id, Pair user, List<GroupFullInfoDto> groups)

@@ -2,24 +2,29 @@
 using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
+using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.UI.Handlers;
+using System.Collections.Immutable;
 
 namespace MareSynchronos.UI.Components;
 
 public abstract class DrawFolderBase : IDrawFolder
 {
-    public IEnumerable<DrawUserPair> DrawPairs { get; private set; }
+    public IImmutableList<DrawUserPair> DrawPairs { get; init; }
     protected readonly string _id;
+    protected readonly IImmutableList<Pair> _allPairs;
     protected readonly TagHandler _tagHandler;
     private float _menuWidth = -1;
     public int OnlinePairs => DrawPairs.Count(u => u.Pair.IsOnline);
-    public int TotalPairs { get; }
-    protected DrawFolderBase(string id, IEnumerable<DrawUserPair> drawPairs, TagHandler tagHandler, int totalPairs)
+    public int TotalPairs => _allPairs.Count;
+
+    protected DrawFolderBase(string id, IImmutableList<DrawUserPair> drawPairs,
+        IImmutableList<Pair> allPairs, TagHandler tagHandler)
     {
         _id = id;
         DrawPairs = drawPairs;
+        _allPairs = allPairs;
         _tagHandler = tagHandler;
-        TotalPairs = totalPairs;
     }
 
     protected abstract bool RenderIfEmpty { get; }

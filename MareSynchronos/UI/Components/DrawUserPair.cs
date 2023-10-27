@@ -43,15 +43,11 @@ public class DrawUserPair
     }
 
     public Pair Pair => _pair;
-    public string UID => _pair.UserData.UID;
     public UserFullPairDto UserPair => _pair.UserPair!;
 
     public void DrawPairedClient()
     {
         using var id = ImRaii.PushId(GetType() + _id);
-        var originalY = ImGui.GetCursorPosY();
-        var pauseIconSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars);
-        var textSize = ImGui.CalcTextSize(_pair.UserData.AliasOrUID);
 
         DrawLeftSide();
         ImGui.SameLine();

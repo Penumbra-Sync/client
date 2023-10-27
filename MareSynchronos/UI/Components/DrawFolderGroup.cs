@@ -6,9 +6,11 @@ using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
+using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
+using System.Collections.Immutable;
 
 namespace MareSynchronos.UI.Components;
 
@@ -20,9 +22,9 @@ public class DrawFolderGroup : DrawFolderBase
     private readonly MareMediator _mareMediator;
 
     public DrawFolderGroup(string id, GroupFullInfoDto groupFullInfoDto, ApiController apiController,
-        IEnumerable<DrawUserPair> drawPairs, TagHandler tagHandler, IdDisplayHandler idDisplayHandler,
-        MareMediator mareMediator, int totalPairs) :
-        base(id, drawPairs, tagHandler, totalPairs)
+        IImmutableList<DrawUserPair> drawPairs, IImmutableList<Pair> allPairs, TagHandler tagHandler, IdDisplayHandler idDisplayHandler,
+        MareMediator mareMediator) :
+        base(id, drawPairs, allPairs, tagHandler)
     {
         _groupFullInfoDto = groupFullInfoDto;
         _apiController = apiController;

@@ -3,8 +3,10 @@ using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
+using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
+using System.Collections.Immutable;
 
 namespace MareSynchronos.UI.Components;
 
@@ -13,8 +15,9 @@ public class DrawFolderTag : DrawFolderBase
     private readonly ApiController _apiController;
     private readonly SelectPairForTagUi _selectPairForTagUi;
 
-    public DrawFolderTag(string id, IEnumerable<DrawUserPair> drawPairs, TagHandler tagHandler, ApiController apiController, SelectPairForTagUi selectPairForTagUi, int totalPairs)
-        : base(id, drawPairs, tagHandler, totalPairs)
+    public DrawFolderTag(string id, IImmutableList<DrawUserPair> drawPairs, IImmutableList<Pair> allPairs,
+        TagHandler tagHandler, ApiController apiController, SelectPairForTagUi selectPairForTagUi)
+        : base(id, drawPairs, allPairs, tagHandler)
     {
         _apiController = apiController;
         _selectPairForTagUi = selectPairForTagUi;
@@ -51,7 +54,7 @@ public class DrawFolderTag : DrawFolderBase
         TagHandler.CustomAllTag => false,
         TagHandler.CustomOfflineSyncshellTag => false,
         _ => true,
-    } && DrawPairs.Any();
+    } && _allPairs.Any();
 
     private bool RenderCount => _id switch
     {
@@ -135,7 +138,7 @@ public class DrawFolderTag : DrawFolderBase
     {
         if (!RenderPause) return currentRightSideX;
 
-        var allArePaused = DrawPairs.All(pair => pair.UserPair!.OwnPermissions.IsPaused());
+        var allArePaused = _allPairs.All(pair => pair.UserPair!.OwnPermissions.IsPaused());
         var pauseButton = allArePaused ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
         var pauseButtonX = UiSharedService.GetIconButtonSize(pauseButton).X;
 
@@ -145,11 +148,11 @@ public class DrawFolderTag : DrawFolderBase
         {
             if (allArePaused)
             {
-                ResumeAllPairs(DrawPairs);
+                ResumeAllPairs(_allPairs);
             }
             else
             {
-                PauseRemainingPairs(DrawPairs);
+                PauseRemainingPairs(_allPairs);
             }
         }
         if (allArePaused)
@@ -164,10 +167,10 @@ public class DrawFolderTag : DrawFolderBase
         return currentRightSideX;
     }
 
-    private void PauseRemainingPairs(IEnumerable<DrawUserPair> availablePairs)
+    private void PauseRemainingPairs(IEnumerable<Pair> availablePairs)
     {
         _ = _apiController.SetBulkPermissions(new(availablePairs
-            .ToDictionary(g => g.UID, g =>
+            .ToDictionary(g => g.UserData.UID, g =>
         {
             var perm = g.UserPair.OwnPermissions;
             perm.SetPaused(paused: true);
@@ -176,10 +179,10 @@ public class DrawFolderTag : DrawFolderBase
             .ConfigureAwait(false);
     }
 
-    private void ResumeAllPairs(IEnumerable<DrawUserPair> availablePairs)
+    private void ResumeAllPairs(IEnumerable<Pair> availablePairs)
     {
         _ = _apiController.SetBulkPermissions(new(availablePairs
-            .ToDictionary(g => g.UID, g =>
+            .ToDictionary(g => g.UserData.UID, g =>
             {
                 var perm = g.UserPair.OwnPermissions;
                 perm.SetPaused(paused: false);
