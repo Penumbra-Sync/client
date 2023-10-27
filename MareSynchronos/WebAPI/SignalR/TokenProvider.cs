@@ -103,7 +103,10 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         _logger.LogTrace("GetNewToken: JWT {token}", response);
         _logger.LogDebug("GetNewToken: Valid until {date}, ValidClaim until {date}", jwtToken.ValidTo,
                 new DateTime(long.Parse(jwtToken.Claims.Single(c => string.Equals(c.Type, "expiration_date", StringComparison.Ordinal)).Value), DateTimeKind.Utc));
-        if (jwtToken.ValidTo.Subtract(TimeSpan.FromHours(6).Add(TimeSpan.FromMinutes(1))) > DateTime.UtcNow)
+        var dateTimeMinus10 = DateTime.UtcNow.Subtract(TimeSpan.FromMinutes(10));
+        var dateTimePlus10 = DateTime.UtcNow.Add(TimeSpan.FromMinutes(10));
+        var tokenTime = jwtToken.ValidTo.Subtract(TimeSpan.FromHours(6));
+        if (tokenTime <= dateTimeMinus10 || tokenTime >= dateTimePlus10)
         {
             _tokenCache.TryRemove(CurrentIdentifier, out _);
             Mediator.Publish(new NotificationMessage("Invalid system clock", "The clock of your computer is invalid. " +
