@@ -175,7 +175,7 @@ public class CompactUi : WindowMediatorSubscriberBase
 
     private void DrawAddCharacter()
     {
-        ImGui.Dummy(new(10));
+        ImGuiHelpers.ScaledDummy(10f);
         var keys = _serverManager.CurrentServer!.SecretKeys;
         if (keys.Any())
         {

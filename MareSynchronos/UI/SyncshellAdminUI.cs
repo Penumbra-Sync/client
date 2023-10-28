@@ -1,5 +1,6 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
@@ -77,7 +78,7 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
                     _ = _apiController.GroupChangeGroupPermissionState(new(GroupFullInfo.Group, perm));
                 }
 
-                ImGui.Dummy(new(2f));
+                ImGuiHelpers.ScaledDummy(2f);
 
                 UiSharedService.TextWrapped("One-time invites work as single-use passwords. Use those if you do not want to distribute your Syncshell password.");
                 if (UiSharedService.IconTextButton(FontAwesomeIcon.Envelope, "Single one-time invite"))
@@ -116,7 +117,7 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
                 }
                 UiSharedService.AttachToolTip("This will remove all non-pinned, non-moderator users from the Syncshell");
 
-                ImGui.Dummy(new(2f));
+                ImGuiHelpers.ScaledDummy(2f);
 
                 if (UiSharedService.IconTextButton(FontAwesomeIcon.Retweet, "Refresh Banlist from Server"))
                 {

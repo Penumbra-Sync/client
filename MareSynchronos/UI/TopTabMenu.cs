@@ -174,7 +174,6 @@ public class TopTabMenu
 
         if (TabSelection != SelectedTab.None) ImGuiHelpers.ScaledDummy(3f);
         ImGui.Separator();
-        ImGuiHelpers.ScaledDummy(1f);
     }
 
     private void DrawAddPair(float availableXWidth, float spacingX)

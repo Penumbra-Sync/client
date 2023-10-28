@@ -69,22 +69,20 @@ public class DrawFolderTag : DrawFolderBase
 
     protected override float DrawIcon()
     {
-        using (ImRaii.PushFont(UiBuilder.IconFont))
+        var icon = _id switch
         {
-            var icon = _id switch
-            {
-                TagHandler.CustomUnpairedTag => FontAwesomeIcon.ArrowsLeftRight.ToIconString(),
-                TagHandler.CustomOnlineTag => FontAwesomeIcon.Link.ToIconString(),
-                TagHandler.CustomOfflineTag => FontAwesomeIcon.Unlink.ToIconString(),
-                TagHandler.CustomOfflineSyncshellTag => FontAwesomeIcon.Unlink.ToIconString(),
-                TagHandler.CustomVisibleTag => FontAwesomeIcon.Eye.ToIconString(),
-                TagHandler.CustomAllTag => FontAwesomeIcon.User.ToIconString(),
-                _ => FontAwesomeIcon.Folder.ToIconString()
-            };
+            TagHandler.CustomUnpairedTag => FontAwesomeIcon.ArrowsLeftRight,
+            TagHandler.CustomOnlineTag => FontAwesomeIcon.Link,
+            TagHandler.CustomOfflineTag => FontAwesomeIcon.Unlink,
+            TagHandler.CustomOfflineSyncshellTag => FontAwesomeIcon.Unlink,
+            TagHandler.CustomVisibleTag => FontAwesomeIcon.Eye,
+            TagHandler.CustomAllTag => FontAwesomeIcon.User,
+            _ => FontAwesomeIcon.Folder
+        };
 
-            ImGui.AlignTextToFramePadding();
-            ImGui.TextUnformatted(icon);
-        }
+        ImGui.AlignTextToFramePadding();
+        UiSharedService.NormalizedIcon(icon);
+
         if (RenderCount)
         {
             using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X / 2f }))

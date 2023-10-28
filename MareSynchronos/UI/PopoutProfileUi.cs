@@ -114,11 +114,11 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
             using (ImRaii.PushFont(_uiSharedService.UidFont, _uiSharedService.UidFontBuilt)) 
                 UiSharedService.ColorText(_pair.UserData.AliasOrUID, ImGuiColors.HealerGreen);
 
-            ImGui.Dummy(new(spacing.Y, spacing.Y));
+            ImGuiHelpers.ScaledDummy(spacing.Y, spacing.Y);
             var textPos = ImGui.GetCursorPosY();
             ImGui.Separator();
             var imagePos = ImGui.GetCursorPos();
-            ImGui.Dummy(new(256, 256 * ImGuiHelpers.GlobalScale + spacing.Y));
+            ImGuiHelpers.ScaledDummy(256, 256 * ImGuiHelpers.GlobalScale + spacing.Y);
             var note = _serverManager.GetNoteForUid(_pair.UserData.UID);
             if (!string.IsNullOrEmpty(note))
             {

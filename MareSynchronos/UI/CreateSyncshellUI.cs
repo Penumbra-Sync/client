@@ -1,5 +1,6 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Components;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
@@ -64,7 +65,7 @@ public class CreateSyncshellUI : WindowMediatorSubscriberBase
                 "- You can own up to " + _apiController.ServerInfo.MaxGroupsCreatedByUser + " Syncshells on this server." + Environment.NewLine +
                 "- You can join up to " + _apiController.ServerInfo.MaxGroupsJoinedByUser + " Syncshells on this server (including your own)" + Environment.NewLine +
                 "- Syncshells on this server can have a maximum of " + _apiController.ServerInfo.MaxGroupUserCount + " users");
-            ImGui.Dummy(new(2f));
+            ImGuiHelpers.ScaledDummy(2f);
             ImGui.TextUnformatted("Your current Syncshell preferred permissions are:");
             ImGui.TextUnformatted("- Animations");
             UiSharedService.BooleanToColoredIcon(!_apiController.DefaultPermissions!.DisableGroupAnimations);
@@ -88,7 +89,7 @@ public class CreateSyncshellUI : WindowMediatorSubscriberBase
             UiSharedService.TextWrapped("You can change the Syncshell password later at any time.");
             ImGui.Separator();
             UiSharedService.TextWrapped("These settings were set based on your preferred syncshell permissions:");
-            ImGui.Dummy(new(2f));
+            ImGuiHelpers.ScaledDummy(2f);
             UiSharedService.TextWrapped("Suggest Animation sync:");
             UiSharedService.BooleanToColoredIcon(!_lastCreatedGroup.GroupUserPreferredPermissions.IsDisableAnimations());
             UiSharedService.TextWrapped("Suggest Sounds sync:");

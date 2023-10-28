@@ -42,8 +42,7 @@ public class DrawFolderGroup : DrawFolderBase
     {
         ImGui.AlignTextToFramePadding();
 
-        using (ImRaii.PushFont(UiBuilder.IconFont))
-            ImGui.TextUnformatted(_groupFullInfoDto.GroupPermissions.IsDisableInvites() ? FontAwesomeIcon.Lock.ToIconString() : FontAwesomeIcon.Users.ToIconString());
+        UiSharedService.NormalizedIcon(_groupFullInfoDto.GroupPermissions.IsDisableInvites() ? FontAwesomeIcon.Lock : FontAwesomeIcon.Users);
         if (_groupFullInfoDto.GroupPermissions.IsDisableInvites())
         {
             UiSharedService.AttachToolTip("Syncshell " + _groupFullInfoDto.GroupAliasOrGID + " is closed for invites");
@@ -62,22 +61,19 @@ public class DrawFolderGroup : DrawFolderBase
         if (IsOwner)
         {
             ImGui.AlignTextToFramePadding();
-            using (ImRaii.PushFont(UiBuilder.IconFont))
-                ImGui.TextUnformatted(FontAwesomeIcon.Crown.ToIconString());
+            UiSharedService.NormalizedIcon(FontAwesomeIcon.Crown);
             UiSharedService.AttachToolTip("You are the owner of " + _groupFullInfoDto.GroupAliasOrGID);
         }
         else if (IsModerator)
         {
             ImGui.AlignTextToFramePadding();
-            using (ImRaii.PushFont(UiBuilder.IconFont))
-                ImGui.TextUnformatted(FontAwesomeIcon.UserShield.ToIconString());
+            UiSharedService.NormalizedIcon(FontAwesomeIcon.UserShield);
             UiSharedService.AttachToolTip("You are a moderator in " + _groupFullInfoDto.GroupAliasOrGID);
         }
         else if (IsPinned)
         {
             ImGui.AlignTextToFramePadding();
-            using (ImRaii.PushFont(UiBuilder.IconFont))
-                ImGui.TextUnformatted(FontAwesomeIcon.Thumbtack.ToIconString());
+            UiSharedService.NormalizedIcon(FontAwesomeIcon.Thumbtack);
             UiSharedService.AttachToolTip("You are pinned in " + _groupFullInfoDto.GroupAliasOrGID);
         }
         ImGui.SameLine();
@@ -179,8 +175,7 @@ public class DrawFolderGroup : DrawFolderBase
         FontAwesomeIcon pauseIcon = _groupFullInfoDto.GroupUserPermissions.IsPaused() ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
         var pauseButtonSize = UiSharedService.GetIconButtonSize(pauseIcon);
 
-        var folderIcon = FontAwesomeIcon.UsersCog;
-        var userCogButtonSize = UiSharedService.GetIconSize(folderIcon);
+        var userCogButtonSize = UiSharedService.GetNormalizedIconSize(FontAwesomeIcon.UsersCog);
 
         var individualSoundsDisabled = _groupFullInfoDto.GroupUserPermissions.IsDisableSounds();
         var individualAnimDisabled = _groupFullInfoDto.GroupUserPermissions.IsDisableAnimations();
@@ -192,17 +187,15 @@ public class DrawFolderGroup : DrawFolderBase
 
         ImGui.AlignTextToFramePadding();
 
-        using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow,
-            _groupFullInfoDto.GroupPermissions.IsPreferDisableAnimations() != individualAnimDisabled
+        UiSharedService.NormalizedIcon(FontAwesomeIcon.UsersCog, (_groupFullInfoDto.GroupPermissions.IsPreferDisableAnimations() != individualAnimDisabled
             || _groupFullInfoDto.GroupPermissions.IsPreferDisableSounds() != individualSoundsDisabled
-            || _groupFullInfoDto.GroupPermissions.IsPreferDisableVFX() != individualVFXDisabled))
-            UiSharedService.FontText(folderIcon.ToIconString(), UiBuilder.IconFont);
+            || _groupFullInfoDto.GroupPermissions.IsPreferDisableVFX() != individualVFXDisabled) ? ImGuiColors.DalamudYellow : null);
         if (ImGui.IsItemHovered())
         {
             ImGui.BeginTooltip();
 
             ImGui.TextUnformatted("Syncshell Permissions");
-            ImGui.Dummy(new(2f));
+            ImGuiHelpers.ScaledDummy(2f);
 
             UiSharedService.BooleanToColoredIcon(!individualSoundsDisabled, inline: false);
             ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);
@@ -218,9 +211,9 @@ public class DrawFolderGroup : DrawFolderBase
 
             ImGui.Separator();
 
-            ImGui.Dummy(new(2f));
+            ImGuiHelpers.ScaledDummy(2f);
             ImGui.TextUnformatted("Suggested Permissions");
-            ImGui.Dummy(new(2f));
+            ImGuiHelpers.ScaledDummy(2f);
 
             UiSharedService.BooleanToColoredIcon(!_groupFullInfoDto.GroupPermissions.IsPreferDisableSounds(), inline: false);
             ImGui.SameLine(40 * ImGuiHelpers.GlobalScale);

@@ -310,13 +310,6 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return buttonSize;
     }
 
-    public static Vector2 GetIconSize(FontAwesomeIcon icon)
-    {
-        using var font = ImRaii.PushFont(UiBuilder.IconFont);
-        var iconSize = ImGui.CalcTextSize(icon.ToIconString());
-        return iconSize;
-    }
-
     public static string GetNotes(List<Pair> pairs)
     {
         StringBuilder sb = new();
@@ -415,6 +408,77 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
         return wasClicked;
     }
+
+    public static Vector2 GetIconSize(FontAwesomeIcon icon)
+    {
+        if (_iconCacheDict.TryGetValue(ImGuiHelpers.GlobalScale, out var iconCache))
+        {
+            if (iconCache.TryGetValue(icon, out var size)) return size;
+            iconCache[icon] = CalcIconSize(icon);
+            return iconCache[icon];
+        }
+
+        _iconCacheDict.Add(ImGuiHelpers.GlobalScale, new());
+        return _iconCacheDict[ImGuiHelpers.GlobalScale][icon] = CalcIconSize(icon);
+    }
+
+    private static Vector2 CalcIconSize(FontAwesomeIcon icon)
+    {
+        using var font = ImRaii.PushFont(UiBuilder.IconFont);
+        var iconSize = ImGui.CalcTextSize(icon.ToIconString());
+        return iconSize;
+    }
+
+    public static (float xOffset, float scaling) GetIconScaling(FontAwesomeIcon icon)
+    {
+        var iconSize = GetIconSize(icon);
+        return (iconSize.X < iconSize.Y ? (iconSize.Y - iconSize.X) / 2f : 0f, iconSize.X > iconSize.Y ? 1f / (iconSize.X / iconSize.Y) : 1f);
+    }
+
+    private static Vector2 CalcIconScale(FontAwesomeIcon icon)
+    {
+        var iconSize = GetIconSize(icon);
+        var (iconXoffset, iconScaling) = GetIconScaling(icon);
+        return new((iconSize.X * iconScaling) + (iconXoffset * 2),
+            (iconSize.X * iconScaling) + (iconXoffset * 2));
+    }
+
+    public static Vector2 GetNormalizedIconSize(FontAwesomeIcon icon)
+    {
+        if (_iconCacheDict.TryGetValue(ImGuiHelpers.GlobalScale, out var iconCache))
+        {
+            if (iconCache.TryGetValue(icon, out var size)) return size;
+            return iconCache[icon] = CalcIconScale(icon);
+        }
+
+        _iconCacheDict.Add(ImGuiHelpers.GlobalScale, new());
+        return _iconCacheDict[ImGuiHelpers.GlobalScale][icon] = CalcIconScale(icon);
+    }
+
+    public static void NormalizedIcon(FontAwesomeIcon icon, Vector4? color = null)
+    {
+        var cursorPos = ImGui.GetCursorPos();
+        var iconSize = GetIconSize(icon);
+        var normalizedIconSize = GetNormalizedIconSize(icon);
+        var drawList = ImGui.GetWindowDrawList();
+        var windowPos = ImGui.GetWindowPos();
+        var scrollPosX = ImGui.GetScrollX();
+        var scrollPosY = ImGui.GetScrollY();
+        var frameHeight = ImGui.GetFrameHeight();
+
+        var (iconXoffset, iconScaling) = GetIconScaling(icon);
+        var frameOffsetY = ((frameHeight - iconSize.Y * iconScaling) / 2f);
+
+        drawList.AddText(UiBuilder.IconFont, ImGui.GetFontSize() * iconScaling,
+            new(windowPos.X - scrollPosX + cursorPos.X + iconXoffset,
+            windowPos.Y - scrollPosY + cursorPos.Y + frameOffsetY),
+            color != null ? ImGui.GetColorU32(color.Value) : ImGui.GetColorU32(ImGuiCol.Text), icon.ToIconString());
+
+        ImGui.Dummy(new(normalizedIconSize.X, ImGui.GetFrameHeight()));
+    }
+
+    private static Dictionary<float, Dictionary<FontAwesomeIcon, Vector2>> _normalizedIconScales = new();
+    private static Dictionary<float, Dictionary<FontAwesomeIcon, Vector2>> _iconCacheDict = new();
 
     public static bool IsDirectoryWritable(string dirPath, bool throwIfFails = false)
     {

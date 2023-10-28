@@ -1,5 +1,6 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Utility;
 using ImGuiNET;
@@ -476,7 +477,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             ImGui.TextUnformatted("The file compactor is only available on Windows.");
         }
 
-        ImGui.Dummy(new Vector2(10, 10));
+        ImGuiHelpers.ScaledDummy(new Vector2(10, 10));
         ImGui.TextUnformatted("To clear the local storage accept the following disclaimer");
         ImGui.Indent();
         ImGui.Checkbox("##readClearCache", ref _readClearCache);
@@ -865,7 +866,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
         var idx = _uiShared.DrawServiceSelection();
 
-        ImGui.Dummy(new Vector2(10, 10));
+        ImGuiHelpers.ScaledDummy(new Vector2(10, 10));
 
         var selectedServer = _serverConfigurationManager.GetServerByIndex(idx);
         if (selectedServer == _serverConfigurationManager.CurrentServer)
@@ -1056,7 +1057,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 {
                     UiSharedService.TextWrapped("Note: The default permissions settings here are not applied retroactively to existing pairs or joined Syncshells.");
                     UiSharedService.TextWrapped("Note: The default permissions settings here are sent and stored on the connected service.");
-                    ImGui.Dummy(new(5f));
+                    ImGuiHelpers.ScaledDummy(5f);
                     var perms = _apiController.DefaultPermissions!;
                     bool individualIsSticky = perms.IndividualIsSticky;
                     bool disableIndividualSounds = perms.DisableIndividualSounds;
@@ -1075,7 +1076,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         "  - All individually set permissions for any pair will also automatically become preferred permissions. This includes pairs in Syncshells." + Environment.NewLine + Environment.NewLine +
                         "It is possible to remove or set the preferred permission state for any pair at any time." + Environment.NewLine + Environment.NewLine +
                         "If unsure, leave this setting off.");
-                    ImGui.Dummy(new(3f));
+                    ImGuiHelpers.ScaledDummy(3f);
 
                     if (ImGui.Checkbox("Disable individual pair sounds", ref disableIndividualSounds))
                     {
@@ -1095,7 +1096,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         _ = _apiController.UserUpdateDefaultPermissions(perms);
                     }
                     UiSharedService.DrawHelpText("This setting will disable VFX sync for all new individual pairs.");
-                    ImGui.Dummy(new(5f));
+                    ImGuiHelpers.ScaledDummy(5f);
                     bool disableGroundSounds = perms.DisableGroupSounds;
                     bool disableGroupAnimations = perms.DisableGroupAnimations;
                     bool disableGroupVFX = perms.DisableGroupVFX;

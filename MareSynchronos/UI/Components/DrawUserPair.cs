@@ -189,30 +189,31 @@ public class DrawUserPair
             ImGui.AlignTextToFramePadding();
 
             using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow);
-            using var font = ImRaii.PushFont(UiBuilder.IconFont);
-            ImGui.TextUnformatted(FontAwesomeIcon.PauseCircle.ToIconString());
+            //using var font = ImRaii.PushFont(UiBuilder.IconFont);
+            UiSharedService.NormalizedIcon(FontAwesomeIcon.PauseCircle);
             userPairText = _pair.UserData.AliasOrUID + " is paused";
+            ImGui.SameLine();
         }
         else if (!_pair.IsOnline)
         {
             ImGui.AlignTextToFramePadding();
             using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed);
-            using var font = ImRaii.PushFont(UiBuilder.IconFont);
-            ImGui.TextUnformatted(_pair.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.OneSided
-                ? FontAwesomeIcon.ArrowsLeftRight.ToIconString()
+            UiSharedService.NormalizedIcon(_pair.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.OneSided
+                ? FontAwesomeIcon.ArrowsLeftRight
                 : (_pair.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.Bidirectional
-                    ? FontAwesomeIcon.User.ToIconString() : FontAwesomeIcon.Users.ToIconString()));
+                    ? FontAwesomeIcon.User : FontAwesomeIcon.Users));
             userPairText = _pair.UserData.AliasOrUID + " is offline";
+            ImGui.SameLine();
         }
         else
         {
             ImGui.AlignTextToFramePadding();
 
-            using var font = ImRaii.PushFont(UiBuilder.IconFont);
             using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.HealerGreen);
-            ImGui.TextUnformatted(_pair.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.Bidirectional
-                ? FontAwesomeIcon.User.ToIconString() : FontAwesomeIcon.Users.ToIconString());
+            UiSharedService.NormalizedIcon(_pair.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.Bidirectional
+                ? FontAwesomeIcon.User : FontAwesomeIcon.Users);
             userPairText = _pair.UserData.AliasOrUID + " is online";
+            ImGui.SameLine();
         }
 
         if (_pair.IndividualPairStatus == API.Data.Enum.IndividualPairStatus.OneSided)
@@ -241,31 +242,22 @@ public class DrawUserPair
             ImGui.AlignTextToFramePadding();
             if (string.Equals(_currentGroup.OwnerUID, _pair.UserData.UID, StringComparison.Ordinal))
             {
-                using (ImRaii.PushFont(UiBuilder.IconFont))
-                {
-                    ImGui.SameLine();
-                    ImGui.TextUnformatted(FontAwesomeIcon.Crown.ToIconString());
-                }
+                ImGui.SameLine();
+                UiSharedService.NormalizedIcon(FontAwesomeIcon.Crown);
                 UiSharedService.AttachToolTip("User is owner of this syncshell");
             }
             else if (_currentGroup.GroupPairUserInfos.TryGetValue(_pair.UserData.UID, out var userinfo))
             {
                 if (userinfo.IsModerator())
                 {
-                    using (ImRaii.PushFont(UiBuilder.IconFont))
-                    {
-                        ImGui.SameLine();
-                        ImGui.TextUnformatted(FontAwesomeIcon.UserShield.ToIconString());
-                    }
+                    ImGui.SameLine();
+                    UiSharedService.NormalizedIcon(FontAwesomeIcon.UserShield);
                     UiSharedService.AttachToolTip("User is moderator in this syncshell");
                 }
                 else if (userinfo.IsPinned())
                 {
-                    using (ImRaii.PushFont(UiBuilder.IconFont))
-                    {
-                        ImGui.SameLine();
-                        ImGui.TextUnformatted(FontAwesomeIcon.Thumbtack.ToIconString());
-                    }
+                    ImGui.SameLine();
+                    UiSharedService.NormalizedIcon(FontAwesomeIcon.Thumbtack);
                     UiSharedService.AttachToolTip("User is pinned in this syncshell");
                 }
             }
@@ -273,32 +265,26 @@ public class DrawUserPair
 
         if (_pair.UserPair.OwnPermissions.IsSticky())
         {
+            ImGui.SameLine();
             ImGui.AlignTextToFramePadding();
-
             using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X * 3 / 4f }))
-            using (ImRaii.PushFont(UiBuilder.IconFont))
-            {
-                ImGui.SameLine();
-                ImGui.TextUnformatted(FontAwesomeIcon.ArrowCircleUp.ToIconString());
-            }
+                UiSharedService.NormalizedIcon(FontAwesomeIcon.ArrowCircleUp);
 
             UiSharedService.AttachToolTip(_pair.UserData.AliasOrUID + " has preferred permissions enabled");
         }
 
         if (_pair.IsVisible)
         {
+            ImGui.SameLine();
             ImGui.AlignTextToFramePadding();
 
             using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X * 3 / 4f }))
-            using (ImRaii.PushFont(UiBuilder.IconFont))
-            {
-                ImGui.SameLine();
-                using var _ = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.ParsedGreen);
-                ImGui.TextUnformatted(FontAwesomeIcon.Eye.ToIconString());
-            }
+                UiSharedService.NormalizedIcon(FontAwesomeIcon.Eye, ImGuiColors.ParsedGreen);
 
             UiSharedService.AttachToolTip("User is visible: " + _pair.PlayerName);
         }
+
+        ImGui.SameLine();
     }
 
     private void DrawName(float leftSide, float rightSide)
@@ -352,7 +338,7 @@ public class DrawUserPair
             {
                 var infoIconPosDist = windowEndX - barButtonSize.X - spacingX - pauseIconSize.X - spacingX;
                 var icon = FontAwesomeIcon.InfoCircle;
-                var iconwidth = UiSharedService.GetIconSize(icon);
+                var iconwidth = UiSharedService.GetNormalizedIconSize(icon);
 
                 infoIconDist = iconwidth.X;
                 ImGui.SameLine(infoIconPosDist - iconwidth.X);

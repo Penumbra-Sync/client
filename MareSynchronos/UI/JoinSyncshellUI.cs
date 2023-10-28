@@ -1,4 +1,5 @@
 ﻿using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Enum;
@@ -91,7 +92,7 @@ internal class JoinSyncshellUI : WindowMediatorSubscriberBase
         else
         {
             ImGui.TextUnformatted("You are about to join the Syncshell " + _groupJoinInfo.GroupAliasOrGID + " by " + _groupJoinInfo.OwnerAliasOrUID);
-            ImGui.Dummy(new(2));
+            ImGuiHelpers.ScaledDummy(2f);
             ImGui.TextUnformatted("This Syncshell staff has set the following suggested Syncshell permissions:");
             ImGui.TextUnformatted("- Sounds ");
             UiSharedService.BooleanToColoredIcon(!_groupJoinInfo.GroupPermissions.IsPreferDisableSounds());
@@ -104,7 +105,7 @@ internal class JoinSyncshellUI : WindowMediatorSubscriberBase
                 || _groupJoinInfo.GroupPermissions.IsPreferDisableVFX() != _ownPermissions.DisableGroupVFX
                 || _groupJoinInfo.GroupPermissions.IsPreferDisableAnimations() != _ownPermissions.DisableGroupAnimations)
             {
-                ImGui.Dummy(new(2));
+                ImGuiHelpers.ScaledDummy(2f);
                 UiSharedService.ColorText("Your current preferred default Syncshell permissions deviate from the suggested permissions:", ImGuiColors.DalamudYellow);
                 if (_groupJoinInfo.GroupPermissions.IsPreferDisableSounds() != _ownPermissions.DisableGroupSounds)
                 {
@@ -157,7 +158,7 @@ internal class JoinSyncshellUI : WindowMediatorSubscriberBase
             {
                 UiSharedService.TextWrapped("Your default syncshell permissions on joining are in line with the suggested Syncshell permissions through the owner.");
             }
-            ImGui.Dummy(new(2));
+            ImGuiHelpers.ScaledDummy(2f);
             if (UiSharedService.IconTextButton(Dalamud.Interface.FontAwesomeIcon.Plus, "Finalize and join " + _groupJoinInfo.GroupAliasOrGID))
             {
                 GroupUserPreferredPermissions joinPermissions = GroupUserPreferredPermissions.NoneSet;
