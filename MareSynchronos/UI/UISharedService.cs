@@ -18,9 +18,7 @@ using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.WebAPI;
-using MareSynchronos.WebAPI.SignalR.Utils;
 using Microsoft.Extensions.Logging;
-using System.Globalization;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -445,14 +443,14 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public static Vector2 GetNormalizedIconSize(FontAwesomeIcon icon)
     {
-        if (_iconCacheDict.TryGetValue(ImGuiHelpers.GlobalScale, out var iconCache))
+        if (_normalizedIconScales.TryGetValue(ImGuiHelpers.GlobalScale, out var iconCache))
         {
             if (iconCache.TryGetValue(icon, out var size)) return size;
             return iconCache[icon] = CalcIconScale(icon);
         }
 
-        _iconCacheDict.Add(ImGuiHelpers.GlobalScale, new());
-        return _iconCacheDict[ImGuiHelpers.GlobalScale][icon] = CalcIconScale(icon);
+        _normalizedIconScales.Add(ImGuiHelpers.GlobalScale, new());
+        return _normalizedIconScales[ImGuiHelpers.GlobalScale][icon] = CalcIconScale(icon);
     }
 
     public static void NormalizedIcon(FontAwesomeIcon icon, Vector4? color = null)
