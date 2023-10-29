@@ -74,7 +74,7 @@ public class SelectTagForPairUi
 
             ImGui.Separator();
             UiSharedService.FontText($"Create a new group for {name}.", UiBuilder.DefaultFont);
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.Plus))
+            if (UiSharedService.NormalizedIconButton(FontAwesomeIcon.Plus))
             {
                 HandleAddTag();
             }

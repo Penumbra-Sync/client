@@ -151,7 +151,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             {
                 UiSharedService.TextWrapped($"You have successfully added {_lastAddedUser.UserData.AliasOrUID}. Set a local note for the user in the field below:");
                 ImGui.InputTextWithHint("##noteforuser", $"Note for {_lastAddedUser.UserData.AliasOrUID}", ref _lastAddedUserComment, 100);
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.Save, "Save Note"))
+                if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Save, "Save Note"))
                 {
                     _serverManager.SetNoteForUid(_lastAddedUser.UserData.UID, _lastAddedUserComment);
                     _lastAddedUser = null;
@@ -180,7 +180,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         if (keys.Any())
         {
             if (_secretKeyIdx == -1) _secretKeyIdx = keys.First().Key;
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add current character with secret key"))
+            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Plus, "Add current character with secret key"))
             {
                 _serverManager.CurrentServer!.Authentications.Add(new MareConfiguration.Models.Authentication()
                 {
@@ -220,7 +220,7 @@ public class CompactUi : WindowMediatorSubscriberBase
     }
     private void DrawServerStatus()
     {
-        var buttonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Link);
+        var buttonSize = UiSharedService.NormalizedIconButtonSize(FontAwesomeIcon.Link);
         var userCount = _apiController.OnlineUsers.ToString(CultureInfo.InvariantCulture);
         var userSize = ImGui.CalcTextSize(userCount);
         var textSize = ImGui.CalcTextSize("Users Online");
@@ -272,7 +272,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         {
             using (ImRaii.PushColor(ImGuiCol.Text, color))
             {
-                if (ImGuiComponents.IconButton(connectedIcon))
+                if (UiSharedService.NormalizedIconButton(connectedIcon))
                 {
                     _serverManager.CurrentServer.FullPause = !_serverManager.CurrentServer.FullPause;
                     _serverManager.Save();
@@ -287,7 +287,7 @@ public class CompactUi : WindowMediatorSubscriberBase
     private void DrawTransfers()
     {
         var currentUploads = _fileTransferManager.CurrentUploads.ToList();
-        UiSharedService.FontText(FontAwesomeIcon.Upload.ToIconString(), UiBuilder.IconFont);
+        UiSharedService.NormalizedIcon(FontAwesomeIcon.Upload);
         ImGui.SameLine(35 * ImGuiHelpers.GlobalScale);
 
         if (currentUploads.Any())
@@ -302,15 +302,17 @@ public class CompactUi : WindowMediatorSubscriberBase
             var uploadText = $"({UiSharedService.ByteToString(totalUploaded)}/{UiSharedService.ByteToString(totalToUpload)})";
             var textSize = ImGui.CalcTextSize(uploadText);
             ImGui.SameLine(_windowContentWidth - textSize.X);
+            ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted(uploadText);
         }
         else
         {
+            ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted("No uploads in progress");
         }
 
         var currentDownloads = _currentDownloads.SelectMany(d => d.Value.Values).ToList();
-        UiSharedService.FontText(FontAwesomeIcon.Download.ToIconString(), UiBuilder.IconFont);
+        UiSharedService.NormalizedIcon(FontAwesomeIcon.Download);
         ImGui.SameLine(35 * ImGuiHelpers.GlobalScale);
 
         if (currentDownloads.Any())
@@ -325,10 +327,12 @@ public class CompactUi : WindowMediatorSubscriberBase
                 $"({UiSharedService.ByteToString(totalDownloaded)}/{UiSharedService.ByteToString(totalToDownload)})";
             var textSize = ImGui.CalcTextSize(downloadText);
             ImGui.SameLine(_windowContentWidth - textSize.X);
+            ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted(downloadText);
         }
         else
         {
+            ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted("No downloads in progress");
         }
     }

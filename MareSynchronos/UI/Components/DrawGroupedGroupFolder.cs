@@ -30,7 +30,8 @@ public class DrawGroupedGroupFolder : IDrawFolder
         using var id = ImRaii.PushId(_id);
 
         ImGui.Dummy(new Vector2(0f, ImGui.GetFrameHeight()));
-        ImGui.SameLine();
+        using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, new Vector2(0f, 0f)))
+            ImGui.SameLine();
 
         var icon = _tagHandler.IsTagOpen(_id) ? FontAwesomeIcon.CaretDown : FontAwesomeIcon.CaretRight;
         UiSharedService.NormalizedIcon(icon);

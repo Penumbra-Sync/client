@@ -101,12 +101,12 @@ public class DrawFolderTag : DrawFolderBase
     protected override void DrawMenu(float menuWidth)
     {
         ImGui.TextUnformatted("Group Menu");
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Users, "Select Pairs", menuWidth, true))
+        if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Users, "Select Pairs", menuWidth, true))
         {
             _selectPairForTagUi.Open(_id);
         }
         UiSharedService.AttachToolTip("Select Individual Pairs for this Pair Group");
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Pair Group", menuWidth, true) && UiSharedService.CtrlPressed())
+        if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Trash, "Delete Pair Group", menuWidth, true) && UiSharedService.CtrlPressed())
         {
             _tagHandler.RemoveTag(_id);
         }
@@ -138,11 +138,11 @@ public class DrawFolderTag : DrawFolderBase
 
         var allArePaused = _allPairs.All(pair => pair.UserPair!.OwnPermissions.IsPaused());
         var pauseButton = allArePaused ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
-        var pauseButtonX = UiSharedService.GetIconButtonSize(pauseButton).X;
+        var pauseButtonX = UiSharedService.NormalizedIconButtonSize(pauseButton).X;
 
         var buttonPauseOffset = currentRightSideX - pauseButtonX;
         ImGui.SameLine(buttonPauseOffset);
-        if (ImGuiComponents.IconButton(pauseButton))
+        if (UiSharedService.NormalizedIconButton(pauseButton))
         {
             if (allArePaused)
             {

@@ -62,7 +62,7 @@ public abstract class DrawFolderBase : IDrawFolder
         // if opened draw content
         if (_tagHandler.IsTagOpen(_id))
         {
-            using var indent = ImRaii.PushIndent(20f);
+            using var indent = ImRaii.PushIndent(UiSharedService.GetIconData(FontAwesomeIcon.Bars).NormalizedIconScale.X + ImGui.GetStyle().ItemSpacing.X);
             if (DrawPairs.Any())
             {
                 foreach (var item in DrawPairs)
@@ -89,7 +89,7 @@ public abstract class DrawFolderBase : IDrawFolder
 
     private float DrawRightSideInternal()
     {
-        var barButtonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Bars);
+        var barButtonSize = UiSharedService.NormalizedIconButtonSize(FontAwesomeIcon.Bars);
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
         var windowEndX = ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth();
 
@@ -99,7 +99,7 @@ public abstract class DrawFolderBase : IDrawFolder
         if (RenderMenu)
         {
             ImGui.SameLine(windowEndX - barButtonSize.X);
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.Bars))
+            if (UiSharedService.NormalizedIconButton(FontAwesomeIcon.Bars))
             {
                 ImGui.OpenPopup("User Flyout Menu");
             }

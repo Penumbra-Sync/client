@@ -42,7 +42,7 @@ public class CreateSyncshellUI : WindowMediatorSubscriberBase
 
         if (_lastCreatedGroup == null)
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Create Syncshell"))
+            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Plus, "Create Syncshell"))
             {
                 try
                 {
@@ -67,10 +67,13 @@ public class CreateSyncshellUI : WindowMediatorSubscriberBase
                 "- Syncshells on this server can have a maximum of " + _apiController.ServerInfo.MaxGroupUserCount + " users");
             ImGuiHelpers.ScaledDummy(2f);
             ImGui.TextUnformatted("Your current Syncshell preferred permissions are:");
+            ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted("- Animations");
             UiSharedService.BooleanToColoredIcon(!_apiController.DefaultPermissions!.DisableGroupAnimations);
+            ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted("- Sounds");
             UiSharedService.BooleanToColoredIcon(!_apiController.DefaultPermissions!.DisableGroupSounds);
+            ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted("- VFX");
             UiSharedService.BooleanToColoredIcon(!_apiController.DefaultPermissions!.DisableGroupVFX);
             UiSharedService.TextWrapped("(Those preferred permissions can be changed anytime after Syncshell creation, your defaults can be changed anytime in the Mare Settings)");
@@ -82,7 +85,7 @@ public class CreateSyncshellUI : WindowMediatorSubscriberBase
             ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted("Syncshell Password: " + _lastCreatedGroup.Password);
             ImGui.SameLine();
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.Copy))
+            if (UiSharedService.NormalizedIconButton(FontAwesomeIcon.Copy))
             {
                 ImGui.SetClipboardText(_lastCreatedGroup.Password);
             }
@@ -90,10 +93,13 @@ public class CreateSyncshellUI : WindowMediatorSubscriberBase
             ImGui.Separator();
             UiSharedService.TextWrapped("These settings were set based on your preferred syncshell permissions:");
             ImGuiHelpers.ScaledDummy(2f);
+            ImGui.AlignTextToFramePadding();
             UiSharedService.TextWrapped("Suggest Animation sync:");
             UiSharedService.BooleanToColoredIcon(!_lastCreatedGroup.GroupUserPreferredPermissions.IsDisableAnimations());
+            ImGui.AlignTextToFramePadding();
             UiSharedService.TextWrapped("Suggest Sounds sync:");
             UiSharedService.BooleanToColoredIcon(!_lastCreatedGroup.GroupUserPreferredPermissions.IsDisableSounds());
+            ImGui.AlignTextToFramePadding();
             UiSharedService.TextWrapped("Suggest VFX sync:");
             UiSharedService.BooleanToColoredIcon(!_lastCreatedGroup.GroupUserPreferredPermissions.IsDisableVFX());
         }

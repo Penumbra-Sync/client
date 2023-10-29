@@ -131,7 +131,7 @@ public class EditProfileUi : WindowMediatorSubscriberBase
         ImGui.Separator();
         _uiSharedService.BigText("Profile Settings");
 
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.FileUpload, "Upload new profile picture"))
+        if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.FileUpload, "Upload new profile picture"))
         {
             _fileDialogManager.OpenFileDialog("Select new Profile picture", ".png", (success, file) =>
             {
@@ -162,7 +162,7 @@ public class EditProfileUi : WindowMediatorSubscriberBase
         }
         UiSharedService.AttachToolTip("Select and upload a new profile picture");
         ImGui.SameLine();
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Clear uploaded profile picture"))
+        if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Trash, "Clear uploaded profile picture"))
         {
             _ = _apiController.UserSetProfile(new UserProfileDto(new UserData(_apiController.UID), Disabled: false, IsNSFW: null, "", Description: null));
         }
@@ -211,13 +211,13 @@ public class EditProfileUi : WindowMediatorSubscriberBase
         ImGui.EndChildFrame();
         ImGui.PopFont();
 
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Save, "Save Description"))
+        if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Save, "Save Description"))
         {
             _ = _apiController.UserSetProfile(new UserProfileDto(new UserData(_apiController.UID), Disabled: false, IsNSFW: null, ProfilePictureBase64: null, _descriptionText));
         }
         UiSharedService.AttachToolTip("Sets your profile description text");
         ImGui.SameLine();
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Clear Description"))
+        if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Trash, "Clear Description"))
         {
             _ = _apiController.UserSetProfile(new UserProfileDto(new UserData(_apiController.UID), Disabled: false, IsNSFW: null, ProfilePictureBase64: null, ""));
         }

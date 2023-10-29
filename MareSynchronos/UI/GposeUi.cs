@@ -41,7 +41,7 @@ public class GposeUi : WindowMediatorSubscriberBase
 
         if (!_mareCharaFileManager.CurrentlyWorking)
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.FolderOpen, "Load MCDF"))
+            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.FolderOpen, "Load MCDF"))
             {
                 _fileDialogManager.OpenFileDialog("Pick MCDF file", ".mcdf", (success, paths) =>
                 {
@@ -59,7 +59,7 @@ public class GposeUi : WindowMediatorSubscriberBase
             {
                 UiSharedService.TextWrapped("Loaded file: " + _mareCharaFileManager.LoadedCharaFile.FilePath);
                 UiSharedService.TextWrapped("File Description: " + _mareCharaFileManager.LoadedCharaFile.CharaFileData.Description);
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.Check, "Apply loaded MCDF"))
+                if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Check, "Apply loaded MCDF"))
                 {
                     _ = Task.Run(async () => await _mareCharaFileManager.ApplyMareCharaFile(_dalamudUtil.GposeTargetGameObject).ConfigureAwait(false));
                 }

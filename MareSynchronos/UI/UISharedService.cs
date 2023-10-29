@@ -23,6 +23,7 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace MareSynchronos.UI;
 
@@ -153,7 +154,6 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public static void BooleanToColoredIcon(bool value, bool inline = true)
     {
-        using var font = ImRaii.PushFont(UiBuilder.IconFont);
         using var colorgreen = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.HealerGreen, value);
         using var colorred = ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudRed, !value);
 
@@ -161,11 +161,11 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
         if (value)
         {
-            ImGui.TextUnformatted(FontAwesomeIcon.Check.ToIconString());
+            NormalizedIcon(FontAwesomeIcon.Check);
         }
         else
         {
-            ImGui.TextUnformatted(FontAwesomeIcon.Times.ToIconString());
+            NormalizedIcon(FontAwesomeIcon.Times);
         }
     }
 
@@ -329,24 +329,18 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
     }
 
-    public static Vector2 GetIconTextButtonSize(FontAwesomeIcon icon, string text, float? width = null, bool isInPopup = false)
+    public static Vector2 GetNormalizedIconTextButtonSize(FontAwesomeIcon icon, string text, float? width = null, bool isInPopup = false)
     {
-        var iconSize = GetIconSize(icon);
+        var iconData = GetIconData(icon);
         var textSize = ImGui.CalcTextSize(text);
         var padding = ImGui.GetStyle().FramePadding;
-        var spacing = ImGui.GetStyle().ItemSpacing;
-
-        var buttonSizeY = textSize.Y + padding.Y * 2;
+        var buttonSizeY = ImGui.GetFrameHeight();
         var iconExtraSpacing = isInPopup ? padding.X * 2 : 0;
-
-        var iconXoffset = iconSize.X <= iconSize.Y ? (iconSize.Y - iconSize.X) / 2f : 0;
-        var iconScaling = iconSize.X > iconSize.Y ? 1 / (iconSize.X / iconSize.Y) : 1;
 
         if (width == null || width <= 0)
         {
-            var buttonSizeX = (iconScaling == 1 ? iconSize.Y : (iconSize.X * iconScaling))
-                    + textSize.X + padding.X * 2 + spacing.X + (iconXoffset * 2);
-            return new Vector2(buttonSizeX + iconExtraSpacing, buttonSizeY);
+            var buttonSizeX = iconData.NormalizedIconScale.X + (padding.X * 4) + iconExtraSpacing + textSize.X;
+            return new Vector2(buttonSizeX, buttonSizeY);
         }
         else
         {
@@ -354,37 +348,55 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         }
     }
 
-    public static bool IconTextButton(FontAwesomeIcon icon, string text, float? width = null, bool isInPopup = false)
+    public static Vector2 NormalizedIconButtonSize(FontAwesomeIcon icon)
     {
-        var wasClicked = false;
-
-        var iconSize = GetIconSize(icon);
-        var textSize = ImGui.CalcTextSize(text);
+        var iconData = GetIconData(icon);
         var padding = ImGui.GetStyle().FramePadding;
-        var spacing = ImGui.GetStyle().ItemSpacing;
+
+        return iconData.NormalizedIconScale with { X = iconData.NormalizedIconScale.X + padding.X * 2, Y = iconData.NormalizedIconScale.Y + padding.Y * 2 };
+    }
+
+    public static bool NormalizedIconButton(FontAwesomeIcon icon)
+    {
+        bool wasClicked = false;
+        var iconData = GetIconData(icon);
+        var padding = ImGui.GetStyle().FramePadding;
         var cursor = ImGui.GetCursorPos();
         var drawList = ImGui.GetWindowDrawList();
         var pos = ImGui.GetWindowPos();
         var scrollPosY = ImGui.GetScrollY();
         var scrollPosX = ImGui.GetScrollX();
 
-        Vector2 buttonSize;
-        var buttonSizeY = textSize.Y + padding.Y * 2;
+        var buttonSize = NormalizedIconButtonSize(icon);
+
+        if (ImGui.Button("###" + icon.ToIconString(), buttonSize))
+        {
+            wasClicked = true;
+        }
+
+        drawList.AddText(UiBuilder.IconFont, ImGui.GetFontSize() * iconData.IconScaling,
+            new(pos.X - scrollPosX + cursor.X + iconData.OffsetX + padding.X,
+                pos.Y - scrollPosY + cursor.Y + (buttonSize.Y - (iconData.IconSize.Y * iconData.IconScaling)) / 2f),
+            ImGui.GetColorU32(ImGuiCol.Text), icon.ToIconString());
+
+        return wasClicked;
+    }
+
+    public static bool NormalizedIconTextButton(FontAwesomeIcon icon, string text, float? width = null, bool isInPopup = false)
+    {
+        var wasClicked = false;
+
+        var iconData = GetIconData(icon);
+        var textSize = ImGui.CalcTextSize(text);
+        var padding = ImGui.GetStyle().FramePadding;
+        var cursor = ImGui.GetCursorPos();
+        var drawList = ImGui.GetWindowDrawList();
+        var pos = ImGui.GetWindowPos();
+        var scrollPosY = ImGui.GetScrollY();
+        var scrollPosX = ImGui.GetScrollX();
+
+        Vector2 buttonSize = GetNormalizedIconTextButtonSize(icon, text, width, isInPopup);
         var iconExtraSpacing = isInPopup ? padding.X * 2 : 0;
-
-        var iconXoffset = iconSize.X <= iconSize.Y ? (iconSize.Y - iconSize.X) / 2f : 0;
-        var iconScaling = iconSize.X > iconSize.Y ? 1 / (iconSize.X / iconSize.Y) : 1;
-
-        if (width == null || width <= 0)
-        {
-            var buttonSizeX = (iconScaling == 1 ? iconSize.Y : (iconSize.X * iconScaling))
-                    + textSize.X + padding.X * 2 + spacing.X + (iconXoffset * 2);
-            buttonSize = new Vector2(buttonSizeX + iconExtraSpacing, buttonSizeY);
-        }
-        else
-        {
-            buttonSize = new Vector2(width.Value, buttonSizeY);
-        }
 
         using (ImRaii.PushColor(ImGuiCol.Button, ImGui.GetColorU32(ImGuiCol.PopupBg), isInPopup))
         {
@@ -394,89 +406,64 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             }
         }
 
-        drawList.AddText(UiBuilder.IconFont, ImGui.GetFontSize() * iconScaling,
-            new(pos.X - scrollPosX + cursor.X + iconXoffset + padding.X,
-                pos.Y - scrollPosY + cursor.Y + (buttonSizeY - (iconSize.Y * iconScaling)) / 2f),
-            ImGui.GetColorU32(ImGuiCol.Text), icon.ToIconString());
-
         drawList.AddText(UiBuilder.DefaultFont, ImGui.GetFontSize(),
-            new(pos.X - scrollPosX + cursor.X + (padding.X) + spacing.X + (iconSize.X * iconScaling) + (iconXoffset * 2) + iconExtraSpacing,
-                pos.Y - scrollPosY + cursor.Y + ((buttonSizeY - textSize.Y) / 2f)),
+            new(pos.X - scrollPosX + cursor.X + iconData.NormalizedIconScale.X + (padding.X * 2) + iconExtraSpacing,
+               pos.Y - scrollPosY + cursor.Y + ((buttonSize.Y - textSize.Y) / 2f)),
             ImGui.GetColorU32(ImGuiCol.Text), text);
 
+        drawList.AddText(UiBuilder.IconFont, ImGui.GetFontSize() * iconData.IconScaling,
+            new(pos.X - scrollPosX + cursor.X + iconData.OffsetX + padding.X,
+                pos.Y - scrollPosY + cursor.Y + (buttonSize.Y - (iconData.IconSize.Y * iconData.IconScaling)) / 2f),
+            ImGui.GetColorU32(ImGuiCol.Text), icon.ToIconString());
+
         return wasClicked;
-    }
-
-    public static Vector2 GetIconSize(FontAwesomeIcon icon)
-    {
-        if (_iconCacheDict.TryGetValue(ImGuiHelpers.GlobalScale, out var iconCache))
-        {
-            if (iconCache.TryGetValue(icon, out var size)) return size;
-            iconCache[icon] = CalcIconSize(icon);
-            return iconCache[icon];
-        }
-
-        _iconCacheDict.Add(ImGuiHelpers.GlobalScale, new());
-        return _iconCacheDict[ImGuiHelpers.GlobalScale][icon] = CalcIconSize(icon);
-    }
-
-    private static Vector2 CalcIconSize(FontAwesomeIcon icon)
-    {
-        using var font = ImRaii.PushFont(UiBuilder.IconFont);
-        var iconSize = ImGui.CalcTextSize(icon.ToIconString());
-        return iconSize;
-    }
-
-    public static (float xOffset, float scaling) GetIconScaling(FontAwesomeIcon icon)
-    {
-        var iconSize = GetIconSize(icon);
-        return (iconSize.X < iconSize.Y ? (iconSize.Y - iconSize.X) / 2f : 0f, iconSize.X > iconSize.Y ? 1f / (iconSize.X / iconSize.Y) : 1f);
-    }
-
-    private static Vector2 CalcIconScale(FontAwesomeIcon icon)
-    {
-        var iconSize = GetIconSize(icon);
-        var (iconXoffset, iconScaling) = GetIconScaling(icon);
-        return new((iconSize.X * iconScaling) + (iconXoffset * 2),
-            (iconSize.X * iconScaling) + (iconXoffset * 2));
-    }
-
-    public static Vector2 GetNormalizedIconSize(FontAwesomeIcon icon)
-    {
-        if (_normalizedIconScales.TryGetValue(ImGuiHelpers.GlobalScale, out var iconCache))
-        {
-            if (iconCache.TryGetValue(icon, out var size)) return size;
-            return iconCache[icon] = CalcIconScale(icon);
-        }
-
-        _normalizedIconScales.Add(ImGuiHelpers.GlobalScale, new());
-        return _normalizedIconScales[ImGuiHelpers.GlobalScale][icon] = CalcIconScale(icon);
     }
 
     public static void NormalizedIcon(FontAwesomeIcon icon, Vector4? color = null)
     {
         var cursorPos = ImGui.GetCursorPos();
-        var iconSize = GetIconSize(icon);
-        var normalizedIconSize = GetNormalizedIconSize(icon);
+        var iconData = GetIconData(icon);
         var drawList = ImGui.GetWindowDrawList();
         var windowPos = ImGui.GetWindowPos();
         var scrollPosX = ImGui.GetScrollX();
         var scrollPosY = ImGui.GetScrollY();
         var frameHeight = ImGui.GetFrameHeight();
 
-        var (iconXoffset, iconScaling) = GetIconScaling(icon);
-        var frameOffsetY = ((frameHeight - iconSize.Y * iconScaling) / 2f);
+        var frameOffsetY = ((frameHeight - iconData.IconSize.Y * iconData.IconScaling) / 2f);
 
-        drawList.AddText(UiBuilder.IconFont, ImGui.GetFontSize() * iconScaling,
-            new(windowPos.X - scrollPosX + cursorPos.X + iconXoffset,
+        drawList.AddText(UiBuilder.IconFont, ImGui.GetFontSize() * iconData.IconScaling,
+            new(windowPos.X - scrollPosX + cursorPos.X + iconData.OffsetX,
             windowPos.Y - scrollPosY + cursorPos.Y + frameOffsetY),
             color != null ? ImGui.GetColorU32(color.Value) : ImGui.GetColorU32(ImGuiCol.Text), icon.ToIconString());
 
-        ImGui.Dummy(new(normalizedIconSize.X, ImGui.GetFrameHeight()));
+        ImGui.Dummy(new(iconData.NormalizedIconScale.X, ImGui.GetFrameHeight()));
     }
 
-    private static Dictionary<float, Dictionary<FontAwesomeIcon, Vector2>> _normalizedIconScales = new();
-    private static Dictionary<float, Dictionary<FontAwesomeIcon, Vector2>> _iconCacheDict = new();
+    private static IconScaleData CalcIconScaleData(FontAwesomeIcon icon)
+    {
+        using var font = ImRaii.PushFont(UiBuilder.IconFont);
+        var iconSize = ImGui.CalcTextSize(icon.ToIconString());
+        var iconscaling = (iconSize.X < iconSize.Y ? (iconSize.Y - iconSize.X) / 2f : 0f, iconSize.X > iconSize.Y ? 1f / (iconSize.X / iconSize.Y) : 1f);
+        var normalized = iconscaling.Item2 == 1f ?
+            new Vector2(iconSize.Y, iconSize.Y)
+            : new((iconSize.X * iconscaling.Item2) + (iconscaling.Item1 * 2), (iconSize.X * iconscaling.Item2) + (iconscaling.Item1 * 2));
+        return new(iconSize, normalized, iconscaling.Item1, iconscaling.Item2);
+    }
+
+    public static IconScaleData GetIconData(FontAwesomeIcon icon)
+    {
+        if (_iconData.TryGetValue(ImGuiHelpers.GlobalScale, out var iconCache))
+        {
+            if (iconCache.TryGetValue(icon, out var iconData)) return iconData;
+            return iconCache[icon] = CalcIconScaleData(icon);
+        }
+
+        _iconData.Add(ImGuiHelpers.GlobalScale, new());
+        return _iconData[ImGuiHelpers.GlobalScale][icon] = CalcIconScaleData(icon);
+    }
+
+    public sealed record IconScaleData(Vector2 IconSize, Vector2 NormalizedIconScale, float OffsetX, float IconScaling);
+    private static Dictionary<float, Dictionary<FontAwesomeIcon, IconScaleData>> _iconData = new();
 
     public static bool IsDirectoryWritable(string dirPath, bool throwIfFails = false)
     {
@@ -831,7 +818,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             ImGui.SameLine();
             var text = "Connect";
             if (_serverSelectionIndex == _serverConfigurationManager.CurrentServerIndex) text = "Reconnect";
-            if (IconTextButton(FontAwesomeIcon.Link, text))
+            if (NormalizedIconTextButton(FontAwesomeIcon.Link, text))
             {
                 _serverConfigurationManager.SelectServer(_serverSelectionIndex);
                 _ = _apiController.CreateConnections();
@@ -844,7 +831,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             ImGui.InputText("Custom Service URI", ref _customServerUri, 255);
             ImGui.SetNextItemWidth(250);
             ImGui.InputText("Custom Service Name", ref _customServerName, 255);
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add Custom Service")
+            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Plus, "Add Custom Service")
                 && !string.IsNullOrEmpty(_customServerUri)
                 && !string.IsNullOrEmpty(_customServerName))
             {
