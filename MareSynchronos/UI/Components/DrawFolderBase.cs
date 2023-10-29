@@ -60,7 +60,7 @@ public abstract class DrawFolderBase : IDrawFolder
         // if opened draw content
         if (_tagHandler.IsTagOpen(_id))
         {
-            using var indent = ImRaii.PushIndent(UiSharedService.GetIconData(FontAwesomeIcon.Bars).NormalizedIconScale.X + ImGui.GetStyle().ItemSpacing.X);
+            using var indent = ImRaii.PushIndent(UiSharedService.GetIconData(FontAwesomeIcon.Bars).NormalizedIconScale.Y + ImGui.GetStyle().ItemSpacing.X, false);
             if (DrawPairs.Any())
             {
                 foreach (var item in DrawPairs)
