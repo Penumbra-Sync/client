@@ -23,7 +23,6 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace MareSynchronos.UI;
 
@@ -339,7 +338,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
         if (width == null || width <= 0)
         {
-            var buttonSizeX = iconData.NormalizedIconScale.X + (padding.X * 4) + iconExtraSpacing + textSize.X;
+            var buttonSizeX = iconData.NormalizedIconScale.X + (padding.X * 3) + iconExtraSpacing + textSize.X;
             return new Vector2(buttonSizeX, buttonSizeY);
         }
         else

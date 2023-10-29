@@ -1,7 +1,4 @@
-﻿using Dalamud.Plugin.Services;
-using MareSynchronos.API.SignalR;
-using MareSynchronos.Interop;
-using MareSynchronos.MareConfiguration;
+﻿using MareSynchronos.API.SignalR;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.WebAPI.SignalR.Utils;
