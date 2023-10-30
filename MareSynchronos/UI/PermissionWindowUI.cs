@@ -144,7 +144,7 @@ public class PermissionWindowUI : WindowMediatorSubscriberBase
         UiSharedService.AttachToolTip("Save and apply all changes");
 
         var rightSideButtons = UiSharedService.GetNormalizedIconTextButtonSize(Dalamud.Interface.FontAwesomeIcon.Undo, "Revert").X +
-            UiSharedService.GetNormalizedIconTextButtonSize(Dalamud.Interface.FontAwesomeIcon.ArrowsSpin, "Reset to Default Permissions").X;
+            UiSharedService.GetNormalizedIconTextButtonSize(Dalamud.Interface.FontAwesomeIcon.ArrowsSpin, "Reset to Default").X;
         var availableWidth = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
 
         ImGui.SameLine(availableWidth - rightSideButtons);
