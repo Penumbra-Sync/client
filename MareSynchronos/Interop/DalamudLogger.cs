@@ -36,6 +36,13 @@ internal sealed class DalamudLogger : ILogger
             StringBuilder sb = new();
             sb.AppendLine($"[{_name}]{{{(int)logLevel}}} {state}: {exception?.Message}");
             sb.AppendLine(exception?.StackTrace);
+            var innerException = exception?.InnerException;
+            while (innerException != null)
+            {
+                sb.AppendLine($"InnerException {innerException}: {innerException.Message}");
+                sb.AppendLine(innerException.StackTrace);
+                innerException = innerException.InnerException;
+            }
             if (logLevel == LogLevel.Warning)
                 _pluginLog.Warning(sb.ToString());
             else if (logLevel == LogLevel.Error)
