@@ -157,7 +157,7 @@ public class PermissionWindowUI : WindowMediatorSubscriberBase
         UiSharedService.AttachToolTip("Revert all changes");
 
         ImGui.SameLine();
-        if (UiSharedService.NormalizedIconTextButton(Dalamud.Interface.FontAwesomeIcon.ArrowsSpin, "Reset to Default Permissions"))
+        if (UiSharedService.NormalizedIconTextButton(Dalamud.Interface.FontAwesomeIcon.ArrowsSpin, "Reset to Default"))
         {
             var defaultPermissions = _apiController.DefaultPermissions!;
             _ownPermissions.SetSticky(Pair.IsDirectlyPaired || defaultPermissions.IndividualIsSticky);
