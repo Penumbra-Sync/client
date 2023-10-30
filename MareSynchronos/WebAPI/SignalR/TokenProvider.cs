@@ -27,14 +27,22 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         _httpClient = new();
         var ver = Assembly.GetExecutingAssembly().GetName().Version;
         Mediator = mareMediator;
-        Mediator.Subscribe<DalamudLogoutMessage>(this, (_) => _tokenCache.Clear());
-        Mediator.Subscribe<DalamudLoginMessage>(this, (_) => _tokenCache.Clear());
+        Mediator.Subscribe<DalamudLogoutMessage>(this, (_) =>
+        {
+            _lastJwtIdentifier = null;
+            _tokenCache.Clear();
+        });
+        Mediator.Subscribe<DalamudLoginMessage>(this, (_) =>
+        {
+            _lastJwtIdentifier = null;
+            _tokenCache.Clear();
+        });
         _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("MareSynchronos", ver!.Major + "." + ver!.Minor + "." + ver!.Build));
     }
 
     public MareMediator Mediator { get; }
 
-    private JwtIdentifier CurrentIdentifier => new(_serverManager.CurrentApiUrl, _serverManager.GetSecretKey()!);
+    private JwtIdentifier? _lastJwtIdentifier;
 
     public void Dispose()
     {
@@ -42,7 +50,7 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         _httpClient.Dispose();
     }
 
-    public async Task<string> GetNewToken(bool isRenewal, CancellationToken token)
+    public async Task<string> GetNewToken(bool isRenewal, JwtIdentifier identifier, CancellationToken token)
     {
         Uri tokenUri;
         string response = string.Empty;
@@ -73,17 +81,17 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
                     .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
                     .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)));
                 HttpRequestMessage request = new(HttpMethod.Get, tokenUri.ToString());
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _tokenCache[CurrentIdentifier]);
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _tokenCache[identifier]);
                 result = await _httpClient.SendAsync(request, token).ConfigureAwait(false);
             }
 
             response = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
             result.EnsureSuccessStatusCode();
-            _tokenCache[CurrentIdentifier] = response;
+            _tokenCache[identifier] = response;
         }
         catch (HttpRequestException ex)
         {
-            _tokenCache.TryRemove(CurrentIdentifier, out _);
+            _tokenCache.TryRemove(identifier, out _);
 
             _logger.LogError(ex, "GetNewToken: Failure to get token");
 
@@ -108,7 +116,7 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         var tokenTime = jwtToken.ValidTo.Subtract(TimeSpan.FromHours(6));
         if (tokenTime <= dateTimeMinus10 || tokenTime >= dateTimePlus10)
         {
-            _tokenCache.TryRemove(CurrentIdentifier, out _);
+            _tokenCache.TryRemove(identifier, out _);
             Mediator.Publish(new NotificationMessage("Invalid system clock", "The clock of your computer is invalid. " +
                 "Mare will not function properly if the time zone is not set correctly. " +
                 "Please set your computers time zone correctly and keep your clock synchronized with the internet.",
@@ -118,9 +126,38 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         return response;
     }
 
+    private JwtIdentifier? GetIdentifier()
+    {
+        JwtIdentifier jwtIdentifier;
+        try
+        {
+            jwtIdentifier = new(_serverManager.CurrentApiUrl,
+                                _dalamudUtil.GetPlayerNameHashedAsync().GetAwaiter().GetResult(),
+                                _serverManager.GetSecretKey()!);
+            _lastJwtIdentifier = jwtIdentifier;
+        }
+        catch (Exception ex)
+        {
+            if (_lastJwtIdentifier == null)
+            {
+                _logger.LogError("GetOrUpdate: No last identifier found, aborting");
+                return null;
+            }
+
+            _logger.LogWarning(ex, "GetOrUpdate: Could not get JwtIdentifier for some reason or another, reusing last identifier {identifier}", _lastJwtIdentifier);
+            jwtIdentifier = _lastJwtIdentifier;
+        }
+
+        _logger.LogDebug("GetOrUpdate: Using identifier {identifier}", jwtIdentifier);
+        return jwtIdentifier;
+    }
+
     public string? GetToken()
     {
-        if (_tokenCache.TryGetValue(CurrentIdentifier, out var token))
+        JwtIdentifier? jwtIdentifier = GetIdentifier();
+        if (jwtIdentifier == null) return null;
+
+        if (_tokenCache.TryGetValue(jwtIdentifier, out var token))
         {
             return token;
         }
@@ -130,8 +167,11 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
 
     public async Task<string?> GetOrUpdateToken(CancellationToken ct)
     {
+        JwtIdentifier? jwtIdentifier = GetIdentifier();
+        if (jwtIdentifier == null) return null;
+
         bool renewal = false;
-        if (_tokenCache.TryGetValue(CurrentIdentifier, out var token))
+        if (_tokenCache.TryGetValue(jwtIdentifier, out var token))
         {
             var handler = new JwtSecurityTokenHandler();
             var jwt = handler.ReadJwtToken(token);
@@ -150,6 +190,6 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         }
 
         _logger.LogTrace("GetOrUpdate: Getting new token");
-        return await GetNewToken(renewal, ct).ConfigureAwait(false);
+        return await GetNewToken(renewal, jwtIdentifier, ct).ConfigureAwait(false);
     }
 }
