@@ -134,6 +134,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
         {
             ImGui.BeginTooltip();
+            ImGui.PushTextWrapPos(ImGui.GetFontSize() * 35f);
             if (text.Contains(TooltipSeparator, StringComparison.Ordinal))
             {
                 var splitText = text.Split(TooltipSeparator, StringSplitOptions.RemoveEmptyEntries);
@@ -147,6 +148,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             {
                 ImGui.TextUnformatted(text);
             }
+            ImGui.PopTextWrapPos();
             ImGui.EndTooltip();
         }
     }
@@ -219,20 +221,8 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     public static void DrawHelpText(string helpText)
     {
         ImGui.SameLine();
-        using (ImRaii.PushFont(UiBuilder.IconFont))
-        {
-            ImGui.SetWindowFontScale(0.8f);
-            ImGui.TextDisabled(FontAwesomeIcon.Question.ToIconString());
-            ImGui.SetWindowFontScale(1.0f);
-        }
-
-        if (ImGui.IsItemHovered())
-        {
-            using var tooltip = ImRaii.Tooltip();
-            ImGui.PushTextWrapPos(ImGui.GetFontSize() * 35.0f);
-            ImGui.TextUnformatted(helpText);
-            ImGui.PopTextWrapPos();
-        }
+        NormalizedIcon(FontAwesomeIcon.QuestionCircle, ImGui.GetColorU32(ImGuiCol.TextDisabled));
+        AttachToolTip(helpText);
     }
 
     public static void DrawOutlinedFont(string text, Vector4 fontColor, Vector4 outlineColor, int thickness)
@@ -418,7 +408,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return wasClicked;
     }
 
-    public static void NormalizedIcon(FontAwesomeIcon icon, Vector4? color = null)
+    public static void NormalizedIcon(FontAwesomeIcon icon, uint color)
     {
         var cursorPos = ImGui.GetCursorPos();
         var iconData = GetIconData(icon);
@@ -433,9 +423,14 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         drawList.AddText(UiBuilder.IconFont, ImGui.GetFontSize() * iconData.IconScaling,
             new(windowPos.X - scrollPosX + cursorPos.X + iconData.OffsetX,
             windowPos.Y - scrollPosY + cursorPos.Y + frameOffsetY),
-            color != null ? ImGui.GetColorU32(color.Value) : ImGui.GetColorU32(ImGuiCol.Text), icon.ToIconString());
+            color, icon.ToIconString());
 
         ImGui.Dummy(new(iconData.NormalizedIconScale.X, ImGui.GetFrameHeight()));
+    }
+
+    public static void NormalizedIcon(FontAwesomeIcon icon, Vector4? color = null)
+    {
+        NormalizedIcon(icon, color == null ? ImGui.GetColorU32(ImGuiCol.Text) : ImGui.GetColorU32(color.Value));
     }
 
     private static IconScaleData CalcIconScaleData(FontAwesomeIcon icon)

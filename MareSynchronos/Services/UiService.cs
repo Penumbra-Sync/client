@@ -65,6 +65,17 @@ public sealed class UiService : DisposableMediatorSubscriberBase
             }
         });
 
+        Mediator.Subscribe<OpenPermissionWindow>(this, (msg) =>
+        {
+            if (!_createdWindows.Exists(p => p is PermissionWindowUI ui
+                && msg.Pair == ui.Pair))
+            {
+                var window = _uiFactory.CreatePermissionPopupUi(msg.Pair);
+                _createdWindows.Add(window);
+                _windowSystem.AddWindow(window);
+            }
+        });
+
         Mediator.Subscribe<RemoveWindowMessage>(this, (msg) =>
         {
             _windowSystem.RemoveWindow(msg.Window);

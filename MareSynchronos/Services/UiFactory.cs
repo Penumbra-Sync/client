@@ -43,4 +43,10 @@ public class UiFactory
         return new StandaloneProfileUi(_loggerFactory.CreateLogger<StandaloneProfileUi>(), _mareMediator,
             _uiSharedService, _serverConfigManager, _mareProfileManager, _pairManager, pair);
     }
+
+    public PermissionWindowUI CreatePermissionPopupUi(Pair pair)
+    {
+        return new PermissionWindowUI(_loggerFactory.CreateLogger<PermissionWindowUI>(), pair,
+            _mareMediator, _uiSharedService, _apiController);
+    }
 }

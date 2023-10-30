@@ -87,6 +87,13 @@ public class DrawUserPair
         ImGui.Separator();
 
         ImGui.TextUnformatted("Pair Permission Functions");
+        if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.WindowMaximize, "Open Permissions Window", _menuRenderWidth, true))
+        {
+            _mediator.Publish(new OpenPermissionWindow(_pair));
+            ImGui.CloseCurrentPopup();
+        }
+        UiSharedService.AttachToolTip("Opens the Permissions Window which allows you to manage multiple permissions at once.");
+
         var isSticky = _pair.UserPair!.OwnPermissions.IsSticky();
         string stickyText = isSticky ? "Disable Preferred Permissions" : "Enable Preferred Permissions";
         var stickyIcon = isSticky ? FontAwesomeIcon.ArrowCircleDown : FontAwesomeIcon.ArrowCircleUp;
@@ -201,7 +208,7 @@ public class DrawUserPair
         else if (_pair.IsVisible)
         {
             UiSharedService.NormalizedIcon(FontAwesomeIcon.Eye, ImGuiColors.ParsedGreen);
-            userPairText = _pair.UserData.AliasOrUID + " is visible";
+            userPairText = _pair.UserData.AliasOrUID + " is visible: " + _pair.PlayerName;
         }
         else
         {
@@ -306,7 +313,7 @@ public class DrawUserPair
                 currentRightSide -= (UiSharedService.GetIconData(individualIcon).NormalizedIconScale.X + spacingX);
 
                 ImGui.SameLine(currentRightSide);
-                using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.HealerGreen, individualIsSticky))
+                using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow, individualAnimDisabled || individualSoundsDisabled || individualVFXDisabled))
                     UiSharedService.NormalizedIcon(individualIcon);
                 if (ImGui.IsItemHovered())
                 {
