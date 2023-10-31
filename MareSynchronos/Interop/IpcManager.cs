@@ -157,7 +157,14 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => PeriodicApiStateCheck());
 
-        PeriodicApiStateCheck();
+        try
+        {
+            PeriodicApiStateCheck();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to check for some IPC, plugin not installed?");
+        }
     }
 
     public bool Initialized => CheckPenumbraApiInternal() && CheckGlamourerApiInternal();
