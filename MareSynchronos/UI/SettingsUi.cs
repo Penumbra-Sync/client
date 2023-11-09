@@ -69,8 +69,9 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _apiController = apiController;
         _fileCompactor = fileCompactor;
         _uiShared = uiShared;
-        AllowClickthrough = false;
-        AllowPinning = false;
+        // todo: reenable when dalamud is out of staging
+        /*AllowClickthrough = false;
+        AllowPinning = false;*/
 
         SizeConstraints = new WindowSizeConstraints()
         {

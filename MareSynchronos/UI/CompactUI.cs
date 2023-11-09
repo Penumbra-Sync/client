@@ -1,6 +1,5 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
-using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Utility;
@@ -69,7 +68,8 @@ public class CompactUi : WindowMediatorSubscriberBase
         _selectPairsForGroupUi = selectPairForTagUi;
         _tabMenu = new TopTabMenu(Mediator, _apiController, _pairManager);
 
-        AllowPinning = false;
+        // todo: reenable when dalamud title bar buttons are out of staging
+        /*AllowPinning = false;
         AllowClickthrough = false;
         TitleBarButtons = new()
         {
@@ -82,7 +82,7 @@ public class CompactUi : WindowMediatorSubscriberBase
                 },
                 IconOffset = new(2,1)
             }
-        };
+        };*/
 
         _drawFolders = GetDrawFolders().ToList();
 
@@ -370,6 +370,17 @@ public class CompactUi : WindowMediatorSubscriberBase
                 ImGui.SetClipboardText(_apiController.DisplayName);
             }
             UiSharedService.AttachToolTip("Click to copy");
+
+            // todo: remove when dalamud title bar buttons are out of staging
+            ImGui.SetWindowFontScale(1.5f);
+            var buttonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Cog);
+            ImGui.SameLine();
+            ImGui.SetCursorPosX(ImGui.GetWindowContentRegionMax().X - buttonSize.X);
+            if (UiSharedService.NormalizedIconButton(FontAwesomeIcon.Cog))
+            {
+                Mediator.Publish(new UiToggleMessage(typeof(SettingsUi)));
+            }
+            ImGui.SetWindowFontScale(1.0f);
 
             if (!string.Equals(_apiController.DisplayName, _apiController.UID, StringComparison.Ordinal))
             {
