@@ -191,22 +191,35 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
             if (_lifetime.ApplicationStopping.IsCancellationRequested) return;
 
-            if (_dalamudUtil is { IsZoning: false, IsInCutscene: false })
+            if (_dalamudUtil is { IsZoning: false, IsInCutscene: false } && !string.IsNullOrEmpty(name))
             {
                 Logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser);
+                Logger.LogDebug("[{applicationId}] Removing Temp Collection for {name} ({user})", applicationId, name, OnlineUser);
                 _ipcManager.PenumbraRemoveTemporaryCollectionAsync(Logger, applicationId, _penumbraCollection).GetAwaiter().GetResult();
-
-                foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData?.FileReplacements ?? [])
+                if (!IsVisible)
                 {
-                    try
+                    Logger.LogDebug("[{applicationId}] Restoring Glamourer for {name} ({user})", applicationId, name, OnlineUser);
+                    _ipcManager.GlamourerRevertByNameAsync(Logger, name, applicationId).GetAwaiter().GetResult();
+                }
+                else
+                {
+                    var cts = new CancellationTokenSource();
+                    cts.CancelAfter(TimeSpan.FromSeconds(60));
+
+                    foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData?.FileReplacements ?? [])
                     {
-                        RevertCustomizationDataAsync(item.Key, name, applicationId).GetAwaiter().GetResult();
+                        try
+                        {
+                            RevertCustomizationDataAsync(item.Key, name, applicationId, cts.Token).GetAwaiter().GetResult();
+                        }
+                        catch (InvalidOperationException ex)
+                        {
+                            Logger.LogWarning(ex, "Failed disposing player (not present anymore?)");
+                            break;
+                        }
                     }
-                    catch (InvalidOperationException ex)
-                    {
-                        Logger.LogWarning(ex, "Failed disposing player (not present anymore?)");
-                        break;
-                    }
+
+                    cts.CancelDispose();
                 }
             }
         }
@@ -477,13 +490,10 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         _ipcManager.PenumbraAssignTemporaryCollectionAsync(Logger, _penumbraCollection, _charaHandler.GetGameObject()!.ObjectIndex).GetAwaiter().GetResult();
     }
 
-    private async Task RevertCustomizationDataAsync(ObjectKind objectKind, string name, Guid applicationId)
+    private async Task RevertCustomizationDataAsync(ObjectKind objectKind, string name, Guid applicationId, CancellationToken cancelToken)
     {
         nint address = _dalamudUtil.GetPlayerCharacterFromCachedTableByIdent(OnlineUser.Ident);
         if (address == nint.Zero) return;
-
-        var cancelToken = new CancellationTokenSource();
-        cancelToken.CancelAfter(TimeSpan.FromSeconds(60));
 
         Logger.LogDebug("[{applicationId}] Reverting all Customization for {alias}/{name} {objectKind}", applicationId, OnlineUser.User.AliasOrUID, name, objectKind);
 
@@ -492,7 +502,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Player, () => address, isWatched: false).ConfigureAwait(false);
             tempHandler.CompareNameAndThrow(name);
             Logger.LogDebug("[{applicationId}] Restoring Customization and Equipment for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
-            await _ipcManager.GlamourerRevert(Logger, name, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
+            await _ipcManager.GlamourerRevert(Logger, name, tempHandler, applicationId, cancelToken).ConfigureAwait(false);
             tempHandler.CompareNameAndThrow(name);
             Logger.LogDebug("[{applicationId}] Restoring Heels for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             await _ipcManager.HeelsRestoreOffsetForPlayerAsync(address).ConfigureAwait(false);
@@ -513,8 +523,8 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             {
                 await _ipcManager.CustomizePlusRevertAsync(minionOrMount).ConfigureAwait(false);
                 using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => minionOrMount, isWatched: false).ConfigureAwait(false);
-                await _ipcManager.GlamourerRevert(Logger, tempHandler.Name, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
-                await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
+                await _ipcManager.GlamourerRevert(Logger, tempHandler.Name, tempHandler, applicationId, cancelToken).ConfigureAwait(false);
+                await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken).ConfigureAwait(false);
             }
         }
         else if (objectKind == ObjectKind.Pet)
@@ -524,8 +534,8 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             {
                 await _ipcManager.CustomizePlusRevertAsync(pet).ConfigureAwait(false);
                 using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => pet, isWatched: false).ConfigureAwait(false);
-                await _ipcManager.GlamourerRevert(Logger, tempHandler.Name, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
-                await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
+                await _ipcManager.GlamourerRevert(Logger, tempHandler.Name, tempHandler, applicationId, cancelToken).ConfigureAwait(false);
+                await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken).ConfigureAwait(false);
             }
         }
         else if (objectKind == ObjectKind.Companion)
@@ -535,12 +545,10 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             {
                 await _ipcManager.CustomizePlusRevertAsync(companion).ConfigureAwait(false);
                 using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Pet, () => companion, isWatched: false).ConfigureAwait(false);
-                await _ipcManager.GlamourerRevert(Logger, tempHandler.Name, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
-                await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken.Token).ConfigureAwait(false);
+                await _ipcManager.GlamourerRevert(Logger, tempHandler.Name, tempHandler, applicationId, cancelToken).ConfigureAwait(false);
+                await _ipcManager.PenumbraRedrawAsync(Logger, tempHandler, applicationId, cancelToken).ConfigureAwait(false);
             }
         }
-
-        cancelToken.CancelDispose();
     }
 
     private List<FileReplacementData> TryCalculateModdedDictionary(Guid applicationBase, CharacterData charaData, out Dictionary<string, string> moddedDictionary, CancellationToken token)

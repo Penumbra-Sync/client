@@ -19,6 +19,7 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
     private readonly TokenProvider _tokenProvider;
     private int _availableDownloadSlots;
     private SemaphoreSlim _downloadSemaphore;
+    private int CurrentlyUsedDownloadSlots => _availableDownloadSlots - _downloadSemaphore.CurrentCount;
 
     public FileTransferOrchestrator(ILogger<FileTransferOrchestrator> logger, MareConfigService mareConfig,
         MareMediator mediator, TokenProvider tokenProvider) : base(logger, mediator)
@@ -72,6 +73,7 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
     public void ReleaseDownloadSlot()
     {
         _downloadSemaphore.Release();
+        Mediator.Publish(new DownloadLimitChangedMessage());
     }
 
     public async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, Uri uri,
@@ -110,6 +112,22 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         }
 
         await _downloadSemaphore.WaitAsync(token).ConfigureAwait(false);
+        Mediator.Publish(new DownloadLimitChangedMessage());
+    }
+
+    public long DownloadLimitPerSlot()
+    {
+        var limit = _mareConfig.Current.DownloadSpeedLimitInBytes;
+        if (limit <= 0) return 0;
+        limit = _mareConfig.Current.DownloadSpeedType switch
+        {
+            MareConfiguration.Models.DownloadSpeeds.Bps => limit,
+            MareConfiguration.Models.DownloadSpeeds.KBps => limit * 1024,
+            MareConfiguration.Models.DownloadSpeeds.MBps => limit * 1024 * 1024,
+            _ => limit,
+        };
+        var dividedLimit = limit / (CurrentlyUsedDownloadSlots == 0 ? 1 : CurrentlyUsedDownloadSlots);
+        return dividedLimit == 0 ? 1 : dividedLimit;
     }
 
     private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage,

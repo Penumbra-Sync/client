@@ -322,6 +322,26 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         }
     }
 
+    public async Task GlamourerRevertByNameAsync(ILogger logger, string name, Guid applicationId)
+    {
+        if ((!CheckGlamourerApi()) || _dalamudUtil.IsZoning) return;
+
+        await _dalamudUtil.RunOnFrameworkThread(() =>
+        {
+            try
+            {
+                logger.LogDebug("[{appid}] Calling On IPC: GlamourerRevertByName", applicationId);
+                _glamourerRevertByName.InvokeAction(name, LockCode);
+                logger.LogDebug("[{appid}] Calling On IPC: GlamourerUnlockName", applicationId);
+                _glamourerUnlock.InvokeFunc(name, LockCode);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Error during Glamourer RevertByName");
+            }
+        }).ConfigureAwait(false);
+    }
+
     public void GlamourerRevertByName(ILogger logger, string name, Guid applicationId)
     {
         if ((!CheckGlamourerApi()) || _dalamudUtil.IsZoning) return;

@@ -69,6 +69,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _apiController = apiController;
         _fileCompactor = fileCompactor;
         _uiShared = uiShared;
+        AllowClickthrough = false;
+        AllowPinning = false;
 
         SizeConstraints = new WindowSizeConstraints()
         {
@@ -142,6 +144,37 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
         int maxParallelDownloads = _configService.Current.ParallelDownloads;
         bool useAlternativeUpload = _configService.Current.UseAlternativeFileUpload;
+        int downloadSpeedLimit = _configService.Current.DownloadSpeedLimitInBytes;
+
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted("Global Download Speed Limit");
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(100);
+        if (ImGui.InputInt("###speedlimit", ref downloadSpeedLimit))
+        {
+            _configService.Current.DownloadSpeedLimitInBytes = downloadSpeedLimit;
+            _configService.Save();
+            Mediator.Publish(new DownloadLimitChangedMessage());
+        }
+        ImGui.SameLine();
+        ImGui.SetNextItemWidth(100);
+        _uiShared.DrawCombo("###speed", new[] { DownloadSpeeds.Bps, DownloadSpeeds.KBps, DownloadSpeeds.MBps },
+            (s) => s switch
+            {
+                DownloadSpeeds.Bps => "Byte/s",
+                DownloadSpeeds.KBps => "KB/s",
+                DownloadSpeeds.MBps => "MB/s",
+                _ => throw new NotSupportedException()
+            }, (s) =>
+            {
+                _configService.Current.DownloadSpeedType = s;
+                _configService.Save();
+                Mediator.Publish(new DownloadLimitChangedMessage());
+            }, _configService.Current.DownloadSpeedType);
+        ImGui.SameLine();
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted("0 = No limit/infinite");
+
         if (ImGui.SliderInt("Maximum Parallel Downloads", ref maxParallelDownloads, 1, 10))
         {
             _configService.Current.ParallelDownloads = maxParallelDownloads;

@@ -19,6 +19,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
     private readonly FileCompactor _fileCompactor;
     private readonly FileCacheManager _fileDbManager;
     private readonly FileTransferOrchestrator _orchestrator;
+    private readonly List<ThrottledStream> _activeDownloadStreams;
 
     public FileDownloadManager(ILogger<FileDownloadManager> logger, MareMediator mediator,
         FileTransferOrchestrator orchestrator,
@@ -28,6 +29,18 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         _orchestrator = orchestrator;
         _fileDbManager = fileCacheManager;
         _fileCompactor = fileCompactor;
+        _activeDownloadStreams = [];
+
+        Mediator.Subscribe<DownloadLimitChangedMessage>(this, (msg) =>
+        {
+            if (!_activeDownloadStreams.Any()) return;
+            var newLimit = _orchestrator.DownloadLimitPerSlot();
+            Logger.LogTrace("Setting new Download Speed Limit to {newLimit}", newLimit);
+            foreach (var stream in _activeDownloadStreams)
+            {
+                stream.BandwidthLimit = newLimit;
+            }
+        });
     }
 
     public List<DownloadFileTransfer> CurrentDownloads { get; private set; } = [];
@@ -71,6 +84,14 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
     protected override void Dispose(bool disposing)
     {
         CancelDownload();
+        foreach (var stream in _activeDownloadStreams)
+        {
+            try
+            {
+                stream.Dispose();
+            }
+            catch { }
+        }
         base.Dispose(disposing);
     }
 
@@ -133,6 +154,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
             }
         }
 
+        ThrottledStream? stream = null;
         try
         {
             var fileStream = File.Create(tempPath);
@@ -142,7 +164,10 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                 var buffer = new byte[bufferSize];
 
                 var bytesRead = 0;
-                var stream = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+                var limit = _orchestrator.DownloadLimitPerSlot();
+                Logger.LogTrace("Starting Download of {id} with a speed limit of {limit}", requestId, limit);
+                stream = new ThrottledStream(await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false), limit);
+                _activeDownloadStreams.Add(stream);
                 while ((bytesRead = await stream.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
                 {
                     ct.ThrowIfCancellationRequested();
@@ -170,6 +195,14 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                 // ignore if file deletion fails
             }
             throw;
+        }
+        finally
+        {
+            if (stream != null)
+            {
+                _activeDownloadStreams.Remove(stream);
+                await stream.DisposeAsync().ConfigureAwait(false);
+            }
         }
     }
 

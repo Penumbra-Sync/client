@@ -69,6 +69,21 @@ public class CompactUi : WindowMediatorSubscriberBase
         _selectPairsForGroupUi = selectPairForTagUi;
         _tabMenu = new TopTabMenu(Mediator, _apiController, _pairManager);
 
+        AllowPinning = false;
+        AllowClickthrough = false;
+        TitleBarButtons = new()
+        {
+            new TitleBarButton()
+            {
+                Icon = FontAwesomeIcon.Cog,
+                Click = (msg) =>
+                {
+                    Mediator.Publish(new UiToggleMessage(typeof(SettingsUi)));
+                },
+                IconOffset = new(2,1)
+            }
+        };
+
         _drawFolders = GetDrawFolders().ToList();
 
 #if DEBUG
@@ -340,47 +355,35 @@ public class CompactUi : WindowMediatorSubscriberBase
     private void DrawUIDHeader()
     {
         var uidText = GetUidText();
-        var buttonSizeX = 0f;
 
-        if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
-        var uidTextSize = ImGui.CalcTextSize(uidText);
-        if (_uiShared.UidFontBuilt) ImGui.PopFont();
-
-        var originalPos = ImGui.GetCursorPos();
-        ImGui.SetWindowFontScale(1.5f);
-        var buttonSize = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Cog);
-        buttonSizeX -= buttonSize.X - ImGui.GetStyle().ItemSpacing.X * 2;
-        ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - buttonSize.X);
-        ImGui.SetCursorPosY(originalPos.Y + uidTextSize.Y / 2 - buttonSize.Y / 2);
-        if (ImGuiComponents.IconButton(FontAwesomeIcon.Cog))
+        using (ImRaii.PushFont(_uiShared.UidFont, _uiShared.UidFontBuilt))
         {
-            Mediator.Publish(new OpenSettingsUiMessage());
+            var uidTextSize = ImGui.CalcTextSize(uidText);
+            ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X) / 2 - (uidTextSize.X / 2));
+            ImGui.TextColored(GetUidColor(), uidText);
         }
-        UiSharedService.AttachToolTip("Open the Mare Synchronos Settings");
-
-        ImGui.SameLine(); //Important to draw the uidText consistently
-        ImGui.SetCursorPos(originalPos);
 
         if (_apiController.ServerState is ServerState.Connected)
         {
-            buttonSizeX += UiSharedService.GetIconButtonSize(FontAwesomeIcon.Copy).X - ImGui.GetStyle().ItemSpacing.X * 2;
-            ImGui.SetCursorPosY(originalPos.Y + uidTextSize.Y / 2 - buttonSize.Y / 2);
-            if (ImGuiComponents.IconButton(FontAwesomeIcon.Copy))
+            if (ImGui.IsItemClicked())
             {
                 ImGui.SetClipboardText(_apiController.DisplayName);
             }
-            UiSharedService.AttachToolTip("Copy your UID to clipboard");
-            ImGui.SameLine();
+            UiSharedService.AttachToolTip("Click to copy");
+
+            if (!string.Equals(_apiController.DisplayName, _apiController.UID, StringComparison.Ordinal))
+            {
+                var origTextSize = ImGui.CalcTextSize(_apiController.UID);
+                ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X) / 2 - (origTextSize.X / 2));
+                ImGui.TextColored(GetUidColor(), _apiController.UID);
+                if (ImGui.IsItemClicked())
+                {
+                    ImGui.SetClipboardText(_apiController.UID);
+                }
+                UiSharedService.AttachToolTip("Click to copy");
+            }
         }
-        ImGui.SetWindowFontScale(1f);
-
-        ImGui.SetCursorPosY(originalPos.Y + buttonSize.Y / 2 - uidTextSize.Y / 2 - ImGui.GetStyle().ItemSpacing.Y / 2);
-        ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMax().X + ImGui.GetWindowContentRegionMin().X) / 2 + buttonSizeX - uidTextSize.X / 2);
-        if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
-        ImGui.TextColored(GetUidColor(), uidText);
-        if (_uiShared.UidFontBuilt) ImGui.PopFont();
-
-        if (_apiController.ServerState is not ServerState.Connected)
+        else
         {
             UiSharedService.ColorTextWrapped(GetServerError(), GetUidColor());
             if (_apiController.ServerState is ServerState.NoSecretKey)

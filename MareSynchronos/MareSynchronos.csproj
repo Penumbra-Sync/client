@@ -31,6 +31,7 @@
   <ItemGroup>
     <PackageReference Include="Dalamud.ContextMenu" Version="1.3.1" />
     <PackageReference Include="DalamudPackager" Version="2.1.12" />
+    <PackageReference Include="Downloader" Version="3.0.6" />
     <PackageReference Include="lz4net" Version="1.0.15.93" />
     <PackageReference Include="Meziantou.Analyzer" Version="2.0.92">
       <PrivateAssets>all</PrivateAssets>
