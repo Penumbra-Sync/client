@@ -293,7 +293,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         }
     }
 
-    public async Task GlamourerRevert(ILogger logger, GameObjectHandler handler, Guid applicationId, CancellationToken token)
+    public async Task GlamourerRevert(ILogger logger, string name, GameObjectHandler handler, Guid applicationId, CancellationToken token)
     {
         if ((!CheckGlamourerApi()) || _dalamudUtil.IsZoning) return;
         try
@@ -304,7 +304,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
                 try
                 {
                     logger.LogDebug("[{appid}] Calling On IPC: GlamourerUnlockName", applicationId);
-                    _glamourerUnlock.InvokeFunc(handler.Name, LockCode);
+                    _glamourerUnlock.InvokeFunc(name, LockCode);
                     logger.LogDebug("[{appid}] Calling On IPC: GlamourerRevert", applicationId);
                     _glamourerRevert.InvokeAction(chara, LockCode);
                     logger.LogDebug("[{appid}] Calling On IPC: PenumbraRedraw", applicationId);
