@@ -404,8 +404,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                         LastAppliedDataSize = -1;
                         foreach (var path in moddedPaths.Select(v => new FileInfo(v.Value)).Where(p => p.Exists))
                         {
-                            if (path.Exists)
-                                LastAppliedDataSize += path.Length;
+                            LastAppliedDataSize += path.Length;
                         }
                     }
 
