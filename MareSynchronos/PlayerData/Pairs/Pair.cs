@@ -44,6 +44,7 @@ public class Pair
     public bool IsVisible => CachedPlayer?.IsVisible ?? false;
     public CharacterData? LastReceivedCharacterData { get; set; }
     public string? PlayerName => CachedPlayer?.PlayerName ?? string.Empty;
+    public long LastAppliedDataSize => CachedPlayer?.LastAppliedDataSize ?? -1;
 
     public UserData UserData => UserPair.User;
 

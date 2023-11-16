@@ -227,6 +227,12 @@ public class DrawUserPair
             userPairText += UiSharedService.TooltipSeparator + "You are directly Paired";
         }
 
+        if (_pair.LastAppliedDataSize >= 0)
+        {
+            userPairText += UiSharedService.TooltipSeparator + (!_pair.IsVisible ? "(Last) " : string.Empty) +
+                "Loaded Mods Size: " + UiSharedService.ByteToString(_pair.LastAppliedDataSize, true);
+        }
+
         if (_syncedGroups.Any())
         {
             userPairText += UiSharedService.TooltipSeparator + string.Join(Environment.NewLine,

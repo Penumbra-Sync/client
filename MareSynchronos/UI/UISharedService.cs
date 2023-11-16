@@ -420,7 +420,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
         var frameOffsetY = ((frameHeight - iconData.IconSize.Y * iconData.IconScaling) / 2f);
 
-        drawList.AddText(UiBuilder.IconFont, ImGui.GetFontSize() * iconData.IconScaling,
+        drawList.AddText(UiBuilder.IconFont, UiBuilder.IconFont.FontSize * iconData.IconScaling,
             new(windowPos.X - scrollPosX + cursorPos.X + iconData.OffsetX,
             windowPos.Y - scrollPosY + cursorPos.Y + frameOffsetY),
             color, icon.ToIconString());

@@ -37,6 +37,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private bool _isVisible;
     private string _penumbraCollection;
     private bool _redrawOnNextApplication = false;
+    public long LastAppliedDataSize { get; private set; }
 
     public PairHandler(ILogger<PairHandler> logger, OnlineUserIdentDto onlineUser,
         GameObjectHandlerFactory gameObjectHandlerFactory,
@@ -81,6 +82,8 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                 _redrawOnNextApplication = true;
             }
         });
+
+        LastAppliedDataSize = -1;
     }
 
     public bool IsVisible
@@ -398,6 +401,12 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                     if (updateModdedPaths)
                     {
                         await _ipcManager.PenumbraSetTemporaryModsAsync(Logger, _applicationId, _penumbraCollection, moddedPaths).ConfigureAwait(false);
+                        LastAppliedDataSize = -1;
+                        foreach (var path in moddedPaths.Select(v => new FileInfo(v.Value)).Where(p => p.Exists))
+                        {
+                            if (path.Exists)
+                                LastAppliedDataSize += path.Length;
+                        }
                     }
 
                     if (updateManip)
