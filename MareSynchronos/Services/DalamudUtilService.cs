@@ -173,7 +173,7 @@ public class DalamudUtilService : IHostedService
 
     public async Task<string> GetPlayerNameHashedAsync()
     {
-        return await RunOnFrameworkThread(() => (GetPlayerName() + GetWorldId()).GetHash256()).ConfigureAwait(false);
+        return await RunOnFrameworkThread(() => (GetPlayerName() + GetHomeWorldId()).GetHash256()).ConfigureAwait(false);
     }
 
     public IntPtr GetPlayerPointer()
@@ -187,15 +187,26 @@ public class DalamudUtilService : IHostedService
         return await RunOnFrameworkThread(GetPlayerPointer).ConfigureAwait(false);
     }
 
-    public uint GetWorldId()
+    public uint GetHomeWorldId()
     {
         EnsureIsOnFramework();
         return _clientState.LocalPlayer!.HomeWorld.Id;
     }
 
+    public uint GetWorldId()
+    {
+        EnsureIsOnFramework();
+        return _clientState.LocalPlayer!.CurrentWorld.Id;
+    }
+
     public async Task<uint> GetWorldIdAsync()
     {
         return await RunOnFrameworkThread(GetWorldId).ConfigureAwait(false);
+    }
+
+    public async Task<uint> GetHomeWorldIdAsync()
+    {
+        return await RunOnFrameworkThread(GetHomeWorldId).ConfigureAwait(false);
     }
 
     public unsafe bool IsGameObjectPresent(IntPtr key)

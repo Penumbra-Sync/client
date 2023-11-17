@@ -77,7 +77,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         });
         Mediator.Subscribe<ClassJobChangedMessage>(this, (msg) =>
         {
-            if (_mareConfigService.Current.UseLessRedraws && msg.gameObjectHandler == _charaHandler)
+            if (msg.gameObjectHandler == _charaHandler)
             {
                 _redrawOnNextApplication = true;
             }
@@ -262,7 +262,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             Logger.LogDebug("[{applicationId}] Applying Customization Data for {handler}", applicationId, handler);
             await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, handler, applicationId, 30000, token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
-            if (!_mareConfigService.Current.UseLessRedraws) changes.Value.Remove(PlayerChanges.ForcedRedraw);
             foreach (var change in changes.Value.OrderBy(p => (int)p))
             {
                 Logger.LogDebug("[{applicationId}] Processing {change} for {handler}", applicationId, change, handler);
@@ -306,11 +305,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                         break;
                 }
                 token.ThrowIfCancellationRequested();
-            }
-
-            if (!_mareConfigService.Current.UseLessRedraws && (changes.Value.Contains(PlayerChanges.ModFiles) || changes.Value.Contains(PlayerChanges.ModManip) || changes.Value.Contains(PlayerChanges.Glamourer)))
-            {
-                await _ipcManager.PenumbraRedrawAsync(Logger, handler, applicationId, token).ConfigureAwait(false);
             }
         }
         finally

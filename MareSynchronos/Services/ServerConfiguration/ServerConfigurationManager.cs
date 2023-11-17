@@ -62,7 +62,7 @@ public class ServerConfigurationManager
         }
 
         var charaName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult();
-        var worldId = _dalamudUtil.GetWorldIdAsync().GetAwaiter().GetResult();
+        var worldId = _dalamudUtil.GetHomeWorldIdAsync().GetAwaiter().GetResult();
         if (!currentServer.Authentications.Any() && currentServer.SecretKeys.Any())
         {
             currentServer.Authentications.Add(new Authentication()
@@ -136,7 +136,7 @@ public class ServerConfigurationManager
         server.Authentications.Add(new Authentication()
         {
             CharacterName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult(),
-            WorldId = _dalamudUtil.GetWorldIdAsync().GetAwaiter().GetResult(),
+            WorldId = _dalamudUtil.GetHomeWorldIdAsync().GetAwaiter().GetResult(),
             SecretKeyIdx = addLastSecretKey ? server.SecretKeys.Last().Key : -1,
         });
         Save();

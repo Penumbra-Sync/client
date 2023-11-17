@@ -125,7 +125,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public Dictionary<ushort, string> WorldData => _dalamudUtil.WorldData.Value;
 
-    public uint WorldId => _dalamudUtil.GetWorldId();
+    public uint WorldId => _dalamudUtil.GetHomeWorldId();
 
     public const string TooltipSeparator = "--SEP--";
 
