@@ -37,6 +37,10 @@ public class BanUserPopupHandler : IPopupHandler
         UiSharedService.TextWrapped("The reason will be displayed in the banlist. The current server-side alias if present (Vanity ID) will automatically be attached to the reason.");
     }
 
+    public void OnClose()
+    {
+    }
+
     public void Open(OpenBanUserPopupMessage message)
     {
         _reportedPair = message.PairToBan;

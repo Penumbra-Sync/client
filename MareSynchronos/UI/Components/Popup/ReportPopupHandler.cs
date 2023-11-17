@@ -49,6 +49,10 @@ internal class ReportPopupHandler : IPopupHandler
         }
     }
 
+    public void OnClose()
+    {
+    }
+
     public void Open(OpenReportPopupMessage msg)
     {
         _reportedPair = msg.PairToReport;

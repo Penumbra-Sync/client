@@ -44,6 +44,19 @@ public class ServerConfigurationManager
         }
     }
 
+    public bool ShownCensusPopup
+    {
+        get
+        {
+            return _configService.Current.ShownCensusPopup;
+        }
+        set
+        {
+            _configService.Current.ShownCensusPopup = value;
+            _configService.Save();
+        }
+    }
+
     public int CurrentServerIndex
     {
         set

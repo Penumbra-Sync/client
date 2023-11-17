@@ -44,6 +44,13 @@ public class PopupHandler : WindowMediatorSubscriberBase
             ((BanUserPopupHandler)_currentHandler).Open(msg);
             IsOpen = true;
         });
+
+        Mediator.Subscribe<OpenCensusPopupMessage>(this, (msg) =>
+        {
+            _openPopup = true;
+            _currentHandler = _handlers.OfType<CensusPopupHandler>().Single();
+            IsOpen = true;
+        });
     }
 
     public override void Draw()
@@ -66,6 +73,13 @@ public class PopupHandler : WindowMediatorSubscriberBase
         if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Times, "Close"))
         {
             ImGui.CloseCurrentPopup();
+            _currentHandler.OnClose();
         }
+    }
+
+    public override void OnClose()
+    {
+        base.OnClose();
+        _currentHandler?.OnClose();
     }
 }

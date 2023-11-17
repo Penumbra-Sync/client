@@ -72,6 +72,7 @@ public record PairHandlerVisibleMessage(PairHandler Player) : MessageBase;
 public record RefreshUiMessage : MessageBase;
 public record OpenReportPopupMessage(Pair PairToReport) : MessageBase;
 public record OpenBanUserPopupMessage(Pair PairToBan, GroupFullInfoDto GroupFullInfoDto) : MessageBase;
+public record OpenCensusPopupMessage() : MessageBase;
 public record OpenSyncshellAdminPanel(GroupFullInfoDto GroupInfo) : MessageBase;
 public record OpenPermissionWindow(Pair Pair) : MessageBase;
 public record DownloadLimitChangedMessage() : SameThreadMessage;
