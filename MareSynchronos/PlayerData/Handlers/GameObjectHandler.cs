@@ -99,6 +99,10 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         ModelFilesInSlotLoaded
     }
 
+    public byte RaceId { get; private set; }
+    public byte Gender { get; private set; }
+    public byte TribeId { get; private set; }
+
     public IntPtr Address { get; private set; }
     public string Name { get; private set; }
     public ObjectKind ObjectKind { get; }
@@ -253,6 +257,19 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             if (((DrawObject*)DrawObjectAddress)->Object.GetObjectType() == ObjectType.CharacterBase
                 && ((CharacterBase*)DrawObjectAddress)->GetModelType() == CharacterBase.ModelType.Human)
             {
+                var gender = ((Human*)DrawObjectAddress)->Customize.Sex;
+                var raceId = ((Human*)DrawObjectAddress)->Customize.Race;
+                var tribeId = ((Human*)DrawObjectAddress)->Customize.Clan;
+
+                if (_isOwnedObject && ObjectKind == ObjectKind.Player
+                    && (gender != Gender || raceId != RaceId || tribeId != TribeId))
+                {
+                    Mediator.Publish(new CensusUpdateMessage(gender, raceId, tribeId));
+                    Gender = gender;
+                    RaceId = raceId;
+                    TribeId = tribeId;
+                }
+
                 customizeDiff = CompareAndUpdateCustomizeData(((Human*)DrawObjectAddress)->Customize.Data);
                 if (customizeDiff)
                     Logger.LogTrace("Checking [{this}] customize data as human from draw obj, result: {diff}", this, customizeDiff);

@@ -2,6 +2,7 @@
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto;
+using MareSynchronos.API.Dto.User;
 using MareSynchronos.API.SignalR;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
@@ -34,6 +35,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
     private string? _lastUsedToken;
     private HubConnection? _mareHub;
     private ServerState _serverState;
+    private CensusUpdateMessage? _lastCensus;
 
     public ApiController(ILogger<ApiController> logger, HubFactory hubFactory, DalamudUtilService dalamudUtil,
         PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator,
@@ -52,6 +54,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         Mediator.Subscribe<HubReconnectedMessage>(this, async (msg) => await MareHubOnReconnected().ConfigureAwait(false));
         Mediator.Subscribe<HubReconnectingMessage>(this, (msg) => MareHubOnReconnecting(msg.Exception));
         Mediator.Subscribe<CyclePauseMessage>(this, (msg) => _ = CyclePause(msg.UserData));
+        Mediator.Subscribe<CensusUpdateMessage>(this, (msg) => _lastCensus = msg);
 
         ServerState = ServerState.Offline;
 
@@ -348,7 +351,15 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
     private async Task LoadOnlinePairs()
     {
-        foreach (var entry in await UserGetOnlinePairs().ConfigureAwait(false))
+        CensusDataDto? dto = null;
+        if (_serverManager.SendCensusData && _lastCensus != null)
+        {
+            var world = await _dalamudUtil.GetWorldIdAsync().ConfigureAwait(false);
+            dto = new((ushort)world, _lastCensus.RaceId, _lastCensus.TribeId, _lastCensus.Gender);
+            Logger.LogDebug("Attaching Census Data: {data}", dto);
+        }
+
+        foreach (var entry in await UserGetOnlinePairs(dto).ConfigureAwait(false))
         {
             Logger.LogDebug("Pair online: {pair}", entry);
             _pairManager.MarkPairOnline(entry, sendNotif: false);

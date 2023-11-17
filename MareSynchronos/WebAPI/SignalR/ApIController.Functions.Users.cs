@@ -41,9 +41,9 @@ public partial class ApiController
         await CreateConnections().ConfigureAwait(false);
     }
 
-    public async Task<List<OnlineUserIdentDto>> UserGetOnlinePairs()
+    public async Task<List<OnlineUserIdentDto>> UserGetOnlinePairs(CensusDataDto? censusDataDto)
     {
-        return await _mareHub!.InvokeAsync<List<OnlineUserIdentDto>>(nameof(UserGetOnlinePairs)).ConfigureAwait(false);
+        return await _mareHub!.InvokeAsync<List<OnlineUserIdentDto>>(nameof(UserGetOnlinePairs), censusDataDto).ConfigureAwait(false);
     }
 
     public async Task<List<UserFullPairDto>> UserGetPairedClients()
@@ -128,7 +128,16 @@ public partial class ApiController
             sb.AppendLine($"GlamourerData for {item.Key}: {!string.IsNullOrEmpty(item.Value)}");
         }
         Logger.LogDebug("Chara data contained: {nl} {data}", Environment.NewLine, sb.ToString());
-        await UserPushData(new(visibleCharacters, character)).ConfigureAwait(false);
+
+        CensusDataDto? censusDto = null;
+        if (_serverManager.SendCensusData && _lastCensus != null)
+        {
+            var world = await _dalamudUtil.GetWorldIdAsync().ConfigureAwait(false);
+            censusDto = new((ushort)world, _lastCensus.RaceId, _lastCensus.TribeId, _lastCensus.Gender);
+            Logger.LogDebug("Attaching Census Data: {data}", censusDto);
+        }
+
+        await UserPushData(new(visibleCharacters, character, censusDto)).ConfigureAwait(false);
     }
 }
 #pragma warning restore MA0040

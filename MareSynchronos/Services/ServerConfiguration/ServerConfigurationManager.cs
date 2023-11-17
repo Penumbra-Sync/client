@@ -31,6 +31,18 @@ public class ServerConfigurationManager
 
     public string CurrentApiUrl => CurrentServer.ServerUri;
     public ServerStorage CurrentServer => _configService.Current.ServerStorage[CurrentServerIndex];
+    public bool SendCensusData
+    {
+        get
+        {
+            return _configService.Current.SendCensusData;
+        }
+        set
+        {
+            _configService.Current.SendCensusData = value;
+            _configService.Save();
+        }
+    }
 
     public int CurrentServerIndex
     {
