@@ -24,6 +24,8 @@ internal class ReportPopupHandler : IPopupHandler
 
     public Vector2 PopupSize => new(500, 500);
 
+    public bool ShowClose => true;
+
     public void DrawContent()
     {
         using (ImRaii.PushFont(_uiSharedService.UidFont))
@@ -47,10 +49,6 @@ internal class ReportPopupHandler : IPopupHandler
                 _ = _apiController.UserReportProfile(new(_reportedPair.UserData, reason));
             }
         }
-    }
-
-    public void OnClose()
-    {
     }
 
     public void Open(OpenReportPopupMessage msg)

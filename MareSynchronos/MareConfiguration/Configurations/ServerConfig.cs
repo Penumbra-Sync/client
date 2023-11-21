@@ -13,7 +13,7 @@ public class ServerConfig : IMareConfiguration
         { new ServerStorage() { ServerName = ApiController.MainServer, ServerUri = ApiController.MainServiceUri } },
     };
 
-    public bool SendCensusData { get; set; } = true;
+    public bool SendCensusData { get; set; } = false;
     public bool ShownCensusPopup { get; set; } = false;
 
     public int Version { get; set; } = 1;

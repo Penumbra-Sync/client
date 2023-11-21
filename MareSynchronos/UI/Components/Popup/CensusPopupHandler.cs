@@ -17,13 +17,20 @@ public class CensusPopupHandler : IPopupHandler
         _uiSharedService = uiSharedService;
     }
 
-    public Vector2 PopupSize => new(600, 350);
+    private Vector2 _size = new(600, 450);
+    public Vector2 PopupSize => _size;
+
+    public bool ShowClose => false;
 
     public void DrawContent()
     {
+        var start = 0f;
         using (ImRaii.PushFont(_uiSharedService.UidFont))
-            UiSharedService.TextWrapped("Mare Census Opt-Out");
-        ImGuiHelpers.ScaledDummy(5, 5);
+        {
+            start = ImGui.GetCursorPosY() - ImGui.CalcTextSize("Mare Census Data").Y;
+            UiSharedService.TextWrapped("Mare Census Participation");
+        }
+        ImGuiHelpers.ScaledDummy(5f);
         UiSharedService.TextWrapped("If you are seeing this popup you are updating from a Mare version that did not collect census data. Please read the following carefully.");
         ImGui.Separator();
         UiSharedService.TextWrapped("Mare Census is a data collecting service that can be used for statistical purposes. " +
@@ -34,17 +41,25 @@ public class CensusPopupHandler : IPopupHandler
             + "- Current Gender (reflecting Glamourer changes)" + Environment.NewLine
             + "- Current Race (reflecting Glamourer changes)" + Environment.NewLine
             + "- Current Clan (i.e. Seeker of the Sun, Keeper of the Moon, etc., reflecting Glamourer changes)");
-        UiSharedService.TextWrapped("If you do not consent to the data mentioned above being sent, untick the checkbox below.");
+        UiSharedService.TextWrapped("To consent to collecting census data press the appropriate button below.");
         UiSharedService.TextWrapped("This setting can be changed anytime in the Mare Settings.");
-        var sendCensus = _serverConfigurationManager.SendCensusData;
-        if (ImGui.Checkbox("Allow sending census data", ref sendCensus))
+        var width = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
+        var buttonSize = ImGuiHelpers.GetButtonSize("I consent to send my census data");
+        ImGuiHelpers.ScaledDummy(5f);
+        if (ImGui.Button("I consent to send my census data", new Vector2(width, buttonSize.Y * 2.5f)))
         {
-            _serverConfigurationManager.SendCensusData = sendCensus;
+            _serverConfigurationManager.SendCensusData = true;
+            _serverConfigurationManager.ShownCensusPopup = true;
+            ImGui.CloseCurrentPopup();
         }
-    }
-
-    public void OnClose()
-    {
-        _serverConfigurationManager.ShownCensusPopup = true;
+        ImGuiHelpers.ScaledDummy(1f);
+        if (ImGui.Button("I do not consent to send my census data", new Vector2(width, buttonSize.Y)))
+        {
+            _serverConfigurationManager.SendCensusData = false;
+            _serverConfigurationManager.ShownCensusPopup = true;
+            ImGui.CloseCurrentPopup();
+        }
+        var height = ImGui.GetCursorPosY() - start;
+        _size = _size with { Y = height };
     }
 }

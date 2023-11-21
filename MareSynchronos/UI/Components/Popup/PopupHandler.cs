@@ -69,17 +69,13 @@ public class PopupHandler : WindowMediatorSubscriberBase
         using var popup = ImRaii.Popup(WindowName, ImGuiWindowFlags.Modal);
         if (!popup) return;
         _currentHandler.DrawContent();
-        ImGui.Separator();
-        if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Times, "Close"))
+        if (_currentHandler.ShowClose)
         {
-            ImGui.CloseCurrentPopup();
-            _currentHandler.OnClose();
+            ImGui.Separator();
+            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Times, "Close"))
+            {
+                ImGui.CloseCurrentPopup();
+            }
         }
-    }
-
-    public override void OnClose()
-    {
-        base.OnClose();
-        _currentHandler?.OnClose();
     }
 }
