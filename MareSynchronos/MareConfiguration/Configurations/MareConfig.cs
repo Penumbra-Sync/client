@@ -50,6 +50,7 @@ public class MareConfig : IMareConfiguration
     public int TransferBarsWidth { get; set; } = 250;
     public bool UseAlternativeFileUpload { get; set; } = false;
     public bool UseCompactor { get; set; } = false;
+    public bool ExperimentalUsePenumbraResourceTree { get; set; } = false;
     public int Version { get; set; } = 1;
     public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;
 }

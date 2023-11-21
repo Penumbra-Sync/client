@@ -549,6 +549,16 @@ public class SettingsUi : WindowMediatorSubscriberBase
         }
 
         _lastTab = "General";
+        UiSharedService.FontText("Experimental", _uiShared.UidFont);
+        var usePenumbraResolve = _configService.Current.ExperimentalUsePenumbraResourceTree;
+        if (ImGui.Checkbox("Use Penumbra to resolve character", ref usePenumbraResolve))
+        {
+            _configService.Current.ExperimentalUsePenumbraResourceTree = usePenumbraResolve;
+            _configService.Save();
+        }
+        UiSharedService.DrawHelpText("Requires Penumbra version greater equal to 0.8.1.9 - please report issues with that feature to the Penumbra Discord");
+        ImGui.Separator();
+
         UiSharedService.FontText("Notes", _uiShared.UidFont);
         if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.StickyNote, "Export all your user notes to clipboard"))
         {

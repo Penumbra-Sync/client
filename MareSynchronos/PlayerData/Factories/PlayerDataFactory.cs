@@ -5,6 +5,7 @@ using FFXIVClientStructs.FFXIV.Client.System.Resource;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Data;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services;
@@ -25,11 +26,12 @@ public class PlayerDataFactory
     private readonly IpcManager _ipcManager;
     private readonly ILogger<PlayerDataFactory> _logger;
     private readonly PerformanceCollectorService _performanceCollector;
+    private readonly MareConfigService _mareConfigService;
     private readonly TransientResourceManager _transientResourceManager;
 
     public PlayerDataFactory(ILogger<PlayerDataFactory> logger, DalamudUtilService dalamudUtil, IpcManager ipcManager,
         TransientResourceManager transientResourceManager, FileCacheManager fileReplacementFactory,
-        PerformanceCollectorService performanceCollector)
+        PerformanceCollectorService performanceCollector, MareConfigService mareConfigService)
     {
         _logger = logger;
         _dalamudUtil = dalamudUtil;
@@ -37,7 +39,7 @@ public class PlayerDataFactory
         _transientResourceManager = transientResourceManager;
         _fileCacheManager = fileReplacementFactory;
         _performanceCollector = performanceCollector;
-
+        _mareConfigService = mareConfigService;
         _logger.LogTrace("Creating " + nameof(PlayerDataFactory));
     }
 
@@ -281,7 +283,7 @@ public class PlayerDataFactory
             AddReplacementsFromRenderModel(mdl, forwardResolve, reverseResolve);
         }
 
-        if (objectKind == ObjectKind.Player)
+        if (objectKind == ObjectKind.Player && human->CharacterBase.GetModelType() == CharacterBase.ModelType.Human)
         {
             AddPlayerSpecificReplacements(human, forwardResolve, reverseResolve);
         }
@@ -330,12 +332,18 @@ public class PlayerDataFactory
         Stopwatch st = Stopwatch.StartNew();
 
         // penumbra call, it's currently broken
-        // var data = (await _ipcManager.PenumbraGetCharacterData(_logger, playerRelatedObject).ConfigureAwait(false))![0];
-        // if (data == null) throw new InvalidOperationException("Penumbra returned null data");
-
-        // gather static replacements from render model
-        var (forwardResolve, reverseResolve) = await _dalamudUtil.RunOnFrameworkThread(() => BuildDataFromModel(objectKind, charaPointer, token)).ConfigureAwait(false);
-        Dictionary<string, List<string>> resolvedPaths = await GetFileReplacementsFromPaths(forwardResolve, reverseResolve).ConfigureAwait(false);
+        IReadOnlyDictionary<string, string[]>? resolvedPaths;
+        if (_mareConfigService.Current.ExperimentalUsePenumbraResourceTree)
+        {
+            resolvedPaths = (await _ipcManager.PenumbraGetCharacterData(_logger, playerRelatedObject).ConfigureAwait(false))![0];
+            if (resolvedPaths == null) throw new InvalidOperationException("Penumbra returned null data");
+        }
+        else
+        {
+            // gather static replacements from render model
+            var (forwardResolve, reverseResolve) = await _dalamudUtil.RunOnFrameworkThread(() => BuildDataFromModel(objectKind, charaPointer, token)).ConfigureAwait(false);
+            resolvedPaths = await GetFileReplacementsFromPaths(forwardResolve, reverseResolve).ConfigureAwait(false);
+        }
         previousData.FileReplacements[objectKind] =
                 new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement([.. c.Value], c.Key)), FileReplacementComparer.Instance)
                 .Where(p => p.HasFileReplacement).ToHashSet();
@@ -425,7 +433,7 @@ public class PlayerDataFactory
         return previousData;
     }
 
-    private async Task<Dictionary<string, List<string>>> GetFileReplacementsFromPaths(HashSet<string> forwardResolve, HashSet<string> reverseResolve)
+    private async Task<IReadOnlyDictionary<string, string[]>> GetFileReplacementsFromPaths(HashSet<string> forwardResolve, HashSet<string> reverseResolve)
     {
         var forwardPaths = forwardResolve.ToArray();
         var reversePaths = reverseResolve.ToArray();
@@ -457,7 +465,7 @@ public class PlayerDataFactory
             }
         }
 
-        return resolvedPaths;
+        return resolvedPaths.ToDictionary(k => k.Key, k => k.Value.ToArray(), StringComparer.OrdinalIgnoreCase).AsReadOnly();
     }
 
     private HashSet<string> ManageSemiTransientData(ObjectKind objectKind, IntPtr charaPointer)
