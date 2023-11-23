@@ -1,6 +1,7 @@
 ﻿using LZ4;
 using MareSynchronos.Interop;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
@@ -15,17 +16,19 @@ public sealed class FileCacheManager : IDisposable
     public const string CsvSplit = "|";
     public const string PenumbraPrefix = "{penumbra}";
     private readonly MareConfigService _configService;
+    private readonly MareMediator _mareMediator;
     private readonly string _csvPath;
     private readonly ConcurrentDictionary<string, List<FileCacheEntity>> _fileCaches = new(StringComparer.Ordinal);
     private readonly object _fileWriteLock = new();
     private readonly IpcManager _ipcManager;
     private readonly ILogger<FileCacheManager> _logger;
 
-    public FileCacheManager(ILogger<FileCacheManager> logger, IpcManager ipcManager, MareConfigService configService)
+    public FileCacheManager(ILogger<FileCacheManager> logger, IpcManager ipcManager, MareConfigService configService, MareMediator mareMediator)
     {
         _logger = logger;
         _ipcManager = ipcManager;
         _configService = configService;
+        _mareMediator = mareMediator;
         _csvPath = Path.Combine(configService.ConfigurationDirectory, "FileCache.csv");
 
         lock (_fileWriteLock)
@@ -170,6 +173,47 @@ public sealed class FileCacheManager : IDisposable
         }
 
         return output;
+    }
+
+    public Task<List<FileCacheEntity>> ValidateLocalIntegrity(IProgress<(int, int, FileCacheEntity)> progress, CancellationToken cancellationToken)
+    {
+        _mareMediator.Publish(new HaltScanMessage("IntegrityCheck"));
+        _logger.LogInformation("Validating local storage");
+        var cacheEntries = _fileCaches.SelectMany(v => v.Value).Where(v => v.IsCacheEntry).ToList();
+        List<FileCacheEntity> brokenEntities = new();
+        int i = 0;
+        foreach (var fileCache in cacheEntries)
+        {
+            _logger.LogInformation("Validating {file}", fileCache.ResolvedFilepath);
+
+            progress.Report((i, cacheEntries.Count, fileCache));
+            i++;
+            var computedHash = Crypto.GetFileHash(fileCache.ResolvedFilepath);
+            if (!string.Equals(computedHash, fileCache.Hash, StringComparison.Ordinal))
+            {
+                _logger.LogInformation("Failed to validate {file}, got hash {hash}, expected hash {hash}", fileCache.ResolvedFilepath, computedHash, fileCache.Hash);
+                brokenEntities.Add(fileCache);
+            }
+
+            if (cancellationToken.IsCancellationRequested) break;
+        }
+
+        foreach (var brokenEntity in brokenEntities)
+        {
+            RemoveHashedFile(brokenEntity.Hash, brokenEntity.PrefixedFilePath);
+
+            try
+            {
+                File.Delete(brokenEntity.ResolvedFilepath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Could not delete {file}", brokenEntity.ResolvedFilepath);
+            }
+        }
+
+        _mareMediator.Publish(new ResumeScanMessage("IntegrityCheck"));
+        return Task.FromResult(brokenEntities);
     }
 
     public string GetCacheFilePath(string hash, string extension)

@@ -35,6 +35,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private readonly FileCompactor _fileCompactor;
     private readonly FileUploadManager _fileTransferManager;
     private readonly FileTransferOrchestrator _fileTransferOrchestrator;
+    private readonly FileCacheManager _fileCacheManager;
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly PairManager _pairManager;
     private readonly PerformanceCollectorService _performanceCollector;
@@ -49,6 +50,10 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private bool _readClearCache = false;
     private bool _readExport = false;
     private bool _wasOpen = false;
+    private readonly IProgress<(int, int, FileCacheEntity)> _validationProgress;
+    private Task<List<FileCacheEntity>>? _validationTask;
+    private CancellationTokenSource? _validationCts;
+    private (int, int, FileCacheEntity) _currentProgress;
 
     public SettingsUi(ILogger<SettingsUi> logger,
         UiSharedService uiShared, MareConfigService configService,
@@ -57,6 +62,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         MareMediator mediator, PerformanceCollectorService performanceCollector,
         FileUploadManager fileTransferManager,
         FileTransferOrchestrator fileTransferOrchestrator,
+        FileCacheManager fileCacheManager,
         FileCompactor fileCompactor, ApiController apiController) : base(logger, mediator, "Mare Synchronos Settings")
     {
         _configService = configService;
@@ -66,11 +72,13 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _performanceCollector = performanceCollector;
         _fileTransferManager = fileTransferManager;
         _fileTransferOrchestrator = fileTransferOrchestrator;
+        _fileCacheManager = fileCacheManager;
         _apiController = apiController;
         _fileCompactor = fileCompactor;
         _uiShared = uiShared;
         AllowClickthrough = false;
         AllowPinning = false;
+        _validationProgress = new Progress<(int, int, FileCacheEntity)>(v => _currentProgress = v);
 
         SizeConstraints = new WindowSizeConstraints()
         {
@@ -509,6 +517,49 @@ public class SettingsUi : WindowMediatorSubscriberBase
             ImGui.EndDisabled();
             ImGui.TextUnformatted("The file compactor is only available on Windows.");
         }
+        ImGuiHelpers.ScaledDummy(new Vector2(10, 10));
+
+        ImGui.Separator();
+        UiSharedService.TextWrapped("File Storage validation can make sure that all files in your local Mare Storage are valid. " +
+            "Run the validation before you clear the Storage for no reason. " + Environment.NewLine +
+            "This operation, depending on how many files you have in your storage, can take a while and will be CPU and drive intensive.");
+        using (ImRaii.Disabled(_validationTask != null && !_validationTask.IsCompleted))
+        {
+            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Check, "Start File Storage Validation"))
+            {
+                _validationCts?.Cancel();
+                _validationCts?.Dispose();
+                _validationCts = new();
+                var token = _validationCts.Token;
+                _validationTask = Task.Run(() => _fileCacheManager.ValidateLocalIntegrity(_validationProgress, token));
+            }
+        }
+        if (_validationTask != null && !_validationTask.IsCompleted)
+        {
+            ImGui.SameLine();
+            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Times, "Cancel"))
+            {
+                _validationCts?.Cancel();
+            }
+        }
+
+        if (_validationTask != null)
+        {
+            using (ImRaii.PushIndent(20f))
+            {
+                if (_validationTask.IsCompleted)
+                {
+                    UiSharedService.TextWrapped($"The storage validation has completed and removed {_validationTask.Result.Count} invalid files from storage.");
+                }
+                else
+                {
+
+                    UiSharedService.TextWrapped($"Storage validation is running: {_currentProgress.Item1}/{_currentProgress.Item2}");
+                    UiSharedService.TextWrapped($"Current item: {_currentProgress.Item3.ResolvedFilepath}");
+                }
+            }
+        }
+        ImGui.Separator();
 
         ImGuiHelpers.ScaledDummy(new Vector2(10, 10));
         ImGui.TextUnformatted("To clear the local storage accept the following disclaimer");
