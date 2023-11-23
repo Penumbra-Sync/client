@@ -607,7 +607,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             _configService.Current.ExperimentalUsePenumbraResourceTree = usePenumbraResolve;
             _configService.Save();
         }
-        UiSharedService.DrawHelpText("Requires Penumbra version greater equal to 0.8.1.9 - please report issues with that feature to the Penumbra Discord");
+        UiSharedService.DrawHelpText("Requires Penumbra version greater equal to 0.8.2.1 - please report issues with that feature to the Penumbra Discord");
         ImGui.Separator();
 
         UiSharedService.FontText("Notes", _uiShared.UidFont);
