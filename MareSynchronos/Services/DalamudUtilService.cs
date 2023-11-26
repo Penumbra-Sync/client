@@ -53,6 +53,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         });
         mediator.Subscribe<TargetPairMessage>(this, async (msg) =>
         {
+            if (clientState.IsPvP) return;
             var name = msg.Pair.PlayerName;
             if (string.IsNullOrEmpty(name)) return;
             var addr = _playerCharas.FirstOrDefault(f => string.Equals(f.Value.Name, name, StringComparison.Ordinal)).Value.Address;
