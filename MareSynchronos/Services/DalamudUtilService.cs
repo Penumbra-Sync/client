@@ -1,4 +1,5 @@
 ﻿using Dalamud.Game.ClientState.Conditions;
+using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
@@ -15,7 +16,7 @@ using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 namespace MareSynchronos.Services;
 
-public class DalamudUtilService : IHostedService
+public class DalamudUtilService : IHostedService, IMediatorSubscriber
 {
     private readonly List<uint> _classJobIdsIgnoredForPets = [30];
     private readonly IClientState _clientState;
@@ -23,7 +24,6 @@ public class DalamudUtilService : IHostedService
     private readonly IFramework _framework;
     private readonly IGameGui _gameGui;
     private readonly ILogger<DalamudUtilService> _logger;
-    private readonly MareMediator _mediator;
     private readonly IObjectTable _objectTable;
     private readonly PerformanceCollectorService _performanceCollector;
     private uint? _classJobId = 0;
@@ -35,7 +35,7 @@ public class DalamudUtilService : IHostedService
     private bool _sentBetweenAreas = false;
 
     public DalamudUtilService(ILogger<DalamudUtilService> logger, IClientState clientState, IObjectTable objectTable, IFramework framework,
-        IGameGui gameGui, ICondition condition, IDataManager gameData, MareMediator mediator, PerformanceCollectorService performanceCollector)
+        IGameGui gameGui, ICondition condition, IDataManager gameData, ITargetManager targetManager, MareMediator mediator, PerformanceCollectorService performanceCollector)
     {
         _logger = logger;
         _clientState = clientState;
@@ -43,13 +43,24 @@ public class DalamudUtilService : IHostedService
         _framework = framework;
         _gameGui = gameGui;
         _condition = condition;
-        _mediator = mediator;
+        Mediator = mediator;
         _performanceCollector = performanceCollector;
         WorldData = new(() =>
         {
             return gameData.GetExcelSheet<Lumina.Excel.GeneratedSheets.World>(Dalamud.ClientLanguage.English)!
                 .Where(w => w.IsPublic && !w.Name.RawData.IsEmpty)
                 .ToDictionary(w => (ushort)w.RowId, w => w.Name.ToString());
+        });
+        mediator.Subscribe<TargetPairMessage>(this, async (msg) =>
+        {
+            var name = msg.Pair.PlayerName;
+            if (string.IsNullOrEmpty(name)) return;
+            var addr = _playerCharas.FirstOrDefault(f => string.Equals(f.Value.Name, name, StringComparison.Ordinal)).Value.Address;
+            if (addr == nint.Zero) return;
+            await RunOnFrameworkThread(() =>
+            {
+                targetManager.Target = CreateGameObject(addr);
+            }).ConfigureAwait(false);
         });
     }
 
@@ -63,6 +74,8 @@ public class DalamudUtilService : IHostedService
     public bool IsZoning => _condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51];
 
     public Lazy<Dictionary<ushort, string>> WorldData { get; private set; }
+
+    public MareMediator Mediator { get; }
 
     public Dalamud.Game.ClientState.Objects.Types.GameObject? CreateGameObject(IntPtr reference)
     {
@@ -279,6 +292,7 @@ public class DalamudUtilService : IHostedService
     {
         _logger.LogTrace("Stopping {type}", GetType());
 
+        Mediator.UnsubscribeAll(this);
         _framework.Update -= FrameworkOnUpdate;
         return Task.CompletedTask;
     }
@@ -433,31 +447,31 @@ public class DalamudUtilService : IHostedService
         {
             _logger.LogDebug("Gpose start");
             IsInGpose = true;
-            _mediator.Publish(new GposeStartMessage());
+            Mediator.Publish(new GposeStartMessage());
         }
         else if (GposeTarget == null && IsInGpose)
         {
             _logger.LogDebug("Gpose end");
             IsInGpose = false;
-            _mediator.Publish(new GposeEndMessage());
+            Mediator.Publish(new GposeEndMessage());
         }
 
         if (_condition[ConditionFlag.WatchingCutscene] && !IsInCutscene)
         {
             _logger.LogDebug("Cutscene start");
             IsInCutscene = true;
-            _mediator.Publish(new CutsceneStartMessage());
-            _mediator.Publish(new HaltScanMessage("Cutscene"));
+            Mediator.Publish(new CutsceneStartMessage());
+            Mediator.Publish(new HaltScanMessage("Cutscene"));
         }
         else if (!_condition[ConditionFlag.WatchingCutscene] && IsInCutscene)
         {
             _logger.LogDebug("Cutscene end");
             IsInCutscene = false;
-            _mediator.Publish(new CutsceneEndMessage());
-            _mediator.Publish(new ResumeScanMessage("Cutscene"));
+            Mediator.Publish(new CutsceneEndMessage());
+            Mediator.Publish(new ResumeScanMessage("Cutscene"));
         }
 
-        if (IsInCutscene) { _mediator.Publish(new CutsceneFrameworkUpdateMessage()); return; }
+        if (IsInCutscene) { Mediator.Publish(new CutsceneFrameworkUpdateMessage()); return; }
 
         if (_condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51])
         {
@@ -469,8 +483,8 @@ public class DalamudUtilService : IHostedService
                 {
                     _logger.LogDebug("Zone switch/Gpose start");
                     _sentBetweenAreas = true;
-                    _mediator.Publish(new ZoneSwitchStartMessage());
-                    _mediator.Publish(new HaltScanMessage("Zone switch"));
+                    Mediator.Publish(new ZoneSwitchStartMessage());
+                    Mediator.Publish(new HaltScanMessage("Zone switch"));
                 }
             }
 
@@ -481,11 +495,11 @@ public class DalamudUtilService : IHostedService
         {
             _logger.LogDebug("Zone switch/Gpose end");
             _sentBetweenAreas = false;
-            _mediator.Publish(new ZoneSwitchEndMessage());
-            _mediator.Publish(new ResumeScanMessage("Zone switch"));
+            Mediator.Publish(new ZoneSwitchEndMessage());
+            Mediator.Publish(new ResumeScanMessage("Zone switch"));
         }
 
-        _mediator.Publish(new FrameworkUpdateMessage());
+        Mediator.Publish(new FrameworkUpdateMessage());
 
         if (DateTime.Now < _delayedFrameworkUpdateCheck.AddSeconds(1)) return;
 
@@ -496,16 +510,16 @@ public class DalamudUtilService : IHostedService
             _logger.LogDebug("Logged in");
             IsLoggedIn = true;
             _lastZone = _clientState.TerritoryType;
-            _mediator.Publish(new DalamudLoginMessage());
+            Mediator.Publish(new DalamudLoginMessage());
         }
         else if (localPlayer == null && IsLoggedIn)
         {
             _logger.LogDebug("Logged out");
             IsLoggedIn = false;
-            _mediator.Publish(new DalamudLogoutMessage());
+            Mediator.Publish(new DalamudLogoutMessage());
         }
 
-        _mediator.Publish(new DelayedFrameworkUpdateMessage());
+        Mediator.Publish(new DelayedFrameworkUpdateMessage());
 
         _delayedFrameworkUpdateCheck = DateTime.Now;
     }

@@ -208,7 +208,11 @@ public class DrawUserPair
         else if (_pair.IsVisible)
         {
             UiSharedService.NormalizedIcon(FontAwesomeIcon.Eye, ImGuiColors.ParsedGreen);
-            userPairText = _pair.UserData.AliasOrUID + " is visible: " + _pair.PlayerName;
+            userPairText = _pair.UserData.AliasOrUID + " is visible: " + _pair.PlayerName + Environment.NewLine + "Click to target this player";
+            if (ImGui.IsItemClicked())
+            {
+                _mediator.Publish(new TargetPairMessage(_pair));
+            }
         }
         else
         {
@@ -243,6 +247,7 @@ public class DrawUserPair
                     return "Paired through " + groupString;
                 }));
         }
+
         UiSharedService.AttachToolTip(userPairText);
 
         ImGui.SameLine();
