@@ -17,6 +17,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
     private readonly string[] _fileTypesToHandle = ["tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk"];
     private readonly HashSet<GameObjectHandler> _playerRelatedPointers = [];
     private HashSet<IntPtr> _cachedFrameAddresses = [];
+    private readonly object _cacheAdditionLock = new();
 
     public TransientResourceManager(ILogger<TransientResourceManager> logger, TransientConfigService configurationService,
         DalamudUtilService dalamudUtil, MareMediator mediator) : base(logger, mediator)
@@ -189,7 +190,10 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
     private void DalamudUtil_FrameworkUpdate()
     {
         _cachedFrameAddresses = _playerRelatedPointers.Select(c => c.CurrentAddress()).ToHashSet();
-        _cachedHandledPaths.Clear();
+        lock (_cacheAdditionLock)
+        {
+            _cachedHandledPaths.Clear();
+        }
         foreach (var item in TransientResources.Where(item => !_dalamudUtil.IsGameObjectPresent(item.Key)).Select(i => i.Key).ToList())
         {
             Logger.LogDebug("Object not present anymore: {addr}", item.ToString("X"));
@@ -218,7 +222,10 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         // ignore files already processed this frame
         if (_cachedHandledPaths.Contains(gamePath)) return;
 
-        _cachedHandledPaths.Add(gamePath);
+        lock (_cacheAdditionLock)
+        {
+            _cachedHandledPaths.Add(gamePath);
+        }
 
         // replace individual mtrl stuff
         if (filePath.StartsWith("|", StringComparison.OrdinalIgnoreCase))
@@ -235,14 +242,20 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         // ignore files to not handle
         if (!_fileTypesToHandle.Any(type => gamePath.EndsWith(type, StringComparison.OrdinalIgnoreCase)))
         {
-            _cachedHandledPaths.Add(gamePath);
+            lock (_cacheAdditionLock)
+            {
+                _cachedHandledPaths.Add(gamePath);
+            }
             return;
         }
 
         // ignore files not belonging to anything player related
         if (!_cachedFrameAddresses.Contains(gameObject))
         {
-            _cachedHandledPaths.Add(gamePath);
+            lock (_cacheAdditionLock)
+            {
+                _cachedHandledPaths.Add(gamePath);
+            }
             return;
         }
 
