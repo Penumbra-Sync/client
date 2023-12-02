@@ -277,12 +277,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
                 var gameObj = _dalamudUtil.CreateGameObject(character);
                 if (gameObj is Character c)
                 {
-                    var glamourerString = _glamourerGetAllCustomization!.InvokeFunc(c);
-                    byte[] bytes = Convert.FromBase64String(glamourerString);
-                    // ignore transparency
-                    bytes[88] = 128;
-                    bytes[89] = 63;
-                    return Convert.ToBase64String(bytes);
+                    return _glamourerGetAllCustomization!.InvokeFunc(c);
                 }
                 return string.Empty;
             }).ConfigureAwait(false);
@@ -667,7 +662,10 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         try
         {
             var version = _glamourerApiVersions.InvokeFunc();
-            if (version.Item1 == 0 && version.Item2 >= 1)
+            bool versionValid = (_pi.InstalledPlugins
+                .FirstOrDefault(p => string.Equals(p.InternalName, "Glamourer", StringComparison.OrdinalIgnoreCase))
+                ?.Version ?? new Version(0, 0, 0, 0)) >= new Version(1, 0, 6, 1);
+            if (version.Item1 == 0 && version.Item2 >= 1 && versionValid)
             {
                 apiAvailable = true;
             }
