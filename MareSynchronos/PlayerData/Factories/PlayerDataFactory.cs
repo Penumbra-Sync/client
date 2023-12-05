@@ -361,6 +361,7 @@ public class PlayerDataFactory
         {
             foreach (var item in previousData.FileReplacements[objectKind].Where(i => i.HasFileReplacement).SelectMany(p => p.GamePaths))
             {
+                _logger.LogDebug("Persisting {item}", item);
                 _transientResourceManager.AddSemiTransientResource(objectKind, item);
             }
         }

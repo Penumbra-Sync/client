@@ -65,7 +65,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
 
     public async Task DownloadFiles(GameObjectHandler gameObject, List<FileReplacementData> fileReplacementDto, CancellationToken ct)
     {
-        Mediator.Publish(new HaltScanMessage("Download"));
+        Mediator.Publish(new HaltScanMessage(nameof(DownloadFiles)));
         try
         {
             await DownloadFilesInternal(gameObject, fileReplacementDto, ct).ConfigureAwait(false);
@@ -77,7 +77,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         finally
         {
             Mediator.Publish(new DownloadFinishedMessage(gameObject));
-            Mediator.Publish(new ResumeScanMessage("Download"));
+            Mediator.Publish(new ResumeScanMessage(nameof(DownloadFiles)));
         }
     }
 

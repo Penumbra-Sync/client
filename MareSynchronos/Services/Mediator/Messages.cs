@@ -18,7 +18,7 @@ public record OpenSettingsUiMessage : MessageBase;
 public record DalamudLoginMessage : MessageBase;
 public record DalamudLogoutMessage : MessageBase;
 public record FrameworkUpdateMessage : SameThreadMessage;
-public record ClassJobChangedMessage(GameObjectHandler gameObjectHandler) : MessageBase;
+public record ClassJobChangedMessage(GameObjectHandler GameObjectHandler) : MessageBase;
 public record DelayedFrameworkUpdateMessage : SameThreadMessage;
 public record ZoneSwitchStartMessage : MessageBase;
 public record ZoneSwitchEndMessage : MessageBase;
@@ -78,6 +78,8 @@ public record OpenPermissionWindow(Pair Pair) : MessageBase;
 public record DownloadLimitChangedMessage() : SameThreadMessage;
 public record CensusUpdateMessage(byte Gender, byte RaceId, byte TribeId) : MessageBase;
 public record TargetPairMessage(Pair Pair) : MessageBase;
+public record CombatStartMessage : MessageBase;
+public record CombatEndMessage : MessageBase;
 
 #pragma warning restore S2094
 #pragma warning restore MA0048 // File name must match type name

@@ -48,8 +48,21 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         _playerRelatedObjects[ObjectKind.Companion] = gameObjectHandlerFactory.Create(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), isWatched: true)
             .GetAwaiter().GetResult();
 
+        Mediator.Subscribe<ClassJobChangedMessage>(this, (msg) =>
+        {
+            if (msg.GameObjectHandler != _playerRelatedObjects[ObjectKind.Player]) return;
+
+            Logger.LogTrace("Removing pet data for {obj}", msg.GameObjectHandler);
+            _playerData.FileReplacements.Remove(ObjectKind.Pet);
+            _playerData.GlamourerString.Remove(ObjectKind.Pet);
+            _playerData.CustomizePlusScale.Remove(ObjectKind.Pet);
+            Mediator.Publish(new CharacterDataCreatedMessage(_playerData.ToAPI()));
+        });
+
         Mediator.Subscribe<ClearCacheForObjectMessage>(this, (msg) =>
         {
+            // ignore pets
+            if (msg.ObjectToCreateFor == _playerRelatedObjects[ObjectKind.Pet]) return;
             _ = Task.Run(() =>
             {
                 Logger.LogTrace("Clearing cache for {obj}", msg.ObjectToCreateFor);

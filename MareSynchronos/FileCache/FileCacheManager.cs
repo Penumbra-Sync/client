@@ -177,7 +177,7 @@ public sealed class FileCacheManager : IDisposable
 
     public Task<List<FileCacheEntity>> ValidateLocalIntegrity(IProgress<(int, int, FileCacheEntity)> progress, CancellationToken cancellationToken)
     {
-        _mareMediator.Publish(new HaltScanMessage("IntegrityCheck"));
+        _mareMediator.Publish(new HaltScanMessage(nameof(ValidateLocalIntegrity)));
         _logger.LogInformation("Validating local storage");
         var cacheEntries = _fileCaches.SelectMany(v => v.Value).Where(v => v.IsCacheEntry).ToList();
         List<FileCacheEntity> brokenEntities = new();
@@ -212,7 +212,7 @@ public sealed class FileCacheManager : IDisposable
             }
         }
 
-        _mareMediator.Publish(new ResumeScanMessage("IntegrityCheck"));
+        _mareMediator.Publish(new ResumeScanMessage(nameof(ValidateLocalIntegrity)));
         return Task.FromResult(brokenEntities);
     }
 

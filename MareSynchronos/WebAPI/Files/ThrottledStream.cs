@@ -1,6 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
-
-namespace MareSynchronos.WebAPI.Files
+﻿namespace MareSynchronos.WebAPI.Files
 {
     /// <summary>
     ///     Class for streaming data with throttling support.

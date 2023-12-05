@@ -30,7 +30,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => DalamudUtil_FrameworkUpdate());
         Mediator.Subscribe<ClassJobChangedMessage>(this, (msg) =>
         {
-            if (_playerRelatedPointers.Contains(msg.gameObjectHandler))
+            if (_playerRelatedPointers.Contains(msg.GameObjectHandler))
             {
                 DalamudUtil_ClassJobChanged();
             }

@@ -2,7 +2,6 @@
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
-using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Factories;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
@@ -22,7 +21,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private readonly DalamudUtilService _dalamudUtil;
     private readonly FileDownloadManager _downloadManager;
     private readonly FileCacheManager _fileDbManager;
-    private readonly MareConfigService _mareConfigService;
     private readonly GameObjectHandlerFactory _gameObjectHandlerFactory;
     private readonly IpcManager _ipcManager;
     private readonly IHostApplicationLifetime _lifetime;
@@ -44,8 +42,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         IpcManager ipcManager, FileDownloadManager transferManager,
         PluginWarningNotificationService pluginWarningNotificationManager,
         DalamudUtilService dalamudUtil, IHostApplicationLifetime lifetime,
-        FileCacheManager fileDbManager, MareMediator mediator,
-        MareConfigService mareConfigService) : base(logger, mediator)
+        FileCacheManager fileDbManager, MareMediator mediator) : base(logger, mediator)
     {
         OnlineUser = onlineUser;
         _gameObjectHandlerFactory = gameObjectHandlerFactory;
@@ -55,7 +52,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         _dalamudUtil = dalamudUtil;
         _lifetime = lifetime;
         _fileDbManager = fileDbManager;
-        _mareConfigService = mareConfigService;
         _penumbraCollection = _ipcManager.PenumbraCreateTemporaryCollectionAsync(logger, OnlineUser.User.UID).ConfigureAwait(false).GetAwaiter().GetResult();
 
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
@@ -77,10 +73,23 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         });
         Mediator.Subscribe<ClassJobChangedMessage>(this, (msg) =>
         {
-            if (msg.gameObjectHandler == _charaHandler)
+            if (msg.GameObjectHandler == _charaHandler)
             {
                 _redrawOnNextApplication = true;
             }
+        });
+        Mediator.Subscribe<CombatEndMessage>(this, (msg) =>
+        {
+            if (IsVisible && _cachedData != null)
+            {
+                Guid g = Guid.NewGuid();
+                ApplyCharacterData(g, _cachedData, true);
+            }
+        });
+        Mediator.Subscribe<CombatStartMessage>(this, _ =>
+        {
+            _downloadCancellationTokenSource = _downloadCancellationTokenSource?.CancelRecreate();
+            _applicationCancellationTokenSource = _applicationCancellationTokenSource?.CancelRecreate();
         });
 
         LastAppliedDataSize = -1;
@@ -108,15 +117,17 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
     public void ApplyCharacterData(Guid applicationBase, CharacterData characterData, bool forceApplyCustomization = false)
     {
-        if (_charaHandler == null || (PlayerCharacter == IntPtr.Zero))
+        if (_charaHandler == null || (PlayerCharacter == IntPtr.Zero) || _dalamudUtil.IsInCombat)
         {
-            Logger.LogDebug("[BASE-{appBase}] Received data but player was in invalid state, charaHandlerIsNull: {charaIsNull}, playerPointerIsNull: {ptrIsNull}",
-                applicationBase, _charaHandler == null, PlayerCharacter == IntPtr.Zero);
+            Logger.LogDebug("[BASE-{appBase}] Received data but player was in invalid state, inCombat: {inCombat}, charaHandlerIsNull: {charaIsNull}, playerPointerIsNull: {ptrIsNull}",
+                applicationBase, _dalamudUtil.IsInCombat, _charaHandler == null, PlayerCharacter == IntPtr.Zero);
             var hasDiffMods = characterData.CheckUpdatedData(applicationBase, _cachedData, Logger,
-                this, forceApplyCustomization, forceApplyMods: false).Any(p => p.Value.Contains(PlayerChanges.ModManip) || p.Value.Contains(PlayerChanges.ModFiles));
+                this, forceApplyCustomization, forceApplyMods: false)
+                .Any(p => p.Value.Contains(PlayerChanges.ModManip) || p.Value.Contains(PlayerChanges.ModFiles));
             _forceApplyMods = hasDiffMods || _forceApplyMods || (PlayerCharacter == IntPtr.Zero && _cachedData == null);
             _cachedData = characterData;
             Logger.LogDebug("[BASE-{appBase}] Setting data: {hash}, forceApplyMods: {force}", applicationBase, _cachedData.DataHash.Value, _forceApplyMods);
+            if (_dalamudUtil.IsInCombat) SetUploading(isUploading: false);
             return;
         }
 

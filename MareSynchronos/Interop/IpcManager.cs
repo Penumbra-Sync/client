@@ -492,7 +492,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     {
         if (!CheckPenumbraApi()) return;
 
-        Mediator.Publish(new HaltScanMessage("TextureConversion"));
+        Mediator.Publish(new HaltScanMessage(nameof(PenumbraConvertTextureFiles)));
         int currentTexture = 0;
         foreach (var texture in textures)
         {
@@ -519,7 +519,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
                 }
             }
         }
-        Mediator.Publish(new ResumeScanMessage("TextureConversion"));
+        Mediator.Publish(new ResumeScanMessage(nameof(PenumbraConvertTextureFiles)));
 
         await _dalamudUtil.RunOnFrameworkThread(async () =>
         {

@@ -173,7 +173,7 @@ public sealed class PerformanceCollectorService : IHostedService
             {
                 try
                 {
-                    var last = entries.Value.Last();
+                    var last = entries.Value.ToList().Last();
                     if (last.Item1.AddMinutes(10) < TimeOnly.FromDateTime(DateTime.Now) && !_performanceCounters.TryRemove(entries.Key, out _))
                     {
                         _logger.LogDebug("Could not remove performance counter {counter}", entries.Key);

@@ -51,18 +51,27 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
             CurrentFile = 1;
             Logger.LogDebug("=== Computing {amount} remaining files ===", remaining.Count);
 
-            Mediator.Publish(new HaltScanMessage("CharacterAnalyzer"));
-
-            foreach (var file in remaining)
+            Mediator.Publish(new HaltScanMessage(nameof(CharacterAnalyzer)));
+            try
             {
-                Logger.LogDebug("Computing file {file}", file.FilePaths[0]);
-                await file.ComputeSizes(_fileCacheManager, cancelToken).ConfigureAwait(false);
-                CurrentFile++;
+                foreach (var file in remaining)
+                {
+                    Logger.LogDebug("Computing file {file}", file.FilePaths[0]);
+                    await file.ComputeSizes(_fileCacheManager, cancelToken).ConfigureAwait(false);
+                    CurrentFile++;
+                }
+
+                _fileCacheManager.WriteOutFullCsv();
+
             }
-
-            _fileCacheManager.WriteOutFullCsv();
-
-            Mediator.Publish(new ResumeScanMessage("CharacterAnalzyer"));
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Failed to analyze files");
+            }
+            finally
+            {
+                Mediator.Publish(new ResumeScanMessage(nameof(CharacterAnalyzer)));
+            }
         }
 
         Mediator.Publish(new CharacterDataAnalyzedMessage());
