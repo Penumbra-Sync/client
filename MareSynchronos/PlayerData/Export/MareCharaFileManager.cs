@@ -65,7 +65,7 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
     public bool CurrentlyWorking { get; private set; } = false;
     public MareCharaFileHeader? LoadedCharaFile { get; private set; }
 
-    public async Task ApplyMareCharaFile(GameObject? charaTarget)
+    public async Task ApplyMareCharaFile(GameObject? charaTarget, long expectedLength)
     {
         if (charaTarget == null) return;
         Dictionary<string, string> extractedFiles = new(StringComparer.Ordinal);
@@ -80,8 +80,8 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
                 using var lz4Stream = new LZ4Stream(unwrapped, LZ4StreamMode.Decompress, LZ4StreamFlags.HighCompression);
                 using var reader = new BinaryReader(lz4Stream);
                 MareCharaFileHeader.AdvanceReaderToData(reader);
-                _logger.LogDebug("Applying to {chara}", charaTarget.Name.TextValue);
-                extractedFiles = ExtractFilesFromCharaFile(LoadedCharaFile, reader);
+                _logger.LogDebug("Applying to {chara}, expected length of contents: {exp}", charaTarget.Name.TextValue, expectedLength);
+                extractedFiles = ExtractFilesFromCharaFile(LoadedCharaFile, reader, expectedLength);
                 Dictionary<string, string> fileSwaps = new(StringComparer.Ordinal);
                 foreach (var fileSwap in LoadedCharaFile.CharaFileData.FileSwaps)
                 {
@@ -125,14 +125,19 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
                 }
             }
         }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failure to read MCDF");
+            throw;
+        }
         finally
         {
             CurrentlyWorking = false;
 
             _logger.LogDebug("Clearing local files");
-            foreach (var file in extractedFiles)
+            foreach (var file in Directory.EnumerateFiles(_configService.Current.CacheFolder, "*.tmp"))
             {
-                File.Delete(file.Value);
+                File.Delete(file);
             }
         }
     }
@@ -142,7 +147,7 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
         LoadedCharaFile = null;
     }
 
-    public void LoadMareCharaFile(string filePath)
+    public long LoadMareCharaFile(string filePath)
     {
         CurrentlyWorking = true;
         try
@@ -179,6 +184,7 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
 
                 _logger.LogInformation("Expected length: {expected}", expectedLength);
             }
+            return expectedLength;
         }
         finally { CurrentlyWorking = false; }
     }
@@ -214,34 +220,38 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
                 }
             }
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failure Saving Mare Chara File, deleting output");
+            File.Delete(filePath);
+        }
         finally { CurrentlyWorking = false; }
     }
 
-    private Dictionary<string, string> ExtractFilesFromCharaFile(MareCharaFileHeader charaFileHeader, BinaryReader reader)
+    private Dictionary<string, string> ExtractFilesFromCharaFile(MareCharaFileHeader charaFileHeader, BinaryReader reader, long expectedLength)
     {
+        long totalRead = 0;
         Dictionary<string, string> gamePathToFilePath = new(StringComparer.Ordinal);
         foreach (var fileData in charaFileHeader.CharaFileData.Files)
         {
             var fileName = Path.Combine(_configService.Current.CacheFolder, "mare_" + _globalFileCounter++ + ".tmp");
-            var length = fileData.Length;
-            var bufferSize = 4 * 1024 * 1024;
+            var length = (int)fileData.Length;
+            var bufferSize = length;
             using var fs = File.OpenWrite(fileName);
             using var wr = new BinaryWriter(fs);
-            int chunk = 0;
-            while (length > 0)
-            {
-                if (length < bufferSize) bufferSize = (int)length;
-                _logger.LogTrace("Reading chunk {chunk} {bufferSize}/{length} of {fileName}", chunk++, bufferSize, length, fileName);
-                var buffer = reader.ReadBytes(bufferSize);
-                wr.Write(length > bufferSize ? buffer : buffer.Take((int)length).ToArray());
-                length -= bufferSize;
-            }
+            _logger.LogTrace("Reading {length} of {fileName}", length, fileName);
+            var buffer = reader.ReadBytes(bufferSize);
+            wr.Write(buffer);
             wr.Flush();
+            wr.Close();
+            if (buffer.Length == 0) throw new EndOfStreamException("Unexpected EOF");
             foreach (var path in fileData.GamePaths)
             {
                 gamePathToFilePath[path] = fileName;
                 _logger.LogTrace("{path} => {fileName}", path, fileName);
             }
+            totalRead += length;
+            _logger.LogTrace("Read {read}/{expected} bytes", totalRead, expectedLength);
         }
 
         return gamePathToFilePath;

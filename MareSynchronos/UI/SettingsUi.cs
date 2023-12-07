@@ -54,6 +54,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private Task<List<FileCacheEntity>>? _validationTask;
     private CancellationTokenSource? _validationCts;
     private (int, int, FileCacheEntity) _currentProgress;
+    private Task? _exportTask;
 
     public SettingsUi(ILogger<SettingsUi> logger,
         UiSharedService uiShared, MareConfigService configService,
@@ -439,17 +440,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         _configService.Current.ExportFolder = Path.GetDirectoryName(path) ?? string.Empty;
                         _configService.Save();
 
-                        _ = Task.Run(() =>
+                        _exportTask = Task.Run(() =>
                         {
-                            try
-                            {
-                                _mareCharaFileManager.SaveMareCharaFile(LastCreatedCharacterData, _exportDescription, path);
-                                _exportDescription = string.Empty;
-                            }
-                            catch (Exception ex)
-                            {
-                                _logger.LogCritical(ex, "Error saving data");
-                            }
+                            var desc = _exportDescription;
+                            _exportDescription = string.Empty;
+                            _mareCharaFileManager.SaveMareCharaFile(LastCreatedCharacterData, desc, path);
                         });
                     }, Directory.Exists(_configService.Current.ExportFolder) ? _configService.Current.ExportFolder : null);
                 }
@@ -459,6 +454,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
             else
             {
                 UiSharedService.ColorTextWrapped("Export in progress", ImGuiColors.DalamudYellow);
+            }
+
+            if (_exportTask?.IsFaulted ?? false)
+            {
+                UiSharedService.ColorTextWrapped("Export failed, check /xllog for more details.", ImGuiColors.DalamudRed);
             }
 
             ImGui.Unindent();

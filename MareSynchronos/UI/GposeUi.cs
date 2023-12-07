@@ -15,6 +15,8 @@ public class GposeUi : WindowMediatorSubscriberBase
     private readonly DalamudUtilService _dalamudUtil;
     private readonly FileDialogManager _fileDialogManager;
     private readonly MareCharaFileManager _mareCharaFileManager;
+    private Task<long>? _expectedLength;
+    private Task? _applicationTask;
 
     public GposeUi(ILogger<GposeUi> logger, MareCharaFileManager mareCharaFileManager,
         DalamudUtilService dalamudUtil, FileDialogManager fileDialogManager, MareConfigService configService,
@@ -51,20 +53,27 @@ public class GposeUi : WindowMediatorSubscriberBase
                     _configService.Current.ExportFolder = Path.GetDirectoryName(path) ?? string.Empty;
                     _configService.Save();
 
-                    _ = Task.Run(() => _mareCharaFileManager.LoadMareCharaFile(path));
+                    _expectedLength = Task.Run(() => _mareCharaFileManager.LoadMareCharaFile(path));
                 }, 1, Directory.Exists(_configService.Current.ExportFolder) ? _configService.Current.ExportFolder : null);
             }
             UiSharedService.AttachToolTip("Applies it to the currently selected GPose actor");
-            if (_mareCharaFileManager.LoadedCharaFile != null)
+            if (_mareCharaFileManager.LoadedCharaFile != null && _expectedLength != null)
             {
                 UiSharedService.TextWrapped("Loaded file: " + _mareCharaFileManager.LoadedCharaFile.FilePath);
                 UiSharedService.TextWrapped("File Description: " + _mareCharaFileManager.LoadedCharaFile.CharaFileData.Description);
                 if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Check, "Apply loaded MCDF"))
                 {
-                    _ = Task.Run(async () => await _mareCharaFileManager.ApplyMareCharaFile(_dalamudUtil.GposeTargetGameObject).ConfigureAwait(false));
+                    _applicationTask = Task.Run(async () => await _mareCharaFileManager.ApplyMareCharaFile(_dalamudUtil.GposeTargetGameObject, _expectedLength!.GetAwaiter().GetResult()).ConfigureAwait(false));
                 }
                 UiSharedService.AttachToolTip("Applies it to the currently selected GPose actor");
                 UiSharedService.ColorTextWrapped("Warning: redrawing or changing the character will revert all applied mods.", ImGuiColors.DalamudYellow);
+            }
+            if (_applicationTask?.IsFaulted ?? false)
+            {
+                UiSharedService.ColorTextWrapped("Failure to read MCDF file. MCDF file is possibly corrupt. Re-export the MCDF file and try again.",
+                    ImGuiColors.DalamudRed);
+                UiSharedService.ColorTextWrapped("Note: if this is your MCDF, try redrawing yourself, wait and re-export the file. " +
+                    "If you received it from someone else have them do the same.", ImGuiColors.DalamudYellow);
             }
         }
         else
@@ -77,6 +86,8 @@ public class GposeUi : WindowMediatorSubscriberBase
     private void EndGpose()
     {
         IsOpen = false;
+        _applicationTask = null;
+        _expectedLength = null;
         _mareCharaFileManager.ClearMareCharaFile();
     }
 
