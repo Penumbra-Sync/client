@@ -18,6 +18,8 @@ namespace MareSynchronos.PlayerData.Handlers;
 
 public sealed class PairHandler : DisposableMediatorSubscriberBase
 {
+    private sealed record CombatData(Guid ApplicationId, CharacterData CharacterData, bool Forced);
+
     private readonly DalamudUtilService _dalamudUtil;
     private readonly FileDownloadManager _downloadManager;
     private readonly FileCacheManager _fileDbManager;
@@ -35,6 +37,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private bool _isVisible;
     private string _penumbraCollection;
     private bool _redrawOnNextApplication = false;
+    private CombatData? _dataReceivedInCombat;
     public long LastAppliedDataSize { get; private set; }
 
     public PairHandler(ILogger<PairHandler> logger, OnlineUserIdentDto onlineUser,
@@ -80,14 +83,16 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         });
         Mediator.Subscribe<CombatEndMessage>(this, (msg) =>
         {
-            if (IsVisible && _cachedData != null)
+            if (IsVisible && _dataReceivedInCombat != null)
             {
-                Guid g = Guid.NewGuid();
-                ApplyCharacterData(g, _cachedData, true);
+                ApplyCharacterData(_dataReceivedInCombat.ApplicationId,
+                    _dataReceivedInCombat.CharacterData, _dataReceivedInCombat.Forced);
+                _dataReceivedInCombat = null;
             }
         });
         Mediator.Subscribe<CombatStartMessage>(this, _ =>
         {
+            _dataReceivedInCombat = null;
             _downloadCancellationTokenSource = _downloadCancellationTokenSource?.CancelRecreate();
             _applicationCancellationTokenSource = _applicationCancellationTokenSource?.CancelRecreate();
         });
@@ -117,17 +122,24 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
     public void ApplyCharacterData(Guid applicationBase, CharacterData characterData, bool forceApplyCustomization = false)
     {
-        if (_charaHandler == null || (PlayerCharacter == IntPtr.Zero) || _dalamudUtil.IsInCombat)
+        if (_dalamudUtil.IsInCombat)
         {
-            Logger.LogDebug("[BASE-{appBase}] Received data but player was in invalid state, inCombat: {inCombat}, charaHandlerIsNull: {charaIsNull}, playerPointerIsNull: {ptrIsNull}",
-                applicationBase, _dalamudUtil.IsInCombat, _charaHandler == null, PlayerCharacter == IntPtr.Zero);
+            Logger.LogDebug("[BASE-{appBase}] Received data but player is in combat", applicationBase);
+            _dataReceivedInCombat = new(applicationBase, characterData, forceApplyCustomization);
+            SetUploading(isUploading: false);
+            return;
+        }
+
+        if (_charaHandler == null || (PlayerCharacter == IntPtr.Zero))
+        {
+            Logger.LogDebug("[BASE-{appBase}] Received data but player was in invalid state, charaHandlerIsNull: {charaIsNull}, playerPointerIsNull: {ptrIsNull}",
+                applicationBase, _charaHandler == null, PlayerCharacter == IntPtr.Zero);
             var hasDiffMods = characterData.CheckUpdatedData(applicationBase, _cachedData, Logger,
                 this, forceApplyCustomization, forceApplyMods: false)
                 .Any(p => p.Value.Contains(PlayerChanges.ModManip) || p.Value.Contains(PlayerChanges.ModFiles));
             _forceApplyMods = hasDiffMods || _forceApplyMods || (PlayerCharacter == IntPtr.Zero && _cachedData == null);
             _cachedData = characterData;
             Logger.LogDebug("[BASE-{appBase}] Setting data: {hash}, forceApplyMods: {force}", applicationBase, _cachedData.DataHash.Value, _forceApplyMods);
-            if (_dalamudUtil.IsInCombat) SetUploading(isUploading: false);
             return;
         }
 
@@ -407,7 +419,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                     {
                         await _ipcManager.PenumbraSetTemporaryModsAsync(Logger, _applicationId, _penumbraCollection, moddedPaths).ConfigureAwait(false);
                         LastAppliedDataSize = -1;
-                        foreach (var path in moddedPaths.Select(v => new FileInfo(v.Value)).Where(p => p.Exists))
+                        foreach (var path in moddedPaths.Values.Distinct(StringComparer.OrdinalIgnoreCase).Select(v => new FileInfo(v)).Where(p => p.Exists))
                         {
                             LastAppliedDataSize += path.Length;
                         }
