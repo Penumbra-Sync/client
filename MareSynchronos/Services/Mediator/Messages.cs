@@ -78,8 +78,8 @@ public record OpenPermissionWindow(Pair Pair) : MessageBase;
 public record DownloadLimitChangedMessage() : SameThreadMessage;
 public record CensusUpdateMessage(byte Gender, byte RaceId, byte TribeId) : MessageBase;
 public record TargetPairMessage(Pair Pair) : MessageBase;
-public record CombatStartMessage : MessageBase;
-public record CombatEndMessage : MessageBase;
+public record CombatOrPerformanceStartMessage : MessageBase;
+public record CombatOrPerformanceEndMessage : MessageBase;
 
 #pragma warning restore S2094
 #pragma warning restore MA0048 // File name must match type name

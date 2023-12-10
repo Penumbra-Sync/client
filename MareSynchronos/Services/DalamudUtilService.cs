@@ -74,7 +74,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     public bool IsLoggedIn { get; private set; }
     public bool IsOnFrameworkThread => _framework.IsInFrameworkUpdateThread;
     public bool IsZoning => _condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51];
-    public bool IsInCombat { get; private set; } = false;
+    public bool IsInCombatOrPerforming { get; private set; } = false;
 
     public Lazy<Dictionary<ushort, string>> WorldData { get; private set; }
 
@@ -459,19 +459,19 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
             Mediator.Publish(new GposeEndMessage());
         }
 
-        if (_condition[ConditionFlag.InCombat] && !IsInCombat)
+        if ((_condition[ConditionFlag.Performing] || _condition[ConditionFlag.InCombat]) && !IsInCombatOrPerforming)
         {
-            _logger.LogDebug("Combat start");
-            IsInCombat = true;
-            Mediator.Publish(new CombatStartMessage());
-            Mediator.Publish(new HaltScanMessage(nameof(IsInCombat)));
+            _logger.LogDebug("Combat/Performance start");
+            IsInCombatOrPerforming = true;
+            Mediator.Publish(new CombatOrPerformanceStartMessage());
+            Mediator.Publish(new HaltScanMessage(nameof(IsInCombatOrPerforming)));
         }
-        else if (!_condition[ConditionFlag.InCombat] && IsInCombat)
+        else if ((!_condition[ConditionFlag.Performing] && !_condition[ConditionFlag.InCombat]) && IsInCombatOrPerforming)
         {
-            _logger.LogDebug("Combat end");
-            IsInCombat = false;
-            Mediator.Publish(new CombatEndMessage());
-            Mediator.Publish(new ResumeScanMessage(nameof(IsInCombat)));
+            _logger.LogDebug("Combat/Performance end");
+            IsInCombatOrPerforming = false;
+            Mediator.Publish(new CombatOrPerformanceEndMessage());
+            Mediator.Publish(new ResumeScanMessage(nameof(IsInCombatOrPerforming)));
         }
 
         if (_condition[ConditionFlag.WatchingCutscene] && !IsInCutscene)
@@ -517,7 +517,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
             Mediator.Publish(new ResumeScanMessage(nameof(ConditionFlag.BetweenAreas)));
         }
 
-        if (!IsInCombat)
+        if (!IsInCombatOrPerforming)
             Mediator.Publish(new FrameworkUpdateMessage());
 
         if (DateTime.Now < _delayedFrameworkUpdateCheck.AddSeconds(1)) return;
@@ -538,7 +538,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
             Mediator.Publish(new DalamudLogoutMessage());
         }
 
-        if (IsInCombat)
+        if (IsInCombatOrPerforming)
             Mediator.Publish(new FrameworkUpdateMessage());
 
         Mediator.Publish(new DelayedFrameworkUpdateMessage());

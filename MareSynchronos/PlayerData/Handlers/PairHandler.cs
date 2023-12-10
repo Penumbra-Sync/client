@@ -37,7 +37,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private bool _isVisible;
     private string _penumbraCollection;
     private bool _redrawOnNextApplication = false;
-    private CombatData? _dataReceivedInCombat;
+    private CombatData? _dataReceivedInDowntime;
     public long LastAppliedDataSize { get; private set; }
 
     public PairHandler(ILogger<PairHandler> logger, OnlineUserIdentDto onlineUser,
@@ -81,18 +81,18 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                 _redrawOnNextApplication = true;
             }
         });
-        Mediator.Subscribe<CombatEndMessage>(this, (msg) =>
+        Mediator.Subscribe<CombatOrPerformanceEndMessage>(this, (msg) =>
         {
-            if (IsVisible && _dataReceivedInCombat != null)
+            if (IsVisible && _dataReceivedInDowntime != null)
             {
-                ApplyCharacterData(_dataReceivedInCombat.ApplicationId,
-                    _dataReceivedInCombat.CharacterData, _dataReceivedInCombat.Forced);
-                _dataReceivedInCombat = null;
+                ApplyCharacterData(_dataReceivedInDowntime.ApplicationId,
+                    _dataReceivedInDowntime.CharacterData, _dataReceivedInDowntime.Forced);
+                _dataReceivedInDowntime = null;
             }
         });
-        Mediator.Subscribe<CombatStartMessage>(this, _ =>
+        Mediator.Subscribe<CombatOrPerformanceStartMessage>(this, _ =>
         {
-            _dataReceivedInCombat = null;
+            _dataReceivedInDowntime = null;
             _downloadCancellationTokenSource = _downloadCancellationTokenSource?.CancelRecreate();
             _applicationCancellationTokenSource = _applicationCancellationTokenSource?.CancelRecreate();
         });
@@ -122,10 +122,10 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
     public void ApplyCharacterData(Guid applicationBase, CharacterData characterData, bool forceApplyCustomization = false)
     {
-        if (_dalamudUtil.IsInCombat)
+        if (_dalamudUtil.IsInCombatOrPerforming)
         {
-            Logger.LogDebug("[BASE-{appBase}] Received data but player is in combat", applicationBase);
-            _dataReceivedInCombat = new(applicationBase, characterData, forceApplyCustomization);
+            Logger.LogDebug("[BASE-{appBase}] Received data but player is in combat or performing", applicationBase);
+            _dataReceivedInDowntime = new(applicationBase, characterData, forceApplyCustomization);
             SetUploading(isUploading: false);
             return;
         }
