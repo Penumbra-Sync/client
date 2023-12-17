@@ -10,6 +10,7 @@ using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 using CharacterData = MareSynchronos.API.Data.CharacterData;
 
 namespace MareSynchronos.PlayerData.Export;
@@ -49,12 +50,14 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
                 if ((await dalamudUtil.RunOnFrameworkThread(() => item.Value.CurrentAddress()).ConfigureAwait(false)) != nint.Zero)
                 {
                     await _ipcManager.GlamourerRevert(logger, item.Value.Name, item.Value, Guid.NewGuid(), cts.Token).ConfigureAwait(false);
+                    await _ipcManager.PalettePlusRemovePaletteAsync(item.Value.Address).ConfigureAwait(false);
                 }
                 else
                 {
                     _logger.LogDebug("Reverting by name: {name}", item.Key);
                     _ipcManager.GlamourerRevertByName(logger, item.Key, Guid.NewGuid());
                 }
+
 
                 item.Value.Dispose();
             }
@@ -80,7 +83,7 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
                 using var lz4Stream = new LZ4Stream(unwrapped, LZ4StreamMode.Decompress, LZ4StreamFlags.HighCompression);
                 using var reader = new BinaryReader(lz4Stream);
                 MareCharaFileHeader.AdvanceReaderToData(reader);
-                _logger.LogDebug("Applying to {chara}, expected length of contents: {exp}", charaTarget.Name.TextValue, expectedLength);
+                _logger.LogDebug("Applying to {chara}, expected length of contents: {exp}, stream length: {len}", charaTarget.Name.TextValue, expectedLength, reader.BaseStream.Length);
                 extractedFiles = ExtractFilesFromCharaFile(LoadedCharaFile, reader, expectedLength);
                 Dictionary<string, string> fileSwaps = new(StringComparer.Ordinal);
                 foreach (var fileSwap in LoadedCharaFile.CharaFileData.FileSwaps)
@@ -178,11 +181,11 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
                     expectedLength += item.Length;
                     foreach (var gamePath in item.GamePaths)
                     {
-                        _logger.LogTrace("File {itemNr}: {gamePath} = {len}", itemNr, gamePath, item.Length);
+                        _logger.LogTrace("File {itemNr}: {gamePath} = {len}", itemNr, gamePath, item.Length.ToByteString());
                     }
                 }
 
-                _logger.LogInformation("Expected length: {expected}", expectedLength);
+                _logger.LogInformation("Expected length: {expected}", expectedLength.ToByteString());
             }
             return expectedLength;
         }
@@ -203,22 +206,26 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
             using var lz4 = new LZ4Stream(fs, LZ4StreamMode.Compress, LZ4StreamFlags.HighCompression);
             using var writer = new BinaryWriter(lz4);
             output.WriteToStream(writer);
-            var bufferSize = 4 * 1024 * 1024;
-            byte[] buffer = new byte[bufferSize];
 
-            var playerReplacements = dto.FileReplacements[ObjectKind.Player];
             foreach (var item in output.CharaFileData.Files)
             {
-                var itemFromData = playerReplacements.First(f => f.GamePaths.Any(p => item.GamePaths.Contains(p, StringComparer.OrdinalIgnoreCase)));
-                var file = _manager.GetFileCacheByHash(itemFromData.Hash)!;
+                var file = _manager.GetFileCacheByHash(item.Hash)!;
+                _logger.LogDebug("Saving to MCDF: {hash}:{file}", item.Hash, file.ResolvedFilepath);
+                _logger.LogDebug("\tAssociated GamePaths:");
+                foreach (var path in item.GamePaths)
+                {
+                    _logger.LogDebug("\t{path}", path);
+                }
                 using var fsRead = File.OpenRead(file.ResolvedFilepath);
                 using var br = new BinaryReader(fsRead);
-                int readBytes = 0;
-                while ((readBytes = br.Read(buffer, 0, bufferSize)) > 0)
-                {
-                    writer.Write(readBytes == bufferSize ? buffer : buffer.Take(readBytes).ToArray());
-                }
+                byte[] buffer = new byte[item.Length];
+                br.Read(buffer, 0, item.Length);
+                writer.Write(buffer);
             }
+            writer.Flush();
+            lz4.Flush();
+            fs.Flush();
+            fs.Close();
         }
         catch (Exception ex)
         {
@@ -235,11 +242,11 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
         foreach (var fileData in charaFileHeader.CharaFileData.Files)
         {
             var fileName = Path.Combine(_configService.Current.CacheFolder, "mare_" + _globalFileCounter++ + ".tmp");
-            var length = (int)fileData.Length;
+            var length = fileData.Length;
             var bufferSize = length;
             using var fs = File.OpenWrite(fileName);
             using var wr = new BinaryWriter(fs);
-            _logger.LogTrace("Reading {length} of {fileName}", length, fileName);
+            _logger.LogTrace("Reading {length} of {fileName}", length.ToByteString(), fileName);
             var buffer = reader.ReadBytes(bufferSize);
             wr.Write(buffer);
             wr.Flush();
@@ -248,10 +255,10 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
             foreach (var path in fileData.GamePaths)
             {
                 gamePathToFilePath[path] = fileName;
-                _logger.LogTrace("{path} => {fileName}", path, fileName);
+                _logger.LogTrace("{path} => {fileName} [{hash}]", path, fileName, fileData.Hash);
             }
             totalRead += length;
-            _logger.LogTrace("Read {read}/{expected} bytes", totalRead, expectedLength);
+            _logger.LogTrace("Read {read}/{expected} bytes", totalRead.ToByteString(), expectedLength.ToByteString());
         }
 
         return gamePathToFilePath;

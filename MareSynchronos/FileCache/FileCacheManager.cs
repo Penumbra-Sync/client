@@ -232,7 +232,7 @@ public sealed class FileCacheManager : IDisposable
     {
         if (_fileCaches.TryGetValue(hash, out var hashes))
         {
-            var item = hashes.FirstOrDefault();
+            var item = hashes.OrderBy(p => p.PrefixedFilePath.Contains(PenumbraPrefix) ? 0 : 1).FirstOrDefault();
             if (item != null) return GetValidatedFileCache(item);
         }
         return null;
