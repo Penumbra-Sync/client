@@ -7,6 +7,7 @@ using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Factories;
+using MareSynchronos.Services.Events;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
@@ -156,8 +157,9 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
 
     public void ReceiveCharaData(OnlineUserCharaDataDto dto)
     {
-        if (!_allClientPairs.ContainsKey(dto.User)) throw new InvalidOperationException("No user found for " + dto.User);
+        if (!_allClientPairs.TryGetValue(dto.User, out var pair)) throw new InvalidOperationException("No user found for " + dto.User);
 
+        Mediator.Publish(new EventMessage(new Event(pair.UserData, nameof(PairManager), EventSeverity.Informational, "Received Character Data")));
         _allClientPairs[dto.User].ApplyData(dto);
     }
 

@@ -79,7 +79,28 @@ public class CompactUi : WindowMediatorSubscriberBase
                 {
                     Mediator.Publish(new UiToggleMessage(typeof(SettingsUi)));
                 },
-                IconOffset = new(2,1)
+                IconOffset = new(2,1),
+                ShowTooltip = () =>
+                {
+                    ImGui.BeginTooltip();
+                    ImGui.Text("Open Mare Settings");
+                    ImGui.EndTooltip();
+                }
+            },
+            new TitleBarButton()
+            {
+                Icon = FontAwesomeIcon.Book,
+                Click = (msg) =>
+                {
+                    Mediator.Publish(new UiToggleMessage(typeof(EventViewerUI)));
+                },
+                IconOffset = new(2,1),
+                ShowTooltip = () =>
+                {
+                    ImGui.BeginTooltip();
+                    ImGui.Text("Open Mare Event Viewer");
+                    ImGui.EndTooltip();
+                }
             }
         };
 

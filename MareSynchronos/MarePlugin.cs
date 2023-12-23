@@ -89,6 +89,8 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
     {
         var version = Assembly.GetExecutingAssembly().GetName().Version!;
         Logger.LogInformation("Launching {name} {major}.{minor}.{build}", "Mare Synchronos", version.Major, version.Minor, version.Build);
+        Mediator.Publish(new EventMessage(new Services.Events.Event(nameof(MarePlugin), Services.Events.EventSeverity.Informational,
+            $"Starting Mare Synchronos {version.Major}.{version.Minor}.{version.Build}")));
 
         Mediator.Subscribe<SwitchToMainUiMessage>(this, (msg) => _ = Task.Run(WaitForPlayerAndLaunchCharacterManager));
         Mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());

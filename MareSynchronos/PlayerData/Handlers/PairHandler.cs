@@ -5,6 +5,7 @@ using MareSynchronos.Interop;
 using MareSynchronos.PlayerData.Factories;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
+using MareSynchronos.Services.Events;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Files;
@@ -108,6 +109,9 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             if (_isVisible != value)
             {
                 _isVisible = value;
+                string text = "User Visibility Changed, now: " + (_isVisible ? "Is Visible" : "Is not Visible");
+                Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.User, nameof(PairHandler),
+                    EventSeverity.Informational, text)));
                 Mediator.Publish(new RefreshUiMessage());
             }
         }
@@ -124,6 +128,8 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     {
         if (_dalamudUtil.IsInCombatOrPerforming)
         {
+            Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.User, nameof(PairHandler), EventSeverity.Warning,
+                "Cannot apply character data: you are in combat or performing music, deferring application")));
             Logger.LogDebug("[BASE-{appBase}] Received data but player is in combat or performing", applicationBase);
             _dataReceivedInDowntime = new(applicationBase, characterData, forceApplyCustomization);
             SetUploading(isUploading: false);
@@ -132,6 +138,8 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
         if (_charaHandler == null || (PlayerCharacter == IntPtr.Zero))
         {
+            Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.User, nameof(PairHandler), EventSeverity.Warning,
+                "Cannot apply character data: Receiving Player is in an invalid state, deferring application")));
             Logger.LogDebug("[BASE-{appBase}] Received data but player was in invalid state, charaHandlerIsNull: {charaIsNull}, playerPointerIsNull: {ptrIsNull}",
                 applicationBase, _charaHandler == null, PlayerCharacter == IntPtr.Zero);
             var hasDiffMods = characterData.CheckUpdatedData(applicationBase, _cachedData, Logger,
@@ -152,9 +160,14 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
         if (_dalamudUtil.IsInCutscene || _dalamudUtil.IsInGpose || !_ipcManager.CheckPenumbraApi() || !_ipcManager.CheckGlamourerApi())
         {
+            Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.User, nameof(PairHandler), EventSeverity.Warning,
+                "Cannot apply character data: you are in GPose, a Cutscene or Penumbra/Glamourer is not available")));
             Logger.LogInformation("[BASE-{appbase}] Application of data for {player} while in cutscene/gpose or Penumbra/Glamourer unavailable, returning", applicationBase, this);
             return;
         }
+
+        Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.User, nameof(PairHandler), EventSeverity.Informational,
+            "Applying Character Data")));
 
         _forceApplyMods |= forceApplyCustomization;
 
@@ -214,6 +227,11 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             _downloadCancellationTokenSource = null;
             _charaHandler?.Dispose();
             _charaHandler = null;
+
+            if (!string.IsNullOrEmpty(name))
+            {
+                Mediator.Publish(new EventMessage(new Event(name, OnlineUser.User, nameof(PairHandler), EventSeverity.Informational, "Disposing User")));
+            }
 
             if (_lifetime.ApplicationStopping.IsCancellationRequested) return;
 
@@ -365,6 +383,8 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                     Logger.LogDebug("[BASE-{appBase}] Downloading missing files for player {name}, {kind}", applicationBase, PlayerName, updatedData);
                     if (toDownloadReplacements.Any())
                     {
+                        Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.User, nameof(PairHandler), EventSeverity.Informational,
+                            $"Starting download for {toDownloadReplacements.Count} files")));
                         await _downloadManager.DownloadFiles(_charaHandler!, toDownloadReplacements, downloadToken).ConfigureAwait(false);
                         _downloadManager.CancelDownload();
                     }
@@ -469,6 +489,8 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             Logger.LogDebug("One-Time Initializing {this}", this);
             Initialize(pc.Name);
             Logger.LogDebug("One-Time Initialized {this}", this);
+            Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.User, nameof(PairHandler), EventSeverity.Informational,
+                $"Initializing User For Character {pc.Name}")));
         }
 
         if (_charaHandler?.Address != nint.Zero && !IsVisible)

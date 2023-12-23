@@ -5,6 +5,7 @@ using MareSynchronos.API.Dto;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.Services.Events;
 using MareSynchronos.WebAPI.Files.Models;
 using System.Numerics;
 
@@ -80,6 +81,7 @@ public record CensusUpdateMessage(byte Gender, byte RaceId, byte TribeId) : Mess
 public record TargetPairMessage(Pair Pair) : MessageBase;
 public record CombatOrPerformanceStartMessage : MessageBase;
 public record CombatOrPerformanceEndMessage : MessageBase;
+public record EventMessage(Event Event) : MessageBase;
 
 #pragma warning restore S2094
 #pragma warning restore MA0048 // File name must match type name
