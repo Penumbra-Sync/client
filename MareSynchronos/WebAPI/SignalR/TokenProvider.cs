@@ -97,7 +97,11 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
 
             if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                Mediator.Publish(new NotificationMessage("Error refreshing token", "Your authentication token could not be renewed. Try reconnecting to Mare manually.",
+                if (isRenewal)
+                    Mediator.Publish(new NotificationMessage("Error refreshing token", "Your authentication token could not be renewed. Try reconnecting to Mare manually.",
+                    Dalamud.Interface.Internal.Notifications.NotificationType.Error));
+                else
+                    Mediator.Publish(new NotificationMessage("Error generating token", "Your authentication token could not be generated. Check Mares main UI to see the error message.",
                     Dalamud.Interface.Internal.Notifications.NotificationType.Error));
                 Mediator.Publish(new DisconnectedMessage());
                 throw new MareAuthFailureException(response);
