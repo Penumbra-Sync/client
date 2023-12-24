@@ -520,6 +520,8 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         if (!IsInCombatOrPerforming)
             Mediator.Publish(new FrameworkUpdateMessage());
 
+        Mediator.Publish(new PriorityFrameworkUpdateMessage());
+
         if (DateTime.Now < _delayedFrameworkUpdateCheck.AddSeconds(1)) return;
 
         var localPlayer = _clientState.LocalPlayer;
