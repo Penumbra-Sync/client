@@ -10,7 +10,6 @@ using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
 using CharacterData = MareSynchronos.API.Data.CharacterData;
 
 namespace MareSynchronos.PlayerData.Export;

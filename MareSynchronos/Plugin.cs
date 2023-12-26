@@ -35,7 +35,7 @@ public sealed class Plugin : IDalamudPlugin
 
     public Plugin(DalamudPluginInterface pluginInterface, ICommandManager commandManager, IDataManager gameData,
         IFramework framework, IObjectTable objectTable, IClientState clientState, ICondition condition, IChatGui chatGui,
-        IGameGui gameGui, IDtrBar dtrBar, IPluginLog pluginLog, ITargetManager targetManager)
+        IGameGui gameGui, IDtrBar dtrBar, IPluginLog pluginLog, ITargetManager targetManager, IGameLifecycle addonLifecycle)
     {
         _hostBuilderRunTask = new HostBuilder()
         .UseContentRoot(pluginInterface.ConfigDirectory.FullName)
@@ -66,7 +66,10 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<MareProfileManager>();
             collection.AddSingleton<GameObjectHandlerFactory>();
             collection.AddSingleton<FileDownloadManagerFactory>();
-            collection.AddSingleton<PairHandlerFactory>();
+            collection.AddSingleton((s) => new PairHandlerFactory(s.GetRequiredService<ILoggerFactory>(), s.GetRequiredService<GameObjectHandlerFactory>(),
+                s.GetRequiredService<IpcManager>(), s.GetRequiredService<FileDownloadManagerFactory>(), s.GetRequiredService<DalamudUtilService>(),
+                s.GetRequiredService<PluginWarningNotificationService>(), CancellationTokenSource.CreateLinkedTokenSource(addonLifecycle.GameShuttingDownToken, addonLifecycle.DalamudUnloadingToken).Token,
+                s.GetRequiredService<FileCacheManager>(), s.GetRequiredService<MareMediator>()));
             collection.AddSingleton<PairFactory>();
             collection.AddSingleton<CharacterAnalyzer>();
             collection.AddSingleton<TokenProvider>();
@@ -150,6 +153,6 @@ public sealed class Plugin : IDalamudPlugin
     {
         _pluginCts.Cancel();
         _pluginCts.Dispose();
-        Task.WaitAny(_hostBuilderRunTask);
+        _hostBuilderRunTask.Wait();
     }
 }
