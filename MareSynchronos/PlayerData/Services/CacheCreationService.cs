@@ -22,6 +22,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
     private CancellationTokenSource _honorificCts = new();
     private bool _isZoning = false;
     private CancellationTokenSource _palettePlusCts = new();
+    private readonly Dictionary<ObjectKind, CancellationTokenSource> _glamourerCts = new();
 
     public CacheCreationService(ILogger<CacheCreationService> logger, MareMediator mediator, GameObjectHandlerFactory gameObjectHandlerFactory,
         PlayerDataFactory characterDataFactory, DalamudUtilService dalamudUtil) : base(logger, mediator)
@@ -90,6 +91,15 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
             Logger.LogDebug("Received Heels Offset change, updating player");
             await AddPlayerCacheToCreate().ConfigureAwait(false);
         });
+        Mediator.Subscribe<GlamourerChangedMessage>(this, async (msg) =>
+        {
+            if (_isZoning) return;
+            var changedType = _playerRelatedObjects.FirstOrDefault(f => f.Value.Address == msg.Address);
+            if (!default(KeyValuePair<ObjectKind, GameObjectHandler>).Equals(changedType))
+            {
+                GlamourerChanged(changedType.Key);
+            }
+        });
         Mediator.Subscribe<PalettePlusMessage>(this, (msg) =>
         {
             if (_isZoning) return;
@@ -130,6 +140,23 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         await _cacheCreateLock.WaitAsync().ConfigureAwait(false);
         _cachesToCreate[kind] = _playerRelatedObjects[kind];
         _cacheCreateLock.Release();
+    }
+
+    private void GlamourerChanged(ObjectKind kind)
+    {
+        if (_glamourerCts.TryGetValue(kind, out var cts))
+        {
+            _glamourerCts[kind]?.Cancel();
+            _glamourerCts[kind]?.Dispose();
+        }
+        _glamourerCts[kind] = new();
+        var token = _glamourerCts[kind].Token;
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
+            await AddPlayerCacheToCreate(kind).ConfigureAwait(false);
+        });
     }
 
     private void HonorificChanged()

@@ -114,6 +114,8 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         _glamourerRevertByName = pi.GetIpcSubscriber<string, uint, object?>("Glamourer.RevertLock");
         _glamourerUnlock = pi.GetIpcSubscriber<string, uint, bool>("Glamourer.UnlockName");
 
+        pi.GetIpcSubscriber<int, nint, Lazy<string>, object?>("Glamourer.StateChanged").Subscribe((type, address, customize) => GlamourerChanged(address));
+
         _heelsGetApiVersion = pi.GetIpcSubscriber<(int, int)>("SimpleHeels.ApiVersion");
         _heelsGetOffset = pi.GetIpcSubscriber<string>("SimpleHeels.GetLocalPlayer");
         _heelsRegisterPlayer = pi.GetIpcSubscriber<GameObject, string, object?>("SimpleHeels.RegisterPlayer");
@@ -753,6 +755,11 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     {
         if (!CheckPenumbraApi()) return null;
         return _penumbraResolveModDir!.Invoke().ToLowerInvariant();
+    }
+
+    private void GlamourerChanged(nint address)
+    {
+        Mediator.Publish(new GlamourerChangedMessage(address));
     }
 
     private void HeelsOffsetChange(string offset)
