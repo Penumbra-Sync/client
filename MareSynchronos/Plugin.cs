@@ -35,7 +35,7 @@ public sealed class Plugin : IDalamudPlugin
 
     public Plugin(DalamudPluginInterface pluginInterface, ICommandManager commandManager, IDataManager gameData,
         IFramework framework, IObjectTable objectTable, IClientState clientState, ICondition condition, IChatGui chatGui,
-        IGameGui gameGui, IDtrBar dtrBar, IPluginLog pluginLog, ITargetManager targetManager, IGameLifecycle addonLifecycle)
+        IGameGui gameGui, IDtrBar dtrBar, IPluginLog pluginLog, ITargetManager targetManager)
     {
         _hostBuilderRunTask = new HostBuilder()
         .UseContentRoot(pluginInterface.ConfigDirectory.FullName)
