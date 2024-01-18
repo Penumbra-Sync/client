@@ -30,7 +30,6 @@ public class PluginWarningNotificationService
             {
                 ShownCustomizePlusWarning = _mareConfigService.Current.DisableOptionalPluginWarnings,
                 ShownHeelsWarning = _mareConfigService.Current.DisableOptionalPluginWarnings,
-                ShownPalettePlusWarning = _mareConfigService.Current.DisableOptionalPluginWarnings,
                 ShownHonorificWarning = _mareConfigService.Current.DisableOptionalPluginWarnings,
             };
         }
@@ -45,12 +44,6 @@ public class PluginWarningNotificationService
         {
             missingPluginsForData.Add("Customize+");
             warning.ShownCustomizePlusWarning = true;
-        }
-
-        if (changes.Contains(PlayerChanges.Palette) && !warning.ShownPalettePlusWarning && !_ipcManager.CheckPalettePlusApi())
-        {
-            missingPluginsForData.Add("Palette+");
-            warning.ShownPalettePlusWarning = true;
         }
 
         if (changes.Contains(PlayerChanges.Honorific) && !warning.ShownHonorificWarning && !_ipcManager.CheckHonorificApi())

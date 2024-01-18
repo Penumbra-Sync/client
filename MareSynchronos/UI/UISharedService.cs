@@ -102,7 +102,6 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             _glamourerExists = _ipcManager.CheckGlamourerApi();
             _customizePlusExists = _ipcManager.CheckCustomizePlusApi();
             _heelsExists = _ipcManager.CheckHeelsApi();
-            _palettePlusExists = _ipcManager.CheckPalettePlusApi();
             _honorificExists = _ipcManager.CheckHonorificApi();
         });
     }
@@ -703,7 +702,6 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         var glamourerColor = _glamourerExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         var heelsColor = _heelsExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         var customizeColor = _customizePlusExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
-        var paletteColor = _palettePlusExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         var honorificColor = _honorificExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         var check = FontAwesomeIcon.Check.ToIconString();
         var cross = FontAwesomeIcon.SquareXmark.ToIconString();
@@ -740,14 +738,6 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         FontText(_customizePlusExists ? check : cross, UiBuilder.IconFont, customizeColor);
         ImGui.SameLine();
         AttachToolTip($"Customize+ is " + (_customizePlusExists ? "available and up to date." : "unavailable or not up to date."));
-        ImGui.Spacing();
-
-        ImGui.SameLine();
-        ImGui.TextUnformatted("Palette+");
-        ImGui.SameLine();
-        FontText(_palettePlusExists ? check : cross, UiBuilder.IconFont, paletteColor);
-        ImGui.SameLine();
-        AttachToolTip($"Palette+ is " + (_palettePlusExists ? "available and up to date." : "unavailable or not up to date."));
         ImGui.Spacing();
 
         ImGui.SameLine();
