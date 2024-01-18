@@ -66,11 +66,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<MareProfileManager>();
             collection.AddSingleton<GameObjectHandlerFactory>();
             collection.AddSingleton<FileDownloadManagerFactory>();
-            collection.AddSingleton((s) => new PairHandlerFactory(s.GetRequiredService<ILoggerFactory>(), s.GetRequiredService<GameObjectHandlerFactory>(),
-                s.GetRequiredService<IpcManager>(), s.GetRequiredService<FileDownloadManagerFactory>(), s.GetRequiredService<DalamudUtilService>(),
-                s.GetRequiredService<PluginWarningNotificationService>(), 
-                CancellationTokenSource.CreateLinkedTokenSource(addonLifecycle.GameShuttingDownToken, addonLifecycle.DalamudUnloadingToken).Token,
-                s.GetRequiredService<FileCacheManager>(), s.GetRequiredService<MareMediator>()));
+            collection.AddSingleton<PairHandlerFactory>();
             collection.AddSingleton<PairFactory>();
             collection.AddSingleton<CharacterAnalyzer>();
             collection.AddSingleton<TokenProvider>();

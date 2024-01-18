@@ -9,6 +9,5 @@
     "customization"
   ],
   "IconUrl": "https://raw.githubusercontent.com/Penumbra-Sync/client/main/MareSynchronos/images/logo.png",
-  "RepoUrl": "https://github.com/Penumbra-Sync/client",
-  "CanUnloadAsync": true
+  "RepoUrl": "https://github.com/Penumbra-Sync/client"
 }
