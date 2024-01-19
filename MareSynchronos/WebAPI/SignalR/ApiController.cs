@@ -406,6 +406,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
             }
             await LoadIninitialPairs().ConfigureAwait(false);
             await LoadOnlinePairs().ConfigureAwait(false);
+            Mediator.Publish(new ConnectedMessage(_connectionDto));
         }
         catch (Exception ex)
         {

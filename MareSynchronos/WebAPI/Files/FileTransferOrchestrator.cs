@@ -126,8 +126,17 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
             MareConfiguration.Models.DownloadSpeeds.MBps => limit * 1024 * 1024,
             _ => limit,
         };
-        var dividedLimit = limit / (CurrentlyUsedDownloadSlots == 0 ? 1 : CurrentlyUsedDownloadSlots);
-        return dividedLimit == 0 ? 1 : dividedLimit;
+        var currentUsedDlSlots = CurrentlyUsedDownloadSlots;
+        var avaialble = _availableDownloadSlots;
+        var currentCount = _downloadSemaphore.CurrentCount;
+        var dividedLimit = limit / (currentUsedDlSlots == 0 ? 1 : currentUsedDlSlots);
+        if (dividedLimit < 0)
+        {
+            Logger.LogWarning("Calculated Bandwidth Limit is negative, returning Infinity: {value}, CurrentlyUsedDownloadSlots is {currentSlots}, " +
+                "DownloadSpeedLimit is {limit}, available slots: {avail}, current count: {count}", dividedLimit, currentUsedDlSlots, limit, avaialble, currentCount);
+            return long.MaxValue;
+        }
+        return Math.Clamp(dividedLimit, 1, long.MaxValue);
     }
 
     private async Task<HttpResponseMessage> SendRequestInternalAsync(HttpRequestMessage requestMessage,
