@@ -4,9 +4,11 @@ using Dalamud.Interface.Internal.Notifications;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using Dalamud.Utility;
+using MareSynchronos.PlayerData.Export;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Penumbra.Api.Enums;
 using Penumbra.Api.Helpers;
@@ -17,6 +19,7 @@ namespace MareSynchronos.Interop;
 
 public sealed class IpcManager : DisposableMediatorSubscriberBase
 {
+    private readonly ICallGateProvider<string, GameObject, bool> _loadMcdfProvider;
     private readonly ICallGateSubscriber<(int, int)> _customizePlusApiVersion;
     private readonly ICallGateSubscriber<Character?, string?> _customizePlusGetBodyScale;
     private readonly ICallGateSubscriber<string?, string?, object> _customizePlusOnScaleUpdate;
@@ -78,10 +81,16 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private bool _shownGlamourerUnavailable = false;
     private bool _shownPenumbraUnavailable = false;
 
-    public IpcManager(ILogger<IpcManager> logger, DalamudPluginInterface pi, DalamudUtilService dalamudUtil, MareMediator mediator) : base(logger, mediator)
+    private readonly IServiceProvider _serviceProvider;
+
+    public IpcManager(ILogger<IpcManager> logger, DalamudPluginInterface pi, DalamudUtilService dalamudUtil, MareMediator mediator, IServiceProvider services) : base(logger, mediator)
     {
         _pi = pi;
         _dalamudUtil = dalamudUtil;
+        _serviceProvider = services;
+
+        _loadMcdfProvider = pi.GetIpcProvider<string, GameObject, bool>("MareSynchronos.LoadMcdf");
+        _loadMcdfProvider.RegisterFunc(this.LoadMcdf);
 
         _penumbraInit = Penumbra.Api.Ipc.Initialized.Subscriber(pi, PenumbraInit);
         _penumbraDispose = Penumbra.Api.Ipc.Disposed.Subscriber(pi, PenumbraDispose);
@@ -863,5 +872,28 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         {
             Mediator.Publish(new PenumbraResourceLoadMessage(ptr, arg1, arg2));
         }
+    }
+
+    private bool LoadMcdf(string path, GameObject target)
+    {
+        MareCharaFileManager? mareCharaFileManager = _serviceProvider.GetService<MareCharaFileManager>();
+
+        if (mareCharaFileManager == null)
+            return false;
+
+        if (mareCharaFileManager.CurrentlyWorking)
+            return false;
+
+        if (!_dalamudUtil.IsInGpose)
+            return false;
+
+        _ = Task.Run(async () =>
+        {
+            long expectedLength = mareCharaFileManager.LoadMareCharaFile(path);
+            await mareCharaFileManager.ApplyMareCharaFile(target, expectedLength).ConfigureAwait(false);
+            mareCharaFileManager.ClearMareCharaFile();
+        });
+
+        return true;
     }
 }
