@@ -394,7 +394,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
     private async Task MareHubOnReconnected()
     {
-        ServerState = ServerState.Connected;
+        ServerState = ServerState.Reconnecting;
         try
         {
             InitializeApiHooks();
@@ -404,6 +404,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                 await StopConnection(ServerState.VersionMisMatch).ConfigureAwait(false);
                 return;
             }
+            ServerState = ServerState.Connected;
             await LoadIninitialPairs().ConfigureAwait(false);
             await LoadOnlinePairs().ConfigureAwait(false);
             Mediator.Publish(new ConnectedMessage(_connectionDto));
