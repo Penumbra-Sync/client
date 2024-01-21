@@ -265,6 +265,8 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         return Task.CompletedTask;
     }
 
+    public Task<ConnectionDto> GetConnectionDto() => GetConnectionDto(true);
+
     public async Task<ConnectionDto> GetConnectionDto(bool publishConnected = true)
     {
         var dto = await _mareHub!.InvokeAsync<ConnectionDto>(nameof(GetConnectionDto)).ConfigureAwait(false);
