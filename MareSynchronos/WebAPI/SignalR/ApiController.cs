@@ -265,10 +265,10 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         return Task.CompletedTask;
     }
 
-    public async Task<ConnectionDto> GetConnectionDto()
+    public async Task<ConnectionDto> GetConnectionDto(bool publishConnected = true)
     {
         var dto = await _mareHub!.InvokeAsync<ConnectionDto>(nameof(GetConnectionDto)).ConfigureAwait(false);
-        Mediator.Publish(new ConnectedMessage(dto));
+        if (publishConnected) Mediator.Publish(new ConnectedMessage(dto));
         return dto;
     }
 
@@ -398,7 +398,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         try
         {
             InitializeApiHooks();
-            _connectionDto = await GetConnectionDto().ConfigureAwait(false);
+            _connectionDto = await GetConnectionDto(publishConnected: false).ConfigureAwait(false);
             if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
             {
                 await StopConnection(ServerState.VersionMisMatch).ConfigureAwait(false);
