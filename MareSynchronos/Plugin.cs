@@ -75,6 +75,9 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<TagHandler>();
             collection.AddSingleton<IdDisplayHandler>();
             collection.AddSingleton<DrawEntityFactory>();
+            collection.AddSingleton((s) => new IpcProvider(s.GetRequiredService<ILogger<IpcProvider>>(),
+                pluginInterface,
+                s.GetRequiredService<MareCharaFileManager>(), s.GetRequiredService<DalamudUtilService>()));
             collection.AddSingleton<SelectPairForTagUi>();
             collection.AddSingleton((s) => new EventAggregator(pluginInterface.ConfigDirectory.FullName,
                 s.GetRequiredService<ILogger<EventAggregator>>(), s.GetRequiredService<MareMediator>()));
@@ -141,6 +144,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddHostedService(p => p.GetRequiredService<DtrEntry>());
             collection.AddHostedService(p => p.GetRequiredService<MarePlugin>());
             collection.AddHostedService(p => p.GetRequiredService<EventAggregator>());
+            collection.AddHostedService(p => p.GetRequiredService<IpcProvider>());
         })
         .Build()
         .RunAsync(_pluginCts.Token);
