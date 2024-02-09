@@ -34,7 +34,7 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
         _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("MareSynchronos", ver!.Major + "." + ver!.Minor + "." + ver!.Build));
 
         _availableDownloadSlots = mareConfig.Current.ParallelDownloads;
-        _downloadSemaphore = new(_availableDownloadSlots);
+        _downloadSemaphore = new(_availableDownloadSlots, _availableDownloadSlots);
 
         Mediator.Subscribe<ConnectedMessage>(this, (msg) =>
         {
@@ -72,8 +72,15 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
 
     public void ReleaseDownloadSlot()
     {
-        _downloadSemaphore.Release();
-        Mediator.Publish(new DownloadLimitChangedMessage());
+        try
+        {
+            _downloadSemaphore.Release();
+            Mediator.Publish(new DownloadLimitChangedMessage());
+        }
+        catch (SemaphoreFullException)
+        {
+            // ignore
+        }
     }
 
     public async Task<HttpResponseMessage> SendRequestAsync(HttpMethod method, Uri uri,
@@ -107,7 +114,7 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
             if (_availableDownloadSlots != _mareConfig.Current.ParallelDownloads && _availableDownloadSlots == _downloadSemaphore.CurrentCount)
             {
                 _availableDownloadSlots = _mareConfig.Current.ParallelDownloads;
-                _downloadSemaphore = new(_availableDownloadSlots);
+                _downloadSemaphore = new(_availableDownloadSlots, _availableDownloadSlots);
             }
         }
 
