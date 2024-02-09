@@ -21,7 +21,6 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
     private Task? _cacheCreationTask;
     private CancellationTokenSource _honorificCts = new();
     private bool _isZoning = false;
-    private CancellationTokenSource _palettePlusCts = new();
     private readonly Dictionary<ObjectKind, CancellationTokenSource> _glamourerCts = new();
 
     public CacheCreationService(ILogger<CacheCreationService> logger, MareMediator mediator, GameObjectHandlerFactory gameObjectHandlerFactory,
@@ -100,15 +99,6 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
                 GlamourerChanged(changedType.Key);
             }
         });
-        Mediator.Subscribe<PalettePlusMessage>(this, (msg) =>
-        {
-            if (_isZoning) return;
-            if (msg.Character.Address == _playerRelatedObjects[ObjectKind.Player].Address)
-            {
-                Logger.LogDebug("Received PalettePlus change, updating player");
-                PalettePlusChanged();
-            }
-        });
         Mediator.Subscribe<HonorificMessage>(this, (msg) =>
         {
             if (_isZoning) return;
@@ -172,21 +162,6 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
             await AddPlayerCacheToCreate().ConfigureAwait(false);
         }, token);
     }
-
-    private void PalettePlusChanged()
-    {
-        _palettePlusCts?.Cancel();
-        _palettePlusCts?.Dispose();
-        _palettePlusCts = new();
-        var token = _palettePlusCts.Token;
-
-        _ = Task.Run(async () =>
-        {
-            await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
-            await AddPlayerCacheToCreate().ConfigureAwait(false);
-        }, token);
-    }
-
     private void ProcessCacheCreation()
     {
         if (_isZoning) return;

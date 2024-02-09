@@ -42,11 +42,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private readonly ICallGateSubscriber<string, object> _honorificLocalCharacterTitleChanged;
     private readonly ICallGateSubscriber<object> _honorificReady;
     private readonly ICallGateSubscriber<Character, string, object> _honorificSetCharacterTitle;
-    private readonly ICallGateSubscriber<string> _palettePlusApiVersion;
-    private readonly ICallGateSubscriber<Character, string> _palettePlusBuildCharaPalette;
-    private readonly ICallGateSubscriber<Character, string, object> _palettePlusPaletteChanged;
-    private readonly ICallGateSubscriber<Character, object> _palettePlusRemoveCharaPalette;
-    private readonly ICallGateSubscriber<Character, string, object> _palettePlusSetCharaPalette;
     private readonly FuncSubscriber<string, string, Dictionary<string, string>, string, int, PenumbraApiEc> _penumbraAddTemporaryMod;
     private readonly FuncSubscriber<string, int, bool, PenumbraApiEc> _penumbraAssignTemporaryCollection;
     private readonly FuncSubscriber<string, string, TextureType, bool, Task> _penumbraConvertTextureFile;
@@ -73,7 +68,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     private bool _glamourerAvailable = false;
     private bool _heelsAvailable = false;
     private bool _honorificAvailable = false;
-    private bool _palettePlusAvailable = false;
     private bool _penumbraAvailable = false;
     private bool _shownGlamourerUnavailable = false;
     private bool _shownPenumbraUnavailable = false;
@@ -132,14 +126,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
 
         _customizePlusOnScaleUpdate.Subscribe(OnCustomizePlusScaleChange);
 
-        _palettePlusApiVersion = pi.GetIpcSubscriber<string>("PalettePlus.ApiVersion");
-        _palettePlusBuildCharaPalette = pi.GetIpcSubscriber<Character, string>("PalettePlus.BuildCharaPaletteOrEmpty");
-        _palettePlusSetCharaPalette = pi.GetIpcSubscriber<Character, string, object>("PalettePlus.SetCharaPalette");
-        _palettePlusRemoveCharaPalette = pi.GetIpcSubscriber<Character, object>("PalettePlus.RemoveCharaPalette");
-        _palettePlusPaletteChanged = pi.GetIpcSubscriber<Character, string, object>("PalettePlus.PaletteChanged");
-
-        _palettePlusPaletteChanged.Subscribe(OnPalettePlusPaletteChange);
-
         _honorificApiVersion = pi.GetIpcSubscriber<(uint, uint)>("Honorific.ApiVersion");
         _honorificGetLocalCharacterTitle = pi.GetIpcSubscriber<string>("Honorific.GetLocalCharacterTitle");
         _honorificClearCharacterTitle = pi.GetIpcSubscriber<Character, object>("Honorific.ClearCharacterTitle");
@@ -179,8 +165,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     public bool CheckHeelsApi() => _heelsAvailable;
 
     public bool CheckHonorificApi() => _honorificAvailable;
-
-    public bool CheckPalettePlusApi() => _palettePlusAvailable;
 
     public bool CheckPenumbraApi() => _penumbraAvailable;
 
@@ -433,51 +417,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         }
     }
 
-    public async Task<string> PalettePlusBuildPaletteAsync()
-    {
-        if (!CheckPalettePlusApi()) return string.Empty;
-        var palette = await _dalamudUtil.RunOnFrameworkThread(() => _palettePlusBuildCharaPalette.InvokeFunc(_dalamudUtil.GetPlayerCharacter())).ConfigureAwait(false);
-        if (string.IsNullOrEmpty(palette)) return string.Empty;
-        return Convert.ToBase64String(Encoding.UTF8.GetBytes(palette));
-    }
-
-    public async Task PalettePlusRemovePaletteAsync(IntPtr character)
-    {
-        if (!CheckPalettePlusApi()) return;
-        await _dalamudUtil.RunOnFrameworkThread(() =>
-        {
-            var gameObj = _dalamudUtil.CreateGameObject(character);
-            if (gameObj is Character c)
-            {
-                Logger.LogTrace("PalettePlus removing for {addr}", c.Address.ToString("X"));
-                _palettePlusRemoveCharaPalette!.InvokeAction(c);
-            }
-        }).ConfigureAwait(false);
-    }
-
-    public async Task PalettePlusSetPaletteAsync(IntPtr character, string palette)
-    {
-        if (!CheckPalettePlusApi()) return;
-        string decodedPalette = Encoding.UTF8.GetString(Convert.FromBase64String(palette));
-        await _dalamudUtil.RunOnFrameworkThread(() =>
-        {
-            var gameObj = _dalamudUtil.CreateGameObject(character);
-            if (gameObj is Character c)
-            {
-                if (string.IsNullOrEmpty(decodedPalette))
-                {
-                    Logger.LogTrace("PalettePlus removing for {addr}", c.Address.ToString("X"));
-                    _palettePlusRemoveCharaPalette!.InvokeAction(c);
-                }
-                else
-                {
-                    Logger.LogTrace("PalettePlus applying for {addr}", c.Address.ToString("X"));
-                    _palettePlusSetCharaPalette!.InvokeAction(c, decodedPalette);
-                }
-            }
-        }).ConfigureAwait(false);
-    }
-
     public async Task PenumbraAssignTemporaryCollectionAsync(ILogger logger, string collName, int idx)
     {
         if (!CheckPenumbraApi()) return;
@@ -637,7 +576,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         _penumbraInit.Dispose();
         _penumbraObjectIsRedrawn.Dispose();
         _heelsOffsetUpdate.Unsubscribe(HeelsOffsetChange);
-        _palettePlusPaletteChanged.Unsubscribe(OnPalettePlusPaletteChange);
         _customizePlusOnScaleUpdate.Unsubscribe(OnCustomizePlusScaleChange);
         _honorificLocalCharacterTitleChanged.Unsubscribe(OnHonorificLocalCharacterTitleChanged);
         _honorificDisposing.Unsubscribe(OnHonorificDisposing);
@@ -713,18 +651,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         }
     }
 
-    private bool CheckPalettePlusApiInternal()
-    {
-        try
-        {
-            return string.Equals(_palettePlusApiVersion.InvokeFunc(), "1.1.0", StringComparison.Ordinal);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
     private bool CheckPenumbraApiInternal()
     {
         bool penumbraAvailable = false;
@@ -789,11 +715,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         Mediator.Publish(new HonorificReadyMessage());
     }
 
-    private void OnPalettePlusPaletteChange(Character character, string palette)
-    {
-        Mediator.Publish(new PalettePlusMessage(character));
-    }
-
     private void PenumbraDispose()
     {
         _disposalCts.Cancel();
@@ -839,7 +760,6 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
         _penumbraAvailable = CheckPenumbraApiInternal();
         _heelsAvailable = CheckHeelsApiInternal();
         _customizePlusAvailable = CheckCustomizePlusApiInternal();
-        _palettePlusAvailable = CheckPalettePlusApiInternal();
         _honorificAvailable = CheckHonorificApiInternal();
         PenumbraModDirectory = GetPenumbraModDirectoryInternal();
     }

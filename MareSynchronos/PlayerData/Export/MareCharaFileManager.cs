@@ -49,7 +49,6 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
                 if ((await dalamudUtil.RunOnFrameworkThread(() => item.Value.CurrentAddress()).ConfigureAwait(false)) != nint.Zero)
                 {
                     await _ipcManager.GlamourerRevert(logger, item.Value.Name, item.Value, Guid.NewGuid(), cts.Token).ConfigureAwait(false);
-                    await _ipcManager.PalettePlusRemovePaletteAsync(item.Value.Address).ConfigureAwait(false);
                 }
                 else
                 {
@@ -116,14 +115,6 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
                 else
                 {
                     await _ipcManager.CustomizePlusRevertAsync(tempHandler.Address).ConfigureAwait(false);
-                }
-                if (!string.IsNullOrEmpty(LoadedCharaFile.CharaFileData.PalettePlusData))
-                {
-                    await _ipcManager.PalettePlusSetPaletteAsync(tempHandler.Address, LoadedCharaFile.CharaFileData.PalettePlusData).ConfigureAwait(false);
-                }
-                else
-                {
-                    await _ipcManager.PalettePlusRemovePaletteAsync(tempHandler.Address).ConfigureAwait(false);
                 }
             }
         }

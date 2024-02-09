@@ -308,10 +308,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                 Logger.LogDebug("[{applicationId}] Processing {change} for {handler}", applicationId, change, handler);
                 switch (change)
                 {
-                    case PlayerChanges.Palette:
-                        await _ipcManager.PalettePlusSetPaletteAsync(handler.Address, charaData.PalettePlusData).ConfigureAwait(false);
-                        break;
-
                     case PlayerChanges.Customize:
                         if (charaData.CustomizePlusData.TryGetValue(changes.Key, out var customizePlusData))
                         {
@@ -556,9 +552,6 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             tempHandler.CompareNameAndThrow(name);
             Logger.LogDebug("[{applicationId}] Restoring C+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             await _ipcManager.CustomizePlusRevertAsync(address).ConfigureAwait(false);
-            tempHandler.CompareNameAndThrow(name);
-            Logger.LogDebug("[{applicationId}] Restoring Palette+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
-            await _ipcManager.PalettePlusRemovePaletteAsync(address).ConfigureAwait(false);
             tempHandler.CompareNameAndThrow(name);
             Logger.LogDebug("[{applicationId}] Restoring Honorific for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             await _ipcManager.HonorificClearTitleAsync(address).ConfigureAwait(false);

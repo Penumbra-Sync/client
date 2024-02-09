@@ -197,7 +197,6 @@ public class PlayerDataFactory
         Task<string> getHeelsOffset = _ipcManager.GetHeelsOffsetAsync();
         Task<string> getGlamourerData = _ipcManager.GlamourerGetCharacterCustomizationAsync(playerRelatedObject.Address);
         Task<string?> getCustomizeData = _ipcManager.GetCustomizePlusScaleAsync(playerRelatedObject.Address);
-        Task<string> getPalettePlusData = _ipcManager.PalettePlusBuildPaletteAsync();
         previousData.GlamourerString[playerRelatedObject.ObjectKind] = await getGlamourerData.ConfigureAwait(false);
         _logger.LogDebug("Glamourer is now: {data}", previousData.GlamourerString[playerRelatedObject.ObjectKind]);
         var customizeScale = await getCustomizeData.ConfigureAwait(false);
@@ -206,8 +205,8 @@ public class PlayerDataFactory
             previousData.CustomizePlusScale[playerRelatedObject.ObjectKind] = customizeScale;
             _logger.LogDebug("Customize is now: {data}", previousData.CustomizePlusScale[playerRelatedObject.ObjectKind]);
         }
-        previousData.PalettePlusPalette = await getPalettePlusData.ConfigureAwait(false);
-        _logger.LogDebug("Palette is now: {data}", previousData.PalettePlusPalette);
+        // todo: remove once heaving api
+        previousData.PalettePlusPalette = string.Empty;
         previousData.HonorificData = _ipcManager.HonorificGetTitle();
         _logger.LogDebug("Honorific is now: {data}", previousData.HonorificData);
         previousData.HeelsData = await getHeelsOffset.ConfigureAwait(false);

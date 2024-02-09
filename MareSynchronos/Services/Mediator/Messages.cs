@@ -39,7 +39,6 @@ public record GlamourerChangedMessage(IntPtr Address) : MessageBase;
 public record HeelsOffsetMessage : MessageBase;
 public record PenumbraResourceLoadMessage(IntPtr GameObject, string GamePath, string FilePath) : SameThreadMessage;
 public record CustomizePlusMessage(string ProfileName) : MessageBase;
-public record PalettePlusMessage(Character Character) : MessageBase;
 public record HonorificMessage(string NewHonorificTitle) : MessageBase;
 public record HonorificReadyMessage : MessageBase;
 public record PlayerChangedMessage(CharacterData Data) : MessageBase;

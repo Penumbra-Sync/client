@@ -174,15 +174,6 @@ public static class VariousExtensions
                 charaDataToUpdate[objectKind].Add(PlayerChanges.Heels);
             }
 
-            bool palettePlusDataDifferent = !string.Equals(oldData.PalettePlusData, newData.PalettePlusData, StringComparison.Ordinal)
-                || (charaDataToUpdate.TryGetValue(objectKind, out var playerChanges) && playerChanges.Contains(PlayerChanges.Glamourer)
-                    && (!string.IsNullOrEmpty(oldData.PalettePlusData) || !string.IsNullOrEmpty(newData.PalettePlusData)));
-            if (palettePlusDataDifferent || (forceApplyCustomization && !string.IsNullOrEmpty(newData.PalettePlusData)))
-            {
-                logger.LogDebug("[BASE-{appBase}] Updating {object}/{kind} (Diff palette data) => {change}", applicationBase, cachedPlayer, objectKind, PlayerChanges.Palette);
-                charaDataToUpdate[objectKind].Add(PlayerChanges.Palette);
-            }
-
             bool honorificDataDifferent = !string.Equals(oldData.HonorificData, newData.HonorificData, StringComparison.Ordinal);
             if (honorificDataDifferent || (forceApplyCustomization && !string.IsNullOrEmpty(newData.HonorificData)))
             {

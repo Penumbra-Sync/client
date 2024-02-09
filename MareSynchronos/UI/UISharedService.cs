@@ -69,7 +69,6 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     private bool _isPenumbraDirectory = false;
 
-    private bool _palettePlusExists = false;
     private bool _penumbraExists = false;
 
     private int _serverSelectionIndex = -1;
