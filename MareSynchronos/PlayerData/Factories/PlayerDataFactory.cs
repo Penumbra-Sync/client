@@ -2,7 +2,6 @@
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop;
-using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Data;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services;
@@ -205,8 +204,6 @@ public class PlayerDataFactory
             previousData.CustomizePlusScale[playerRelatedObject.ObjectKind] = customizeScale;
             _logger.LogDebug("Customize is now: {data}", previousData.CustomizePlusScale[playerRelatedObject.ObjectKind]);
         }
-        // todo: remove once heaving api
-        previousData.PalettePlusPalette = string.Empty;
         previousData.HonorificData = _ipcManager.HonorificGetTitle();
         _logger.LogDebug("Honorific is now: {data}", previousData.HonorificData);
         previousData.HeelsData = await getHeelsOffset.ConfigureAwait(false);

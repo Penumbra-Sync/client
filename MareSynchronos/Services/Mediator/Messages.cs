@@ -1,5 +1,4 @@
-﻿using Dalamud.Game.ClientState.Objects.Types;
-using Dalamud.Interface.Internal.Notifications;
+﻿using Dalamud.Interface.Internal.Notifications;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto;
 using MareSynchronos.API.Dto.Group;

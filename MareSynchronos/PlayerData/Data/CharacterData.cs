@@ -16,7 +16,6 @@ public class CharacterData
     public string HeelsData { get; set; } = string.Empty;
     public string HonorificData { get; set; } = string.Empty;
     public string ManipulationString { get; set; } = string.Empty;
-    public string PalettePlusPalette { get; set; } = string.Empty;
 
     public API.Data.CharacterData ToAPI()
     {
@@ -45,7 +44,6 @@ public class CharacterData
             ManipulationData = ManipulationString,
             HeelsData = HeelsData,
             CustomizePlusData = CustomizePlusScale.ToDictionary(d => d.Key, d => d.Value),
-            PalettePlusData = PalettePlusPalette,
             HonorificData = HonorificData
         };
     }
