@@ -293,7 +293,7 @@ public class TopTabMenu
                 perm.SetDisableSounds(true);
                 return perm;
             });
-        PopupIndividualSetting("Individual Animations", "Enable sounds for all individuals", "Disable sounds for all individuals",
+        PopupIndividualSetting("Individual Animations", "Enable animations for all individuals", "Disable animations for all individuals",
             FontAwesomeIcon.Running, FontAwesomeIcon.Stop,
             (perm) =>
             {
