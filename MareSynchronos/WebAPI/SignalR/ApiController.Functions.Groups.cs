@@ -99,6 +99,12 @@ public partial class ApiController
         await _mareHub!.SendAsync(nameof(GroupSetUserInfo), groupPair).ConfigureAwait(false);
     }
 
+    public async Task<int> GroupPrune(GroupDto group, int days, bool execute)
+    {
+        CheckConnection();
+        return await _mareHub!.InvokeAsync<int>(nameof(GroupPrune), group, days, execute).ConfigureAwait(false);
+    }
+
     public async Task<List<GroupFullInfoDto>> GroupsGetAll()
     {
         CheckConnection();

@@ -3,10 +3,12 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
+using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.Mediator;
+using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
@@ -25,9 +27,13 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
     private int _multiInvites;
     private string _newPassword;
     private bool _pwChangeSuccess;
+    private Task<int>? _pruneTestTask;
+    private Task<int>? _pruneTask;
+    private int _pruneDays = 14;
+
     public SyncshellAdminUI(ILogger<SyncshellAdminUI> logger, MareMediator mediator, ApiController apiController,
         UiSharedService uiSharedService, PairManager pairManager, GroupFullInfoDto groupFullInfo)
-        : base(logger, mediator, "Syncshell Admin Panel (" + groupFullInfo.GID + ")")
+        : base(logger, mediator, "Syncshell Admin Panel (" + groupFullInfo.GroupAliasOrGID + ")")
     {
         GroupFullInfo = groupFullInfo;
         _apiController = apiController;
@@ -111,52 +117,244 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
             var mgmtTab = ImRaii.TabItem("User Management");
             if (mgmtTab)
             {
-                if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Broom, "Clear Syncshell"))
+                var userNode = ImRaii.TreeNode("User List & Administration");
+                if (userNode)
                 {
-                    _ = _apiController.GroupClear(new(GroupFullInfo.Group));
-                }
-                UiSharedService.AttachToolTip("This will remove all non-pinned, non-moderator users from the Syncshell");
-
-                ImGuiHelpers.ScaledDummy(2f);
-
-                if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Retweet, "Refresh Banlist from Server"))
-                {
-                    _bannedUsers = _apiController.GroupGetBannedUsers(new GroupDto(GroupFullInfo.Group)).Result;
-                }
-
-                if (ImGui.BeginTable("bannedusertable" + GroupFullInfo.GID, 6, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.ScrollY))
-                {
-                    ImGui.TableSetupColumn("UID", ImGuiTableColumnFlags.None, 1);
-                    ImGui.TableSetupColumn("Alias", ImGuiTableColumnFlags.None, 1);
-                    ImGui.TableSetupColumn("By", ImGuiTableColumnFlags.None, 1);
-                    ImGui.TableSetupColumn("Date", ImGuiTableColumnFlags.None, 2);
-                    ImGui.TableSetupColumn("Reason", ImGuiTableColumnFlags.None, 3);
-                    ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.None, 1);
-
-                    ImGui.TableHeadersRow();
-
-                    foreach (var bannedUser in _bannedUsers.ToList())
+                    if (!_pairManager.GroupPairs.TryGetValue(GroupFullInfo, out var pairs))
                     {
-                        ImGui.TableNextColumn();
-                        ImGui.TextUnformatted(bannedUser.UID);
-                        ImGui.TableNextColumn();
-                        ImGui.TextUnformatted(bannedUser.UserAlias ?? string.Empty);
-                        ImGui.TableNextColumn();
-                        ImGui.TextUnformatted(bannedUser.BannedBy);
-                        ImGui.TableNextColumn();
-                        ImGui.TextUnformatted(bannedUser.BannedOn.ToLocalTime().ToString(CultureInfo.CurrentCulture));
-                        ImGui.TableNextColumn();
-                        UiSharedService.TextWrapped(bannedUser.Reason);
-                        ImGui.TableNextColumn();
-                        if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Check, "Unban#" + bannedUser.UID))
+                        UiSharedService.ColorTextWrapped("No users found in this Syncshell", ImGuiColors.DalamudYellow);
+                    }
+                    else
+                    {
+                        using var table = ImRaii.Table("userList#" + GroupFullInfo.Group.GID, 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.ScrollY);
+                        if (table)
                         {
-                            _ = _apiController.GroupUnbanUser(bannedUser);
-                            _bannedUsers.RemoveAll(b => string.Equals(b.UID, bannedUser.UID, StringComparison.Ordinal));
+                            ImGui.TableSetupColumn("Alias/UID/Note", ImGuiTableColumnFlags.None, 3);
+                            ImGui.TableSetupColumn("Online/Name", ImGuiTableColumnFlags.None, 2);
+                            ImGui.TableSetupColumn("Flags", ImGuiTableColumnFlags.None, 1);
+                            ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.None, 2);
+                            ImGui.TableHeadersRow();
+
+                            var groupedPairs = new Dictionary<Pair, GroupPairUserInfo?>(pairs.Select(p => new KeyValuePair<Pair, GroupPairUserInfo?>(p,
+                                GroupFullInfo.GroupPairUserInfos.TryGetValue(p.UserData.UID, out GroupPairUserInfo value) ? value : null)));
+
+                            foreach (var pair in groupedPairs.OrderBy(p =>
+                            {
+                                if (p.Value == null) return 10;
+                                if (p.Value.Value.IsModerator()) return 0;
+                                if (p.Value.Value.IsPinned()) return 1;
+                                return 10;
+                            }).ThenBy(p => p.Key.GetNote() ?? p.Key.UserData.AliasOrUID, StringComparer.OrdinalIgnoreCase))
+                            {
+                                using var tableId = ImRaii.PushId("userTable_" + pair.Key.UserData.UID);
+
+                                ImGui.TableNextColumn(); // alias/uid/note
+                                var note = pair.Key.GetNote();
+                                var text = note == null ? pair.Key.UserData.AliasOrUID : note + " (" + pair.Key.UserData.AliasOrUID + ")";
+                                ImGui.AlignTextToFramePadding();
+                                ImGui.TextUnformatted(text);
+
+                                ImGui.TableNextColumn(); // online/name
+                                string onlineText = pair.Key.IsOnline ? "Online" : "Offline";
+                                if (!string.IsNullOrEmpty(pair.Key.PlayerName))
+                                {
+                                    onlineText += " (" + pair.Key.PlayerName + ")";
+                                }
+                                var boolcolor = UiSharedService.GetBoolColor(pair.Key.IsOnline);
+                                ImGui.AlignTextToFramePadding();
+                                UiSharedService.ColorText(onlineText, boolcolor);
+
+                                ImGui.TableNextColumn(); // special flags
+                                if (pair.Value != null && (pair.Value.Value.IsModerator() || pair.Value.Value.IsPinned()))
+                                {
+                                    if (pair.Value.Value.IsModerator())
+                                    {
+                                        UiSharedService.NormalizedIcon(FontAwesomeIcon.UserShield);
+                                        UiSharedService.AttachToolTip("Moderator");
+                                    }
+                                    if (pair.Value.Value.IsPinned())
+                                    {
+                                        UiSharedService.NormalizedIcon(FontAwesomeIcon.Thumbtack);
+                                        UiSharedService.AttachToolTip("Pinned");
+                                    }
+                                }
+                                else
+                                {
+                                    UiSharedService.FontText(FontAwesomeIcon.None.ToIconString(), UiBuilder.IconFont);
+                                }
+
+                                ImGui.TableNextColumn(); // actions
+                                if (_isOwner)
+                                {
+                                    if (UiSharedService.NormalizedIconButton(FontAwesomeIcon.UserShield))
+                                    {
+                                        GroupPairUserInfo userInfo = pair.Value ?? GroupPairUserInfo.None;
+
+                                        userInfo.SetModerator(!userInfo.IsModerator());
+
+                                        _ = _apiController.GroupSetUserInfo(new GroupPairUserInfoDto(GroupFullInfo.Group, pair.Key.UserData, userInfo));
+                                    }
+                                    UiSharedService.AttachToolTip(pair.Value != null && pair.Value.Value.IsModerator() ? "Demod user" : "Mod user");
+                                    ImGui.SameLine();
+
+                                    if (UiSharedService.NormalizedIconButton(FontAwesomeIcon.Thumbtack))
+                                    {
+                                        GroupPairUserInfo userInfo = pair.Value ?? GroupPairUserInfo.None;
+
+                                        userInfo.SetPinned(!userInfo.IsPinned());
+
+                                        _ = _apiController.GroupSetUserInfo(new GroupPairUserInfoDto(GroupFullInfo.Group, pair.Key.UserData, userInfo));
+                                    }
+                                    UiSharedService.AttachToolTip(pair.Value != null && pair.Value.Value.IsPinned() ? "Unpin user" : "Pin user");
+                                    ImGui.SameLine();
+
+                                    using (ImRaii.Disabled(!UiSharedService.CtrlPressed()))
+                                    {
+                                        if (UiSharedService.NormalizedIconButton(FontAwesomeIcon.Trash))
+                                        {
+                                            _ = _apiController.GroupRemoveUser(new GroupPairDto(GroupFullInfo.Group, pair.Key.UserData));
+                                        }
+                                    }
+                                    UiSharedService.AttachToolTip("Remove user from Syncshell"
+                                        + UiSharedService.TooltipSeparator + "Hold CTRL to enable this button");
+
+                                    ImGui.SameLine();
+                                    using (ImRaii.Disabled(!UiSharedService.CtrlPressed()))
+                                    {
+                                        if (UiSharedService.NormalizedIconButton(FontAwesomeIcon.Ban))
+                                        {
+                                            Mediator.Publish(new OpenBanUserPopupMessage(pair.Key, GroupFullInfo));
+                                        }
+                                    }
+                                    UiSharedService.AttachToolTip("Ban user from Syncshell"
+                                        + UiSharedService.TooltipSeparator + "Hold CTRL to enable this button");
+                                }
+                            }
                         }
                     }
-
-                    ImGui.EndTable();
                 }
+                userNode.Dispose();
+                var clearNode = ImRaii.TreeNode("Mass Cleanup");
+                if (clearNode)
+                {
+                    using (ImRaii.Disabled(!UiSharedService.CtrlPressed()))
+                    {
+                        if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Broom, "Clear Syncshell"))
+                        {
+                            _ = _apiController.GroupClear(new(GroupFullInfo.Group));
+                        }
+                    }
+                    UiSharedService.AttachToolTip("This will remove all non-pinned, non-moderator users from the Syncshell."
+                        + UiSharedService.TooltipSeparator + "Hold CTRL to enable this button");
+
+                    ImGuiHelpers.ScaledDummy(2f);
+                    ImGui.Separator();
+                    ImGuiHelpers.ScaledDummy(2f);
+
+                    if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Unlink, "Check for Inactive Users"))
+                    {
+                        _pruneTestTask = _apiController.GroupPrune(new(GroupFullInfo.Group), _pruneDays, execute: false);
+                        _pruneTask = null;
+                    }
+                    UiSharedService.AttachToolTip($"This will start the prune process for this Syncshell of inactive Mare users that have not logged in in the past {_pruneDays} days."
+                        + Environment.NewLine + "You will be able to review the amount of inactive users before executing the prune."
+                        + UiSharedService.TooltipSeparator + "Note: this check excludes pinned users and moderators of this Syncshell.");
+                    ImGui.SameLine();
+                    ImGui.SetNextItemWidth(150);
+                    _uiSharedService.DrawCombo("Days of inactivity", [7, 14, 30, 90], (count) =>
+                    {
+                        return count + " days";
+                    },
+                    (selected) =>
+                    {
+                        _pruneDays = selected;
+                        _pruneTestTask = null;
+                        _pruneTask = null;
+                    },
+                    _pruneDays);
+
+                    if (_pruneTestTask != null)
+                    {
+                        if (!_pruneTestTask.IsCompleted)
+                        {
+                            UiSharedService.ColorTextWrapped("Calculating inactive users...", ImGuiColors.DalamudYellow);
+                        }
+                        else
+                        {
+                            ImGui.AlignTextToFramePadding();
+                            UiSharedService.TextWrapped($"Found {_pruneTestTask.Result} user(s) that have not logged into Mare in the past {_pruneDays} days.");
+                            if (_pruneTestTask.Result > 0)
+                            {
+                                using (ImRaii.Disabled(!UiSharedService.CtrlPressed()))
+                                {
+                                    if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Broom, "Prune Inactive Users"))
+                                    {
+                                        _pruneTask = _apiController.GroupPrune(new(GroupFullInfo.Group), _pruneDays, execute: true);
+                                        _pruneTestTask = null;
+                                    }
+                                }
+                                UiSharedService.AttachToolTip($"Pruning will remove {_pruneTestTask?.Result ?? 0} inactive user(s)."
+                                    + UiSharedService.TooltipSeparator + "Hold CTRL to enable this button");
+                            }
+                        }
+                    }
+                    if (_pruneTask != null)
+                    {
+                        if (!_pruneTask.IsCompleted)
+                        {
+                            UiSharedService.ColorTextWrapped("Pruning Syncshell...", ImGuiColors.DalamudYellow);
+                        }
+                        else
+                        {
+                            UiSharedService.TextWrapped($"Syncshell was pruned and {_pruneTask.Result} inactive user(s) have been removed.");
+                        }
+                    }
+                }
+                clearNode.Dispose();
+
+                var banNode = ImRaii.TreeNode("User Bans");
+                if (banNode)
+                {
+                    if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Retweet, "Refresh Banlist from Server"))
+                    {
+                        _bannedUsers = _apiController.GroupGetBannedUsers(new GroupDto(GroupFullInfo.Group)).Result;
+                    }
+
+                    if (ImGui.BeginTable("bannedusertable" + GroupFullInfo.GID, 6, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.ScrollY))
+                    {
+                        ImGui.TableSetupColumn("UID", ImGuiTableColumnFlags.None, 1);
+                        ImGui.TableSetupColumn("Alias", ImGuiTableColumnFlags.None, 1);
+                        ImGui.TableSetupColumn("By", ImGuiTableColumnFlags.None, 1);
+                        ImGui.TableSetupColumn("Date", ImGuiTableColumnFlags.None, 2);
+                        ImGui.TableSetupColumn("Reason", ImGuiTableColumnFlags.None, 3);
+                        ImGui.TableSetupColumn("Actions", ImGuiTableColumnFlags.None, 1);
+
+                        ImGui.TableHeadersRow();
+
+                        foreach (var bannedUser in _bannedUsers.ToList())
+                        {
+                            ImGui.TableNextColumn();
+                            ImGui.TextUnformatted(bannedUser.UID);
+                            ImGui.TableNextColumn();
+                            ImGui.TextUnformatted(bannedUser.UserAlias ?? string.Empty);
+                            ImGui.TableNextColumn();
+                            ImGui.TextUnformatted(bannedUser.BannedBy);
+                            ImGui.TableNextColumn();
+                            ImGui.TextUnformatted(bannedUser.BannedOn.ToLocalTime().ToString(CultureInfo.CurrentCulture));
+                            ImGui.TableNextColumn();
+                            UiSharedService.TextWrapped(bannedUser.Reason);
+                            ImGui.TableNextColumn();
+                            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Check, "Unban#" + bannedUser.UID))
+                            {
+                                _ = _apiController.GroupUnbanUser(bannedUser);
+                                _bannedUsers.RemoveAll(b => string.Equals(b.UID, bannedUser.UID, StringComparison.Ordinal));
+                            }
+                        }
+
+                        ImGui.EndTable();
+                    }
+                }
+                banNode.Dispose();
             }
             mgmtTab.Dispose();
 
