@@ -3,7 +3,6 @@ using MareSynchronos.Utils;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 
@@ -14,7 +13,7 @@ public sealed class PerformanceCollectorService : IHostedService
     private const string _counterSplit = "=>";
     private readonly ILogger<PerformanceCollectorService> _logger;
     private readonly MareConfigService _mareConfigService;
-    private readonly ConcurrentDictionary<string, RollingList<Tuple<TimeOnly, long>>> _performanceCounters = new(StringComparer.Ordinal);
+    public ConcurrentDictionary<string, RollingList<Tuple<TimeOnly, long>>> PerformanceCounters { get; } = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource _periodicLogPruneTask = new();
 
     public PerformanceCollectorService(ILogger<PerformanceCollectorService> logger, MareConfigService mareConfigService)
@@ -23,49 +22,57 @@ public sealed class PerformanceCollectorService : IHostedService
         _mareConfigService = mareConfigService;
     }
 
-    public T LogPerformance<T>(object sender, string counterName, Func<T> func)
+    public T LogPerformance<T>(object sender, string counterName, Func<T> func, int maxEntries = 10000)
     {
         if (!_mareConfigService.Current.LogPerformance) return func.Invoke();
 
         counterName = sender.GetType().Name + _counterSplit + counterName;
 
-        if (!_performanceCounters.TryGetValue(counterName, out var list))
+        if (!PerformanceCounters.TryGetValue(counterName, out var list))
         {
-            list = _performanceCounters[counterName] = new(10000);
+            list = PerformanceCounters[counterName] = new(maxEntries);
         }
 
-        Stopwatch st = Stopwatch.StartNew();
+        var dt = DateTime.UtcNow.Ticks;
         try
         {
             return func.Invoke();
         }
         finally
         {
-            st.Stop();
-            list.Add(new(TimeOnly.FromDateTime(DateTime.Now), st.ElapsedTicks));
+            var elapsed = DateTime.UtcNow.Ticks - dt;
+#if DEBUG
+            if (TimeSpan.FromTicks(elapsed) > TimeSpan.FromMilliseconds(10))
+                _logger.LogWarning(">10ms spike on {counterName}: {time}", counterName, TimeSpan.FromTicks(elapsed));
+#endif
+            list.Add(new(TimeOnly.FromDateTime(DateTime.Now), elapsed));
         }
     }
 
-    public void LogPerformance(object sender, string counterName, Action act)
+    public void LogPerformance(object sender, string counterName, Action act, int maxEntries = 10000)
     {
         if (!_mareConfigService.Current.LogPerformance) { act.Invoke(); return; }
 
         counterName = sender.GetType().Name + _counterSplit + counterName;
 
-        if (!_performanceCounters.TryGetValue(counterName, out var list))
+        if (!PerformanceCounters.TryGetValue(counterName, out var list))
         {
-            list = _performanceCounters[counterName] = new(10000);
+            list = PerformanceCounters[counterName] = new(maxEntries);
         }
 
-        Stopwatch st = Stopwatch.StartNew();
+        var dt = DateTime.UtcNow.Ticks;
         try
         {
             act.Invoke();
         }
         finally
         {
-            st.Stop();
-            list.Add(new(TimeOnly.FromDateTime(DateTime.Now), st.ElapsedTicks));
+            var elapsed = DateTime.UtcNow.Ticks - dt;
+#if DEBUG
+            if (TimeSpan.FromTicks(elapsed) > TimeSpan.FromMilliseconds(10))
+                _logger.LogWarning(">10ms spike on {counterName}: {time}", counterName, TimeSpan.FromTicks(elapsed));
+#endif
+            list.Add(new(TimeOnly.FromDateTime(DateTime.Now), elapsed));
         }
     }
 
@@ -97,7 +104,7 @@ public sealed class PerformanceCollectorService : IHostedService
         {
             sb.AppendLine("Performance metrics over total lifetime of each counter");
         }
-        var data = _performanceCounters.ToList();
+        var data = PerformanceCounters.ToList();
         var longestCounterName = data.OrderByDescending(d => d.Key.Length).First().Key.Length + 2;
         sb.Append("-Last".PadRight(15, '-'));
         sb.Append('|');
@@ -169,12 +176,12 @@ public sealed class PerformanceCollectorService : IHostedService
         {
             await Task.Delay(TimeSpan.FromMinutes(10), _periodicLogPruneTask.Token).ConfigureAwait(false);
 
-            foreach (var entries in _performanceCounters.ToList())
+            foreach (var entries in PerformanceCounters.ToList())
             {
                 try
                 {
                     var last = entries.Value.ToList().Last();
-                    if (last.Item1.AddMinutes(10) < TimeOnly.FromDateTime(DateTime.Now) && !_performanceCounters.TryRemove(entries.Key, out _))
+                    if (last.Item1.AddMinutes(10) < TimeOnly.FromDateTime(DateTime.Now) && !PerformanceCounters.TryRemove(entries.Key, out _))
                     {
                         _logger.LogDebug("Could not remove performance counter {counter}", entries.Key);
                     }

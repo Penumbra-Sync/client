@@ -7,10 +7,12 @@ namespace MareSynchronos.Utils;
 
 public static class Crypto
 {
+#pragma warning disable SYSLIB0021 // Type or member is obsolete
+
     private static readonly Dictionary<string, string> _hashListSHA1 = new(StringComparer.Ordinal);
     private static readonly Dictionary<string, string> _hashListSHA256 = new(StringComparer.Ordinal);
-
-#pragma warning disable SYSLIB0021 // Type or member is obsolete
+    private static readonly SHA256CryptoServiceProvider _sha256CryptoProvider = new();
+    private static readonly SHA1CryptoServiceProvider _sha1CryptoProvider = new();
 
     public static string GetFileHash(this string filePath)
     {
@@ -39,10 +41,7 @@ public static class Crypto
         if (_hashListSHA1.TryGetValue(stringToCompute, out var hash))
             return hash;
 
-        using SHA1CryptoServiceProvider cryptoProvider = new();
-        var computedHash = BitConverter.ToString(cryptoProvider.ComputeHash(Encoding.UTF8.GetBytes(stringToCompute))).Replace("-", "", StringComparison.Ordinal);
-        _hashListSHA1[stringToCompute] = computedHash;
-        return computedHash;
+        return _hashListSHA1[stringToCompute] = BitConverter.ToString(_sha1CryptoProvider.ComputeHash(Encoding.UTF8.GetBytes(stringToCompute))).Replace("-", "", StringComparison.Ordinal);
     }
 
     private static string GetOrComputeHashSHA256(string stringToCompute)
@@ -50,10 +49,7 @@ public static class Crypto
         if (_hashListSHA256.TryGetValue(stringToCompute, out var hash))
             return hash;
 
-        using SHA256CryptoServiceProvider cryptoProvider = new();
-        var computedHash = BitConverter.ToString(cryptoProvider.ComputeHash(Encoding.UTF8.GetBytes(stringToCompute))).Replace("-", "", StringComparison.Ordinal);
-        _hashListSHA256[stringToCompute] = computedHash;
-        return computedHash;
+        return _hashListSHA256[stringToCompute] = BitConverter.ToString(_sha256CryptoProvider.ComputeHash(Encoding.UTF8.GetBytes(stringToCompute))).Replace("-", "", StringComparison.Ordinal);
     }
 
 #pragma warning restore SYSLIB0021 // Type or member is obsolete

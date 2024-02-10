@@ -31,7 +31,8 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     private string _lastGlobalBlockPlayer = string.Empty;
     private string _lastGlobalBlockReason = string.Empty;
     private ushort _lastZone = 0;
-    private Dictionary<string, (string Name, nint Address)> _playerCharas = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (string Name, nint Address)> _playerCharas = new(StringComparer.Ordinal);
+    private readonly List<string> _notUpdatedCharas = [];
     private bool _sentBetweenAreas = false;
 
     public DalamudUtilService(ILogger<DalamudUtilService> logger, IClientState clientState, IObjectTable objectTable, IFramework framework,
@@ -360,13 +361,13 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         return result;
     }
 
-    private unsafe void CheckCharacterForDrawing(PlayerCharacter p)
+    private unsafe void CheckCharacterForDrawing(nint address, string characterName)
     {
         if (!IsAnythingDrawing)
         {
-            var gameObj = (GameObject*)p.Address;
+            var gameObj = (GameObject*)address;
             var drawObj = gameObj->DrawObject;
-            var playerName = p.Name.ToString();
+            var playerName = characterName;
             bool isDrawing = false;
             bool isDrawingChanged = false;
             if ((nint)drawObj != IntPtr.Zero)
@@ -431,13 +432,32 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         }
 
         IsAnythingDrawing = false;
-        _playerCharas = _performanceCollector.LogPerformance(this, "ObjTableToCharas",
-            () => _objectTable.OfType<PlayerCharacter>().Where(o => o.ObjectIndex < 200)
-                .ToDictionary(p => p.GetHash256(), p =>
+        _performanceCollector.LogPerformance(this, "ObjTableToCharas",
+            () =>
+            {
+                _notUpdatedCharas.AddRange(_playerCharas.Keys);
+
+                foreach (var chara in _objectTable)
                 {
-                    CheckCharacterForDrawing(p);
-                    return (p.Name.ToString(), p.Address);
-                }, StringComparer.Ordinal));
+                    if (chara.ObjectIndex % 2 != 0 || chara.ObjectIndex >= 200) continue;
+
+                    string charaName = chara.Name.ToString();
+                    string homeWorldId = ((BattleChara*)chara.Address)->Character.HomeWorld.ToString();
+
+                    var hash = (charaName + homeWorldId).GetHash256();
+                    if (!IsAnythingDrawing)
+                        CheckCharacterForDrawing(chara.Address, charaName);
+                    _notUpdatedCharas.Remove(hash);
+                    _playerCharas[hash] = (charaName, chara.Address);
+                }
+
+                foreach (var notUpdatedChara in _notUpdatedCharas)
+                {
+                    _playerCharas.Remove(notUpdatedChara);
+                }
+
+                _notUpdatedCharas.Clear();
+            });
 
         if (!IsAnythingDrawing && !string.IsNullOrEmpty(_lastGlobalBlockPlayer))
         {
