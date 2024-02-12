@@ -2,12 +2,13 @@
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
+using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 
 namespace MareSynchronos.FileCache;
 
-public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
+public sealed class CacheMonitor : DisposableMediatorSubscriberBase
 {
     private readonly MareConfigService _configService;
     private readonly DalamudUtilService _dalamudUtil;
@@ -16,11 +17,10 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
     private readonly IpcManager _ipcManager;
     private readonly PerformanceCollectorService _performanceCollector;
     private long _currentFileProgress = 0;
-    private bool _fileScanWasRunning = false;
     private CancellationTokenSource _scanCancellationTokenSource = new();
-    private TimeSpan _timeUntilNextScan = TimeSpan.Zero;
+    private readonly string[] _allowedExtensions = [".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk"];
 
-    public PeriodicFileScanner(ILogger<PeriodicFileScanner> logger, IpcManager ipcManager, MareConfigService configService,
+    public CacheMonitor(ILogger<CacheMonitor> logger, IpcManager ipcManager, MareConfigService configService,
         FileCacheManager fileDbManager, MareMediator mediator, PerformanceCollectorService performanceCollector, DalamudUtilService dalamudUtil,
         FileCompactor fileCompactor) : base(logger, mediator)
     {
@@ -30,38 +30,287 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         _performanceCollector = performanceCollector;
         _dalamudUtil = dalamudUtil;
         _fileCompactor = fileCompactor;
-        Mediator.Subscribe<PenumbraInitializedMessage>(this, (_) => StartScan());
+        Mediator.Subscribe<PenumbraInitializedMessage>(this, (_) =>
+        {
+            StartPenumbraWatcher(_ipcManager.PenumbraModDirectory);
+            StartMareWatcher(configService.Current.CacheFolder);
+            InvokeScan();
+        });
         Mediator.Subscribe<HaltScanMessage>(this, (msg) => HaltScan(msg.Source));
         Mediator.Subscribe<ResumeScanMessage>(this, (msg) => ResumeScan(msg.Source));
-        Mediator.Subscribe<SwitchToMainUiMessage>(this, (_) => StartScan());
-        Mediator.Subscribe<DalamudLoginMessage>(this, (_) => StartScan());
+        Mediator.Subscribe<DalamudLoginMessage>(this, (_) =>
+        {
+            StartMareWatcher(configService.Current.CacheFolder);
+            StartPenumbraWatcher(_ipcManager.PenumbraModDirectory);
+            InvokeScan();
+        });
+        Mediator.Subscribe<PenumbraDirectoryChangedMessage>(this, (msg) => StartPenumbraWatcher(msg.ModDirectory));
+        if (_ipcManager.CheckPenumbraApi() && !string.IsNullOrEmpty(_ipcManager.PenumbraModDirectory))
+            StartPenumbraWatcher(_ipcManager.PenumbraModDirectory);
+        if (configService.Current.HasValidSetup())
+        {
+            StartMareWatcher(configService.Current.CacheFolder);
+        }
     }
 
     public long CurrentFileProgress => _currentFileProgress;
     public long FileCacheSize { get; set; }
     public ConcurrentDictionary<string, int> HaltScanLocks { get; set; } = new(StringComparer.Ordinal);
     public bool IsScanRunning => CurrentFileProgress > 0 || TotalFiles > 0;
-    public string TimeUntilNextScan => _timeUntilNextScan.ToString(@"mm\:ss");
     public long TotalFiles { get; private set; }
     public long TotalFilesStorage { get; private set; }
-    private int TimeBetweenScans => _configService.Current.TimeSpanBetweenScansInSeconds;
 
     public void HaltScan(string source)
     {
         if (!HaltScanLocks.ContainsKey(source)) HaltScanLocks[source] = 0;
         HaltScanLocks[source]++;
+    }
 
-        if (IsScanRunning && HaltScanLocks.Any(f => f.Value > 0))
+    record WatcherChange(WatcherChangeTypes ChangeType, string? OldPath = null);
+    private readonly Dictionary<string, WatcherChange> _watcherChanges = new Dictionary<string, WatcherChange>(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, WatcherChange> _mareChanges = new Dictionary<string, WatcherChange>(StringComparer.OrdinalIgnoreCase);
+
+    public void StopMonitoring()
+    {
+        Logger.LogInformation("Stopping monitoring of Penumbra and Mare storage folders");
+        MareWatcher?.Dispose();
+        PenumbraWatcher?.Dispose();
+        MareWatcher = null;
+        PenumbraWatcher = null;
+    }
+
+    public void StartMareWatcher(string? marePath)
+    {
+        MareWatcher?.Dispose();
+        if (string.IsNullOrEmpty(marePath))
         {
-            _scanCancellationTokenSource?.Cancel();
-            _fileScanWasRunning = true;
+            MareWatcher = null;
+            Logger.LogWarning("Mare file path is not set, cannot start the FSW for Mare.");
+            return;
+        }
+
+        RecalculateFileCacheSize();
+
+        Logger.LogDebug("Initializing Mare FSW on {path}", marePath);
+        MareWatcher = new()
+        {
+            Path = marePath,
+            InternalBufferSize = 8388608,
+            NotifyFilter = NotifyFilters.CreationTime
+                | NotifyFilters.LastWrite
+                | NotifyFilters.FileName
+                | NotifyFilters.DirectoryName
+                | NotifyFilters.Size,
+            Filter = "*.*",
+            IncludeSubdirectories = false
+        };
+
+        MareWatcher.Deleted += MareWatcher_FileChanged;
+        MareWatcher.Created += MareWatcher_FileChanged;
+    }
+
+    private void MareWatcher_FileChanged(object sender, FileSystemEventArgs e)
+    {
+        if (!_allowedExtensions.Any(ext => e.FullPath.EndsWith(ext, StringComparison.OrdinalIgnoreCase))) return;
+
+        lock (_watcherChanges)
+        {
+            _mareChanges[e.FullPath] = new(e.ChangeType);
+        }
+
+        _ = MareWatcherExecution();
+    }
+
+    public void StartPenumbraWatcher(string? penumbraPath)
+    {
+        PenumbraWatcher?.Dispose();
+        if (string.IsNullOrEmpty(penumbraPath))
+        {
+            PenumbraWatcher = null;
+            Logger.LogWarning("Penumbra is not connected or the path is not set, cannot start FSW for Penumbra.");
+            return;
+        }
+
+        Logger.LogDebug("Initializing Penumbra FSW on {path}", penumbraPath);
+        PenumbraWatcher = new()
+        {
+            Path = penumbraPath,
+            InternalBufferSize = 8388608,
+            NotifyFilter = NotifyFilters.CreationTime
+                | NotifyFilters.LastWrite
+                | NotifyFilters.FileName
+                | NotifyFilters.DirectoryName
+                | NotifyFilters.Size,
+            Filter = "*.*",
+            IncludeSubdirectories = true
+        };
+
+        PenumbraWatcher.Deleted += Fs_Changed;
+        PenumbraWatcher.Created += Fs_Changed;
+        PenumbraWatcher.Changed += Fs_Changed;
+        PenumbraWatcher.Renamed += Fs_Renamed;
+        PenumbraWatcher.EnableRaisingEvents = true;
+    }
+
+    private void Fs_Changed(object sender, FileSystemEventArgs e)
+    {
+        if (Directory.Exists(e.FullPath)) return;
+        if (!_allowedExtensions.Any(ext => e.FullPath.EndsWith(ext, StringComparison.OrdinalIgnoreCase))) return;
+
+        if (e.ChangeType is not (WatcherChangeTypes.Changed or WatcherChangeTypes.Deleted or WatcherChangeTypes.Created))
+            return;
+
+        lock (_watcherChanges)
+        {
+            _watcherChanges[e.FullPath] = new(e.ChangeType);
+        }
+
+        Logger.LogTrace("FSW {event}: {path}", e.ChangeType, e.FullPath);
+
+        _ = PenumbraWatcherExecution();
+    }
+
+    private void Fs_Renamed(object sender, RenamedEventArgs e)
+    {
+        if (Directory.Exists(e.FullPath))
+        {
+            var directoryFiles = Directory.GetFiles(e.FullPath, "*.*", SearchOption.AllDirectories);
+            lock (_watcherChanges)
+            {
+                foreach (var file in directoryFiles)
+                {
+                    if (!_allowedExtensions.Any(ext => file.EndsWith(ext, StringComparison.OrdinalIgnoreCase))) continue;
+                    var oldPath = file.Replace(e.FullPath, e.OldFullPath, StringComparison.OrdinalIgnoreCase);
+
+                    _watcherChanges.Remove(oldPath);
+                    _watcherChanges[file] = new(WatcherChangeTypes.Renamed, oldPath);
+                    Logger.LogTrace("FSW Renamed: {path} -> {new}", oldPath, file);
+
+                }
+            }
+        }
+        else
+        {
+            if (!_allowedExtensions.Any(ext => e.FullPath.EndsWith(ext, StringComparison.OrdinalIgnoreCase))) return;
+
+            lock (_watcherChanges)
+            {
+                _watcherChanges.Remove(e.OldFullPath);
+                _watcherChanges[e.FullPath] = new(WatcherChangeTypes.Renamed, e.OldFullPath);
+            }
+
+            Logger.LogTrace("FSW Renamed: {path} -> {new}", e.OldFullPath, e.FullPath);
+        }
+
+        _ = PenumbraWatcherExecution();
+    }
+
+    private CancellationTokenSource _penumbraFswCts = new();
+    private CancellationTokenSource _mareFswCts = new();
+    public FileSystemWatcher? PenumbraWatcher { get; private set; }
+    public FileSystemWatcher? MareWatcher { get; private set; }
+
+    private async Task MareWatcherExecution()
+    {
+        _mareFswCts = _mareFswCts.CancelRecreate();
+        var token = _mareFswCts.Token;
+        var delay = TimeSpan.FromSeconds(5);
+        Dictionary<string, WatcherChange> changes;
+        lock (_mareChanges)
+            changes = _mareChanges.ToDictionary(t => t.Key, t => t.Value, StringComparer.Ordinal);
+        try
+        {
+            do
+            {
+                await Task.Delay(delay, token).ConfigureAwait(false);
+            } while (HaltScanLocks.Any(f => f.Value > 0));
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        lock (_mareChanges)
+        {
+            foreach (var key in changes.Keys)
+            {
+                _mareChanges.Remove(key);
+            }
+        }
+
+        _ = RecalculateFileCacheSize();
+
+        if (changes.Any(c => c.Value.ChangeType == WatcherChangeTypes.Deleted))
+        {
+            var threadCount = Math.Clamp((int)(Environment.ProcessorCount / 2.0f), 2, 8);
+
+            Parallel.ForEach(changes, new ParallelOptions()
+            {
+                MaxDegreeOfParallelism = threadCount,
+            },
+            (change) =>
+            {
+                Logger.LogDebug("FSW Change: {change} = {val}", change.Key, change.Value);
+                _ = _fileDbManager.GetFileCacheByPath(change.Key);
+            });
+
+            _fileDbManager.WriteOutFullCsv();
         }
     }
 
-    public void InvokeScan(bool forced = false)
+    private async Task PenumbraWatcherExecution()
     {
-        bool isForced = forced;
-        bool isForcedFromExternal = forced;
+        _penumbraFswCts = _penumbraFswCts.CancelRecreate();
+        var token = _penumbraFswCts.Token;
+        Dictionary<string, WatcherChange> changes;
+        lock (_watcherChanges)
+            changes = _watcherChanges.ToDictionary(t => t.Key, t => t.Value, StringComparer.Ordinal);
+        var delay = TimeSpan.FromSeconds(10);
+        try
+        {
+            do
+            {
+                await Task.Delay(delay, token).ConfigureAwait(false);
+            } while (HaltScanLocks.Any(f => f.Value > 0));
+        }
+        catch (TaskCanceledException)
+        {
+            return;
+        }
+
+        lock (_watcherChanges)
+        {
+            foreach (var key in changes.Keys)
+            {
+                _watcherChanges.Remove(key);
+            }
+        }
+
+        var threadCount = Math.Clamp((int)(Environment.ProcessorCount / 2.0f), 2, 8);
+
+        Parallel.ForEach(changes, new ParallelOptions()
+        {
+            MaxDegreeOfParallelism = threadCount,
+        },
+        (change) =>
+        {
+            Logger.LogDebug("FSW Change: {change} = {val}", change.Key, change.Value);
+            if (change.Value.ChangeType == WatcherChangeTypes.Deleted)
+            {
+                _fileDbManager.GetFileCacheByPath(change.Key);
+            }
+            else
+            {
+                if (change.Value.OldPath != null) _fileDbManager.GetFileCacheByPath(change.Value.OldPath);
+                _fileDbManager.CreateFileEntry(change.Key);
+            }
+        });
+
+        _fileDbManager.WriteOutFullCsv();
+    }
+
+    public void InvokeScan()
+    {
         TotalFiles = 0;
         _currentFileProgress = 0;
         _scanCancellationTokenSource?.Cancel();
@@ -69,56 +318,36 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         var token = _scanCancellationTokenSource.Token;
         _ = Task.Run(async () =>
         {
-            while (!token.IsCancellationRequested)
+            TotalFiles = 0;
+            _currentFileProgress = 0;
+            while (_dalamudUtil.IsOnFrameworkThread)
             {
-                while (HaltScanLocks.Any(f => f.Value > 0) || !_ipcManager.CheckPenumbraApi() || _dalamudUtil.IsOnFrameworkThread)
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
-                }
-
-                isForced |= RecalculateFileCacheSize();
-                if (!_configService.Current.FileScanPaused || isForced)
-                {
-                    isForced = false;
-                    TotalFiles = 0;
-                    _currentFileProgress = 0;
-                    while (_dalamudUtil.IsOnFrameworkThread)
-                    {
-                        Logger.LogWarning("Scanner is on framework, waiting for leaving thread before continuing");
-                        await Task.Delay(250, token).ConfigureAwait(false);
-                    }
-
-                    Thread scanThread = new(() =>
-                    {
-                        try
-                        {
-                            _performanceCollector.LogPerformance(this, "PeriodicFileScan", () => PeriodicFileScan(isForcedFromExternal, token));
-                        }
-                        catch (Exception ex)
-                        {
-                            Logger.LogError(ex, "Error during Periodic File Scan");
-                        }
-                    })
-                    {
-                        Priority = ThreadPriority.Lowest,
-                        IsBackground = true
-                    };
-                    scanThread.Start();
-                    while (scanThread.IsAlive)
-                    {
-                        await Task.Delay(250).ConfigureAwait(false);
-                    }
-                    if (isForcedFromExternal) isForcedFromExternal = false;
-                    TotalFiles = 0;
-                    _currentFileProgress = 0;
-                }
-                _timeUntilNextScan = TimeSpan.FromSeconds(TimeBetweenScans);
-                while (_timeUntilNextScan.TotalSeconds >= 0 || _dalamudUtil.IsOnFrameworkThread)
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
-                    _timeUntilNextScan -= TimeSpan.FromSeconds(1);
-                }
+                Logger.LogWarning("Scanner is on framework, waiting for leaving thread before continuing");
+                await Task.Delay(250, token).ConfigureAwait(false);
             }
+
+            Thread scanThread = new(() =>
+            {
+                try
+                {
+                    _performanceCollector.LogPerformance(this, "FullFileScan", () => FullFileScan(token));
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "Error during Full File Scan");
+                }
+            })
+            {
+                Priority = ThreadPriority.Lowest,
+                IsBackground = true
+            };
+            scanThread.Start();
+            while (scanThread.IsAlive)
+            {
+                await Task.Delay(250).ConfigureAwait(false);
+            }
+            TotalFiles = 0;
+            _currentFileProgress = 0;
         }, token);
     }
 
@@ -165,28 +394,19 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
 
         HaltScanLocks[source]--;
         if (HaltScanLocks[source] < 0) HaltScanLocks[source] = 0;
-
-        if (_fileScanWasRunning && HaltScanLocks.All(f => f.Value == 0))
-        {
-            _fileScanWasRunning = false;
-            InvokeScan(forced: true);
-        }
-    }
-
-    public void StartScan()
-    {
-        if (!_ipcManager.Initialized || !_configService.Current.HasValidSetup()) return;
-        Logger.LogTrace("Penumbra is active, configuration is valid, scan");
-        InvokeScan(forced: true);
     }
 
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
         _scanCancellationTokenSource?.Cancel();
+        PenumbraWatcher?.Dispose();
+        MareWatcher?.Dispose();
+        _penumbraFswCts?.CancelDispose();
+        _mareFswCts?.CancelDispose();
     }
 
-    private void PeriodicFileScan(bool noWaiting, CancellationToken ct)
+    private void FullFileScan(CancellationToken ct)
     {
         TotalFiles = 1;
         var penumbraDir = _ipcManager.PenumbraModDirectory;
@@ -210,7 +430,6 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         var previousThreadPriority = Thread.CurrentThread.Priority;
         Thread.CurrentThread.Priority = ThreadPriority.Lowest;
         Logger.LogDebug("Getting files from {penumbra} and {storage}", penumbraDir, _configService.Current.CacheFolder);
-        string[] ext = [".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk"];
 
         Dictionary<string, string[]> penumbraFiles = new(StringComparer.Ordinal);
         foreach (var folder in Directory.EnumerateDirectories(penumbraDir!))
@@ -221,7 +440,7 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
                 [
                     .. Directory.GetFiles(folder, "*.*", SearchOption.AllDirectories)
                                             .AsParallel()
-                                            .Where(f => ext.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase))
+                                            .Where(f => _allowedExtensions.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase))
                                                 && !f.Contains(@"\bg\", StringComparison.OrdinalIgnoreCase)
                                                 && !f.Contains(@"\bgcommon\", StringComparison.OrdinalIgnoreCase)
                                                 && !f.Contains(@"\ui\", StringComparison.OrdinalIgnoreCase)),
@@ -309,7 +528,6 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
                         Logger.LogWarning(ex, "Failed validating {path}", workload.ResolvedFilepath);
                     }
                     Interlocked.Increment(ref _currentFileProgress);
-                    if (!noWaiting) Thread.Sleep(5);
                 }
 
                 Logger.LogTrace("Ending Worker Thread {i}", threadNr);
@@ -390,7 +608,6 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
                     }
 
                     Interlocked.Increment(ref _currentFileProgress);
-                    if (!noWaiting) Thread.Sleep(5);
                 });
 
             Logger.LogTrace("Scanner added {notScanned} new files to db", allScannedFiles.Count(c => !c.Value));
@@ -406,6 +623,8 @@ public sealed class PeriodicFileScanner : DisposableMediatorSubscriberBase
         {
             _configService.Current.InitialScanComplete = true;
             _configService.Save();
+            StartMareWatcher(_configService.Current.CacheFolder);
+            StartPenumbraWatcher(penumbraDir);
         }
     }
 }

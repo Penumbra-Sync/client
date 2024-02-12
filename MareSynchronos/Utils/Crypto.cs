@@ -47,8 +47,5 @@ public static class Crypto
         return _hashListSHA1[stringToCompute] = 
             BitConverter.ToString(_sha1CryptoProvider.ComputeHash(Encoding.UTF8.GetBytes(stringToCompute))).Replace("-", "", StringComparison.Ordinal);
     }
-
-
-
 #pragma warning restore SYSLIB0021 // Type or member is obsolete
 }

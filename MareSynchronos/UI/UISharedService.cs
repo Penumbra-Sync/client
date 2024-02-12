@@ -40,7 +40,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     private readonly ApiController _apiController;
 
-    private readonly PeriodicFileScanner _cacheScanner;
+    private readonly CacheMonitor _cacheMonitor;
 
     private readonly MareConfigService _configService;
 
@@ -74,13 +74,13 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     private int _serverSelectionIndex = -1;
 
     public UiSharedService(ILogger<UiSharedService> logger, IpcManager ipcManager, ApiController apiController,
-        PeriodicFileScanner cacheScanner, FileDialogManager fileDialogManager,
+        CacheMonitor cacheMonitor, FileDialogManager fileDialogManager,
         MareConfigService configService, DalamudUtilService dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization,
         ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
     {
         _ipcManager = ipcManager;
         _apiController = apiController;
-        _cacheScanner = cacheScanner;
+        _cacheMonitor = cacheMonitor;
         FileDialogManager = fileDialogManager;
         _configService = configService;
         _dalamudUtil = dalamudUtil;
@@ -109,7 +109,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public bool EditTrackerPosition { get; set; }
 
-    public long FileCacheSize => _cacheScanner.FileCacheSize;
+    public long FileCacheSize => _cacheMonitor.FileCacheSize;
 
     public bool HasValidPenumbraModPath => !(_ipcManager.PenumbraModDirectory ?? string.Empty).IsNullOrEmpty() && Directory.Exists(_ipcManager.PenumbraModDirectory);
 
@@ -583,7 +583,8 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
                 {
                     _configService.Current.CacheFolder = path;
                     _configService.Save();
-                    _cacheScanner.StartScan();
+                    _cacheMonitor.StartMareWatcher(path);
+                    _cacheMonitor.InvokeScan();
                 }
             });
         }
@@ -657,41 +658,45 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public void DrawFileScanState()
     {
+        ImGui.AlignTextToFramePadding();
         ImGui.TextUnformatted("File Scanner Status");
         ImGui.SameLine();
-        if (_cacheScanner.IsScanRunning)
+        if (_cacheMonitor.IsScanRunning)
         {
+            ImGui.AlignTextToFramePadding();
+
             ImGui.TextUnformatted("Scan is running");
             ImGui.TextUnformatted("Current Progress:");
             ImGui.SameLine();
-            ImGui.TextUnformatted(_cacheScanner.TotalFiles == 1
+            ImGui.TextUnformatted(_cacheMonitor.TotalFiles == 1
                 ? "Collecting files"
-                : $"Processing {_cacheScanner.CurrentFileProgress}/{_cacheScanner.TotalFilesStorage} from storage ({_cacheScanner.TotalFiles} scanned in)");
+                : $"Processing {_cacheMonitor.CurrentFileProgress}/{_cacheMonitor.TotalFilesStorage} from storage ({_cacheMonitor.TotalFiles} scanned in)");
             AttachToolTip("Note: it is possible to have more files in storage than scanned in, " +
                 "this is due to the scanner normally ignoring those files but the game loading them in and using them on your character, so they get " +
                 "added to the local storage.");
         }
-        else if (_configService.Current.FileScanPaused)
+        else if (_cacheMonitor.HaltScanLocks.Any(f => f.Value > 0))
         {
-            ImGui.TextUnformatted("File scanner is paused");
-            ImGui.SameLine();
-            if (ImGui.Button("Force Rescan##forcedrescan"))
-            {
-                _cacheScanner.InvokeScan(forced: true);
-            }
-        }
-        else if (_cacheScanner.HaltScanLocks.Any(f => f.Value > 0))
-        {
-            ImGui.TextUnformatted("Halted (" + string.Join(", ", _cacheScanner.HaltScanLocks.Where(f => f.Value > 0).Select(locker => locker.Key + ": " + locker.Value + " halt requests")) + ")");
+            ImGui.AlignTextToFramePadding();
+
+            ImGui.TextUnformatted("Halted (" + string.Join(", ", _cacheMonitor.HaltScanLocks.Where(f => f.Value > 0).Select(locker => locker.Key + ": " + locker.Value + " halt requests")) + ")");
             ImGui.SameLine();
             if (ImGui.Button("Reset halt requests##clearlocks"))
             {
-                _cacheScanner.ResetLocks();
+                _cacheMonitor.ResetLocks();
             }
         }
         else
         {
-            ImGui.TextUnformatted("Next scan in " + _cacheScanner.TimeUntilNextScan);
+            ImGui.TextUnformatted("Idle");
+            if (_configService.Current.InitialScanComplete)
+            {
+                ImGui.SameLine();
+                if (NormalizedIconTextButton(FontAwesomeIcon.Play, "Force rescan"))
+                {
+                    _cacheMonitor.InvokeScan();
+                }
+            }
         }
     }
 
@@ -833,33 +838,10 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return _serverSelectionIndex;
     }
 
-    public void DrawTimeSpanBetweenScansSetting()
-    {
-        var timeSpan = _configService.Current.TimeSpanBetweenScansInSeconds;
-        if (ImGui.SliderInt("Seconds between scans##timespan", ref timeSpan, 20, 60))
-        {
-            _configService.Current.TimeSpanBetweenScansInSeconds = timeSpan;
-            _configService.Save();
-        }
-        DrawHelpText("This is the time in seconds between file scans. Increase it to reduce system load. A too high setting can cause issues when manually fumbling about in the cache or Penumbra mods folders.");
-        var isPaused = _configService.Current.FileScanPaused;
-        if (ImGui.Checkbox("Pause periodic file scan##filescanpause", ref isPaused))
-        {
-            _configService.Current.FileScanPaused = isPaused;
-            _configService.Save();
-        }
-        DrawHelpText("This allows you to stop the periodic scans of your Penumbra and Mare cache directories. Use this to move the Mare cache and Penumbra mod folders around. If you enable this permanently, run a Force rescan after adding mods to Penumbra.");
-    }
-
     public void LoadLocalization(string languageCode)
     {
         _localization.SetupWithLangCode(languageCode);
         Strings.ToS = new Strings.ToSStrings();
-    }
-
-    public void RecalculateFileCacheSize()
-    {
-        _cacheScanner.InvokeScan(forced: true);
     }
 
     [LibraryImport("user32")]

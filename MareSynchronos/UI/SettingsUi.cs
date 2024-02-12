@@ -7,6 +7,7 @@ using ImGuiNET;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Comparer;
 using MareSynchronos.FileCache;
+using MareSynchronos.Interop;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.PlayerData.Export;
@@ -30,6 +31,8 @@ namespace MareSynchronos.UI;
 public class SettingsUi : WindowMediatorSubscriberBase
 {
     private readonly ApiController _apiController;
+    private readonly IpcManager _ipcManager;
+    private readonly CacheMonitor _cacheMonitor;
     private readonly MareConfigService _configService;
     private readonly ConcurrentDictionary<GameObjectHandler, Dictionary<string, FileDownloadStatus>> _currentDownloads = new();
     private readonly FileCompactor _fileCompactor;
@@ -64,7 +67,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
         FileUploadManager fileTransferManager,
         FileTransferOrchestrator fileTransferOrchestrator,
         FileCacheManager fileCacheManager,
-        FileCompactor fileCompactor, ApiController apiController) : base(logger, mediator, "Mare Synchronos Settings")
+        FileCompactor fileCompactor, ApiController apiController,
+        IpcManager ipcManager, CacheMonitor cacheMonitor) : base(logger, mediator, "Mare Synchronos Settings")
     {
         _configService = configService;
         _mareCharaFileManager = mareCharaFileManager;
@@ -75,6 +79,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _fileTransferOrchestrator = fileTransferOrchestrator;
         _fileCacheManager = fileCacheManager;
         _apiController = apiController;
+        _ipcManager = ipcManager;
+        _cacheMonitor = cacheMonitor;
         _fileCompactor = fileCompactor;
         _uiShared = uiShared;
         AllowClickthrough = false;
@@ -479,7 +485,57 @@ public class SettingsUi : WindowMediatorSubscriberBase
             "The storage governs itself by clearing data beyond the set storage size. Please set the storage size accordingly. It is not necessary to manually clear the storage.");
 
         _uiShared.DrawFileScanState();
-        _uiShared.DrawTimeSpanBetweenScansSetting();
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted("Monitoring Penumbra Folder: " + (_cacheMonitor.PenumbraWatcher?.Path ?? "Not monitoring"));
+        if (string.IsNullOrEmpty(_cacheMonitor.PenumbraWatcher?.Path))
+        {
+            ImGui.SameLine();
+            using var id = ImRaii.PushId("penumbraMonitor");
+            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.ArrowsToCircle, "Try to reinitialize Monitor"))
+            {
+                _cacheMonitor.StartPenumbraWatcher(_ipcManager.PenumbraModDirectory);
+            }
+        }
+
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted("Monitoring Mare Storage Folder: " + (_cacheMonitor.MareWatcher?.Path ?? "Not monitoring"));
+        if (string.IsNullOrEmpty(_cacheMonitor.MareWatcher?.Path))
+        {
+            ImGui.SameLine();
+            using var id = ImRaii.PushId("mareMonitor");
+            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.ArrowsToCircle, "Try to reinitialize Monitor"))
+            {
+                _cacheMonitor.StartMareWatcher(_configService.Current.CacheFolder);
+            }
+        }
+        if (_cacheMonitor.MareWatcher == null || _cacheMonitor.PenumbraWatcher == null)
+        {
+            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Play, "Resume Monitoring"))
+            {
+                _cacheMonitor.StartMareWatcher(_configService.Current.CacheFolder);
+                _cacheMonitor.StartPenumbraWatcher(_ipcManager.PenumbraModDirectory);
+                _cacheMonitor.InvokeScan();
+            }
+            UiSharedService.AttachToolTip("Attempts to resume monitoring for both Penumbra and Mare Storage. "
+                + "Resuming the monitoring will also force a full scan to run." + Environment.NewLine
+                + "If the button remains present after clicking it, consult /xllog for errors");
+        }
+        else
+        {
+            using (ImRaii.Disabled(!UiSharedService.CtrlPressed()))
+            {
+                if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Stop, "Stop Monitoring"))
+                {
+                    _cacheMonitor.StopMonitoring();
+                }
+            }
+            UiSharedService.AttachToolTip("Stops the monitoring for both Penumbra and Mare Storage. "
+                + "Do not stop the monitoring, unless you plan to move the Penumbra and Mare Storage folders, to ensure correct functionality of Mare." + Environment.NewLine
+                + "If you stop the monitoring to move folders around, resume it after you are finished moving the files."
+                + UiSharedService.TooltipSeparator + "Hold CTRL to enable this button");
+        }
+
+
         _uiShared.DrawCacheDirectorySetting();
         ImGui.TextUnformatted($"Currently utilized local storage: {UiSharedService.ByteToString(_uiShared.FileCacheSize)}");
         bool isLinux = Util.IsWine();
@@ -579,8 +635,6 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 {
                     File.Delete(file);
                 }
-
-                _uiShared.RecalculateFileCacheSize();
             });
         }
         UiSharedService.AttachToolTip("You normally do not need to do this. THIS IS NOT SOMETHING YOU SHOULD BE DOING TO TRY TO FIX SYNC ISSUES." + Environment.NewLine

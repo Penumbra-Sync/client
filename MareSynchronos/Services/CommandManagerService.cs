@@ -19,17 +19,17 @@ public sealed class CommandManagerService : IDisposable
     private readonly MareMediator _mediator;
     private readonly MareConfigService _mareConfigService;
     private readonly PerformanceCollectorService _performanceCollectorService;
-    private readonly PeriodicFileScanner _periodicFileScanner;
+    private readonly CacheMonitor _cacheMonitor;
     private readonly ServerConfigurationManager _serverConfigurationManager;
 
     public CommandManagerService(ICommandManager commandManager, PerformanceCollectorService performanceCollectorService,
-        ServerConfigurationManager serverConfigurationManager, PeriodicFileScanner periodicFileScanner,
+        ServerConfigurationManager serverConfigurationManager, CacheMonitor periodicFileScanner,
         ApiController apiController, MareMediator mediator, MareConfigService mareConfigService)
     {
         _commandManager = commandManager;
         _performanceCollectorService = performanceCollectorService;
         _serverConfigurationManager = serverConfigurationManager;
-        _periodicFileScanner = periodicFileScanner;
+        _cacheMonitor = periodicFileScanner;
         _apiController = apiController;
         _mediator = mediator;
         _mareConfigService = mareConfigService;
@@ -87,7 +87,7 @@ public sealed class CommandManagerService : IDisposable
         }
         else if (string.Equals(splitArgs[0], "rescan", StringComparison.OrdinalIgnoreCase))
         {
-            _periodicFileScanner.InvokeScan(forced: true);
+            _cacheMonitor.InvokeScan();
         }
         else if (string.Equals(splitArgs[0], "perf", StringComparison.OrdinalIgnoreCase))
         {

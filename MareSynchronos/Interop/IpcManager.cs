@@ -156,7 +156,19 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     }
 
     public bool Initialized => CheckPenumbraApiInternal() && CheckGlamourerApiInternal();
-    public string? PenumbraModDirectory { get; private set; }
+    private string? _penumbraModDirectory;
+    public string? PenumbraModDirectory
+    {
+        get => _penumbraModDirectory;
+        private set
+        {
+            if (!string.Equals(_penumbraModDirectory, value, StringComparison.Ordinal))
+            {
+                _penumbraModDirectory = value;
+                Mediator.Publish(new PenumbraDirectoryChangedMessage(_penumbraModDirectory));
+            }
+        }
+    }
 
     public bool CheckCustomizePlusApi() => _customizePlusAvailable;
 

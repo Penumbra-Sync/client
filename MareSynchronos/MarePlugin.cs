@@ -144,7 +144,6 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
                 Mediator.Publish(new SwitchToIntroUiMessage());
                 return;
             }
-            _runtimeServiceScope.ServiceProvider.GetRequiredService<PeriodicFileScanner>().StartScan();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<CacheCreationService>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<TransientResourceManager>();
             _runtimeServiceScope.ServiceProvider.GetRequiredService<OnlinePlayerManager>();

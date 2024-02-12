@@ -3,6 +3,7 @@ using MareSynchronos.Interop;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Globalization;
@@ -10,7 +11,7 @@ using System.Text;
 
 namespace MareSynchronos.FileCache;
 
-public sealed class FileCacheManager : IDisposable
+public sealed class FileCacheManager : IHostedService
 {
     public const string CachePrefix = "{cache}";
     public const string CsvSplit = "|";
@@ -30,101 +31,6 @@ public sealed class FileCacheManager : IDisposable
         _configService = configService;
         _mareMediator = mareMediator;
         _csvPath = Path.Combine(configService.ConfigurationDirectory, "FileCache.csv");
-
-        lock (_fileWriteLock)
-        {
-            try
-            {
-                if (File.Exists(CsvBakPath))
-                {
-                    File.Move(CsvBakPath, _csvPath, overwrite: true);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to move BAK to ORG, deleting BAK");
-                try
-                {
-                    if (File.Exists(CsvBakPath))
-                        File.Delete(CsvBakPath);
-                }
-                catch (Exception ex1)
-                {
-                    _logger.LogWarning(ex1, "Could not delete bak file");
-                }
-            }
-        }
-
-        if (File.Exists(_csvPath))
-        {
-            bool success = false;
-            string[] entries = [];
-            int attempts = 0;
-            while (!success && attempts < 10)
-            {
-                try
-                {
-                    entries = File.ReadAllLines(_csvPath);
-                    success = true;
-                }
-                catch (Exception ex)
-                {
-                    attempts++;
-                    _logger.LogWarning(ex, "Could not open {file}, trying again", _csvPath);
-                    Thread.Sleep(100);
-                }
-            }
-
-            if (!entries.Any())
-            {
-                _logger.LogWarning("Could not load entries from {path}, continuing with empty file cache", _csvPath);
-            }
-
-            Dictionary<string, bool> processedFiles = new(StringComparer.OrdinalIgnoreCase);
-            foreach (var entry in entries)
-            {
-                var splittedEntry = entry.Split(CsvSplit, StringSplitOptions.None);
-                try
-                {
-                    var hash = splittedEntry[0];
-                    if (hash.Length != 40) throw new InvalidOperationException("Expected Hash length of 40, received " + hash.Length);
-                    var path = splittedEntry[1];
-                    var time = splittedEntry[2];
-
-                    if (processedFiles.ContainsKey(path))
-                    {
-                        _logger.LogWarning("Already processed {file}, ignoring", path);
-                        continue;
-                    }
-
-                    processedFiles.Add(path, value: true);
-
-                    long size = -1;
-                    long compressed = -1;
-                    if (splittedEntry.Length > 3)
-                    {
-                        if (long.TryParse(splittedEntry[3], CultureInfo.InvariantCulture, out long result))
-                        {
-                            size = result;
-                        }
-                        if (long.TryParse(splittedEntry[4], CultureInfo.InvariantCulture, out long resultCompressed))
-                        {
-                            compressed = resultCompressed;
-                        }
-                    }
-                    AddHashedFile(ReplacePathPrefixes(new FileCacheEntity(hash, path, time, size, compressed)));
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to initialize entry {entry}, ignoring", entry);
-                }
-            }
-
-            if (processedFiles.Count != entries.Length)
-            {
-                WriteOutFullCsv();
-            }
-        }
     }
 
     private string CsvBakPath => _csvPath + ".bak";
@@ -149,13 +55,6 @@ public sealed class FileCacheManager : IDisposable
         if (!fullName.Contains(_ipcManager.PenumbraModDirectory!.ToLowerInvariant(), StringComparison.Ordinal)) return null;
         string prefixedPath = fullName.Replace(_ipcManager.PenumbraModDirectory!.ToLowerInvariant(), PenumbraPrefix + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
         return CreateFileCacheEntity(fi, prefixedPath);
-    }
-
-    public void Dispose()
-    {
-        _logger.LogTrace("Disposing {type}", GetType());
-        WriteOutFullCsv();
-        GC.SuppressFinalize(this);
     }
 
     public List<FileCacheEntity> GetAllFileCaches() => _fileCaches.Values.SelectMany(v => v).ToList();
@@ -331,13 +230,14 @@ public sealed class FileCacheManager : IDisposable
 
     public void WriteOutFullCsv()
     {
-        StringBuilder sb = new();
-        foreach (var entry in _fileCaches.SelectMany(k => k.Value).OrderBy(f => f.PrefixedFilePath, StringComparer.OrdinalIgnoreCase))
-        {
-            sb.AppendLine(entry.CsvEntry);
-        }
         lock (_fileWriteLock)
         {
+            StringBuilder sb = new();
+            foreach (var entry in _fileCaches.SelectMany(k => k.Value).OrderBy(f => f.PrefixedFilePath, StringComparer.OrdinalIgnoreCase))
+            {
+                sb.AppendLine(entry.CsvEntry);
+            }
+
             if (File.Exists(_csvPath))
             {
                 File.Copy(_csvPath, CsvBakPath, overwrite: true);
@@ -442,5 +342,111 @@ public sealed class FileCacheManager : IDisposable
         }
 
         return fileCache;
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        lock (_fileWriteLock)
+        {
+            try
+            {
+                if (File.Exists(CsvBakPath))
+                {
+                    File.Move(CsvBakPath, _csvPath, overwrite: true);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to move BAK to ORG, deleting BAK");
+                try
+                {
+                    if (File.Exists(CsvBakPath))
+                        File.Delete(CsvBakPath);
+                }
+                catch (Exception ex1)
+                {
+                    _logger.LogWarning(ex1, "Could not delete bak file");
+                }
+            }
+        }
+
+        if (File.Exists(_csvPath))
+        {
+            bool success = false;
+            string[] entries = [];
+            int attempts = 0;
+            while (!success && attempts < 10)
+            {
+                try
+                {
+                    entries = File.ReadAllLines(_csvPath);
+                    success = true;
+                }
+                catch (Exception ex)
+                {
+                    attempts++;
+                    _logger.LogWarning(ex, "Could not open {file}, trying again", _csvPath);
+                    Thread.Sleep(100);
+                }
+            }
+
+            if (!entries.Any())
+            {
+                _logger.LogWarning("Could not load entries from {path}, continuing with empty file cache", _csvPath);
+            }
+
+            Dictionary<string, bool> processedFiles = new(StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in entries)
+            {
+                var splittedEntry = entry.Split(CsvSplit, StringSplitOptions.None);
+                try
+                {
+                    var hash = splittedEntry[0];
+                    if (hash.Length != 40) throw new InvalidOperationException("Expected Hash length of 40, received " + hash.Length);
+                    var path = splittedEntry[1];
+                    var time = splittedEntry[2];
+
+                    if (processedFiles.ContainsKey(path))
+                    {
+                        _logger.LogWarning("Already processed {file}, ignoring", path);
+                        continue;
+                    }
+
+                    processedFiles.Add(path, value: true);
+
+                    long size = -1;
+                    long compressed = -1;
+                    if (splittedEntry.Length > 3)
+                    {
+                        if (long.TryParse(splittedEntry[3], CultureInfo.InvariantCulture, out long result))
+                        {
+                            size = result;
+                        }
+                        if (long.TryParse(splittedEntry[4], CultureInfo.InvariantCulture, out long resultCompressed))
+                        {
+                            compressed = resultCompressed;
+                        }
+                    }
+                    AddHashedFile(ReplacePathPrefixes(new FileCacheEntity(hash, path, time, size, compressed)));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to initialize entry {entry}, ignoring", entry);
+                }
+            }
+
+            if (processedFiles.Count != entries.Length)
+            {
+                WriteOutFullCsv();
+            }
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        WriteOutFullCsv();
+        return Task.CompletedTask;
     }
 }
