@@ -1,4 +1,5 @@
-﻿using FFXIVClientStructs.FFXIV.Client.Game.Character;
+﻿using Dalamud.Memory;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
@@ -209,7 +210,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
                 _clearCts = null;
             }
             var chara = (Character*)Address;
-            var name = new ByteString(chara->GameObject.Name).ToString();
+            MemoryHelper.ReadStringNullTerminated((nint)chara->GameObject.Name, out var name);
             bool nameChange = !string.Equals(name, Name, StringComparison.Ordinal);
             if (nameChange)
             {

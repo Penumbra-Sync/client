@@ -130,38 +130,41 @@ public sealed class MareMediator : IHostedService
     {
         if (!_subscriberDict.TryGetValue(message.GetType(), out HashSet<SubscriberAction>? subscribers) || subscribers == null || !subscribers.Any()) return;
 
-        HashSet<SubscriberAction> subscribersCopy = [];
+        List<SubscriberAction> subscribersCopy = [];
         lock (_addRemoveLock)
         {
-            subscribersCopy = subscribers?.Where(s => s.Subscriber != null).ToHashSet() ?? [];
+            subscribersCopy = subscribers?.Where(s => s.Subscriber != null).ToList() ?? [];
         }
 
-        foreach (SubscriberAction subscriber in subscribersCopy)
+#pragma warning disable S3011 // Reflection should not be used to increase accessibility of classes, methods, or fields
+        GetType()
+           .GetMethod(nameof(ExecuteReflected), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
+           .MakeGenericMethod(message.GetType())?
+           .Invoke(this, [subscribersCopy, message]);
+#pragma warning restore S3011 // Reflection should not be used to increase accessibility of classes, methods, or fields
+    }
+
+    private void ExecuteReflected<T>(List<SubscriberAction> subscribers, T message) where T : MessageBase
+    {
+        var msgTypeName = message.GetType().Name;
+        foreach (SubscriberAction subscriber in subscribers)
         {
             try
             {
-#pragma warning disable S3011 // Reflection should not be used to increase accessibility of classes, methods, or fields
-                typeof(MareMediator)
-                    .GetMethod(nameof(ExecuteSubscriber), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
-                    .MakeGenericMethod(message.GetType())
-                    .Invoke(this, new object[] { subscriber, message });
-#pragma warning restore S3011 // Reflection should not be used to increase accessibility of classes, methods, or fields
+                var isSameThread = message.KeepThreadContext ? "$" : string.Empty;
+                _performanceCollector.LogPerformance(this, $"{isSameThread}Execute>{msgTypeName}+{subscriber.Subscriber.GetType().Name}>{subscriber.Subscriber}",
+                    () => ((Action<T>)subscriber.Action).Invoke(message));
             }
             catch (Exception ex)
             {
                 if (_lastErrorTime.TryGetValue(subscriber, out var lastErrorTime) && lastErrorTime.Add(TimeSpan.FromSeconds(10)) > DateTime.UtcNow)
                     continue;
 
-                _logger.LogError(ex.InnerException ?? ex, "Error executing {type} for subscriber {subscriber}", message.GetType().Name, subscriber.Subscriber.GetType().Name);
+                _logger.LogError(ex.InnerException ?? ex, "Error executing {type} for subscriber {subscriber}",
+                    message.GetType().Name, subscriber.Subscriber.GetType().Name);
                 _lastErrorTime[subscriber] = DateTime.UtcNow;
             }
         }
-    }
-
-    private void ExecuteSubscriber<T>(SubscriberAction subscriber, T message) where T : MessageBase
-    {
-        var isSameThread = message.KeepThreadContext ? "$" : string.Empty;
-        _performanceCollector.LogPerformance(this, $"{isSameThread}Execute>{message.GetType().Name}+{subscriber.Subscriber.GetType().Name}>{subscriber.Subscriber}", () => ((Action<T>)subscriber.Action).Invoke(message));
     }
 
     private sealed class SubscriberAction
