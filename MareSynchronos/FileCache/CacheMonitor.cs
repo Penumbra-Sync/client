@@ -44,9 +44,15 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
             StartPenumbraWatcher(_ipcManager.PenumbraModDirectory);
             InvokeScan();
         });
-        Mediator.Subscribe<PenumbraDirectoryChangedMessage>(this, (msg) => StartPenumbraWatcher(msg.ModDirectory));
+        Mediator.Subscribe<PenumbraDirectoryChangedMessage>(this, (msg) =>
+        {
+            StartPenumbraWatcher(msg.ModDirectory);
+            InvokeScan();
+        });
         if (_ipcManager.CheckPenumbraApi() && !string.IsNullOrEmpty(_ipcManager.PenumbraModDirectory))
+        {
             StartPenumbraWatcher(_ipcManager.PenumbraModDirectory);
+        }
         if (configService.Current.HasValidSetup())
         {
             StartMareWatcher(configService.Current.CacheFolder);
