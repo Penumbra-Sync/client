@@ -535,7 +535,6 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 + UiSharedService.TooltipSeparator + "Hold CTRL to enable this button");
         }
 
-
         _uiShared.DrawCacheDirectorySetting();
         ImGui.TextUnformatted($"Currently utilized local storage: {UiSharedService.ByteToString(_uiShared.FileCacheSize)}");
         bool isLinux = Util.IsWine();

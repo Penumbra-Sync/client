@@ -561,34 +561,38 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.InputText("Storage Folder##cache", ref cacheDirectory, 255, ImGuiInputTextFlags.ReadOnly);
 
         ImGui.SameLine();
-        ImGui.PushFont(UiBuilder.IconFont);
-        string folderIcon = FontAwesomeIcon.Folder.ToIconString();
-        if (ImGui.Button(folderIcon + "##chooseCacheFolder"))
+        using (ImRaii.Disabled(_cacheMonitor.MareWatcher != null))
         {
-            FileDialogManager.OpenFolderDialog("Pick Mare Synchronos Storage Folder", (success, path) =>
+            if (NormalizedIconButton(FontAwesomeIcon.Folder))
             {
-                if (!success) return;
-
-                _isPenumbraDirectory = string.Equals(path.ToLowerInvariant(), _ipcManager.PenumbraModDirectory?.ToLowerInvariant(), StringComparison.Ordinal);
-                _isDirectoryWritable = IsDirectoryWritable(path);
-                _cacheDirectoryHasOtherFilesThanCache = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Any(f => Path.GetFileNameWithoutExtension(f).Length != 40);
-                _cacheDirectoryIsValidPath = PathRegex().IsMatch(path);
-
-                if (!string.IsNullOrEmpty(path)
-                    && Directory.Exists(path)
-                    && _isDirectoryWritable
-                    && !_isPenumbraDirectory
-                    && !_cacheDirectoryHasOtherFilesThanCache
-                    && _cacheDirectoryIsValidPath)
+                FileDialogManager.OpenFolderDialog("Pick Mare Synchronos Storage Folder", (success, path) =>
                 {
-                    _configService.Current.CacheFolder = path;
-                    _configService.Save();
-                    _cacheMonitor.StartMareWatcher(path);
-                    _cacheMonitor.InvokeScan();
-                }
-            });
+                    if (!success) return;
+
+                    _isPenumbraDirectory = string.Equals(path.ToLowerInvariant(), _ipcManager.PenumbraModDirectory?.ToLowerInvariant(), StringComparison.Ordinal);
+                    _isDirectoryWritable = IsDirectoryWritable(path);
+                    _cacheDirectoryHasOtherFilesThanCache = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Any(f => Path.GetFileNameWithoutExtension(f).Length != 40);
+                    _cacheDirectoryIsValidPath = PathRegex().IsMatch(path);
+
+                    if (!string.IsNullOrEmpty(path)
+                        && Directory.Exists(path)
+                        && _isDirectoryWritable
+                        && !_isPenumbraDirectory
+                        && !_cacheDirectoryHasOtherFilesThanCache
+                        && _cacheDirectoryIsValidPath)
+                    {
+                        _configService.Current.CacheFolder = path;
+                        _configService.Save();
+                        _cacheMonitor.StartMareWatcher(path);
+                        _cacheMonitor.InvokeScan();
+                    }
+                });
+            }
         }
-        ImGui.PopFont();
+        if (_cacheMonitor.MareWatcher != null)
+        {
+            AttachToolTip("Stop the Monitoring before changing the Storage folder. As long as monitoring is active, you cannot change the Storage folder location.");
+        }
 
         if (_isPenumbraDirectory)
         {
