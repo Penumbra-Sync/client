@@ -83,18 +83,24 @@ public sealed class FileCacheManager : IHostedService
         int i = 0;
         foreach (var fileCache in cacheEntries)
         {
+            if (cancellationToken.IsCancellationRequested) break;
+
             _logger.LogInformation("Validating {file}", fileCache.ResolvedFilepath);
 
             progress.Report((i, cacheEntries.Count, fileCache));
             i++;
+            if (!File.Exists(fileCache.ResolvedFilepath))
+            {
+                brokenEntities.Add(fileCache);
+                continue;
+            }
+
             var computedHash = Crypto.GetFileHash(fileCache.ResolvedFilepath);
             if (!string.Equals(computedHash, fileCache.Hash, StringComparison.Ordinal))
             {
                 _logger.LogInformation("Failed to validate {file}, got hash {hash}, expected hash {hash}", fileCache.ResolvedFilepath, computedHash, fileCache.Hash);
                 brokenEntities.Add(fileCache);
             }
-
-            if (cancellationToken.IsCancellationRequested) break;
         }
 
         foreach (var brokenEntity in brokenEntities)

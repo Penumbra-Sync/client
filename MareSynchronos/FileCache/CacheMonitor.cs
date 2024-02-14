@@ -108,15 +108,18 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
                 | NotifyFilters.DirectoryName
                 | NotifyFilters.Size,
             Filter = "*.*",
-            IncludeSubdirectories = false
+            IncludeSubdirectories = false,
         };
 
         MareWatcher.Deleted += MareWatcher_FileChanged;
         MareWatcher.Created += MareWatcher_FileChanged;
+        MareWatcher.EnableRaisingEvents = true;
     }
 
     private void MareWatcher_FileChanged(object sender, FileSystemEventArgs e)
     {
+        Logger.LogTrace("Mare FSW: FileChanged: {change} => {path}", e.ChangeType, e.FullPath);
+
         if (!_allowedExtensions.Any(ext => e.FullPath.EndsWith(ext, StringComparison.OrdinalIgnoreCase))) return;
 
         lock (_watcherChanges)
