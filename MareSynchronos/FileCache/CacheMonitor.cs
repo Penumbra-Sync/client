@@ -61,6 +61,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
 
     public long CurrentFileProgress => _currentFileProgress;
     public long FileCacheSize { get; set; }
+    public long FileCacheDriveFree { get; set; }
     public ConcurrentDictionary<string, int> HaltScanLocks { get; set; } = new(StringComparer.Ordinal);
     public bool IsScanRunning => CurrentFileProgress > 0 || TotalFiles > 0;
     public long TotalFiles { get; private set; }
@@ -368,6 +369,9 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
                 return 0;
             }
         });
+
+        DriveInfo di = new DriveInfo(new DirectoryInfo(_configService.Current.CacheFolder).Root.FullName);
+        FileCacheDriveFree = di.AvailableFreeSpace;
 
         var maxCacheInBytes = (long)(_configService.Current.MaxLocalCacheInGiB * 1024d * 1024d * 1024d);
 

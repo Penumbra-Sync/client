@@ -536,10 +536,16 @@ public class SettingsUi : WindowMediatorSubscriberBase
         }
 
         _uiShared.DrawCacheDirectorySetting();
-        ImGui.TextUnformatted($"Currently utilized local storage: {UiSharedService.ByteToString(_uiShared.FileCacheSize)}");
-        bool isLinux = Util.IsWine();
-        if (isLinux) ImGui.BeginDisabled();
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted($"Currently utilized local storage: {UiSharedService.ByteToString(_cacheMonitor.FileCacheSize)}");
+        ImGui.TextUnformatted($"Remaining space free on drive: {UiSharedService.ByteToString(_cacheMonitor.FileCacheDriveFree)}");
         bool useFileCompactor = _configService.Current.UseCompactor;
+        bool isLinux = Util.IsWine();
+        if (!useFileCompactor && !isLinux)
+        {
+            UiSharedService.ColorTextWrapped("Hint: To free up space when using Mare consider enabling the File Compactor", ImGuiColors.DalamudYellow);
+        }
+        if (isLinux) ImGui.BeginDisabled();
         if (ImGui.Checkbox("Use file compactor", ref useFileCompactor))
         {
             _configService.Current.UseCompactor = useFileCompactor;
@@ -552,14 +558,22 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.FileArchive, "Compact all files in storage"))
             {
-                _ = Task.Run(() => _fileCompactor.CompactStorage(compress: true));
+                _ = Task.Run(() =>
+                {
+                    _fileCompactor.CompactStorage(compress: true);
+                    _ = _cacheMonitor.RecalculateFileCacheSize();
+                });
             }
             UiSharedService.AttachToolTip("This will run compression on all files in your current Mare Storage." + Environment.NewLine
                 + "You do not need to run this manually if you keep the file compactor enabled.");
             ImGui.SameLine();
             if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.File, "Decompact all files in storage"))
             {
-                _ = Task.Run(() => _fileCompactor.CompactStorage(compress: false));
+                _ = Task.Run(() =>
+                {
+                    _fileCompactor.CompactStorage(compress: false);
+                    _ = _cacheMonitor.RecalculateFileCacheSize();
+                });
             }
             UiSharedService.AttachToolTip("This will run decompression on all files in your current Mare Storage.");
         }
