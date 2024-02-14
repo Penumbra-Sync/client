@@ -249,21 +249,19 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
 
         _ = RecalculateFileCacheSize();
 
+
         if (changes.Any(c => c.Value.ChangeType == WatcherChangeTypes.Deleted))
         {
-            var threadCount = Math.Clamp((int)(Environment.ProcessorCount / 2.0f), 2, 8);
-
-            Parallel.ForEach(changes, new ParallelOptions()
+            lock (_fileDbManager)
             {
-                MaxDegreeOfParallelism = threadCount,
-            },
-            (change) =>
-            {
-                Logger.LogDebug("FSW Change: {change} = {val}", change.Key, change.Value);
-                _ = _fileDbManager.GetFileCacheByPath(change.Key);
-            });
+                foreach (var change in changes)
+                {
+                    Logger.LogDebug("FSW Change: {change} = {val}", change.Key, change.Value);
+                    _ = _fileDbManager.GetFileCacheByPath(change.Key);
+                }
 
-            _fileDbManager.WriteOutFullCsv();
+                _fileDbManager.WriteOutFullCsv();
+            }
         }
     }
 
@@ -295,27 +293,24 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
             }
         }
 
-        var threadCount = Math.Clamp((int)(Environment.ProcessorCount / 2.0f), 2, 8);
-
-        Parallel.ForEach(changes, new ParallelOptions()
+        lock (_fileDbManager)
         {
-            MaxDegreeOfParallelism = threadCount,
-        },
-        (change) =>
-        {
-            Logger.LogDebug("FSW Change: {change} = {val}", change.Key, change.Value);
-            if (change.Value.ChangeType == WatcherChangeTypes.Deleted)
+            foreach (var change in changes)
             {
-                _fileDbManager.GetFileCacheByPath(change.Key);
+                Logger.LogDebug("FSW Change: {change} = {val}", change.Key, change.Value);
+                if (change.Value.ChangeType == WatcherChangeTypes.Deleted)
+                {
+                    _fileDbManager.GetFileCacheByPath(change.Key);
+                }
+                else
+                {
+                    if (change.Value.OldPath != null) _fileDbManager.GetFileCacheByPath(change.Value.OldPath);
+                    _fileDbManager.CreateFileEntry(change.Key);
+                }
             }
-            else
-            {
-                if (change.Value.OldPath != null) _fileDbManager.GetFileCacheByPath(change.Value.OldPath);
-                _fileDbManager.CreateFileEntry(change.Key);
-            }
-        });
 
-        _fileDbManager.WriteOutFullCsv();
+            _fileDbManager.WriteOutFullCsv();
+        }
     }
 
     public void InvokeScan()
