@@ -99,6 +99,8 @@ public class EventAggregator : MediatorSubscriberBase, IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
+        Logger.LogInformation("Starting EventAggregatorService");
+        Logger.LogInformation("Started EventAggregatorService");
         return Task.CompletedTask;
     }
 

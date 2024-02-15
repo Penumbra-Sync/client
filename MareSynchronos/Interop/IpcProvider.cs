@@ -28,11 +28,12 @@ public class IpcProvider : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.LogDebug("Starting IpcProvider Service");
+        _logger.LogInformation("Starting IpcProviderService");
         _loadFileProvider = _pi.GetIpcProvider<string, GameObject, bool>("MareSynchronos.LoadMcdf");
         _loadFileProvider.RegisterFunc(LoadMcdf);
         _loadFileAsyncProvider = _pi.GetIpcProvider<string, GameObject, Task<bool>>("MareSynchronos.LoadMcdfAsync");
         _loadFileAsyncProvider.RegisterFunc(LoadMcdfAsync);
+        _logger.LogInformation("Started IpcProviderService");
         return Task.CompletedTask;
     }
 

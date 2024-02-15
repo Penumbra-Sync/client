@@ -18,6 +18,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
     private readonly PerformanceCollectorService _performanceCollector;
     private long _currentFileProgress = 0;
     private CancellationTokenSource _scanCancellationTokenSource = new();
+    private readonly CancellationTokenSource _periodicCalculationTokenSource = new();
     private readonly string[] _allowedExtensions = [".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk"];
 
     public CacheMonitor(ILogger<CacheMonitor> logger, IpcManager ipcManager, MareConfigService configService,
@@ -57,6 +58,25 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
         {
             StartMareWatcher(configService.Current.CacheFolder);
         }
+
+        var token = _periodicCalculationTokenSource.Token;
+        _ = Task.Run(async () =>
+        {
+            Logger.LogInformation("Starting Periodic Storage Directory Calculation Task");
+            var token = _periodicCalculationTokenSource.Token;
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    RecalculateFileCacheSize(token);
+                }
+                catch
+                {
+                    // ignore
+                }
+                await Task.Delay(TimeSpan.FromMinutes(1), token).ConfigureAwait(false);
+            }
+        }, token);
     }
 
     public long CurrentFileProgress => _currentFileProgress;
@@ -86,17 +106,21 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
         PenumbraWatcher = null;
     }
 
+    public bool StorageisNTFS { get; private set; } = false;
+
     public void StartMareWatcher(string? marePath)
     {
         MareWatcher?.Dispose();
-        if (string.IsNullOrEmpty(marePath))
+        if (string.IsNullOrEmpty(marePath) || !Directory.Exists(marePath))
         {
             MareWatcher = null;
             Logger.LogWarning("Mare file path is not set, cannot start the FSW for Mare.");
             return;
         }
 
-        RecalculateFileCacheSize();
+        DriveInfo di = new(new DirectoryInfo(_configService.Current.CacheFolder).Root.FullName);
+        StorageisNTFS = string.Equals("NTFS", di.DriveFormat, StringComparison.OrdinalIgnoreCase);
+        Logger.LogInformation("Mare Storage is on NTFS drive: {isNtfs}", StorageisNTFS);
 
         Logger.LogDebug("Initializing Mare FSW on {path}", marePath);
         MareWatcher = new()
@@ -248,9 +272,6 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
             }
         }
 
-        _ = RecalculateFileCacheSize();
-
-
         if (changes.Any(c => c.Value.ChangeType == WatcherChangeTypes.Deleted))
         {
             lock (_fileDbManager)
@@ -356,26 +377,43 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
         }, token);
     }
 
-    public bool RecalculateFileCacheSize()
+    public void RecalculateFileCacheSize(CancellationToken token)
     {
-        FileCacheSize = Directory.EnumerateFiles(_configService.Current.CacheFolder).Sum(f =>
+        if (string.IsNullOrEmpty(_configService.Current.CacheFolder) || !Directory.Exists(_configService.Current.CacheFolder))
         {
-            try
-            {
-                return _fileCompactor.GetFileSizeOnDisk(f);
-            }
-            catch
-            {
-                return 0;
-            }
-        });
+            FileCacheSize = 0;
+            return;
+        }
 
-        DriveInfo di = new DriveInfo(new DirectoryInfo(_configService.Current.CacheFolder).Root.FullName);
-        FileCacheDriveFree = di.AvailableFreeSpace;
+        FileCacheSize = -1;
+        DriveInfo di = new(new DirectoryInfo(_configService.Current.CacheFolder).Root.FullName);
+        try
+        {
+            FileCacheDriveFree = di.AvailableFreeSpace;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Could not determine drive size for Storage Folder {folder}", _configService.Current.CacheFolder);
+        }
+
+        FileCacheSize = Directory.EnumerateFiles(_configService.Current.CacheFolder)
+            .AsParallel().Sum(f =>
+            {
+                token.ThrowIfCancellationRequested();
+
+                try
+                {
+                    return _fileCompactor.GetFileSizeOnDisk(f, StorageisNTFS);
+                }
+                catch
+                {
+                    return 0;
+                }
+            });
 
         var maxCacheInBytes = (long)(_configService.Current.MaxLocalCacheInGiB * 1024d * 1024d * 1024d);
 
-        if (FileCacheSize < maxCacheInBytes) return false;
+        if (FileCacheSize < maxCacheInBytes) return;
 
         var allFiles = Directory.EnumerateFiles(_configService.Current.CacheFolder)
             .Select(f => new FileInfo(f)).OrderBy(f => f.LastAccessTime).ToList();
@@ -387,8 +425,6 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
             File.Delete(oldestFile.FullName);
             allFiles.Remove(oldestFile);
         }
-
-        return true;
     }
 
     public void ResetLocks()
@@ -412,6 +448,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
         MareWatcher?.Dispose();
         _penumbraFswCts?.CancelDispose();
         _mareFswCts?.CancelDispose();
+        _periodicCalculationTokenSource?.CancelDispose();
     }
 
     private void FullFileScan(CancellationToken ct)

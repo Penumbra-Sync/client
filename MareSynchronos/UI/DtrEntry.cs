@@ -46,7 +46,9 @@ public sealed class DtrEntry : IDisposable, IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Starting DtrEntry");
         _runTask = Task.Run(RunAsync, _cancellationTokenSource.Token);
+        _logger.LogInformation("Started DtrEntry");
         return Task.CompletedTask;
     }
 
@@ -127,7 +129,7 @@ public sealed class DtrEntry : IDisposable, IHostedService
                 {
                     visiblePairs = _pairManager.GetOnlineUserPairs()
                         .Where(x => x.IsVisible)
-                        .Select(x => string.Format("{0} ({1})", _configService.Current.PreferNoteInDtrTooltip ? x.GetNote() ?? x.PlayerName : x.PlayerName, x.UserData.AliasOrUID ));
+                        .Select(x => string.Format("{0} ({1})", _configService.Current.PreferNoteInDtrTooltip ? x.GetNote() ?? x.PlayerName : x.PlayerName, x.UserData.AliasOrUID));
                 }
                 else
                 {
@@ -135,7 +137,7 @@ public sealed class DtrEntry : IDisposable, IHostedService
                         .Where(x => x.IsVisible)
                         .Select(x => string.Format("{0}", _configService.Current.PreferNoteInDtrTooltip ? x.GetNote() ?? x.PlayerName : x.PlayerName));
                 }
-                
+
                 tooltip = $"Mare Synchronos: Connected{Environment.NewLine}----------{Environment.NewLine}{string.Join(Environment.NewLine, visiblePairs)}";
             }
             else

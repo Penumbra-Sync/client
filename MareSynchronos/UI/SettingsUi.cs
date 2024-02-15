@@ -537,7 +537,10 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
         _uiShared.DrawCacheDirectorySetting();
         ImGui.AlignTextToFramePadding();
-        ImGui.TextUnformatted($"Currently utilized local storage: {UiSharedService.ByteToString(_cacheMonitor.FileCacheSize)}");
+        if (_cacheMonitor.FileCacheSize >= 0)
+            ImGui.TextUnformatted($"Currently utilized local storage: {UiSharedService.ByteToString(_cacheMonitor.FileCacheSize)}");
+        else
+            ImGui.TextUnformatted($"Currently utilized local storage: Calculating...");
         ImGui.TextUnformatted($"Remaining space free on drive: {UiSharedService.ByteToString(_cacheMonitor.FileCacheDriveFree)}");
         bool useFileCompactor = _configService.Current.UseCompactor;
         bool isLinux = Util.IsWine();
@@ -545,7 +548,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             UiSharedService.ColorTextWrapped("Hint: To free up space when using Mare consider enabling the File Compactor", ImGuiColors.DalamudYellow);
         }
-        if (isLinux) ImGui.BeginDisabled();
+        if (isLinux || !_cacheMonitor.StorageisNTFS) ImGui.BeginDisabled();
         if (ImGui.Checkbox("Use file compactor", ref useFileCompactor))
         {
             _configService.Current.UseCompactor = useFileCompactor;
@@ -561,7 +564,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 _ = Task.Run(() =>
                 {
                     _fileCompactor.CompactStorage(compress: true);
-                    _ = _cacheMonitor.RecalculateFileCacheSize();
+                    CancellationTokenSource cts = new();
+                    _cacheMonitor.RecalculateFileCacheSize(cts.Token);
                 });
             }
             UiSharedService.AttachToolTip("This will run compression on all files in your current Mare Storage." + Environment.NewLine
@@ -572,7 +576,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 _ = Task.Run(() =>
                 {
                     _fileCompactor.CompactStorage(compress: false);
-                    _ = _cacheMonitor.RecalculateFileCacheSize();
+                    CancellationTokenSource cts = new();
+                    _cacheMonitor.RecalculateFileCacheSize(cts.Token);
                 });
             }
             UiSharedService.AttachToolTip("This will run decompression on all files in your current Mare Storage.");
@@ -581,10 +586,10 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             UiSharedService.ColorText($"File compactor currently running ({_fileCompactor.Progress})", ImGuiColors.DalamudYellow);
         }
-        if (isLinux)
+        if (isLinux || !_cacheMonitor.StorageisNTFS)
         {
             ImGui.EndDisabled();
-            ImGui.TextUnformatted("The file compactor is only available on Windows.");
+            ImGui.TextUnformatted("The file compactor is only available on Windows and NTFS drives.");
         }
         ImGuiHelpers.ScaledDummy(new Vector2(10, 10));
 

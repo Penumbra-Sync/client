@@ -62,9 +62,11 @@ public sealed class FileCompactor
         MassCompactRunning = false;
     }
 
-    public long GetFileSizeOnDisk(string filePath)
+    public long GetFileSizeOnDisk(string filePath, bool? isNTFS = null)
     {
-        if (Dalamud.Utility.Util.IsWine()) return new FileInfo(filePath).Length;
+        bool ntfs = isNTFS ?? string.Equals(new DriveInfo(new FileInfo(filePath).Directory!.Root.FullName).DriveFormat, "NTFS", StringComparison.OrdinalIgnoreCase);
+
+        if (Dalamud.Utility.Util.IsWine() || !ntfs) return new FileInfo(filePath).Length;
 
         var clusterSize = GetClusterSize(filePath);
         if (clusterSize == -1) return new FileInfo(filePath).Length;
@@ -105,6 +107,14 @@ public sealed class FileCompactor
 
     private void CompactFile(string filePath)
     {
+        var fs = new DriveInfo(new FileInfo(filePath).Directory!.Root.FullName);
+        bool isNTFS = string.Equals(fs.DriveFormat, "NTFS", StringComparison.OrdinalIgnoreCase);
+        if (!isNTFS)
+        {
+            _logger.LogWarning("Drive for file {file} is not NTFS", filePath);
+            return;
+        }
+
         var oldSize = new FileInfo(filePath).Length;
         var clusterSize = GetClusterSize(filePath);
 

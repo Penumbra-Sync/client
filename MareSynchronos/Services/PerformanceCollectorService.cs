@@ -78,7 +78,9 @@ public sealed class PerformanceCollectorService : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Starting PerformanceCollectorService");
         _ = Task.Run(PeriodicLogPrune, _periodicLogPruneTask.Token);
+        _logger.LogInformation("Started PerformanceCollectorService");
         return Task.CompletedTask;
     }
 

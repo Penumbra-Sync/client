@@ -352,12 +352,17 @@ public sealed class FileCacheManager : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Starting FileCacheManager");
         lock (_fileWriteLock)
         {
             try
             {
+                _logger.LogInformation("Checking for {bakPath}", CsvBakPath);
+
                 if (File.Exists(CsvBakPath))
                 {
+                    _logger.LogInformation("{bakPath} found, moving to {csvPath}", CsvBakPath, _csvPath);
+
                     File.Move(CsvBakPath, _csvPath, overwrite: true);
                 }
             }
@@ -378,6 +383,8 @@ public sealed class FileCacheManager : IHostedService
 
         if (File.Exists(_csvPath))
         {
+            _logger.LogInformation("{csvPath} found, parsing", _csvPath);
+
             bool success = false;
             string[] entries = [];
             int attempts = 0;
@@ -385,6 +392,7 @@ public sealed class FileCacheManager : IHostedService
             {
                 try
                 {
+                    _logger.LogInformation("Attempting to read {csvPath}", _csvPath);
                     entries = File.ReadAllLines(_csvPath);
                     success = true;
                 }
@@ -400,6 +408,8 @@ public sealed class FileCacheManager : IHostedService
             {
                 _logger.LogWarning("Could not load entries from {path}, continuing with empty file cache", _csvPath);
             }
+
+            _logger.LogInformation("Found {amount} files in {path}", entries.Length, _csvPath);
 
             Dictionary<string, bool> processedFiles = new(StringComparer.OrdinalIgnoreCase);
             foreach (var entry in entries)
@@ -446,6 +456,8 @@ public sealed class FileCacheManager : IHostedService
                 WriteOutFullCsv();
             }
         }
+
+        _logger.LogInformation("Started FileCacheManager");
 
         return Task.CompletedTask;
     }

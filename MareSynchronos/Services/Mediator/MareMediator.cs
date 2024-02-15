@@ -54,7 +54,7 @@ public sealed class MareMediator : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.LogTrace("Starting MareMediator");
+        _logger.LogInformation("Starting MareMediator");
 
         _ = Task.Run(async () =>
         {
@@ -73,7 +73,7 @@ public sealed class MareMediator : IHostedService
             }
         });
 
-        _logger.LogTrace("Started MareMediator");
+        _logger.LogInformation("Started MareMediator");
 
         return Task.CompletedTask;
     }

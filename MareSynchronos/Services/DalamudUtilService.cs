@@ -284,12 +284,14 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
+        _logger.LogInformation("Starting DalamudUtilService");
         _framework.Update += FrameworkOnUpdate;
         if (IsLoggedIn)
         {
             _classJobId = _clientState.LocalPlayer!.ClassJob.Id;
         }
 
+        _logger.LogInformation("Started DalamudUtilService");
         return Task.CompletedTask;
     }
 
