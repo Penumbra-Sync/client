@@ -14,6 +14,7 @@ public sealed class MareMediator : IHostedService
     private readonly ConcurrentQueue<MessageBase> _messageQueue = new();
     private readonly PerformanceCollectorService _performanceCollector;
     private readonly Dictionary<Type, HashSet<SubscriberAction>> _subscriberDict = [];
+    private bool _processQueue = false;
 
     public MareMediator(ILogger<MareMediator> logger, PerformanceCollectorService performanceCollector)
     {
@@ -60,6 +61,11 @@ public sealed class MareMediator : IHostedService
         {
             while (!_loopCts.Token.IsCancellationRequested)
             {
+                while (!_processQueue)
+                {
+                    await Task.Delay(100, _loopCts.Token).ConfigureAwait(false);
+                }
+
                 await Task.Delay(100, _loopCts.Token).ConfigureAwait(false);
 
                 HashSet<MessageBase> processedMessages = [];
@@ -165,6 +171,12 @@ public sealed class MareMediator : IHostedService
                 _lastErrorTime[subscriber] = DateTime.UtcNow;
             }
         }
+    }
+
+    public void StartQueueProcessing()
+    {
+        _logger.LogInformation("Starting Message Queue Processing");
+        _processQueue = true;
     }
 
     private sealed class SubscriberAction

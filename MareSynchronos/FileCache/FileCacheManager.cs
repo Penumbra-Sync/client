@@ -38,9 +38,9 @@ public sealed class FileCacheManager : IHostedService
 
     public FileCacheEntity? CreateCacheEntry(string path)
     {
-        _logger.LogTrace("Creating cache entry for {path}", path);
         FileInfo fi = new(path);
         if (!fi.Exists) return null;
+        _logger.LogTrace("Creating cache entry for {path}", path);
         var fullName = fi.FullName.ToLowerInvariant();
         if (!fullName.Contains(_configService.Current.CacheFolder.ToLowerInvariant(), StringComparison.Ordinal)) return null;
         string prefixedPath = fullName.Replace(_configService.Current.CacheFolder.ToLowerInvariant(), CachePrefix + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
@@ -49,9 +49,9 @@ public sealed class FileCacheManager : IHostedService
 
     public FileCacheEntity? CreateFileEntry(string path)
     {
-        _logger.LogTrace("Creating file entry for {path}", path);
         FileInfo fi = new(path);
         if (!fi.Exists) return null;
+        _logger.LogTrace("Creating file entry for {path}", path);
         var fullName = fi.FullName.ToLowerInvariant();
         if (!fullName.Contains(_ipcManager.PenumbraModDirectory!.ToLowerInvariant(), StringComparison.Ordinal)) return null;
         string prefixedPath = fullName.Replace(_ipcManager.PenumbraModDirectory!.ToLowerInvariant(), PenumbraPrefix + "\\", StringComparison.Ordinal).Replace("\\\\", "\\", StringComparison.Ordinal);
@@ -144,7 +144,7 @@ public sealed class FileCacheManager : IHostedService
         return null;
     }
 
-    public FileCacheEntity? GetFileCacheByPath(string path)
+    private FileCacheEntity? GetFileCacheByPath(string path)
     {
         var cleanedPath = path.Replace("/", "\\", StringComparison.OrdinalIgnoreCase).ToLowerInvariant().Replace(_ipcManager.PenumbraModDirectory!.ToLowerInvariant(), "", StringComparison.OrdinalIgnoreCase);
         var entry = _fileCaches.SelectMany(v => v.Value).FirstOrDefault(f => f.ResolvedFilepath.EndsWith(cleanedPath, StringComparison.OrdinalIgnoreCase));
@@ -168,18 +168,25 @@ public sealed class FileCacheManager : IHostedService
         {
             var cleanedPaths = paths.Distinct(StringComparer.OrdinalIgnoreCase).ToDictionary(p => p,
                 p => p.Replace("/", "\\", StringComparison.OrdinalIgnoreCase)
-                    .Replace(_ipcManager.PenumbraModDirectory!, PenumbraPrefix, StringComparison.OrdinalIgnoreCase)
-                    .Replace(_configService.Current.CacheFolder, CachePrefix, StringComparison.OrdinalIgnoreCase)
+                    .Replace(_ipcManager.PenumbraModDirectory!, _ipcManager.PenumbraModDirectory!.EndsWith('\\') ? PenumbraPrefix + '\\' : PenumbraPrefix, StringComparison.OrdinalIgnoreCase)
+                    .Replace(_configService.Current.CacheFolder, _configService.Current.CacheFolder.EndsWith('\\') ? CachePrefix + '\\' : CachePrefix, StringComparison.OrdinalIgnoreCase)
                     .Replace("\\\\", "\\", StringComparison.Ordinal),
                 StringComparer.OrdinalIgnoreCase);
+
+            foreach (var entry in cleanedPaths)
+            {
+                _logger.LogInformation("Getting FileCache by Cleaned Path: {path}", entry.Value);
+            }
 
             Dictionary<string, FileCacheEntity?> result = new(StringComparer.OrdinalIgnoreCase);
 
             var dict = _fileCaches.SelectMany(f => f.Value)
-                .ToDictionary(d => d.PrefixedFilePath, d => d, StringComparer.Ordinal);
+                .ToDictionary(d => d.PrefixedFilePath, d => d, StringComparer.OrdinalIgnoreCase);
 
             foreach (var entry in cleanedPaths)
             {
+                _logger.LogDebug("Validating {path}", entry.Value);
+
                 if (dict.TryGetValue(entry.Value, out var entity))
                 {
                     var validatedCache = GetValidatedFileCache(entity);
@@ -206,10 +213,12 @@ public sealed class FileCacheManager : IHostedService
     {
         if (_fileCaches.TryGetValue(hash, out var caches))
         {
-            caches?.RemoveAll(c => string.Equals(c.PrefixedFilePath, prefixedFilePath, StringComparison.Ordinal));
+            var removedCount = caches?.RemoveAll(c => string.Equals(c.PrefixedFilePath, prefixedFilePath, StringComparison.Ordinal));
+            _logger.LogDebug("Removed {count} files with hash {hash} and file cache {path}", removedCount, hash, prefixedFilePath);
+
             if (caches?.Count == 0)
             {
-                _fileCaches.Remove(hash, out _);
+                _fileCaches.Remove(hash, out var entity);
             }
         }
     }
@@ -319,7 +328,7 @@ public sealed class FileCacheManager : IHostedService
             File.AppendAllLines(_csvPath, new[] { entity.CsvEntry });
         }
         var result = GetFileCacheByPath(fileInfo.FullName);
-        _logger.LogDebug("Creating file cache for {name} success: {success}", fileInfo.FullName, (result != null));
+        _logger.LogDebug("Creating cache entity for {name} success: {success}", fileInfo.FullName, (result != null));
         return result;
     }
 

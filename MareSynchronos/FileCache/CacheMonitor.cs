@@ -57,6 +57,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
         if (configService.Current.HasValidSetup())
         {
             StartMareWatcher(configService.Current.CacheFolder);
+            InvokeScan();
         }
 
         var token = _periodicCalculationTokenSource.Token;
@@ -350,11 +351,11 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
     {
         TotalFiles = 0;
         _currentFileProgress = 0;
-        _scanCancellationTokenSource?.Cancel();
-        _scanCancellationTokenSource = new CancellationTokenSource();
+        _scanCancellationTokenSource = _scanCancellationTokenSource?.CancelRecreate() ?? new CancellationTokenSource();
         var token = _scanCancellationTokenSource.Token;
         _ = Task.Run(async () =>
         {
+            Logger.LogDebug("Starting Full File Scan");
             TotalFiles = 0;
             _currentFileProgress = 0;
             while (_dalamudUtil.IsOnFrameworkThread)

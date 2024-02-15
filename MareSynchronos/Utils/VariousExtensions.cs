@@ -51,7 +51,7 @@ public static class VariousExtensions
 
     public static CancellationTokenSource CancelRecreate(this CancellationTokenSource? cts)
     {
-        cts.CancelDispose();
+        cts?.CancelDispose();
         return new CancellationTokenSource();
     }
 
