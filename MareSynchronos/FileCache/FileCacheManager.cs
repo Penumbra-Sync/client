@@ -60,15 +60,19 @@ public sealed class FileCacheManager : IHostedService
 
     public List<FileCacheEntity> GetAllFileCaches() => _fileCaches.Values.SelectMany(v => v).ToList();
 
-    public List<FileCacheEntity> GetAllFileCachesByHash(string hash)
+    public List<FileCacheEntity> GetAllFileCachesByHash(string hash, bool ignoreCacheEntries = false, bool validate = true)
     {
         List<FileCacheEntity> output = [];
         if (_fileCaches.TryGetValue(hash, out var fileCacheEntities))
         {
-            foreach (var fileCache in fileCacheEntities.ToList())
+            foreach (var fileCache in fileCacheEntities.Where(c => ignoreCacheEntries ? !c.IsCacheEntry : true).ToList())
             {
-                var validated = GetValidatedFileCache(fileCache);
-                if (validated != null) output.Add(validated);
+                if (!validate) output.Add(fileCache);
+                else
+                {
+                    var validated = GetValidatedFileCache(fileCache);
+                    if (validated != null) output.Add(validated);
+                }
             }
         }
 
@@ -173,11 +177,6 @@ public sealed class FileCacheManager : IHostedService
                     .Replace("\\\\", "\\", StringComparison.Ordinal),
                 StringComparer.OrdinalIgnoreCase);
 
-            foreach (var entry in cleanedPaths)
-            {
-                _logger.LogInformation("Getting FileCache by Cleaned Path: {path}", entry.Value);
-            }
-
             Dictionary<string, FileCacheEntity?> result = new(StringComparer.OrdinalIgnoreCase);
 
             var dict = _fileCaches.SelectMany(f => f.Value)
@@ -185,7 +184,7 @@ public sealed class FileCacheManager : IHostedService
 
             foreach (var entry in cleanedPaths)
             {
-                _logger.LogDebug("Validating {path}", entry.Value);
+                _logger.LogDebug("Checking {path}", entry.Value);
 
                 if (dict.TryGetValue(entry.Value, out var entity))
                 {
@@ -214,7 +213,7 @@ public sealed class FileCacheManager : IHostedService
         if (_fileCaches.TryGetValue(hash, out var caches))
         {
             var removedCount = caches?.RemoveAll(c => string.Equals(c.PrefixedFilePath, prefixedFilePath, StringComparison.Ordinal));
-            _logger.LogDebug("Removed {count} files with hash {hash} and file cache {path}", removedCount, hash, prefixedFilePath);
+            _logger.LogTrace("Removed from DB: {count} file(s) with hash {hash} and file cache {path}", removedCount, hash, prefixedFilePath);
 
             if (caches?.Count == 0)
             {
@@ -293,7 +292,7 @@ public sealed class FileCacheManager : IHostedService
             var newHashedEntity = new FileCacheEntity(fileCache.Hash, fileCache.PrefixedFilePath + "." + ext, DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture));
             newHashedEntity.SetResolvedFilePath(extensionPath);
             AddHashedFile(newHashedEntity);
-            _logger.LogDebug("Migrated from {oldPath} to {newPath}", fileCache.ResolvedFilepath, newHashedEntity.ResolvedFilepath);
+            _logger.LogTrace("Migrated from {oldPath} to {newPath}", fileCache.ResolvedFilepath, newHashedEntity.ResolvedFilepath);
             return newHashedEntity;
         }
         catch (Exception ex)
@@ -313,6 +312,7 @@ public sealed class FileCacheManager : IHostedService
 
         if (!entries.Exists(u => string.Equals(u.PrefixedFilePath, fileCache.PrefixedFilePath, StringComparison.OrdinalIgnoreCase)))
         {
+            _logger.LogTrace("Adding to DB: {hash} => {path}", fileCache.Hash, fileCache.PrefixedFilePath);
             entries.Add(fileCache);
         }
     }
@@ -328,13 +328,14 @@ public sealed class FileCacheManager : IHostedService
             File.AppendAllLines(_csvPath, new[] { entity.CsvEntry });
         }
         var result = GetFileCacheByPath(fileInfo.FullName);
-        _logger.LogDebug("Creating cache entity for {name} success: {success}", fileInfo.FullName, (result != null));
+        _logger.LogTrace("Creating cache entity for {name} success: {success}", fileInfo.FullName, (result != null));
         return result;
     }
 
     private FileCacheEntity? GetValidatedFileCache(FileCacheEntity fileCache)
     {
         var resultingFileCache = ReplacePathPrefixes(fileCache);
+        _logger.LogTrace("Validating {path}", fileCache.PrefixedFilePath);
         resultingFileCache = Validate(resultingFileCache);
         return resultingFileCache;
     }

@@ -98,7 +98,7 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
             Dictionary<string, FileDataEntry> data = new(StringComparer.OrdinalIgnoreCase);
             foreach (var fileEntry in obj.Value)
             {
-                var fileCacheEntries = _fileCacheManager.GetAllFileCachesByHash(fileEntry.Hash).Where(c => !c.IsCacheEntry).ToList();
+                var fileCacheEntries = _fileCacheManager.GetAllFileCachesByHash(fileEntry.Hash, ignoreCacheEntries: true, validate: false).ToList();
                 if (fileCacheEntries.Count == 0) continue;
 
                 var filePath = fileCacheEntries[0].ResolvedFilepath;
@@ -183,7 +183,7 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
         {
             var compressedsize = await fileCacheManager.GetCompressedFileData(Hash, token).ConfigureAwait(false);
             var normalSize = new FileInfo(FilePaths[0]).Length;
-            var entries = fileCacheManager.GetAllFileCachesByHash(Hash);
+            var entries = fileCacheManager.GetAllFileCachesByHash(Hash, ignoreCacheEntries: true, validate: false);
             foreach (var entry in entries)
             {
                 entry.Size = normalSize;
