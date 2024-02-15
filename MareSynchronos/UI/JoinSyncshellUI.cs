@@ -6,6 +6,7 @@ using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto;
 using MareSynchronos.API.Dto.Group;
+using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
@@ -24,7 +25,8 @@ internal class JoinSyncshellUI : WindowMediatorSubscriberBase
     private string _syncshellPassword = string.Empty;
 
     public JoinSyncshellUI(ILogger<JoinSyncshellUI> logger, MareMediator mediator,
-        UiSharedService uiSharedService, ApiController apiController) : base(logger, mediator, "Join existing Syncshell###MareSynchronosJoinSyncshell")
+        UiSharedService uiSharedService, ApiController apiController, PerformanceCollectorService performanceCollectorService) 
+        : base(logger, mediator, "Join existing Syncshell###MareSynchronosJoinSyncshell", performanceCollectorService)
     {
         _uiSharedService = uiSharedService;
         _apiController = apiController;
@@ -48,7 +50,7 @@ internal class JoinSyncshellUI : WindowMediatorSubscriberBase
         _ownPermissions = _apiController.DefaultPermissions.DeepClone()!;
     }
 
-    public override void Draw()
+    protected override void DrawInternal()
     {
         using (ImRaii.PushFont(_uiSharedService.UidFont))
             ImGui.TextUnformatted(_groupJoinInfo == null || !_groupJoinInfo.Success ? "Join Syncshell" : "Finalize join Syncshell " + _groupJoinInfo.GroupAliasOrGID);

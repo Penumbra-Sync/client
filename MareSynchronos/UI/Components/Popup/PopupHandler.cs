@@ -2,6 +2,7 @@
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
+using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
@@ -14,8 +15,8 @@ public class PopupHandler : WindowMediatorSubscriberBase
     private readonly HashSet<IPopupHandler> _handlers;
     private IPopupHandler? _currentHandler = null;
 
-    public PopupHandler(ILogger<PopupHandler> logger, MareMediator mediator, IEnumerable<IPopupHandler> popupHandlers)
-        : base(logger, mediator, "MarePopupHandler")
+    public PopupHandler(ILogger<PopupHandler> logger, MareMediator mediator, IEnumerable<IPopupHandler> popupHandlers, PerformanceCollectorService performanceCollectorService)
+        : base(logger, mediator, "MarePopupHandler", performanceCollectorService)
     {
         Flags = ImGuiWindowFlags.NoBringToFrontOnFocus
           | ImGuiWindowFlags.NoDecoration
@@ -53,7 +54,7 @@ public class PopupHandler : WindowMediatorSubscriberBase
         });
     }
 
-    public override void Draw()
+    protected override void DrawInternal()
     {
         if (_currentHandler == null) return;
 

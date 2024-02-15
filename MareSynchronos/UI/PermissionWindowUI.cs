@@ -4,6 +4,7 @@ using ImGuiNET;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
@@ -20,7 +21,8 @@ public class PermissionWindowUI : WindowMediatorSubscriberBase
     private UserPermissions _ownPermissions;
 
     public PermissionWindowUI(ILogger<PermissionWindowUI> logger, Pair pair, MareMediator mediator, UiSharedService uiSharedService,
-        ApiController apiController) : base(logger, mediator, "Permissions for " + pair.UserData.AliasOrUID + "###MareSynchronosPermissions" + pair.UserData.UID)
+        ApiController apiController, PerformanceCollectorService performanceCollectorService)
+        : base(logger, mediator, "Permissions for " + pair.UserData.AliasOrUID + "###MareSynchronosPermissions" + pair.UserData.UID, performanceCollectorService)
     {
         Pair = pair;
         _uiSharedService = uiSharedService;
@@ -35,7 +37,7 @@ public class PermissionWindowUI : WindowMediatorSubscriberBase
         IsOpen = true;
     }
 
-    public override void Draw()
+    protected override void DrawInternal()
     {
         var sticky = _ownPermissions.IsSticky();
         var paused = _ownPermissions.IsPaused();

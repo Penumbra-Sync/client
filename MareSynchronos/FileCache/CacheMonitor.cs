@@ -68,6 +68,11 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
             {
                 try
                 {
+                    while (_dalamudUtil.IsOnFrameworkThread && !token.IsCancellationRequested)
+                    {
+                        await Task.Delay(1).ConfigureAwait(false);
+                    }
+
                     RecalculateFileCacheSize(token);
                 }
                 catch
@@ -272,18 +277,41 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
             }
         }
 
-        if (changes.Any(c => c.Value.ChangeType == WatcherChangeTypes.Deleted))
-        {
-            lock (_fileDbManager)
-            {
-                foreach (var change in changes)
-                {
-                    Logger.LogDebug("FSW Change: {change} = {val}", change.Key, change.Value);
-                    _ = _fileDbManager.GetFileCacheByPath(change.Key);
-                }
+        HandleChanges(changes);
+    }
 
-                _fileDbManager.WriteOutFullCsv();
+    private void HandleChanges(Dictionary<string, WatcherChange> changes)
+    {
+        lock (_fileDbManager)
+        {
+            var deletedEntries = changes.Where(c => c.Value.ChangeType == WatcherChangeTypes.Deleted).Select(c => c.Key);
+            var renamedEntries = changes.Where(c => c.Value.ChangeType == WatcherChangeTypes.Renamed);
+            var remainingEntries = changes.Where(c => c.Value.ChangeType != WatcherChangeTypes.Deleted).Select(c => c.Key);
+
+            foreach (var entry in deletedEntries)
+            {
+                Logger.LogDebug("FSW Change: Deletion - {val}", entry);
             }
+
+            foreach (var entry in renamedEntries)
+            {
+                Logger.LogDebug("FSW Change: Renamed - {oldVal} => {val}", entry.Value.OldPath, entry.Key);
+            }
+
+            foreach (var entry in remainingEntries)
+            {
+                Logger.LogDebug("FSW Change: Creation or Change - {val}", entry);
+            }
+
+            var allChanges = deletedEntries
+                .Concat(renamedEntries.Select(c => c.Value.OldPath!))
+                .Concat(renamedEntries.Select(c => c.Key))
+                .Concat(remainingEntries)
+                .ToArray();
+
+            _ = _fileDbManager.GetFileCachesByPaths(allChanges);
+
+            _fileDbManager.WriteOutFullCsv();
         }
     }
 
@@ -315,24 +343,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
             }
         }
 
-        lock (_fileDbManager)
-        {
-            foreach (var change in changes)
-            {
-                Logger.LogDebug("FSW Change: {change} = {val}", change.Key, change.Value);
-                if (change.Value.ChangeType == WatcherChangeTypes.Deleted)
-                {
-                    _fileDbManager.GetFileCacheByPath(change.Key);
-                }
-                else
-                {
-                    if (change.Value.OldPath != null) _fileDbManager.GetFileCacheByPath(change.Value.OldPath);
-                    _fileDbManager.CreateFileEntry(change.Key);
-                }
-            }
-
-            _fileDbManager.WriteOutFullCsv();
-        }
+        HandleChanges(changes);
     }
 
     public void InvokeScan()
@@ -397,7 +408,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
         }
 
         FileCacheSize = Directory.EnumerateFiles(_configService.Current.CacheFolder)
-            .AsParallel().Sum(f =>
+            .Sum(f =>
             {
                 token.ThrowIfCancellationRequested();
 

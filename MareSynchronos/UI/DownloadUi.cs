@@ -22,7 +22,8 @@ public class DownloadUi : WindowMediatorSubscriberBase
     private readonly ConcurrentDictionary<GameObjectHandler, bool> _uploadingPlayers = new();
 
     public DownloadUi(ILogger<DownloadUi> logger, DalamudUtilService dalamudUtilService, MareConfigService configService,
-        FileUploadManager fileTransferManager, MareMediator mediator, UiSharedService uiShared) : base(logger, mediator, "Mare Synchronos Downloads")
+        FileUploadManager fileTransferManager, MareMediator mediator, UiSharedService uiShared, PerformanceCollectorService performanceCollectorService) 
+        : base(logger, mediator, "Mare Synchronos Downloads", performanceCollectorService)
     {
         _dalamudUtilService = dalamudUtilService;
         _configService = configService;
@@ -66,7 +67,7 @@ public class DownloadUi : WindowMediatorSubscriberBase
         });
     }
 
-    public override void Draw()
+    protected override void DrawInternal()
     {
         if (_configService.Current.ShowTransferWindow)
         {

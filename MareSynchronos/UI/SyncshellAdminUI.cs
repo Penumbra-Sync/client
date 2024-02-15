@@ -7,6 +7,7 @@ using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;
@@ -31,8 +32,8 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
     private int _pruneDays = 14;
 
     public SyncshellAdminUI(ILogger<SyncshellAdminUI> logger, MareMediator mediator, ApiController apiController,
-        UiSharedService uiSharedService, PairManager pairManager, GroupFullInfoDto groupFullInfo)
-        : base(logger, mediator, "Syncshell Admin Panel (" + groupFullInfo.GroupAliasOrGID + ")")
+        UiSharedService uiSharedService, PairManager pairManager, GroupFullInfoDto groupFullInfo, PerformanceCollectorService performanceCollectorService)
+        : base(logger, mediator, "Syncshell Admin Panel (" + groupFullInfo.GroupAliasOrGID + ")", performanceCollectorService)
     {
         GroupFullInfo = groupFullInfo;
         _apiController = apiController;
@@ -53,7 +54,7 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
 
     public GroupFullInfoDto GroupFullInfo { get; private set; }
 
-    public override void Draw()
+    protected override void DrawInternal()
     {
         if (!_isModerator && !_isOwner) return;
 

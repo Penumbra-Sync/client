@@ -32,7 +32,9 @@ public class EditProfileUi : WindowMediatorSubscriberBase
 
     public EditProfileUi(ILogger<EditProfileUi> logger, MareMediator mediator,
         ApiController apiController, UiBuilder uiBuilder, UiSharedService uiSharedService,
-        FileDialogManager fileDialogManager, MareProfileManager mareProfileManager) : base(logger, mediator, "Mare Synchronos Edit Profile###MareSynchronosEditProfileUI")
+        FileDialogManager fileDialogManager, MareProfileManager mareProfileManager,
+        PerformanceCollectorService performanceCollectorService)
+        : base(logger, mediator, "Mare Synchronos Edit Profile###MareSynchronosEditProfileUI", performanceCollectorService)
     {
         IsOpen = false;
         this.SizeConstraints = new()
@@ -59,7 +61,7 @@ public class EditProfileUi : WindowMediatorSubscriberBase
         });
     }
 
-    public override void Draw()
+    protected override void DrawInternal()
     {
         _uiSharedService.BigText("Current Profile (as saved on server)");
 

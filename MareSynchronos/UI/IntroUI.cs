@@ -6,6 +6,7 @@ using MareSynchronos.FileCache;
 using MareSynchronos.Localization;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Models;
+using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using Microsoft.Extensions.Logging;
@@ -29,7 +30,8 @@ public class IntroUi : WindowMediatorSubscriberBase
     private string[]? _tosParagraphs;
 
     public IntroUi(ILogger<IntroUi> logger, UiSharedService uiShared, MareConfigService configService,
-        CacheMonitor fileCacheManager, ServerConfigurationManager serverConfigurationManager, MareMediator mareMediator) : base(logger, mareMediator, "Mare Synchronos Setup")
+        CacheMonitor fileCacheManager, ServerConfigurationManager serverConfigurationManager, MareMediator mareMediator,
+        PerformanceCollectorService performanceCollectorService) : base(logger, mareMediator, "Mare Synchronos Setup", performanceCollectorService)
     {
         _uiShared = uiShared;
         _configService = configService;
@@ -56,7 +58,7 @@ public class IntroUi : WindowMediatorSubscriberBase
         });
     }
 
-    public override void Draw()
+    protected override void DrawInternal()
     {
         if (_uiShared.IsInGpose) return;
 

@@ -9,6 +9,7 @@ using MareSynchronos.API.Dto.Group;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.UI.Components;
@@ -53,8 +54,9 @@ public class CompactUi : WindowMediatorSubscriberBase
 
     public CompactUi(ILogger<CompactUi> logger, UiSharedService uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
         ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager,
-        TagHandler tagHandler, DrawEntityFactory drawEntityFactory, SelectTagForPairUi selectTagForPairUi, SelectPairForTagUi selectPairForTagUi)
-        : base(logger, mediator, "###MareSynchronosMainUI")
+        TagHandler tagHandler, DrawEntityFactory drawEntityFactory, SelectTagForPairUi selectTagForPairUi, SelectPairForTagUi selectPairForTagUi,
+        PerformanceCollectorService performanceCollectorService)
+        : base(logger, mediator, "###MareSynchronosMainUI", performanceCollectorService)
     {
         _uiShared = uiShared;
         _configService = configService;
@@ -132,7 +134,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         };
     }
 
-    public override void Draw()
+    protected override void DrawInternal()
     {
         _windowContentWidth = UiSharedService.GetWindowContentRegionWidth();
         if (!_apiController.IsCurrentVersion)

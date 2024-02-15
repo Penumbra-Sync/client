@@ -20,6 +20,7 @@ public sealed class FileCacheManager : IHostedService
     private readonly MareMediator _mareMediator;
     private readonly string _csvPath;
     private readonly ConcurrentDictionary<string, List<FileCacheEntity>> _fileCaches = new(StringComparer.Ordinal);
+    private readonly SemaphoreSlim _getCachesByPathsSemaphore = new(1, 1);
     private readonly object _fileWriteLock = new();
     private readonly IpcManager _ipcManager;
     private readonly ILogger<FileCacheManager> _logger;
@@ -64,9 +65,9 @@ public sealed class FileCacheManager : IHostedService
         List<FileCacheEntity> output = [];
         if (_fileCaches.TryGetValue(hash, out var fileCacheEntities))
         {
-            foreach (var filecache in fileCacheEntities.ToList())
+            foreach (var fileCache in fileCacheEntities.ToList())
             {
-                var validated = GetValidatedFileCache(filecache);
+                var validated = GetValidatedFileCache(fileCache);
                 if (validated != null) output.Add(validated);
             }
         }
@@ -79,7 +80,7 @@ public sealed class FileCacheManager : IHostedService
         _mareMediator.Publish(new HaltScanMessage(nameof(ValidateLocalIntegrity)));
         _logger.LogInformation("Validating local storage");
         var cacheEntries = _fileCaches.SelectMany(v => v.Value).Where(v => v.IsCacheEntry).ToList();
-        List<FileCacheEntity> brokenEntities = new();
+        List<FileCacheEntity> brokenEntities = [];
         int i = 0;
         foreach (var fileCache in cacheEntries)
         {
@@ -161,32 +162,44 @@ public sealed class FileCacheManager : IHostedService
 
     public Dictionary<string, FileCacheEntity?> GetFileCachesByPaths(string[] paths)
     {
-        var cleanedPaths = paths.Distinct(StringComparer.OrdinalIgnoreCase).ToDictionary(p => p,
-            p => p.Replace("/", "\\", StringComparison.OrdinalIgnoreCase)
-            .Replace(_ipcManager.PenumbraModDirectory!,
-                _ipcManager.PenumbraModDirectory!.EndsWith('\\') ? (PenumbraPrefix + "\\") : PenumbraPrefix,
-                StringComparison.OrdinalIgnoreCase),
-            StringComparer.OrdinalIgnoreCase);
+        _getCachesByPathsSemaphore.Wait();
 
-        Dictionary<string, FileCacheEntity?> result = new(StringComparer.OrdinalIgnoreCase);
-
-        var dict = _fileCaches.SelectMany(f => f.Value).Where(f => f.PrefixedFilePath.StartsWith(PenumbraPrefix, StringComparison.Ordinal))
-            .ToDictionary(d => d.PrefixedFilePath, d => d, StringComparer.Ordinal);
-
-        foreach (var entry in cleanedPaths)
+        try
         {
-            if (dict.TryGetValue(entry.Value, out var entity))
-            {
-                var validatedCache = GetValidatedFileCache(entity);
-                result.Add(entry.Key, validatedCache);
-            }
-            else
-            {
-                result.Add(entry.Key, CreateFileEntry(entry.Key));
-            }
-        }
+            var cleanedPaths = paths.Distinct(StringComparer.OrdinalIgnoreCase).ToDictionary(p => p,
+                p => p.Replace("/", "\\", StringComparison.OrdinalIgnoreCase)
+                    .Replace(_ipcManager.PenumbraModDirectory!, PenumbraPrefix, StringComparison.OrdinalIgnoreCase)
+                    .Replace(_configService.Current.CacheFolder, CachePrefix, StringComparison.OrdinalIgnoreCase)
+                    .Replace("\\\\", "\\", StringComparison.Ordinal),
+                StringComparer.OrdinalIgnoreCase);
 
-        return result;
+            Dictionary<string, FileCacheEntity?> result = new(StringComparer.OrdinalIgnoreCase);
+
+            var dict = _fileCaches.SelectMany(f => f.Value)
+                .ToDictionary(d => d.PrefixedFilePath, d => d, StringComparer.Ordinal);
+
+            foreach (var entry in cleanedPaths)
+            {
+                if (dict.TryGetValue(entry.Value, out var entity))
+                {
+                    var validatedCache = GetValidatedFileCache(entity);
+                    result.Add(entry.Key, validatedCache);
+                }
+                else
+                {
+                    if (!entry.Value.Contains(CachePrefix, StringComparison.Ordinal))
+                        result.Add(entry.Key, CreateFileEntry(entry.Key));
+                    else
+                        result.Add(entry.Key, CreateCacheEntry(entry.Key));
+                }
+            }
+
+            return result;
+        }
+        finally
+        {
+            _getCachesByPathsSemaphore.Release();
+        }
     }
 
     public void RemoveHashedFile(string hash, string prefixedFilePath)
@@ -266,8 +279,6 @@ public sealed class FileCacheManager : IHostedService
         try
         {
             RemoveHashedFile(fileCache.Hash, fileCache.PrefixedFilePath);
-            FileInfo fileInfo = new(fileCache.ResolvedFilepath);
-            FileInfo oldCache = fileInfo;
             var extensionPath = fileCache.ResolvedFilepath.ToUpper(CultureInfo.InvariantCulture) + "." + ext;
             File.Move(fileCache.ResolvedFilepath, extensionPath, overwrite: true);
             var newHashedEntity = new FileCacheEntity(fileCache.Hash, fileCache.PrefixedFilePath + "." + ext, DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture));
@@ -314,9 +325,9 @@ public sealed class FileCacheManager : IHostedService
 
     private FileCacheEntity? GetValidatedFileCache(FileCacheEntity fileCache)
     {
-        var resulingFileCache = ReplacePathPrefixes(fileCache);
-        resulingFileCache = Validate(resulingFileCache);
-        return resulingFileCache;
+        var resultingFileCache = ReplacePathPrefixes(fileCache);
+        resultingFileCache = Validate(resultingFileCache);
+        return resultingFileCache;
     }
 
     private FileCacheEntity ReplacePathPrefixes(FileCacheEntity fileCache)

@@ -20,7 +20,8 @@ public class GposeUi : WindowMediatorSubscriberBase
 
     public GposeUi(ILogger<GposeUi> logger, MareCharaFileManager mareCharaFileManager,
         DalamudUtilService dalamudUtil, FileDialogManager fileDialogManager, MareConfigService configService,
-        MareMediator mediator) : base(logger, mediator, "Mare Synchronos Gpose Import UI###MareSynchronosGposeUI")
+        MareMediator mediator, PerformanceCollectorService performanceCollectorService) 
+        : base(logger, mediator, "Mare Synchronos Gpose Import UI###MareSynchronosGposeUI", performanceCollectorService)
     {
         _mareCharaFileManager = mareCharaFileManager;
         _dalamudUtil = dalamudUtil;
@@ -37,7 +38,7 @@ public class GposeUi : WindowMediatorSubscriberBase
         };
     }
 
-    public override void Draw()
+    protected override void DrawInternal()
     {
         if (!_dalamudUtil.IsInGpose) IsOpen = false;
 

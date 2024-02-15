@@ -68,7 +68,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         FileTransferOrchestrator fileTransferOrchestrator,
         FileCacheManager fileCacheManager,
         FileCompactor fileCompactor, ApiController apiController,
-        IpcManager ipcManager, CacheMonitor cacheMonitor) : base(logger, mediator, "Mare Synchronos Settings")
+        IpcManager ipcManager, CacheMonitor cacheMonitor) : base(logger, mediator, "Mare Synchronos Settings", performanceCollector)
     {
         _configService = configService;
         _mareCharaFileManager = mareCharaFileManager;
@@ -105,7 +105,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
     public CharacterData? LastCreatedCharacterData { private get; set; }
     private ApiController ApiController => _uiShared.ApiController;
 
-    public override void Draw()
+    protected override void DrawInternal()
     {
         _ = _uiShared.DrawOtherPluginState();
 

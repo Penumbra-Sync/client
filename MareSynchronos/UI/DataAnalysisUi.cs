@@ -31,7 +31,8 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
     private ObjectKind _selectedObjectTab;
     private bool _showModal = false;
 
-    public DataAnalysisUi(ILogger<DataAnalysisUi> logger, MareMediator mediator, CharacterAnalyzer characterAnalyzer, IpcManager ipcManager) : base(logger, mediator, "Mare Character Data Analysis")
+    public DataAnalysisUi(ILogger<DataAnalysisUi> logger, MareMediator mediator, CharacterAnalyzer characterAnalyzer, IpcManager ipcManager, PerformanceCollectorService performanceCollectorService)
+        : base(logger, mediator, "Mare Character Data Analysis", performanceCollectorService)
     {
         _characterAnalyzer = characterAnalyzer;
         _ipcManager = ipcManager;
@@ -56,7 +57,7 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
         _conversionProgress.ProgressChanged += ConversionProgress_ProgressChanged;
     }
 
-    public override void Draw()
+    protected override void DrawInternal()
     {
         if (_conversionTask != null && !_conversionTask.IsCompleted)
         {
@@ -333,7 +334,7 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
 
     private void DrawTable(IGrouping<string, CharacterAnalyzer.FileDataEntry> fileGroup)
     {
-        using var table = ImRaii.Table("Analysis", string.Equals(fileGroup.Key, "tex", StringComparison.Ordinal) ? 
+        using var table = ImRaii.Table("Analysis", string.Equals(fileGroup.Key, "tex", StringComparison.Ordinal) ?
             (_enableBc7ConversionMode ? 7 : 6) : 5, ImGuiTableFlags.Sortable | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit,
             new Vector2(0, 300));
         if (!table.Success) return;

@@ -4,6 +4,7 @@ using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
+using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;
@@ -18,8 +19,9 @@ public class CreateSyncshellUI : WindowMediatorSubscriberBase
     private bool _errorGroupCreate;
     private GroupJoinDto? _lastCreatedGroup;
 
-    public CreateSyncshellUI(ILogger<CreateSyncshellUI> logger, MareMediator mareMediator, ApiController apiController, UiSharedService uiSharedService)
-        : base(logger, mareMediator, "Create new Syncshell###MareSynchronosCreateSyncshell")
+    public CreateSyncshellUI(ILogger<CreateSyncshellUI> logger, MareMediator mareMediator, ApiController apiController, UiSharedService uiSharedService,
+        PerformanceCollectorService performanceCollectorService)
+        : base(logger, mareMediator, "Create new Syncshell###MareSynchronosCreateSyncshell", performanceCollectorService)
     {
         _apiController = apiController;
         _uiSharedService = uiSharedService;
@@ -34,7 +36,7 @@ public class CreateSyncshellUI : WindowMediatorSubscriberBase
         Mediator.Subscribe<DisconnectedMessage>(this, (_) => IsOpen = false);
     }
 
-    public override void Draw()
+    protected override void DrawInternal()
     {
         using (ImRaii.PushFont(_uiSharedService.UidFont))
             ImGui.TextUnformatted("Create new Syncshell");

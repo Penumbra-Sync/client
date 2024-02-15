@@ -2,6 +2,7 @@
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
+using MareSynchronos.Services;
 using MareSynchronos.Services.Events;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
@@ -37,7 +38,8 @@ internal class EventViewerUI : WindowMediatorSubscriberBase
     }
 
     public EventViewerUI(ILogger<EventViewerUI> logger, MareMediator mediator,
-        EventAggregator eventAggregator, UiSharedService uiSharedService) : base(logger, mediator, "Event Viewer")
+        EventAggregator eventAggregator, UiSharedService uiSharedService, PerformanceCollectorService performanceCollectorService) 
+        : base(logger, mediator, "Event Viewer", performanceCollectorService)
     {
         _eventAggregator = eventAggregator;
         _uiSharedService = uiSharedService;
@@ -94,7 +96,7 @@ internal class EventViewerUI : WindowMediatorSubscriberBase
         ClearFilters();
     }
 
-    public override void Draw()
+    protected override void DrawInternal()
     {
         using (ImRaii.Disabled(!_eventAggregator.NewEventsAvailable))
         {

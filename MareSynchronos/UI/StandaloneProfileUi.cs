@@ -27,8 +27,9 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
     private IDalamudTextureWrap? _textureWrap;
 
     public StandaloneProfileUi(ILogger<StandaloneProfileUi> logger, MareMediator mediator, UiSharedService uiBuilder,
-        ServerConfigurationManager serverManager, MareProfileManager mareProfileManager, PairManager pairManager, Pair pair)
-        : base(logger, mediator, "Mare Profile of " + pair.UserData.AliasOrUID + "##MareSynchronosStandaloneProfileUI" + pair.UserData.AliasOrUID)
+        ServerConfigurationManager serverManager, MareProfileManager mareProfileManager, PairManager pairManager, Pair pair,
+        PerformanceCollectorService performanceCollector)
+        : base(logger, mediator, "Mare Profile of " + pair.UserData.AliasOrUID + "##MareSynchronosStandaloneProfileUI" + pair.UserData.AliasOrUID, performanceCollector)
     {
         _uiSharedService = uiBuilder;
         _serverManager = serverManager;
@@ -46,7 +47,7 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
 
     public Pair Pair { get; init; }
 
-    public override void Draw()
+    protected override void DrawInternal()
     {
         try
         {
