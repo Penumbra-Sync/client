@@ -643,7 +643,7 @@ public sealed class IpcManager : DisposableMediatorSubscriberBase
     {
         try
         {
-            return _heelsGetApiVersion.InvokeFunc() is { Item1: 1, Item2: >= 0 };
+            return _heelsGetApiVersion.InvokeFunc() is { Item1: 1, Item2: >= 1 };
         }
         catch
         {
