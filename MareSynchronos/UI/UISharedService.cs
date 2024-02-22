@@ -68,6 +68,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     private bool _isDirectoryWritable = false;
 
     private bool _isPenumbraDirectory = false;
+    private bool _isOneDrive = false;
 
     private bool _penumbraExists = false;
 
@@ -567,6 +568,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
                 {
                     if (!success) return;
 
+                    _isOneDrive = path.Contains("onedrive", StringComparison.OrdinalIgnoreCase);
                     _isPenumbraDirectory = string.Equals(path.ToLowerInvariant(), _ipcManager.PenumbraModDirectory?.ToLowerInvariant(), StringComparison.Ordinal);
                     _isDirectoryWritable = IsDirectoryWritable(path);
                     _cacheDirectoryHasOtherFilesThanCache = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Any(f => Path.GetFileNameWithoutExtension(f).Length != 40);
@@ -576,6 +578,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
                         && Directory.Exists(path)
                         && _isDirectoryWritable
                         && !_isPenumbraDirectory
+                        && !_isOneDrive
                         && !_cacheDirectoryHasOtherFilesThanCache
                         && _cacheDirectoryIsValidPath)
                     {
@@ -595,6 +598,10 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         if (_isPenumbraDirectory)
         {
             ColorTextWrapped("Do not point the storage path directly to the Penumbra directory. If necessary, make a subfolder in it.", ImGuiColors.DalamudRed);
+        }
+        else if (_isOneDrive)
+        {
+            ColorTextWrapped("Do not point the storage path to a folder in OneDrive. Do not use OneDrive folders for any Mod related functionality.", ImGuiColors.DalamudRed);
         }
         else if (!_isDirectoryWritable)
         {
