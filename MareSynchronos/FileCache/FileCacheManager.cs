@@ -100,10 +100,18 @@ public sealed class FileCacheManager : IHostedService
                 continue;
             }
 
-            var computedHash = Crypto.GetFileHash(fileCache.ResolvedFilepath);
-            if (!string.Equals(computedHash, fileCache.Hash, StringComparison.Ordinal))
+            try
             {
-                _logger.LogInformation("Failed to validate {file}, got hash {hash}, expected hash {hash}", fileCache.ResolvedFilepath, computedHash, fileCache.Hash);
+                var computedHash = Crypto.GetFileHash(fileCache.ResolvedFilepath);
+                if (!string.Equals(computedHash, fileCache.Hash, StringComparison.Ordinal))
+                {
+                    _logger.LogInformation("Failed to validate {file}, got hash {hash}, expected hash {hash}", fileCache.ResolvedFilepath, computedHash, fileCache.Hash);
+                    brokenEntities.Add(fileCache);
+                }
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning("Error during validation of {file}", fileCache.ResolvedFilepath);
                 brokenEntities.Add(fileCache);
             }
         }
