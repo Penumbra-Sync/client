@@ -111,7 +111,7 @@ public sealed class FileCacheManager : IHostedService
             }
             catch (Exception e)
             {
-                _logger.LogWarning("Error during validation of {file}", fileCache.ResolvedFilepath);
+                _logger.LogWarning(e, "Error during validation of {file}", fileCache.ResolvedFilepath);
                 brokenEntities.Add(fileCache);
             }
         }
