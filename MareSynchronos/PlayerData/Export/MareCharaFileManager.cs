@@ -2,7 +2,7 @@
 using LZ4;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.FileCache;
-using MareSynchronos.Interop;
+using MareSynchronos.Interop.Ipc;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Factories;
 using MareSynchronos.PlayerData.Handlers;
@@ -48,12 +48,12 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
             {
                 if ((await dalamudUtil.RunOnFrameworkThread(() => item.Value.CurrentAddress()).ConfigureAwait(false)) != nint.Zero)
                 {
-                    await _ipcManager.GlamourerRevert(logger, item.Value.Name, item.Value, Guid.NewGuid(), cts.Token).ConfigureAwait(false);
+                    await _ipcManager.Glamourer.RevertAsync(logger, item.Value.Name, item.Value, Guid.NewGuid(), cts.Token).ConfigureAwait(false);
                 }
                 else
                 {
                     _logger.LogDebug("Reverting by name: {name}", item.Key);
-                    _ipcManager.GlamourerRevertByName(logger, item.Key, Guid.NewGuid());
+                    _ipcManager.Glamourer.RevertByName(logger, item.Key, Guid.NewGuid());
                 }
 
 
@@ -92,11 +92,11 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
                     }
                 }
                 var applicationId = Guid.NewGuid();
-                await _ipcManager.PenumbraRemoveTemporaryCollectionAsync(_logger, applicationId, charaTarget.Name.TextValue).ConfigureAwait(false);
-                var coll = await _ipcManager.PenumbraCreateTemporaryCollectionAsync(_logger, charaTarget.Name.TextValue).ConfigureAwait(false);
-                await _ipcManager.PenumbraAssignTemporaryCollectionAsync(_logger, coll, charaTarget.ObjectTableIndex()!.Value).ConfigureAwait(false);
-                await _ipcManager.PenumbraSetTemporaryModsAsync(_logger, applicationId, coll, extractedFiles.Union(fileSwaps).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal)).ConfigureAwait(false);
-                await _ipcManager.PenumbraSetManipulationDataAsync(_logger, applicationId, coll, LoadedCharaFile.CharaFileData.ManipulationData).ConfigureAwait(false);
+                await _ipcManager.Penumbra.RemoveTemporaryCollectionAsync(_logger, applicationId, charaTarget.Name.TextValue).ConfigureAwait(false);
+                var coll = await _ipcManager.Penumbra.CreateTemporaryCollectionAsync(_logger, charaTarget.Name.TextValue).ConfigureAwait(false);
+                await _ipcManager.Penumbra.AssignTemporaryCollectionAsync(_logger, coll, charaTarget.ObjectTableIndex()!.Value).ConfigureAwait(false);
+                await _ipcManager.Penumbra.SetTemporaryModsAsync(_logger, applicationId, coll, extractedFiles.Union(fileSwaps).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal)).ConfigureAwait(false);
+                await _ipcManager.Penumbra.SetManipulationDataAsync(_logger, applicationId, coll, LoadedCharaFile.CharaFileData.ManipulationData).ConfigureAwait(false);
 
                 GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Player,
                     () => _dalamudUtil.GetGposeCharacterFromObjectTableByName(charaTarget.Name.ToString(), _isInGpose)?.Address ?? IntPtr.Zero, isWatched: false).ConfigureAwait(false);
@@ -104,17 +104,17 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
                 if (!_gposeGameObjects.ContainsKey(charaTarget.Name.ToString()))
                     _gposeGameObjects[charaTarget.Name.ToString()] = tempHandler;
 
-                await _ipcManager.GlamourerApplyAllAsync(_logger, tempHandler, LoadedCharaFile.CharaFileData.GlamourerData, applicationId, disposeCts.Token).ConfigureAwait(false);
-                await _ipcManager.PenumbraRedrawAsync(_logger, tempHandler, applicationId, disposeCts.Token).ConfigureAwait(false);
+                await _ipcManager.Glamourer.ApplyAllAsync(_logger, tempHandler, LoadedCharaFile.CharaFileData.GlamourerData, applicationId, disposeCts.Token).ConfigureAwait(false);
+                await _ipcManager.Penumbra.RedrawAsync(_logger, tempHandler, applicationId, disposeCts.Token).ConfigureAwait(false);
                 _dalamudUtil.WaitWhileGposeCharacterIsDrawing(charaTarget.Address, 30000);
-                await _ipcManager.PenumbraRemoveTemporaryCollectionAsync(_logger, applicationId, coll).ConfigureAwait(false);
+                await _ipcManager.Penumbra.RemoveTemporaryCollectionAsync(_logger, applicationId, coll).ConfigureAwait(false);
                 if (!string.IsNullOrEmpty(LoadedCharaFile.CharaFileData.CustomizePlusData))
                 {
-                    await _ipcManager.CustomizePlusSetBodyScaleAsync(tempHandler.Address, LoadedCharaFile.CharaFileData.CustomizePlusData).ConfigureAwait(false);
+                    await _ipcManager.CustomizePlus.SetBodyScaleAsync(tempHandler.Address, LoadedCharaFile.CharaFileData.CustomizePlusData).ConfigureAwait(false);
                 }
                 else
                 {
-                    await _ipcManager.CustomizePlusRevertAsync(tempHandler.Address).ConfigureAwait(false);
+                    await _ipcManager.CustomizePlus.RevertAsync(tempHandler.Address).ConfigureAwait(false);
                 }
             }
         }

@@ -9,7 +9,7 @@ using Dalamud.Plugin;
 using Dalamud.Utility;
 using ImGuiNET;
 using MareSynchronos.FileCache;
-using MareSynchronos.Interop;
+using MareSynchronos.Interop.Ipc;
 using MareSynchronos.Localization;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Models;
@@ -98,11 +98,11 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) =>
         {
-            _penumbraExists = _ipcManager.CheckPenumbraApi();
-            _glamourerExists = _ipcManager.CheckGlamourerApi();
-            _customizePlusExists = _ipcManager.CheckCustomizePlusApi();
-            _heelsExists = _ipcManager.CheckHeelsApi();
-            _honorificExists = _ipcManager.CheckHonorificApi();
+            _penumbraExists = _ipcManager.Penumbra.APIAvailable;
+            _glamourerExists = _ipcManager.Glamourer.APIAvailable;
+            _customizePlusExists = _ipcManager.CustomizePlus.APIAvailable;
+            _heelsExists = _ipcManager.Heels.APIAvailable;
+            _honorificExists = _ipcManager.Honorific.APIAvailable;
         });
     }
 
@@ -110,7 +110,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public bool EditTrackerPosition { get; set; }
 
-    public bool HasValidPenumbraModPath => !(_ipcManager.PenumbraModDirectory ?? string.Empty).IsNullOrEmpty() && Directory.Exists(_ipcManager.PenumbraModDirectory);
+    public bool HasValidPenumbraModPath => !(_ipcManager.Penumbra.PenumbraModDirectory ?? string.Empty).IsNullOrEmpty() && Directory.Exists(_ipcManager.Penumbra.PenumbraModDirectory);
 
     public bool IsInGpose => _dalamudUtil.IsInCutscene;
 
@@ -569,7 +569,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
                     if (!success) return;
 
                     _isOneDrive = path.Contains("onedrive", StringComparison.OrdinalIgnoreCase);
-                    _isPenumbraDirectory = string.Equals(path.ToLowerInvariant(), _ipcManager.PenumbraModDirectory?.ToLowerInvariant(), StringComparison.Ordinal);
+                    _isPenumbraDirectory = string.Equals(path.ToLowerInvariant(), _ipcManager.Penumbra.PenumbraModDirectory?.ToLowerInvariant(), StringComparison.Ordinal);
                     _isDirectoryWritable = IsDirectoryWritable(path);
                     _cacheDirectoryHasOtherFilesThanCache = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Any(f => Path.GetFileNameWithoutExtension(f).Length != 40)
                         || Directory.GetDirectories(path).Any();

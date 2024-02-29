@@ -5,7 +5,6 @@ using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
-using Penumbra.String;
 using System.Runtime.InteropServices;
 using static FFXIVClientStructs.FFXIV.Client.Game.Character.DrawDataContainer;
 using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;

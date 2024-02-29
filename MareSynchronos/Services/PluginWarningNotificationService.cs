@@ -1,7 +1,7 @@
 ﻿using Dalamud.Interface.Internal.Notifications;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Comparer;
-using MareSynchronos.Interop;
+using MareSynchronos.Interop.Ipc;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
 using System.Collections.Concurrent;
@@ -35,18 +35,18 @@ public class PluginWarningNotificationService
         }
 
         List<string> missingPluginsForData = [];
-        if (changes.Contains(PlayerChanges.Heels) && !warning.ShownHeelsWarning && !_ipcManager.CheckHeelsApi())
+        if (changes.Contains(PlayerChanges.Heels) && !warning.ShownHeelsWarning && !_ipcManager.Heels.APIAvailable)
         {
             missingPluginsForData.Add("SimpleHeels");
             warning.ShownHeelsWarning = true;
         }
-        if (changes.Contains(PlayerChanges.Customize) && !warning.ShownCustomizePlusWarning && !_ipcManager.CheckCustomizePlusApi())
+        if (changes.Contains(PlayerChanges.Customize) && !warning.ShownCustomizePlusWarning && !_ipcManager.CustomizePlus.APIAvailable)
         {
             missingPluginsForData.Add("Customize+");
             warning.ShownCustomizePlusWarning = true;
         }
 
-        if (changes.Contains(PlayerChanges.Honorific) && !warning.ShownHonorificWarning && !_ipcManager.CheckHonorificApi())
+        if (changes.Contains(PlayerChanges.Honorific) && !warning.ShownHonorificWarning && !_ipcManager.Honorific.APIAvailable)
         {
             missingPluginsForData.Add("Honorific");
             warning.ShownHonorificWarning = true;

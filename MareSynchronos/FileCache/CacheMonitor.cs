@@ -1,4 +1,4 @@
-﻿using MareSynchronos.Interop;
+﻿using MareSynchronos.Interop.Ipc;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
@@ -33,7 +33,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
         _fileCompactor = fileCompactor;
         Mediator.Subscribe<PenumbraInitializedMessage>(this, (_) =>
         {
-            StartPenumbraWatcher(_ipcManager.PenumbraModDirectory);
+            StartPenumbraWatcher(_ipcManager.Penumbra.PenumbraModDirectory);
             StartMareWatcher(configService.Current.CacheFolder);
             InvokeScan();
         });
@@ -42,7 +42,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
         Mediator.Subscribe<DalamudLoginMessage>(this, (_) =>
         {
             StartMareWatcher(configService.Current.CacheFolder);
-            StartPenumbraWatcher(_ipcManager.PenumbraModDirectory);
+            StartPenumbraWatcher(_ipcManager.Penumbra.PenumbraModDirectory);
             InvokeScan();
         });
         Mediator.Subscribe<PenumbraDirectoryChangedMessage>(this, (msg) =>
@@ -50,9 +50,9 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
             StartPenumbraWatcher(msg.ModDirectory);
             InvokeScan();
         });
-        if (_ipcManager.CheckPenumbraApi() && !string.IsNullOrEmpty(_ipcManager.PenumbraModDirectory))
+        if (_ipcManager.Penumbra.APIAvailable && !string.IsNullOrEmpty(_ipcManager.Penumbra.PenumbraModDirectory))
         {
-            StartPenumbraWatcher(_ipcManager.PenumbraModDirectory);
+            StartPenumbraWatcher(_ipcManager.Penumbra.PenumbraModDirectory);
         }
         if (configService.Current.HasValidSetup())
         {
@@ -466,7 +466,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
     private void FullFileScan(CancellationToken ct)
     {
         TotalFiles = 1;
-        var penumbraDir = _ipcManager.PenumbraModDirectory;
+        var penumbraDir = _ipcManager.Penumbra.PenumbraModDirectory;
         bool penDirExists = true;
         bool cacheDirExists = true;
         if (string.IsNullOrEmpty(penumbraDir) || !Directory.Exists(penumbraDir))
@@ -558,7 +558,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
                     {
                         if (ct.IsCancellationRequested) return;
 
-                        if (!_ipcManager.CheckPenumbraApi())
+                        if (!_ipcManager.Penumbra.APIAvailable)
                         {
                             Logger.LogWarning("Penumbra not available");
                             return;
@@ -605,7 +605,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
 
         Logger.LogTrace("Threads exited");
 
-        if (!_ipcManager.CheckPenumbraApi())
+        if (!_ipcManager.Penumbra.APIAvailable)
         {
             Logger.LogWarning("Penumbra not available");
             return;
@@ -628,7 +628,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
 
         Logger.LogTrace("Scanner validated existing db files");
 
-        if (!_ipcManager.CheckPenumbraApi())
+        if (!_ipcManager.Penumbra.APIAvailable)
         {
             Logger.LogWarning("Penumbra not available");
             return;
@@ -648,7 +648,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
                 {
                     if (ct.IsCancellationRequested) return;
 
-                    if (!_ipcManager.CheckPenumbraApi())
+                    if (!_ipcManager.Penumbra.APIAvailable)
                     {
                         Logger.LogWarning("Penumbra not available");
                         return;
