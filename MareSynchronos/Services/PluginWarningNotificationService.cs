@@ -52,6 +52,12 @@ public class PluginWarningNotificationService
             warning.ShownHonorificWarning = true;
         }
 
+        if (changes.Contains(PlayerChanges.Moodles) && !warning.ShownMoodlesWarning && !_ipcManager.Moodles.APIAvailable)
+        {
+            missingPluginsForData.Add("Moodles");
+            warning.ShownMoodlesWarning = true;
+        }
+
         if (missingPluginsForData.Any())
         {
             _mediator.Publish(new NotificationMessage("Missing plugins for " + playerName,

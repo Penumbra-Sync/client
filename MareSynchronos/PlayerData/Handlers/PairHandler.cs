@@ -334,6 +334,10 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                         }
                         break;
 
+                    case PlayerChanges.Moodles:
+                        await _ipcManager.Moodles.SetStatusAsync(handler.Address, charaData.PalettePlusData).ConfigureAwait(false);
+                        break;
+
                     case PlayerChanges.ForcedRedraw:
                         await _ipcManager.Penumbra.RedrawAsync(Logger, handler, applicationId, token).ConfigureAwait(false);
                         break;
@@ -555,6 +559,8 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             tempHandler.CompareNameAndThrow(name);
             Logger.LogDebug("[{applicationId}] Restoring Honorific for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
             await _ipcManager.Honorific.ClearTitleAsync(address).ConfigureAwait(false);
+            Logger.LogDebug("[{applicationId}] Restoring Moodles for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
+            await _ipcManager.Moodles.RevertStatusAsync(address).ConfigureAwait(false);
         }
         else if (objectKind == ObjectKind.MinionOrMount)
         {

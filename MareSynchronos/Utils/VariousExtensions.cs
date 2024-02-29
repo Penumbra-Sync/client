@@ -180,6 +180,13 @@ public static class VariousExtensions
                 logger.LogDebug("[BASE-{appBase}] Updating {object}/{kind} (Diff honorific data) => {change}", applicationBase, cachedPlayer, objectKind, PlayerChanges.Honorific);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.Honorific);
             }
+
+            bool moodlesDataDifferent = !string.Equals(oldData.PalettePlusData, newData.PalettePlusData, StringComparison.Ordinal);
+            if (moodlesDataDifferent || (forceApplyCustomization && !string.IsNullOrEmpty(newData.PalettePlusData)))
+            {
+                logger.LogDebug("[BASE-{appBase}] Updating {object}/{kind} (Diff moodles data) => {change}", applicationBase, cachedPlayer, objectKind, PlayerChanges.Moodles);
+                charaDataToUpdate[objectKind].Add(PlayerChanges.Moodles);
+            }
         }
 
         foreach (KeyValuePair<ObjectKind, HashSet<PlayerChanges>> data in charaDataToUpdate.ToList())

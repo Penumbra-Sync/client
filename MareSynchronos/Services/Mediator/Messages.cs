@@ -40,6 +40,7 @@ public record HeelsOffsetMessage : MessageBase;
 public record PenumbraResourceLoadMessage(IntPtr GameObject, string GamePath, string FilePath) : SameThreadMessage;
 public record CustomizePlusMessage(string ProfileName) : MessageBase;
 public record HonorificMessage(string NewHonorificTitle) : MessageBase;
+public record MoodlesMessage(IntPtr Address) : MessageBase;
 public record HonorificReadyMessage : MessageBase;
 public record PlayerChangedMessage(CharacterData Data) : MessageBase;
 public record CharacterChangedMessage(GameObjectHandler GameObjectHandler) : MessageBase;

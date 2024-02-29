@@ -65,6 +65,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     private bool _heelsExists = false;
 
     private bool _honorificExists = false;
+    private bool _moodlesExists = false;
     private bool _isDirectoryWritable = false;
 
     private bool _isPenumbraDirectory = false;
@@ -103,6 +104,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             _customizePlusExists = _ipcManager.CustomizePlus.APIAvailable;
             _heelsExists = _ipcManager.Heels.APIAvailable;
             _honorificExists = _ipcManager.Honorific.APIAvailable;
+            _moodlesExists = _ipcManager.Moodles.APIAvailable;
         });
     }
 
@@ -712,11 +714,6 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public bool DrawOtherPluginState()
     {
-        var penumbraColor = _penumbraExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
-        var glamourerColor = _glamourerExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
-        var heelsColor = _heelsExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
-        var customizeColor = _customizePlusExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
-        var honorificColor = _honorificExists ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
         var check = FontAwesomeIcon.Check.ToIconString();
         var cross = FontAwesomeIcon.SquareXmark.ToIconString();
         ImGui.TextUnformatted("Mandatory Plugins:");
@@ -724,7 +721,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.SameLine();
         ImGui.TextUnformatted("Penumbra");
         ImGui.SameLine();
-        FontText(_penumbraExists ? check : cross, UiBuilder.IconFont, penumbraColor);
+        FontText(_penumbraExists ? check : cross, UiBuilder.IconFont, GetBoolColor(_penumbraExists));
         ImGui.SameLine();
         AttachToolTip($"Penumbra is " + (_penumbraExists ? "available and up to date." : "unavailable or not up to date."));
         ImGui.Spacing();
@@ -732,7 +729,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.SameLine();
         ImGui.TextUnformatted("Glamourer");
         ImGui.SameLine();
-        FontText(_glamourerExists ? check : cross, UiBuilder.IconFont, glamourerColor);
+        FontText(_glamourerExists ? check : cross, UiBuilder.IconFont, GetBoolColor(_glamourerExists));
         ImGui.SameLine();
         AttachToolTip($"Glamourer is " + (_glamourerExists ? "available and up to date." : "unavailable or not up to date."));
         ImGui.Spacing();
@@ -741,7 +738,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.SameLine();
         ImGui.TextUnformatted("SimpleHeels");
         ImGui.SameLine();
-        FontText(_heelsExists ? check : cross, UiBuilder.IconFont, heelsColor);
+        FontText(_heelsExists ? check : cross, UiBuilder.IconFont, GetBoolColor(_heelsExists));
         ImGui.SameLine();
         AttachToolTip($"SimpleHeels is " + (_heelsExists ? "available and up to date." : "unavailable or not up to date."));
         ImGui.Spacing();
@@ -749,7 +746,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.SameLine();
         ImGui.TextUnformatted("Customize+");
         ImGui.SameLine();
-        FontText(_customizePlusExists ? check : cross, UiBuilder.IconFont, customizeColor);
+        FontText(_customizePlusExists ? check : cross, UiBuilder.IconFont, GetBoolColor(_customizePlusExists));
         ImGui.SameLine();
         AttachToolTip($"Customize+ is " + (_customizePlusExists ? "available and up to date." : "unavailable or not up to date."));
         ImGui.Spacing();
@@ -757,9 +754,17 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.SameLine();
         ImGui.TextUnformatted("Honorific");
         ImGui.SameLine();
-        FontText(_honorificExists ? check : cross, UiBuilder.IconFont, honorificColor);
+        FontText(_honorificExists ? check : cross, UiBuilder.IconFont, GetBoolColor(_honorificExists));
         ImGui.SameLine();
         AttachToolTip($"Honorific is " + (_honorificExists ? "available and up to date." : "unavailable or not up to date."));
+        ImGui.Spacing();
+
+        ImGui.SameLine();
+        ImGui.TextUnformatted("Moodles");
+        ImGui.SameLine();
+        FontText(_moodlesExists ? check : cross, UiBuilder.IconFont, GetBoolColor(_moodlesExists));
+        ImGui.SameLine();
+        AttachToolTip($"Moodles is " + (_moodlesExists ? "available and up to date." : "unavailable or not up to date."));
         ImGui.Spacing();
 
         if (!_penumbraExists || !_glamourerExists)
