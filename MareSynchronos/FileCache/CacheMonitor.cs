@@ -33,7 +33,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
         _fileCompactor = fileCompactor;
         Mediator.Subscribe<PenumbraInitializedMessage>(this, (_) =>
         {
-            StartPenumbraWatcher(_ipcManager.Penumbra.PenumbraModDirectory);
+            StartPenumbraWatcher(_ipcManager.Penumbra.ModDirectory);
             StartMareWatcher(configService.Current.CacheFolder);
             InvokeScan();
         });
@@ -42,7 +42,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
         Mediator.Subscribe<DalamudLoginMessage>(this, (_) =>
         {
             StartMareWatcher(configService.Current.CacheFolder);
-            StartPenumbraWatcher(_ipcManager.Penumbra.PenumbraModDirectory);
+            StartPenumbraWatcher(_ipcManager.Penumbra.ModDirectory);
             InvokeScan();
         });
         Mediator.Subscribe<PenumbraDirectoryChangedMessage>(this, (msg) =>
@@ -50,9 +50,9 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
             StartPenumbraWatcher(msg.ModDirectory);
             InvokeScan();
         });
-        if (_ipcManager.Penumbra.APIAvailable && !string.IsNullOrEmpty(_ipcManager.Penumbra.PenumbraModDirectory))
+        if (_ipcManager.Penumbra.APIAvailable && !string.IsNullOrEmpty(_ipcManager.Penumbra.ModDirectory))
         {
-            StartPenumbraWatcher(_ipcManager.Penumbra.PenumbraModDirectory);
+            StartPenumbraWatcher(_ipcManager.Penumbra.ModDirectory);
         }
         if (configService.Current.HasValidSetup())
         {
@@ -466,7 +466,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
     private void FullFileScan(CancellationToken ct)
     {
         TotalFiles = 1;
-        var penumbraDir = _ipcManager.Penumbra.PenumbraModDirectory;
+        var penumbraDir = _ipcManager.Penumbra.ModDirectory;
         bool penDirExists = true;
         bool cacheDirExists = true;
         if (string.IsNullOrEmpty(penumbraDir) || !Directory.Exists(penumbraDir))

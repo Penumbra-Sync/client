@@ -110,7 +110,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public bool EditTrackerPosition { get; set; }
 
-    public bool HasValidPenumbraModPath => !(_ipcManager.Penumbra.PenumbraModDirectory ?? string.Empty).IsNullOrEmpty() && Directory.Exists(_ipcManager.Penumbra.PenumbraModDirectory);
+    public bool HasValidPenumbraModPath => !(_ipcManager.Penumbra.ModDirectory ?? string.Empty).IsNullOrEmpty() && Directory.Exists(_ipcManager.Penumbra.ModDirectory);
 
     public bool IsInGpose => _dalamudUtil.IsInCutscene;
 
@@ -569,7 +569,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
                     if (!success) return;
 
                     _isOneDrive = path.Contains("onedrive", StringComparison.OrdinalIgnoreCase);
-                    _isPenumbraDirectory = string.Equals(path.ToLowerInvariant(), _ipcManager.Penumbra.PenumbraModDirectory?.ToLowerInvariant(), StringComparison.Ordinal);
+                    _isPenumbraDirectory = string.Equals(path.ToLowerInvariant(), _ipcManager.Penumbra.ModDirectory?.ToLowerInvariant(), StringComparison.Ordinal);
                     _isDirectoryWritable = IsDirectoryWritable(path);
                     _cacheDirectoryHasOtherFilesThanCache = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Any(f => Path.GetFileNameWithoutExtension(f).Length != 40)
                         || Directory.GetDirectories(path).Any();
