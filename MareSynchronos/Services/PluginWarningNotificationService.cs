@@ -31,6 +31,7 @@ public class PluginWarningNotificationService
                 ShownCustomizePlusWarning = _mareConfigService.Current.DisableOptionalPluginWarnings,
                 ShownHeelsWarning = _mareConfigService.Current.DisableOptionalPluginWarnings,
                 ShownHonorificWarning = _mareConfigService.Current.DisableOptionalPluginWarnings,
+                ShownMoodlesWarning = _mareConfigService.Current.DisableOptionalPluginWarnings
             };
         }
 
