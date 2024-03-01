@@ -44,7 +44,7 @@ public class CharacterData
             HeelsData = HeelsData,
             CustomizePlusData = CustomizePlusScale.ToDictionary(d => d.Key, d => d.Value),
             HonorificData = HonorificData,
-            PalettePlusData = MoodlesData
+            MoodlesData = MoodlesData
         };
     }
 }

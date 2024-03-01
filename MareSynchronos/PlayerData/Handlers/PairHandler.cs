@@ -335,7 +335,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                         break;
 
                     case PlayerChanges.Moodles:
-                        await _ipcManager.Moodles.SetStatusAsync(handler.Address, charaData.PalettePlusData).ConfigureAwait(false);
+                        await _ipcManager.Moodles.SetStatusAsync(handler.Address, charaData.MoodlesData).ConfigureAwait(false);
                         break;
 
                     case PlayerChanges.ForcedRedraw:

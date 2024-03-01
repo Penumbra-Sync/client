@@ -181,8 +181,8 @@ public static class VariousExtensions
                 charaDataToUpdate[objectKind].Add(PlayerChanges.Honorific);
             }
 
-            bool moodlesDataDifferent = !string.Equals(oldData.PalettePlusData, newData.PalettePlusData, StringComparison.Ordinal);
-            if (moodlesDataDifferent || (forceApplyCustomization && !string.IsNullOrEmpty(newData.PalettePlusData)))
+            bool moodlesDataDifferent = !string.Equals(oldData.MoodlesData, newData.MoodlesData, StringComparison.Ordinal);
+            if (moodlesDataDifferent || (forceApplyCustomization && !string.IsNullOrEmpty(newData.MoodlesData)))
             {
                 logger.LogDebug("[BASE-{appBase}] Updating {object}/{kind} (Diff moodles data) => {change}", applicationBase, cachedPlayer, objectKind, PlayerChanges.Moodles);
                 charaDataToUpdate[objectKind].Add(PlayerChanges.Moodles);
