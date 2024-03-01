@@ -210,6 +210,7 @@ public class PlayerDataFactory
         if (objectKind == ObjectKind.Player)
         {
             previousData.MoodlesData = await _ipcManager.Moodles.GetStatusAsync(playerRelatedObject.Address).ConfigureAwait(false) ?? string.Empty;
+            _logger.LogDebug("Moodles is now: {moodles}", previousData.MoodlesData);
         }
 
         if (previousData.FileReplacements.TryGetValue(objectKind, out HashSet<FileReplacement>? fileReplacements))
