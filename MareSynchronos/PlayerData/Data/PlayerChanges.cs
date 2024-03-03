@@ -8,6 +8,6 @@ public enum PlayerChanges
     Customize = 4,
     Heels = 5,
     Honorific = 7,
-    Moodles = 8,
-    ForcedRedraw = 9,
+    ForcedRedraw = 8,
+    Moodles = 9,
 }
