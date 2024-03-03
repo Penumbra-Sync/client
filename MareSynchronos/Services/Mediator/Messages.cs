@@ -45,8 +45,6 @@ public record HonorificReadyMessage : MessageBase;
 public record PlayerChangedMessage(CharacterData Data) : MessageBase;
 public record CharacterChangedMessage(GameObjectHandler GameObjectHandler) : MessageBase;
 public record TransientResourceChangedMessage(IntPtr Address) : MessageBase;
-public record AddWatchedGameObjectHandler(GameObjectHandler Handler) : MessageBase;
-public record RemoveWatchedGameObjectHandler(GameObjectHandler Handler) : MessageBase;
 public record HaltScanMessage(string Source) : MessageBase;
 public record ResumeScanMessage(string Source) : MessageBase;
 public record NotificationMessage
@@ -86,5 +84,7 @@ public record CombatOrPerformanceEndMessage : MessageBase;
 public record EventMessage(Event Event) : MessageBase;
 public record PenumbraDirectoryChangedMessage(string? ModDirectory) : MessageBase;
 public record PenumbraRedrawCharacterMessage(Character Character) : SameThreadMessage;
+public record GameObjectHandlerCreatedMessage(GameObjectHandler GameObjectHandler, bool OwnedObject) : MessageBase;
+public record GameObjectHandlerDestroyedMessage(GameObjectHandler GameObjectHandler, bool OwnedObject) : MessageBase;
 #pragma warning restore S2094
 #pragma warning restore MA0048 // File name must match type name

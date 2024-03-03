@@ -35,13 +35,15 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
                 DalamudUtil_ClassJobChanged();
             }
         });
-        Mediator.Subscribe<AddWatchedGameObjectHandler>(this, (msg) =>
+        Mediator.Subscribe<GameObjectHandlerCreatedMessage>(this, (msg) =>
         {
-            _playerRelatedPointers.Add(msg.Handler);
+            if (!msg.OwnedObject) return;
+            _playerRelatedPointers.Add(msg.GameObjectHandler);
         });
-        Mediator.Subscribe<RemoveWatchedGameObjectHandler>(this, (msg) =>
+        Mediator.Subscribe<GameObjectHandlerDestroyedMessage>(this, (msg) =>
         {
-            _playerRelatedPointers.Remove(msg.Handler);
+            if (!msg.OwnedObject) return;
+            _playerRelatedPointers.Remove(msg.GameObjectHandler);
         });
     }
 

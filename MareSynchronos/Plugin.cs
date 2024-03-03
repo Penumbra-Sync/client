@@ -78,7 +78,8 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<DrawEntityFactory>();
             collection.AddSingleton((s) => new IpcProvider(s.GetRequiredService<ILogger<IpcProvider>>(),
                 pluginInterface,
-                s.GetRequiredService<MareCharaFileManager>(), s.GetRequiredService<DalamudUtilService>()));
+                s.GetRequiredService<MareCharaFileManager>(), s.GetRequiredService<DalamudUtilService>(),
+                s.GetRequiredService<MareMediator>()));
             collection.AddSingleton<SelectPairForTagUi>();
             collection.AddSingleton((s) => new EventAggregator(pluginInterface.ConfigDirectory.FullName,
                 s.GetRequiredService<ILogger<EventAggregator>>(), s.GetRequiredService<MareMediator>()));
