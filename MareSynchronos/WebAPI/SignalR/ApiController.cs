@@ -204,6 +204,14 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                         Dalamud.Interface.Internal.Notifications.NotificationType.Warning));
                 }
 
+                if (_dalamudUtil.HasModifiedGameFiles)
+                {
+                    Mediator.Publish(new NotificationMessage("Modified Game Files detected",
+                        "Mare has detected modified game files in your FFXIV installation. You will be able to connect, but the synchronization functionality might be (partially) broken. " +
+                        "Exit the game and repair it through XIVLauncher to get rid of this message.",
+                        Dalamud.Interface.Internal.Notifications.NotificationType.Error));
+                }
+
                 await LoadIninitialPairs().ConfigureAwait(false);
                 await LoadOnlinePairs().ConfigureAwait(false);
             }

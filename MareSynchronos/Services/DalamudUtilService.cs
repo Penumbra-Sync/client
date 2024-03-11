@@ -22,6 +22,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     private readonly List<uint> _classJobIdsIgnoredForPets = [30];
     private readonly IClientState _clientState;
     private readonly ICondition _condition;
+    private readonly IDataManager _gameData;
     private readonly IFramework _framework;
     private readonly IGameGui _gameGui;
     private readonly ILogger<DalamudUtilService> _logger;
@@ -46,6 +47,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         _framework = framework;
         _gameGui = gameGui;
         _condition = condition;
+        _gameData = gameData;
         Mediator = mediator;
         _performanceCollector = performanceCollector;
         WorldData = new(() =>
@@ -77,6 +79,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     public bool IsOnFrameworkThread => _framework.IsInFrameworkUpdateThread;
     public bool IsZoning => _condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51];
     public bool IsInCombatOrPerforming { get; private set; } = false;
+    public bool HasModifiedGameFiles => _gameData.HasModifiedGameDataFiles;
 
     public Lazy<Dictionary<ushort, string>> WorldData { get; private set; }
 
