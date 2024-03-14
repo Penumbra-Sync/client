@@ -185,6 +185,8 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
     public void SaveMareCharaFile(CharacterData? dto, string description, string filePath)
     {
         CurrentlyWorking = true;
+        var tempFilePath = filePath + ".tmp";
+
         try
         {
             if (dto == null) return;
@@ -192,7 +194,7 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
             var mareCharaFileData = _factory.Create(description, dto);
             MareCharaFileHeader output = new(MareCharaFileHeader.CurrentVersion, mareCharaFileData);
 
-            using var fs = new FileStream(filePath, FileMode.Create);
+            using var fs = new FileStream(tempFilePath, FileMode.Create);
             using var lz4 = new LZ4Stream(fs, LZ4StreamMode.Compress, LZ4StreamFlags.HighCompression);
             using var writer = new BinaryWriter(lz4);
             output.WriteToStream(writer);
@@ -216,11 +218,12 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
             lz4.Flush();
             fs.Flush();
             fs.Close();
+            File.Move(tempFilePath, filePath, true);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failure Saving Mare Chara File, deleting output");
-            File.Delete(filePath);
+            File.Delete(tempFilePath);
         }
         finally { CurrentlyWorking = false; }
     }
