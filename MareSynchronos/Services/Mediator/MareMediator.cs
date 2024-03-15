@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Reflection;
 using System.Text;
 
 namespace MareSynchronos.Services.Mediator;
@@ -15,7 +16,7 @@ public sealed class MareMediator : IHostedService
     private readonly PerformanceCollectorService _performanceCollector;
     private readonly Dictionary<Type, HashSet<SubscriberAction>> _subscriberDict = [];
     private bool _processQueue = false;
-
+    private readonly Dictionary<Type, MethodInfo?> _genericExecuteMethods = new();
     public MareMediator(ILogger<MareMediator> logger, PerformanceCollectorService performanceCollector)
     {
         _logger = logger;
@@ -143,10 +144,15 @@ public sealed class MareMediator : IHostedService
         }
 
 #pragma warning disable S3011 // Reflection should not be used to increase accessibility of classes, methods, or fields
-        GetType()
-           .GetMethod(nameof(ExecuteReflected), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
-           .MakeGenericMethod(message.GetType())?
-           .Invoke(this, [subscribersCopy, message]);
+        var msgType = message.GetType();
+        if (!_genericExecuteMethods.TryGetValue(msgType, out var methodInfo))
+        {
+            _genericExecuteMethods[message.GetType()] = methodInfo = GetType()
+                 .GetMethod(nameof(ExecuteReflected), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
+                 .MakeGenericMethod(msgType);
+        }
+
+        methodInfo!.Invoke(this, [subscribersCopy, message]);
 #pragma warning restore S3011 // Reflection should not be used to increase accessibility of classes, methods, or fields
     }
 

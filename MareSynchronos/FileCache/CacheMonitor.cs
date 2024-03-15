@@ -408,7 +408,9 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
             Logger.LogWarning(ex, "Could not determine drive size for Storage Folder {folder}", _configService.Current.CacheFolder);
         }
 
-        FileCacheSize = Directory.EnumerateFiles(_configService.Current.CacheFolder)
+        var files = Directory.EnumerateFiles(_configService.Current.CacheFolder).Select(f => new FileInfo(f))
+            .OrderBy(f => f.LastAccessTime).ToList();
+        FileCacheSize = files
             .Sum(f =>
             {
                 token.ThrowIfCancellationRequested();
@@ -427,15 +429,13 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
 
         if (FileCacheSize < maxCacheInBytes) return;
 
-        var allFiles = Directory.EnumerateFiles(_configService.Current.CacheFolder)
-            .Select(f => new FileInfo(f)).OrderBy(f => f.LastAccessTime).ToList();
         var maxCacheBuffer = maxCacheInBytes * 0.05d;
         while (FileCacheSize > maxCacheInBytes - (long)maxCacheBuffer)
         {
-            var oldestFile = allFiles[0];
-            FileCacheSize -= _fileCompactor.GetFileSizeOnDisk(oldestFile.FullName);
+            var oldestFile = files[0];
+            FileCacheSize -= _fileCompactor.GetFileSizeOnDisk(oldestFile);
             File.Delete(oldestFile.FullName);
-            allFiles.Remove(oldestFile);
+            files.Remove(oldestFile);
         }
     }
 

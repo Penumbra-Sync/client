@@ -65,15 +65,15 @@ public sealed class FileCompactor
         MassCompactRunning = false;
     }
 
-    public long GetFileSizeOnDisk(string filePath, bool? isNTFS = null)
+    public long GetFileSizeOnDisk(FileInfo fileInfo, bool? isNTFS = null)
     {
-        bool ntfs = isNTFS ?? string.Equals(new DriveInfo(new FileInfo(filePath).Directory!.Root.FullName).DriveFormat, "NTFS", StringComparison.OrdinalIgnoreCase);
+        bool ntfs = isNTFS ?? string.Equals(new DriveInfo(fileInfo.Directory!.Root.FullName).DriveFormat, "NTFS", StringComparison.OrdinalIgnoreCase);
 
-        if (_dalamudUtilService.IsWine || !ntfs) return new FileInfo(filePath).Length;
+        if (_dalamudUtilService.IsWine || !ntfs) return fileInfo.Length;
 
-        var clusterSize = GetClusterSize(filePath);
-        if (clusterSize == -1) return new FileInfo(filePath).Length;
-        var losize = GetCompressedFileSizeW(filePath, out uint hosize);
+        var clusterSize = GetClusterSize(fileInfo);
+        if (clusterSize == -1) return fileInfo.Length;
+        var losize = GetCompressedFileSizeW(fileInfo.FullName, out uint hosize);
         var size = (long)hosize << 32 | losize;
         return ((size + clusterSize - 1) / clusterSize) * clusterSize;
     }
@@ -118,8 +118,9 @@ public sealed class FileCompactor
             return;
         }
 
-        var oldSize = new FileInfo(filePath).Length;
-        var clusterSize = GetClusterSize(filePath);
+        var fi = new FileInfo(filePath);
+        var oldSize = fi.Length;
+        var clusterSize = GetClusterSize(fi);
 
         if (oldSize < Math.Max(clusterSize, 8 * 1024))
         {
@@ -133,7 +134,7 @@ public sealed class FileCompactor
 
             WOFCompressFile(filePath);
 
-            var newSize = GetFileSizeOnDisk(filePath);
+            var newSize = GetFileSizeOnDisk(fi);
 
             _logger.LogDebug("Compressed {file} from {orig}b to {comp}b", filePath, oldSize, newSize);
         }
@@ -162,14 +163,13 @@ public sealed class FileCompactor
         }
     }
 
-    private int GetClusterSize(string filePath)
+    private int GetClusterSize(FileInfo fi)
     {
-        FileInfo fi = new(filePath);
         if (!fi.Exists) return -1;
         var root = fi.Directory?.Root.FullName.ToLower() ?? string.Empty;
         if (string.IsNullOrEmpty(root)) return -1;
         if (_clusterSizes.TryGetValue(root, out int value)) return value;
-        _logger.LogDebug("Getting Cluster Size for {path}, root {root}", filePath, root);
+        _logger.LogDebug("Getting Cluster Size for {path}, root {root}", fi.FullName, root);
         int result = GetDiskFreeSpaceW(root, out uint sectorsPerCluster, out uint bytesPerSector, out _, out _);
         if (result == 0) return -1;
         _clusterSizes[root] = (int)(sectorsPerCluster * bytesPerSector);
