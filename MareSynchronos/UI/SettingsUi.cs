@@ -567,8 +567,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 _ = Task.Run(() =>
                 {
                     _fileCompactor.CompactStorage(compress: true);
-                    CancellationTokenSource cts = new();
-                    _cacheMonitor.RecalculateFileCacheSize(cts.Token);
+                    _cacheMonitor.RecalculateFileCacheSize(CancellationToken.None);
                 });
             }
             UiSharedService.AttachToolTip("This will run compression on all files in your current Mare Storage." + Environment.NewLine
@@ -580,7 +579,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 {
                     _fileCompactor.CompactStorage(compress: false);
                     CancellationTokenSource cts = new();
-                    _cacheMonitor.RecalculateFileCacheSize(cts.Token);
+                    _cacheMonitor.RecalculateFileCacheSize(CancellationToken.None);
                 });
             }
             UiSharedService.AttachToolTip("This will run decompression on all files in your current Mare Storage.");

@@ -69,7 +69,7 @@ public sealed class FileCompactor
     {
         bool ntfs = isNTFS ?? string.Equals(new DriveInfo(new FileInfo(filePath).Directory!.Root.FullName).DriveFormat, "NTFS", StringComparison.OrdinalIgnoreCase);
 
-        if (_dalamudUtilService.IsWine.Value || !ntfs) return new FileInfo(filePath).Length;
+        if (_dalamudUtilService.IsWine || !ntfs) return new FileInfo(filePath).Length;
 
         var clusterSize = GetClusterSize(filePath);
         if (clusterSize == -1) return new FileInfo(filePath).Length;
@@ -82,7 +82,7 @@ public sealed class FileCompactor
     {
         await File.WriteAllBytesAsync(filePath, decompressedFile, token).ConfigureAwait(false);
 
-        if (_dalamudUtilService.IsWine.Value || !_mareConfigService.Current.UseCompactor)
+        if (_dalamudUtilService.IsWine || !_mareConfigService.Current.UseCompactor)
         {
             return;
         }
