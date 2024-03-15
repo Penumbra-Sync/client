@@ -33,6 +33,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private readonly ApiController _apiController;
     private readonly IpcManager _ipcManager;
     private readonly CacheMonitor _cacheMonitor;
+    private readonly DalamudUtilService _dalamudUtilService;
     private readonly MareConfigService _configService;
     private readonly ConcurrentDictionary<GameObjectHandler, Dictionary<string, FileDownloadStatus>> _currentDownloads = new();
     private readonly FileCompactor _fileCompactor;
@@ -68,7 +69,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
         FileTransferOrchestrator fileTransferOrchestrator,
         FileCacheManager fileCacheManager,
         FileCompactor fileCompactor, ApiController apiController,
-        IpcManager ipcManager, CacheMonitor cacheMonitor) : base(logger, mediator, "Mare Synchronos Settings", performanceCollector)
+        IpcManager ipcManager, CacheMonitor cacheMonitor,
+        DalamudUtilService dalamudUtilService) : base(logger, mediator, "Mare Synchronos Settings", performanceCollector)
     {
         _configService = configService;
         _mareCharaFileManager = mareCharaFileManager;
@@ -81,6 +83,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _apiController = apiController;
         _ipcManager = ipcManager;
         _cacheMonitor = cacheMonitor;
+        _dalamudUtilService = dalamudUtilService;
         _fileCompactor = fileCompactor;
         _uiShared = uiShared;
         AllowClickthrough = false;
@@ -543,7 +546,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             ImGui.TextUnformatted($"Currently utilized local storage: Calculating...");
         ImGui.TextUnformatted($"Remaining space free on drive: {UiSharedService.ByteToString(_cacheMonitor.FileCacheDriveFree)}");
         bool useFileCompactor = _configService.Current.UseCompactor;
-        bool isLinux = Util.IsWine();
+        bool isLinux = _dalamudUtilService.IsWine;
         if (!useFileCompactor && !isLinux)
         {
             UiSharedService.ColorTextWrapped("Hint: To free up space when using Mare consider enabling the File Compactor", ImGuiColors.DalamudYellow);

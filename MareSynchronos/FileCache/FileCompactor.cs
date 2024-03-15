@@ -1,4 +1,5 @@
 ﻿using MareSynchronos.MareConfiguration;
+using MareSynchronos.Services;
 using Microsoft.Extensions.Logging;
 using System.Runtime.InteropServices;
 
@@ -15,12 +16,14 @@ public sealed class FileCompactor
     private readonly ILogger<FileCompactor> _logger;
 
     private readonly MareConfigService _mareConfigService;
+    private readonly DalamudUtilService _dalamudUtilService;
 
-    public FileCompactor(ILogger<FileCompactor> logger, MareConfigService mareConfigService)
+    public FileCompactor(ILogger<FileCompactor> logger, MareConfigService mareConfigService, DalamudUtilService dalamudUtilService)
     {
         _clusterSizes = new(StringComparer.Ordinal);
         _logger = logger;
         _mareConfigService = mareConfigService;
+        _dalamudUtilService = dalamudUtilService;
         _efInfo = new WOF_FILE_COMPRESSION_INFO_V1
         {
             Algorithm = CompressionAlgorithm.XPRESS8K,
@@ -66,7 +69,7 @@ public sealed class FileCompactor
     {
         bool ntfs = isNTFS ?? string.Equals(new DriveInfo(new FileInfo(filePath).Directory!.Root.FullName).DriveFormat, "NTFS", StringComparison.OrdinalIgnoreCase);
 
-        if (Dalamud.Utility.Util.IsWine() || !ntfs) return new FileInfo(filePath).Length;
+        if (_dalamudUtilService.IsWine.Value || !ntfs) return new FileInfo(filePath).Length;
 
         var clusterSize = GetClusterSize(filePath);
         if (clusterSize == -1) return new FileInfo(filePath).Length;
@@ -79,7 +82,7 @@ public sealed class FileCompactor
     {
         await File.WriteAllBytesAsync(filePath, decompressedFile, token).ConfigureAwait(false);
 
-        if (Dalamud.Utility.Util.IsWine() || !_mareConfigService.Current.UseCompactor)
+        if (_dalamudUtilService.IsWine.Value || !_mareConfigService.Current.UseCompactor)
         {
             return;
         }

@@ -3,6 +3,7 @@ using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Memory;
 using Dalamud.Plugin.Services;
+using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
@@ -68,8 +69,10 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
                 targetManager.Target = CreateGameObject(addr);
             }).ConfigureAwait(false);
         });
+        IsWine = Util.IsWine();
     }
 
+    public bool IsWine { get; init; }
     public unsafe GameObject* GposeTarget => TargetSystem.Instance()->GPoseTarget;
     public unsafe Dalamud.Game.ClientState.Objects.Types.GameObject? GposeTargetGameObject => GposeTarget == null ? null : _objectTable[GposeTarget->ObjectIndex];
     public bool IsAnythingDrawing { get; private set; } = false;
