@@ -374,7 +374,6 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     {
         var gameObj = (GameObject*)address;
         var drawObj = gameObj->DrawObject;
-        var playerName = characterName;
         bool isDrawing = false;
         bool isDrawingChanged = false;
         if ((nint)drawObj != IntPtr.Zero)
@@ -386,20 +385,20 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
                 if (!isDrawing)
                 {
                     isDrawing = ((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0;
-                    if (isDrawing && !string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal)
+                    if (isDrawing && !string.Equals(_lastGlobalBlockPlayer, characterName, StringComparison.Ordinal)
                         && !string.Equals(_lastGlobalBlockReason, "HasModelFilesInSlotLoaded", StringComparison.Ordinal))
                     {
-                        _lastGlobalBlockPlayer = playerName;
+                        _lastGlobalBlockPlayer = characterName;
                         _lastGlobalBlockReason = "HasModelFilesInSlotLoaded";
                         isDrawingChanged = true;
                     }
                 }
                 else
                 {
-                    if (!string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal)
+                    if (!string.Equals(_lastGlobalBlockPlayer, characterName, StringComparison.Ordinal)
                         && !string.Equals(_lastGlobalBlockReason, "HasModelInSlotLoaded", StringComparison.Ordinal))
                     {
-                        _lastGlobalBlockPlayer = playerName;
+                        _lastGlobalBlockPlayer = characterName;
                         _lastGlobalBlockReason = "HasModelInSlotLoaded";
                         isDrawingChanged = true;
                     }
@@ -407,10 +406,10 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
             }
             else
             {
-                if (!string.Equals(_lastGlobalBlockPlayer, playerName, StringComparison.Ordinal)
+                if (!string.Equals(_lastGlobalBlockPlayer, characterName, StringComparison.Ordinal)
                     && !string.Equals(_lastGlobalBlockReason, "RenderFlags", StringComparison.Ordinal))
                 {
-                    _lastGlobalBlockPlayer = playerName;
+                    _lastGlobalBlockPlayer = characterName;
                     _lastGlobalBlockReason = "RenderFlags";
                     isDrawingChanged = true;
                 }
@@ -419,7 +418,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
 
         if (isDrawingChanged)
         {
-            _logger.LogTrace("Global draw block: START => {name} ({reason})", playerName, _lastGlobalBlockReason);
+            _logger.LogTrace("Global draw block: START => {name} ({reason})", characterName, _lastGlobalBlockReason);
         }
 
         IsAnythingDrawing |= isDrawing;
@@ -454,9 +453,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
                             continue;
 
                         MemoryHelper.ReadStringNullTerminated((nint)((GameObject*)chara.Address)->Name, out string charaName);
-                        string homeWorldId = ((BattleChara*)chara.Address)->Character.HomeWorld.ToString();
-
-                        var hash = (charaName + homeWorldId).GetHash256();
+                        var hash = (charaName + ((BattleChara*)chara.Address)->Character.HomeWorld.ToString()).GetHash256();
                         if (!IsAnythingDrawing)
                             CheckCharacterForDrawing(chara.Address, charaName);
                         _notUpdatedCharas.Remove(hash);

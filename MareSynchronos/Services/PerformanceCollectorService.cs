@@ -13,7 +13,7 @@ public sealed class PerformanceCollectorService : IHostedService
     private const string _counterSplit = "=>";
     private readonly ILogger<PerformanceCollectorService> _logger;
     private readonly MareConfigService _mareConfigService;
-    public ConcurrentDictionary<string, RollingList<Tuple<TimeOnly, long>>> PerformanceCounters { get; } = new(StringComparer.Ordinal);
+    public ConcurrentDictionary<string, RollingList<(TimeOnly, long)>> PerformanceCounters { get; } = new(StringComparer.Ordinal);
     private readonly CancellationTokenSource _periodicLogPruneTask = new();
 
     public PerformanceCollectorService(ILogger<PerformanceCollectorService> logger, MareConfigService mareConfigService)
@@ -45,7 +45,7 @@ public sealed class PerformanceCollectorService : IHostedService
             if (TimeSpan.FromTicks(elapsed) > TimeSpan.FromMilliseconds(10))
                 _logger.LogWarning(">10ms spike on {counterName}: {time}", counterName, TimeSpan.FromTicks(elapsed));
 #endif
-            list.Add(new(TimeOnly.FromDateTime(DateTime.Now), elapsed));
+            list.Add((TimeOnly.FromDateTime(DateTime.Now), elapsed));
         }
     }
 
@@ -134,13 +134,13 @@ public sealed class PerformanceCollectorService : IHostedService
 
             if (pastEntries.Any())
             {
-                sb.Append((" " + TimeSpan.FromTicks(pastEntries.LastOrDefault()?.Item2 ?? 0).TotalMilliseconds.ToString("0.00000", CultureInfo.InvariantCulture)).PadRight(15));
+                sb.Append((" " + TimeSpan.FromTicks(pastEntries.LastOrDefault() == default ? 0 : pastEntries.Last().Item2).TotalMilliseconds.ToString("0.00000", CultureInfo.InvariantCulture)).PadRight(15));
                 sb.Append('|');
                 sb.Append((" " + TimeSpan.FromTicks(pastEntries.Max(m => m.Item2)).TotalMilliseconds.ToString("0.00000", CultureInfo.InvariantCulture)).PadRight(15));
                 sb.Append('|');
                 sb.Append((" " + TimeSpan.FromTicks((long)pastEntries.Average(m => m.Item2)).TotalMilliseconds.ToString("0.00000", CultureInfo.InvariantCulture)).PadRight(15));
                 sb.Append('|');
-                sb.Append((" " + (pastEntries.LastOrDefault()?.Item1.ToString("HH:mm:ss.ffff", CultureInfo.InvariantCulture) ?? "-")).PadRight(15, ' '));
+                sb.Append((" " + (pastEntries.LastOrDefault() == default ? "-" : pastEntries.Last().Item1.ToString("HH:mm:ss.ffff", CultureInfo.InvariantCulture))).PadRight(15, ' '));
                 sb.Append('|');
                 sb.Append((" " + pastEntries.Count).PadRight(10));
                 sb.Append('|');
