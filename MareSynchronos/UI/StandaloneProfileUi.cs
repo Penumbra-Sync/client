@@ -2,7 +2,6 @@
 using Dalamud.Interface.Internal;
 
 using Dalamud.Interface.Utility;
-using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.PlayerData.Pairs;
@@ -78,7 +77,7 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
             var rectMax = drawList.GetClipRectMax();
             var headerSize = ImGui.GetCursorPosY() - ImGui.GetStyle().WindowPadding.Y;
 
-            using (ImRaii.PushFont(_uiSharedService.UidFont, _uiSharedService.UidFontBuilt))
+            using (_uiSharedService.UidFont.Push())
                 UiSharedService.ColorText(Pair.UserData.AliasOrUID, ImGuiColors.HealerGreen);
 
             ImGuiHelpers.ScaledDummy(new Vector2(spacing.Y, spacing.Y));
@@ -108,9 +107,8 @@ public class StandaloneProfileUi : WindowMediatorSubscriberBase
             };
             if (ImGui.BeginChildFrame(1000, childFrame))
             {
-                ImGui.PushFont(_uiSharedService.GetGameFontHandle());
+                using var _ = _uiSharedService.GameFont.Push();
                 ImGui.TextWrapped(mareProfile.Description);
-                ImGui.PopFont();
             }
             ImGui.EndChildFrame();
 

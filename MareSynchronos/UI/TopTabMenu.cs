@@ -19,18 +19,19 @@ public class TopTabMenu
     private readonly MareMediator _mareMediator;
 
     private readonly PairManager _pairManager;
-
+    private readonly UiSharedService _uiSharedService;
     private string _filter = string.Empty;
     private int _globalControlCountdown = 0;
 
     private string _pairToAdd = string.Empty;
 
     private SelectedTab _selectedTab = SelectedTab.None;
-    public TopTabMenu(MareMediator mareMediator, ApiController apiController, PairManager pairManager)
+    public TopTabMenu(MareMediator mareMediator, ApiController apiController, PairManager pairManager, UiSharedService uiSharedService)
     {
         _mareMediator = mareMediator;
         _apiController = apiController;
         _pairManager = pairManager;
+        _uiSharedService = uiSharedService;
     }
 
     private enum SelectedTab
@@ -72,7 +73,7 @@ public class TopTabMenu
         var availableWidth = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
         var spacing = ImGui.GetStyle().ItemSpacing;
         var buttonX = (availableWidth - (spacing.X * 3)) / 4f;
-        var buttonY = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Pause).Y;
+        var buttonY = _uiSharedService.GetIconButtonSize(FontAwesomeIcon.Pause).Y;
         var buttonSize = new Vector2(buttonX, buttonY);
         var drawList = ImGui.GetWindowDrawList();
         var underlineColor = ImGui.GetColorU32(ImGuiCol.Separator);
@@ -178,14 +179,14 @@ public class TopTabMenu
 
     private void DrawAddPair(float availableXWidth, float spacingX)
     {
-        var buttonSize = UiSharedService.GetNormalizedIconTextButtonSize(FontAwesomeIcon.UserPlus, "Add");
-        ImGui.SetNextItemWidth(availableXWidth - buttonSize.X - spacingX);
+        var buttonSize = UiSharedService.GetIconTextButtonSize(FontAwesomeIcon.UserPlus, "Add");
+        ImGui.SetNextItemWidth(availableXWidth - buttonSize - spacingX);
         ImGui.InputTextWithHint("##otheruid", "Other players UID/Alias", ref _pairToAdd, 20);
         ImGui.SameLine();
         var alreadyExisting = _pairManager.DirectPairs.Exists(p => string.Equals(p.UserData.UID, _pairToAdd, StringComparison.Ordinal) || string.Equals(p.UserData.Alias, _pairToAdd, StringComparison.Ordinal));
         using (ImRaii.Disabled(alreadyExisting || string.IsNullOrEmpty(_pairToAdd)))
         {
-            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.UserPlus, "Add"))
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.UserPlus, "Add"))
             {
                 _ = _apiController.UserAddPair(new(new(_pairToAdd)));
                 _pairToAdd = string.Empty;
@@ -196,8 +197,8 @@ public class TopTabMenu
 
     private void DrawFilter(float availableWidth, float spacingX)
     {
-        var buttonSize = UiSharedService.GetNormalizedIconTextButtonSize(FontAwesomeIcon.Ban, "Clear");
-        ImGui.SetNextItemWidth(availableWidth - buttonSize.X - spacingX);
+        var buttonSize = UiSharedService.GetIconTextButtonSize(FontAwesomeIcon.Ban, "Clear");
+        ImGui.SetNextItemWidth(availableWidth - buttonSize - spacingX);
         string filter = Filter;
         if (ImGui.InputTextWithHint("##filter", "Filter for UID/notes", ref filter, 255))
         {
@@ -205,7 +206,7 @@ public class TopTabMenu
         }
         ImGui.SameLine();
         using var disabled = ImRaii.Disabled(string.IsNullOrEmpty(Filter));
-        if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Ban, "Clear"))
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.Ban, "Clear"))
         {
             Filter = string.Empty;
         }
@@ -214,7 +215,7 @@ public class TopTabMenu
     private void DrawGlobalIndividualButtons(float availableXWidth, float spacingX)
     {
         var buttonX = (availableXWidth - (spacingX * 3)) / 4f;
-        var buttonY = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Pause).Y;
+        var buttonY = _uiSharedService.GetIconButtonSize(FontAwesomeIcon.Pause).Y;
         var buttonSize = new Vector2(buttonX, buttonY);
 
         using (ImRaii.PushFont(UiBuilder.IconFont))
@@ -322,7 +323,7 @@ public class TopTabMenu
     private void DrawGlobalSyncshellButtons(float availableXWidth, float spacingX)
     {
         var buttonX = (availableXWidth - (spacingX * 4)) / 5f;
-        var buttonY = UiSharedService.GetIconButtonSize(FontAwesomeIcon.Pause).Y;
+        var buttonY = _uiSharedService.GetIconButtonSize(FontAwesomeIcon.Pause).Y;
         var buttonSize = new Vector2(buttonX, buttonY);
 
         using (ImRaii.PushFont(UiBuilder.IconFont))
@@ -466,7 +467,7 @@ public class TopTabMenu
         using (ImRaii.Disabled(_pairManager.GroupPairs.Select(k => k.Key).Distinct()
             .Count(g => string.Equals(g.OwnerUID, _apiController.UID, StringComparison.Ordinal)) >= _apiController.ServerInfo.MaxGroupsCreatedByUser))
         {
-            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Plus, "Create new Syncshell", buttonX))
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Create new Syncshell"))
             {
                 _mareMediator.Publish(new UiToggleMessage(typeof(CreateSyncshellUI)));
             }
@@ -475,7 +476,7 @@ public class TopTabMenu
 
         using (ImRaii.Disabled(_pairManager.GroupPairs.Select(k => k.Key).Distinct().Count() >= _apiController.ServerInfo.MaxGroupsJoinedByUser))
         {
-            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Users, "Join existing Syncshell", buttonX))
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.Users, "Join existing Syncshell"))
             {
                 _mareMediator.Publish(new UiToggleMessage(typeof(JoinSyncshellUI)));
             }
@@ -485,13 +486,13 @@ public class TopTabMenu
     private void DrawUserConfig(float availableWidth, float spacingX)
     {
         var buttonX = (availableWidth - spacingX) / 2f;
-        if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.UserCircle, "Edit Mare Profile", buttonX))
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.UserCircle, "Edit Mare Profile", buttonX))
         {
             _mareMediator.Publish(new UiToggleMessage(typeof(EditProfileUi)));
         }
         UiSharedService.AttachToolTip("Edit your Mare Profile");
         ImGui.SameLine();
-        if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.PersonCircleQuestion, "Chara Data Analysis", buttonX))
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.PersonCircleQuestion, "Chara Data Analysis", buttonX))
         {
             _mareMediator.Publish(new UiToggleMessage(typeof(DataAnalysisUi)));
         }
@@ -518,7 +519,7 @@ public class TopTabMenu
     {
         if (ImGui.BeginPopup(popupTitle))
         {
-            if (UiSharedService.NormalizedIconTextButton(enableIcon, enableText, 0, true))
+            if (UiSharedService.IconTextButton(enableIcon, enableText, null, true))
             {
                 _ = GlobalControlCountdown(10);
                 var bulkIndividualPairs = _pairManager.PairsWithGroups.Keys
@@ -532,7 +533,7 @@ public class TopTabMenu
                 ImGui.CloseCurrentPopup();
             }
 
-            if (UiSharedService.NormalizedIconTextButton(disableIcon, disableText, 0, true))
+            if (UiSharedService.IconTextButton(disableIcon, disableText, null, true))
             {
                 _ = GlobalControlCountdown(10);
                 var bulkIndividualPairs = _pairManager.PairsWithGroups.Keys
@@ -556,7 +557,7 @@ public class TopTabMenu
         if (ImGui.BeginPopup(popupTitle))
         {
 
-            if (UiSharedService.NormalizedIconTextButton(enableIcon, enableText, 0, true))
+            if (UiSharedService.IconTextButton(enableIcon, enableText, null, true))
             {
                 _ = GlobalControlCountdown(10);
                 var bulkSyncshells = _pairManager.GroupPairs.Keys
@@ -570,7 +571,7 @@ public class TopTabMenu
                 ImGui.CloseCurrentPopup();
             }
 
-            if (UiSharedService.NormalizedIconTextButton(disableIcon, disableText, 0, true))
+            if (UiSharedService.IconTextButton(disableIcon, disableText, null, true))
             {
                 _ = GlobalControlCountdown(10);
                 var bulkSyncshells = _pairManager.GroupPairs.Keys

@@ -13,17 +13,19 @@ public abstract class DrawFolderBase : IDrawFolder
     protected readonly string _id;
     protected readonly IImmutableList<Pair> _allPairs;
     protected readonly TagHandler _tagHandler;
+    protected readonly UiSharedService _uiSharedService;
     private float _menuWidth = -1;
     public int OnlinePairs => DrawPairs.Count(u => u.Pair.IsOnline);
     public int TotalPairs => _allPairs.Count;
 
     protected DrawFolderBase(string id, IImmutableList<DrawUserPair> drawPairs,
-        IImmutableList<Pair> allPairs, TagHandler tagHandler)
+        IImmutableList<Pair> allPairs, TagHandler tagHandler, UiSharedService uiSharedService)
     {
         _id = id;
         DrawPairs = drawPairs;
         _allPairs = allPairs;
         _tagHandler = tagHandler;
+        _uiSharedService = uiSharedService;
     }
 
     protected abstract bool RenderIfEmpty { get; }
@@ -40,7 +42,7 @@ public abstract class DrawFolderBase : IDrawFolder
 
         ImGui.AlignTextToFramePadding();
 
-        UiSharedService.NormalizedIcon(icon);
+        _uiSharedService.IconText(icon);
         if (ImGui.IsItemClicked())
         {
             _tagHandler.SetTagOpen(_id, !_tagHandler.IsTagOpen(_id));
@@ -60,7 +62,7 @@ public abstract class DrawFolderBase : IDrawFolder
         // if opened draw content
         if (_tagHandler.IsTagOpen(_id))
         {
-            using var indent = ImRaii.PushIndent(UiSharedService.GetIconData(FontAwesomeIcon.Bars).NormalizedIconScale.Y + ImGui.GetStyle().ItemSpacing.X, false);
+            using var indent = ImRaii.PushIndent(_uiSharedService.GetIconData(FontAwesomeIcon.Bars).X + ImGui.GetStyle().ItemSpacing.X, false);
             if (DrawPairs.Any())
             {
                 foreach (var item in DrawPairs)
@@ -87,7 +89,7 @@ public abstract class DrawFolderBase : IDrawFolder
 
     private float DrawRightSideInternal()
     {
-        var barButtonSize = UiSharedService.NormalizedIconButtonSize(FontAwesomeIcon.Bars);
+        var barButtonSize = _uiSharedService.IconButtonSize(FontAwesomeIcon.Bars);
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
         var windowEndX = ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth();
 
@@ -97,7 +99,7 @@ public abstract class DrawFolderBase : IDrawFolder
         if (RenderMenu)
         {
             ImGui.SameLine(windowEndX - barButtonSize.X);
-            if (UiSharedService.NormalizedIconButton(FontAwesomeIcon.Bars))
+            if (UiSharedService.IconButton(FontAwesomeIcon.Bars))
             {
                 ImGui.OpenPopup("User Flyout Menu");
             }

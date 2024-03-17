@@ -17,6 +17,7 @@ public class DrawEntityFactory
     private readonly MareMediator _mediator;
     private readonly SelectPairForTagUi _selectPairForTagUi;
     private readonly ServerConfigurationManager _serverConfigurationManager;
+    private readonly UiSharedService _uiSharedService;
     private readonly SelectTagForPairUi _selectTagForPairUi;
     private readonly TagHandler _tagHandler;
     private readonly IdDisplayHandler _uidDisplayHandler;
@@ -24,7 +25,7 @@ public class DrawEntityFactory
     public DrawEntityFactory(ILogger<DrawEntityFactory> logger, ApiController apiController, IdDisplayHandler uidDisplayHandler,
         SelectTagForPairUi selectTagForPairUi, MareMediator mediator,
         TagHandler tagHandler, SelectPairForTagUi selectPairForTagUi,
-        ServerConfigurationManager serverConfigurationManager)
+        ServerConfigurationManager serverConfigurationManager, UiSharedService uiSharedService)
     {
         _logger = logger;
         _apiController = apiController;
@@ -34,6 +35,7 @@ public class DrawEntityFactory
         _tagHandler = tagHandler;
         _selectPairForTagUi = selectPairForTagUi;
         _serverConfigurationManager = serverConfigurationManager;
+        _uiSharedService = uiSharedService;
     }
 
     public DrawFolderGroup CreateDrawGroupFolder(GroupFullInfoDto groupFullInfoDto,
@@ -42,7 +44,7 @@ public class DrawEntityFactory
     {
         return new DrawFolderGroup(groupFullInfoDto.Group.GID, groupFullInfoDto, _apiController,
             filteredPairs.Select(p => CreateDrawPair(groupFullInfoDto.Group.GID + p.Key.UserData.UID, p.Key, p.Value, groupFullInfoDto)).ToImmutableList(),
-            allPairs, _tagHandler, _uidDisplayHandler, _mediator);
+            allPairs, _tagHandler, _uidDisplayHandler, _mediator, _uiSharedService);
     }
 
     public DrawFolderTag CreateDrawTagFolder(string tag,
@@ -50,12 +52,12 @@ public class DrawEntityFactory
         IImmutableList<Pair> allPairs)
     {
         return new(tag, filteredPairs.Select(u => CreateDrawPair(tag, u.Key, u.Value, null)).ToImmutableList(),
-            allPairs, _tagHandler, _apiController, _selectPairForTagUi);
+            allPairs, _tagHandler, _apiController, _selectPairForTagUi, _uiSharedService);
     }
 
     public DrawUserPair CreateDrawPair(string id, Pair user, List<GroupFullInfoDto> groups, GroupFullInfoDto? currentGroup)
     {
         return new DrawUserPair(id + user.UserData.UID, user, groups, currentGroup, _apiController, _uidDisplayHandler,
-            _mediator, _selectTagForPairUi, _serverConfigurationManager);
+            _mediator, _selectTagForPairUi, _serverConfigurationManager, _uiSharedService);
     }
 }

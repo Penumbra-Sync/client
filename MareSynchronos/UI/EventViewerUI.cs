@@ -38,7 +38,7 @@ internal class EventViewerUI : WindowMediatorSubscriberBase
     }
 
     public EventViewerUI(ILogger<EventViewerUI> logger, MareMediator mediator,
-        EventAggregator eventAggregator, UiSharedService uiSharedService, PerformanceCollectorService performanceCollectorService) 
+        EventAggregator eventAggregator, UiSharedService uiSharedService, PerformanceCollectorService performanceCollectorService)
         : base(logger, mediator, "Event Viewer", performanceCollectorService)
     {
         _eventAggregator = eventAggregator;
@@ -100,7 +100,7 @@ internal class EventViewerUI : WindowMediatorSubscriberBase
     {
         using (ImRaii.Disabled(!_eventAggregator.NewEventsAvailable))
         {
-            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.ArrowsToCircle, "Refresh events"))
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.ArrowsToCircle, "Refresh events"))
             {
                 CurrentEvents = _eventAggregator.EventList.Value.OrderByDescending(f => f.EventTime).ToList();
             }
@@ -113,10 +113,10 @@ internal class EventViewerUI : WindowMediatorSubscriberBase
             UiSharedService.ColorTextWrapped("New events are available, press refresh to update", ImGuiColors.DalamudYellow);
         }
 
-        var buttonSize = UiSharedService.GetNormalizedIconTextButtonSize(FontAwesomeIcon.FolderOpen, "Open EventLog Folder");
-        var dist = ImGui.GetWindowContentRegionMax().X - buttonSize.X;
+        var buttonSize = UiSharedService.GetIconTextButtonSize(FontAwesomeIcon.FolderOpen, "Open EventLog Folder");
+        var dist = ImGui.GetWindowContentRegionMax().X - buttonSize;
         ImGui.SameLine(dist);
-        if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.FolderOpen, "Open EventLog folder"))
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.FolderOpen, "Open EventLog folder"))
         {
             ProcessStartInfo ps = new()
             {
@@ -127,11 +127,11 @@ internal class EventViewerUI : WindowMediatorSubscriberBase
             Process.Start(ps);
         }
 
-        UiSharedService.FontText("Last Events", _uiSharedService.UidFont);
+        _uiSharedService.BigText("Last Events");
         var foldOut = ImRaii.TreeNode("Filter");
         if (foldOut)
         {
-            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Ban, "Clear Filters"))
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.Ban, "Clear Filters"))
             {
                 ClearFilters();
             }
@@ -186,7 +186,7 @@ internal class EventViewerUI : WindowMediatorSubscriberBase
                 };
 
                 ImGui.TableNextColumn();
-                UiSharedService.NormalizedIcon(icon, iconColor == new Vector4() ? null : iconColor);
+                _uiSharedService.IconText(icon, iconColor == new Vector4() ? null : iconColor);
                 UiSharedService.AttachToolTip(ev.EventSeverity.ToString());
                 ImGui.TableNextColumn();
                 ImGui.AlignTextToFramePadding();

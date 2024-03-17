@@ -36,7 +36,7 @@ public class FileReplacementDataComparer : IEqualityComparer<FileReplacementData
         return true;
     }
 
-    private static int GetOrderIndependentHashCode<T>(IEnumerable<T> source)
+    private static int GetOrderIndependentHashCode<T>(IEnumerable<T> source) where T : notnull
     {
         int hash = 0;
         foreach (T element in source)

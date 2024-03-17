@@ -57,14 +57,14 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
                 .Where(w => w.IsPublic && !w.Name.RawData.IsEmpty)
                 .ToDictionary(w => (ushort)w.RowId, w => w.Name.ToString());
         });
-        mediator.Subscribe<TargetPairMessage>(this, async (msg) =>
+        mediator.Subscribe<TargetPairMessage>(this, (msg) =>
         {
             if (clientState.IsPvP) return;
             var name = msg.Pair.PlayerName;
             if (string.IsNullOrEmpty(name)) return;
             var addr = _playerCharas.FirstOrDefault(f => string.Equals(f.Value.Name, name, StringComparison.Ordinal)).Value.Address;
             if (addr == nint.Zero) return;
-            await RunOnFrameworkThread(() =>
+            _ = RunOnFrameworkThread(() =>
             {
                 targetManager.Target = CreateGameObject(addr);
             }).ConfigureAwait(false);

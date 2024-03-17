@@ -91,10 +91,12 @@ public class IntroUi : WindowMediatorSubscriberBase
         }
         else if (!_configService.Current.AcceptedAgreement && _readFirstPage)
         {
-            if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
-            var textSize = ImGui.CalcTextSize(Strings.ToS.LanguageLabel);
-            ImGui.TextUnformatted(Strings.ToS.AgreementLabel);
-            if (_uiShared.UidFontBuilt) ImGui.PopFont();
+            Vector2 textSize;
+            using (_uiShared.UidFont.Push())
+            {
+                textSize = ImGui.CalcTextSize(Strings.ToS.LanguageLabel);
+                ImGui.TextUnformatted(Strings.ToS.AgreementLabel);
+            }
 
             ImGui.SameLine();
             var languageSize = ImGui.CalcTextSize(Strings.ToS.LanguageLabel);
@@ -145,9 +147,9 @@ public class IntroUi : WindowMediatorSubscriberBase
                      || !_configService.Current.InitialScanComplete
                      || !Directory.Exists(_configService.Current.CacheFolder)))
         {
-            if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
-            ImGui.TextUnformatted("File Storage Setup");
-            if (_uiShared.UidFontBuilt) ImGui.PopFont();
+            using (_uiShared.UidFont.Push())
+                ImGui.TextUnformatted("File Storage Setup");
+
             ImGui.Separator();
 
             if (!_uiShared.HasValidPenumbraModPath)
@@ -191,9 +193,8 @@ public class IntroUi : WindowMediatorSubscriberBase
         }
         else if (!_uiShared.ApiController.ServerAlive)
         {
-            if (_uiShared.UidFontBuilt) ImGui.PushFont(_uiShared.UidFont);
-            ImGui.TextUnformatted("Service Registration");
-            if (_uiShared.UidFontBuilt) ImGui.PopFont();
+            using (_uiShared.UidFont.Push())
+                ImGui.TextUnformatted("Service Registration");
             ImGui.Separator();
             UiSharedService.TextWrapped("To be able to use Mare Synchronos you will have to register an account.");
             UiSharedService.TextWrapped("For the official Mare Synchronos Servers the account creation will be handled on the official Mare Synchronos Discord. Due to security risks for the server, there is no way to handle this senisibly otherwise.");

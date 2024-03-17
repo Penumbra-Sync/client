@@ -11,14 +11,17 @@ public class DrawGroupedGroupFolder : IDrawFolder
 {
     private readonly IEnumerable<IDrawFolder> _groups;
     private readonly TagHandler _tagHandler;
+    private readonly UiSharedService _uiSharedService;
+
     public IImmutableList<DrawUserPair> DrawPairs => throw new NotSupportedException();
     public int OnlinePairs => _groups.SelectMany(g => g.DrawPairs).Where(g => g.Pair.IsOnline).DistinctBy(g => g.Pair.UserData.UID).Count();
     public int TotalPairs => _groups.Sum(g => g.TotalPairs);
 
-    public DrawGroupedGroupFolder(IEnumerable<IDrawFolder> groups, TagHandler tagHandler)
+    public DrawGroupedGroupFolder(IEnumerable<IDrawFolder> groups, TagHandler tagHandler, UiSharedService uiSharedService)
     {
         _groups = groups;
         _tagHandler = tagHandler;
+        _uiSharedService = uiSharedService;
     }
 
     public void Draw()
@@ -33,14 +36,14 @@ public class DrawGroupedGroupFolder : IDrawFolder
             ImGui.SameLine();
 
         var icon = _tagHandler.IsTagOpen(_id) ? FontAwesomeIcon.CaretDown : FontAwesomeIcon.CaretRight;
-        UiSharedService.NormalizedIcon(icon);
+        _uiSharedService.IconText(icon);
         if (ImGui.IsItemClicked())
         {
             _tagHandler.SetTagOpen(_id, !_tagHandler.IsTagOpen(_id));
         }
 
         ImGui.SameLine();
-        UiSharedService.NormalizedIcon(FontAwesomeIcon.UsersRectangle);
+        _uiSharedService.IconText(FontAwesomeIcon.UsersRectangle);
         using (ImRaii.PushStyle(ImGuiStyleVar.ItemSpacing, ImGui.GetStyle().ItemSpacing with { X = ImGui.GetStyle().ItemSpacing.X / 2f }))
         {
             ImGui.SameLine();

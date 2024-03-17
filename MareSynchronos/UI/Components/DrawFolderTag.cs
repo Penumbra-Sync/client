@@ -15,8 +15,8 @@ public class DrawFolderTag : DrawFolderBase
     private readonly SelectPairForTagUi _selectPairForTagUi;
 
     public DrawFolderTag(string id, IImmutableList<DrawUserPair> drawPairs, IImmutableList<Pair> allPairs,
-        TagHandler tagHandler, ApiController apiController, SelectPairForTagUi selectPairForTagUi)
-        : base(id, drawPairs, allPairs, tagHandler)
+        TagHandler tagHandler, ApiController apiController, SelectPairForTagUi selectPairForTagUi, UiSharedService uiSharedService)
+        : base(id, drawPairs, allPairs, tagHandler, uiSharedService)
     {
         _apiController = apiController;
         _selectPairForTagUi = selectPairForTagUi;
@@ -80,7 +80,7 @@ public class DrawFolderTag : DrawFolderBase
         };
 
         ImGui.AlignTextToFramePadding();
-        UiSharedService.NormalizedIcon(icon);
+        _uiSharedService.IconText(icon);
 
         if (RenderCount)
         {
@@ -100,12 +100,12 @@ public class DrawFolderTag : DrawFolderBase
     protected override void DrawMenu(float menuWidth)
     {
         ImGui.TextUnformatted("Group Menu");
-        if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Users, "Select Pairs", menuWidth, true))
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.Users, "Select Pairs", menuWidth, true))
         {
             _selectPairForTagUi.Open(_id);
         }
         UiSharedService.AttachToolTip("Select Individual Pairs for this Pair Group");
-        if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Trash, "Delete Pair Group", menuWidth, true) && UiSharedService.CtrlPressed())
+        if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Pair Group", menuWidth, true) && UiSharedService.CtrlPressed())
         {
             _tagHandler.RemoveTag(_id);
         }
@@ -137,11 +137,11 @@ public class DrawFolderTag : DrawFolderBase
 
         var allArePaused = _allPairs.All(pair => pair.UserPair!.OwnPermissions.IsPaused());
         var pauseButton = allArePaused ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
-        var pauseButtonX = UiSharedService.NormalizedIconButtonSize(pauseButton).X;
+        var pauseButtonX = _uiSharedService.IconButtonSize(pauseButton).X;
 
         var buttonPauseOffset = currentRightSideX - pauseButtonX;
         ImGui.SameLine(buttonPauseOffset);
-        if (UiSharedService.NormalizedIconButton(pauseButton))
+        if (UiSharedService.IconButton(pauseButton))
         {
             if (allArePaused)
             {

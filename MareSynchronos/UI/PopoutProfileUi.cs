@@ -2,7 +2,6 @@
 using Dalamud.Interface.Internal;
 
 using Dalamud.Interface.Utility;
-using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.MareConfiguration;
@@ -111,7 +110,7 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
             var rectMin = drawList.GetClipRectMin();
             var rectMax = drawList.GetClipRectMax();
 
-            using (ImRaii.PushFont(_uiSharedService.UidFont, _uiSharedService.UidFontBuilt)) 
+            using (_uiSharedService.UidFont.Push())
                 UiSharedService.ColorText(_pair.UserData.AliasOrUID, ImGuiColors.HealerGreen);
 
             ImGuiHelpers.ScaledDummy(spacing.Y, spacing.Y);
@@ -158,7 +157,7 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
             }
 
             ImGui.Separator();
-            ImGui.PushFont(_uiSharedService.GetGameFontHandle());
+            var font = _uiSharedService.GameFont.Push();
             var remaining = ImGui.GetWindowContentRegionMax().Y - ImGui.GetCursorPosY();
             var descText = mareProfile.Description;
             var textSize = ImGui.CalcTextSize(descText, 256f * ImGuiHelpers.GlobalScale);
@@ -169,7 +168,7 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
                 textSize = ImGui.CalcTextSize(descText + $"...{Environment.NewLine}[Open Full Profile for complete description]", 256f * ImGuiHelpers.GlobalScale);
             }
             UiSharedService.TextWrapped(trimmed ? descText + $"...{Environment.NewLine}[Open Full Profile for complete description]" : mareProfile.Description);
-            ImGui.PopFont();
+            font.Dispose();
 
             var padding = ImGui.GetStyle().WindowPadding.X / 2;
             bool tallerThanWide = _textureWrap.Height >= _textureWrap.Width;

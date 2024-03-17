@@ -28,7 +28,7 @@ internal class ReportPopupHandler : IPopupHandler
 
     public void DrawContent()
     {
-        using (ImRaii.PushFont(_uiSharedService.UidFont))
+        using (_uiSharedService.UidFont.Push())
             UiSharedService.TextWrapped("Report " + _reportedPair!.UserData.AliasOrUID + " Mare Profile");
 
         ImGui.InputTextMultiline("##reportReason", ref _reportReason, 500, new Vector2(500 - ImGui.GetStyle().ItemSpacing.X * 2, 200));
@@ -42,7 +42,7 @@ internal class ReportPopupHandler : IPopupHandler
 
         using (ImRaii.Disabled(string.IsNullOrEmpty(_reportReason)))
         {
-            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.ExclamationTriangle, "Send Report"))
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.ExclamationTriangle, "Send Report"))
             {
                 ImGui.CloseCurrentPopup();
                 var reason = _reportReason;

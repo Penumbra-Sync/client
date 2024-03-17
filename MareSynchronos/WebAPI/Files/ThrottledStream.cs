@@ -152,10 +152,10 @@
         /// <inheritdoc />
         public override string ToString()
         {
-            return _baseStream.ToString();
+            return _baseStream?.ToString() ?? string.Empty;
         }
 
-        private class Bandwidth
+        private sealed class Bandwidth
         {
             private long _count;
             private int _lastSecondCheckpoint;
@@ -175,7 +175,7 @@
             {
                 int elapsedTime = Environment.TickCount - _lastSecondCheckpoint + 1;
                 receivedBytesCount = Interlocked.Add(ref _lastTransferredBytesCount, receivedBytesCount);
-                double momentSpeed = receivedBytesCount * 1000 / elapsedTime; // B/s
+                double momentSpeed = receivedBytesCount * 1000 / (double)elapsedTime; // B/s
 
                 if (1000 < elapsedTime)
                 {

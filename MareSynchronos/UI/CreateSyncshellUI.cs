@@ -1,6 +1,5 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Utility;
-using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
@@ -38,12 +37,12 @@ public class CreateSyncshellUI : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
-        using (ImRaii.PushFont(_uiSharedService.UidFont))
+        using (_uiSharedService.UidFont.Push())
             ImGui.TextUnformatted("Create new Syncshell");
 
         if (_lastCreatedGroup == null)
         {
-            if (UiSharedService.NormalizedIconTextButton(FontAwesomeIcon.Plus, "Create Syncshell"))
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Create Syncshell"))
             {
                 try
                 {
@@ -70,13 +69,13 @@ public class CreateSyncshellUI : WindowMediatorSubscriberBase
             ImGui.TextUnformatted("Your current Syncshell preferred permissions are:");
             ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted("- Animations");
-            UiSharedService.BooleanToColoredIcon(!_apiController.DefaultPermissions!.DisableGroupAnimations);
+            _uiSharedService.BooleanToColoredIcon(!_apiController.DefaultPermissions!.DisableGroupAnimations);
             ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted("- Sounds");
-            UiSharedService.BooleanToColoredIcon(!_apiController.DefaultPermissions!.DisableGroupSounds);
+            _uiSharedService.BooleanToColoredIcon(!_apiController.DefaultPermissions!.DisableGroupSounds);
             ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted("- VFX");
-            UiSharedService.BooleanToColoredIcon(!_apiController.DefaultPermissions!.DisableGroupVFX);
+            _uiSharedService.BooleanToColoredIcon(!_apiController.DefaultPermissions!.DisableGroupVFX);
             UiSharedService.TextWrapped("(Those preferred permissions can be changed anytime after Syncshell creation, your defaults can be changed anytime in the Mare Settings)");
         }
         else
@@ -86,7 +85,7 @@ public class CreateSyncshellUI : WindowMediatorSubscriberBase
             ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted("Syncshell Password: " + _lastCreatedGroup.Password);
             ImGui.SameLine();
-            if (UiSharedService.NormalizedIconButton(FontAwesomeIcon.Copy))
+            if (UiSharedService.IconButton(FontAwesomeIcon.Copy))
             {
                 ImGui.SetClipboardText(_lastCreatedGroup.Password);
             }
@@ -96,13 +95,13 @@ public class CreateSyncshellUI : WindowMediatorSubscriberBase
             ImGuiHelpers.ScaledDummy(2f);
             ImGui.AlignTextToFramePadding();
             UiSharedService.TextWrapped("Suggest Animation sync:");
-            UiSharedService.BooleanToColoredIcon(!_lastCreatedGroup.GroupUserPreferredPermissions.IsDisableAnimations());
+            _uiSharedService.BooleanToColoredIcon(!_lastCreatedGroup.GroupUserPreferredPermissions.IsDisableAnimations());
             ImGui.AlignTextToFramePadding();
             UiSharedService.TextWrapped("Suggest Sounds sync:");
-            UiSharedService.BooleanToColoredIcon(!_lastCreatedGroup.GroupUserPreferredPermissions.IsDisableSounds());
+            _uiSharedService.BooleanToColoredIcon(!_lastCreatedGroup.GroupUserPreferredPermissions.IsDisableSounds());
             ImGui.AlignTextToFramePadding();
             UiSharedService.TextWrapped("Suggest VFX sync:");
-            UiSharedService.BooleanToColoredIcon(!_lastCreatedGroup.GroupUserPreferredPermissions.IsDisableVFX());
+            _uiSharedService.BooleanToColoredIcon(!_lastCreatedGroup.GroupUserPreferredPermissions.IsDisableVFX());
         }
 
         if (_errorGroupCreate)

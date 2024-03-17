@@ -74,24 +74,27 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
             });
         });
 
-        Mediator.Subscribe<CustomizePlusMessage>(this, async (msg) =>
+        Mediator.Subscribe<CustomizePlusMessage>(this, (msg) =>
         {
             if (_isZoning) return;
-            foreach (var item in _playerRelatedObjects
-                .Where(item => string.IsNullOrEmpty(msg.ProfileName)
-                || string.Equals(item.Value.Name, msg.ProfileName, StringComparison.Ordinal)).Select(k => k.Key))
+            _ = Task.Run(async () =>
             {
-                Logger.LogDebug("Received CustomizePlus change, updating {obj}", item);
-                await AddPlayerCacheToCreate(item).ConfigureAwait(false);
-            }
+                foreach (var item in _playerRelatedObjects
+                    .Where(item => string.IsNullOrEmpty(msg.ProfileName)
+                    || string.Equals(item.Value.Name, msg.ProfileName, StringComparison.Ordinal)).Select(k => k.Key))
+                {
+                    Logger.LogDebug("Received CustomizePlus change, updating {obj}", item);
+                    await AddPlayerCacheToCreate(item).ConfigureAwait(false);
+                }
+            });
         });
-        Mediator.Subscribe<HeelsOffsetMessage>(this, async (_) =>
+        Mediator.Subscribe<HeelsOffsetMessage>(this, (msg) =>
         {
             if (_isZoning) return;
             Logger.LogDebug("Received Heels Offset change, updating player");
-            await AddPlayerCacheToCreate().ConfigureAwait(false);
+            _ = AddPlayerCacheToCreate();
         });
-        Mediator.Subscribe<GlamourerChangedMessage>(this, async (msg) =>
+        Mediator.Subscribe<GlamourerChangedMessage>(this, (msg) =>
         {
             if (_isZoning) return;
             var changedType = _playerRelatedObjects.FirstOrDefault(f => f.Value.Address == msg.Address);
@@ -119,10 +122,10 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
                 MoodlesChanged();
             }
         });
-        Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, async (msg) =>
+        Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, (msg) =>
         {
             Logger.LogDebug("Received Penumbra Mod settings change, updating player");
-            await AddPlayerCacheToCreate().ConfigureAwait(false);
+            _ = AddPlayerCacheToCreate();
         });
 
         Mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (msg) => ProcessCacheCreation());

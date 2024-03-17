@@ -54,7 +54,7 @@ public class PermissionWindowUI : WindowMediatorSubscriberBase
         {
             _ownPermissions.SetSticky(sticky);
         }
-        UiSharedService.DrawHelpText("Preferred Permissions, when enabled, will exclude this user from any permission changes on any syncshells you share with this user.");
+        _uiSharedService.DrawHelpText("Preferred Permissions, when enabled, will exclude this user from any permission changes on any syncshells you share with this user.");
 
         ImGuiHelpers.ScaledDummy(1f);
 
@@ -63,7 +63,7 @@ public class PermissionWindowUI : WindowMediatorSubscriberBase
         {
             _ownPermissions.SetPaused(paused);
         }
-        UiSharedService.DrawHelpText("Pausing will completely cease any sync with this user." + UiSharedService.TooltipSeparator
+        _uiSharedService.DrawHelpText("Pausing will completely cease any sync with this user." + UiSharedService.TooltipSeparator
             + "Note: this is bidirectional, either user pausing will cease sync completely.");
         var otherPerms = Pair.UserPair.OtherPermissions;
 
@@ -74,7 +74,7 @@ public class PermissionWindowUI : WindowMediatorSubscriberBase
 
         using (ImRaii.PushIndent(indentSize, false))
         {
-            UiSharedService.BooleanToColoredIcon(!otherIsPaused, false);
+            _uiSharedService.BooleanToColoredIcon(!otherIsPaused, false);
             ImGui.SameLine();
             ImGui.AlignTextToFramePadding();
             ImGui.Text(Pair.UserData.AliasOrUID + " has " + (!otherIsPaused ? "not " : string.Empty) + "paused you");
@@ -88,11 +88,11 @@ public class PermissionWindowUI : WindowMediatorSubscriberBase
         {
             _ownPermissions.SetDisableSounds(disableSounds);
         }
-        UiSharedService.DrawHelpText("Disabling sounds will remove all sounds synced with this user on both sides." + UiSharedService.TooltipSeparator
+        _uiSharedService.DrawHelpText("Disabling sounds will remove all sounds synced with this user on both sides." + UiSharedService.TooltipSeparator
             + "Note: this is bidirectional, either user disabling sound sync will stop sound sync on both sides.");
         using (ImRaii.PushIndent(indentSize, false))
         {
-            UiSharedService.BooleanToColoredIcon(!otherDisableSounds, false);
+            _uiSharedService.BooleanToColoredIcon(!otherDisableSounds, false);
             ImGui.SameLine();
             ImGui.AlignTextToFramePadding();
             ImGui.Text(Pair.UserData.AliasOrUID + " has " + (!otherDisableSounds ? "not " : string.Empty) + "disabled sound sync with you");
@@ -102,11 +102,11 @@ public class PermissionWindowUI : WindowMediatorSubscriberBase
         {
             _ownPermissions.SetDisableAnimations(disableAnimations);
         }
-        UiSharedService.DrawHelpText("Disabling sounds will remove all animations synced with this user on both sides." + UiSharedService.TooltipSeparator
+        _uiSharedService.DrawHelpText("Disabling sounds will remove all animations synced with this user on both sides." + UiSharedService.TooltipSeparator
             + "Note: this is bidirectional, either user disabling animation sync will stop animation sync on both sides.");
         using (ImRaii.PushIndent(indentSize, false))
         {
-            UiSharedService.BooleanToColoredIcon(!otherDisableAnimations, false);
+            _uiSharedService.BooleanToColoredIcon(!otherDisableAnimations, false);
             ImGui.SameLine();
             ImGui.AlignTextToFramePadding();
             ImGui.Text(Pair.UserData.AliasOrUID + " has " + (!otherDisableAnimations ? "not " : string.Empty) + "disabled animation sync with you");
@@ -116,11 +116,11 @@ public class PermissionWindowUI : WindowMediatorSubscriberBase
         {
             _ownPermissions.SetDisableVFX(disableVfx);
         }
-        UiSharedService.DrawHelpText("Disabling sounds will remove all VFX synced with this user on both sides." + UiSharedService.TooltipSeparator
+        _uiSharedService.DrawHelpText("Disabling sounds will remove all VFX synced with this user on both sides." + UiSharedService.TooltipSeparator
             + "Note: this is bidirectional, either user disabling VFX sync will stop VFX sync on both sides.");
         using (ImRaii.PushIndent(indentSize, false))
         {
-            UiSharedService.BooleanToColoredIcon(!otherDisableVFX, false);
+            _uiSharedService.BooleanToColoredIcon(!otherDisableVFX, false);
             ImGui.SameLine();
             ImGui.AlignTextToFramePadding();
             ImGui.Text(Pair.UserData.AliasOrUID + " has " + (!otherDisableVFX ? "not " : string.Empty) + "disabled VFX sync with you");
@@ -133,7 +133,7 @@ public class PermissionWindowUI : WindowMediatorSubscriberBase
         bool hasChanges = _ownPermissions != Pair.UserPair.OwnPermissions;
 
         using (ImRaii.Disabled(!hasChanges))
-            if (UiSharedService.NormalizedIconTextButton(Dalamud.Interface.FontAwesomeIcon.Save, "Save"))
+            if (UiSharedService.IconTextButton(Dalamud.Interface.FontAwesomeIcon.Save, "Save"))
             {
                 _ = _apiController.SetBulkPermissions(new(
                     new(StringComparer.Ordinal)
@@ -145,21 +145,21 @@ public class PermissionWindowUI : WindowMediatorSubscriberBase
             }
         UiSharedService.AttachToolTip("Save and apply all changes");
 
-        var rightSideButtons = UiSharedService.GetNormalizedIconTextButtonSize(Dalamud.Interface.FontAwesomeIcon.Undo, "Revert").X +
-            UiSharedService.GetNormalizedIconTextButtonSize(Dalamud.Interface.FontAwesomeIcon.ArrowsSpin, "Reset to Default").X;
+        var rightSideButtons = UiSharedService.GetIconTextButtonSize(Dalamud.Interface.FontAwesomeIcon.Undo, "Revert") +
+            UiSharedService.GetIconTextButtonSize(Dalamud.Interface.FontAwesomeIcon.ArrowsSpin, "Reset to Default");
         var availableWidth = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
 
         ImGui.SameLine(availableWidth - rightSideButtons);
 
         using (ImRaii.Disabled(!hasChanges))
-            if (UiSharedService.NormalizedIconTextButton(Dalamud.Interface.FontAwesomeIcon.Undo, "Revert"))
+            if (UiSharedService.IconTextButton(Dalamud.Interface.FontAwesomeIcon.Undo, "Revert"))
             {
                 _ownPermissions = Pair.UserPair.OwnPermissions.DeepClone();
             }
         UiSharedService.AttachToolTip("Revert all changes");
 
         ImGui.SameLine();
-        if (UiSharedService.NormalizedIconTextButton(Dalamud.Interface.FontAwesomeIcon.ArrowsSpin, "Reset to Default"))
+        if (UiSharedService.IconTextButton(Dalamud.Interface.FontAwesomeIcon.ArrowsSpin, "Reset to Default"))
         {
             var defaultPermissions = _apiController.DefaultPermissions!;
             _ownPermissions.SetSticky(Pair.IsDirectlyPaired || defaultPermissions.IndividualIsSticky);
