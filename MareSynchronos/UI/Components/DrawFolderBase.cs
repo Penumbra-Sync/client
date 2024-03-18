@@ -17,6 +17,7 @@ public abstract class DrawFolderBase : IDrawFolder
     private float _menuWidth = -1;
     public int OnlinePairs => DrawPairs.Count(u => u.Pair.IsOnline);
     public int TotalPairs => _allPairs.Count;
+    private bool _wasHovered = false;
 
     protected DrawFolderBase(string id, IImmutableList<DrawUserPair> drawPairs,
         IImmutableList<Pair> allPairs, TagHandler tagHandler, UiSharedService uiSharedService)
@@ -36,33 +37,41 @@ public abstract class DrawFolderBase : IDrawFolder
         if (!RenderIfEmpty && !DrawPairs.Any()) return;
 
         using var id = ImRaii.PushId("folder_" + _id);
-
-        // draw opener
-        var icon = _tagHandler.IsTagOpen(_id) ? FontAwesomeIcon.CaretDown : FontAwesomeIcon.CaretRight;
-
-        ImGui.AlignTextToFramePadding();
-
-        _uiSharedService.IconText(icon);
-        if (ImGui.IsItemClicked())
+        var color = ImRaii.PushColor(ImGuiCol.ChildBg, ImGui.GetColorU32(ImGuiCol.FrameBgHovered), _wasHovered);
+        using (ImRaii.Child("folder__" + _id, new System.Numerics.Vector2(UiSharedService.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImGui.GetFrameHeight())))
         {
-            _tagHandler.SetTagOpen(_id, !_tagHandler.IsTagOpen(_id));
+            // draw opener
+            var icon = _tagHandler.IsTagOpen(_id) ? FontAwesomeIcon.CaretDown : FontAwesomeIcon.CaretRight;
+
+            ImGui.AlignTextToFramePadding();
+
+            _uiSharedService.IconText(icon);
+            if (ImGui.IsItemClicked())
+            {
+                _tagHandler.SetTagOpen(_id, !_tagHandler.IsTagOpen(_id));
+            }
+
+            ImGui.SameLine();
+            var leftSideEnd = DrawIcon();
+
+            ImGui.SameLine();
+            var rightSideStart = DrawRightSideInternal();
+
+            // draw name
+            ImGui.SameLine(leftSideEnd);
+            DrawName(rightSideStart - leftSideEnd);
         }
 
-        ImGui.SameLine();
-        var leftSideEnd = DrawIcon();
+        _wasHovered = ImGui.IsItemHovered();
 
-        ImGui.SameLine();
-        var rightSideStart = DrawRightSideInternal();
+        color.Dispose();
 
-        // draw name
-        ImGui.SameLine(leftSideEnd);
-        DrawName(rightSideStart - leftSideEnd);
         ImGui.Separator();
 
         // if opened draw content
         if (_tagHandler.IsTagOpen(_id))
         {
-            using var indent = ImRaii.PushIndent(_uiSharedService.GetIconData(FontAwesomeIcon.Bars).X + ImGui.GetStyle().ItemSpacing.X, false);
+            using var indent = ImRaii.PushIndent(_uiSharedService.GetIconData(FontAwesomeIcon.EllipsisV).X + ImGui.GetStyle().ItemSpacing.X, false);
             if (DrawPairs.Any())
             {
                 foreach (var item in DrawPairs)
@@ -89,7 +98,7 @@ public abstract class DrawFolderBase : IDrawFolder
 
     private float DrawRightSideInternal()
     {
-        var barButtonSize = _uiSharedService.IconButtonSize(FontAwesomeIcon.Bars);
+        var barButtonSize = _uiSharedService.IconButtonSize(FontAwesomeIcon.EllipsisV);
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
         var windowEndX = ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth();
 
@@ -99,7 +108,7 @@ public abstract class DrawFolderBase : IDrawFolder
         if (RenderMenu)
         {
             ImGui.SameLine(windowEndX - barButtonSize.X);
-            if (UiSharedService.IconButton(FontAwesomeIcon.Bars))
+            if (UiSharedService.IconButton(FontAwesomeIcon.EllipsisV))
             {
                 ImGui.OpenPopup("User Flyout Menu");
             }

@@ -467,7 +467,7 @@ public class TopTabMenu
         using (ImRaii.Disabled(_pairManager.GroupPairs.Select(k => k.Key).Distinct()
             .Count(g => string.Equals(g.OwnerUID, _apiController.UID, StringComparison.Ordinal)) >= _apiController.ServerInfo.MaxGroupsCreatedByUser))
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Create new Syncshell"))
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Create new Syncshell", buttonX))
             {
                 _mareMediator.Publish(new UiToggleMessage(typeof(CreateSyncshellUI)));
             }
@@ -476,7 +476,7 @@ public class TopTabMenu
 
         using (ImRaii.Disabled(_pairManager.GroupPairs.Select(k => k.Key).Distinct().Count() >= _apiController.ServerInfo.MaxGroupsJoinedByUser))
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Users, "Join existing Syncshell"))
+            if (UiSharedService.IconTextButton(FontAwesomeIcon.Users, "Join existing Syncshell", buttonX))
             {
                 _mareMediator.Publish(new UiToggleMessage(typeof(JoinSyncshellUI)));
             }

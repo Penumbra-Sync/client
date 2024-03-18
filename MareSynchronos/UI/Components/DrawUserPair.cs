@@ -27,6 +27,7 @@ public class DrawUserPair
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly UiSharedService _uiSharedService;
     private float _menuWidth = -1;
+    private bool _wasHovered = false;
 
     public DrawUserPair(string id, Pair entry, List<GroupFullInfoDto> syncedGroups,
         GroupFullInfoDto? currentGroup,
@@ -53,12 +54,17 @@ public class DrawUserPair
     public void DrawPairedClient()
     {
         using var id = ImRaii.PushId(GetType() + _id);
-
-        DrawLeftSide();
-        ImGui.SameLine();
-        var posX = ImGui.GetCursorPosX();
-        var rightSide = DrawRightSide();
-        DrawName(posX, rightSide);
+        var color = ImRaii.PushColor(ImGuiCol.ChildBg, ImGui.GetColorU32(ImGuiCol.FrameBgHovered), _wasHovered);
+        using (ImRaii.Child(GetType() + _id, new System.Numerics.Vector2(UiSharedService.GetWindowContentRegionWidth() - ImGui.GetCursorPosX(), ImGui.GetFrameHeight())))
+        {
+            DrawLeftSide();
+            ImGui.SameLine();
+            var posX = ImGui.GetCursorPosX();
+            var rightSide = DrawRightSide();
+            DrawName(posX, rightSide);
+        }
+        _wasHovered = ImGui.IsItemHovered();
+        color.Dispose();
     }
 
     private void DrawCommonClientMenu()
@@ -290,14 +296,14 @@ public class DrawUserPair
     {
         var pauseIcon = _pair.UserPair!.OwnPermissions.IsPaused() ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
         var pauseIconSize = _uiSharedService.IconButtonSize(pauseIcon);
-        var barButtonSize = _uiSharedService.IconButtonSize(FontAwesomeIcon.Bars);
+        var barButtonSize = _uiSharedService.IconButtonSize(FontAwesomeIcon.EllipsisV);
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
         var windowEndX = ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth();
         float currentRightSide = windowEndX - barButtonSize.X;
 
         ImGui.SameLine(currentRightSide);
         ImGui.AlignTextToFramePadding();
-        if (UiSharedService.IconButton(FontAwesomeIcon.Bars))
+        if (UiSharedService.IconButton(FontAwesomeIcon.EllipsisV))
         {
             ImGui.OpenPopup("User Flyout Menu");
         }

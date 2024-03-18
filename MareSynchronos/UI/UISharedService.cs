@@ -337,7 +337,8 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     public static bool IconTextButton(FontAwesomeIcon icon, string text, float? width = null, bool isInPopup = false)
     {
         return IconTextButtonInternal(icon, text,
-            isInPopup ? ColorHelpers.RgbaUintToVector4(ImGui.GetColorU32(ImGuiCol.PopupBg)) : null, width);
+            isInPopup ? ColorHelpers.RgbaUintToVector4(ImGui.GetColorU32(ImGuiCol.PopupBg)) : null,
+            width <= 0 ? null : width);
     }
 
     public static bool IsDirectoryWritable(string dirPath, bool throwIfFails = false)
