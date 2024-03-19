@@ -76,7 +76,7 @@ public class PlayerDataFactory
 
         try
         {
-            await _performanceCollector.LogPerformance(this, "CreateCharacterData>" + playerRelatedObject.ObjectKind, async () =>
+            await _performanceCollector.LogPerformance(this, $"CreateCharacterData>{playerRelatedObject.ObjectKind}", async () =>
             {
                 await CreateCharacterData(previousData, playerRelatedObject, token).ConfigureAwait(false);
             }).ConfigureAwait(true);

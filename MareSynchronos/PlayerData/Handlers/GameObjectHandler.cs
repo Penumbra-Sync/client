@@ -374,8 +374,8 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
         try
         {
-            _performanceCollector.LogPerformance(this, "CheckAndUpdateObject>" + (_isOwnedObject ? "Self+" : "Other+") + ObjectKind + "/"
-                + (string.IsNullOrEmpty(Name) ? "Unk" : Name) + "+" + Address.ToString("X"), CheckAndUpdateObject);
+            _performanceCollector.LogPerformance(this, $"CheckAndUpdateObject>{(_isOwnedObject ? "Self" : "Other")}+{ObjectKind}/{(string.IsNullOrEmpty(Name) ? "Unk" : Name)}"
+                + $"+{Address.ToString("X")}", CheckAndUpdateObject);
         }
         catch (Exception ex)
         {

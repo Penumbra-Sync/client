@@ -8,6 +8,7 @@ public static class Crypto
 #pragma warning disable SYSLIB0021 // Type or member is obsolete
 
     private static readonly Dictionary<string, string> _hashListSHA1 = new(StringComparer.Ordinal);
+    private static readonly Dictionary<(string, ushort), string> _hashListPlayersSHA256 = new();
     private static readonly Dictionary<string, string> _hashListSHA256 = new(StringComparer.Ordinal);
     private static readonly SHA256CryptoServiceProvider _sha256CryptoProvider = new();
     private static readonly SHA1CryptoServiceProvider _sha1CryptoProvider = new();
@@ -23,6 +24,15 @@ public static class Crypto
         return GetOrComputeHashSHA1(stringToHash);
     }
 
+    public static string GetHash256(this (string, ushort) playerToHash)
+    {
+        if (_hashListPlayersSHA256.TryGetValue(playerToHash, out var hash))
+            return hash;
+
+        return _hashListPlayersSHA256[playerToHash] =
+            BitConverter.ToString(_sha256CryptoProvider.ComputeHash(Encoding.UTF8.GetBytes(playerToHash.Item1 + playerToHash.Item2.ToString()))).Replace("-", "", StringComparison.Ordinal);
+    }
+
     public static string GetHash256(this string stringToHash)
     {
         return GetOrComputeHashSHA256(stringToHash);
@@ -33,7 +43,7 @@ public static class Crypto
         if (_hashListSHA256.TryGetValue(stringToCompute, out var hash))
             return hash;
 
-        return _hashListSHA256[stringToCompute] = 
+        return _hashListSHA256[stringToCompute] =
             BitConverter.ToString(_sha256CryptoProvider.ComputeHash(Encoding.UTF8.GetBytes(stringToCompute))).Replace("-", "", StringComparison.Ordinal);
     }
 
@@ -42,7 +52,7 @@ public static class Crypto
         if (_hashListSHA1.TryGetValue(stringToCompute, out var hash))
             return hash;
 
-        return _hashListSHA1[stringToCompute] = 
+        return _hashListSHA1[stringToCompute] =
             BitConverter.ToString(_sha1CryptoProvider.ComputeHash(Encoding.UTF8.GetBytes(stringToCompute))).Replace("-", "", StringComparison.Ordinal);
     }
 #pragma warning restore SYSLIB0021 // Type or member is obsolete

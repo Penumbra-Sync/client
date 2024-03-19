@@ -368,7 +368,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
             {
                 try
                 {
-                    _performanceCollector.LogPerformance(this, "FullFileScan", () => FullFileScan(token));
+                    _performanceCollector.LogPerformance(this, $"FullFileScan", () => FullFileScan(token));
                 }
                 catch (Exception ex)
                 {

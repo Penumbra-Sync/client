@@ -14,7 +14,7 @@ public sealed class PerformanceCollectorService : IHostedService
     private readonly ILogger<PerformanceCollectorService> _logger;
     private readonly MareConfigService _mareConfigService;
     public ConcurrentDictionary<string, RollingList<(TimeOnly, long)>> PerformanceCounters { get; } = new(StringComparer.Ordinal);
-    private readonly CancellationTokenSource _periodicLogPruneTask = new();
+    private readonly CancellationTokenSource _periodicLogPruneTaskCts = new();
 
     public PerformanceCollectorService(ILogger<PerformanceCollectorService> logger, MareConfigService mareConfigService)
     {
@@ -22,15 +22,15 @@ public sealed class PerformanceCollectorService : IHostedService
         _mareConfigService = mareConfigService;
     }
 
-    public T LogPerformance<T>(object sender, string counterName, Func<T> func, int maxEntries = 10000)
+    public T LogPerformance<T>(object sender, MareInterpolatedStringHandler counterName, Func<T> func, int maxEntries = 10000)
     {
         if (!_mareConfigService.Current.LogPerformance) return func.Invoke();
 
-        counterName = sender.GetType().Name + _counterSplit + counterName;
+        string cn = sender.GetType().Name + _counterSplit + counterName.BuildMessage();
 
-        if (!PerformanceCounters.TryGetValue(counterName, out var list))
+        if (!PerformanceCounters.TryGetValue(cn, out var list))
         {
-            list = PerformanceCounters[counterName] = new(maxEntries);
+            list = PerformanceCounters[cn] = new(maxEntries);
         }
 
         var dt = DateTime.UtcNow.Ticks;
@@ -43,21 +43,21 @@ public sealed class PerformanceCollectorService : IHostedService
             var elapsed = DateTime.UtcNow.Ticks - dt;
 #if DEBUG
             if (TimeSpan.FromTicks(elapsed) > TimeSpan.FromMilliseconds(10))
-                _logger.LogWarning(">10ms spike on {counterName}: {time}", counterName, TimeSpan.FromTicks(elapsed));
+                _logger.LogWarning(">10ms spike on {counterName}: {time}", cn, TimeSpan.FromTicks(elapsed));
 #endif
             list.Add((TimeOnly.FromDateTime(DateTime.Now), elapsed));
         }
     }
 
-    public void LogPerformance(object sender, string counterName, Action act, int maxEntries = 10000)
+    public void LogPerformance(object sender, MareInterpolatedStringHandler counterName, Action act, int maxEntries = 10000)
     {
         if (!_mareConfigService.Current.LogPerformance) { act.Invoke(); return; }
 
-        counterName = sender.GetType().Name + _counterSplit + counterName;
+        var cn = sender.GetType().Name + _counterSplit + counterName.BuildMessage();
 
-        if (!PerformanceCounters.TryGetValue(counterName, out var list))
+        if (!PerformanceCounters.TryGetValue(cn, out var list))
         {
-            list = PerformanceCounters[counterName] = new(maxEntries);
+            list = PerformanceCounters[cn] = new(maxEntries);
         }
 
         var dt = DateTime.UtcNow.Ticks;
@@ -70,7 +70,7 @@ public sealed class PerformanceCollectorService : IHostedService
             var elapsed = DateTime.UtcNow.Ticks - dt;
 #if DEBUG
             if (TimeSpan.FromTicks(elapsed) > TimeSpan.FromMilliseconds(10))
-                _logger.LogWarning(">10ms spike on {counterName}: {time}", counterName, TimeSpan.FromTicks(elapsed));
+                _logger.LogWarning(">10ms spike on {counterName}: {time}", cn, TimeSpan.FromTicks(elapsed));
 #endif
             list.Add(new(TimeOnly.FromDateTime(DateTime.Now), elapsed));
         }
@@ -79,14 +79,15 @@ public sealed class PerformanceCollectorService : IHostedService
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting PerformanceCollectorService");
-        _ = Task.Run(PeriodicLogPrune, _periodicLogPruneTask.Token);
+        _ = Task.Run(PeriodicLogPrune, _periodicLogPruneTaskCts.Token);
         _logger.LogInformation("Started PerformanceCollectorService");
         return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        _periodicLogPruneTask.Cancel();
+        _periodicLogPruneTaskCts.Cancel();
+        _periodicLogPruneTaskCts.Dispose();
         return Task.CompletedTask;
     }
 
@@ -174,9 +175,9 @@ public sealed class PerformanceCollectorService : IHostedService
 
     private async Task PeriodicLogPrune()
     {
-        while (!_periodicLogPruneTask.Token.IsCancellationRequested)
+        while (!_periodicLogPruneTaskCts.Token.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromMinutes(10), _periodicLogPruneTask.Token).ConfigureAwait(false);
+            await Task.Delay(TimeSpan.FromMinutes(10), _periodicLogPruneTaskCts.Token).ConfigureAwait(false);
 
             foreach (var entries in PerformanceCounters.ToList())
             {
