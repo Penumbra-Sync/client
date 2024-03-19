@@ -147,7 +147,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
             var msg = !string.IsNullOrEmpty(note)
                 ? $"{note} ({pair.UserData.AliasOrUID}) is now online"
                 : $"{pair.UserData.AliasOrUID} is now online";
-            Mediator.Publish(new NotificationMessage("User online", msg, NotificationType.Info, 5000));
+            Mediator.Publish(new NotificationMessage("User online", msg, NotificationType.Info, TimeSpan.FromSeconds(5)));
         }
 
         pair.CreateCachedPlayer(dto);

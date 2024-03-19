@@ -11,13 +11,13 @@ namespace MareSynchronos.Services;
 
 public class NotificationService : DisposableMediatorSubscriberBase
 {
+    private readonly INotificationManager _notificationManager;
     private readonly IChatGui _chatGui;
     private readonly MareConfigService _configurationService;
-    private readonly UiBuilder _uiBuilder;
 
-    public NotificationService(ILogger<NotificationService> logger, MareMediator mediator, UiBuilder uiBuilder, IChatGui chatGui, MareConfigService configurationService) : base(logger, mediator)
+    public NotificationService(ILogger<NotificationService> logger, MareMediator mediator, INotificationManager notificationManager, IChatGui chatGui, MareConfigService configurationService) : base(logger, mediator)
     {
-        _uiBuilder = uiBuilder;
+        _notificationManager = notificationManager;
         _chatGui = chatGui;
         _configurationService = configurationService;
 
@@ -108,6 +108,13 @@ public class NotificationService : DisposableMediatorSubscriberBase
 
     private void ShowToast(NotificationMessage msg)
     {
-        _uiBuilder.AddNotification(msg.Message ?? string.Empty, "[Mare Synchronos] " + msg.Title, msg.Type, msg.TimeShownOnScreen);
+        _notificationManager.AddNotification(new Dalamud.Interface.ImGuiNotification.Notification()
+        {
+            Content = msg.Message ?? string.Empty,
+            Title = msg.Title,
+            Type = msg.Type,
+            Minimized = false,
+            InitialDuration = msg.TimeShownOnScreen ?? TimeSpan.FromSeconds(3)
+        });
     }
 }

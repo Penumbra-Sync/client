@@ -28,7 +28,7 @@ public class ForeverRetryPolicy : IRetryPolicy
         {
             if (!_sentDisconnected)
             {
-                _mediator.Publish(new NotificationMessage("Connection lost", "Connection lost to server", NotificationType.Warning, 5000));
+                _mediator.Publish(new NotificationMessage("Connection lost", "Connection lost to server", NotificationType.Warning, TimeSpan.FromSeconds(10)));
                 _mediator.Publish(new DisconnectedMessage());
             }
             _sentDisconnected = true;
