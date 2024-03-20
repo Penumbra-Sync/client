@@ -73,6 +73,7 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private IServiceScope? _runtimeServiceScope;
+    private Task? _launchTask = null;
 
     public MarePlugin(ILogger<MarePlugin> logger, MareConfigService mareConfigService,
         ServerConfigurationManager serverConfigurationManager,
@@ -92,7 +93,7 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
         Mediator.Publish(new EventMessage(new Services.Events.Event(nameof(MarePlugin), Services.Events.EventSeverity.Informational,
             $"Starting Mare Synchronos {version.Major}.{version.Minor}.{version.Build}")));
 
-        Mediator.Subscribe<SwitchToMainUiMessage>(this, (msg) => _ = Task.Run(WaitForPlayerAndLaunchCharacterManager));
+        Mediator.Subscribe<SwitchToMainUiMessage>(this, (msg) => { if (_launchTask == null || _launchTask.IsCompleted) _launchTask = Task.Run(WaitForPlayerAndLaunchCharacterManager); });
         Mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
         Mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
 
@@ -115,8 +116,7 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
     private void DalamudUtilOnLogIn()
     {
         Logger?.LogDebug("Client login");
-
-        _ = Task.Run(WaitForPlayerAndLaunchCharacterManager);
+        if (_launchTask == null || _launchTask.IsCompleted) _launchTask = Task.Run(WaitForPlayerAndLaunchCharacterManager);
     }
 
     private void DalamudUtilOnLogOut()

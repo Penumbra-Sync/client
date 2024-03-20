@@ -5,6 +5,7 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace MareSynchronos.FileCache;
 
@@ -25,6 +26,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
         FileCacheManager fileDbManager, MareMediator mediator, PerformanceCollectorService performanceCollector, DalamudUtilService dalamudUtil,
         FileCompactor fileCompactor) : base(logger, mediator)
     {
+        Logger.LogInformation("Creating CacheMonitor from {trace}", Environment.StackTrace);
         _ipcManager = ipcManager;
         _configService = configService;
         _fileDbManager = fileDbManager;

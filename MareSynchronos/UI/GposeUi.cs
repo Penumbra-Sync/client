@@ -12,7 +12,6 @@ namespace MareSynchronos.UI;
 public class GposeUi : WindowMediatorSubscriberBase
 {
     private readonly MareConfigService _configService;
-    private readonly UiSharedService _uiSharedService;
     private readonly DalamudUtilService _dalamudUtil;
     private readonly FileDialogManager _fileDialogManager;
     private readonly MareCharaFileManager _mareCharaFileManager;
@@ -21,15 +20,13 @@ public class GposeUi : WindowMediatorSubscriberBase
 
     public GposeUi(ILogger<GposeUi> logger, MareCharaFileManager mareCharaFileManager,
         DalamudUtilService dalamudUtil, FileDialogManager fileDialogManager, MareConfigService configService,
-        MareMediator mediator, PerformanceCollectorService performanceCollectorService,
-        UiSharedService uiSharedService)
+        MareMediator mediator, PerformanceCollectorService performanceCollectorService)
         : base(logger, mediator, "Mare Synchronos Gpose Import UI###MareSynchronosGposeUI", performanceCollectorService)
     {
         _mareCharaFileManager = mareCharaFileManager;
         _dalamudUtil = dalamudUtil;
         _fileDialogManager = fileDialogManager;
         _configService = configService;
-        _uiSharedService = uiSharedService;
         Mediator.Subscribe<GposeStartMessage>(this, (_) => StartGpose());
         Mediator.Subscribe<GposeEndMessage>(this, (_) => EndGpose());
         IsOpen = _dalamudUtil.IsInGpose;

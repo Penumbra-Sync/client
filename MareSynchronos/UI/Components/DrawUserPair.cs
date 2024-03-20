@@ -242,8 +242,14 @@ public class DrawUserPair
 
         if (_pair.LastAppliedDataSize >= 0)
         {
-            userPairText += UiSharedService.TooltipSeparator + (!_pair.IsVisible ? "(Last) " : string.Empty) +
-                "Loaded Mods Size: " + UiSharedService.ByteToString(_pair.LastAppliedDataSize, true);
+            userPairText += UiSharedService.TooltipSeparator;
+            userPairText += ((!_pair.IsPaired) ? "(Last) " : string.Empty) + "Mods Info" + Environment.NewLine;
+            userPairText += "Files Size: " + UiSharedService.ByteToString(_pair.LastAppliedDataSize, true);
+            if (_pair.LastAppliedDataTris >= 0)
+            {
+                userPairText += Environment.NewLine + "Triangle Count (excl. Vanilla): "
+                    + (_pair.LastAppliedDataTris > 1000 ? (_pair.LastAppliedDataTris / 1000d).ToString("0.0'k'") : _pair.LastAppliedDataTris);
+            }
         }
 
         if (_syncedGroups.Any())

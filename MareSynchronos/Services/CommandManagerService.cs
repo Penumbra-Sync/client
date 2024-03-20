@@ -48,7 +48,7 @@ public sealed class CommandManagerService : IDisposable
     {
         var splitArgs = args.ToLowerInvariant().Trim().Split(" ", StringSplitOptions.RemoveEmptyEntries);
 
-        if (splitArgs == null || splitArgs.Length == 0)
+        if (splitArgs.Length == 0)
         {
             // Interpret this as toggling the UI
             if (_mareConfigService.Current.HasValidSetup())

@@ -12,16 +12,22 @@ namespace MareSynchronos.Services;
 public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
 {
     private readonly FileCacheManager _fileCacheManager;
+    private readonly ModelAnalyzer _modelAnalyzer;
     private CancellationTokenSource? _analysisCts;
+    private CancellationTokenSource _baseAnalysisCts = new();
     private string _lastDataHash = string.Empty;
 
-    public CharacterAnalyzer(ILogger<CharacterAnalyzer> logger, MareMediator mediator, FileCacheManager fileCacheManager) : base(logger, mediator)
+    public CharacterAnalyzer(ILogger<CharacterAnalyzer> logger, MareMediator mediator, FileCacheManager fileCacheManager, ModelAnalyzer modelAnalyzer)
+        : base(logger, mediator)
     {
         Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) =>
         {
-            _ = Task.Run(() => BaseAnalysis(msg.CharacterData.DeepClone()));
+            _baseAnalysisCts = _baseAnalysisCts.CancelRecreate();
+            var token = _baseAnalysisCts.Token;
+            _ = BaseAnalysis(msg.CharacterData, token);
         });
         _fileCacheManager = fileCacheManager;
+        _modelAnalyzer = modelAnalyzer;
     }
 
     public int CurrentFile { get; internal set; }
@@ -87,7 +93,7 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
         _analysisCts.CancelDispose();
     }
 
-    private void BaseAnalysis(CharacterData charaData)
+    private async Task BaseAnalysis(CharacterData charaData, CancellationToken token)
     {
         if (string.Equals(charaData.DataHash.Value, _lastDataHash, StringComparison.Ordinal)) return;
 
@@ -98,6 +104,8 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
             Dictionary<string, FileDataEntry> data = new(StringComparer.OrdinalIgnoreCase);
             foreach (var fileEntry in obj.Value)
             {
+                token.ThrowIfCancellationRequested();
+
                 var fileCacheEntries = _fileCacheManager.GetAllFileCachesByHash(fileEntry.Hash, ignoreCacheEntries: true, validate: false).ToList();
                 if (fileCacheEntries.Count == 0) continue;
 
@@ -113,12 +121,16 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
                     Logger.LogWarning(ex, "Could not identify extension for {path}", filePath);
                 }
 
+                var tris = await _modelAnalyzer.GetTrianglesByHash(fileEntry.Hash).ConfigureAwait(false);
+
                 foreach (var entry in fileCacheEntries)
                 {
                     data[fileEntry.Hash] = new FileDataEntry(fileEntry.Hash, ext,
                         [.. fileEntry.GamePaths],
                         fileCacheEntries.Select(c => c.ResolvedFilepath).Distinct().ToList(),
-                        entry.Size > 0 ? entry.Size.Value : 0, entry.CompressedSize > 0 ? entry.CompressedSize.Value : 0);
+                        entry.Size > 0 ? entry.Size.Value : 0,
+                        entry.CompressedSize > 0 ? entry.CompressedSize.Value : 0,
+                        tris);
                 }
             }
 
@@ -176,7 +188,7 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
         Logger.LogInformation("IMPORTANT NOTES:\n\r- For Mare up- and downloads only the compressed size is relevant.\n\r- An unusually high total files count beyond 200 and up will also increase your download time to others significantly.");
     }
 
-    internal sealed record FileDataEntry(string Hash, string FileType, List<string> GamePaths, List<string> FilePaths, long OriginalSize, long CompressedSize)
+    internal sealed record FileDataEntry(string Hash, string FileType, List<string> GamePaths, List<string> FilePaths, long OriginalSize, long CompressedSize, long Triangles)
     {
         public bool IsComputed => OriginalSize > 0 && CompressedSize > 0;
         public async Task ComputeSizes(FileCacheManager fileCacheManager, CancellationToken token)
@@ -194,6 +206,7 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
         }
         public long OriginalSize { get; private set; } = OriginalSize;
         public long CompressedSize { get; private set; } = CompressedSize;
+        public long Triangles { get; private set; } = Triangles;
 
         public Lazy<string> Format = new(() =>
         {

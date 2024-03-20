@@ -24,6 +24,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private readonly DalamudUtilService _dalamudUtil;
     private readonly FileDownloadManager _downloadManager;
     private readonly FileCacheManager _fileDbManager;
+    private readonly ModelAnalyzer _modelAnalyzer;
     private readonly GameObjectHandlerFactory _gameObjectHandlerFactory;
     private readonly IpcManager _ipcManager;
     private readonly IHostApplicationLifetime _lifetime;
@@ -40,13 +41,15 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private bool _redrawOnNextApplication = false;
     private CombatData? _dataReceivedInDowntime;
     public long LastAppliedDataSize { get; private set; }
+    public long LastAppliedDataTris { get; private set; }
 
     public PairHandler(ILogger<PairHandler> logger, OnlineUserIdentDto onlineUser,
         GameObjectHandlerFactory gameObjectHandlerFactory,
         IpcManager ipcManager, FileDownloadManager transferManager,
         PluginWarningNotificationService pluginWarningNotificationManager,
         DalamudUtilService dalamudUtil, IHostApplicationLifetime lifetime,
-        FileCacheManager fileDbManager, MareMediator mediator) : base(logger, mediator)
+        FileCacheManager fileDbManager, MareMediator mediator,
+        ModelAnalyzer modelAnalyzer) : base(logger, mediator)
     {
         OnlineUser = onlineUser;
         _gameObjectHandlerFactory = gameObjectHandlerFactory;
@@ -56,6 +59,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         _dalamudUtil = dalamudUtil;
         _lifetime = lifetime;
         _fileDbManager = fileDbManager;
+        _modelAnalyzer = modelAnalyzer;
         _penumbraCollection = _ipcManager.Penumbra.CreateTemporaryCollectionAsync(logger, OnlineUser.User.UID).ConfigureAwait(false).GetAwaiter().GetResult();
 
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
@@ -99,6 +103,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         });
 
         LastAppliedDataSize = -1;
+        LastAppliedDataTris = -1;
     }
 
     public bool IsVisible
@@ -370,7 +375,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
         _ = Task.Run(async () =>
         {
-            Dictionary<string, string> moddedPaths = new(StringComparer.Ordinal);
+            Dictionary<(string GamePath, string? Hash), string> moddedPaths = new();
 
             if (updateModdedPaths)
             {
@@ -437,11 +442,19 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
                     if (updateModdedPaths)
                     {
-                        await _ipcManager.Penumbra.SetTemporaryModsAsync(Logger, _applicationId, _penumbraCollection, moddedPaths).ConfigureAwait(false);
+                        await _ipcManager.Penumbra.SetTemporaryModsAsync(Logger, _applicationId, _penumbraCollection,
+                            moddedPaths.ToDictionary(k => k.Key.GamePath, k => k.Value, StringComparer.Ordinal)).ConfigureAwait(false);
                         LastAppliedDataSize = -1;
+                        LastAppliedDataTris = -1;
                         foreach (var path in moddedPaths.Values.Distinct(StringComparer.OrdinalIgnoreCase).Select(v => new FileInfo(v)).Where(p => p.Exists))
                         {
+                            if (LastAppliedDataSize == -1) LastAppliedDataSize = 0;
                             LastAppliedDataSize += path.Length;
+                        }
+                        foreach (var key in moddedPaths.Keys.Where(k => !string.IsNullOrEmpty(k.Hash)))
+                        {
+                            if (LastAppliedDataTris == -1) LastAppliedDataTris = 0;
+                            LastAppliedDataTris += await _modelAnalyzer.GetTrianglesByHash(key.Hash!).ConfigureAwait(false);
                         }
                     }
 
@@ -597,12 +610,12 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         }
     }
 
-    private List<FileReplacementData> TryCalculateModdedDictionary(Guid applicationBase, CharacterData charaData, out Dictionary<string, string> moddedDictionary, CancellationToken token)
+    private List<FileReplacementData> TryCalculateModdedDictionary(Guid applicationBase, CharacterData charaData, out Dictionary<(string GamePath, string? Hash), string> moddedDictionary, CancellationToken token)
     {
         Stopwatch st = Stopwatch.StartNew();
         ConcurrentBag<FileReplacementData> missingFiles = [];
-        moddedDictionary = new Dictionary<string, string>(StringComparer.Ordinal);
-        ConcurrentDictionary<string, string> outputDict = new(StringComparer.Ordinal);
+        moddedDictionary = new Dictionary<(string GamePath, string? Hash), string>();
+        ConcurrentDictionary<(string GamePath, string? Hash), string> outputDict = new();
         bool hasMigrationChanges = false;
 
         try
@@ -627,7 +640,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
                     foreach (var gamePath in item.GamePaths)
                     {
-                        outputDict[gamePath] = fileCache.ResolvedFilepath;
+                        outputDict[(gamePath, item.Hash)] = fileCache.ResolvedFilepath;
                     }
                 }
                 else
@@ -637,14 +650,14 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                 }
             });
 
-            moddedDictionary = outputDict.ToDictionary(k => k.Key, k => k.Value, StringComparer.Ordinal);
+            moddedDictionary = outputDict.ToDictionary(k => k.Key, k => k.Value);
 
             foreach (var item in charaData.FileReplacements.SelectMany(k => k.Value.Where(v => !string.IsNullOrEmpty(v.FileSwapPath))).ToList())
             {
                 foreach (var gamePath in item.GamePaths)
                 {
                     Logger.LogTrace("[BASE-{appBase}] Adding file swap for {path}: {fileSwap}", applicationBase, gamePath, item.FileSwapPath);
-                    moddedDictionary[gamePath] = item.FileSwapPath;
+                    moddedDictionary[(gamePath, null)] = item.FileSwapPath;
                 }
             }
         }

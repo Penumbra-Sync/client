@@ -161,7 +161,7 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
         ImGui.TextUnformatted("Total size (compressed):");
         ImGui.SameLine();
         ImGui.TextUnformatted(UiSharedService.ByteToString(_cachedAnalysis!.Sum(c => c.Value.Sum(c => c.Value.CompressedSize))));
-
+        ImGui.TextUnformatted($"Total modded model triangles: {_cachedAnalysis.Sum(c => c.Value.Sum(f => f.Value.Triangles))}");
         ImGui.Separator();
 
         using var tabbar = ImRaii.TabBar("objectSelection");
@@ -198,6 +198,7 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
                 ImGui.TextUnformatted($"{kvp.Key} size (compressed):");
                 ImGui.SameLine();
                 ImGui.TextUnformatted(UiSharedService.ByteToString(kvp.Value.Sum(c => c.Value.CompressedSize)));
+                ImGui.TextUnformatted($"{kvp.Key} modded model triangles: {kvp.Value.Sum(f => f.Value.Triangles)}");
 
                 ImGui.Separator();
                 if (_selectedObjectTab != kvp.Key)
@@ -337,8 +338,10 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
 
     private void DrawTable(IGrouping<string, CharacterAnalyzer.FileDataEntry> fileGroup)
     {
-        using var table = ImRaii.Table("Analysis", string.Equals(fileGroup.Key, "tex", StringComparison.Ordinal) ?
-            (_enableBc7ConversionMode ? 7 : 6) : 5, ImGuiTableFlags.Sortable | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit,
+        var tableColumns = string.Equals(fileGroup.Key, "tex", StringComparison.Ordinal)
+            ? (_enableBc7ConversionMode ? 7 : 6)
+            : (string.Equals(fileGroup.Key, "mdl", StringComparison.Ordinal) ? 6 : 5);
+        using var table = ImRaii.Table("Analysis", tableColumns, ImGuiTableFlags.Sortable | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit,
             new Vector2(0, 300));
         if (!table.Success) return;
         ImGui.TableSetupColumn("Hash");
@@ -350,6 +353,10 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
         {
             ImGui.TableSetupColumn("Format");
             if (_enableBc7ConversionMode) ImGui.TableSetupColumn("Convert to BC7");
+        }
+        if (string.Equals(fileGroup.Key, "mdl", StringComparison.Ordinal))
+        {
+            ImGui.TableSetupColumn("Triangles");
         }
         ImGui.TableSetupScrollFreeze(0, 1);
         ImGui.TableHeadersRow();
@@ -443,6 +450,12 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
                         }
                     }
                 }
+            }
+            if (string.Equals(fileGroup.Key, "mdl", StringComparison.Ordinal))
+            {
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted(item.Triangles.ToString());
+                if (ImGui.IsItemClicked()) _selectedHash = item.Hash;
             }
         }
     }

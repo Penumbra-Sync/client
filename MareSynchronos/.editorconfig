@@ -100,3 +100,12 @@ dotnet_diagnostic.MA0075.severity = silent
 
 # S3358: Ternary operators should not be nested
 dotnet_diagnostic.S3358.severity = suggestion
+
+# S6678: Use PascalCase for named placeholders
+dotnet_diagnostic.S6678.severity = suggestion
+
+# S6605: Collection-specific "Exists" method should be used instead of the "Any" extension
+dotnet_diagnostic.S6605.severity = suggestion
+
+# S6667: Logging in a catch clause should pass the caught exception as a parameter.
+dotnet_diagnostic.S6667.severity = suggestion
