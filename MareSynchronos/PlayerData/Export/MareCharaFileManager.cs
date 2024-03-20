@@ -194,7 +194,7 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
             var mareCharaFileData = _factory.Create(description, dto);
             MareCharaFileHeader output = new(MareCharaFileHeader.CurrentVersion, mareCharaFileData);
 
-            using var fs = new FileStream(tempFilePath, FileMode.Create);
+            using var fs = new FileStream(tempFilePath, FileMode.Create, FileAccess.ReadWrite, FileShare.Delete);
             using var lz4 = new LZ4Stream(fs, LZ4StreamMode.Compress, LZ4StreamFlags.HighCompression);
             using var writer = new BinaryWriter(lz4);
             output.WriteToStream(writer);
