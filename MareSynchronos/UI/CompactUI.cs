@@ -324,6 +324,7 @@ public class CompactUi : WindowMediatorSubscriberBase
     private void DrawTransfers()
     {
         var currentUploads = _fileTransferManager.CurrentUploads.ToList();
+        ImGui.AlignTextToFramePadding();
         _uiSharedService.IconText(FontAwesomeIcon.Upload);
         ImGui.SameLine(35 * ImGuiHelpers.GlobalScale);
 
@@ -349,6 +350,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         }
 
         var currentDownloads = _currentDownloads.SelectMany(d => d.Value.Values).ToList();
+        ImGui.AlignTextToFramePadding();
         _uiSharedService.IconText(FontAwesomeIcon.Download);
         ImGui.SameLine(35 * ImGuiHelpers.GlobalScale);
 
