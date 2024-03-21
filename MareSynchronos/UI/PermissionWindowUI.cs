@@ -133,7 +133,7 @@ public class PermissionWindowUI : WindowMediatorSubscriberBase
         bool hasChanges = _ownPermissions != Pair.UserPair.OwnPermissions;
 
         using (ImRaii.Disabled(!hasChanges))
-            if (UiSharedService.IconTextButton(Dalamud.Interface.FontAwesomeIcon.Save, "Save"))
+            if (_uiSharedService.IconTextButton(Dalamud.Interface.FontAwesomeIcon.Save, "Save"))
             {
                 _ = _apiController.SetBulkPermissions(new(
                     new(StringComparer.Ordinal)
@@ -145,21 +145,21 @@ public class PermissionWindowUI : WindowMediatorSubscriberBase
             }
         UiSharedService.AttachToolTip("Save and apply all changes");
 
-        var rightSideButtons = UiSharedService.GetIconTextButtonSize(Dalamud.Interface.FontAwesomeIcon.Undo, "Revert") +
-            UiSharedService.GetIconTextButtonSize(Dalamud.Interface.FontAwesomeIcon.ArrowsSpin, "Reset to Default");
+        var rightSideButtons = _uiSharedService.GetIconTextButtonSize(Dalamud.Interface.FontAwesomeIcon.Undo, "Revert") +
+            _uiSharedService.GetIconTextButtonSize(Dalamud.Interface.FontAwesomeIcon.ArrowsSpin, "Reset to Default");
         var availableWidth = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
 
         ImGui.SameLine(availableWidth - rightSideButtons);
 
         using (ImRaii.Disabled(!hasChanges))
-            if (UiSharedService.IconTextButton(Dalamud.Interface.FontAwesomeIcon.Undo, "Revert"))
+            if (_uiSharedService.IconTextButton(Dalamud.Interface.FontAwesomeIcon.Undo, "Revert"))
             {
                 _ownPermissions = Pair.UserPair.OwnPermissions.DeepClone();
             }
         UiSharedService.AttachToolTip("Revert all changes");
 
         ImGui.SameLine();
-        if (UiSharedService.IconTextButton(Dalamud.Interface.FontAwesomeIcon.ArrowsSpin, "Reset to Default"))
+        if (_uiSharedService.IconTextButton(Dalamud.Interface.FontAwesomeIcon.ArrowsSpin, "Reset to Default"))
         {
             var defaultPermissions = _apiController.DefaultPermissions!;
             _ownPermissions.SetSticky(Pair.IsDirectlyPaired || defaultPermissions.IndividualIsSticky);

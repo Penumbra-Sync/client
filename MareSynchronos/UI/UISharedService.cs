@@ -113,8 +113,38 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             }));
         });
         GameFont = _pluginInterface.UiBuilder.FontAtlas.NewGameFontHandle(new(GameFontFamilyAndSize.Axis12));
-        IconFont = _pluginInterface.UiBuilder.IconFontHandle;
+        IconFont = _pluginInterface.UiBuilder.FontAtlas.NewDelegateFontHandle(e =>
+        {
+            e.OnPreBuild(tk => tk.AddFontAwesomeIconFont(new()
+            {
+                SizePx = _pluginInterface.UiBuilder.DefaultFontSpec.SizePx,
+                GlyphMinAdvanceX = _pluginInterface.UiBuilder.DefaultFontSpec.SizePx,
+                GlyphMaxAdvanceX = _pluginInterface.UiBuilder.DefaultFontSpec.SizePx
+            }));
+            e.OnPostBuild(tk =>
+            {
+                var font = tk.Font;
+                var nsize = font.FontSize;
+                var glyphs = font.GlyphsWrapped();
+                foreach (ref var glyph in glyphs.DataSpan)
+                {
+                    var ratio = 1f;
+                    if (glyph.X1 - glyph.X0 > nsize)
+                        ratio = Math.Max(ratio, (glyph.X1 - glyph.X0) / nsize);
+                    if (glyph.Y1 - glyph.Y0 > nsize)
+                        ratio = Math.Max(ratio, (glyph.Y1 - glyph.Y0) / nsize);
+                    var w = MathF.Round((glyph.X1 - glyph.X0) / ratio, MidpointRounding.ToZero);
+                    var h = MathF.Round((glyph.Y1 - glyph.Y0) / ratio, MidpointRounding.AwayFromZero);
+                    glyph.X0 = MathF.Round((nsize - w) / 2f, MidpointRounding.ToZero);
+                    glyph.Y0 = MathF.Round((nsize - h) / 2f, MidpointRounding.AwayFromZero);
+                    glyph.X1 = glyph.X0 + w;
+                    glyph.Y1 = glyph.Y0 + h;
+                    glyph.AdvanceX = nsize;
+                }
 
+                tk.BuildLookupTable(font);
+            });
+        });
     }
 
     public ApiController ApiController => _apiController;
@@ -264,11 +294,12 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public static Vector4 GetBoolColor(bool input) => input ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
 
-    public static float GetIconTextButtonSize(FontAwesomeIcon icon, string text)
+    public float GetIconTextButtonSize(FontAwesomeIcon icon, string text)
     {
-        ImGui.PushFont(UiBuilder.IconFont);
-        Vector2 vector = ImGui.CalcTextSize(icon.ToIconString());
-        ImGui.PopFont();
+        Vector2 vector;
+        using (IconFont.Push())
+            vector = ImGui.CalcTextSize(icon.ToIconString());
+
         Vector2 vector2 = ImGui.CalcTextSize(text);
         float num = 3f * ImGuiHelpers.GlobalScale;
         return vector.X + vector2.X + ImGui.GetStyle().FramePadding.X * 2f + num;
@@ -295,14 +326,14 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
     }
 
-    public static bool IconButton(FontAwesomeIcon icon, float? height = null)
+    public bool IconButton(FontAwesomeIcon icon, float? height = null)
     {
         string text = icon.ToIconString();
 
         ImGui.PushID(text);
-        ImGui.PushFont(UiBuilder.IconFont);
-        Vector2 vector = ImGui.CalcTextSize(text);
-        ImGui.PopFont();
+        Vector2 vector;
+        using (IconFont.Push())
+            vector = ImGui.CalcTextSize(text);
         ImDrawListPtr windowDrawList = ImGui.GetWindowDrawList();
         Vector2 cursorScreenPos = ImGui.GetCursorScreenPos();
         float x = vector.X + ImGui.GetStyle().FramePadding.X * 2f;
@@ -310,15 +341,14 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         bool result = ImGui.Button(string.Empty, new Vector2(x, frameHeight));
         Vector2 pos = new Vector2(cursorScreenPos.X + ImGui.GetStyle().FramePadding.X,
             cursorScreenPos.Y + (height ?? ImGui.GetFrameHeight()) / 2f - (vector.Y / 2f));
-        ImGui.PushFont(UiBuilder.IconFont);
-        windowDrawList.AddText(pos, ImGui.GetColorU32(ImGuiCol.Text), text);
-        ImGui.PopFont();
+        using (IconFont.Push())
+            windowDrawList.AddText(pos, ImGui.GetColorU32(ImGuiCol.Text), text);
         ImGui.PopID();
 
         return result;
     }
 
-    private static bool IconTextButtonInternal(FontAwesomeIcon icon, string text, Vector4? defaultColor = null, float? width = null)
+    private bool IconTextButtonInternal(FontAwesomeIcon icon, string text, Vector4? defaultColor = null, float? width = null)
     {
         int num = 0;
         if (defaultColor.HasValue)
@@ -328,9 +358,9 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         }
 
         ImGui.PushID(text);
-        ImGui.PushFont(UiBuilder.IconFont);
-        Vector2 vector = ImGui.CalcTextSize(icon.ToIconString());
-        ImGui.PopFont();
+        Vector2 vector;
+        using (IconFont.Push())
+            vector = ImGui.CalcTextSize(icon.ToIconString());
         Vector2 vector2 = ImGui.CalcTextSize(text);
         ImDrawListPtr windowDrawList = ImGui.GetWindowDrawList();
         Vector2 cursorScreenPos = ImGui.GetCursorScreenPos();
@@ -339,9 +369,8 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         float frameHeight = ImGui.GetFrameHeight();
         bool result = ImGui.Button(string.Empty, new Vector2(x, frameHeight));
         Vector2 pos = new Vector2(cursorScreenPos.X + ImGui.GetStyle().FramePadding.X, cursorScreenPos.Y + ImGui.GetStyle().FramePadding.Y);
-        ImGui.PushFont(UiBuilder.IconFont);
-        windowDrawList.AddText(pos, ImGui.GetColorU32(ImGuiCol.Text), icon.ToIconString());
-        ImGui.PopFont();
+        using (IconFont.Push())
+            windowDrawList.AddText(pos, ImGui.GetColorU32(ImGuiCol.Text), icon.ToIconString());
         Vector2 pos2 = new Vector2(pos.X + vector.X + num2, cursorScreenPos.Y + ImGui.GetStyle().FramePadding.Y);
         windowDrawList.AddText(pos2, ImGui.GetColorU32(ImGuiCol.Text), text);
         ImGui.PopID();
@@ -353,7 +382,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return result;
     }
 
-    public static bool IconTextButton(FontAwesomeIcon icon, string text, float? width = null, bool isInPopup = false)
+    public bool IconTextButton(FontAwesomeIcon icon, string text, float? width = null, bool isInPopup = false)
     {
         return IconTextButtonInternal(icon, text,
             isInPopup ? ColorHelpers.RgbaUintToVector4(ImGui.GetColorU32(ImGuiCol.PopupBg)) : null,
@@ -843,4 +872,15 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     }
 
     public sealed record IconScaleData(Vector2 IconSize, Vector2 NormalizedIconScale, float OffsetX, float IconScaling);
+
+    protected override void Dispose(bool disposing)
+    {
+        if (!disposing) return;
+
+        base.Dispose(disposing);
+
+        IconFont.Dispose();
+        UidFont.Dispose();
+        GameFont.Dispose();
+    }
 }

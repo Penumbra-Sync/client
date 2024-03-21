@@ -100,12 +100,12 @@ public class DrawFolderTag : DrawFolderBase
     protected override void DrawMenu(float menuWidth)
     {
         ImGui.TextUnformatted("Group Menu");
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Users, "Select Pairs", menuWidth, true))
+        if (_uiSharedService.IconTextButton(FontAwesomeIcon.Users, "Select Pairs", menuWidth, true))
         {
             _selectPairForTagUi.Open(_id);
         }
         UiSharedService.AttachToolTip("Select Individual Pairs for this Pair Group");
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Pair Group", menuWidth, true) && UiSharedService.CtrlPressed())
+        if (_uiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Pair Group", menuWidth, true) && UiSharedService.CtrlPressed())
         {
             _tagHandler.RemoveTag(_id);
         }
@@ -141,7 +141,7 @@ public class DrawFolderTag : DrawFolderBase
 
         var buttonPauseOffset = currentRightSideX - pauseButtonX;
         ImGui.SameLine(buttonPauseOffset);
-        if (UiSharedService.IconButton(pauseButton))
+        if (_uiSharedService.IconButton(pauseButton))
         {
             if (allArePaused)
             {

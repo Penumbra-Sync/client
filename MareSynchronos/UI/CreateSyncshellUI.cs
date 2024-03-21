@@ -42,7 +42,7 @@ public class CreateSyncshellUI : WindowMediatorSubscriberBase
 
         if (_lastCreatedGroup == null)
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Create Syncshell"))
+            if (_uiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Create Syncshell"))
             {
                 try
                 {
@@ -85,7 +85,7 @@ public class CreateSyncshellUI : WindowMediatorSubscriberBase
             ImGui.AlignTextToFramePadding();
             ImGui.TextUnformatted("Syncshell Password: " + _lastCreatedGroup.Password);
             ImGui.SameLine();
-            if (UiSharedService.IconButton(FontAwesomeIcon.Copy))
+            if (_uiSharedService.IconButton(FontAwesomeIcon.Copy))
             {
                 ImGui.SetClipboardText(_lastCreatedGroup.Password);
             }

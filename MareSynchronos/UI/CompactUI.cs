@@ -188,7 +188,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             {
                 UiSharedService.TextWrapped($"You have successfully added {_lastAddedUser.UserData.AliasOrUID}. Set a local note for the user in the field below:");
                 ImGui.InputTextWithHint("##noteforuser", $"Note for {_lastAddedUser.UserData.AliasOrUID}", ref _lastAddedUserComment, 100);
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.Save, "Save Note"))
+                if (_uiSharedService.IconTextButton(FontAwesomeIcon.Save, "Save Note"))
                 {
                     _serverManager.SetNoteForUid(_lastAddedUser.UserData.UID, _lastAddedUserComment);
                     _lastAddedUser = null;
@@ -217,7 +217,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         if (keys.Any())
         {
             if (_secretKeyIdx == -1) _secretKeyIdx = keys.First().Key;
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add current character with secret key"))
+            if (_uiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add current character with secret key"))
             {
                 _serverManager.CurrentServer!.Authentications.Add(new MareConfiguration.Models.Authentication()
                 {
@@ -309,7 +309,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         {
             using (ImRaii.PushColor(ImGuiCol.Text, color))
             {
-                if (UiSharedService.IconButton(connectedIcon))
+                if (_uiSharedService.IconButton(connectedIcon))
                 {
                     _serverManager.CurrentServer.FullPause = !_serverManager.CurrentServer.FullPause;
                     _serverManager.Save();

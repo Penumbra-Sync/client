@@ -179,14 +179,14 @@ public class TopTabMenu
 
     private void DrawAddPair(float availableXWidth, float spacingX)
     {
-        var buttonSize = UiSharedService.GetIconTextButtonSize(FontAwesomeIcon.UserPlus, "Add");
+        var buttonSize = _uiSharedService.GetIconTextButtonSize(FontAwesomeIcon.UserPlus, "Add");
         ImGui.SetNextItemWidth(availableXWidth - buttonSize - spacingX);
         ImGui.InputTextWithHint("##otheruid", "Other players UID/Alias", ref _pairToAdd, 20);
         ImGui.SameLine();
         var alreadyExisting = _pairManager.DirectPairs.Exists(p => string.Equals(p.UserData.UID, _pairToAdd, StringComparison.Ordinal) || string.Equals(p.UserData.Alias, _pairToAdd, StringComparison.Ordinal));
         using (ImRaii.Disabled(alreadyExisting || string.IsNullOrEmpty(_pairToAdd)))
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.UserPlus, "Add"))
+            if (_uiSharedService.IconTextButton(FontAwesomeIcon.UserPlus, "Add"))
             {
                 _ = _apiController.UserAddPair(new(new(_pairToAdd)));
                 _pairToAdd = string.Empty;
@@ -197,7 +197,7 @@ public class TopTabMenu
 
     private void DrawFilter(float availableWidth, float spacingX)
     {
-        var buttonSize = UiSharedService.GetIconTextButtonSize(FontAwesomeIcon.Ban, "Clear");
+        var buttonSize = _uiSharedService.GetIconTextButtonSize(FontAwesomeIcon.Ban, "Clear");
         ImGui.SetNextItemWidth(availableWidth - buttonSize - spacingX);
         string filter = Filter;
         if (ImGui.InputTextWithHint("##filter", "Filter for UID/notes", ref filter, 255))
@@ -206,7 +206,7 @@ public class TopTabMenu
         }
         ImGui.SameLine();
         using var disabled = ImRaii.Disabled(string.IsNullOrEmpty(Filter));
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Ban, "Clear"))
+        if (_uiSharedService.IconTextButton(FontAwesomeIcon.Ban, "Clear"))
         {
             Filter = string.Empty;
         }
@@ -467,7 +467,7 @@ public class TopTabMenu
         using (ImRaii.Disabled(_pairManager.GroupPairs.Select(k => k.Key).Distinct()
             .Count(g => string.Equals(g.OwnerUID, _apiController.UID, StringComparison.Ordinal)) >= _apiController.ServerInfo.MaxGroupsCreatedByUser))
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Create new Syncshell", buttonX))
+            if (_uiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Create new Syncshell", buttonX))
             {
                 _mareMediator.Publish(new UiToggleMessage(typeof(CreateSyncshellUI)));
             }
@@ -476,7 +476,7 @@ public class TopTabMenu
 
         using (ImRaii.Disabled(_pairManager.GroupPairs.Select(k => k.Key).Distinct().Count() >= _apiController.ServerInfo.MaxGroupsJoinedByUser))
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Users, "Join existing Syncshell", buttonX))
+            if (_uiSharedService.IconTextButton(FontAwesomeIcon.Users, "Join existing Syncshell", buttonX))
             {
                 _mareMediator.Publish(new UiToggleMessage(typeof(JoinSyncshellUI)));
             }
@@ -486,13 +486,13 @@ public class TopTabMenu
     private void DrawUserConfig(float availableWidth, float spacingX)
     {
         var buttonX = (availableWidth - spacingX) / 2f;
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.UserCircle, "Edit Mare Profile", buttonX))
+        if (_uiSharedService.IconTextButton(FontAwesomeIcon.UserCircle, "Edit Mare Profile", buttonX))
         {
             _mareMediator.Publish(new UiToggleMessage(typeof(EditProfileUi)));
         }
         UiSharedService.AttachToolTip("Edit your Mare Profile");
         ImGui.SameLine();
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.PersonCircleQuestion, "Chara Data Analysis", buttonX))
+        if (_uiSharedService.IconTextButton(FontAwesomeIcon.PersonCircleQuestion, "Chara Data Analysis", buttonX))
         {
             _mareMediator.Publish(new UiToggleMessage(typeof(DataAnalysisUi)));
         }
@@ -519,7 +519,7 @@ public class TopTabMenu
     {
         if (ImGui.BeginPopup(popupTitle))
         {
-            if (UiSharedService.IconTextButton(enableIcon, enableText, null, true))
+            if (_uiSharedService.IconTextButton(enableIcon, enableText, null, true))
             {
                 _ = GlobalControlCountdown(10);
                 var bulkIndividualPairs = _pairManager.PairsWithGroups.Keys
@@ -533,7 +533,7 @@ public class TopTabMenu
                 ImGui.CloseCurrentPopup();
             }
 
-            if (UiSharedService.IconTextButton(disableIcon, disableText, null, true))
+            if (_uiSharedService.IconTextButton(disableIcon, disableText, null, true))
             {
                 _ = GlobalControlCountdown(10);
                 var bulkIndividualPairs = _pairManager.PairsWithGroups.Keys
@@ -557,7 +557,7 @@ public class TopTabMenu
         if (ImGui.BeginPopup(popupTitle))
         {
 
-            if (UiSharedService.IconTextButton(enableIcon, enableText, null, true))
+            if (_uiSharedService.IconTextButton(enableIcon, enableText, null, true))
             {
                 _ = GlobalControlCountdown(10);
                 var bulkSyncshells = _pairManager.GroupPairs.Keys
@@ -571,7 +571,7 @@ public class TopTabMenu
                 ImGui.CloseCurrentPopup();
             }
 
-            if (UiSharedService.IconTextButton(disableIcon, disableText, null, true))
+            if (_uiSharedService.IconTextButton(disableIcon, disableText, null, true))
             {
                 _ = GlobalControlCountdown(10);
                 var bulkSyncshells = _pairManager.GroupPairs.Keys

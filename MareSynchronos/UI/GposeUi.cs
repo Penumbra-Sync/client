@@ -12,6 +12,7 @@ namespace MareSynchronos.UI;
 public class GposeUi : WindowMediatorSubscriberBase
 {
     private readonly MareConfigService _configService;
+    private readonly UiSharedService _uiSharedService;
     private readonly DalamudUtilService _dalamudUtil;
     private readonly FileDialogManager _fileDialogManager;
     private readonly MareCharaFileManager _mareCharaFileManager;
@@ -20,13 +21,14 @@ public class GposeUi : WindowMediatorSubscriberBase
 
     public GposeUi(ILogger<GposeUi> logger, MareCharaFileManager mareCharaFileManager,
         DalamudUtilService dalamudUtil, FileDialogManager fileDialogManager, MareConfigService configService,
-        MareMediator mediator, PerformanceCollectorService performanceCollectorService)
+        MareMediator mediator, PerformanceCollectorService performanceCollectorService, UiSharedService uiSharedService)
         : base(logger, mediator, "Mare Synchronos Gpose Import UI###MareSynchronosGposeUI", performanceCollectorService)
     {
         _mareCharaFileManager = mareCharaFileManager;
         _dalamudUtil = dalamudUtil;
         _fileDialogManager = fileDialogManager;
         _configService = configService;
+        _uiSharedService = uiSharedService;
         Mediator.Subscribe<GposeStartMessage>(this, (_) => StartGpose());
         Mediator.Subscribe<GposeEndMessage>(this, (_) => EndGpose());
         IsOpen = _dalamudUtil.IsInGpose;
@@ -43,7 +45,7 @@ public class GposeUi : WindowMediatorSubscriberBase
 
         if (!_mareCharaFileManager.CurrentlyWorking)
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.FolderOpen, "Load MCDF"))
+            if (_uiSharedService.IconTextButton(FontAwesomeIcon.FolderOpen, "Load MCDF"))
             {
                 _fileDialogManager.OpenFileDialog("Pick MCDF file", ".mcdf", (success, paths) =>
                 {
@@ -61,7 +63,7 @@ public class GposeUi : WindowMediatorSubscriberBase
             {
                 UiSharedService.TextWrapped("Loaded file: " + _mareCharaFileManager.LoadedCharaFile.FilePath);
                 UiSharedService.TextWrapped("File Description: " + _mareCharaFileManager.LoadedCharaFile.CharaFileData.Description);
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.Check, "Apply loaded MCDF"))
+                if (_uiSharedService.IconTextButton(FontAwesomeIcon.Check, "Apply loaded MCDF"))
                 {
                     _applicationTask = Task.Run(async () => await _mareCharaFileManager.ApplyMareCharaFile(_dalamudUtil.GposeTargetGameObject, _expectedLength!.GetAwaiter().GetResult()).ConfigureAwait(false));
                 }

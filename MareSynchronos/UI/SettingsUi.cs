@@ -378,7 +378,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             ImGui.TreePop();
         }
 #endif
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Copy, "[DEBUG] Copy Last created Character Data to clipboard"))
+        if (_uiShared.IconTextButton(FontAwesomeIcon.Copy, "[DEBUG] Copy Last created Character Data to clipboard"))
         {
             if (LastCreatedCharacterData != null)
             {
@@ -406,12 +406,12 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _uiShared.DrawHelpText("Enabling this can incur a (slight) performance impact. Enabling this for extended periods of time is not recommended.");
 
         using var disabled = ImRaii.Disabled(!logPerformance);
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.StickyNote, "Print Performance Stats to /xllog"))
+        if (_uiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Print Performance Stats to /xllog"))
         {
             _performanceCollector.PrintPerformanceStats();
         }
         ImGui.SameLine();
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.StickyNote, "Print Performance Stats (last 60s) to /xllog"))
+        if (_uiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Print Performance Stats (last 60s) to /xllog"))
         {
             _performanceCollector.PrintPerformanceStats(60);
         }
@@ -437,7 +437,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             if (!_mareCharaFileManager.CurrentlyWorking)
             {
                 ImGui.InputTextWithHint("Export Descriptor", "This description will be shown on loading the data", ref _exportDescription, 255);
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.Save, "Export Character as MCDF"))
+                if (_uiShared.IconTextButton(FontAwesomeIcon.Save, "Export Character as MCDF"))
                 {
                     string defaultFileName = string.IsNullOrEmpty(_exportDescription)
                         ? "export.mcdf"
@@ -494,7 +494,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             ImGui.SameLine();
             using var id = ImRaii.PushId("penumbraMonitor");
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.ArrowsToCircle, "Try to reinitialize Monitor"))
+            if (_uiShared.IconTextButton(FontAwesomeIcon.ArrowsToCircle, "Try to reinitialize Monitor"))
             {
                 _cacheMonitor.StartPenumbraWatcher(_ipcManager.Penumbra.ModDirectory);
             }
@@ -506,14 +506,14 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             ImGui.SameLine();
             using var id = ImRaii.PushId("mareMonitor");
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.ArrowsToCircle, "Try to reinitialize Monitor"))
+            if (_uiShared.IconTextButton(FontAwesomeIcon.ArrowsToCircle, "Try to reinitialize Monitor"))
             {
                 _cacheMonitor.StartMareWatcher(_configService.Current.CacheFolder);
             }
         }
         if (_cacheMonitor.MareWatcher == null || _cacheMonitor.PenumbraWatcher == null)
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Play, "Resume Monitoring"))
+            if (_uiShared.IconTextButton(FontAwesomeIcon.Play, "Resume Monitoring"))
             {
                 _cacheMonitor.StartMareWatcher(_configService.Current.CacheFolder);
                 _cacheMonitor.StartPenumbraWatcher(_ipcManager.Penumbra.ModDirectory);
@@ -527,7 +527,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             using (ImRaii.Disabled(!UiSharedService.CtrlPressed()))
             {
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.Stop, "Stop Monitoring"))
+                if (_uiShared.IconTextButton(FontAwesomeIcon.Stop, "Stop Monitoring"))
                 {
                     _cacheMonitor.StopMonitoring();
                 }
@@ -562,7 +562,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         ImGui.SameLine();
         if (!_fileCompactor.MassCompactRunning)
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.FileArchive, "Compact all files in storage"))
+            if (_uiShared.IconTextButton(FontAwesomeIcon.FileArchive, "Compact all files in storage"))
             {
                 _ = Task.Run(() =>
                 {
@@ -573,7 +573,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             UiSharedService.AttachToolTip("This will run compression on all files in your current Mare Storage." + Environment.NewLine
                 + "You do not need to run this manually if you keep the file compactor enabled.");
             ImGui.SameLine();
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.File, "Decompact all files in storage"))
+            if (_uiShared.IconTextButton(FontAwesomeIcon.File, "Decompact all files in storage"))
             {
                 _ = Task.Run(() =>
                 {
@@ -600,7 +600,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             "This operation, depending on how many files you have in your storage, can take a while and will be CPU and drive intensive.");
         using (ImRaii.Disabled(_validationTask != null && !_validationTask.IsCompleted))
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Check, "Start File Storage Validation"))
+            if (_uiShared.IconTextButton(FontAwesomeIcon.Check, "Start File Storage Validation"))
             {
                 _validationCts?.Cancel();
                 _validationCts?.Dispose();
@@ -612,7 +612,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         if (_validationTask != null && !_validationTask.IsCompleted)
         {
             ImGui.SameLine();
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Times, "Cancel"))
+            if (_uiShared.IconTextButton(FontAwesomeIcon.Times, "Cancel"))
             {
                 _validationCts?.Cancel();
             }
@@ -646,7 +646,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             + Environment.NewLine + "- This can make the situation of not getting other players data worse in situations of heavy file server load.");
         if (!_readClearCache)
             ImGui.BeginDisabled();
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Clear local storage") && UiSharedService.CtrlPressed() && _readClearCache)
+        if (_uiShared.IconTextButton(FontAwesomeIcon.Trash, "Clear local storage") && UiSharedService.CtrlPressed() && _readClearCache)
         {
             _ = Task.Run(() =>
             {
@@ -677,11 +677,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
         //ImGui.Separator();
 
         _uiShared.BigText("Notes");
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.StickyNote, "Export all your user notes to clipboard"))
+        if (_uiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Export all your user notes to clipboard"))
         {
             ImGui.SetClipboardText(UiSharedService.GetNotes(_pairManager.DirectPairs.UnionBy(_pairManager.GroupPairs.SelectMany(p => p.Value), p => p.UserData, UserDataComparer.Instance).ToList()));
         }
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.FileImport, "Import notes from clipboard"))
+        if (_uiShared.IconTextButton(FontAwesomeIcon.FileImport, "Import notes from clipboard"))
         {
             _notesSuccessfullyApplied = null;
             var notes = ImGui.GetClipboardText();
@@ -1094,7 +1094,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                                     }
                                 }, EqualityComparer<KeyValuePair<int, SecretKey>>.Default.Equals(keys.FirstOrDefault(f => f.Key == item.SecretKeyIdx), default) ? keys.First() : keys.First(f => f.Key == item.SecretKeyIdx));
 
-                            if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Character") && UiSharedService.CtrlPressed())
+                            if (_uiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Character") && UiSharedService.CtrlPressed())
                                 _serverConfigurationManager.RemoveCharacterFromServer(idx, item);
                             UiSharedService.AttachToolTip("Hold CTRL to delete this entry.");
 
@@ -1108,14 +1108,14 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     if (!selectedServer.Authentications.Exists(c => string.Equals(c.CharacterName, _uiShared.PlayerName, StringComparison.Ordinal)
                         && c.WorldId == _uiShared.WorldId))
                     {
-                        if (UiSharedService.IconTextButton(FontAwesomeIcon.User, "Add current character"))
+                        if (_uiShared.IconTextButton(FontAwesomeIcon.User, "Add current character"))
                         {
                             _serverConfigurationManager.AddCurrentCharacterToServer(idx);
                         }
                         ImGui.SameLine();
                     }
 
-                    if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add new character"))
+                    if (_uiShared.IconTextButton(FontAwesomeIcon.Plus, "Add new character"))
                     {
                         _serverConfigurationManager.AddEmptyCharacterToServer(idx);
                     }
@@ -1147,7 +1147,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     }
                     if (!selectedServer.Authentications.Exists(p => p.SecretKeyIdx == item.Key))
                     {
-                        if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Secret Key") && UiSharedService.CtrlPressed())
+                        if (_uiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Secret Key") && UiSharedService.CtrlPressed())
                         {
                             selectedServer.SecretKeys.Remove(item.Key);
                             _serverConfigurationManager.Save();
@@ -1164,7 +1164,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 }
 
                 ImGui.Separator();
-                if (UiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add new Secret Key"))
+                if (_uiShared.IconTextButton(FontAwesomeIcon.Plus, "Add new Secret Key"))
                 {
                     selectedServer.SecretKeys.Add(selectedServer.SecretKeys.Any() ? selectedServer.SecretKeys.Max(p => p.Key) + 1 : 0, new SecretKey()
                     {
@@ -1204,7 +1204,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
                 if (!isMain && selectedServer != _serverConfigurationManager.CurrentServer)
                 {
-                    if (UiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Service") && UiSharedService.CtrlPressed())
+                    if (_uiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Service") && UiSharedService.CtrlPressed())
                     {
                         _serverConfigurationManager.DeleteServer(selectedServer);
                     }

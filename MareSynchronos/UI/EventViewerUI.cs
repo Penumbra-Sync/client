@@ -100,7 +100,7 @@ internal class EventViewerUI : WindowMediatorSubscriberBase
     {
         using (ImRaii.Disabled(!_eventAggregator.NewEventsAvailable))
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.ArrowsToCircle, "Refresh events"))
+            if (_uiSharedService.IconTextButton(FontAwesomeIcon.ArrowsToCircle, "Refresh events"))
             {
                 CurrentEvents = _eventAggregator.EventList.Value.OrderByDescending(f => f.EventTime).ToList();
             }
@@ -113,10 +113,10 @@ internal class EventViewerUI : WindowMediatorSubscriberBase
             UiSharedService.ColorTextWrapped("New events are available, press refresh to update", ImGuiColors.DalamudYellow);
         }
 
-        var buttonSize = UiSharedService.GetIconTextButtonSize(FontAwesomeIcon.FolderOpen, "Open EventLog Folder");
+        var buttonSize = _uiSharedService.GetIconTextButtonSize(FontAwesomeIcon.FolderOpen, "Open EventLog Folder");
         var dist = ImGui.GetWindowContentRegionMax().X - buttonSize;
         ImGui.SameLine(dist);
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.FolderOpen, "Open EventLog folder"))
+        if (_uiSharedService.IconTextButton(FontAwesomeIcon.FolderOpen, "Open EventLog folder"))
         {
             ProcessStartInfo ps = new()
             {
@@ -131,7 +131,7 @@ internal class EventViewerUI : WindowMediatorSubscriberBase
         var foldOut = ImRaii.TreeNode("Filter");
         if (foldOut)
         {
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Ban, "Clear Filters"))
+            if (_uiSharedService.IconTextButton(FontAwesomeIcon.Ban, "Clear Filters"))
             {
                 ClearFilters();
             }

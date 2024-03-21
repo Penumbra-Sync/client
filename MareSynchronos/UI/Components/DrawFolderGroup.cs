@@ -85,21 +85,21 @@ public class DrawFolderGroup : DrawFolderBase
         ImGui.Separator();
 
         ImGui.TextUnformatted("General Syncshell Actions");
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.Copy, "Copy ID", menuWidth, true))
+        if (_uiSharedService.IconTextButton(FontAwesomeIcon.Copy, "Copy ID", menuWidth, true))
         {
             ImGui.CloseCurrentPopup();
             ImGui.SetClipboardText(_groupFullInfoDto.GroupAliasOrGID);
         }
         UiSharedService.AttachToolTip("Copy Syncshell ID to Clipboard");
 
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.StickyNote, "Copy Notes", menuWidth, true))
+        if (_uiSharedService.IconTextButton(FontAwesomeIcon.StickyNote, "Copy Notes", menuWidth, true))
         {
             ImGui.CloseCurrentPopup();
             ImGui.SetClipboardText(UiSharedService.GetNotes(DrawPairs.Select(k => k.Pair).ToList()));
         }
         UiSharedService.AttachToolTip("Copies all your notes for all users in this Syncshell to the clipboard." + Environment.NewLine + "They can be imported via Settings -> Privacy -> Import Notes from Clipboard");
 
-        if (UiSharedService.IconTextButton(FontAwesomeIcon.ArrowCircleLeft, "Leave Syncshell", menuWidth, true) && UiSharedService.CtrlPressed())
+        if (_uiSharedService.IconTextButton(FontAwesomeIcon.ArrowCircleLeft, "Leave Syncshell", menuWidth, true) && UiSharedService.CtrlPressed())
         {
             _ = _apiController.GroupLeave(_groupFullInfoDto);
             ImGui.CloseCurrentPopup();
@@ -117,7 +117,7 @@ public class DrawFolderGroup : DrawFolderBase
         if ((_groupFullInfoDto.GroupPermissions.IsPreferDisableAnimations() != disableAnims
             || _groupFullInfoDto.GroupPermissions.IsPreferDisableSounds() != disableSounds
             || _groupFullInfoDto.GroupPermissions.IsPreferDisableVFX() != disableVfx)
-            && UiSharedService.IconTextButton(FontAwesomeIcon.Check, "Align with suggested permissions", menuWidth, true))
+            && _uiSharedService.IconTextButton(FontAwesomeIcon.Check, "Align with suggested permissions", menuWidth, true))
         {
             perm.SetDisableVFX(_groupFullInfoDto.GroupPermissions.IsPreferDisableVFX());
             perm.SetDisableSounds(_groupFullInfoDto.GroupPermissions.IsPreferDisableSounds());
@@ -126,21 +126,21 @@ public class DrawFolderGroup : DrawFolderBase
             ImGui.CloseCurrentPopup();
         }
 
-        if (UiSharedService.IconTextButton(disableSounds ? FontAwesomeIcon.VolumeUp : FontAwesomeIcon.VolumeOff, disableSounds ? "Enable Sound Sync" : "Disable Sound Sync", menuWidth, true))
+        if (_uiSharedService.IconTextButton(disableSounds ? FontAwesomeIcon.VolumeUp : FontAwesomeIcon.VolumeOff, disableSounds ? "Enable Sound Sync" : "Disable Sound Sync", menuWidth, true))
         {
             perm.SetDisableSounds(!disableSounds);
             _ = _apiController.GroupChangeIndividualPermissionState(new(_groupFullInfoDto.Group, new(_apiController.UID), perm));
             ImGui.CloseCurrentPopup();
         }
 
-        if (UiSharedService.IconTextButton(disableAnims ? FontAwesomeIcon.Running : FontAwesomeIcon.Stop, disableAnims ? "Enable Animation Sync" : "Disable Animation Sync", menuWidth, true))
+        if (_uiSharedService.IconTextButton(disableAnims ? FontAwesomeIcon.Running : FontAwesomeIcon.Stop, disableAnims ? "Enable Animation Sync" : "Disable Animation Sync", menuWidth, true))
         {
             perm.SetDisableAnimations(!disableAnims);
             _ = _apiController.GroupChangeIndividualPermissionState(new(_groupFullInfoDto.Group, new(_apiController.UID), perm));
             ImGui.CloseCurrentPopup();
         }
 
-        if (UiSharedService.IconTextButton(disableVfx ? FontAwesomeIcon.Sun : FontAwesomeIcon.Circle, disableVfx ? "Enable VFX Sync" : "Disable VFX Sync", menuWidth, true))
+        if (_uiSharedService.IconTextButton(disableVfx ? FontAwesomeIcon.Sun : FontAwesomeIcon.Circle, disableVfx ? "Enable VFX Sync" : "Disable VFX Sync", menuWidth, true))
         {
             perm.SetDisableVFX(!disableVfx);
             _ = _apiController.GroupChangeIndividualPermissionState(new(_groupFullInfoDto.Group, new(_apiController.UID), perm));
@@ -151,7 +151,7 @@ public class DrawFolderGroup : DrawFolderBase
         {
             ImGui.Separator();
             ImGui.TextUnformatted("Syncshell Admin Functions");
-            if (UiSharedService.IconTextButton(FontAwesomeIcon.Cog, "Open Admin Panel", menuWidth, true))
+            if (_uiSharedService.IconTextButton(FontAwesomeIcon.Cog, "Open Admin Panel", menuWidth, true))
             {
                 ImGui.CloseCurrentPopup();
                 _mareMediator.Publish(new OpenSyncshellAdminPanel(_groupFullInfoDto));
@@ -233,7 +233,7 @@ public class DrawFolderGroup : DrawFolderBase
         }
 
         ImGui.SameLine();
-        if (UiSharedService.IconButton(pauseIcon))
+        if (_uiSharedService.IconButton(pauseIcon))
         {
             var perm = _groupFullInfoDto.GroupUserPermissions;
             perm.SetPaused(!perm.IsPaused());
