@@ -405,16 +405,25 @@ public class SettingsUi : WindowMediatorSubscriberBase
         }
         _uiShared.DrawHelpText("Enabling this can incur a (slight) performance impact. Enabling this for extended periods of time is not recommended.");
 
-        using var disabled = ImRaii.Disabled(!logPerformance);
-        if (_uiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Print Performance Stats to /xllog"))
+        using (ImRaii.Disabled(!logPerformance))
         {
-            _performanceCollector.PrintPerformanceStats();
+            if (_uiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Print Performance Stats to /xllog"))
+            {
+                _performanceCollector.PrintPerformanceStats();
+            }
+            ImGui.SameLine();
+            if (_uiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Print Performance Stats (last 60s) to /xllog"))
+            {
+                _performanceCollector.PrintPerformanceStats(60);
+            }
         }
-        ImGui.SameLine();
-        if (_uiShared.IconTextButton(FontAwesomeIcon.StickyNote, "Print Performance Stats (last 60s) to /xllog"))
+
+        bool stopWhining = _configService.Current.DebugStopWhining;
+        if (ImGui.Checkbox("Do not notify for modified game files", ref stopWhining))
         {
-            _performanceCollector.PrintPerformanceStats(60);
+            _configService.Current.DebugStopWhining = stopWhining;
         }
+        _uiShared.DrawHelpText("Having modified game files will still mark your logs with UNSUPPORTED and you will not receive support, message shown or not.");
     }
 
     private void DrawFileStorageSettings()

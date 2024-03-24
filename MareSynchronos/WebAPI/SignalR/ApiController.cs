@@ -4,6 +4,7 @@ using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.API.SignalR;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
@@ -27,6 +28,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
     private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverManager;
     private readonly TokenProvider _tokenProvider;
+    private readonly MareConfigService _mareConfigService;
     private CancellationTokenSource _connectionCancellationTokenSource;
     private ConnectionDto? _connectionDto;
     private bool _doNotNotifyOnNextInfo = false;
@@ -39,13 +41,14 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
     public ApiController(ILogger<ApiController> logger, HubFactory hubFactory, DalamudUtilService dalamudUtil,
         PairManager pairManager, ServerConfigurationManager serverManager, MareMediator mediator,
-        TokenProvider tokenProvider) : base(logger, mediator)
+        TokenProvider tokenProvider, MareConfigService mareConfigService) : base(logger, mediator)
     {
         _hubFactory = hubFactory;
         _dalamudUtil = dalamudUtil;
         _pairManager = pairManager;
         _serverManager = serverManager;
         _tokenProvider = tokenProvider;
+        _mareConfigService = mareConfigService;
         _connectionCancellationTokenSource = new CancellationTokenSource();
 
         Mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
@@ -208,10 +211,11 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                 if (_dalamudUtil.HasModifiedGameFiles)
                 {
                     Logger.LogError("Detected modified game files on connection");
-                    Mediator.Publish(new NotificationMessage("Modified Game Files detected",
-                        "Mare has detected modified game files in your FFXIV installation. You will be able to connect, but the synchronization functionality might be (partially) broken. " +
-                        "Exit the game and repair it through XIVLauncher to get rid of this message.",
-                        Dalamud.Interface.Internal.Notifications.NotificationType.Error, TimeSpan.FromSeconds(15)));
+                    if (!_mareConfigService.Current.DebugStopWhining)
+                        Mediator.Publish(new NotificationMessage("Modified Game Files detected",
+                            "Mare has detected modified game files in your FFXIV installation. You will be able to connect, but the synchronization functionality might be (partially) broken. " +
+                            "Exit the game and repair it through XIVLauncher to get rid of this message.",
+                            Dalamud.Interface.Internal.Notifications.NotificationType.Error, TimeSpan.FromSeconds(15)));
                 }
 
                 await LoadIninitialPairs().ConfigureAwait(false);

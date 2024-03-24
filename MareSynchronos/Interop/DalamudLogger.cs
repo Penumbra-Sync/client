@@ -10,12 +10,14 @@ internal sealed class DalamudLogger : ILogger
     private readonly MareConfigService _mareConfigService;
     private readonly string _name;
     private readonly IPluginLog _pluginLog;
+    private readonly bool _hasModifiedGameFiles;
 
-    public DalamudLogger(string name, MareConfigService mareConfigService, IPluginLog pluginLog)
+    public DalamudLogger(string name, MareConfigService mareConfigService, IPluginLog pluginLog, bool hasModifiedGameFiles)
     {
         _name = name;
         _mareConfigService = mareConfigService;
         _pluginLog = pluginLog;
+        _hasModifiedGameFiles = hasModifiedGameFiles;
     }
 
     public IDisposable BeginScope<TState>(TState state) => default!;
@@ -29,12 +31,14 @@ internal sealed class DalamudLogger : ILogger
     {
         if (!IsEnabled(logLevel)) return;
 
+        string unsupported = _hasModifiedGameFiles ? "[UNSUPPORTED]" : string.Empty;
+
         if ((int)logLevel <= (int)LogLevel.Information)
-            _pluginLog.Information($"[{_name}]{{{(int)logLevel}}} {state}");
+            _pluginLog.Information($"{unsupported}[{_name}]{{{(int)logLevel}}} {state}{(_hasModifiedGameFiles ? "." : string.Empty)}");
         else
         {
             StringBuilder sb = new();
-            sb.AppendLine($"[{_name}]{{{(int)logLevel}}} {state}: {exception?.Message}");
+            sb.AppendLine($"{unsupported}[{_name}]{{{(int)logLevel}}} {state}{(_hasModifiedGameFiles ? "." : string.Empty)}: {exception?.Message}");
             sb.AppendLine(exception?.StackTrace);
             var innerException = exception?.InnerException;
             while (innerException != null)

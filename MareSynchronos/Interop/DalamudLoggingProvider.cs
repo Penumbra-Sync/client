@@ -14,11 +14,13 @@ public sealed class DalamudLoggingProvider : ILoggerProvider
 
     private readonly MareConfigService _mareConfigService;
     private readonly IPluginLog _pluginLog;
+    private readonly bool _hasModifiedGameFiles;
 
-    public DalamudLoggingProvider(MareConfigService mareConfigService, IPluginLog pluginLog)
+    public DalamudLoggingProvider(MareConfigService mareConfigService, IPluginLog pluginLog, bool hasModifiedGameFiles)
     {
         _mareConfigService = mareConfigService;
         _pluginLog = pluginLog;
+        _hasModifiedGameFiles = hasModifiedGameFiles;
     }
 
     public ILogger CreateLogger(string categoryName)
@@ -33,7 +35,7 @@ public sealed class DalamudLoggingProvider : ILoggerProvider
             catName = string.Join("", Enumerable.Range(0, 15 - catName.Length).Select(_ => " ")) + catName;
         }
 
-        return _loggers.GetOrAdd(catName, name => new DalamudLogger(name, _mareConfigService, _pluginLog));
+        return _loggers.GetOrAdd(catName, name => new DalamudLogger(name, _mareConfigService, _pluginLog, _hasModifiedGameFiles));
     }
 
     public void Dispose()

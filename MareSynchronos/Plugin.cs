@@ -31,19 +31,18 @@ namespace MareSynchronos;
 
 public sealed class Plugin : IDalamudPlugin
 {
-    private readonly CancellationTokenSource _pluginCts = new();
-    private readonly Task _hostBuilderRunTask;
+    private readonly IHost _host;
 
     public Plugin(DalamudPluginInterface pluginInterface, ICommandManager commandManager, IDataManager gameData,
         IFramework framework, IObjectTable objectTable, IClientState clientState, ICondition condition, IChatGui chatGui,
         IGameGui gameGui, IDtrBar dtrBar, IPluginLog pluginLog, ITargetManager targetManager, INotificationManager notificationManager)
     {
-        _hostBuilderRunTask = new HostBuilder()
+        _host = new HostBuilder()
         .UseContentRoot(pluginInterface.ConfigDirectory.FullName)
         .ConfigureLogging(lb =>
         {
             lb.ClearProviders();
-            lb.AddDalamudLogging(pluginLog);
+            lb.AddDalamudLogging(pluginLog, gameData.HasModifiedGameDataFiles);
             lb.SetMinimumLevel(LogLevel.Trace);
         })
         .ConfigureServices(collection =>
@@ -168,14 +167,14 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddHostedService(p => p.GetRequiredService<IpcProvider>());
             collection.AddHostedService(p => p.GetRequiredService<MarePlugin>());
         })
-        .Build()
-        .RunAsync(_pluginCts.Token);
+        .Build();
+
+        _ = _host.StartAsync();
     }
 
     public void Dispose()
     {
-        _pluginCts.Cancel();
-        _pluginCts.Dispose();
-        _hostBuilderRunTask.Wait();
+        _host.StopAsync().GetAwaiter().GetResult();
+        _host.Dispose();
     }
 }
