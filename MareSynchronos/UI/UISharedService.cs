@@ -810,20 +810,13 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     public Vector2 GetIconButtonSize(FontAwesomeIcon icon)
     {
         using var font = IconFont.Push();
-        var buttonSize = ImGuiHelpers.GetButtonSize(icon.ToIconString());
-        return buttonSize;
+        return ImGuiHelpers.GetButtonSize(icon.ToIconString());
     }
 
     public Vector2 GetIconData(FontAwesomeIcon icon)
     {
         using var font = IconFont.Push();
         return ImGui.CalcTextSize(icon.ToIconString());
-    }
-
-    public Vector2 IconButtonSize(FontAwesomeIcon icon)
-    {
-        using var font = IconFont.Push();
-        return ImGuiHelpers.GetButtonSize(icon.ToIconString());
     }
 
     public void IconText(FontAwesomeIcon icon, uint color)

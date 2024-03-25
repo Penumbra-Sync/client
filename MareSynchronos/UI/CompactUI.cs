@@ -257,7 +257,7 @@ public class CompactUi : WindowMediatorSubscriberBase
     }
     private void DrawServerStatus()
     {
-        var buttonSize = _uiSharedService.IconButtonSize(FontAwesomeIcon.Link);
+        var buttonSize = _uiSharedService.GetIconButtonSize(FontAwesomeIcon.Link);
         var userCount = _apiController.OnlineUsers.ToString(CultureInfo.InvariantCulture);
         var userSize = ImGui.CalcTextSize(userCount);
         var textSize = ImGui.CalcTextSize("Users Online");

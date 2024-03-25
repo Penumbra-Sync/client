@@ -98,7 +98,7 @@ public abstract class DrawFolderBase : IDrawFolder
 
     private float DrawRightSideInternal()
     {
-        var barButtonSize = _uiSharedService.IconButtonSize(FontAwesomeIcon.EllipsisV);
+        var barButtonSize = _uiSharedService.GetIconButtonSize(FontAwesomeIcon.EllipsisV);
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
         var windowEndX = ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth();
 

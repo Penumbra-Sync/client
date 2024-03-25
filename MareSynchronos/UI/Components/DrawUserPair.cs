@@ -301,8 +301,8 @@ public class DrawUserPair
     private float DrawRightSide()
     {
         var pauseIcon = _pair.UserPair!.OwnPermissions.IsPaused() ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
-        var pauseIconSize = _uiSharedService.IconButtonSize(pauseIcon);
-        var barButtonSize = _uiSharedService.IconButtonSize(FontAwesomeIcon.EllipsisV);
+        var pauseIconSize = _uiSharedService.GetIconButtonSize(pauseIcon);
+        var barButtonSize = _uiSharedService.GetIconButtonSize(FontAwesomeIcon.EllipsisV);
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
         var windowEndX = ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth();
         float currentRightSide = windowEndX - barButtonSize.X;

@@ -169,7 +169,7 @@ public class DrawFolderGroup : DrawFolderBase
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
 
         FontAwesomeIcon pauseIcon = _groupFullInfoDto.GroupUserPermissions.IsPaused() ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
-        var pauseButtonSize = _uiSharedService.IconButtonSize(pauseIcon);
+        var pauseButtonSize = _uiSharedService.GetIconButtonSize(pauseIcon);
 
         var userCogButtonSize = _uiSharedService.GetIconData(FontAwesomeIcon.UsersCog);
 
