@@ -34,14 +34,16 @@ public sealed class XivDataAnalyzer
         if (chara->GetModelType() != CharacterBase.ModelType.Human) return null;
         var resHandles = chara->Skeleton->SkeletonResourceHandles;
         int i = 0;
-        Dictionary<string, List<ushort>> outputIndices = new();
+        Dictionary<string, List<ushort>> outputIndices = [];
         while (*(resHandles + i) != null)
         {
+            string skeletonName = "unknown";
+
             try
             {
                 var handle = *(resHandles + i);
                 var curBones = handle->BoneCount;
-                var skeletonName = handle->ResourceHandle.FileName.ToString();
+                skeletonName = handle->ResourceHandle.FileName.ToString();
                 outputIndices[skeletonName] = new();
                 for (ushort boneIdx = 0; boneIdx < curBones; boneIdx++)
                 {
@@ -52,9 +54,9 @@ public sealed class XivDataAnalyzer
 
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                _logger.LogTrace("Could not get bone for {skellyname}:{idx}", skeletonName, boneIdx);
+                _logger.LogWarning(ex, "Could procss skeleton {skl}", skeletonName);
             }
             i++;
         }
