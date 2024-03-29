@@ -27,38 +27,35 @@ public sealed class XivDataAnalyzer
         _luminaGameData = new GameData(gameData.GameData.DataPath.FullName);
     }
 
-    public unsafe List<ushort>? GetSkeletonBoneIndices(nint charaPtr)
+    public unsafe Dictionary<string, List<ushort>>? GetSkeletonBoneIndices(nint charaPtr)
     {
         if (charaPtr == nint.Zero) return null;
         var chara = (CharacterBase*)(((Character*)charaPtr)->GameObject.DrawObject);
+        if (chara->GetModelType() != CharacterBase.ModelType.Human) return null;
         var resHandles = chara->Skeleton->SkeletonResourceHandles;
-        int i = -1;
-        uint maxBones = 0;
-        List<ushort> outputIndices = new();
-        while (*(resHandles + ++i) != null)
+        int i = 0;
+        Dictionary<string, List<ushort>> outputIndices = new();
+        while (*(resHandles + i) != null)
         {
             var handle = *(resHandles + i);
             var curBones = handle->BoneCount;
-            List<ushort> indices = new();
+            var skeletonName = handle->ResourceHandle.FileName.ToString();
+            outputIndices[skeletonName] = new();
             for (ushort boneIdx = 0; boneIdx < curBones; boneIdx++)
             {
                 var boneName = handle->HavokSkeleton->Bones[boneIdx].Name.String;
                 if (boneName == null) continue;
-                indices.Add(boneIdx);
+                outputIndices[skeletonName].Add(boneIdx);
             }
-            if (curBones > maxBones)
-            {
-                maxBones = curBones;
-                outputIndices = indices;
-            }
+            i++;
         }
 
         return outputIndices;
     }
 
-    public unsafe List<List<ushort>>? GetBoneIndicesFromPap(string hash)
+    public unsafe Dictionary<string, List<ushort>>? GetBoneIndicesFromPap(string hash)
     {
-        if (_configService.Current.BoneDictionary.TryGetValue(hash, out var bones)) return bones;
+        if (_configService.Current.BonesDictionary.TryGetValue(hash, out var bones)) return bones;
 
         var cacheEntity = _fileCacheManager.GetFileCacheByHash(hash);
         if (cacheEntity == null) return null;
@@ -82,7 +79,7 @@ public sealed class XivDataAnalyzer
         var havokData = reader.ReadBytes(havokDataSize);
         if (havokData.Length <= 8) return null; // no havok data
 
-        var output = new List<List<ushort>>();
+        var output = new Dictionary<string, List<ushort>>(StringComparer.OrdinalIgnoreCase);
         var tempHavokDataPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName()) + ".hkx";
         var tempHavokDataPathAnsi = Marshal.StringToHGlobalAnsi(tempHavokDataPath);
 
@@ -114,14 +111,15 @@ public sealed class XivDataAnalyzer
                     var animContainer = (hkaAnimationContainer*)container->findObjectByName(n2, null);
                     for (int i = 0; i < animContainer->Bindings.Length; i++)
                     {
-                        var boneTransform = animContainer->Bindings[i].ptr->TransformTrackToBoneIndices;
-                        List<ushort> boneIndices = [];
+                        var binding = animContainer->Bindings[i].ptr;
+                        var boneTransform = binding->TransformTrackToBoneIndices;
+                        string name = binding->OriginalSkeletonName.String! + "_" + i;
+                        output[name] = [];
                         for (int boneIdx = 0; boneIdx < boneTransform.Length; boneIdx++)
                         {
-                            boneIndices.Add((ushort)boneTransform[boneIdx]);
+                            output[name].Add((ushort)boneTransform[boneIdx]);
                         }
-
-                        output.Add(boneIndices);
+                        output[name].Sort();
                     }
 
                 }
@@ -137,7 +135,7 @@ public sealed class XivDataAnalyzer
             File.Delete(tempHavokDataPath);
         }
 
-        _configService.Current.BoneDictionary[hash] = output;
+        _configService.Current.BonesDictionary[hash] = output;
         _configService.Save();
         return output;
     }

@@ -38,7 +38,7 @@ internal sealed class DalamudLogger : ILogger
         else
         {
             StringBuilder sb = new();
-            sb.AppendLine($"{unsupported}[{_name}]{{{(int)logLevel}}} {state}{(_hasModifiedGameFiles ? "." : string.Empty)}: {exception?.Message}");
+            sb.AppendLine($"{unsupported}[{_name}]{{{(int)logLevel}}} {state}{(_hasModifiedGameFiles ? "." : string.Empty)} {exception?.Message}");
             sb.AppendLine(exception?.StackTrace);
             var innerException = exception?.InnerException;
             while (innerException != null)

@@ -249,28 +249,37 @@ public class PlayerDataFactory
         var boneIndices = _modelAnalyzer.GetSkeletonBoneIndices(charaPointer);
         if (boneIndices != null)
         {
-            _logger.LogDebug("Found {idx} bone indices on player: {bones}", boneIndices.Count, string.Join(',', boneIndices));
+            foreach (var kvp in boneIndices)
+            {
+                _logger.LogDebug("Found {skellyname} ({idx} bone indices) on player: {bones}", kvp.Key, kvp.Value.Max(), string.Join(',', kvp.Value));
+            }
+
+            if (boneIndices.All(u => u.Value.Count == 0)) return;
 
             int noValidationFailed = 0;
             foreach (var file in previousData.FileReplacements[objectKind].Where(f => !f.IsFileSwap && f.GamePaths.First().EndsWith("pap", StringComparison.OrdinalIgnoreCase)).ToList())
             {
-                var animationIndices = await _dalamudUtil.RunOnFrameworkThread(() => _modelAnalyzer.GetBoneIndicesFromPap(file.Hash)).ConfigureAwait(false);
+                var skeletonIndices = await _dalamudUtil.RunOnFrameworkThread(() => _modelAnalyzer.GetBoneIndicesFromPap(file.Hash)).ConfigureAwait(false);
                 bool validationFailed = false;
-                if (animationIndices != null)
+                if (skeletonIndices != null)
                 {
-                    _logger.LogDebug("Verifying bone indices for {path}, found {x} animations", file.ResolvedPath, animationIndices.Count);
-                    for (int i = 0; i < animationIndices.Count; i++)
+                    // 105 is the maximum vanilla skellington spoopy bone index
+                    if (skeletonIndices.All(k => k.Value.Max() <= 105))
                     {
-                        _logger.LogTrace("Verifying animation set {i}, found {idx} bone indeces", i, animationIndices[i].Count);
-                        if (animationIndices[i].Count > boneIndices.Count)
+                        _logger.LogTrace("All indices of {path} are <= 105, ignoring", file.ResolvedPath);
+                        continue;
+                    }
+
+                    _logger.LogDebug("Verifying bone indices for {path}, found {x} skeletons", file.ResolvedPath, skeletonIndices.Count);
+
+                    foreach (var boneCount in skeletonIndices.Select(k => k).ToList())
+                    {
+                        if (boneCount.Value.Max() > boneIndices.SelectMany(b => b.Value).Max())
                         {
-                            _logger.LogWarning("Found more bone indeces on the animation {path} ({idx}) than on player skeleton ({idx2})", file.ResolvedPath, animationIndices[i].Count, boneIndices.Count);
+                            _logger.LogWarning("Found more bone indices on the animation {path} skeleton {skl} (max indice {idx}) than on any player related skeleton (max indice {idx2})",
+                                file.ResolvedPath, boneCount.Key, boneCount.Value.Max(), boneIndices.SelectMany(b => b.Value).Max());
                             validationFailed = true;
-                        }
-                        else if (animationIndices[i].Exists(idx => !boneIndices.Contains(idx)))
-                        {
-                            _logger.LogWarning("Found bone indices referred on animation {path} that are not on the player skeleton", file.ResolvedPath);
-                            validationFailed = true;
+                            break;
                         }
                     }
                 }
@@ -287,6 +296,7 @@ public class PlayerDataFactory
                 }
 
             }
+
             if (noValidationFailed > 0)
             {
                 _mareMediator.Publish(new NotificationMessage("Invalid Skeleton Setup",
