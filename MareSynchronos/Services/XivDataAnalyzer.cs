@@ -37,22 +37,24 @@ public sealed class XivDataAnalyzer
         Dictionary<string, List<ushort>> outputIndices = new();
         while (*(resHandles + i) != null)
         {
-            var handle = *(resHandles + i);
-            var curBones = handle->BoneCount;
-            var skeletonName = handle->ResourceHandle.FileName.ToString();
-            outputIndices[skeletonName] = new();
-            for (ushort boneIdx = 0; boneIdx < curBones; boneIdx++)
+            try
             {
-                try
+                var handle = *(resHandles + i);
+                var curBones = handle->BoneCount;
+                var skeletonName = handle->ResourceHandle.FileName.ToString();
+                outputIndices[skeletonName] = new();
+                for (ushort boneIdx = 0; boneIdx < curBones; boneIdx++)
                 {
+
                     var boneName = handle->HavokSkeleton->Bones[boneIdx].Name.String;
                     if (boneName == null) continue;
                     outputIndices[skeletonName].Add(boneIdx);
+
                 }
-                catch
-                {
-                    _logger.LogTrace("Could not get bone for {skellyname}:{idx}", skeletonName, boneIdx);
-                }
+            }
+            catch
+            {
+                _logger.LogTrace("Could not get bone for {skellyname}:{idx}", skeletonName, boneIdx);
             }
             i++;
         }
