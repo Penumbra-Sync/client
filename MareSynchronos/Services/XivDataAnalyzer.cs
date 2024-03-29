@@ -46,11 +46,9 @@ public sealed class XivDataAnalyzer
                 outputIndices[skeletonName] = new();
                 for (ushort boneIdx = 0; boneIdx < curBones; boneIdx++)
                 {
-
                     var boneName = handle->HavokSkeleton->Bones[boneIdx].Name.String;
                     if (boneName == null) continue;
-                    outputIndices[skeletonName].Add(boneIdx);
-
+                    outputIndices[skeletonName].Add((ushort)(boneIdx + 1));
                 }
                 i++;
             }

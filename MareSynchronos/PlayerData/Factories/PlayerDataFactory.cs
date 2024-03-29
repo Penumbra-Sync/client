@@ -133,13 +133,16 @@ public class PlayerDataFactory
         // wait until chara is not drawing and present so nothing spontaneously explodes
         await _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, playerRelatedObject, Guid.NewGuid(), 30000, ct: token).ConfigureAwait(false);
         int totalWaitTime = 10000;
-        while (!await _dalamudUtil.IsObjectPresentAsync(await _dalamudUtil.CreateGameObjectAsync(charaPointer).ConfigureAwait(false)).ConfigureAwait(false) && totalWaitTime > 0)
+        while (!await _dalamudUtil.IsObjectPresentAsync(await _dalamudUtil.CreateGameObjectAsync(playerRelatedObject.Address).ConfigureAwait(false)).ConfigureAwait(false) && totalWaitTime > 0)
         {
             _logger.LogTrace("Character is null but it shouldn't be, waiting");
             await Task.Delay(50, token).ConfigureAwait(false);
             totalWaitTime -= 50;
         }
-        var boneIndices = await _dalamudUtil.RunOnFrameworkThread(() => _modelAnalyzer.GetSkeletonBoneIndices(charaPointer)).ConfigureAwait(false);
+        Dictionary<string, List<ushort>>? boneIndices =
+            objectKind != ObjectKind.Player
+            ? null
+            : await _dalamudUtil.RunOnFrameworkThread(() => _modelAnalyzer.GetSkeletonBoneIndices(playerRelatedObject.Address)).ConfigureAwait(false);
 
         DateTime start = DateTime.UtcNow;
 
@@ -243,7 +246,7 @@ public class PlayerDataFactory
             }
             catch (Exception e)
             {
-                _logger.LogWarning(e, "Failed to verify player animations, continuing");
+                _logger.LogWarning(e, "Failed to verify player animations, continuing without further verification");
             }
         }
 
