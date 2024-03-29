@@ -68,8 +68,8 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<FileDownloadManagerFactory>();
             collection.AddSingleton<PairHandlerFactory>();
             collection.AddSingleton<PairFactory>();
-            collection.AddSingleton<ModelAnalyzer>(s => new(s.GetRequiredService<ILogger<ModelAnalyzer>>(), s.GetRequiredService<FileCacheManager>(),
-                s.GetRequiredService<TriangleCalculationConfigService>(), gameData));
+            collection.AddSingleton<XivDataAnalyzer>(s => new(s.GetRequiredService<ILogger<XivDataAnalyzer>>(), s.GetRequiredService<FileCacheManager>(),
+                s.GetRequiredService<XivDataStorageService>(), gameData));
             collection.AddSingleton<CharacterAnalyzer>();
             collection.AddSingleton<TokenProvider>();
             collection.AddSingleton<PluginWarningNotificationService>();
@@ -113,7 +113,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton((s) => new NotesConfigService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new ServerTagConfigService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new TransientConfigService(pluginInterface.ConfigDirectory.FullName));
-            collection.AddSingleton((s) => new TriangleCalculationConfigService(pluginInterface.ConfigDirectory.FullName));
+            collection.AddSingleton((s) => new XivDataStorageService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new ConfigurationMigrator(s.GetRequiredService<ILogger<ConfigurationMigrator>>(), pluginInterface));
             collection.AddSingleton<HubFactory>();
 

@@ -24,7 +24,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private readonly DalamudUtilService _dalamudUtil;
     private readonly FileDownloadManager _downloadManager;
     private readonly FileCacheManager _fileDbManager;
-    private readonly ModelAnalyzer _modelAnalyzer;
+    private readonly XivDataAnalyzer _xivDataAnalyzer;
     private readonly GameObjectHandlerFactory _gameObjectHandlerFactory;
     private readonly IpcManager _ipcManager;
     private readonly IHostApplicationLifetime _lifetime;
@@ -49,7 +49,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         PluginWarningNotificationService pluginWarningNotificationManager,
         DalamudUtilService dalamudUtil, IHostApplicationLifetime lifetime,
         FileCacheManager fileDbManager, MareMediator mediator,
-        ModelAnalyzer modelAnalyzer) : base(logger, mediator)
+        XivDataAnalyzer modelAnalyzer) : base(logger, mediator)
     {
         OnlineUser = onlineUser;
         _gameObjectHandlerFactory = gameObjectHandlerFactory;
@@ -59,7 +59,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         _dalamudUtil = dalamudUtil;
         _lifetime = lifetime;
         _fileDbManager = fileDbManager;
-        _modelAnalyzer = modelAnalyzer;
+        _xivDataAnalyzer = modelAnalyzer;
         _penumbraCollection = _ipcManager.Penumbra.CreateTemporaryCollectionAsync(logger, OnlineUser.User.UID).ConfigureAwait(false).GetAwaiter().GetResult();
 
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
@@ -454,7 +454,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                         foreach (var key in moddedPaths.Keys.Where(k => !string.IsNullOrEmpty(k.Hash)))
                         {
                             if (LastAppliedDataTris == -1) LastAppliedDataTris = 0;
-                            LastAppliedDataTris += await _modelAnalyzer.GetTrianglesByHash(key.Hash!).ConfigureAwait(false);
+                            LastAppliedDataTris += await _xivDataAnalyzer.GetTrianglesByHash(key.Hash!).ConfigureAwait(false);
                         }
                     }
 

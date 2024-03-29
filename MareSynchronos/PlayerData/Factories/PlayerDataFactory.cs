@@ -5,6 +5,7 @@ using MareSynchronos.Interop.Ipc;
 using MareSynchronos.PlayerData.Data;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services;
+using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
 using CharacterData = MareSynchronos.PlayerData.Data.CharacterData;
 
@@ -18,11 +19,13 @@ public class PlayerDataFactory
     private readonly IpcManager _ipcManager;
     private readonly ILogger<PlayerDataFactory> _logger;
     private readonly PerformanceCollectorService _performanceCollector;
+    private readonly XivDataAnalyzer _modelAnalyzer;
+    private readonly MareMediator _mareMediator;
     private readonly TransientResourceManager _transientResourceManager;
 
     public PlayerDataFactory(ILogger<PlayerDataFactory> logger, DalamudUtilService dalamudUtil, IpcManager ipcManager,
         TransientResourceManager transientResourceManager, FileCacheManager fileReplacementFactory,
-        PerformanceCollectorService performanceCollector)
+        PerformanceCollectorService performanceCollector, XivDataAnalyzer modelAnalyzer, MareMediator mareMediator)
     {
         _logger = logger;
         _dalamudUtil = dalamudUtil;
@@ -30,6 +33,8 @@ public class PlayerDataFactory
         _transientResourceManager = transientResourceManager;
         _fileCacheManager = fileReplacementFactory;
         _performanceCollector = performanceCollector;
+        _modelAnalyzer = modelAnalyzer;
+        _mareMediator = mareMediator;
         _logger.LogTrace("Creating {this}", nameof(PlayerDataFactory));
     }
 
@@ -229,9 +234,67 @@ public class PlayerDataFactory
             }
         }
 
+        if (objectKind == ObjectKind.Player)
+        {
+            await VerifyPlayerAnimationBones(previousData, objectKind, charaPointer).ConfigureAwait(false);
+        }
+
         _logger.LogInformation("Building character data for {obj} took {time}ms", objectKind, TimeSpan.FromTicks(DateTime.UtcNow.Ticks - start.Ticks).TotalMilliseconds);
 
         return previousData;
+    }
+
+    private async Task VerifyPlayerAnimationBones(CharacterData previousData, ObjectKind objectKind, nint charaPointer)
+    {
+        var boneIndices = _modelAnalyzer.GetSkeletonBoneIndices(charaPointer);
+        if (boneIndices != null)
+        {
+            _logger.LogDebug("Found {idx} bone indices on player: {bones}", boneIndices.Count, string.Join(',', boneIndices));
+
+            int noValidationFailed = 0;
+            foreach (var file in previousData.FileReplacements[objectKind].Where(f => !f.IsFileSwap && f.GamePaths.First().EndsWith("pap", StringComparison.OrdinalIgnoreCase)).ToList())
+            {
+                var animationIndices = await _dalamudUtil.RunOnFrameworkThread(() => _modelAnalyzer.GetBoneIndicesFromPap(file.Hash)).ConfigureAwait(false);
+                bool validationFailed = false;
+                if (animationIndices != null)
+                {
+                    _logger.LogDebug("Verifying bone indices for {path}, found {x} animations", file.ResolvedPath, animationIndices.Count);
+                    for (int i = 0; i < animationIndices.Count; i++)
+                    {
+                        _logger.LogTrace("Verifying animation set {i}, found {idx} bone indeces", i, animationIndices[i].Count);
+                        if (animationIndices[i].Count > boneIndices.Count)
+                        {
+                            _logger.LogWarning("Found more bone indeces on the animation {path} ({idx}) than on player skeleton ({idx2})", file.ResolvedPath, animationIndices[i].Count, boneIndices.Count);
+                            validationFailed = true;
+                        }
+                        else if (animationIndices[i].Exists(idx => !boneIndices.Contains(idx)))
+                        {
+                            _logger.LogWarning("Found bone indices referred on animation {path} that are not on the player skeleton", file.ResolvedPath);
+                            validationFailed = true;
+                        }
+                    }
+                }
+
+                if (validationFailed)
+                {
+                    noValidationFailed++;
+                    _logger.LogDebug("Removing {file} from sent file replacements and transient data", file.ResolvedPath);
+                    previousData.FileReplacements[objectKind].Remove(file);
+                    foreach (var gamePath in file.GamePaths)
+                    {
+                        _transientResourceManager.RemoveTransientResource(objectKind, gamePath);
+                    }
+                }
+
+            }
+            if (noValidationFailed > 0)
+            {
+                _mareMediator.Publish(new NotificationMessage("Invalid Skeleton Setup",
+                    $"Your client is attempting to send {noValidationFailed} animation files with invalid bone data. Those animation files have been removed from your sent data. " +
+                    $"Verify that you are using the correct skeleton for those animation files (Check /xllog for more information).",
+                    Dalamud.Interface.Internal.Notifications.NotificationType.Warning, TimeSpan.FromSeconds(10)));
+            }
+        }
     }
 
     private async Task<IReadOnlyDictionary<string, string[]>> GetFileReplacementsFromPaths(HashSet<string> forwardResolve, HashSet<string> reverseResolve)

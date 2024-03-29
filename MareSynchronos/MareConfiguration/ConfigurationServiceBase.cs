@@ -40,6 +40,7 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
     {
         _periodicCheckCts.Cancel();
         _periodicCheckCts.Dispose();
+        if (_configIsDirty) SaveDirtyConfig();
     }
 
     protected T LoadConfig()
@@ -94,10 +95,12 @@ public abstract class ConfigurationServiceBase<T> : IDisposable where T : IMareC
             // ignore if file cannot be backupped once
         }
 
-        File.WriteAllText(ConfigurationPath, JsonSerializer.Serialize(Current, new JsonSerializerOptions()
+        var temp = ConfigurationPath + ".tmp";
+        File.WriteAllText(temp, JsonSerializer.Serialize(Current, new JsonSerializerOptions()
         {
             WriteIndented = true
         }));
+        File.Move(temp, ConfigurationPath, true);
         _configLastWriteTime = new FileInfo(ConfigurationPath).LastWriteTimeUtc;
     }
 

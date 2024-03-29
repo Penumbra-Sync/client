@@ -12,12 +12,12 @@ namespace MareSynchronos.Services;
 public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
 {
     private readonly FileCacheManager _fileCacheManager;
-    private readonly ModelAnalyzer _modelAnalyzer;
+    private readonly XivDataAnalyzer _xivDataAnalyzer;
     private CancellationTokenSource? _analysisCts;
     private CancellationTokenSource _baseAnalysisCts = new();
     private string _lastDataHash = string.Empty;
 
-    public CharacterAnalyzer(ILogger<CharacterAnalyzer> logger, MareMediator mediator, FileCacheManager fileCacheManager, ModelAnalyzer modelAnalyzer)
+    public CharacterAnalyzer(ILogger<CharacterAnalyzer> logger, MareMediator mediator, FileCacheManager fileCacheManager, XivDataAnalyzer modelAnalyzer)
         : base(logger, mediator)
     {
         Mediator.Subscribe<CharacterDataCreatedMessage>(this, (msg) =>
@@ -27,7 +27,7 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
             _ = BaseAnalysis(msg.CharacterData, token);
         });
         _fileCacheManager = fileCacheManager;
-        _modelAnalyzer = modelAnalyzer;
+        _xivDataAnalyzer = modelAnalyzer;
     }
 
     public int CurrentFile { get; internal set; }
@@ -121,7 +121,7 @@ public sealed class CharacterAnalyzer : MediatorSubscriberBase, IDisposable
                     Logger.LogWarning(ex, "Could not identify extension for {path}", filePath);
                 }
 
-                var tris = await _modelAnalyzer.GetTrianglesByHash(fileEntry.Hash).ConfigureAwait(false);
+                var tris = await _xivDataAnalyzer.GetTrianglesByHash(fileEntry.Hash).ConfigureAwait(false);
 
                 foreach (var entry in fileCacheEntries)
                 {

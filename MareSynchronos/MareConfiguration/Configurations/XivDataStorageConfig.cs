@@ -2,8 +2,9 @@
 
 namespace MareSynchronos.MareConfiguration.Configurations;
 
-public class TriangleCalculationConfig : IMareConfiguration
+public class XivDataStorageConfig : IMareConfiguration
 {
     public ConcurrentDictionary<string, long> TriangleDictionary { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public ConcurrentDictionary<string, List<List<ushort>>> BoneDictionary { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public int Version { get; set; } = 0;
 }
