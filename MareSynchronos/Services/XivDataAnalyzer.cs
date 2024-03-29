@@ -35,15 +35,14 @@ public sealed class XivDataAnalyzer
         var resHandles = chara->Skeleton->SkeletonResourceHandles;
         int i = 0;
         Dictionary<string, List<ushort>> outputIndices = [];
-        while (*(resHandles + i) != null)
+        try
         {
-            string skeletonName = "unknown";
-
-            try
+            while (*(resHandles + i) != null)
             {
                 var handle = *(resHandles + i);
                 var curBones = handle->BoneCount;
-                skeletonName = handle->ResourceHandle.FileName.ToString();
+                var skeletonName = handle->ResourceHandle.FileName.ToString();
+                if (string.IsNullOrEmpty(skeletonName)) continue;
                 outputIndices[skeletonName] = new();
                 for (ushort boneIdx = 0; boneIdx < curBones; boneIdx++)
                 {
@@ -53,12 +52,12 @@ public sealed class XivDataAnalyzer
                     outputIndices[skeletonName].Add(boneIdx);
 
                 }
+                i++;
             }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Could procss skeleton {skl}", skeletonName);
-            }
-            i++;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not process skeleton data");
         }
 
         return outputIndices;

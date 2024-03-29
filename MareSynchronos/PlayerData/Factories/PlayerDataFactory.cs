@@ -139,6 +139,7 @@ public class PlayerDataFactory
             await Task.Delay(50, token).ConfigureAwait(false);
             totalWaitTime -= 50;
         }
+        var boneIndices = await _dalamudUtil.RunOnFrameworkThread(() => _modelAnalyzer.GetSkeletonBoneIndices(charaPointer)).ConfigureAwait(false);
 
         DateTime start = DateTime.UtcNow;
 
@@ -236,7 +237,14 @@ public class PlayerDataFactory
 
         if (objectKind == ObjectKind.Player)
         {
-            await VerifyPlayerAnimationBones(previousData, objectKind, charaPointer).ConfigureAwait(false);
+            try
+            {
+                await VerifyPlayerAnimationBones(boneIndices, previousData, objectKind).ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning(e, "Failed to verify player animations, continuing");
+            }
         }
 
         _logger.LogInformation("Building character data for {obj} took {time}ms", objectKind, TimeSpan.FromTicks(DateTime.UtcNow.Ticks - start.Ticks).TotalMilliseconds);
@@ -244,14 +252,13 @@ public class PlayerDataFactory
         return previousData;
     }
 
-    private async Task VerifyPlayerAnimationBones(CharacterData previousData, ObjectKind objectKind, nint charaPointer)
+    private async Task VerifyPlayerAnimationBones(Dictionary<string, List<ushort>>? boneIndices, CharacterData previousData, ObjectKind objectKind)
     {
-        var boneIndices = _modelAnalyzer.GetSkeletonBoneIndices(charaPointer);
         if (boneIndices != null)
         {
             foreach (var kvp in boneIndices)
             {
-                _logger.LogDebug("Found {skellyname} ({idx} bone indices) on player: {bones}", kvp.Key, kvp.Value.Max(), string.Join(',', kvp.Value));
+                _logger.LogDebug("Found {skellyname} ({idx} bone indices) on player: {bones}", kvp.Key, kvp.Value.Any() ? kvp.Value.Max() : 0, string.Join(',', kvp.Value));
             }
 
             if (boneIndices.All(u => u.Value.Count == 0)) return;
