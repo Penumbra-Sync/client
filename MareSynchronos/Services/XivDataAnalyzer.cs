@@ -43,9 +43,16 @@ public sealed class XivDataAnalyzer
             outputIndices[skeletonName] = new();
             for (ushort boneIdx = 0; boneIdx < curBones; boneIdx++)
             {
-                var boneName = handle->HavokSkeleton->Bones[boneIdx].Name.String;
-                if (boneName == null) continue;
-                outputIndices[skeletonName].Add(boneIdx);
+                try
+                {
+                    var boneName = handle->HavokSkeleton->Bones[boneIdx].Name.String;
+                    if (boneName == null) continue;
+                    outputIndices[skeletonName].Add(boneIdx);
+                }
+                catch
+                {
+                    _logger.LogTrace("Could not get bone for {skellyname}:{idx}", skeletonName, boneIdx);
+                }
             }
             i++;
         }
