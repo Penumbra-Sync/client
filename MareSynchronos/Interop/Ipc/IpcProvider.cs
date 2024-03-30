@@ -95,6 +95,10 @@ public class IpcProvider : IHostedService, IMediatorSubscriber
             var expectedLength = _mareCharaFileManager.LoadMareCharaFile(path);
             await _mareCharaFileManager.ApplyMareCharaFile(target, expectedLength).ConfigureAwait(false);
         }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Failure of IPC call");
+        }
         finally
         {
             _mareCharaFileManager.ClearMareCharaFile();
