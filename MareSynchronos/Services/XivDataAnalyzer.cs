@@ -156,7 +156,7 @@ public sealed class XivDataAnalyzer
         if (_configService.Current.TriangleDictionary.TryGetValue(gamePath, out var cachedTris))
             return Task.FromResult(cachedTris);
 
-        _logger.LogInformation("Detected Model File {path}, calculating Tris", gamePath);
+        _logger.LogDebug("Detected Model File {path}, calculating Tris", gamePath);
         var file = _luminaGameData.GetFile<MdlFile>(gamePath);
         if (file == null)
             return Task.FromResult((long)0);
@@ -167,7 +167,7 @@ public sealed class XivDataAnalyzer
         var meshCnt = file.Lods[0].MeshCount;
         var tris = file.Meshes.Skip(meshIdx).Take(meshCnt).Sum(p => p.IndexCount) / 3;
 
-        _logger.LogInformation("{filePath} => {tris} triangles", gamePath, tris);
+        _logger.LogDebug("{filePath} => {tris} triangles", gamePath, tris);
         _configService.Current.TriangleDictionary[gamePath] = tris;
         _configService.Save();
         return Task.FromResult(tris);
@@ -184,7 +184,7 @@ public sealed class XivDataAnalyzer
 
         var filePath = path.ResolvedFilepath;
 
-        _logger.LogInformation("Detected Model File {path}, calculating Tris", filePath);
+        _logger.LogDebug("Detected Model File {path}, calculating Tris", filePath);
         var file = _luminaGameData.GetFileFromDisk<MdlFile>(filePath);
         if (file.FileHeader.LodCount <= 0)
             return Task.FromResult((long)0);
@@ -192,7 +192,7 @@ public sealed class XivDataAnalyzer
         var meshCnt = file.Lods[0].MeshCount;
         var tris = file.Meshes.Skip(meshIdx).Take(meshCnt).Sum(p => p.IndexCount) / 3;
 
-        _logger.LogInformation("{filePath} => {tris} triangles", filePath, tris);
+        _logger.LogDebug("{filePath} => {tris} triangles", filePath, tris);
         _configService.Current.TriangleDictionary[hash] = tris;
         _configService.Save();
         return Task.FromResult(tris);
