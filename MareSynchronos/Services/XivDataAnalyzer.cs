@@ -33,14 +33,16 @@ public sealed class XivDataAnalyzer
         var chara = (CharacterBase*)(((Character*)charaPtr)->GameObject.DrawObject);
         if (chara->GetModelType() != CharacterBase.ModelType.Human) return null;
         var resHandles = chara->Skeleton->SkeletonResourceHandles;
-        int i = 0;
+        int i = -1;
         Dictionary<string, List<ushort>> outputIndices = [];
         try
         {
-            while (*(resHandles + i) != null)
+            while (*(resHandles + ++i) != null)
             {
                 var handle = *(resHandles + i);
                 var curBones = handle->BoneCount;
+                // this is unrealistic, the filename shouldn't ever be that long
+                if (handle->ResourceHandle.FileName.Length > 1024) continue;
                 var skeletonName = handle->ResourceHandle.FileName.ToString();
                 if (string.IsNullOrEmpty(skeletonName)) continue;
                 outputIndices[skeletonName] = new();
@@ -50,7 +52,6 @@ public sealed class XivDataAnalyzer
                     if (boneName == null) continue;
                     outputIndices[skeletonName].Add((ushort)(boneIdx + 1));
                 }
-                i++;
             }
         }
         catch (Exception ex)
