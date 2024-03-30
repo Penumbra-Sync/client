@@ -59,7 +59,7 @@ public sealed class XivDataAnalyzer
             _logger.LogWarning(ex, "Could not process skeleton data");
         }
 
-        return outputIndices;
+        return (outputIndices.Count != 0 && outputIndices.Values.All(u => u.Count > 0)) ? outputIndices : null;
     }
 
     public unsafe Dictionary<string, List<ushort>>? GetBoneIndicesFromPap(string hash)
