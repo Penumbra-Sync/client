@@ -6,6 +6,7 @@ using Lumina;
 using Lumina.Data.Files;
 using MareSynchronos.FileCache;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.PlayerData.Handlers;
 using Microsoft.Extensions.Logging;
 using System.Runtime.InteropServices;
 
@@ -27,19 +28,20 @@ public sealed class XivDataAnalyzer
         _luminaGameData = new GameData(gameData.GameData.DataPath.FullName);
     }
 
-    public unsafe Dictionary<string, List<ushort>>? GetSkeletonBoneIndices(nint charaPtr)
+    public unsafe Dictionary<string, List<ushort>>? GetSkeletonBoneIndices(GameObjectHandler handler)
     {
-        if (charaPtr == nint.Zero) return null;
-        var chara = (CharacterBase*)(((Character*)charaPtr)->GameObject.DrawObject);
+        if (handler.Address == nint.Zero) return null;
+        var chara = (CharacterBase*)(((Character*)handler.Address)->GameObject.DrawObject);
         if (chara->GetModelType() != CharacterBase.ModelType.Human) return null;
         var resHandles = chara->Skeleton->SkeletonResourceHandles;
-        int i = -1;
         Dictionary<string, List<ushort>> outputIndices = [];
         try
         {
-            while (*(resHandles + ++i) != null)
+            for (int i = 0; i < chara->Skeleton->PartialSkeletonCount; i++)
             {
                 var handle = *(resHandles + i);
+                _logger.LogTrace("Iterating over SkeletonResourceHandle #{i}:{x}", i, ((nint)handle).ToString("X"));
+                if ((nint)handle == nint.Zero) continue;
                 var curBones = handle->BoneCount;
                 // this is unrealistic, the filename shouldn't ever be that long
                 if (handle->ResourceHandle.FileName.Length > 1024) continue;

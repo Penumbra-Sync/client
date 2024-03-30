@@ -142,7 +142,7 @@ public class PlayerDataFactory
         Dictionary<string, List<ushort>>? boneIndices =
             objectKind != ObjectKind.Player
             ? null
-            : await _dalamudUtil.RunOnFrameworkThread(() => _modelAnalyzer.GetSkeletonBoneIndices(playerRelatedObject.Address)).ConfigureAwait(false);
+            : await _dalamudUtil.RunOnFrameworkThread(() => _modelAnalyzer.GetSkeletonBoneIndices(playerRelatedObject)).ConfigureAwait(false);
 
         DateTime start = DateTime.UtcNow;
 
