@@ -1,7 +1,8 @@
 ﻿using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Interface.Internal.Notifications;
 using Dalamud.Plugin;
-using Dalamud.Plugin.Ipc;
+using Glamourer.Api.Helpers;
+using Glamourer.Api.IpcSubscribers;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
@@ -11,12 +12,14 @@ namespace MareSynchronos.Interop.Ipc;
 
 public sealed class IpcCallerGlamourer : IIpcCaller
 {
-    private readonly ICallGateSubscriber<(int, int)> _glamourerApiVersions;
-    private readonly ICallGateSubscriber<string, GameObject?, uint, object>? _glamourerApplyAll;
-    private readonly ICallGateSubscriber<GameObject?, string>? _glamourerGetAllCustomization;
-    private readonly ICallGateSubscriber<Character?, uint, object?> _glamourerRevert;
-    private readonly ICallGateSubscriber<string, uint, object?> _glamourerRevertByName;
-    private readonly ICallGateSubscriber<string, uint, bool> _glamourerUnlock;
+    private readonly ApiVersion _glamourerApiVersions;
+    private readonly ApplyState? _glamourerApplyAll;
+    private readonly GetStateBase64? _glamourerGetAllCustomization;
+    private readonly RevertState _glamourerRevert;
+    private readonly RevertStateName _glamourerRevertByName;
+    private readonly UnlockState _glamourerUnlock;
+    private readonly UnlockStateName _glamourerUnlockByName;
+    private readonly EventSubscriber<nint> _glamourerStateChanged;
     private readonly ILogger<IpcCallerGlamourer> _logger;
     private readonly DalamudPluginInterface _pi;
     private readonly DalamudUtilService _dalamudUtil;
@@ -28,14 +31,16 @@ public sealed class IpcCallerGlamourer : IIpcCaller
     public IpcCallerGlamourer(ILogger<IpcCallerGlamourer> logger, DalamudPluginInterface pi, DalamudUtilService dalamudUtil, MareMediator mareMediator,
         RedrawManager redrawManager)
     {
-        _glamourerApiVersions = pi.GetIpcSubscriber<(int, int)>("Glamourer.ApiVersions");
-        _glamourerGetAllCustomization = pi.GetIpcSubscriber<GameObject?, string>("Glamourer.GetAllCustomizationFromCharacter");
-        _glamourerApplyAll = pi.GetIpcSubscriber<string, GameObject?, uint, object>("Glamourer.ApplyAllToCharacterLock");
-        _glamourerRevert = pi.GetIpcSubscriber<Character?, uint, object?>("Glamourer.RevertCharacterLock");
-        _glamourerRevertByName = pi.GetIpcSubscriber<string, uint, object?>("Glamourer.RevertLock");
-        _glamourerUnlock = pi.GetIpcSubscriber<string, uint, bool>("Glamourer.UnlockName");
+        _glamourerApiVersions = new ApiVersion(pi);
+        _glamourerGetAllCustomization = new GetStateBase64(pi);
+        _glamourerApplyAll = new ApplyState(pi);
+        _glamourerRevert = new RevertState(pi);
+        _glamourerRevertByName = new RevertStateName(pi);
+        _glamourerUnlock = new UnlockState(pi);
+        _glamourerUnlockByName = new UnlockStateName(pi);
 
-        pi.GetIpcSubscriber<int, nint, Lazy<string>, object?>("Glamourer.StateChanged").Subscribe((type, address, customize) => GlamourerChanged(address));
+        _glamourerStateChanged = StateChanged.Subscriber(pi, GlamourerChanged);
+        _glamourerStateChanged.Enable();
         _logger = logger;
         _pi = pi;
         _dalamudUtil = dalamudUtil;
@@ -51,11 +56,11 @@ public sealed class IpcCallerGlamourer : IIpcCaller
         bool apiAvailable = false;
         try
         {
-            var version = _glamourerApiVersions.InvokeFunc();
+            var version = _glamourerApiVersions.Invoke();
             bool versionValid = (_pi.InstalledPlugins
                 .FirstOrDefault(p => string.Equals(p.InternalName, "Glamourer", StringComparison.OrdinalIgnoreCase))
-                ?.Version ?? new Version(0, 0, 0, 0)) >= new Version(1, 0, 6, 1);
-            if (version.Item1 == 0 && version.Item2 >= 1 && versionValid)
+                ?.Version ?? new Version(0, 0, 0, 0)) >= new Version(1, 2, 1, 4);
+            if (version is { Major: 1, Minor: >= 1 } && versionValid)
             {
                 apiAvailable = true;
             }
@@ -80,7 +85,7 @@ public sealed class IpcCallerGlamourer : IIpcCaller
 
     public void Dispose()
     {
-        _pi.GetIpcSubscriber<int, nint, Lazy<string>, object?>("Glamourer.StateChanged").Unsubscribe((type, address, customize) => GlamourerChanged(address));
+        _glamourerStateChanged.Dispose();
     }
 
     public async Task ApplyAllAsync(ILogger logger, GameObjectHandler handler, string? customization, Guid applicationId, CancellationToken token, bool fireAndForget = false)
@@ -97,7 +102,7 @@ public sealed class IpcCallerGlamourer : IIpcCaller
                 try
                 {
                     logger.LogDebug("[{appid}] Calling on IPC: GlamourerApplyAll", applicationId);
-                    _glamourerApplyAll!.InvokeAction(customization, chara, LockCode);
+                    _glamourerApplyAll!.Invoke(customization, chara.ObjectIndex, LockCode);
                 }
                 catch (Exception)
                 {
@@ -121,7 +126,7 @@ public sealed class IpcCallerGlamourer : IIpcCaller
                 var gameObj = _dalamudUtil.CreateGameObject(character);
                 if (gameObj is Character c)
                 {
-                    return _glamourerGetAllCustomization!.InvokeFunc(c);
+                    return _glamourerGetAllCustomization!.Invoke(c.ObjectIndex).Item2 ?? string.Empty;
                 }
                 return string.Empty;
             }).ConfigureAwait(false);
@@ -143,9 +148,9 @@ public sealed class IpcCallerGlamourer : IIpcCaller
                 try
                 {
                     logger.LogDebug("[{appid}] Calling On IPC: GlamourerUnlockName", applicationId);
-                    _glamourerUnlock.InvokeFunc(name, LockCode);
+                    _glamourerUnlock.Invoke(chara.ObjectIndex, LockCode);
                     logger.LogDebug("[{appid}] Calling On IPC: GlamourerRevert", applicationId);
-                    _glamourerRevert.InvokeAction(chara, LockCode);
+                    _glamourerRevert.Invoke(chara.ObjectIndex, LockCode);
                     logger.LogDebug("[{appid}] Calling On IPC: PenumbraRedraw", applicationId);
                     _mareMediator.Publish(new PenumbraRedrawCharacterMessage(chara));
                 }
@@ -170,9 +175,9 @@ public sealed class IpcCallerGlamourer : IIpcCaller
             try
             {
                 logger.LogDebug("[{appid}] Calling On IPC: GlamourerRevertByName", applicationId);
-                _glamourerRevertByName.InvokeAction(name, LockCode);
+                _glamourerRevertByName.Invoke(name, LockCode);
                 logger.LogDebug("[{appid}] Calling On IPC: GlamourerUnlockName", applicationId);
-                _glamourerUnlock.InvokeFunc(name, LockCode);
+                _glamourerUnlockByName.Invoke(name, LockCode);
             }
             catch (Exception ex)
             {
@@ -187,9 +192,9 @@ public sealed class IpcCallerGlamourer : IIpcCaller
         try
         {
             logger.LogDebug("[{appid}] Calling On IPC: GlamourerRevertByName", applicationId);
-            _glamourerRevertByName.InvokeAction(name, LockCode);
+            _glamourerRevertByName.Invoke(name, LockCode);
             logger.LogDebug("[{appid}] Calling On IPC: GlamourerUnlockName", applicationId);
-            _glamourerUnlock.InvokeFunc(name, LockCode);
+            _glamourerUnlockByName.Invoke(name, LockCode);
         }
         catch (Exception ex)
         {
