@@ -149,7 +149,7 @@ public class PlayerDataFactory
         // penumbra call, it's currently broken
         Dictionary<string, HashSet<string>>? resolvedPaths;
 
-        resolvedPaths = (await _ipcManager.Penumbra.GetCharacterData(_logger, playerRelatedObject).ConfigureAwait(false))?[0];
+        resolvedPaths = (await _ipcManager.Penumbra.GetCharacterData(_logger, playerRelatedObject).ConfigureAwait(false));
         if (resolvedPaths == null) throw new InvalidOperationException("Penumbra returned null data");
 
         previousData.FileReplacements[objectKind] =

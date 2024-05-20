@@ -40,7 +40,7 @@
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.5" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="8.0.5" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-    <PackageReference Include="Glamourer.Api" Version="1.0.0" />
+    <PackageReference Include="Glamourer.Api" Version="2.0.0" />
     <PackageReference Include="Penumbra.Api" Version="5.0.0" />
     <PackageReference Include="Penumbra.String" Version="1.0.4" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.4" />
