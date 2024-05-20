@@ -147,7 +147,7 @@ public class PlayerDataFactory
         DateTime start = DateTime.UtcNow;
 
         // penumbra call, it's currently broken
-        IReadOnlyDictionary<string, string[]>? resolvedPaths;
+        Dictionary<string, HashSet<string>>? resolvedPaths;
 
         resolvedPaths = (await _ipcManager.Penumbra.GetCharacterData(_logger, playerRelatedObject).ConfigureAwait(false))?[0];
         if (resolvedPaths == null) throw new InvalidOperationException("Penumbra returned null data");
