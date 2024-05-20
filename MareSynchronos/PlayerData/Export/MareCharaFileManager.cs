@@ -92,9 +92,8 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
                     }
                 }
                 var applicationId = Guid.NewGuid();
-                await _ipcManager.Penumbra.RemoveTemporaryCollectionAsync(_logger, applicationId, charaTarget.Name.TextValue).ConfigureAwait(false);
                 var coll = await _ipcManager.Penumbra.CreateTemporaryCollectionAsync(_logger, charaTarget.Name.TextValue).ConfigureAwait(false);
-                await _ipcManager.Penumbra.AssignTemporaryCollectionAsync(_logger, coll, charaTarget.ObjectTableIndex()!.Value).ConfigureAwait(false);
+                await _ipcManager.Penumbra.AssignTemporaryCollectionAsync(_logger, coll, charaTarget.ObjectIndex).ConfigureAwait(false);
                 await _ipcManager.Penumbra.SetTemporaryModsAsync(_logger, applicationId, coll, extractedFiles.Union(fileSwaps).ToDictionary(d => d.Key, d => d.Value, StringComparer.Ordinal)).ConfigureAwait(false);
                 await _ipcManager.Penumbra.SetManipulationDataAsync(_logger, applicationId, coll, LoadedCharaFile.CharaFileData.ManipulationData).ConfigureAwait(false);
 

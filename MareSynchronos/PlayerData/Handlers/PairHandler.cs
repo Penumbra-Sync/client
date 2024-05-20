@@ -37,7 +37,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private CancellationTokenSource? _downloadCancellationTokenSource = new();
     private bool _forceApplyMods = false;
     private bool _isVisible;
-    private string _penumbraCollection;
+    private Guid _penumbraCollection;
     private bool _redrawOnNextApplication = false;
     private CombatData? _dataReceivedInDowntime;
     public long LastAppliedDataSize { get; private set; }
