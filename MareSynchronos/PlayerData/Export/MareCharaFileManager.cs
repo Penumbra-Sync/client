@@ -21,6 +21,7 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
     private readonly MareCharaFileDataFactory _factory;
     private readonly GameObjectHandlerFactory _gameObjectHandlerFactory;
     private readonly Dictionary<string, GameObjectHandler> _gposeGameObjects;
+    private readonly List<Guid?> _gposeCustomizeObjects;
     private readonly IpcManager _ipcManager;
     private readonly ILogger<MareCharaFileManager> _logger;
     private readonly FileCacheManager _manager;
@@ -39,6 +40,7 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
         _configService = configService;
         _dalamudUtil = dalamudUtil;
         _gposeGameObjects = [];
+        _gposeCustomizeObjects = [];
         Mediator.Subscribe<GposeStartMessage>(this, _ => _isInGpose = true);
         Mediator.Subscribe<GposeEndMessage>(this, async _ =>
         {
@@ -58,6 +60,10 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
 
 
                 item.Value.Dispose();
+            }
+            foreach (var id in _gposeCustomizeObjects.Where(d => d != null))
+            {
+                await _ipcManager.CustomizePlus.RevertByIdAsync(id.Value);
             }
             _gposeGameObjects.Clear();
         });
@@ -109,11 +115,13 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
                 await _ipcManager.Penumbra.RemoveTemporaryCollectionAsync(_logger, applicationId, coll).ConfigureAwait(false);
                 if (!string.IsNullOrEmpty(LoadedCharaFile.CharaFileData.CustomizePlusData))
                 {
-                    await _ipcManager.CustomizePlus.SetBodyScaleAsync(tempHandler.Address, LoadedCharaFile.CharaFileData.CustomizePlusData).ConfigureAwait(false);
+                    var id = await _ipcManager.CustomizePlus.SetBodyScaleAsync(tempHandler.Address, LoadedCharaFile.CharaFileData.CustomizePlusData).ConfigureAwait(false);
+                    _gposeCustomizeObjects.Add(id);
                 }
                 else
                 {
-                    await _ipcManager.CustomizePlus.RevertAsync(tempHandler.Address).ConfigureAwait(false);
+                    var id = await _ipcManager.CustomizePlus.SetBodyScaleAsync(tempHandler.Address, "{}").ConfigureAwait(false);
+                    _gposeCustomizeObjects.Add(id);
                 }
             }
         }

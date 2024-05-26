@@ -12,10 +12,12 @@ namespace MareSynchronos.Interop.Ipc;
 public sealed class IpcCallerCustomize : IIpcCaller
 {
     private readonly ICallGateSubscriber<(int, int)> _customizePlusApiVersion;
-    private readonly ICallGateSubscriber<Character?, string?> _customizePlusGetBodyScale;
-    private readonly ICallGateSubscriber<string?, string?, object> _customizePlusOnScaleUpdate;
-    private readonly ICallGateSubscriber<Character?, object> _customizePlusRevertCharacter;
-    private readonly ICallGateSubscriber<string, Character?, object> _customizePlusSetBodyScaleToCharacter;
+    private readonly ICallGateSubscriber<Character, (int, Guid?)> _customizePlusGetActiveProfile;
+    private readonly ICallGateSubscriber<Guid, (int, string?)> _customizePlusGetProfileById;
+    private readonly ICallGateSubscriber<Character, Guid, object> _customizePlusOnScaleUpdate;
+    private readonly ICallGateSubscriber<Character, int> _customizePlusRevertCharacter;
+    private readonly ICallGateSubscriber<Character, string, (int, Guid?)> _customizePlusSetBodyScaleToCharacter;
+    private readonly ICallGateSubscriber<Guid, int> _customizePlusDeleteByUniqueId;
     private readonly ILogger<IpcCallerCustomize> _logger;
     private readonly DalamudUtilService _dalamudUtil;
     private readonly MareMediator _mareMediator;
@@ -23,11 +25,13 @@ public sealed class IpcCallerCustomize : IIpcCaller
     public IpcCallerCustomize(ILogger<IpcCallerCustomize> logger, DalamudPluginInterface dalamudPluginInterface,
         DalamudUtilService dalamudUtil, MareMediator mareMediator)
     {
-        _customizePlusApiVersion = dalamudPluginInterface.GetIpcSubscriber<(int, int)>("CustomizePlus.GetApiVersion");
-        _customizePlusGetBodyScale = dalamudPluginInterface.GetIpcSubscriber<Character?, string?>("CustomizePlus.GetProfileFromCharacter");
-        _customizePlusRevertCharacter = dalamudPluginInterface.GetIpcSubscriber<Character?, object>("CustomizePlus.RevertCharacter");
-        _customizePlusSetBodyScaleToCharacter = dalamudPluginInterface.GetIpcSubscriber<string, Character?, object>("CustomizePlus.SetProfileToCharacter");
-        _customizePlusOnScaleUpdate = dalamudPluginInterface.GetIpcSubscriber<string?, string?, object>("CustomizePlus.OnProfileUpdate");
+        _customizePlusApiVersion = dalamudPluginInterface.GetIpcSubscriber<(int, int)>("CustomizePlus.General.GetApiVersion");
+        _customizePlusGetActiveProfile = dalamudPluginInterface.GetIpcSubscriber<Character, (int, Guid?)>("CustomizePlus.Profile.GetActiveProfileIdOnCharacter");
+        _customizePlusGetProfileById = dalamudPluginInterface.GetIpcSubscriber<Guid, (int, string?)>("CustomizePlus.Profile.GetByUniqueId");
+        _customizePlusRevertCharacter = dalamudPluginInterface.GetIpcSubscriber<Character, int>("CustomizePlus.Profile.DeleteTemporaryProfileOnCharacter");
+        _customizePlusSetBodyScaleToCharacter = dalamudPluginInterface.GetIpcSubscriber<Character, string, (int, Guid?)>("CustomizePlus.Profile.SetTemporaryProfileOnCharacter");
+        _customizePlusOnScaleUpdate = dalamudPluginInterface.GetIpcSubscriber<Character, Guid, object>("CustomizePlus.Profile.OnUpdate");
+        _customizePlusDeleteByUniqueId = dalamudPluginInterface.GetIpcSubscriber<Guid, int>("CustomizePlus.Profile.DeleteTemporaryProfileByUniqueId");
 
         _customizePlusOnScaleUpdate.Subscribe(OnCustomizePlusScaleChange);
         _logger = logger;
@@ -53,10 +57,10 @@ public sealed class IpcCallerCustomize : IIpcCaller
         }).ConfigureAwait(false);
     }
 
-    public async Task SetBodyScaleAsync(nint character, string scale)
+    public async Task<Guid?> SetBodyScaleAsync(nint character, string scale)
     {
-        if (!APIAvailable) return;
-        await _dalamudUtil.RunOnFrameworkThread(() =>
+        if (!APIAvailable) return null;
+        return await _dalamudUtil.RunOnFrameworkThread(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj is Character c)
@@ -66,12 +70,26 @@ public sealed class IpcCallerCustomize : IIpcCaller
                 if (scale.IsNullOrEmpty())
                 {
                     _customizePlusRevertCharacter!.InvokeAction(c);
+                    return null;
                 }
                 else
                 {
-                    _customizePlusSetBodyScaleToCharacter!.InvokeAction(decodedScale, c);
+                    var result = _customizePlusSetBodyScaleToCharacter!.InvokeFunc(c, decodedScale);
+                    return result.Item2;
                 }
             }
+
+            return null;
+        }).ConfigureAwait(false);
+    }
+
+    public async Task RevertByIdAsync(Guid? profileId)
+    {
+        if (!APIAvailable || profileId == null) return;
+
+        await _dalamudUtil.RunOnFrameworkThread(() =>
+        {
+            _ = _customizePlusDeleteByUniqueId.InvokeFunc(profileId.Value);
         }).ConfigureAwait(false);
     }
 
@@ -83,7 +101,10 @@ public sealed class IpcCallerCustomize : IIpcCaller
             var gameObj = _dalamudUtil.CreateGameObject(character);
             if (gameObj is Character c)
             {
-                return _customizePlusGetBodyScale.InvokeFunc(c);
+                var res = _customizePlusGetActiveProfile.InvokeFunc(c);
+                _logger.LogTrace("CustomizePlus GetActiveProfile returned {err}", res.Item1);
+                if (res.Item1 != 0 || res.Item2 == null) return string.Empty;
+                return _customizePlusGetProfileById.InvokeFunc(res.Item2.Value).Item2;
             }
 
             return string.Empty;
@@ -97,7 +118,7 @@ public sealed class IpcCallerCustomize : IIpcCaller
         try
         {
             var version = _customizePlusApiVersion.InvokeFunc();
-            APIAvailable = (version.Item1 == 3 && version.Item2 >= 0);
+            APIAvailable = (version.Item1 == 4 && version.Item2 >= 0);
         }
         catch
         {
@@ -105,9 +126,9 @@ public sealed class IpcCallerCustomize : IIpcCaller
         }
     }
 
-    private void OnCustomizePlusScaleChange(string? profileName, string? scale)
+    private void OnCustomizePlusScaleChange(Character c, Guid g)
     {
-        _mareMediator.Publish(new CustomizePlusMessage(profileName ?? string.Empty));
+        _mareMediator.Publish(new CustomizePlusMessage(c.Name.ToString() ?? string.Empty));
     }
 
     public void Dispose()
