@@ -128,6 +128,7 @@ public sealed class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCa
             try
             {
                 _ = _penumbraApiVersion.Invoke();
+                _useLegacyPenumbraApi = false;
             }
             catch
             {
