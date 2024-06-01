@@ -52,7 +52,7 @@ public sealed class IpcCallerCustomize : IIpcCaller
             if (gameObj is Character c)
             {
                 _logger.LogTrace("CustomizePlus reverting for {chara}", c.Address.ToString("X"));
-                _customizePlusRevertCharacter!.InvokeAction(c);
+                _customizePlusRevertCharacter!.InvokeFunc(c);
             }
         }).ConfigureAwait(false);
     }
@@ -69,7 +69,7 @@ public sealed class IpcCallerCustomize : IIpcCaller
                 _logger.LogTrace("CustomizePlus applying for {chara}", c.Address.ToString("X"));
                 if (scale.IsNullOrEmpty())
                 {
-                    _customizePlusRevertCharacter!.InvokeAction(c);
+                    _customizePlusRevertCharacter!.InvokeFunc(c);
                     return null;
                 }
                 else
