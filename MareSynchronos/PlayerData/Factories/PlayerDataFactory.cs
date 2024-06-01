@@ -207,11 +207,8 @@ public class PlayerDataFactory
         previousData.GlamourerString[playerRelatedObject.ObjectKind] = await getGlamourerData.ConfigureAwait(false);
         _logger.LogDebug("Glamourer is now: {data}", previousData.GlamourerString[playerRelatedObject.ObjectKind]);
         var customizeScale = await getCustomizeData.ConfigureAwait(false);
-        if (!string.IsNullOrEmpty(customizeScale))
-        {
-            previousData.CustomizePlusScale[playerRelatedObject.ObjectKind] = customizeScale;
-            _logger.LogDebug("Customize is now: {data}", previousData.CustomizePlusScale[playerRelatedObject.ObjectKind]);
-        }
+        previousData.CustomizePlusScale[playerRelatedObject.ObjectKind] = customizeScale ?? string.Empty;
+        _logger.LogDebug("Customize is now: {data}", previousData.CustomizePlusScale[playerRelatedObject.ObjectKind]);
         previousData.HonorificData = _ipcManager.Honorific.GetTitle();
         _logger.LogDebug("Honorific is now: {data}", previousData.HonorificData);
         previousData.HeelsData = await getHeelsOffset.ConfigureAwait(false);
