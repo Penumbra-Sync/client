@@ -150,6 +150,9 @@ public static class VariousExtensions
             oldData.CustomizePlusData.TryGetValue(objectKind, out var oldCustomizePlusData);
             newData.CustomizePlusData.TryGetValue(objectKind, out var newCustomizePlusData);
 
+            oldCustomizePlusData ??= string.Empty;
+            newCustomizePlusData ??= string.Empty;
+
             bool customizeDataDifferent = !string.Equals(oldCustomizePlusData, newCustomizePlusData, StringComparison.Ordinal);
             if (customizeDataDifferent || (forceApplyCustomization && !string.IsNullOrEmpty(newCustomizePlusData)))
             {
