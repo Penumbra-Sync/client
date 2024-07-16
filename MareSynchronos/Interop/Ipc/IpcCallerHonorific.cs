@@ -12,17 +12,17 @@ namespace MareSynchronos.Interop.Ipc;
 public sealed class IpcCallerHonorific : IIpcCaller
 {
     private readonly ICallGateSubscriber<(uint major, uint minor)> _honorificApiVersion;
-    private readonly ICallGateSubscriber<Character, object> _honorificClearCharacterTitle;
+    private readonly ICallGateSubscriber<ICharacter, object> _honorificClearCharacterTitle;
     private readonly ICallGateSubscriber<object> _honorificDisposing;
     private readonly ICallGateSubscriber<string> _honorificGetLocalCharacterTitle;
     private readonly ICallGateSubscriber<string, object> _honorificLocalCharacterTitleChanged;
     private readonly ICallGateSubscriber<object> _honorificReady;
-    private readonly ICallGateSubscriber<Character, string, object> _honorificSetCharacterTitle;
+    private readonly ICallGateSubscriber<ICharacter, string, object> _honorificSetCharacterTitle;
     private readonly ILogger<IpcCallerHonorific> _logger;
     private readonly MareMediator _mareMediator;
     private readonly DalamudUtilService _dalamudUtil;
 
-    public IpcCallerHonorific(ILogger<IpcCallerHonorific> logger, DalamudPluginInterface pi, DalamudUtilService dalamudUtil,
+    public IpcCallerHonorific(ILogger<IpcCallerHonorific> logger, IDalamudPluginInterface pi, DalamudUtilService dalamudUtil,
         MareMediator mareMediator)
     {
         _logger = logger;
@@ -30,8 +30,8 @@ public sealed class IpcCallerHonorific : IIpcCaller
         _dalamudUtil = dalamudUtil;
         _honorificApiVersion = pi.GetIpcSubscriber<(uint, uint)>("Honorific.ApiVersion");
         _honorificGetLocalCharacterTitle = pi.GetIpcSubscriber<string>("Honorific.GetLocalCharacterTitle");
-        _honorificClearCharacterTitle = pi.GetIpcSubscriber<Character, object>("Honorific.ClearCharacterTitle");
-        _honorificSetCharacterTitle = pi.GetIpcSubscriber<Character, string, object>("Honorific.SetCharacterTitle");
+        _honorificClearCharacterTitle = pi.GetIpcSubscriber<ICharacter, object>("Honorific.ClearCharacterTitle");
+        _honorificSetCharacterTitle = pi.GetIpcSubscriber<ICharacter, string, object>("Honorific.SetCharacterTitle");
         _honorificLocalCharacterTitleChanged = pi.GetIpcSubscriber<string, object>("Honorific.LocalCharacterTitleChanged");
         _honorificDisposing = pi.GetIpcSubscriber<object>("Honorific.Disposing");
         _honorificReady = pi.GetIpcSubscriber<object>("Honorific.Ready");
@@ -70,7 +70,7 @@ public sealed class IpcCallerHonorific : IIpcCaller
         await _dalamudUtil.RunOnFrameworkThread(() =>
         {
             var gameObj = _dalamudUtil.CreateGameObject(character);
-            if (gameObj is PlayerCharacter c)
+            if (gameObj is IPlayerCharacter c)
             {
                 _logger.LogTrace("Honorific removing for {addr}", c.Address.ToString("X"));
                 _honorificClearCharacterTitle!.InvokeAction(c);
@@ -94,7 +94,7 @@ public sealed class IpcCallerHonorific : IIpcCaller
             await _dalamudUtil.RunOnFrameworkThread(() =>
             {
                 var gameObj = _dalamudUtil.CreateGameObject(character);
-                if (gameObj is PlayerCharacter pc)
+                if (gameObj is IPlayerCharacter pc)
                 {
                     string honorificData = string.IsNullOrEmpty(honorificDataB64) ? string.Empty : Encoding.UTF8.GetString(Convert.FromBase64String(honorificDataB64));
                     if (string.IsNullOrEmpty(honorificData))

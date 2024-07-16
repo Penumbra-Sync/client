@@ -1,8 +1,8 @@
 ﻿using Dalamud.Game.ClientState.Objects.Types;
-using Dalamud.Interface.Internal.Notifications;
 using Dalamud.Plugin;
 using Glamourer.Api.Helpers;
 using Glamourer.Api.IpcSubscribers;
+using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
@@ -13,7 +13,7 @@ namespace MareSynchronos.Interop.Ipc;
 public sealed class IpcCallerGlamourer : IIpcCaller
 {
     private readonly ILogger<IpcCallerGlamourer> _logger;
-    private readonly DalamudPluginInterface _pi;
+    private readonly IDalamudPluginInterface _pi;
     private readonly DalamudUtilService _dalamudUtil;
     private readonly MareMediator _mareMediator;
     private readonly RedrawManager _redrawManager;
@@ -30,7 +30,7 @@ public sealed class IpcCallerGlamourer : IIpcCaller
     private bool _shownGlamourerUnavailable = false;
     private readonly uint LockCode = 0x6D617265;
 
-    public IpcCallerGlamourer(ILogger<IpcCallerGlamourer> logger, DalamudPluginInterface pi, DalamudUtilService dalamudUtil, MareMediator mareMediator,
+    public IpcCallerGlamourer(ILogger<IpcCallerGlamourer> logger, IDalamudPluginInterface pi, DalamudUtilService dalamudUtil, MareMediator mareMediator,
         RedrawManager redrawManager)
     {
         _glamourerApiVersions = new ApiVersion(pi);
@@ -134,7 +134,7 @@ public sealed class IpcCallerGlamourer : IIpcCaller
             return await _dalamudUtil.RunOnFrameworkThread(() =>
             {
                 var gameObj = _dalamudUtil.CreateGameObject(character);
-                if (gameObj is Character c)
+                if (gameObj is ICharacter c)
                 {
                     return _glamourerGetAllCustomization!.Invoke(c.ObjectIndex).Item2 ?? string.Empty;
                 }

@@ -1,8 +1,8 @@
-﻿using Dalamud.Interface.Internal.Notifications;
-using MareSynchronos.API.Data.Enum;
+﻿using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Dto;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
+using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.Services.Mediator;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;

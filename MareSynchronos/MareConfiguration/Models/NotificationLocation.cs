@@ -7,3 +7,10 @@ public enum NotificationLocation
     Toast,
     Both
 }
+
+public enum NotificationType
+{
+    Info,
+    Warning,
+    Error
+}

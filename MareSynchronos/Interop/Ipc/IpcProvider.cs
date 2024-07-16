@@ -13,17 +13,17 @@ namespace MareSynchronos.Interop.Ipc;
 public class IpcProvider : IHostedService, IMediatorSubscriber
 {
     private readonly ILogger<IpcProvider> _logger;
-    private readonly DalamudPluginInterface _pi;
+    private readonly IDalamudPluginInterface _pi;
     private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly DalamudUtilService _dalamudUtil;
-    private ICallGateProvider<string, GameObject, bool>? _loadFileProvider;
-    private ICallGateProvider<string, GameObject, Task<bool>>? _loadFileAsyncProvider;
+    private ICallGateProvider<string, IGameObject, bool>? _loadFileProvider;
+    private ICallGateProvider<string, IGameObject, Task<bool>>? _loadFileAsyncProvider;
     private ICallGateProvider<List<nint>>? _handledGameAddresses;
     private readonly List<GameObjectHandler> _activeGameObjectHandlers = [];
 
     public MareMediator Mediator { get; init; }
 
-    public IpcProvider(ILogger<IpcProvider> logger, DalamudPluginInterface pi,
+    public IpcProvider(ILogger<IpcProvider> logger, IDalamudPluginInterface pi,
         MareCharaFileManager mareCharaFileManager, DalamudUtilService dalamudUtil,
         MareMediator mareMediator)
     {
@@ -48,9 +48,9 @@ public class IpcProvider : IHostedService, IMediatorSubscriber
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting IpcProviderService");
-        _loadFileProvider = _pi.GetIpcProvider<string, GameObject, bool>("MareSynchronos.LoadMcdf");
+        _loadFileProvider = _pi.GetIpcProvider<string, IGameObject, bool>("MareSynchronos.LoadMcdf");
         _loadFileProvider.RegisterFunc(LoadMcdf);
-        _loadFileAsyncProvider = _pi.GetIpcProvider<string, GameObject, Task<bool>>("MareSynchronos.LoadMcdfAsync");
+        _loadFileAsyncProvider = _pi.GetIpcProvider<string, IGameObject, Task<bool>>("MareSynchronos.LoadMcdfAsync");
         _loadFileAsyncProvider.RegisterFunc(LoadMcdfAsync);
         _handledGameAddresses = _pi.GetIpcProvider<List<nint>>("MareSynchronos.GetHandledAddresses");
         _handledGameAddresses.RegisterFunc(GetHandledAddresses);
@@ -68,7 +68,7 @@ public class IpcProvider : IHostedService, IMediatorSubscriber
         return Task.CompletedTask;
     }
 
-    private async Task<bool> LoadMcdfAsync(string path, GameObject target)
+    private async Task<bool> LoadMcdfAsync(string path, IGameObject target)
     {
         if (_mareCharaFileManager.CurrentlyWorking || !_dalamudUtil.IsInGpose)
             return false;
@@ -78,7 +78,7 @@ public class IpcProvider : IHostedService, IMediatorSubscriber
         return true;
     }
 
-    private bool LoadMcdf(string path, GameObject target)
+    private bool LoadMcdf(string path, IGameObject target)
     {
         if (_mareCharaFileManager.CurrentlyWorking || !_dalamudUtil.IsInGpose)
             return false;
@@ -88,7 +88,7 @@ public class IpcProvider : IHostedService, IMediatorSubscriber
         return true;
     }
 
-    private async Task ApplyFileAsync(string path, GameObject target)
+    private async Task ApplyFileAsync(string path, IGameObject target)
     {
         try
         {

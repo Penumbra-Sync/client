@@ -12,14 +12,14 @@ namespace MareSynchronos.Services;
 public sealed class UiService : DisposableMediatorSubscriberBase
 {
     private readonly List<WindowMediatorSubscriberBase> _createdWindows = [];
-    private readonly UiBuilder _uiBuilder;
+    private readonly IUiBuilder _uiBuilder;
     private readonly FileDialogManager _fileDialogManager;
     private readonly ILogger<UiService> _logger;
     private readonly MareConfigService _mareConfigService;
     private readonly WindowSystem _windowSystem;
     private readonly UiFactory _uiFactory;
 
-    public UiService(ILogger<UiService> logger, UiBuilder uiBuilder,
+    public UiService(ILogger<UiService> logger, IUiBuilder uiBuilder,
         MareConfigService mareConfigService, WindowSystem windowSystem,
         IEnumerable<WindowMediatorSubscriberBase> windows,
         UiFactory uiFactory, FileDialogManager fileDialogManager,

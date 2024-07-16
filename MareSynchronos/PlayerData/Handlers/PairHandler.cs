@@ -127,7 +127,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     public nint PlayerCharacter => _charaHandler?.Address ?? nint.Zero;
     public unsafe uint PlayerCharacterId => (_charaHandler?.Address ?? nint.Zero) == nint.Zero
         ? uint.MaxValue
-        : ((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)_charaHandler!.Address)->ObjectID;
+        : ((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)_charaHandler!.Address)->EntityId;
     public string? PlayerName { get; private set; }
     public string PlayerNameHash => OnlineUser.Ident;
 

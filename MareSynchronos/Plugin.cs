@@ -33,9 +33,10 @@ public sealed class Plugin : IDalamudPlugin
 {
     private readonly IHost _host;
 
-    public Plugin(DalamudPluginInterface pluginInterface, ICommandManager commandManager, IDataManager gameData,
+    public Plugin(IDalamudPluginInterface pluginInterface, ICommandManager commandManager, IDataManager gameData,
         IFramework framework, IObjectTable objectTable, IClientState clientState, ICondition condition, IChatGui chatGui,
-        IGameGui gameGui, IDtrBar dtrBar, IPluginLog pluginLog, ITargetManager targetManager, INotificationManager notificationManager)
+        IGameGui gameGui, IDtrBar dtrBar, IPluginLog pluginLog, ITargetManager targetManager, INotificationManager notificationManager,
+        ITextureProvider textureProvider)
     {
         _host = new HostBuilder()
         .UseContentRoot(pluginInterface.ConfigDirectory.FullName)
@@ -83,7 +84,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<SelectPairForTagUi>();
             collection.AddSingleton((s) => new EventAggregator(pluginInterface.ConfigDirectory.FullName,
                 s.GetRequiredService<ILogger<EventAggregator>>(), s.GetRequiredService<MareMediator>()));
-            collection.AddSingleton((s) => new DalamudContextMenu(pluginInterface));
+            //collection.AddSingleton((s) => new DalamudContextMenu(pluginInterface));
             collection.AddSingleton((s) => new DalamudUtilService(s.GetRequiredService<ILogger<DalamudUtilService>>(),
                 clientState, objectTable, framework, gameGui, condition, gameData, targetManager,
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<PerformanceCollectorService>()));
@@ -134,8 +135,8 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddScoped<WindowMediatorSubscriberBase, EventViewerUI>();
 
             collection.AddScoped<WindowMediatorSubscriberBase, EditProfileUi>((s) => new EditProfileUi(s.GetRequiredService<ILogger<EditProfileUi>>(),
-                s.GetRequiredService<MareMediator>(), s.GetRequiredService<ApiController>(), pluginInterface.UiBuilder, s.GetRequiredService<UiSharedService>(),
-                s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareProfileManager>(), s.GetRequiredService<PerformanceCollectorService>()));
+                s.GetRequiredService<MareMediator>(), s.GetRequiredService<ApiController>(), s.GetRequiredService<UiSharedService>(), s.GetRequiredService<FileDialogManager>(),
+                s.GetRequiredService<MareProfileManager>(), s.GetRequiredService<PerformanceCollectorService>()));
             collection.AddScoped<WindowMediatorSubscriberBase, PopupHandler>();
             collection.AddScoped<IPopupHandler, ReportPopupHandler>();
             collection.AddScoped<IPopupHandler, BanUserPopupHandler>();
@@ -155,7 +156,7 @@ public sealed class Plugin : IDalamudPlugin
                 s.GetRequiredService<MareMediator>(), notificationManager, chatGui, s.GetRequiredService<MareConfigService>()));
             collection.AddScoped((s) => new UiSharedService(s.GetRequiredService<ILogger<UiSharedService>>(), s.GetRequiredService<IpcManager>(), s.GetRequiredService<ApiController>(),
                 s.GetRequiredService<CacheMonitor>(), s.GetRequiredService<FileDialogManager>(), s.GetRequiredService<MareConfigService>(), s.GetRequiredService<DalamudUtilService>(),
-                pluginInterface, s.GetRequiredService<Dalamud.Localization>(), s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<MareMediator>()));
+                pluginInterface, textureProvider, s.GetRequiredService<Dalamud.Localization>(), s.GetRequiredService<ServerConfigurationManager>(), s.GetRequiredService<MareMediator>()));
 
             collection.AddHostedService(p => p.GetRequiredService<FileCacheManager>());
             collection.AddHostedService(p => p.GetRequiredService<MareMediator>());

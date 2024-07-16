@@ -22,7 +22,7 @@ public class RedrawManager
         _dalamudUtil = dalamudUtil;
     }
 
-    public async Task PenumbraRedrawInternalAsync(ILogger logger, GameObjectHandler handler, Guid applicationId, Action<Character> action)
+    public async Task PenumbraRedrawInternalAsync(ILogger logger, GameObjectHandler handler, Guid applicationId, Action<ICharacter> action)
     {
         _mareMediator.Publish(new PenumbraStartRedrawMessage(handler.Address));
 

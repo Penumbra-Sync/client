@@ -2,6 +2,7 @@
 using Dalamud.Plugin.Services;
 using MareSynchronos.FileCache;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.UI;
@@ -63,7 +64,7 @@ public sealed class CommandManagerService : IDisposable
             if (_apiController.ServerState == WebAPI.SignalR.Utils.ServerState.Disconnecting)
             {
                 _mediator.Publish(new NotificationMessage("Mare disconnecting", "Cannot use /toggle while Mare Synchronos is still disconnecting",
-                    Dalamud.Interface.Internal.Notifications.NotificationType.Error));
+                    NotificationType.Error));
             }
 
             if (_serverConfigurationManager.CurrentServer == null) return;

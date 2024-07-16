@@ -16,7 +16,7 @@ public sealed class DtrEntry : IDisposable, IHostedService
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly ConfigurationServiceBase<MareConfig> _configService;
     private readonly IDtrBar _dtrBar;
-    private readonly Lazy<DtrBarEntry> _entry;
+    private readonly Lazy<IDtrBarEntry> _entry;
     private readonly ILogger<DtrEntry> _logger;
     private readonly MareMediator _mareMediator;
     private readonly PairManager _pairManager;
@@ -40,7 +40,7 @@ public sealed class DtrEntry : IDisposable, IHostedService
         {
             _logger.LogDebug("Disposing DtrEntry");
             Clear();
-            _entry.Value.Dispose();
+            _entry.Value.Remove();
         }
     }
 
@@ -78,7 +78,7 @@ public sealed class DtrEntry : IDisposable, IHostedService
         _entry.Value.Shown = false;
     }
 
-    private DtrBarEntry CreateEntry()
+    private IDtrBarEntry CreateEntry()
     {
         _logger.LogTrace("Creating new DtrBar entry");
         var entry = _dtrBar.Get("Mare Synchronos");

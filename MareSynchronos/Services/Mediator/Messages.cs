@@ -1,8 +1,8 @@
 ﻿using Dalamud.Game.ClientState.Objects.Types;
-using Dalamud.Interface.Internal.Notifications;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto;
 using MareSynchronos.API.Dto.Group;
+using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.Events;
@@ -83,7 +83,7 @@ public record CombatOrPerformanceStartMessage : MessageBase;
 public record CombatOrPerformanceEndMessage : MessageBase;
 public record EventMessage(Event Event) : MessageBase;
 public record PenumbraDirectoryChangedMessage(string? ModDirectory) : MessageBase;
-public record PenumbraRedrawCharacterMessage(Character Character) : SameThreadMessage;
+public record PenumbraRedrawCharacterMessage(ICharacter Character) : SameThreadMessage;
 public record GameObjectHandlerCreatedMessage(GameObjectHandler GameObjectHandler, bool OwnedObject) : MessageBase;
 public record GameObjectHandlerDestroyedMessage(GameObjectHandler GameObjectHandler, bool OwnedObject) : MessageBase;
 #pragma warning restore S2094

@@ -15,18 +15,18 @@ public sealed class IpcCallerHeels : IIpcCaller
     private readonly ICallGateSubscriber<(int, int)> _heelsGetApiVersion;
     private readonly ICallGateSubscriber<string> _heelsGetOffset;
     private readonly ICallGateSubscriber<string, object?> _heelsOffsetUpdate;
-    private readonly ICallGateSubscriber<GameObject, string, object?> _heelsRegisterPlayer;
-    private readonly ICallGateSubscriber<GameObject, object?> _heelsUnregisterPlayer;
+    private readonly ICallGateSubscriber<IGameObject, string, object?> _heelsRegisterPlayer;
+    private readonly ICallGateSubscriber<IGameObject, object?> _heelsUnregisterPlayer;
 
-    public IpcCallerHeels(ILogger<IpcCallerHeels> logger, DalamudPluginInterface pi, DalamudUtilService dalamudUtil, MareMediator mareMediator)
+    public IpcCallerHeels(ILogger<IpcCallerHeels> logger, IDalamudPluginInterface pi, DalamudUtilService dalamudUtil, MareMediator mareMediator)
     {
         _logger = logger;
         _mareMediator = mareMediator;
         _dalamudUtil = dalamudUtil;
         _heelsGetApiVersion = pi.GetIpcSubscriber<(int, int)>("SimpleHeels.ApiVersion");
         _heelsGetOffset = pi.GetIpcSubscriber<string>("SimpleHeels.GetLocalPlayer");
-        _heelsRegisterPlayer = pi.GetIpcSubscriber<GameObject, string, object?>("SimpleHeels.RegisterPlayer");
-        _heelsUnregisterPlayer = pi.GetIpcSubscriber<GameObject, object?>("SimpleHeels.UnregisterPlayer");
+        _heelsRegisterPlayer = pi.GetIpcSubscriber<IGameObject, string, object?>("SimpleHeels.RegisterPlayer");
+        _heelsUnregisterPlayer = pi.GetIpcSubscriber<IGameObject, object?>("SimpleHeels.UnregisterPlayer");
         _heelsOffsetUpdate = pi.GetIpcSubscriber<string, object?>("SimpleHeels.LocalChanged");
 
         _heelsOffsetUpdate.Subscribe(HeelsOffsetChange);

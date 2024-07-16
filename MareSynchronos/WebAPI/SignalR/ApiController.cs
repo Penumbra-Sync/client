@@ -5,6 +5,7 @@ using MareSynchronos.API.Dto;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.API.SignalR;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
@@ -193,7 +194,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                             $"Your client is outdated ({currentClientVer.Major}.{currentClientVer.Minor}.{currentClientVer.Build}), current is: " +
                             $"{_connectionDto.CurrentClientVersion.Major}.{_connectionDto.CurrentClientVersion.Minor}.{_connectionDto.CurrentClientVersion.Build}. " +
                             $"This client version is incompatible and will not be able to connect. Please update your Mare Synchronos client.",
-                            Dalamud.Interface.Internal.Notifications.NotificationType.Error));
+                            NotificationType.Error));
                     }
                     await StopConnection(ServerState.VersionMisMatch).ConfigureAwait(false);
                     return;
@@ -205,7 +206,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                         $"Your client is outdated ({currentClientVer.Major}.{currentClientVer.Minor}.{currentClientVer.Build}), current is: " +
                         $"{_connectionDto.CurrentClientVersion.Major}.{_connectionDto.CurrentClientVersion.Minor}.{_connectionDto.CurrentClientVersion.Build}. " +
                         $"Please keep your Mare Synchronos client up-to-date.",
-                        Dalamud.Interface.Internal.Notifications.NotificationType.Warning));
+                        NotificationType.Warning));
                 }
 
                 if (_dalamudUtil.HasModifiedGameFiles)
@@ -215,7 +216,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                         Mediator.Publish(new NotificationMessage("Modified Game Files detected",
                             "Mare has detected modified game files in your FFXIV installation. You will be able to connect, but the synchronization functionality might be (partially) broken. " +
                             "Exit the game and repair it through XIVLauncher to get rid of this message.",
-                            Dalamud.Interface.Internal.Notifications.NotificationType.Error, TimeSpan.FromSeconds(15)));
+                            NotificationType.Error, TimeSpan.FromSeconds(15)));
                 }
 
                 await LoadIninitialPairs().ConfigureAwait(false);

@@ -206,7 +206,7 @@ public static class VariousExtensions
         return JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(obj))!;
     }
 
-    public static unsafe int? ObjectTableIndex(this GameObject? gameObject)
+    public static unsafe int? ObjectTableIndex(this IGameObject? gameObject)
     {
         if (gameObject == null || gameObject.Address == IntPtr.Zero)
         {

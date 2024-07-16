@@ -6,7 +6,7 @@ using Newtonsoft.Json;
 
 namespace MareSynchronos.MareConfiguration;
 
-public class ConfigurationMigrator(ILogger<ConfigurationMigrator> logger, DalamudPluginInterface pi) : IHostedService
+public class ConfigurationMigrator(ILogger<ConfigurationMigrator> logger, IDalamudPluginInterface pi) : IHostedService
 {
     public void Migrate()
     {

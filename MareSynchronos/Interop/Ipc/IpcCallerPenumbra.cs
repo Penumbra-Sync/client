@@ -1,5 +1,5 @@
-﻿using Dalamud.Interface.Internal.Notifications;
-using Dalamud.Plugin;
+﻿using Dalamud.Plugin;
+using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
@@ -13,7 +13,7 @@ namespace MareSynchronos.Interop.Ipc;
 
 public sealed class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCaller
 {
-    private readonly DalamudPluginInterface _pi;
+    private readonly IDalamudPluginInterface _pi;
     private readonly DalamudUtilService _dalamudUtil;
     private readonly MareMediator _mareMediator;
     private readonly RedrawManager _redrawManager;
@@ -53,7 +53,7 @@ public sealed class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCa
     private readonly ResolvePlayerPathsAsync _penumbraResolvePaths;
     private readonly GetGameObjectResourcePaths _penumbraResourcePaths;
 
-    public IpcCallerPenumbra(ILogger<IpcCallerPenumbra> logger, DalamudPluginInterface pi, DalamudUtilService dalamudUtil,
+    public IpcCallerPenumbra(ILogger<IpcCallerPenumbra> logger, IDalamudPluginInterface pi, DalamudUtilService dalamudUtil,
         MareMediator mareMediator, RedrawManager redrawManager) : base(logger, mareMediator)
     {
         _pi = pi;

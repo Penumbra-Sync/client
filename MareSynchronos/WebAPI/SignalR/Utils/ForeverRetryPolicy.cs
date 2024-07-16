@@ -1,4 +1,4 @@
-﻿using Dalamud.Interface.Internal.Notifications;
+﻿using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.Services.Mediator;
 using Microsoft.AspNetCore.SignalR.Client;
 

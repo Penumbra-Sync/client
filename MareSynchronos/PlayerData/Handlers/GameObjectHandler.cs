@@ -5,6 +5,7 @@ using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using static FFXIVClientStructs.FFXIV.Client.Game.Character.DrawDataContainer;
 using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;
@@ -113,13 +114,13 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
     private ushort[] MainHandData { get; set; } = new ushort[3];
     private ushort[] OffHandData { get; set; } = new ushort[3];
 
-    public async Task ActOnFrameworkAfterEnsureNoDrawAsync(Action<Dalamud.Game.ClientState.Objects.Types.Character> act, CancellationToken token)
+    public async Task ActOnFrameworkAfterEnsureNoDrawAsync(Action<Dalamud.Game.ClientState.Objects.Types.ICharacter> act, CancellationToken token)
     {
         while (await _dalamudUtil.RunOnFrameworkThread(() =>
                {
                    if (IsBeingDrawn()) return true;
                    var gameObj = _dalamudUtil.CreateGameObject(Address);
-                   if (gameObj is Dalamud.Game.ClientState.Objects.Types.Character chara)
+                   if (gameObj is Dalamud.Game.ClientState.Objects.Types.ICharacter chara)
                    {
                        act.Invoke(chara);
                    }
@@ -148,7 +149,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         return _getAddress.Invoke();
     }
 
-    public Dalamud.Game.ClientState.Objects.Types.GameObject? GetGameObject()
+    public Dalamud.Game.ClientState.Objects.Types.IGameObject? GetGameObject()
     {
         return _dalamudUtil.CreateGameObject(Address);
     }
@@ -209,7 +210,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
                 _clearCts = null;
             }
             var chara = (Character*)Address;
-            MemoryHelper.ReadStringNullTerminated((nint)chara->GameObject.Name, out var name);
+            var name = chara->GameObject.NameString;
             bool nameChange = !string.Equals(name, Name, StringComparison.Ordinal);
             if (nameChange)
             {
@@ -240,7 +241,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             }
             else
             {
-                equipDiff = CompareAndUpdateEquipByteData((byte*)&chara->DrawData.Head);
+                equipDiff = CompareAndUpdateEquipByteData((byte*)Unsafe.AsPointer(ref chara->DrawData.EquipmentModelIds[0]));
                 if (equipDiff)
                     Logger.LogTrace("Checking [{this}] equip data from game obj, result: {diff}", this, equipDiff);
             }
@@ -259,7 +260,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             {
                 var gender = ((Human*)DrawObjectAddress)->Customize.Sex;
                 var raceId = ((Human*)DrawObjectAddress)->Customize.Race;
-                var tribeId = ((Human*)DrawObjectAddress)->Customize.Clan;
+                var tribeId = ((Human*)DrawObjectAddress)->Customize.Tribe;
 
                 if (_isOwnedObject && ObjectKind == ObjectKind.Player
                     && (gender != Gender || raceId != RaceId || tribeId != TribeId))
@@ -309,13 +310,13 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         _clearCts = null;
     }
 
-    private unsafe bool CompareAndUpdateCustomizeData(byte* customizeData)
+    private unsafe bool CompareAndUpdateCustomizeData(Span<byte> customizeData)
     {
         bool hasChanges = false;
 
-        for (int i = 0; i < CustomizeData.Length; i++)
+        for (int i = 0; i < customizeData.Length; i++)
         {
-            var data = Marshal.ReadByte((IntPtr)customizeData, i);
+            var data = customizeData[i];
             if (CustomizeData[i] != data)
             {
                 CustomizeData[i] = data;
@@ -331,7 +332,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         bool hasChanges = false;
         for (int i = 0; i < EquipSlotData.Length; i++)
         {
-            var data = Marshal.ReadByte((IntPtr)equipSlotData, i);
+            var data = equipSlotData[i];
             if (EquipSlotData[i] != data)
             {
                 EquipSlotData[i] = data;

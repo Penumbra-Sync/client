@@ -5,9 +5,12 @@ using Dalamud.Interface.GameFonts;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Internal;
 using Dalamud.Interface.ManagedFontAtlas;
+using Dalamud.Interface.Textures;
+using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Plugin;
+using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using ImGuiNET;
 using MareSynchronos.FileCache;
@@ -51,7 +54,8 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     private readonly DalamudUtilService _dalamudUtil;
     private readonly IpcManager _ipcManager;
     private readonly Dalamud.Localization _localization;
-    private readonly DalamudPluginInterface _pluginInterface;
+    private readonly IDalamudPluginInterface _pluginInterface;
+    private readonly ITextureProvider _textureProvider;
     private readonly Dictionary<string, object> _selectedComboItems = new(StringComparer.Ordinal);
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private bool _cacheDirectoryHasOtherFilesThanCache = false;
@@ -79,7 +83,9 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public UiSharedService(ILogger<UiSharedService> logger, IpcManager ipcManager, ApiController apiController,
         CacheMonitor cacheMonitor, FileDialogManager fileDialogManager,
-        MareConfigService configService, DalamudUtilService dalamudUtil, DalamudPluginInterface pluginInterface, Dalamud.Localization localization,
+        MareConfigService configService, DalamudUtilService dalamudUtil, IDalamudPluginInterface pluginInterface,
+        ITextureProvider textureProvider,
+        Dalamud.Localization localization,
         ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
     {
         _ipcManager = ipcManager;
@@ -89,6 +95,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         _configService = configService;
         _dalamudUtil = dalamudUtil;
         _pluginInterface = pluginInterface;
+        _textureProvider = textureProvider;
         _localization = localization;
         _serverConfigurationManager = serverManager;
         _localization.SetupWithLangCode("en");
@@ -800,7 +807,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public IDalamudTextureWrap LoadImage(byte[] imageData)
     {
-        return _pluginInterface.UiBuilder.LoadImage(imageData);
+        return _textureProvider.CreateFromImageAsync(imageData).Result;
     }
 
     public void LoadLocalization(string languageCode)

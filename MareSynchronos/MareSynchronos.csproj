@@ -30,25 +30,25 @@
 
   <ItemGroup>
     <PackageReference Include="Dalamud.ContextMenu" Version="1.3.1" />
-    <PackageReference Include="DalamudPackager" Version="2.1.12" />
-    <PackageReference Include="Downloader" Version="3.0.6" />
+    <PackageReference Include="DalamudPackager" Version="2.1.13" />
+    <PackageReference Include="Downloader" Version="3.1.2" />
     <PackageReference Include="lz4net" Version="1.0.15.93" />
-    <PackageReference Include="Meziantou.Analyzer" Version="2.0.152">
+    <PackageReference Include="Meziantou.Analyzer" Version="2.0.160">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.5" />
-    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="8.0.5" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.7" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="8.0.7" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-    <PackageReference Include="Glamourer.Api" Version="2.0.0" />
-    <PackageReference Include="Penumbra.Api" Version="5.0.0" />
+    <PackageReference Include="Glamourer.Api" Version="2.1.0" />
+    <PackageReference Include="Penumbra.Api" Version="5.2.0" />
     <PackageReference Include="Penumbra.String" Version="1.0.4" />
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.4" />
-    <PackageReference Include="SonarAnalyzer.CSharp" Version="9.25.0.90414">
+    <PackageReference Include="SonarAnalyzer.CSharp" Version="9.29.0.95321">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.5.2" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.0.0" />
   </ItemGroup>
 
   <PropertyGroup>

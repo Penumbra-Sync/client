@@ -2,6 +2,7 @@
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop.Ipc;
+using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.PlayerData.Data;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services;
@@ -309,7 +310,7 @@ public class PlayerDataFactory
             _mareMediator.Publish(new NotificationMessage("Invalid Skeleton Setup",
                 $"Your client is attempting to send {noValidationFailed} animation files with invalid bone data. Those animation files have been removed from your sent data. " +
                 $"Verify that you are using the correct skeleton for those animation files (Check /xllog for more information).",
-                Dalamud.Interface.Internal.Notifications.NotificationType.Warning, TimeSpan.FromSeconds(10)));
+                NotificationType.Warning, TimeSpan.FromSeconds(10)));
         }
     }
 

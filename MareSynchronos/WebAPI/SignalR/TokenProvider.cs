@@ -1,4 +1,5 @@
 ﻿using MareSynchronos.API.Routes;
+using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
@@ -99,10 +100,10 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
             {
                 if (isRenewal)
                     Mediator.Publish(new NotificationMessage("Error refreshing token", "Your authentication token could not be renewed. Try reconnecting to Mare manually.",
-                    Dalamud.Interface.Internal.Notifications.NotificationType.Error));
+                    NotificationType.Error));
                 else
                     Mediator.Publish(new NotificationMessage("Error generating token", "Your authentication token could not be generated. Check Mares main UI to see the error message.",
-                    Dalamud.Interface.Internal.Notifications.NotificationType.Error));
+                    NotificationType.Error));
                 Mediator.Publish(new DisconnectedMessage());
                 throw new MareAuthFailureException(response);
             }
@@ -124,7 +125,7 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
             Mediator.Publish(new NotificationMessage("Invalid system clock", "The clock of your computer is invalid. " +
                 "Mare will not function properly if the time zone is not set correctly. " +
                 "Please set your computers time zone correctly and keep your clock synchronized with the internet.",
-                Dalamud.Interface.Internal.Notifications.NotificationType.Error));
+                NotificationType.Error));
             throw new InvalidOperationException($"JwtToken is behind DateTime.UtcNow, DateTime.UtcNow is possibly wrong. DateTime.UtcNow is {DateTime.UtcNow}, JwtToken.ValidTo is {jwtToken.ValidTo}");
         }
         return response;
