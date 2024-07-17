@@ -1,5 +1,4 @@
-﻿using Dalamud.Game.ClientState.Objects.Types;
-using Dalamud.Plugin;
+﻿using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
@@ -15,8 +14,8 @@ public sealed class IpcCallerHeels : IIpcCaller
     private readonly ICallGateSubscriber<(int, int)> _heelsGetApiVersion;
     private readonly ICallGateSubscriber<string> _heelsGetOffset;
     private readonly ICallGateSubscriber<string, object?> _heelsOffsetUpdate;
-    private readonly ICallGateSubscriber<IGameObject, string, object?> _heelsRegisterPlayer;
-    private readonly ICallGateSubscriber<IGameObject, object?> _heelsUnregisterPlayer;
+    private readonly ICallGateSubscriber<int, string, object?> _heelsRegisterPlayer;
+    private readonly ICallGateSubscriber<int, object?> _heelsUnregisterPlayer;
 
     public IpcCallerHeels(ILogger<IpcCallerHeels> logger, IDalamudPluginInterface pi, DalamudUtilService dalamudUtil, MareMediator mareMediator)
     {
@@ -25,8 +24,8 @@ public sealed class IpcCallerHeels : IIpcCaller
         _dalamudUtil = dalamudUtil;
         _heelsGetApiVersion = pi.GetIpcSubscriber<(int, int)>("SimpleHeels.ApiVersion");
         _heelsGetOffset = pi.GetIpcSubscriber<string>("SimpleHeels.GetLocalPlayer");
-        _heelsRegisterPlayer = pi.GetIpcSubscriber<IGameObject, string, object?>("SimpleHeels.RegisterPlayer");
-        _heelsUnregisterPlayer = pi.GetIpcSubscriber<IGameObject, object?>("SimpleHeels.UnregisterPlayer");
+        _heelsRegisterPlayer = pi.GetIpcSubscriber<int, string, object?>("SimpleHeels.RegisterPlayer");
+        _heelsUnregisterPlayer = pi.GetIpcSubscriber<int, object?>("SimpleHeels.UnregisterPlayer");
         _heelsOffsetUpdate = pi.GetIpcSubscriber<string, object?>("SimpleHeels.LocalChanged");
 
         _heelsOffsetUpdate.Subscribe(HeelsOffsetChange);
@@ -56,7 +55,7 @@ public sealed class IpcCallerHeels : IIpcCaller
             if (gameObj != null)
             {
                 _logger.LogTrace("Restoring Heels data to {chara}", character.ToString("X"));
-                _heelsUnregisterPlayer.InvokeAction(gameObj);
+                _heelsUnregisterPlayer.InvokeAction(gameObj.ObjectIndex);
             }
         }).ConfigureAwait(false);
     }
@@ -70,7 +69,7 @@ public sealed class IpcCallerHeels : IIpcCaller
             if (gameObj != null)
             {
                 _logger.LogTrace("Applying Heels data to {chara}", character.ToString("X"));
-                _heelsRegisterPlayer.InvokeAction(gameObj, data);
+                _heelsRegisterPlayer.InvokeAction(gameObj.ObjectIndex, data);
             }
         }).ConfigureAwait(false);
     }
@@ -79,7 +78,7 @@ public sealed class IpcCallerHeels : IIpcCaller
     {
         try
         {
-            APIAvailable = _heelsGetApiVersion.InvokeFunc() is { Item1: 1, Item2: >= 1 };
+            APIAvailable = _heelsGetApiVersion.InvokeFunc() is { Item1: 2, Item2: >= 1 };
         }
         catch
         {

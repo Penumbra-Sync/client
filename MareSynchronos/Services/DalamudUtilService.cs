@@ -1,7 +1,6 @@
 ﻿using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
-using Dalamud.Memory;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
@@ -197,7 +196,13 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
 
     public async Task<string> GetPlayerNameHashedAsync()
     {
-        return await RunOnFrameworkThread(() => (GetPlayerName(), (ushort)GetHomeWorldId()).GetHash256()).ConfigureAwait(false);
+        return await RunOnFrameworkThread(() => GetHashedAccIdFromPlayerPointer(GetPlayerPointer())).ConfigureAwait(false);
+    }
+
+    private unsafe string GetHashedAccIdFromPlayerPointer(nint ptr)
+    {
+        if (ptr == nint.Zero) return string.Empty;
+        return ((BattleChara*)ptr)->Character.AccountId.ToString().GetHash256();
     }
 
     public IntPtr GetPlayerPointer()
@@ -453,7 +458,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
                             continue;
 
                         var charaName = ((GameObject*)chara.Address)->NameString;
-                        var hash = (charaName, ((BattleChara*)chara.Address)->Character.HomeWorld).GetHash256();
+                        var hash = GetHashedAccIdFromPlayerPointer(chara.Address);
                         if (!IsAnythingDrawing)
                             CheckCharacterForDrawing(chara.Address, charaName);
                         _notUpdatedCharas.Remove(hash);

@@ -115,6 +115,9 @@ public sealed class IpcCallerCustomize : IIpcCaller
 
     public void CheckAPI()
     {
+        // todo: restore this when it's available again
+        return;
+
         try
         {
             var version = _customizePlusApiVersion.InvokeFunc();

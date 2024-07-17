@@ -45,6 +45,9 @@ public sealed class IpcCallerMoodles : IIpcCaller
 
     public void CheckAPI()
     {
+        // todo: restore this when it's available again
+        return;
+
         try
         {
             APIAvailable = _moodlesApiVersion.InvokeFunc() == 1;

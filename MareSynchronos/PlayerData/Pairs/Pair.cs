@@ -1,4 +1,4 @@
-﻿using Dalamud.ContextMenu;
+﻿using Dalamud.Game.Gui.ContextMenu;
 using Dalamud.Game.Text.SeStringHandling;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Enum;
@@ -52,34 +52,53 @@ public class Pair
     public UserFullPairDto UserPair { get; set; }
     private PairHandler? CachedPlayer { get; set; }
 
-    public void AddContextMenu(GameObjectContextMenuOpenArgs args)
+    public void AddContextMenu(IMenuOpenedArgs args)
     {
-        if (CachedPlayer == null || args.ObjectId != CachedPlayer.PlayerCharacterId || IsPaused) return;
+        if (CachedPlayer == null || (args.Target is not MenuTargetDefault target) || target.TargetObjectId != CachedPlayer.PlayerCharacterId || IsPaused) return;
 
         SeStringBuilder seStringBuilder = new();
         SeStringBuilder seStringBuilder2 = new();
         SeStringBuilder seStringBuilder3 = new();
         SeStringBuilder seStringBuilder4 = new();
-        var openProfileSeString = seStringBuilder.AddUiForeground(526).AddText(" ").AddUiForegroundOff().AddText("Open Profile").Build();
-        var reapplyDataSeString = seStringBuilder2.AddUiForeground(526).AddText(" ").AddUiForegroundOff().AddText("Reapply last data").Build();
-        var cyclePauseState = seStringBuilder3.AddUiForeground(526).AddText(" ").AddUiForegroundOff().AddText("Cycle pause state").Build();
-        var changePermissions = seStringBuilder4.AddUiForeground(526).AddText(" ").AddUiForegroundOff().AddText("Change Permissions").Build();
-        args.AddCustomItem(new GameObjectContextMenuItem(openProfileSeString, (a) =>
+        var openProfileSeString = seStringBuilder.AddText("Open Profile").Build();
+        var reapplyDataSeString = seStringBuilder2.AddText("Reapply last data").Build();
+        var cyclePauseState = seStringBuilder3.AddText("Cycle pause state").Build();
+        var changePermissions = seStringBuilder4.AddText("Change Permissions").Build();
+        args.AddMenuItem(new MenuItem()
         {
-            _mediator.Publish(new ProfileOpenStandaloneMessage(this));
-        }));
-        args.AddCustomItem(new GameObjectContextMenuItem(reapplyDataSeString, (a) =>
+            Name = openProfileSeString,
+            OnClicked = (a) => _mediator.Publish(new ProfileOpenStandaloneMessage(this)),
+            UseDefaultPrefix = false,
+            PrefixChar = 'M',
+            PrefixColor = 526
+        });
+
+        args.AddMenuItem(new MenuItem()
         {
-            ApplyLastReceivedData(forced: true);
-        }, useDalamudIndicator: false));
-        args.AddCustomItem(new GameObjectContextMenuItem(changePermissions, (a) =>
+            Name = reapplyDataSeString,
+            OnClicked = (a) => ApplyLastReceivedData(forced: true),
+            UseDefaultPrefix = false,
+            PrefixChar = 'M',
+            PrefixColor = 526
+        });
+
+        args.AddMenuItem(new MenuItem()
         {
-            _mediator.Publish(new OpenPermissionWindow(this));
-        }, useDalamudIndicator: false));
-        args.AddCustomItem(new GameObjectContextMenuItem(cyclePauseState, (a) =>
+            Name = changePermissions,
+            OnClicked = (a) => _mediator.Publish(new OpenPermissionWindow(this)),
+            UseDefaultPrefix = false,
+            PrefixChar = 'M',
+            PrefixColor = 526
+        });
+
+        args.AddMenuItem(new MenuItem()
         {
-            _mediator.Publish(new CyclePauseMessage(UserData));
-        }, useDalamudIndicator: false));
+            Name = cyclePauseState,
+            OnClicked = (a) => _mediator.Publish(new CyclePauseMessage(UserData)),
+            UseDefaultPrefix = false,
+            PrefixChar = 'M',
+            PrefixColor = 526
+        });
     }
 
     public void ApplyData(OnlineUserCharaDataDto data)
