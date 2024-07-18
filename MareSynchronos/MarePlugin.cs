@@ -1,5 +1,6 @@
 ﻿using MareSynchronos.FileCache;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.PlayerData.Services;
 using MareSynchronos.Services;
@@ -156,7 +157,7 @@ public class MarePlugin : MediatorSubscriberBase, IHostedService
             {
                 Mediator.Publish(new NotificationMessage("Abnormal Log Level",
                     $"Your log level is set to '{_mareConfigService.Current.LogLevel}' which is not recommended for normal usage. Set it to '{LogLevel.Information}' in \"Mare Settings -> Debug\" unless instructed otherwise.",
-                    Dalamud.Interface.Internal.Notifications.NotificationType.Error, TimeSpan.FromSeconds(15000)));
+                    NotificationType.Error, TimeSpan.FromSeconds(15000)));
             }
 #endif
         }
