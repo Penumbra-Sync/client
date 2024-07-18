@@ -203,6 +203,8 @@ public sealed class XivDataAnalyzer
         }
         catch (Exception e)
         {
+            _configService.Current.TriangleDictionary[hash] = 0;
+            _configService.Save();
             _logger.LogWarning(e, "Could not parse file {file}", filePath);
             return Task.FromResult((long)0);
         }

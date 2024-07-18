@@ -4,12 +4,13 @@ using Dalamud.Plugin.Services;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.Services.Mediator;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NotificationType = MareSynchronos.MareConfiguration.Models.NotificationType;
 
 namespace MareSynchronos.Services;
 
-public class NotificationService : DisposableMediatorSubscriberBase
+public class NotificationService : DisposableMediatorSubscriberBase, IHostedService
 {
     private readonly INotificationManager _notificationManager;
     private readonly IChatGui _chatGui;
@@ -21,8 +22,17 @@ public class NotificationService : DisposableMediatorSubscriberBase
         _notificationManager = notificationManager;
         _chatGui = chatGui;
         _configurationService = configurationService;
+    }
 
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
         Mediator.Subscribe<NotificationMessage>(this, ShowNotification);
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
     }
 
     private void PrintErrorChat(string? message)

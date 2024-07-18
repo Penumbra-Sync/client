@@ -43,7 +43,10 @@ public class PlayerDataFactory
     {
         if (!_ipcManager.Initialized)
         {
-            throw new InvalidOperationException("Penumbra is not connected");
+            _mareMediator.Publish(new NotificationMessage("Penumbra/Glamourer inactive",
+                "Mare attempted to process building your character data, but Penumbra or Glamourer are inactive. Enable and set up Penumbra and Glamourer for Mare to be able to function.",
+                NotificationType.Error));
+            throw new InvalidOperationException("Penumbra or Glamourer is not connected");
         }
 
         if (playerRelatedObject == null) return;

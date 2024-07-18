@@ -383,6 +383,7 @@ public sealed class FileCacheManager : IHostedService
     public Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting FileCacheManager");
+
         lock (_fileWriteLock)
         {
             try
@@ -413,6 +414,13 @@ public sealed class FileCacheManager : IHostedService
 
         if (File.Exists(_csvPath))
         {
+            if (!_ipcManager.Penumbra.APIAvailable || string.IsNullOrEmpty(_ipcManager.Penumbra.ModDirectory))
+            {
+                _mareMediator.Publish(new NotificationMessage("Penumbra not connected",
+                    "Could not load local file cache data. Penumbra is not connected or not properly set up. Please enable and/or configure Penumbra properly to use Mare. After, reload Mare in the Plugin installer.",
+                    MareConfiguration.Models.NotificationType.Error));
+            }
+
             _logger.LogInformation("{csvPath} found, parsing", _csvPath);
 
             bool success = false;

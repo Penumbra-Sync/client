@@ -103,7 +103,14 @@ public sealed class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCa
                 .FirstOrDefault(p => string.Equals(p.InternalName, "Penumbra", StringComparison.OrdinalIgnoreCase))
                 ?.Version ?? new Version(0, 0, 0, 0));
             penumbraAvailable = penumbraVersion >= new Version(1, 1, 0, 0);
-            penumbraAvailable &= _penumbraEnabled.Invoke();
+            try
+            {
+                penumbraAvailable &= _penumbraEnabled.Invoke();
+            }
+            catch
+            {
+                penumbraAvailable = false;
+            }
             _shownPenumbraUnavailable = _shownPenumbraUnavailable && !penumbraAvailable;
             APIAvailable = penumbraAvailable;
         }
