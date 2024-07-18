@@ -90,12 +90,6 @@ public partial class ApiController
         await _mareHub!.SendAsync(nameof(UserRemovePair), userDto).ConfigureAwait(false);
     }
 
-    public async Task UserReportProfile(UserProfileReportDto userDto)
-    {
-        if (!IsConnected) return;
-        await _mareHub!.SendAsync(nameof(UserReportProfile), userDto).ConfigureAwait(false);
-    }
-
     public async Task UserSetPairPermissions(UserPermissionsDto userPermissions)
     {
         await SetBulkPermissions(new(new(StringComparer.Ordinal)
