@@ -32,14 +32,6 @@ public class PopupHandler : WindowMediatorSubscriberBase
 
         _handlers = popupHandlers.ToHashSet();
 
-        Mediator.Subscribe<OpenReportPopupMessage>(this, (msg) =>
-        {
-            _openPopup = true;
-            _currentHandler = _handlers.OfType<ReportPopupHandler>().Single();
-            ((ReportPopupHandler)_currentHandler).Open(msg);
-            IsOpen = true;
-        });
-
         Mediator.Subscribe<OpenBanUserPopupMessage>(this, (msg) =>
         {
             _openPopup = true;

@@ -151,18 +151,6 @@ public class DrawUserPair
             _ = _apiController.UserSetPairPermissions(new UserPermissionsDto(_pair.UserData, permissions));
         }
         UiSharedService.AttachToolTip("Changes VFX sync permissions with this user." + (individual ? individualText : string.Empty));
-
-        if (!_pair.IsPaused)
-        {
-            ImGui.Separator();
-            ImGui.TextUnformatted("Pair reporting");
-            if (_uiSharedService.IconTextButton(FontAwesomeIcon.ExclamationTriangle, "Report Mare Profile", _menuWidth, true))
-            {
-                ImGui.CloseCurrentPopup();
-                _mediator.Publish(new OpenReportPopupMessage(_pair));
-            }
-            UiSharedService.AttachToolTip("Report this users Mare Profile to the administrative team.");
-        }
     }
 
     private void DrawIndividualMenu()
