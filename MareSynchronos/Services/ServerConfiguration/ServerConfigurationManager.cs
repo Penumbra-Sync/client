@@ -103,7 +103,7 @@ public class ServerConfigurationManager
         var auth = currentServer.Authentications.FindAll(f => string.Equals(f.CharacterName, charaName, StringComparison.Ordinal) && f.WorldId == worldId);
         if (auth.Count >= 2)
         {
-            _mareMediator.Publish(new NotificationMessage("Multiple Identical Characters detected", "Your Service configuration has multiple characters with the same name and world set up. Please delete the duplicates in the character configuration.",
+            _mareMediator.Publish(new NotificationMessage("Multiple Identical Characters detected", "Your Service configuration has multiple characters with the same name and world set up. Please delete the duplicates in the character management.",
                 NotificationType.Error));
             _logger.LogTrace("GetSecretKey accessed, returning null because multiple ({count}) identical characters.", auth.Count);
             return null;

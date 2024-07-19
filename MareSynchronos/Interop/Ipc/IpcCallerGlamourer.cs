@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Interop.Ipc;
 
-public sealed class IpcCallerGlamourer : IIpcCaller
+public sealed class IpcCallerGlamourer : DisposableMediatorSubscriberBase, IIpcCaller
 {
     private readonly ILogger<IpcCallerGlamourer> _logger;
     private readonly IDalamudPluginInterface _pi;
@@ -31,7 +31,7 @@ public sealed class IpcCallerGlamourer : IIpcCaller
     private readonly uint LockCode = 0x6D617265;
 
     public IpcCallerGlamourer(ILogger<IpcCallerGlamourer> logger, IDalamudPluginInterface pi, DalamudUtilService dalamudUtil, MareMediator mareMediator,
-        RedrawManager redrawManager)
+        RedrawManager redrawManager) : base(logger, mareMediator)
     {
         _glamourerApiVersions = new ApiVersion(pi);
         _glamourerGetAllCustomization = new GetStateBase64(pi);
@@ -50,6 +50,15 @@ public sealed class IpcCallerGlamourer : IIpcCaller
 
         _glamourerStateChanged = StateChanged.Subscriber(pi, GlamourerChanged);
         _glamourerStateChanged.Enable();
+
+        Mediator.Subscribe<DalamudLoginMessage>(this, s => _shownGlamourerUnavailable = false);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+
+        _redrawManager.Cancel();
     }
 
     public bool APIAvailable { get; private set; }

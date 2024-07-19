@@ -6,6 +6,7 @@ using Dalamud.Utility;
 using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
+using MareSynchronos.Interop.Ipc;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.PlayerData.Pairs;
@@ -37,6 +38,7 @@ public class CompactUi : WindowMediatorSubscriberBase
     private readonly PairManager _pairManager;
     private readonly SelectTagForPairUi _selectGroupForPairUi;
     private readonly SelectPairForTagUi _selectPairsForGroupUi;
+    private readonly IpcManager _ipcManager;
     private readonly ServerConfigurationManager _serverManager;
     private readonly TopTabMenu _tabMenu;
     private readonly TagHandler _tagHandler;
@@ -55,7 +57,7 @@ public class CompactUi : WindowMediatorSubscriberBase
     public CompactUi(ILogger<CompactUi> logger, UiSharedService uiShared, MareConfigService configService, ApiController apiController, PairManager pairManager,
         ServerConfigurationManager serverManager, MareMediator mediator, FileUploadManager fileTransferManager,
         TagHandler tagHandler, DrawEntityFactory drawEntityFactory, SelectTagForPairUi selectTagForPairUi, SelectPairForTagUi selectPairForTagUi,
-        PerformanceCollectorService performanceCollectorService)
+        PerformanceCollectorService performanceCollectorService, IpcManager ipcManager)
         : base(logger, mediator, "###MareSynchronosMainUI", performanceCollectorService)
     {
         _uiSharedService = uiShared;
@@ -68,6 +70,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         _drawEntityFactory = drawEntityFactory;
         _selectGroupForPairUi = selectTagForPairUi;
         _selectPairsForGroupUi = selectPairForTagUi;
+        _ipcManager = ipcManager;
         _tabMenu = new TopTabMenu(Mediator, _apiController, _pairManager, _uiSharedService);
 
         AllowPinning = false;
@@ -150,6 +153,35 @@ public class CompactUi : WindowMediatorSubscriberBase
             }
             UiSharedService.ColorTextWrapped($"Your Mare Synchronos installation is out of date, the current version is {ver.Major}.{ver.Minor}.{ver.Build}. " +
                 $"It is highly recommended to keep Mare Synchronos up to date. Open /xlplugins and update the plugin.", ImGuiColors.DalamudRed);
+        }
+
+        if (!_ipcManager.Initialized)
+        {
+            var unsupported = "MISSING ESSENTIAL PLUGINS";
+
+            using (_uiSharedService.UidFont.Push())
+            {
+                var uidTextSize = ImGui.CalcTextSize(unsupported);
+                ImGui.SetCursorPosX((ImGui.GetWindowContentRegionMax().X + ImGui.GetWindowContentRegionMin().X) / 2 - uidTextSize.X / 2);
+                ImGui.AlignTextToFramePadding();
+                ImGui.TextColored(ImGuiColors.DalamudRed, unsupported);
+            }
+            var penumAvailable = _ipcManager.Penumbra.APIAvailable;
+            var glamAvailable = _ipcManager.Glamourer.APIAvailable;
+
+            UiSharedService.ColorTextWrapped($"One or more Plugins essential for Mare operation are unavailable. Enable or update following plugins:", ImGuiColors.DalamudRed);
+            using var indent = ImRaii.PushIndent(10f);
+            if (!penumAvailable)
+            {
+                UiSharedService.TextWrapped("Penumbra");
+                _uiSharedService.BooleanToColoredIcon(penumAvailable, true);
+            }
+            if (!glamAvailable)
+            {
+                UiSharedService.TextWrapped("Glamourer");
+                _uiSharedService.BooleanToColoredIcon(glamAvailable, true);
+            }
+            ImGui.Separator();
         }
 
         using (ImRaii.PushId("header")) DrawUIDHeader();

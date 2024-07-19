@@ -12,13 +12,17 @@ namespace MareSynchronos.Services;
 
 public class NotificationService : DisposableMediatorSubscriberBase, IHostedService
 {
+    private readonly DalamudUtilService _dalamudUtilService;
     private readonly INotificationManager _notificationManager;
     private readonly IChatGui _chatGui;
     private readonly MareConfigService _configurationService;
 
-    public NotificationService(ILogger<NotificationService> logger, MareMediator mediator, INotificationManager notificationManager,
+    public NotificationService(ILogger<NotificationService> logger, MareMediator mediator,
+        DalamudUtilService dalamudUtilService,
+        INotificationManager notificationManager,
         IChatGui chatGui, MareConfigService configurationService) : base(logger, mediator)
     {
+        _dalamudUtilService = dalamudUtilService;
         _notificationManager = notificationManager;
         _chatGui = chatGui;
         _configurationService = configurationService;
@@ -75,6 +79,8 @@ public class NotificationService : DisposableMediatorSubscriberBase, IHostedServ
     {
         Logger.LogInformation("{msg}", msg.ToString());
 
+        if (!_dalamudUtilService.IsLoggedIn) return;
+
         switch (msg.Type)
         {
             case NotificationType.Info:
@@ -117,9 +123,9 @@ public class NotificationService : DisposableMediatorSubscriberBase, IHostedServ
     {
         Dalamud.Interface.ImGuiNotification.NotificationType dalamudType = msg.Type switch
         {
-            MareConfiguration.Models.NotificationType.Error => Dalamud.Interface.ImGuiNotification.NotificationType.Error,
-            MareConfiguration.Models.NotificationType.Warning => Dalamud.Interface.ImGuiNotification.NotificationType.Warning,
-            MareConfiguration.Models.NotificationType.Info => Dalamud.Interface.ImGuiNotification.NotificationType.Info,
+            NotificationType.Error => Dalamud.Interface.ImGuiNotification.NotificationType.Error,
+            NotificationType.Warning => Dalamud.Interface.ImGuiNotification.NotificationType.Warning,
+            NotificationType.Info => Dalamud.Interface.ImGuiNotification.NotificationType.Info,
             _ => Dalamud.Interface.ImGuiNotification.NotificationType.Info
         };
 
