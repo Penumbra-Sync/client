@@ -100,10 +100,16 @@ public class ServerConfigurationManager
             Save();
         }
 
-        var auth = currentServer.Authentications.Find(f => string.Equals(f.CharacterName, charaName, StringComparison.Ordinal) && f.WorldId == worldId);
-        if (auth == null) return null;
+        var auth = currentServer.Authentications.FindAll(f => string.Equals(f.CharacterName, charaName, StringComparison.Ordinal) && f.WorldId == worldId);
+        if (auth.Count >= 2)
+        {
+            _mareMediator.Publish(new NotificationMessage("Multiple Identical Characters detected", "Your Service configuration has multiple characters with the same name and world set up. Please delete the duplicates.",
+                NotificationType.Error));
+            return null;
+        }
+        if (auth.Count == 0) return null;
 
-        if (currentServer.SecretKeys.TryGetValue(auth.SecretKeyIdx, out var secretKey))
+        if (currentServer.SecretKeys.TryGetValue(auth.Single().SecretKeyIdx, out var secretKey))
         {
             return secretKey.Key;
         }
