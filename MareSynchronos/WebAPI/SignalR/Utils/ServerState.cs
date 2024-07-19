@@ -12,4 +12,5 @@ public enum ServerState
     VersionMisMatch,
     RateLimited,
     NoSecretKey,
+    MultiChara,
 }

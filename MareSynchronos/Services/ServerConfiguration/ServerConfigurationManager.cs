@@ -76,7 +76,7 @@ public class ServerConfigurationManager
         }
     }
 
-    public string? GetSecretKey(int serverIdx = -1)
+    public string? GetSecretKey(out bool hasMulti, int serverIdx = -1)
     {
         ServerStorage? currentServer;
         currentServer = serverIdx == -1 ? CurrentServer : GetServerByIndex(serverIdx);
@@ -85,6 +85,7 @@ public class ServerConfigurationManager
             currentServer = new();
             Save();
         }
+        hasMulti = false;
 
         var charaName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult();
         var worldId = _dalamudUtil.GetHomeWorldIdAsync().GetAwaiter().GetResult();
@@ -103,11 +104,11 @@ public class ServerConfigurationManager
         var auth = currentServer.Authentications.FindAll(f => string.Equals(f.CharacterName, charaName, StringComparison.Ordinal) && f.WorldId == worldId);
         if (auth.Count >= 2)
         {
-            _mareMediator.Publish(new NotificationMessage("Multiple Identical Characters detected", "Your Service configuration has multiple characters with the same name and world set up. Please delete the duplicates in the character management.",
-                NotificationType.Error));
             _logger.LogTrace("GetSecretKey accessed, returning null because multiple ({count}) identical characters.", auth.Count);
+            hasMulti = true;
             return null;
         }
+
         if (auth.Count == 0)
         {
             _logger.LogTrace("GetSecretKey accessed, returning null because no set up characters for {chara} on {world}", charaName, worldId);

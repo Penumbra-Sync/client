@@ -743,16 +743,13 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             ImGui.EndCombo();
         }
 
-        if (_serverConfigurationManager.GetSecretKey(_serverSelectionIndex) != null)
+        ImGui.SameLine();
+        var text = "Connect";
+        if (_serverSelectionIndex == _serverConfigurationManager.CurrentServerIndex) text = "Reconnect";
+        if (IconTextButton(FontAwesomeIcon.Link, text))
         {
-            ImGui.SameLine();
-            var text = "Connect";
-            if (_serverSelectionIndex == _serverConfigurationManager.CurrentServerIndex) text = "Reconnect";
-            if (IconTextButton(FontAwesomeIcon.Link, text))
-            {
-                _serverConfigurationManager.SelectServer(_serverSelectionIndex);
-                _ = _apiController.CreateConnections();
-            }
+            _serverConfigurationManager.SelectServer(_serverSelectionIndex);
+            _ = _apiController.CreateConnections();
         }
 
         if (ImGui.TreeNode("Add Custom Service"))

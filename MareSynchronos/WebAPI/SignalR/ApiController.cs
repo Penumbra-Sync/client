@@ -126,7 +126,18 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
             return;
         }
 
-        var secretKey = _serverManager.GetSecretKey();
+        var secretKey = _serverManager.GetSecretKey(out bool multi);
+        if (multi)
+        {
+            Logger.LogWarning("Multiple secret keys for current character");
+            _connectionDto = null;
+            Mediator.Publish(new NotificationMessage("Multiple Identical Characters detected", "Your Service configuration has multiple characters with the same name and world set up. Delete the duplicates in the character management to be able to connect to Mare.",
+                NotificationType.Error));
+            await StopConnection(ServerState.MultiChara).ConfigureAwait(false);
+            _connectionCancellationTokenSource?.Cancel();
+            return;
+        }
+
         if (secretKey.IsNullOrEmpty())
         {
             Logger.LogWarning("No secret key set for current character");

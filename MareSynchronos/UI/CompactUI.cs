@@ -598,6 +598,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             ServerState.RateLimited => "You are rate limited for (re)connecting too often. Disconnect, wait 10 minutes and try again.",
             ServerState.Connected => string.Empty,
             ServerState.NoSecretKey => "You have no secret key set for this current character. Use the button below or open the settings and set a secret key for the current character. You can reuse the same secret key for multiple characters.",
+            ServerState.MultiChara => "Your Character Configuration has multiple characters configured with same name and world. You will not be able to connect until you fix this issue. Remove the duplicates from the configuration in Settings -> Service Settings -> Character Management and reconnect manually after.",
             _ => string.Empty
         };
     }
@@ -616,6 +617,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             ServerState.Offline => ImGuiColors.DalamudRed,
             ServerState.RateLimited => ImGuiColors.DalamudYellow,
             ServerState.NoSecretKey => ImGuiColors.DalamudYellow,
+            ServerState.MultiChara => ImGuiColors.DalamudYellow,
             _ => ImGuiColors.DalamudRed
         };
     }
@@ -633,6 +635,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             ServerState.Offline => "Unavailable",
             ServerState.RateLimited => "Rate Limited",
             ServerState.NoSecretKey => "No Secret Key",
+            ServerState.MultiChara => "Duplicate Characters",
             ServerState.Connected => _apiController.DisplayName,
             _ => string.Empty
         };
