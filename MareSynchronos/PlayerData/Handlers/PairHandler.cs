@@ -342,6 +342,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                         break;
 
                     case PlayerChanges.Moodles:
+                        // TODO: send it to petnames ipc here instead
                         await _ipcManager.Moodles.SetStatusAsync(handler.Address, charaData.MoodlesData).ConfigureAwait(false);
                         break;
 

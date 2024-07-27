@@ -53,6 +53,7 @@ public class PluginWarningNotificationService
             warning.ShownHonorificWarning = true;
         }
 
+        // todo: change the moodles apiavailable to petnames for testing
         if (changes.Contains(PlayerChanges.Moodles) && !warning.ShownMoodlesWarning && !_ipcManager.Moodles.APIAvailable)
         {
             missingPluginsForData.Add("Moodles");

@@ -122,6 +122,9 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
                 MoodlesChanged();
             }
         });
+
+        // TODO: if event is needed for petnames add it here similar to moodles
+
         Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, (msg) =>
         {
             Logger.LogDebug("Received Penumbra Mod settings change, updating player");
