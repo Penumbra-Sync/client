@@ -31,7 +31,8 @@ public class PluginWarningNotificationService
                 ShownCustomizePlusWarning = _mareConfigService.Current.DisableOptionalPluginWarnings,
                 ShownHeelsWarning = _mareConfigService.Current.DisableOptionalPluginWarnings,
                 ShownHonorificWarning = _mareConfigService.Current.DisableOptionalPluginWarnings,
-                ShownMoodlesWarning = _mareConfigService.Current.DisableOptionalPluginWarnings
+                ShownMoodlesWarning = _mareConfigService.Current.DisableOptionalPluginWarnings,
+                ShowPetNicknamesWarning = _mareConfigService.Current.DisableOptionalPluginWarnings
             };
         }
 
@@ -53,11 +54,16 @@ public class PluginWarningNotificationService
             warning.ShownHonorificWarning = true;
         }
 
-        // todo: change the moodles apiavailable to petnames for testing
         if (changes.Contains(PlayerChanges.Moodles) && !warning.ShownMoodlesWarning && !_ipcManager.Moodles.APIAvailable)
         {
             missingPluginsForData.Add("Moodles");
             warning.ShownMoodlesWarning = true;
+        }
+
+        if (changes.Contains(PlayerChanges.Moodles) && !warning.ShowPetNicknamesWarning && !_ipcManager.PetNames.APIAvailable)
+        {
+            missingPluginsForData.Add("PetNicknames");
+            warning.ShowPetNicknamesWarning = true;
         }
 
         if (missingPluginsForData.Any())
