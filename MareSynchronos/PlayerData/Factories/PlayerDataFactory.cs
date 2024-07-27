@@ -216,8 +216,8 @@ public class PlayerDataFactory
         _logger.LogDebug("Heels is now: {heels}", previousData.HeelsData);
         if (objectKind == ObjectKind.Player)
         {
-            /*previousData.MoodlesData = await _ipcManager.Moodles.GetStatusAsync(playerRelatedObject.Address).ConfigureAwait(false) ?? string.Empty;
-            _logger.LogDebug("Moodles is now: {moodles}", previousData.MoodlesData); */
+            previousData.MoodlesData = await _ipcManager.Moodles.GetStatusAsync(playerRelatedObject.Address).ConfigureAwait(false) ?? string.Empty;
+            _logger.LogDebug("Moodles is now: {moodles}", previousData.MoodlesData);
 
             previousData.MoodlesData = _ipcManager.PetNames.GetLocalNames();
             _logger.LogDebug("Pet Nicknames is now: {moodles}", previousData.MoodlesData);

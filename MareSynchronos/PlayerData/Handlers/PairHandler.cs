@@ -342,7 +342,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                         break;
 
                     case PlayerChanges.Moodles:
-                        /* await _ipcManager.Moodles.SetStatusAsync(handler.Address, charaData.MoodlesData).ConfigureAwait(false); */
+                        await _ipcManager.Moodles.SetStatusAsync(handler.Address, charaData.MoodlesData).ConfigureAwait(false);
 
                         await _ipcManager.PetNames.SetPlayerData(handler.Address, charaData.MoodlesData).ConfigureAwait(false);
                         break;
