@@ -131,13 +131,14 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         return response;
     }
 
-    private JwtIdentifier? GetIdentifier()
+    private async Task<JwtIdentifier?> GetIdentifier()
     {
         JwtIdentifier jwtIdentifier;
         try
         {
+            var playerIdentifier = await _dalamudUtil.GetPlayerNameHashedAsync().ConfigureAwait(false);
             jwtIdentifier = new(_serverManager.CurrentApiUrl,
-                                _dalamudUtil.GetPlayerNameHashedAsync().GetAwaiter().GetResult(),
+                                playerIdentifier,
                                 _serverManager.GetSecretKey(out _)!);
             _lastJwtIdentifier = jwtIdentifier;
         }
@@ -157,9 +158,9 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         return jwtIdentifier;
     }
 
-    public string? GetToken()
+    public async Task<string?> GetToken()
     {
-        JwtIdentifier? jwtIdentifier = GetIdentifier();
+        JwtIdentifier? jwtIdentifier = await GetIdentifier().ConfigureAwait(false);
         if (jwtIdentifier == null) return null;
 
         if (_tokenCache.TryGetValue(jwtIdentifier, out var token))
@@ -172,7 +173,7 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
 
     public async Task<string?> GetOrUpdateToken(CancellationToken ct)
     {
-        JwtIdentifier? jwtIdentifier = GetIdentifier();
+        JwtIdentifier? jwtIdentifier = await GetIdentifier().ConfigureAwait(false);
         if (jwtIdentifier == null) return null;
 
         bool renewal = false;
