@@ -14,7 +14,6 @@ namespace MareSynchronos.PlayerData.Factories;
 
 public class PlayerDataFactory
 {
-    private static readonly string[] _allowedExtensionsForGamePaths = [".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk"];
     private readonly DalamudUtilService _dalamudUtil;
     private readonly FileCacheManager _fileCacheManager;
     private readonly IpcManager _ipcManager;
@@ -156,7 +155,7 @@ public class PlayerDataFactory
         previousData.FileReplacements[objectKind] =
                 new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement([.. c.Value], c.Key)), FileReplacementComparer.Instance)
                 .Where(p => p.HasFileReplacement).ToHashSet();
-        previousData.FileReplacements[objectKind].RemoveWhere(c => c.GamePaths.Any(g => !_allowedExtensionsForGamePaths.Any(e => g.EndsWith(e, StringComparison.OrdinalIgnoreCase))));
+        previousData.FileReplacements[objectKind].RemoveWhere(c => c.GamePaths.Any(g => !CacheMonitor.AllowedFileExtensions.Any(e => g.EndsWith(e, StringComparison.OrdinalIgnoreCase))));
 
         _logger.LogDebug("== Static Replacements ==");
         foreach (var replacement in previousData.FileReplacements[objectKind].Where(i => i.HasFileReplacement).OrderBy(i => i.GamePaths.First(), StringComparer.OrdinalIgnoreCase))

@@ -5,6 +5,7 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 
 namespace MareSynchronos.FileCache;
 
@@ -19,7 +20,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
     private long _currentFileProgress = 0;
     private CancellationTokenSource _scanCancellationTokenSource = new();
     private readonly CancellationTokenSource _periodicCalculationTokenSource = new();
-    private readonly string[] _allowedExtensions = [".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk"];
+    public static readonly IImmutableList<string> AllowedFileExtensions = [".mdl", ".tex", ".mtrl", ".tmb", ".pap", ".avfx", ".atex", ".sklb", ".eid", ".phyb", ".scd", ".skp", ".shpk"];
 
     public CacheMonitor(ILogger<CacheMonitor> logger, IpcManager ipcManager, MareConfigService configService,
         FileCacheManager fileDbManager, MareMediator mediator, PerformanceCollectorService performanceCollector, DalamudUtilService dalamudUtil,
@@ -151,7 +152,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
     {
         Logger.LogTrace("Mare FSW: FileChanged: {change} => {path}", e.ChangeType, e.FullPath);
 
-        if (!_allowedExtensions.Any(ext => e.FullPath.EndsWith(ext, StringComparison.OrdinalIgnoreCase))) return;
+        if (!AllowedFileExtensions.Any(ext => e.FullPath.EndsWith(ext, StringComparison.OrdinalIgnoreCase))) return;
 
         lock (_watcherChanges)
         {
@@ -195,7 +196,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
     private void Fs_Changed(object sender, FileSystemEventArgs e)
     {
         if (Directory.Exists(e.FullPath)) return;
-        if (!_allowedExtensions.Any(ext => e.FullPath.EndsWith(ext, StringComparison.OrdinalIgnoreCase))) return;
+        if (!AllowedFileExtensions.Any(ext => e.FullPath.EndsWith(ext, StringComparison.OrdinalIgnoreCase))) return;
 
         if (e.ChangeType is not (WatcherChangeTypes.Changed or WatcherChangeTypes.Deleted or WatcherChangeTypes.Created))
             return;
@@ -219,7 +220,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
             {
                 foreach (var file in directoryFiles)
                 {
-                    if (!_allowedExtensions.Any(ext => file.EndsWith(ext, StringComparison.OrdinalIgnoreCase))) continue;
+                    if (!AllowedFileExtensions.Any(ext => file.EndsWith(ext, StringComparison.OrdinalIgnoreCase))) continue;
                     var oldPath = file.Replace(e.FullPath, e.OldFullPath, StringComparison.OrdinalIgnoreCase);
 
                     _watcherChanges.Remove(oldPath);
@@ -231,7 +232,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
         }
         else
         {
-            if (!_allowedExtensions.Any(ext => e.FullPath.EndsWith(ext, StringComparison.OrdinalIgnoreCase))) return;
+            if (!AllowedFileExtensions.Any(ext => e.FullPath.EndsWith(ext, StringComparison.OrdinalIgnoreCase))) return;
 
             lock (_watcherChanges)
             {
@@ -497,7 +498,7 @@ public sealed class CacheMonitor : DisposableMediatorSubscriberBase
                 [
                     .. Directory.GetFiles(folder, "*.*", SearchOption.AllDirectories)
                                             .AsParallel()
-                                            .Where(f => _allowedExtensions.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase))
+                                            .Where(f => AllowedFileExtensions.Any(e => f.EndsWith(e, StringComparison.OrdinalIgnoreCase))
                                                 && !f.Contains(@"\bg\", StringComparison.OrdinalIgnoreCase)
                                                 && !f.Contains(@"\bgcommon\", StringComparison.OrdinalIgnoreCase)
                                                 && !f.Contains(@"\ui\", StringComparison.OrdinalIgnoreCase)),

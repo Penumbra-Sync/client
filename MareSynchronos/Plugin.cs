@@ -25,6 +25,7 @@ using MareSynchronos.WebAPI.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using NReco.Logging.File;
 
 namespace MareSynchronos;
 
@@ -37,12 +38,32 @@ public sealed class Plugin : IDalamudPlugin
         IGameGui gameGui, IDtrBar dtrBar, IPluginLog pluginLog, ITargetManager targetManager, INotificationManager notificationManager,
         ITextureProvider textureProvider, IContextMenu contextMenu)
     {
+        if (!Directory.Exists(pluginInterface.ConfigDirectory.FullName))
+            Directory.CreateDirectory(pluginInterface.ConfigDirectory.FullName);
+        var traceDir = Path.Join(pluginInterface.ConfigDirectory.FullName, "tracelog");
+        if (!Directory.Exists(traceDir))
+            Directory.CreateDirectory(traceDir);
+
+        foreach (var file in Directory.EnumerateFiles(traceDir)
+            .Select(f => new FileInfo(f))
+            .OrderByDescending(f => f.LastWriteTimeUtc).Skip(9))
+        {
+            file.Delete();
+        }
+
         _host = new HostBuilder()
         .UseContentRoot(pluginInterface.ConfigDirectory.FullName)
         .ConfigureLogging(lb =>
         {
             lb.ClearProviders();
             lb.AddDalamudLogging(pluginLog, gameData.HasModifiedGameDataFiles);
+            lb.AddFile(Path.Combine(traceDir, $"mare-trace-{DateTime.Now:yyyy-MM-dd-HH-mm-ss}.log"), (opt) =>
+            {
+                opt.Append = true;
+                opt.RollingFilesConvention = FileLoggerOptions.FileRollingConvention.Ascending;
+                opt.MinLevel = LogLevel.Trace;
+                opt.FileSizeLimitBytes = 50 * 1024 * 1024;
+            });
             lb.SetMinimumLevel(LogLevel.Trace);
         })
         .ConfigureServices(collection =>

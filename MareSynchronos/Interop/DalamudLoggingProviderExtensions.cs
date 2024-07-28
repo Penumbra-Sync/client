@@ -3,6 +3,7 @@ using MareSynchronos.MareConfiguration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using NReco.Logging.File;
 
 namespace MareSynchronos.Interop;
 
@@ -14,7 +15,6 @@ public static class DalamudLoggingProviderExtensions
 
         builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<ILoggerProvider, DalamudLoggingProvider>
             (b => new DalamudLoggingProvider(b.GetRequiredService<MareConfigService>(), pluginLog, hasModifiedGameFiles)));
-
         return builder;
     }
 }
