@@ -79,9 +79,10 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
             if (_isZoning) return;
             _ = Task.Run(async () =>
             {
+
                 foreach (var item in _playerRelatedObjects
-                    .Where(item => string.IsNullOrEmpty(msg.ProfileName)
-                    || string.Equals(item.Value.Name, msg.ProfileName, StringComparison.Ordinal)).Select(k => k.Key))
+                    .Where(item => msg.Address == null
+                    || item.Value.Address == msg.Address).Select(k => k.Key))
                 {
                     Logger.LogDebug("Received CustomizePlus change, updating {obj}", item);
                     await AddPlayerCacheToCreate(item).ConfigureAwait(false);

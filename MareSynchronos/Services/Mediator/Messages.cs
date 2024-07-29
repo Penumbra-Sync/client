@@ -38,7 +38,7 @@ public record PenumbraRedrawMessage(IntPtr Address, int ObjTblIdx, bool WasReque
 public record GlamourerChangedMessage(IntPtr Address) : MessageBase;
 public record HeelsOffsetMessage : MessageBase;
 public record PenumbraResourceLoadMessage(IntPtr GameObject, string GamePath, string FilePath) : SameThreadMessage;
-public record CustomizePlusMessage(string ProfileName) : MessageBase;
+public record CustomizePlusMessage(nint? Address) : MessageBase;
 public record HonorificMessage(string NewHonorificTitle) : MessageBase;
 public record MoodlesMessage(IntPtr Address) : MessageBase;
 public record HonorificReadyMessage : MessageBase;
