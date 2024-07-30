@@ -137,6 +137,13 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         try
         {
             var playerIdentifier = await _dalamudUtil.GetPlayerNameHashedAsync().ConfigureAwait(false);
+
+            if (string.IsNullOrEmpty(playerIdentifier))
+            {
+                _logger.LogTrace("GetIdentifier: PlayerIdentifier was null, returning last identifier {identifier}", _lastJwtIdentifier);
+                return _lastJwtIdentifier;
+            }
+
             jwtIdentifier = new(_serverManager.CurrentApiUrl,
                                 playerIdentifier,
                                 _serverManager.GetSecretKey(out _)!);
@@ -146,15 +153,15 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         {
             if (_lastJwtIdentifier == null)
             {
-                _logger.LogError("GetOrUpdate: No last identifier found, aborting");
+                _logger.LogError("GetIdentifier: No last identifier found, aborting");
                 return null;
             }
 
-            _logger.LogWarning(ex, "GetOrUpdate: Could not get JwtIdentifier for some reason or another, reusing last identifier {identifier}", _lastJwtIdentifier);
+            _logger.LogWarning(ex, "GetIdentifier: Could not get JwtIdentifier for some reason or another, reusing last identifier {identifier}", _lastJwtIdentifier);
             jwtIdentifier = _lastJwtIdentifier;
         }
 
-        _logger.LogDebug("GetOrUpdate: Using identifier {identifier}", jwtIdentifier);
+        _logger.LogDebug("GetIdentifier: Using identifier {identifier}", jwtIdentifier);
         return jwtIdentifier;
     }
 
