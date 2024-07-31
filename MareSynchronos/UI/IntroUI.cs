@@ -197,8 +197,8 @@ public class IntroUi : WindowMediatorSubscriberBase
                 ImGui.TextUnformatted("Service Registration");
             ImGui.Separator();
             UiSharedService.TextWrapped("To be able to use Mare Synchronos you will have to register an account.");
-            UiSharedService.TextWrapped("For the official Mare Synchronos Servers the account creation will be handled on the official Mare Synchronos Discord. Due to security risks for the server, there is no way to handle this senisibly otherwise.");
-            UiSharedService.TextWrapped("If you want to register at the main server \"" + WebAPI.ApiController.MainServer + "\" join the Discord and follow the instructions as described in #mare-commands.");
+            UiSharedService.TextWrapped("For the official Mare Synchronos Servers the account creation will be handled on the official Mare Synchronos Discord. Due to security risks for the server, there is no way to handle this sensibly otherwise.");
+            UiSharedService.TextWrapped("If you want to register at the main server \"" + WebAPI.ApiController.MainServer + "\" join the Discord and follow the instructions as described in #mare-service.");
 
             if (ImGui.Button("Join the Mare Synchronos Discord"))
             {
