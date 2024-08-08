@@ -70,7 +70,7 @@ public sealed class IpcCallerGlamourer : DisposableMediatorSubscriberBase, IIpcC
         {
             bool versionValid = (_pi.InstalledPlugins
                 .FirstOrDefault(p => string.Equals(p.InternalName, "Glamourer", StringComparison.OrdinalIgnoreCase))
-                ?.Version ?? new Version(0, 0, 0, 0)) >= new Version(1, 2, 3, 0);
+                ?.Version ?? new Version(0, 0, 0, 0)) >= new Version(1, 3, 0, 10);
             try
             {
                 var version = _glamourerApiVersions.Invoke();
