@@ -731,6 +731,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var enableDtrEntry = _configService.Current.EnableDtrEntry;
         var showUidInDtrTooltip = _configService.Current.ShowUidInDtrTooltip;
         var preferNoteInDtrTooltip = _configService.Current.PreferNoteInDtrTooltip;
+        var useColorsInDtr = _configService.Current.UseColorsInDtr;
         var preferNotesInsteadOfName = _configService.Current.PreferNotesOverNamesForVisible;
         var groupUpSyncshells = _configService.Current.GroupUpSyncshells;
         var groupInVisible = _configService.Current.ShowSyncshellUsersInVisible;
@@ -762,6 +763,12 @@ public class SettingsUi : WindowMediatorSubscriberBase
             if (ImGui.Checkbox("Prefer notes over player names in tooltip", ref preferNoteInDtrTooltip))
             {
                 _configService.Current.PreferNoteInDtrTooltip = preferNoteInDtrTooltip;
+                _configService.Save();
+            }
+
+            if (ImGui.Checkbox("Color-code the Server Info Bar entry according to status", ref useColorsInDtr))
+            {
+                _configService.Current.UseColorsInDtr = useColorsInDtr;
                 _configService.Save();
             }
         }

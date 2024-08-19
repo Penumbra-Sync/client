@@ -12,6 +12,7 @@ public class MareConfig : IMareConfiguration
     public bool EnableDtrEntry { get; set; } = false;
     public bool ShowUidInDtrTooltip { get; set; } = true;
     public bool PreferNoteInDtrTooltip { get; set; } = false;
+    public bool UseColorsInDtr { get; set; } = true;
     public bool EnableRightClickMenus { get; set; } = true;
     public NotificationLocation ErrorNotification { get; set; } = NotificationLocation.Both;
     public string ExportFolder { get; set; } = string.Empty;
