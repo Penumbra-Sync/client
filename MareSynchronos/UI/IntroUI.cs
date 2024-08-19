@@ -11,10 +11,11 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
+using System.Text.RegularExpressions;
 
 namespace MareSynchronos.UI;
 
-public class IntroUi : WindowMediatorSubscriberBase
+public partial class IntroUi : WindowMediatorSubscriberBase
 {
     private readonly MareConfigService _configService;
     private readonly CacheMonitor _cacheMonitor;
@@ -226,18 +227,33 @@ public class IntroUi : WindowMediatorSubscriberBase
             {
                 UiSharedService.ColorTextWrapped("Your secret key must be exactly 64 characters long. Don't enter your Lodestone auth here.", ImGuiColors.DalamudRed);
             }
+            else if (_secretKey.Length == 64 && !HexRegex().IsMatch(_secretKey))
+            {
+                UiSharedService.ColorTextWrapped("Your secret key can only contain ABCDEF and the numbers 0-9.", ImGuiColors.DalamudRed);
+            }
             else if (_secretKey.Length == 64)
             {
                 ImGui.SameLine();
                 if (ImGui.Button(buttonText))
                 {
                     if (_serverConfigurationManager.CurrentServer == null) _serverConfigurationManager.SelectServer(0);
-                    _serverConfigurationManager.CurrentServer!.SecretKeys.Add(_serverConfigurationManager.CurrentServer.SecretKeys.Select(k => k.Key).LastOrDefault() + 1, new SecretKey()
+                    if (!_serverConfigurationManager.CurrentServer!.SecretKeys.Any())
                     {
-                        FriendlyName = $"Secret Key added on Setup ({DateTime.Now:yyyy-MM-dd})",
-                        Key = _secretKey,
-                    });
-                    _serverConfigurationManager.AddCurrentCharacterToServer(addLastSecretKey: true);
+                        _serverConfigurationManager.CurrentServer!.SecretKeys.Add(_serverConfigurationManager.CurrentServer.SecretKeys.Select(k => k.Key).LastOrDefault() + 1, new SecretKey()
+                        {
+                            FriendlyName = $"Secret Key added on Setup ({DateTime.Now:yyyy-MM-dd})",
+                            Key = _secretKey,
+                        });
+                        _serverConfigurationManager.AddCurrentCharacterToServer(addLastSecretKey: true);
+                    }
+                    else
+                    {
+                        _serverConfigurationManager.CurrentServer!.SecretKeys[0] = new SecretKey()
+                        {
+                            FriendlyName = $"Secret Key added on Setup ({DateTime.Now:yyyy-MM-dd})",
+                            Key = _secretKey,
+                        };
+                    }
                     _secretKey = string.Empty;
                     _ = Task.Run(() => _uiShared.ApiController.CreateConnections());
                 }
@@ -259,4 +275,7 @@ public class IntroUi : WindowMediatorSubscriberBase
 
         _tosParagraphs = [Strings.ToS.Paragraph1, Strings.ToS.Paragraph2, Strings.ToS.Paragraph3, Strings.ToS.Paragraph4, Strings.ToS.Paragraph5, Strings.ToS.Paragraph6];
     }
+
+    [GeneratedRegex("^([A-F0-9]{2}\\s+)+")]
+    private static partial Regex HexRegex();
 }

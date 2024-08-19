@@ -48,7 +48,21 @@ public sealed class Plugin : IDalamudPlugin
             .Select(f => new FileInfo(f))
             .OrderByDescending(f => f.LastWriteTimeUtc).Skip(9))
         {
-            file.Delete();
+            int attempts = 0;
+            bool deleted = false;
+            while (!deleted && attempts < 5)
+            {
+                try
+                {
+                    file.Delete();
+                    deleted = true;
+                }
+                catch
+                {
+                    attempts++;
+                    Thread.Sleep(500);
+                }
+            }
         }
 
         _host = new HostBuilder()

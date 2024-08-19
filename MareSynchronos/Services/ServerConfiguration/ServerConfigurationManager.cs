@@ -173,6 +173,10 @@ public class ServerConfigurationManager
     {
         if (serverSelectionIndex == -1) serverSelectionIndex = CurrentServerIndex;
         var server = GetServerByIndex(serverSelectionIndex);
+        if (server.Authentications.Any(c => string.Equals(c.CharacterName, _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult(), StringComparison.Ordinal)
+                && c.WorldId == _dalamudUtil.GetHomeWorldIdAsync().GetAwaiter().GetResult()))
+            return;
+
         server.Authentications.Add(new Authentication()
         {
             CharacterName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult(),
