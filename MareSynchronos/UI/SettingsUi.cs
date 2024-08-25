@@ -732,6 +732,9 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var showUidInDtrTooltip = _configService.Current.ShowUidInDtrTooltip;
         var preferNoteInDtrTooltip = _configService.Current.PreferNoteInDtrTooltip;
         var useColorsInDtr = _configService.Current.UseColorsInDtr;
+        var dtrColorDefault = (int)_configService.Current.DtrColorDefault;
+        var dtrColorNotConnected = (int)_configService.Current.DtrColorNotConnected;
+        var dtrColorPairsInRange = (int)_configService.Current.DtrColorPairsInRange;
         var preferNotesInsteadOfName = _configService.Current.PreferNotesOverNamesForVisible;
         var groupUpSyncshells = _configService.Current.GroupUpSyncshells;
         var groupInVisible = _configService.Current.ShowSyncshellUsersInVisible;
@@ -770,6 +773,39 @@ public class SettingsUi : WindowMediatorSubscriberBase
             {
                 _configService.Current.UseColorsInDtr = useColorsInDtr;
                 _configService.Save();
+            }
+
+            using (ImRaii.Disabled(!useColorsInDtr))
+            {
+                using var indent2 = ImRaii.PushIndent();
+                ImGui.SetNextItemWidth(100);
+                if (ImGui.InputInt("Default", ref dtrColorDefault))
+                {
+                    _configService.Current.DtrColorDefault = (ushort)int.Clamp(dtrColorDefault, 0, 999);
+                    _configService.Save();
+                }
+
+                ImGui.SameLine();
+                ImGui.SetNextItemWidth(100);
+                if (ImGui.InputInt("Not Connected", ref dtrColorNotConnected))
+                {
+                    _configService.Current.DtrColorNotConnected = (ushort)int.Clamp(dtrColorNotConnected, 0, 999);
+                    _configService.Save();
+                }
+
+                ImGui.SameLine();
+                ImGui.SetNextItemWidth(100);
+                if (ImGui.InputInt("Pairs in Range", ref dtrColorPairsInRange))
+                {
+                    _configService.Current.DtrColorPairsInRange = (ushort)int.Clamp(dtrColorPairsInRange, 0, 999);
+                    _configService.Save();
+                }
+
+                ImGui.SameLine();
+                if (ImGui.Button("?"))
+                    _uiShared.OpenUiColorDictionary();
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Open the Color Code Dictionary");
             }
         }
 

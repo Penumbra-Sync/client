@@ -24,7 +24,7 @@ public sealed class DtrEntry : IDisposable, IHostedService
     private Task? _runTask;
     private string? _text;
     private string? _tooltip;
-    private StatusColorId _color;
+    private ushort _color;
 
     public DtrEntry(ILogger<DtrEntry> logger, IDtrBar dtrBar, ConfigurationServiceBase<MareConfig> configService, MareMediator mareMediator, PairManager pairManager, ApiController apiController)
     {
@@ -123,7 +123,7 @@ public sealed class DtrEntry : IDisposable, IHostedService
 
         string text;
         string tooltip;
-        StatusColorId color;
+        ushort color;
         if (_apiController.IsConnected)
         {
             var pairCount = _pairManager.GetVisibleUserCount();
@@ -145,19 +145,19 @@ public sealed class DtrEntry : IDisposable, IHostedService
                 }
 
                 tooltip = $"Mare Synchronos: Connected{Environment.NewLine}----------{Environment.NewLine}{string.Join(Environment.NewLine, visiblePairs)}";
-                color = StatusColorId.PairsInRange;
+                color = _configService.Current.DtrColorPairsInRange;
             }
             else
             {
                 tooltip = "Mare Synchronos: Connected";
-                color = default;
+                color = _configService.Current.DtrColorDefault;
             }
         }
         else
         {
             text = "\uE044 \uE04C";
             tooltip = "Mare Synchronos: Not Connected";
-            color = StatusColorId.NotConnected;
+            color = _configService.Current.DtrColorNotConnected;
         }
 
         if (!_configService.Current.UseColorsInDtr)
@@ -173,13 +173,6 @@ public sealed class DtrEntry : IDisposable, IHostedService
         }
     }
 
-    private static SeString BuildColoredSeString(string text, StatusColorId color)
-        => new SeStringBuilder().AddUiGlow(text, (ushort)color).Build();
-
-    private enum StatusColorId : ushort
-    {
-        None = default,
-        NotConnected = 518,
-        PairsInRange = 526,
-    }
+    private static SeString BuildColoredSeString(string text, ushort color)
+        => new SeStringBuilder().AddUiGlow(text, color).Build();
 }
