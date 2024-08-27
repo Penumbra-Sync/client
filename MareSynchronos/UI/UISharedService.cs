@@ -55,7 +55,6 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     private readonly ITextureProvider _textureProvider;
     private readonly Dictionary<string, object> _selectedComboItems = new(StringComparer.Ordinal);
     private readonly ServerConfigurationManager _serverConfigurationManager;
-    private readonly ICommandManager _commandManager;
     private bool _cacheDirectoryHasOtherFilesThanCache = false;
 
     private bool _cacheDirectoryIsValidPath = true;
@@ -84,7 +83,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         MareConfigService configService, DalamudUtilService dalamudUtil, IDalamudPluginInterface pluginInterface,
         ITextureProvider textureProvider,
         Dalamud.Localization localization,
-        ServerConfigurationManager serverManager, MareMediator mediator, ICommandManager commandManager) : base(logger, mediator)
+        ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
     {
         _ipcManager = ipcManager;
         _apiController = apiController;
@@ -96,7 +95,6 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         _textureProvider = textureProvider;
         _localization = localization;
         _serverConfigurationManager = serverManager;
-        _commandManager = commandManager;
         _localization.SetupWithLangCode("en");
 
         _isDirectoryWritable = IsDirectoryWritable(_configService.Current.CacheFolder);
@@ -811,9 +809,6 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         _localization.SetupWithLangCode(languageCode);
         Strings.ToS = new Strings.ToSStrings();
     }
-
-    public bool OpenUiColorDictionary()
-        => _commandManager.ProcessCommand("/xldata uicolor");
 
     [LibraryImport("user32")]
     internal static partial short GetKeyState(int nVirtKey);
