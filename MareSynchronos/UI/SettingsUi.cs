@@ -732,6 +732,9 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var showUidInDtrTooltip = _configService.Current.ShowUidInDtrTooltip;
         var preferNoteInDtrTooltip = _configService.Current.PreferNoteInDtrTooltip;
         var useColorsInDtr = _configService.Current.UseColorsInDtr;
+        var dtrColorsDefault = _configService.Current.DtrColorsDefault;
+        var dtrColorsNotConnected = _configService.Current.DtrColorsNotConnected;
+        var dtrColorsPairsInRange = _configService.Current.DtrColorsPairsInRange;
         var preferNotesInsteadOfName = _configService.Current.PreferNotesOverNamesForVisible;
         var groupUpSyncshells = _configService.Current.GroupUpSyncshells;
         var groupInVisible = _configService.Current.ShowSyncshellUsersInVisible;
@@ -770,6 +773,30 @@ public class SettingsUi : WindowMediatorSubscriberBase
             {
                 _configService.Current.UseColorsInDtr = useColorsInDtr;
                 _configService.Save();
+            }
+
+            using (ImRaii.Disabled(!useColorsInDtr))
+            {
+                using var indent2 = ImRaii.PushIndent();
+                if (InputDtrColors("Default", ref dtrColorsDefault))
+                {
+                    _configService.Current.DtrColorsDefault = dtrColorsDefault;
+                    _configService.Save();
+                }
+
+                ImGui.SameLine();
+                if (InputDtrColors("Not Connected", ref dtrColorsNotConnected))
+                {
+                    _configService.Current.DtrColorsNotConnected = dtrColorsNotConnected;
+                    _configService.Save();
+                }
+
+                ImGui.SameLine();
+                if (InputDtrColors("Pairs in Range", ref dtrColorsPairsInRange))
+                {
+                    _configService.Current.DtrColorsPairsInRange = dtrColorsPairsInRange;
+                    _configService.Save();
+                }
             }
         }
 
@@ -941,6 +968,37 @@ public class SettingsUi : WindowMediatorSubscriberBase
             _configService.Save();
         }
         _uiShared.DrawHelpText("Enabling this will only show online notifications (type: Info) for pairs where you have set an individual note.");
+    }
+
+    private static bool InputDtrColors(string label, ref DtrEntry.Colors colors)
+    {
+        using var id = ImRaii.PushId(label);
+        var innerSpacing = ImGui.GetStyle().ItemInnerSpacing.X;
+        var foregroundColor = ConvertColor(colors.Foreground);
+        var glowColor = ConvertColor(colors.Glow);
+
+        var ret = ImGui.ColorEdit3("###foreground", ref foregroundColor, ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.NoLabel | ImGuiColorEditFlags.Uint8);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Foreground Color - Set to pure black (#000000) to use the default color");
+
+        ImGui.SameLine(0.0f, innerSpacing);
+        ret |= ImGui.ColorEdit3("###glow", ref glowColor, ImGuiColorEditFlags.NoInputs | ImGuiColorEditFlags.NoLabel | ImGuiColorEditFlags.Uint8);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Glow Color - Set to pure black (#000000) to use the default color");
+
+        ImGui.SameLine(0.0f, innerSpacing);
+        ImGui.TextUnformatted(label);
+
+        if (ret)
+            colors = new(ConvertBackColor(foregroundColor), ConvertBackColor(glowColor));
+
+        return ret;
+
+        static Vector3 ConvertColor(uint color)
+            => unchecked(new((byte)color / 255.0f, (byte)(color >> 8) / 255.0f, (byte)(color >> 16) / 255.0f));
+
+        static uint ConvertBackColor(Vector3 color)
+            => byte.CreateSaturating(color.X * 255.0f) | ((uint)byte.CreateSaturating(color.Y * 255.0f) << 8) | ((uint)byte.CreateSaturating(color.Z * 255.0f) << 16);
     }
 
     private void DrawServerConfiguration()
