@@ -177,7 +177,7 @@ public sealed class XivDataAnalyzer
 
     public Task<long> GetTrianglesByHash(string hash)
     {
-        if (_configService.Current.TriangleDictionary.TryGetValue(hash, out var cachedTris))
+        if (_configService.Current.TriangleDictionary.TryGetValue(hash, out var cachedTris) && cachedTris > 0)
             return Task.FromResult(cachedTris);
 
         var path = _fileCacheManager.GetFileCacheByHash(hash);
@@ -192,13 +192,29 @@ public sealed class XivDataAnalyzer
             var file = _luminaGameData.GetFileFromDisk<MdlFile>(filePath);
             if (file.FileHeader.LodCount <= 0)
                 return Task.FromResult((long)0);
-            var meshIdx = file.Lods[0].MeshIndex;
-            var meshCnt = file.Lods[0].MeshCount;
-            var tris = file.Meshes.Skip(meshIdx).Take(meshCnt).Sum(p => p.IndexCount) / 3;
+            long tris = 0;
+            for (int i = 0; i < file.FileHeader.LodCount; i++)
+            {
+                try
+                {
+                    var meshIdx = file.Lods[i].MeshIndex;
+                    var meshCnt = file.Lods[i].MeshCount;
+                    tris = file.Meshes.Skip(meshIdx).Take(meshCnt).Sum(p => p.IndexCount) / 3;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Could not load lod mesh {mesh} from {path}", i, filePath);
+                    continue;
+                }
 
-            _logger.LogDebug("{filePath} => {tris} triangles", filePath, tris);
-            _configService.Current.TriangleDictionary[hash] = tris;
-            _configService.Save();
+                if (tris > 0)
+                {
+                    _logger.LogDebug("{filePath} => {tris} triangles", filePath, tris);
+                    _configService.Current.TriangleDictionary[hash] = tris;
+                    _configService.Save();
+                    break;
+                }
+            }
             return Task.FromResult(tris);
         }
         catch (Exception e)

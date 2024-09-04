@@ -44,6 +44,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private readonly PairManager _pairManager;
     private readonly PerformanceCollectorService _performanceCollector;
     private readonly ServerConfigurationManager _serverConfigurationManager;
+    private readonly PlayerPerformanceConfigService _playerPerformanceConfigService;
     private readonly UiSharedService _uiShared;
     private bool _deleteAccountPopupModalShown = false;
     private bool _deleteFilesPopupModalShown = false;
@@ -64,6 +65,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         UiSharedService uiShared, MareConfigService configService,
         MareCharaFileManager mareCharaFileManager, PairManager pairManager,
         ServerConfigurationManager serverConfigurationManager,
+        PlayerPerformanceConfigService playerPerformanceConfigService,
         MareMediator mediator, PerformanceCollectorService performanceCollector,
         FileUploadManager fileTransferManager,
         FileTransferOrchestrator fileTransferOrchestrator,
@@ -76,6 +78,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _mareCharaFileManager = mareCharaFileManager;
         _pairManager = pairManager;
         _serverConfigurationManager = serverConfigurationManager;
+        _playerPerformanceConfigService = playerPerformanceConfigService;
         _performanceCollector = performanceCollector;
         _fileTransferManager = fileTransferManager;
         _fileTransferOrchestrator = fileTransferOrchestrator;
@@ -118,6 +121,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
     public override void OnClose()
     {
         _uiShared.EditTrackerPosition = false;
+        _uidToAddForIgnore = string.Empty;
+
         base.OnClose();
     }
 
@@ -1316,6 +1321,156 @@ public class SettingsUi : WindowMediatorSubscriberBase
         }
     }
 
+    private void DrawPerformance()
+    {
+        _uiShared.BigText("Performance Settings");
+        UiSharedService.TextWrapped("The configuration options here are to give you more informed warnings and automation when it comes to other performance-intensive synced players.");
+        ImGui.Dummy(new Vector2(10));
+        ImGui.Separator();
+        ImGui.Dummy(new Vector2(10));
+        bool showPerformanceIndicator = _playerPerformanceConfigService.Current.ShowPerformanceIndicator;
+        if (ImGui.Checkbox("Show performance indicator", ref showPerformanceIndicator))
+        {
+            _playerPerformanceConfigService.Current.ShowPerformanceIndicator = showPerformanceIndicator;
+            _playerPerformanceConfigService.Save();
+        }
+        _uiShared.DrawHelpText("Will show a performance indicator when players exceed defined thresholds in the main UI." + Environment.NewLine + "Will use warning thresholds.");
+        bool warnOnExceedingThresholds = _playerPerformanceConfigService.Current.WarnOnExceedingThresholds;
+        if (ImGui.Checkbox("Warn on loading in players exceeding performance thresholds", ref warnOnExceedingThresholds))
+        {
+            _playerPerformanceConfigService.Current.WarnOnExceedingThresholds = warnOnExceedingThresholds;
+            _playerPerformanceConfigService.Save();
+        }
+        _uiShared.DrawHelpText("Mare will print a warning in chat once per session of meeting those people. Will not warn on players with preferred permissions.");
+        using (ImRaii.Disabled(!warnOnExceedingThresholds))
+        {
+            using var indent = ImRaii.PushIndent();
+            var warnOnPref = _playerPerformanceConfigService.Current.WarnOnPreferredPermissionsExceedingThresholds;
+            if (ImGui.Checkbox("Warn also on players with preferred permissions", ref warnOnPref))
+            {
+                _playerPerformanceConfigService.Current.WarnOnPreferredPermissionsExceedingThresholds = warnOnPref;
+                _playerPerformanceConfigService.Save();
+            }
+            _uiShared.DrawHelpText("Mare will also print warnings for players where you enabled preferred permissions.");
+        }
+        using (ImRaii.Disabled(!showPerformanceIndicator && !warnOnExceedingThresholds))
+        {
+            var vram = _playerPerformanceConfigService.Current.VRAMSizeWarningThresholdMiB;
+            var tris = _playerPerformanceConfigService.Current.TrisWarningThresholdThousands;
+            ImGui.SetNextItemWidth(100);
+            if (ImGui.InputInt("Warning VRAM threshold", ref vram))
+            {
+                _playerPerformanceConfigService.Current.VRAMSizeWarningThresholdMiB = vram;
+                _playerPerformanceConfigService.Save();
+            }
+            ImGui.SameLine();
+            ImGui.Text("(MiB)");
+            _uiShared.DrawHelpText("Limit in MiB of approximate VRAM usage to trigger warning or performance indicator on UI." + UiSharedService.TooltipSeparator
+                + "Default: 375 MiB");
+            ImGui.SetNextItemWidth(100);
+            if (ImGui.InputInt("Warning Triangle threshold", ref tris))
+            {
+                _playerPerformanceConfigService.Current.TrisWarningThresholdThousands = tris;
+                _playerPerformanceConfigService.Save();
+            }
+            ImGui.SameLine();
+            ImGui.Text("(thousand triangles)");
+            _uiShared.DrawHelpText("Limit in approximate used triangles from mods to trigger warning or performance indicator on UI." + UiSharedService.TooltipSeparator
+                + "Default: 165 thousand");
+        }
+        ImGui.Dummy(new Vector2(10));
+        bool autoPause = _playerPerformanceConfigService.Current.AutoPausePlayersExceedingThresholds;
+        bool autoPauseEveryone = _playerPerformanceConfigService.Current.AutoPausePlayersWithPreferredPermissionsExceedingThresholds;
+        if (ImGui.Checkbox("Automatically pause players exceeding thresholds", ref autoPause))
+        {
+            _playerPerformanceConfigService.Current.AutoPausePlayersExceedingThresholds = autoPause;
+            _playerPerformanceConfigService.Save();
+        }
+        _uiShared.DrawHelpText("When enabled, it will automatically pause all players without preferred permissions that exceed the thresholds defined below." + Environment.NewLine
+            + "Will print a warning in chat when a player got paused automatically."
+            + UiSharedService.TooltipSeparator + "Warning: this will not automatically unpause those people again, you will have to do this manually.");
+        using (ImRaii.Disabled(!autoPause))
+        {
+            using var indent = ImRaii.PushIndent();
+            if (ImGui.Checkbox("Automatically pause also players with preferred permissions", ref autoPauseEveryone))
+            {
+                _playerPerformanceConfigService.Current.AutoPausePlayersWithPreferredPermissionsExceedingThresholds = autoPauseEveryone;
+                _playerPerformanceConfigService.Save();
+            }
+            _uiShared.DrawHelpText("When enabled, will automatically pause all players regardless of preferred permissions that exceed thresholds defined below." + UiSharedService.TooltipSeparator +
+                "Warning: this will not automatically unpause those people again, you will have to do this manually." + UiSharedService.TooltipSeparator
+                + "Default: 550 MiB");
+            var vramAuto = _playerPerformanceConfigService.Current.VRAMSizeAutoPauseThresholdMiB;
+            var trisAuto = _playerPerformanceConfigService.Current.TrisAutoPauseThresholdThousands;
+            ImGui.SetNextItemWidth(100);
+            if (ImGui.InputInt("Auto Pause VRAM threshold", ref vramAuto))
+            {
+                _playerPerformanceConfigService.Current.VRAMSizeAutoPauseThresholdMiB = vramAuto;
+                _playerPerformanceConfigService.Save();
+            }
+            ImGui.SameLine();
+            ImGui.Text("(MiB)");
+            _uiShared.DrawHelpText("When a loading in player and their VRAM usage exceeds this amount, automatically pauses the synced player.");
+            ImGui.SetNextItemWidth(100);
+            if (ImGui.InputInt("Auto Pause Triangle threshold", ref trisAuto))
+            {
+                _playerPerformanceConfigService.Current.TrisAutoPauseThresholdThousands = trisAuto;
+                _playerPerformanceConfigService.Save();
+            }
+            ImGui.SameLine();
+            ImGui.Text("(thousand triangles)");
+            _uiShared.DrawHelpText("When a loading in player and their triangle count exceeds this amount, automatically pauses the synced player." + UiSharedService.TooltipSeparator
+                + "Default: 250 thousand");
+        }
+        ImGui.Dummy(new Vector2(10));
+        _uiShared.BigText("Whitelisted UIDs");
+        UiSharedService.TextWrapped("The entries in the list below will be ignored for all warnings and auto pause operations.");
+        ImGui.Dummy(new Vector2(10));
+        ImGui.SetNextItemWidth(200);
+        ImGui.InputText("##ignoreuid", ref _uidToAddForIgnore, 20);
+        ImGui.SameLine();
+        using (ImRaii.Disabled(string.IsNullOrEmpty(_uidToAddForIgnore)))
+        {
+            if (_uiShared.IconTextButton(FontAwesomeIcon.Plus, "Add UID to whitelist"))
+            {
+                if (!_playerPerformanceConfigService.Current.UIDsToIgnore.Contains(_uidToAddForIgnore, StringComparer.Ordinal))
+                {
+                    _playerPerformanceConfigService.Current.UIDsToIgnore.Add(_uidToAddForIgnore);
+                }
+                _uidToAddForIgnore = string.Empty;
+            }
+        }
+        _uiShared.DrawHelpText("Hint: UIDs are case sensitive.");
+        var playerList = _playerPerformanceConfigService.Current.UIDsToIgnore;
+        ImGui.SetNextItemWidth(200);
+        using (var lb = ImRaii.ListBox("UID whitelist"))
+        {
+            if (lb)
+            {
+                for (int i = 0; i < playerList.Count; i++)
+                {
+                    bool shouldBeSelected = _selectedEntry == i;
+                    if (ImGui.Selectable(playerList[i] + "##" + i, shouldBeSelected))
+                    {
+                        _selectedEntry = i;
+                    }
+                }
+            }
+        }
+        using (ImRaii.Disabled(_selectedEntry == -1))
+        {
+            if (_uiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete selected UID"))
+            {
+                _playerPerformanceConfigService.Current.UIDsToIgnore.RemoveAt(_selectedEntry);
+                _selectedEntry = -1;
+                _playerPerformanceConfigService.Save();
+            }
+        }
+    }
+
+    private string _uidToAddForIgnore = string.Empty;
+    private int _selectedEntry = -1;
+
     private void DrawSettingsContent()
     {
         if (_apiController.ServerState is ServerState.Connected)
@@ -1346,6 +1501,12 @@ public class SettingsUi : WindowMediatorSubscriberBase
             if (ImGui.BeginTabItem("General"))
             {
                 DrawGeneral();
+                ImGui.EndTabItem();
+            }
+
+            if (ImGui.BeginTabItem("Performance"))
+            {
+                DrawPerformance();
                 ImGui.EndTabItem();
             }
 

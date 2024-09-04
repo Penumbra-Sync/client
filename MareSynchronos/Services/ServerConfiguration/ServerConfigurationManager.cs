@@ -169,7 +169,7 @@ public class ServerConfigurationManager
         Save();
     }
 
-    internal void AddCurrentCharacterToServer(int serverSelectionIndex = -1, bool addLastSecretKey = false)
+    internal void AddCurrentCharacterToServer(int serverSelectionIndex = -1)
     {
         if (serverSelectionIndex == -1) serverSelectionIndex = CurrentServerIndex;
         var server = GetServerByIndex(serverSelectionIndex);
@@ -181,7 +181,7 @@ public class ServerConfigurationManager
         {
             CharacterName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult(),
             WorldId = _dalamudUtil.GetHomeWorldIdAsync().GetAwaiter().GetResult(),
-            SecretKeyIdx = addLastSecretKey ? server.SecretKeys.Last().Key : -1,
+            SecretKeyIdx = server.SecretKeys.Last().Key,
         });
         Save();
     }
@@ -189,7 +189,10 @@ public class ServerConfigurationManager
     internal void AddEmptyCharacterToServer(int serverSelectionIndex)
     {
         var server = GetServerByIndex(serverSelectionIndex);
-        server.Authentications.Add(new Authentication());
+        server.Authentications.Add(new Authentication()
+        {
+            SecretKeyIdx = server.SecretKeys.Any() ? server.SecretKeys.First().Key : -1,
+        });
         Save();
     }
 

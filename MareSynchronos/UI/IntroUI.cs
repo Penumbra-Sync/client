@@ -244,7 +244,7 @@ public partial class IntroUi : WindowMediatorSubscriberBase
                             FriendlyName = $"Secret Key added on Setup ({DateTime.Now:yyyy-MM-dd})",
                             Key = _secretKey,
                         });
-                        _serverConfigurationManager.AddCurrentCharacterToServer(addLastSecretKey: true);
+                        _serverConfigurationManager.AddCurrentCharacterToServer();
                     }
                     else
                     {

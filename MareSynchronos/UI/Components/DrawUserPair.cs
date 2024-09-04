@@ -228,11 +228,15 @@ public class DrawUserPair
             userPairText += UiSharedService.TooltipSeparator + "You are directly Paired";
         }
 
-        if (_pair.LastAppliedDataSize >= 0)
+        if (_pair.LastAppliedDataBytes >= 0)
         {
             userPairText += UiSharedService.TooltipSeparator;
             userPairText += ((!_pair.IsPaired) ? "(Last) " : string.Empty) + "Mods Info" + Environment.NewLine;
-            userPairText += "Files Size: " + UiSharedService.ByteToString(_pair.LastAppliedDataSize, true);
+            userPairText += "Files Size: " + UiSharedService.ByteToString(_pair.LastAppliedDataBytes, true);
+            if (_pair.LastAppliedApproximateVRAMBytes >= 0)
+            {
+                userPairText += Environment.NewLine + "Approximate max. VRAM Usage: " + UiSharedService.ByteToString(_pair.LastAppliedApproximateVRAMBytes, true);
+            }
             if (_pair.LastAppliedDataTris >= 0)
             {
                 userPairText += Environment.NewLine + "Triangle Count (excl. Vanilla): "

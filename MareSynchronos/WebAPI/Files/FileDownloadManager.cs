@@ -210,7 +210,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
         }
     }
 
-    private async Task DownloadFilesInternal(GameObjectHandler gameObjectHandler, List<FileReplacementData> fileReplacement, CancellationToken ct)
+    public async Task<List<DownloadFileTransfer>> InitiateDownloadList(GameObjectHandler gameObjectHandler, List<FileReplacementData> fileReplacement, CancellationToken ct)
     {
         Logger.LogDebug("Download start: {id}", gameObjectHandler.Name);
 
@@ -221,9 +221,6 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
 
         Logger.LogDebug("Files with size 0 or less: {files}", string.Join(", ", downloadFileInfoFromService.Where(f => f.Size <= 0).Select(f => f.Hash)));
 
-        CurrentDownloads = downloadFileInfoFromService.Distinct().Select(d => new DownloadFileTransfer(d))
-            .Where(d => d.CanBeTransferred).ToList();
-
         foreach (var dto in downloadFileInfoFromService.Where(c => c.IsForbidden))
         {
             if (!_orchestrator.ForbiddenTransfers.Exists(f => string.Equals(f.Hash, dto.Hash, StringComparison.Ordinal)))
@@ -232,7 +229,13 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
             }
         }
 
-        var downloadGroups = CurrentDownloads.Where(f => f.CanBeTransferred).GroupBy(f => f.DownloadUri.Host + ":" + f.DownloadUri.Port, StringComparer.Ordinal);
+        return CurrentDownloads = downloadFileInfoFromService.Distinct().Select(d => new DownloadFileTransfer(d))
+            .Where(d => d.CanBeTransferred).ToList();
+    }
+
+    private async Task DownloadFilesInternal(GameObjectHandler gameObjectHandler, List<FileReplacementData> fileReplacement, CancellationToken ct)
+    {
+        var downloadGroups = CurrentDownloads.GroupBy(f => f.DownloadUri.Host + ":" + f.DownloadUri.Port, StringComparer.Ordinal);
 
         foreach (var downloadGroup in downloadGroups)
         {

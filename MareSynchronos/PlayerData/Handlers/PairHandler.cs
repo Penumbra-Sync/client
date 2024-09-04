@@ -25,6 +25,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private readonly FileDownloadManager _downloadManager;
     private readonly FileCacheManager _fileDbManager;
     private readonly XivDataAnalyzer _xivDataAnalyzer;
+    private readonly PlayerPerformanceService _playerPerformanceService;
     private readonly GameObjectHandlerFactory _gameObjectHandlerFactory;
     private readonly IpcManager _ipcManager;
     private readonly IHostApplicationLifetime _lifetime;
@@ -41,8 +42,9 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private Dictionary<ObjectKind, Guid?> _customizeIds = [];
     private bool _redrawOnNextApplication = false;
     private CombatData? _dataReceivedInDowntime;
-    public long LastAppliedDataSize { get; private set; }
+    public long LastAppliedDataBytes { get; private set; }
     public long LastAppliedDataTris { get; private set; }
+    public long LastAppliedApproximateVRAMBytes { get; private set; }
 
     public PairHandler(ILogger<PairHandler> logger, OnlineUserIdentDto onlineUser,
         GameObjectHandlerFactory gameObjectHandlerFactory,
@@ -50,7 +52,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         PluginWarningNotificationService pluginWarningNotificationManager,
         DalamudUtilService dalamudUtil, IHostApplicationLifetime lifetime,
         FileCacheManager fileDbManager, MareMediator mediator,
-        XivDataAnalyzer modelAnalyzer) : base(logger, mediator)
+        XivDataAnalyzer modelAnalyzer, PlayerPerformanceService playerPerformanceService) : base(logger, mediator)
     {
         OnlineUser = onlineUser;
         _gameObjectHandlerFactory = gameObjectHandlerFactory;
@@ -61,6 +63,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         _lifetime = lifetime;
         _fileDbManager = fileDbManager;
         _xivDataAnalyzer = modelAnalyzer;
+        _playerPerformanceService = playerPerformanceService;
         _penumbraCollection = _ipcManager.Penumbra.CreateTemporaryCollectionAsync(logger, OnlineUser.User.UID).ConfigureAwait(false).GetAwaiter().GetResult();
 
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
@@ -103,7 +106,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             _applicationCancellationTokenSource = _applicationCancellationTokenSource?.CancelRecreate();
         });
 
-        LastAppliedDataSize = -1;
+        LastAppliedDataBytes = -1;
         LastAppliedDataTris = -1;
     }
 
@@ -384,17 +387,28 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                 int attempts = 0;
                 List<FileReplacementData> toDownloadReplacements = TryCalculateModdedDictionary(applicationBase, charaData, out moddedPaths, downloadToken);
 
+                LastAppliedApproximateVRAMBytes = -1;
+
                 while (toDownloadReplacements.Count > 0 && attempts++ <= 10 && !downloadToken.IsCancellationRequested)
                 {
                     _downloadManager.CancelDownload();
                     Logger.LogDebug("[BASE-{appBase}] Downloading missing files for player {name}, {kind}", applicationBase, PlayerName, updatedData);
-                    if (toDownloadReplacements.Any())
+
+                    Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.User, nameof(PairHandler), EventSeverity.Informational,
+                        $"Starting download for {toDownloadReplacements.Count} files")));
+                    var toDownloadFiles = await _downloadManager.InitiateDownloadList(_charaHandler!, toDownloadReplacements, downloadToken).ConfigureAwait(false);
+
+                    if (!_playerPerformanceService.TryCalculateVRAMUsage(this, charaData, toDownloadFiles, out long vramDuringDl))
                     {
-                        Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.User, nameof(PairHandler), EventSeverity.Informational,
-                            $"Starting download for {toDownloadReplacements.Count} files")));
-                        await _downloadManager.DownloadFiles(_charaHandler!, toDownloadReplacements, downloadToken).ConfigureAwait(false);
+                        LastAppliedApproximateVRAMBytes = vramDuringDl;
                         _downloadManager.CancelDownload();
+                        return;
                     }
+
+                    LastAppliedApproximateVRAMBytes = vramDuringDl;
+
+                    await _downloadManager.DownloadFiles(_charaHandler!, toDownloadReplacements, downloadToken).ConfigureAwait(false);
+                    _downloadManager.CancelDownload();
 
                     if (downloadToken.IsCancellationRequested)
                     {
@@ -411,6 +425,13 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                     }
 
                     await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+                }
+
+                if (LastAppliedApproximateVRAMBytes == -1
+                    && !_playerPerformanceService.TryCalculateVRAMUsage(this, charaData, [], out long vramUsage))
+                {
+                    LastAppliedApproximateVRAMBytes = vramUsage;
+                    return;
                 }
             }
 
@@ -446,12 +467,18 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                     {
                         await _ipcManager.Penumbra.SetTemporaryModsAsync(Logger, _applicationId, _penumbraCollection,
                             moddedPaths.ToDictionary(k => k.Key.GamePath, k => k.Value, StringComparer.Ordinal)).ConfigureAwait(false);
-                        LastAppliedDataSize = -1;
+                        LastAppliedDataBytes = -1;
                         LastAppliedDataTris = -1;
                         foreach (var path in moddedPaths.Values.Distinct(StringComparer.OrdinalIgnoreCase).Select(v => new FileInfo(v)).Where(p => p.Exists))
                         {
-                            if (LastAppliedDataSize == -1) LastAppliedDataSize = 0;
-                            LastAppliedDataSize += path.Length;
+                            if (LastAppliedDataBytes == -1) LastAppliedDataBytes = 0;
+                            if (LastAppliedApproximateVRAMBytes == -1) LastAppliedApproximateVRAMBytes = 0;
+
+                            LastAppliedDataBytes += path.Length;
+                            if (path.Name.EndsWith(".tex", StringComparison.OrdinalIgnoreCase))
+                            {
+                                LastAppliedApproximateVRAMBytes += path.Length;
+                            }
                         }
                         foreach (var key in moddedPaths.Keys.Where(k => !string.IsNullOrEmpty(k.Hash)))
                         {
