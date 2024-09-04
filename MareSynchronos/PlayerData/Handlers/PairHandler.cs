@@ -46,7 +46,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     public long LastAppliedDataTris { get; private set; }
     public long LastAppliedApproximateVRAMBytes { get; private set; }
 
-    public PairHandler(ILogger<PairHandler> logger, OnlineUserIdentDto onlineUser,
+    public PairHandler(ILogger<PairHandler> logger, Pair pair,
         GameObjectHandlerFactory gameObjectHandlerFactory,
         IpcManager ipcManager, FileDownloadManager transferManager,
         PluginWarningNotificationService pluginWarningNotificationManager,
@@ -54,7 +54,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         FileCacheManager fileDbManager, MareMediator mediator,
         XivDataAnalyzer modelAnalyzer, PlayerPerformanceService playerPerformanceService) : base(logger, mediator)
     {
-        OnlineUser = onlineUser;
+        OnlineUser = pair;
         _gameObjectHandlerFactory = gameObjectHandlerFactory;
         _ipcManager = ipcManager;
         _downloadManager = transferManager;
@@ -64,7 +64,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         _fileDbManager = fileDbManager;
         _xivDataAnalyzer = modelAnalyzer;
         _playerPerformanceService = playerPerformanceService;
-        _penumbraCollection = _ipcManager.Penumbra.CreateTemporaryCollectionAsync(logger, OnlineUser.User.UID).ConfigureAwait(false).GetAwaiter().GetResult();
+        _penumbraCollection = _ipcManager.Penumbra.CreateTemporaryCollectionAsync(logger, OnlineUser.UserData.UID).ConfigureAwait(false).GetAwaiter().GetResult();
 
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
         Mediator.Subscribe<ZoneSwitchStartMessage>(this, (_) =>
@@ -75,7 +75,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         });
         Mediator.Subscribe<PenumbraInitializedMessage>(this, (_) =>
         {
-            _penumbraCollection = _ipcManager.Penumbra.CreateTemporaryCollectionAsync(logger, OnlineUser.User.UID).ConfigureAwait(false).GetAwaiter().GetResult();
+            _penumbraCollection = _ipcManager.Penumbra.CreateTemporaryCollectionAsync(logger, OnlineUser.UserData.UID).ConfigureAwait(false).GetAwaiter().GetResult();
             if (!IsVisible && _charaHandler != null)
             {
                 PlayerName = string.Empty;
@@ -119,13 +119,13 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             {
                 _isVisible = value;
                 string text = "User Visibility Changed, now: " + (_isVisible ? "Is Visible" : "Is not Visible");
-                Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.User, nameof(PairHandler),
+                Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.UserData, nameof(PairHandler),
                     EventSeverity.Informational, text)));
                 Mediator.Publish(new RefreshUiMessage());
             }
         }
     }
-    public OnlineUserIdentDto OnlineUser { get; private set; }
+    public Pair OnlineUser { get; private set; }
     public nint PlayerCharacter => _charaHandler?.Address ?? nint.Zero;
     public unsafe uint PlayerCharacterId => (_charaHandler?.Address ?? nint.Zero) == nint.Zero
         ? uint.MaxValue
@@ -137,7 +137,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     {
         if (_dalamudUtil.IsInCombatOrPerforming)
         {
-            Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.User, nameof(PairHandler), EventSeverity.Warning,
+            Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.UserData, nameof(PairHandler), EventSeverity.Warning,
                 "Cannot apply character data: you are in combat or performing music, deferring application")));
             Logger.LogDebug("[BASE-{appBase}] Received data but player is in combat or performing", applicationBase);
             _dataReceivedInDowntime = new(applicationBase, characterData, forceApplyCustomization);
@@ -147,7 +147,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
         if (_charaHandler == null || (PlayerCharacter == IntPtr.Zero))
         {
-            Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.User, nameof(PairHandler), EventSeverity.Warning,
+            Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.UserData, nameof(PairHandler), EventSeverity.Warning,
                 "Cannot apply character data: Receiving Player is in an invalid state, deferring application")));
             Logger.LogDebug("[BASE-{appBase}] Received data but player was in invalid state, charaHandlerIsNull: {charaIsNull}, playerPointerIsNull: {ptrIsNull}",
                 applicationBase, _charaHandler == null, PlayerCharacter == IntPtr.Zero);
@@ -169,13 +169,13 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
         if (_dalamudUtil.IsInCutscene || _dalamudUtil.IsInGpose || !_ipcManager.Penumbra.APIAvailable || !_ipcManager.Glamourer.APIAvailable)
         {
-            Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.User, nameof(PairHandler), EventSeverity.Warning,
+            Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.UserData, nameof(PairHandler), EventSeverity.Warning,
                 "Cannot apply character data: you are in GPose, a Cutscene or Penumbra/Glamourer is not available")));
             Logger.LogInformation("[BASE-{appbase}] Application of data for {player} while in cutscene/gpose or Penumbra/Glamourer unavailable, returning", applicationBase, this);
             return;
         }
 
-        Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.User, nameof(PairHandler), EventSeverity.Informational,
+        Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.UserData, nameof(PairHandler), EventSeverity.Informational,
             "Applying Character Data")));
 
         _forceApplyMods |= forceApplyCustomization;
@@ -195,7 +195,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
         if (charaDataToUpdate.TryGetValue(ObjectKind.Player, out var playerChanges))
         {
-            _pluginWarningNotificationManager.NotifyForMissingPlugins(OnlineUser.User, PlayerName!, playerChanges);
+            _pluginWarningNotificationManager.NotifyForMissingPlugins(OnlineUser.UserData, PlayerName!, playerChanges);
         }
 
         Logger.LogDebug("[BASE-{appbase}] Downloading and applying character for {name}", applicationBase, this);
@@ -207,7 +207,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     {
         return OnlineUser == null
             ? base.ToString() ?? string.Empty
-            : OnlineUser.User.AliasOrUID + ":" + PlayerName + ":" + (PlayerCharacter != nint.Zero ? "HasChar" : "NoChar");
+            : OnlineUser.UserData.AliasOrUID + ":" + PlayerName + ":" + (PlayerCharacter != nint.Zero ? "HasChar" : "NoChar");
     }
 
     internal void SetUploading(bool isUploading = true)
@@ -239,25 +239,27 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
             if (!string.IsNullOrEmpty(name))
             {
-                Mediator.Publish(new EventMessage(new Event(name, OnlineUser.User, nameof(PairHandler), EventSeverity.Informational, "Disposing User")));
+                Mediator.Publish(new EventMessage(new Event(name, OnlineUser.UserData, nameof(PairHandler), EventSeverity.Informational, "Disposing User")));
             }
 
             if (_lifetime.ApplicationStopping.IsCancellationRequested) return;
 
             if (_dalamudUtil is { IsZoning: false, IsInCutscene: false } && !string.IsNullOrEmpty(name))
             {
-                Logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser);
-                Logger.LogDebug("[{applicationId}] Removing Temp Collection for {name} ({user})", applicationId, name, OnlineUser);
+                Logger.LogTrace("[{applicationId}] Restoring state for {name} ({OnlineUser})", applicationId, name, OnlineUser.UserPair);
+                Logger.LogDebug("[{applicationId}] Removing Temp Collection for {name} ({user})", applicationId, name, OnlineUser.UserPair);
                 _ipcManager.Penumbra.RemoveTemporaryCollectionAsync(Logger, applicationId, _penumbraCollection).GetAwaiter().GetResult();
                 if (!IsVisible)
                 {
-                    Logger.LogDebug("[{applicationId}] Restoring Glamourer for {name} ({user})", applicationId, name, OnlineUser);
+                    Logger.LogDebug("[{applicationId}] Restoring Glamourer for {name} ({user})", applicationId, name, OnlineUser.UserPair);
                     _ipcManager.Glamourer.RevertByNameAsync(Logger, name, applicationId).GetAwaiter().GetResult();
                 }
                 else
                 {
                     var cts = new CancellationTokenSource();
                     cts.CancelAfter(TimeSpan.FromSeconds(60));
+
+                    Logger.LogInformation("[{applicationId}] CachedData is null {isNull}, contains things: {contains}", applicationId, _cachedData == null, _cachedData?.FileReplacements.Any() ?? false);
 
                     foreach (KeyValuePair<ObjectKind, List<FileReplacementData>> item in _cachedData?.FileReplacements ?? [])
                     {
@@ -394,7 +396,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
                     _downloadManager.CancelDownload();
                     Logger.LogDebug("[BASE-{appBase}] Downloading missing files for player {name}, {kind}", applicationBase, PlayerName, updatedData);
 
-                    Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.User, nameof(PairHandler), EventSeverity.Informational,
+                    Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.UserData, nameof(PairHandler), EventSeverity.Informational,
                         $"Starting download for {toDownloadReplacements.Count} files")));
                     var toDownloadFiles = await _downloadManager.InitiateDownloadList(_charaHandler!, toDownloadReplacements, downloadToken).ConfigureAwait(false);
 
@@ -531,7 +533,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             Logger.LogDebug("One-Time Initializing {this}", this);
             Initialize(pc.Name);
             Logger.LogDebug("One-Time Initialized {this}", this);
-            Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.User, nameof(PairHandler), EventSeverity.Informational,
+            Mediator.Publish(new EventMessage(new Event(PlayerName, OnlineUser.UserData, nameof(PairHandler), EventSeverity.Informational,
                 $"Initializing User For Character {pc.Name}")));
         }
 
@@ -584,7 +586,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         nint address = _dalamudUtil.GetPlayerCharacterFromCachedTableByIdent(OnlineUser.Ident);
         if (address == nint.Zero) return;
 
-        Logger.LogDebug("[{applicationId}] Reverting all Customization for {alias}/{name} {objectKind}", applicationId, OnlineUser.User.AliasOrUID, name, objectKind);
+        Logger.LogDebug("[{applicationId}] Reverting all Customization for {alias}/{name} {objectKind}", applicationId, OnlineUser.UserData.AliasOrUID, name, objectKind);
 
         if (_customizeIds.TryGetValue(objectKind, out var customizeId))
         {
@@ -595,18 +597,18 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         {
             using GameObjectHandler tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Player, () => address, isWatched: false).ConfigureAwait(false);
             tempHandler.CompareNameAndThrow(name);
-            Logger.LogDebug("[{applicationId}] Restoring Customization and Equipment for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
+            Logger.LogDebug("[{applicationId}] Restoring Customization and Equipment for {alias}/{name}", applicationId, OnlineUser.UserData.AliasOrUID, name);
             await _ipcManager.Glamourer.RevertAsync(Logger, name, tempHandler, applicationId, cancelToken).ConfigureAwait(false);
             tempHandler.CompareNameAndThrow(name);
-            Logger.LogDebug("[{applicationId}] Restoring Heels for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
+            Logger.LogDebug("[{applicationId}] Restoring Heels for {alias}/{name}", applicationId, OnlineUser.UserData.AliasOrUID, name);
             await _ipcManager.Heels.RestoreOffsetForPlayerAsync(address).ConfigureAwait(false);
             tempHandler.CompareNameAndThrow(name);
-            Logger.LogDebug("[{applicationId}] Restoring C+ for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
+            Logger.LogDebug("[{applicationId}] Restoring C+ for {alias}/{name}", applicationId, OnlineUser.UserData.AliasOrUID, name);
             await _ipcManager.CustomizePlus.RevertByIdAsync(customizeId).ConfigureAwait(false);
             tempHandler.CompareNameAndThrow(name);
-            Logger.LogDebug("[{applicationId}] Restoring Honorific for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
+            Logger.LogDebug("[{applicationId}] Restoring Honorific for {alias}/{name}", applicationId, OnlineUser.UserData.AliasOrUID, name);
             await _ipcManager.Honorific.ClearTitleAsync(address).ConfigureAwait(false);
-            Logger.LogDebug("[{applicationId}] Restoring Moodles for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
+            Logger.LogDebug("[{applicationId}] Restoring Moodles for {alias}/{name}", applicationId, OnlineUser.UserData.AliasOrUID, name);
             await _ipcManager.Moodles.RevertStatusAsync(address).ConfigureAwait(false);
         }
         else if (objectKind == ObjectKind.MinionOrMount)

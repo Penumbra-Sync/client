@@ -42,9 +42,9 @@ public class PairHandlerFactory
         _playerPerformanceService = playerPerformanceService;
     }
 
-    public PairHandler Create(OnlineUserIdentDto onlineUserIdentDto)
+    public PairHandler Create(Pair pair)
     {
-        return new PairHandler(_loggerFactory.CreateLogger<PairHandler>(), onlineUserIdentDto, _gameObjectHandlerFactory,
+        return new PairHandler(_loggerFactory.CreateLogger<PairHandler>(), pair, _gameObjectHandlerFactory,
             _ipcManager, _fileDownloadManagerFactory.Create(), _pluginWarningNotificationManager, _dalamudUtilService, _hostApplicationLifetime,
             _fileCacheManager, _mareMediator, _xivDataAnalyzer, _playerPerformanceService);
     }

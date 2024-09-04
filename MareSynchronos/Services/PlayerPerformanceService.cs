@@ -1,13 +1,9 @@
 using MareSynchronos.API.Data;
-using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.FileCache;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Handlers;
-using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.UI;
-using MareSynchronos.Utils;
-using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -20,19 +16,14 @@ public class PlayerPerformanceService : IHostedService
     private readonly MareMediator _mediator;
     private readonly PlayerPerformanceConfigService _playerPerformanceConfigService;
     private readonly FileCacheManager _fileCacheManager;
-    private readonly PairManager _pairManager;
-    private readonly ApiController _apiController;
 
     public PlayerPerformanceService(ILogger<PlayerPerformanceService> logger, MareMediator mediator,
-        PlayerPerformanceConfigService playerPerformanceConfigService, FileCacheManager fileCacheManager,
-        PairManager pairManager, ApiController apiController)
+        PlayerPerformanceConfigService playerPerformanceConfigService, FileCacheManager fileCacheManager)
     {
         _logger = logger;
         _mediator = mediator;
         _playerPerformanceConfigService = playerPerformanceConfigService;
         _fileCacheManager = fileCacheManager;
-        _pairManager = pairManager;
-        _apiController = apiController;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -48,7 +39,7 @@ public class PlayerPerformanceService : IHostedService
     public bool TryCalculateVRAMUsage(PairHandler pairHandler, CharacterData charaData, List<DownloadFileTransfer> toDownloadFiles, out long vramUsage)
     {
         var config = _playerPerformanceConfigService.Current;
-        var pair = _pairManager.GetOnlineUserPairs().First(p => string.Equals(p.UserData.UID, pairHandler.OnlineUser.User.UID, StringComparison.OrdinalIgnoreCase));
+        var pair = pairHandler.OnlineUser;
 
         vramUsage = 0;
 
@@ -68,6 +59,7 @@ public class PlayerPerformanceService : IHostedService
             if (download != null)
             {
                 fileSize = download.Total;
+                // todo: use TotalRaw after updating API
             }
             else
             {
@@ -105,12 +97,7 @@ public class PlayerPerformanceService : IHostedService
                 $" and has been automatically paused.",
                 MareConfiguration.Models.NotificationType.Warning));
 
-            // pause
-            var perm = pair.UserPair.OwnPermissions.DeepClone();
-            perm.SetPaused(paused: true);
-            _ = _apiController.SetBulkPermissions(new(
-                new(StringComparer.Ordinal) { { pair.UserData.UID, perm } },
-                new(StringComparer.Ordinal)));
+            _mediator.Publish(new PauseMessage(pair.UserData));
 
             return false;
         }

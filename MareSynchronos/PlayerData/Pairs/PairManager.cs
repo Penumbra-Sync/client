@@ -244,7 +244,8 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
             pair.UserPair.OtherPermissions.IsDisableSounds(),
             pair.UserPair.OtherPermissions.IsDisableVFX());
 
-        pair.ApplyLastReceivedData();
+        if (!pair.IsPaused)
+            pair.ApplyLastReceivedData();
 
         RecreateLazy();
     }
@@ -269,7 +270,8 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
             pair.UserPair.OwnPermissions.IsDisableSounds(),
             pair.UserPair.OwnPermissions.IsDisableVFX());
 
-        pair.ApplyLastReceivedData();
+        if (!pair.IsPaused)
+            pair.ApplyLastReceivedData();
 
         RecreateLazy();
     }

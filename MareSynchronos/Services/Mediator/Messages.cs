@@ -65,6 +65,7 @@ public record UiToggleMessage(Type UiType) : MessageBase;
 public record PlayerUploadingMessage(GameObjectHandler Handler, bool IsUploading) : MessageBase;
 public record ClearProfileDataMessage(UserData? UserData = null) : MessageBase;
 public record CyclePauseMessage(UserData UserData) : MessageBase;
+public record PauseMessage(UserData UserData) : MessageBase;
 public record ProfilePopoutToggle(Pair? Pair) : MessageBase;
 public record CompactUiChange(Vector2 Size, Vector2 Position) : MessageBase;
 public record ProfileOpenStandaloneMessage(Pair Pair) : MessageBase;

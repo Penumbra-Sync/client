@@ -53,7 +53,7 @@ public class OnlinePlayerManager : DisposableMediatorSubscriberBase
         var newVisiblePlayers = _newVisiblePlayers.ToList();
         _newVisiblePlayers.Clear();
         Logger.LogTrace("Has new visible players, pushing character data");
-        PushCharacterData(newVisiblePlayers.Select(c => c.OnlineUser.User).ToList());
+        PushCharacterData(newVisiblePlayers.Select(c => c.OnlineUser.UserData).ToList());
     }
 
     private void PlayerManagerOnPlayerHasChanged()

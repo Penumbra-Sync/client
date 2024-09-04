@@ -59,6 +59,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         Mediator.Subscribe<HubReconnectingMessage>(this, (msg) => MareHubOnReconnecting(msg.Exception));
         Mediator.Subscribe<CyclePauseMessage>(this, (msg) => _ = CyclePause(msg.UserData));
         Mediator.Subscribe<CensusUpdateMessage>(this, (msg) => _lastCensus = msg);
+        Mediator.Subscribe<PauseMessage>(this, (msg) => _ = Pause(msg.UserData));
 
         ServerState = ServerState.Offline;
 
@@ -277,7 +278,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
             var pair = _pairManager.GetOnlineUserPairs().Single(p => p.UserPair != null && p.UserData == userData);
             var perm = pair.UserPair!.OwnPermissions;
             perm.SetPaused(paused: true);
-            await UserSetPairPermissions(new API.Dto.User.UserPermissionsDto(userData, perm)).ConfigureAwait(false);
+            await UserSetPairPermissions(new UserPermissionsDto(userData, perm)).ConfigureAwait(false);
             // wait until it's changed
             while (pair.UserPair!.OwnPermissions != perm)
             {
@@ -285,10 +286,18 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                 Logger.LogTrace("Waiting for permissions change for {data}", userData);
             }
             perm.SetPaused(paused: false);
-            await UserSetPairPermissions(new API.Dto.User.UserPermissionsDto(userData, perm)).ConfigureAwait(false);
+            await UserSetPairPermissions(new UserPermissionsDto(userData, perm)).ConfigureAwait(false);
         }, cts.Token).ContinueWith((t) => cts.Dispose());
 
         return Task.CompletedTask;
+    }
+
+    public async Task Pause(UserData userData)
+    {
+        var pair = _pairManager.GetOnlineUserPairs().Single(p => p.UserPair != null && p.UserData == userData);
+        var perm = pair.UserPair!.OwnPermissions;
+        perm.SetPaused(paused: true);
+        await UserSetPairPermissions(new UserPermissionsDto(userData, perm)).ConfigureAwait(false);
     }
 
     public Task<ConnectionDto> GetConnectionDto() => GetConnectionDto(true);

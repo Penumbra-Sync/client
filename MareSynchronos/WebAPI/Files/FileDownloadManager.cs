@@ -229,8 +229,10 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
             }
         }
 
-        return CurrentDownloads = downloadFileInfoFromService.Distinct().Select(d => new DownloadFileTransfer(d))
+        CurrentDownloads = downloadFileInfoFromService.Distinct().Select(d => new DownloadFileTransfer(d))
             .Where(d => d.CanBeTransferred).ToList();
+
+        return CurrentDownloads;
     }
 
     private async Task DownloadFilesInternal(GameObjectHandler gameObjectHandler, List<FileReplacementData> fileReplacement, CancellationToken ct)

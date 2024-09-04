@@ -47,6 +47,7 @@ public class Pair
     public long LastAppliedDataBytes => CachedPlayer?.LastAppliedDataBytes ?? -1;
     public long LastAppliedDataTris => CachedPlayer?.LastAppliedDataTris ?? -1;
     public long LastAppliedApproximateVRAMBytes => CachedPlayer?.LastAppliedApproximateVRAMBytes ?? -1;
+    public string Ident => _onlineUserIdentDto?.Ident ?? string.Empty;
 
     public UserData UserData => UserPair.User;
 
@@ -161,7 +162,7 @@ public class Pair
             }
 
             CachedPlayer?.Dispose();
-            CachedPlayer = _cachedPlayerFactory.Create(new OnlineUserIdentDto(UserData, _onlineUserIdentDto!.Ident));
+            CachedPlayer = _cachedPlayerFactory.Create(this);
         }
         finally
         {
@@ -189,11 +190,11 @@ public class Pair
         try
         {
             _creationSemaphore.Wait();
-            _onlineUserIdentDto = null;
             LastReceivedCharacterData = null;
             var player = CachedPlayer;
             CachedPlayer = null;
             player?.Dispose();
+            _onlineUserIdentDto = null;
         }
         finally
         {
