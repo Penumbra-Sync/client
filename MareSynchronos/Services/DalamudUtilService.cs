@@ -82,7 +82,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     public bool IsZoning => _condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51];
     public bool IsInCombatOrPerforming { get; private set; } = false;
     public bool HasModifiedGameFiles => _gameData.HasModifiedGameDataFiles;
-
+    public uint ClassJobId => _classJobId!.Value;
     public Lazy<Dictionary<ushort, string>> WorldData { get; private set; }
 
     public MareMediator Mediator { get; }
@@ -555,6 +555,12 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
                 Mediator.Publish(new ResumeScanMessage(nameof(ConditionFlag.BetweenAreas)));
             }
 
+            var localPlayer = _clientState.LocalPlayer;
+            if (localPlayer != null)
+            {
+                _classJobId = localPlayer.ClassJob.Id;
+            }
+
             if (!IsInCombatOrPerforming)
                 Mediator.Publish(new FrameworkUpdateMessage());
 
@@ -562,8 +568,6 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
 
             if (isNormalFrameworkUpdate)
                 return;
-
-            var localPlayer = _clientState.LocalPlayer;
 
             if (localPlayer != null && !IsLoggedIn)
             {
