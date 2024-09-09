@@ -85,8 +85,10 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
 
             foreach (var replacement in fileReplacement.Where(p => !p.HasFileReplacement).SelectMany(p => p.GamePaths).ToList())
             {
-                value.RemoveWhere(p => string.Equals(p, replacement, StringComparison.OrdinalIgnoreCase));
+                PlayerConfig.RemovePath(replacement);
             }
+
+            _configurationService.Save();
         }
     }
 
