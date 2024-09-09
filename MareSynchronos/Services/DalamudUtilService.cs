@@ -199,7 +199,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         return await RunOnFrameworkThread(() => GetHashedAccIdFromPlayerPointer(GetPlayerPointer())).ConfigureAwait(false);
     }
 
-    private unsafe string GetHashedAccIdFromPlayerPointer(nint ptr)
+    private unsafe static string GetHashedAccIdFromPlayerPointer(nint ptr)
     {
         if (ptr == nint.Zero) return string.Empty;
         return ((BattleChara*)ptr)->Character.AccountId.ToString().GetHash256();

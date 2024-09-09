@@ -181,7 +181,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         }
         ImGui.SameLine();
         ImGui.SetNextItemWidth(100);
-        _uiShared.DrawCombo("###speed", new[] { DownloadSpeeds.Bps, DownloadSpeeds.KBps, DownloadSpeeds.MBps },
+        _uiShared.DrawCombo("###speed", [DownloadSpeeds.Bps, DownloadSpeeds.KBps, DownloadSpeeds.MBps],
             (s) => s switch
             {
                 DownloadSpeeds.Bps => "Byte/s",

@@ -20,7 +20,7 @@ public class Pair
     private readonly ILogger<Pair> _logger;
     private readonly MareMediator _mediator;
     private readonly ServerConfigurationManager _serverConfigurationManager;
-    private CancellationTokenSource _applicationCts = new CancellationTokenSource();
+    private CancellationTokenSource _applicationCts = new();
     private OnlineUserIdentDto? _onlineUserIdentDto = null;
 
     public Pair(ILogger<Pair> logger, UserFullPairDto userPair, PairHandlerFactory cachedPlayerFactory,
@@ -45,8 +45,8 @@ public class Pair
     public CharacterData? LastReceivedCharacterData { get; set; }
     public string? PlayerName => CachedPlayer?.PlayerName ?? string.Empty;
     public long LastAppliedDataBytes => CachedPlayer?.LastAppliedDataBytes ?? -1;
-    public long LastAppliedDataTris => CachedPlayer?.LastAppliedDataTris ?? -1;
-    public long LastAppliedApproximateVRAMBytes => CachedPlayer?.LastAppliedApproximateVRAMBytes ?? -1;
+    public long LastAppliedDataTris { get; set; } = -1;
+    public long LastAppliedApproximateVRAMBytes { get; set; } = -1;
     public string Ident => _onlineUserIdentDto?.Ident ?? string.Empty;
 
     public UserData UserData => UserPair.User;

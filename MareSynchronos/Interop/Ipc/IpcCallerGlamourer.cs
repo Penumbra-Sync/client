@@ -59,6 +59,7 @@ public sealed class IpcCallerGlamourer : DisposableMediatorSubscriberBase, IIpcC
         base.Dispose(disposing);
 
         _redrawManager.Cancel();
+        _glamourerStateChanged?.Dispose();
     }
 
     public bool APIAvailable { get; private set; }
@@ -100,11 +101,6 @@ public sealed class IpcCallerGlamourer : DisposableMediatorSubscriberBase, IIpcC
                     NotificationType.Error));
             }
         }
-    }
-
-    public void Dispose()
-    {
-        _glamourerStateChanged?.Dispose();
     }
 
     public async Task ApplyAllAsync(ILogger logger, GameObjectHandler handler, string? customization, Guid applicationId, CancellationToken token, bool fireAndForget = false)
