@@ -17,7 +17,7 @@ public class PlayerPerformanceService
     private readonly ILogger<PlayerPerformanceService> _logger;
     private readonly MareMediator _mediator;
     private readonly PlayerPerformanceConfigService _playerPerformanceConfigService;
-    private Dictionary<string, bool> _warnedForPlayers = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, bool> _warnedForPlayers = new(StringComparer.Ordinal);
 
     public PlayerPerformanceService(ILogger<PlayerPerformanceService> logger, MareMediator mediator,
         PlayerPerformanceConfigService playerPerformanceConfigService, FileCacheManager fileCacheManager,
