@@ -1392,7 +1392,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             _playerPerformanceConfigService.Current.ShowPerformanceIndicator = showPerformanceIndicator;
             _playerPerformanceConfigService.Save();
         }
-        _uiShared.DrawHelpText("Will show a performance indicator when players exceed defined thresholds in the main UI." + Environment.NewLine + "Will use warning thresholds.");
+        _uiShared.DrawHelpText("Will show a performance indicator when players exceed defined thresholds in Mares UI." + Environment.NewLine + "Will use warning thresholds.");
         bool warnOnExceedingThresholds = _playerPerformanceConfigService.Current.WarnOnExceedingThresholds;
         if (ImGui.Checkbox("Warn on loading in players exceeding performance thresholds", ref warnOnExceedingThresholds))
         {
@@ -1404,12 +1404,12 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             using var indent = ImRaii.PushIndent();
             var warnOnPref = _playerPerformanceConfigService.Current.WarnOnPreferredPermissionsExceedingThresholds;
-            if (ImGui.Checkbox("Warn also on players with preferred permissions", ref warnOnPref))
+            if (ImGui.Checkbox("Warn/Indicate also on players with preferred permissions", ref warnOnPref))
             {
                 _playerPerformanceConfigService.Current.WarnOnPreferredPermissionsExceedingThresholds = warnOnPref;
                 _playerPerformanceConfigService.Save();
             }
-            _uiShared.DrawHelpText("Mare will also print warnings and show performance indicator for players where you enabled preferred permissions.");
+            _uiShared.DrawHelpText("Mare will also print warnings and show performance indicator for players where you enabled preferred permissions. If warning in general is disabled, this will not produce any warnings.");
         }
         using (ImRaii.Disabled(!showPerformanceIndicator && !warnOnExceedingThresholds))
         {
