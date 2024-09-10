@@ -79,7 +79,7 @@ public class PlayerPerformanceService
             if (exceedsTris && !exceedsVram)
             {
                 warningText = $"Player {pairHandler.Pair.PlayerName} exceeds your configured triangle warning threshold (" +
-                    $"{triUsage}/{config.TrisAutoPauseThresholdThousands * 1000} triangles).";
+                    $"{triUsage}/{config.TrisWarningThresholdThousands * 1000} triangles).";
             }
             else if (!exceedsTris)
             {
