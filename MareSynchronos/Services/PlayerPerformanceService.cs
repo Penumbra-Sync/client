@@ -90,7 +90,7 @@ public class PlayerPerformanceService
             {
                 warningText = $"Player {pairHandler.Pair.PlayerName} exceeds both VRAM warning threshold (" +
                     $"{UiSharedService.ByteToString(vramUsage, true)}/{config.VRAMSizeWarningThresholdMiB} MiB) and " +
-                    $"triangle warning threshold ({triUsage}/{config.TrisAutoPauseThresholdThousands * 1000} triangles).";
+                    $"triangle warning threshold ({triUsage}/{config.TrisWarningThresholdThousands * 1000} triangles).";
             }
 
             _mediator.Publish(new NotificationMessage($"{pairHandler.Pair.PlayerName} ({pairHandler.Pair.UserData.AliasOrUID}) exceeds performance threshold(s)",
