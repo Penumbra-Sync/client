@@ -6,6 +6,7 @@ using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
@@ -26,6 +27,7 @@ public class DrawUserPair
     private readonly SelectTagForPairUi _selectTagForPairUi;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly UiSharedService _uiSharedService;
+    private readonly PlayerPerformanceConfigService _performanceConfigService;
     private float _menuWidth = -1;
     private bool _wasHovered = false;
 
@@ -34,7 +36,7 @@ public class DrawUserPair
         ApiController apiController, IdDisplayHandler uIDDisplayHandler,
         MareMediator mareMediator, SelectTagForPairUi selectTagForPairUi,
         ServerConfigurationManager serverConfigurationManager,
-        UiSharedService uiSharedService)
+        UiSharedService uiSharedService, PlayerPerformanceConfigService performanceConfigService)
     {
         _id = id;
         _pair = entry;
@@ -46,6 +48,7 @@ public class DrawUserPair
         _selectTagForPairUi = selectTagForPairUi;
         _serverConfigurationManager = serverConfigurationManager;
         _uiSharedService = uiSharedService;
+        _performanceConfigService = performanceConfigService;
     }
 
     public Pair Pair => _pair;
@@ -235,11 +238,11 @@ public class DrawUserPair
             userPairText += "Files Size: " + UiSharedService.ByteToString(_pair.LastAppliedDataBytes, true);
             if (_pair.LastAppliedApproximateVRAMBytes >= 0)
             {
-                userPairText += Environment.NewLine + "Approximate max. VRAM Usage: " + UiSharedService.ByteToString(_pair.LastAppliedApproximateVRAMBytes, true);
+                userPairText += Environment.NewLine + "Approx. VRAM Usage: " + UiSharedService.ByteToString(_pair.LastAppliedApproximateVRAMBytes, true);
             }
             if (_pair.LastAppliedDataTris >= 0)
             {
-                userPairText += Environment.NewLine + "Triangle Count (excl. Vanilla): "
+                userPairText += Environment.NewLine + "Approx. Triangle Count (excl. Vanilla): "
                     + (_pair.LastAppliedDataTris > 1000 ? (_pair.LastAppliedDataTris / 1000d).ToString("0.0'k'") : _pair.LastAppliedDataTris);
             }
         }
@@ -256,6 +259,34 @@ public class DrawUserPair
         }
 
         UiSharedService.AttachToolTip(userPairText);
+
+        if (_performanceConfigService.Current.ShowPerformanceIndicator
+            && !_performanceConfigService.Current.UIDsToIgnore
+                .Exists(uid => string.Equals(uid, UserPair.User.Alias, StringComparison.Ordinal) || string.Equals(uid, UserPair.User.UID, StringComparison.Ordinal))
+            && (_performanceConfigService.Current.VRAMSizeWarningThresholdMiB * 1024 * 1024 < _pair.LastAppliedApproximateVRAMBytes
+                || _performanceConfigService.Current.TrisWarningThresholdThousands * 1000 < _pair.LastAppliedDataTris)
+            && (!_pair.UserPair.OwnPermissions.IsSticky()
+                || _performanceConfigService.Current.WarnOnPreferredPermissionsExceedingThresholds))
+        {
+            ImGui.SameLine();
+
+            _uiSharedService.IconText(FontAwesomeIcon.ExclamationTriangle, ImGuiColors.DalamudYellow);
+
+            string userWarningText = "WARNING: This user exceeds one or more of your defined thresholds:" + UiSharedService.TooltipSeparator;
+            bool shownVram = false;
+            if (_performanceConfigService.Current.VRAMSizeWarningThresholdMiB * 1024 * 1024 < _pair.LastAppliedApproximateVRAMBytes)
+            {
+                shownVram = true;
+                userWarningText += $"Approx. VRAM Usage: Used: {UiSharedService.ByteToString(_pair.LastAppliedApproximateVRAMBytes)}, Threshold: {_performanceConfigService.Current.VRAMSizeWarningThresholdMiB} MiB";
+            }
+            if (_performanceConfigService.Current.TrisWarningThresholdThousands * 1024 < _pair.LastAppliedDataTris)
+            {
+                if (shownVram) userWarningText += Environment.NewLine;
+                userWarningText += $"Approx. Triangle count: Used: {_pair.LastAppliedDataTris}, Threshold: {_performanceConfigService.Current.TrisWarningThresholdThousands * 1000}";
+            }
+
+            UiSharedService.AttachToolTip(userWarningText);
+        }
 
         ImGui.SameLine();
     }

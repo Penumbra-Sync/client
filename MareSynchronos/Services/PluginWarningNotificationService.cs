@@ -60,7 +60,7 @@ public class PluginWarningNotificationService
             warning.ShownMoodlesWarning = true;
         }
 
-        if (changes.Contains(PlayerChanges.Moodles) && !warning.ShowPetNicknamesWarning && !_ipcManager.PetNames.APIAvailable)
+        if (changes.Contains(PlayerChanges.PetNames) && !warning.ShowPetNicknamesWarning && !_ipcManager.PetNames.APIAvailable)
         {
             missingPluginsForData.Add("PetNicknames");
             warning.ShowPetNicknamesWarning = true;

@@ -1400,7 +1400,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             _playerPerformanceConfigService.Save();
         }
         _uiShared.DrawHelpText("Mare will print a warning in chat once per session of meeting those people. Will not warn on players with preferred permissions.");
-        using (ImRaii.Disabled(!warnOnExceedingThresholds))
+        using (ImRaii.Disabled(!warnOnExceedingThresholds && !showPerformanceIndicator))
         {
             using var indent = ImRaii.PushIndent();
             var warnOnPref = _playerPerformanceConfigService.Current.WarnOnPreferredPermissionsExceedingThresholds;
@@ -1409,7 +1409,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 _playerPerformanceConfigService.Current.WarnOnPreferredPermissionsExceedingThresholds = warnOnPref;
                 _playerPerformanceConfigService.Save();
             }
-            _uiShared.DrawHelpText("Mare will also print warnings for players where you enabled preferred permissions.");
+            _uiShared.DrawHelpText("Mare will also print warnings and show performance indicator for players where you enabled preferred permissions.");
         }
         using (ImRaii.Disabled(!showPerformanceIndicator && !warnOnExceedingThresholds))
         {
@@ -1456,8 +1456,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 _playerPerformanceConfigService.Save();
             }
             _uiShared.DrawHelpText("When enabled, will automatically pause all players regardless of preferred permissions that exceed thresholds defined below." + UiSharedService.TooltipSeparator +
-                "Warning: this will not automatically unpause those people again, you will have to do this manually." + UiSharedService.TooltipSeparator
-                + "Default: 550 MiB");
+                "Warning: this will not automatically unpause those people again, you will have to do this manually.");
             var vramAuto = _playerPerformanceConfigService.Current.VRAMSizeAutoPauseThresholdMiB;
             var trisAuto = _playerPerformanceConfigService.Current.TrisAutoPauseThresholdThousands;
             ImGui.SetNextItemWidth(100);
@@ -1468,7 +1467,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
             }
             ImGui.SameLine();
             ImGui.Text("(MiB)");
-            _uiShared.DrawHelpText("When a loading in player and their VRAM usage exceeds this amount, automatically pauses the synced player.");
+            _uiShared.DrawHelpText("When a loading in player and their VRAM usage exceeds this amount, automatically pauses the synced player." + UiSharedService.TooltipSeparator
+                + "Default: 550 MiB");
             ImGui.SetNextItemWidth(100);
             if (ImGui.InputInt("Auto Pause Triangle threshold", ref trisAuto))
             {

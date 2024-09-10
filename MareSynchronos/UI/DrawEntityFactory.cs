@@ -1,4 +1,5 @@
 ﻿using MareSynchronos.API.Dto.Group;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
@@ -18,6 +19,7 @@ public class DrawEntityFactory
     private readonly SelectPairForTagUi _selectPairForTagUi;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly UiSharedService _uiSharedService;
+    private readonly PlayerPerformanceConfigService _playerPerformanceConfigService;
     private readonly SelectTagForPairUi _selectTagForPairUi;
     private readonly TagHandler _tagHandler;
     private readonly IdDisplayHandler _uidDisplayHandler;
@@ -25,7 +27,8 @@ public class DrawEntityFactory
     public DrawEntityFactory(ILogger<DrawEntityFactory> logger, ApiController apiController, IdDisplayHandler uidDisplayHandler,
         SelectTagForPairUi selectTagForPairUi, MareMediator mediator,
         TagHandler tagHandler, SelectPairForTagUi selectPairForTagUi,
-        ServerConfigurationManager serverConfigurationManager, UiSharedService uiSharedService)
+        ServerConfigurationManager serverConfigurationManager, UiSharedService uiSharedService,
+        PlayerPerformanceConfigService playerPerformanceConfigService)
     {
         _logger = logger;
         _apiController = apiController;
@@ -36,6 +39,7 @@ public class DrawEntityFactory
         _selectPairForTagUi = selectPairForTagUi;
         _serverConfigurationManager = serverConfigurationManager;
         _uiSharedService = uiSharedService;
+        _playerPerformanceConfigService = playerPerformanceConfigService;
     }
 
     public DrawFolderGroup CreateDrawGroupFolder(GroupFullInfoDto groupFullInfoDto,
@@ -58,6 +62,6 @@ public class DrawEntityFactory
     public DrawUserPair CreateDrawPair(string id, Pair user, List<GroupFullInfoDto> groups, GroupFullInfoDto? currentGroup)
     {
         return new DrawUserPair(id + user.UserData.UID, user, groups, currentGroup, _apiController, _uidDisplayHandler,
-            _mediator, _selectTagForPairUi, _serverConfigurationManager, _uiSharedService);
+            _mediator, _selectTagForPairUi, _serverConfigurationManager, _uiSharedService, _playerPerformanceConfigService);
     }
 }

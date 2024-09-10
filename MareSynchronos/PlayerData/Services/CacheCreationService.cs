@@ -127,7 +127,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         Mediator.Subscribe<PetNamesMessage>(this, (msg) =>
         {
             if (_isZoning) return;
-            if (!string.Equals(msg.PetNicknamesData, _playerData.MoodlesData, StringComparison.Ordinal))
+            if (!string.Equals(msg.PetNicknamesData, _playerData.PetNamesData, StringComparison.Ordinal))
             {
                 Logger.LogDebug("Received Pet Nicknames change, updating player");
                 PetNicknamesChanged();

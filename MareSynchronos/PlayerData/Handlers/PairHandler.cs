@@ -1,5 +1,4 @@
 ﻿using MareSynchronos.API.Data;
-using MareSynchronos.API.Dto.User;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop.Ipc;
 using MareSynchronos.PlayerData.Factories;
@@ -344,8 +343,10 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
 
                     case PlayerChanges.Moodles:
                         await _ipcManager.Moodles.SetStatusAsync(handler.Address, charaData.MoodlesData).ConfigureAwait(false);
+                        break;
 
-                        await _ipcManager.PetNames.SetPlayerData(handler.Address, charaData.MoodlesData).ConfigureAwait(false);
+                    case PlayerChanges.PetNames:
+                        await _ipcManager.PetNames.SetPlayerData(handler.Address, charaData.PetNamesData).ConfigureAwait(false);
                         break;
 
                     case PlayerChanges.ForcedRedraw:
@@ -378,135 +379,135 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         _downloadCancellationTokenSource = _downloadCancellationTokenSource?.CancelRecreate() ?? new CancellationTokenSource();
         var downloadToken = _downloadCancellationTokenSource.Token;
 
-        _ = Task.Run(async () =>
+        _ = DownloadAndApplyCharacterAsync(applicationBase, charaData, updatedData, updateModdedPaths, updateManip, downloadToken).ConfigureAwait(false);
+    }
+
+    private async Task DownloadAndApplyCharacterAsync(Guid applicationBase, CharacterData charaData, Dictionary<ObjectKind, HashSet<PlayerChanges>> updatedData,
+        bool updateModdedPaths, bool updateManip, CancellationToken downloadToken)
+    {
+        Dictionary<(string GamePath, string? Hash), string> moddedPaths = [];
+
+        if (updateModdedPaths)
         {
-            Dictionary<(string GamePath, string? Hash), string> moddedPaths = [];
+            int attempts = 0;
+            List<FileReplacementData> toDownloadReplacements = TryCalculateModdedDictionary(applicationBase, charaData, out moddedPaths, downloadToken);
+
+            while (toDownloadReplacements.Count > 0 && attempts++ <= 10 && !downloadToken.IsCancellationRequested)
+            {
+                _downloadManager.CancelDownload();
+                Logger.LogDebug("[BASE-{appBase}] Downloading missing files for player {name}, {kind}", applicationBase, PlayerName, updatedData);
+
+                Mediator.Publish(new EventMessage(new Event(PlayerName, Pair.UserData, nameof(PairHandler), EventSeverity.Informational,
+                    $"Starting download for {toDownloadReplacements.Count} files")));
+                var toDownloadFiles = await _downloadManager.InitiateDownloadList(_charaHandler!, toDownloadReplacements, downloadToken).ConfigureAwait(false);
+
+                if (!_playerPerformanceService.ComputeAndAutoPauseOnVRAMUsageThresholds(this, charaData, toDownloadFiles))
+                {
+                    _downloadManager.CancelDownload();
+                    return;
+                }
+
+                await _downloadManager.DownloadFiles(_charaHandler!, toDownloadReplacements, downloadToken).ConfigureAwait(false);
+                _downloadManager.CancelDownload();
+
+                if (downloadToken.IsCancellationRequested)
+                {
+                    Logger.LogTrace("[BASE-{appBase}] Detected cancellation", applicationBase);
+                    _downloadManager.CancelDownload();
+                    return;
+                }
+
+                toDownloadReplacements = TryCalculateModdedDictionary(applicationBase, charaData, out moddedPaths, downloadToken);
+
+                if (toDownloadReplacements.TrueForAll(c => _downloadManager.ForbiddenTransfers.Exists(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
+                {
+                    break;
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+            }
+
+            if (!await _playerPerformanceService.CheckBothThresholds(this, charaData).ConfigureAwait(false))
+                return;
+        }
+
+        downloadToken.ThrowIfCancellationRequested();
+
+        var appToken = _applicationCancellationTokenSource?.Token;
+        while ((!_applicationTask?.IsCompleted ?? false)
+               && !downloadToken.IsCancellationRequested
+               && (!appToken?.IsCancellationRequested ?? false))
+        {
+            // block until current application is done
+            Logger.LogDebug("[BASE-{appBase}] Waiting for current data application (Id: {id}) for player ({handler}) to finish", applicationBase, _applicationId, PlayerName);
+            await Task.Delay(250).ConfigureAwait(false);
+        }
+
+        if (downloadToken.IsCancellationRequested || (appToken?.IsCancellationRequested ?? false)) return;
+
+        _applicationCancellationTokenSource = _applicationCancellationTokenSource.CancelRecreate() ?? new CancellationTokenSource();
+        var token = _applicationCancellationTokenSource.Token;
+
+        _applicationTask = ApplyCharacterDataAsync(applicationBase, charaData, updatedData, updateModdedPaths, updateManip, moddedPaths, token);
+    }
+
+    private async Task ApplyCharacterDataAsync(Guid applicationBase, CharacterData charaData, Dictionary<ObjectKind, HashSet<PlayerChanges>> updatedData, bool updateModdedPaths, bool updateManip, 
+        Dictionary<(string GamePath, string? Hash), string> moddedPaths, CancellationToken token)
+    {
+        try
+        {
+            _applicationId = Guid.NewGuid();
+            Logger.LogDebug("[BASE-{applicationId}] Starting application task for {this}: {appId}", applicationBase, this, _applicationId);
+
+            Logger.LogDebug("[{applicationId}] Waiting for initial draw for for {handler}", _applicationId, _charaHandler);
+            await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, _charaHandler!, _applicationId, 30000, token).ConfigureAwait(false);
+
+            token.ThrowIfCancellationRequested();
 
             if (updateModdedPaths)
             {
-                int attempts = 0;
-                List<FileReplacementData> toDownloadReplacements = TryCalculateModdedDictionary(applicationBase, charaData, out moddedPaths, downloadToken);
-
-                while (toDownloadReplacements.Count > 0 && attempts++ <= 10 && !downloadToken.IsCancellationRequested)
+                await _ipcManager.Penumbra.SetTemporaryModsAsync(Logger, _applicationId, _penumbraCollection,
+                    moddedPaths.ToDictionary(k => k.Key.GamePath, k => k.Value, StringComparer.Ordinal)).ConfigureAwait(false);
+                LastAppliedDataBytes = -1;
+                foreach (var path in moddedPaths.Values.Distinct(StringComparer.OrdinalIgnoreCase).Select(v => new FileInfo(v)).Where(p => p.Exists))
                 {
-                    _downloadManager.CancelDownload();
-                    Logger.LogDebug("[BASE-{appBase}] Downloading missing files for player {name}, {kind}", applicationBase, PlayerName, updatedData);
+                    if (LastAppliedDataBytes == -1) LastAppliedDataBytes = 0;
 
-                    Mediator.Publish(new EventMessage(new Event(PlayerName, Pair.UserData, nameof(PairHandler), EventSeverity.Informational,
-                        $"Starting download for {toDownloadReplacements.Count} files")));
-                    var toDownloadFiles = await _downloadManager.InitiateDownloadList(_charaHandler!, toDownloadReplacements, downloadToken).ConfigureAwait(false);
-
-                    if (!_playerPerformanceService.CheckVRAMUsageThresholds(this, charaData, toDownloadFiles))
-                    {
-                        _downloadManager.CancelDownload();
-                        return;
-                    }
-
-                    await _downloadManager.DownloadFiles(_charaHandler!, toDownloadReplacements, downloadToken).ConfigureAwait(false);
-                    _downloadManager.CancelDownload();
-
-                    if (downloadToken.IsCancellationRequested)
-                    {
-                        Logger.LogTrace("[BASE-{appBase}] Detected cancellation", applicationBase);
-                        _downloadManager.CancelDownload();
-                        return;
-                    }
-
-                    toDownloadReplacements = TryCalculateModdedDictionary(applicationBase, charaData, out moddedPaths, downloadToken);
-
-                    if (toDownloadReplacements.TrueForAll(c => _downloadManager.ForbiddenTransfers.Exists(f => string.Equals(f.Hash, c.Hash, StringComparison.Ordinal))))
-                    {
-                        break;
-                    }
-
-                    await Task.Delay(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
-                }
-
-                if (attempts == 0 && !_playerPerformanceService.CheckVRAMUsageThresholds(this, charaData, []))
-                {
-                    return;
-                }
-
-                if (!await _playerPerformanceService.CheckTriangleUsageThresholds(this, charaData).ConfigureAwait(false))
-                {
-                    return;
+                    LastAppliedDataBytes += path.Length;
                 }
             }
 
-            downloadToken.ThrowIfCancellationRequested();
-
-            var appToken = _applicationCancellationTokenSource?.Token;
-            while ((!_applicationTask?.IsCompleted ?? false)
-                   && !downloadToken.IsCancellationRequested
-                   && (!appToken?.IsCancellationRequested ?? false))
+            if (updateManip)
             {
-                // block until current application is done
-                Logger.LogDebug("[BASE-{appBase}] Waiting for current data application (Id: {id}) for player ({handler}) to finish", applicationBase, _applicationId, PlayerName);
-                await Task.Delay(250).ConfigureAwait(false);
+                await _ipcManager.Penumbra.SetManipulationDataAsync(Logger, _applicationId, _penumbraCollection, charaData.ManipulationData).ConfigureAwait(false);
             }
 
-            if (downloadToken.IsCancellationRequested || (appToken?.IsCancellationRequested ?? false)) return;
+            token.ThrowIfCancellationRequested();
 
-            _applicationCancellationTokenSource = _applicationCancellationTokenSource.CancelRecreate() ?? new CancellationTokenSource();
-            var token = _applicationCancellationTokenSource.Token;
-            _applicationTask = Task.Run(async () =>
+            foreach (var kind in updatedData)
             {
-                try
-                {
-                    _applicationId = Guid.NewGuid();
-                    Logger.LogDebug("[BASE-{applicationId}] Starting application task for {this}: {appId}", applicationBase, this, _applicationId);
+                await ApplyCustomizationDataAsync(_applicationId, kind, charaData, token).ConfigureAwait(false);
+                token.ThrowIfCancellationRequested();
+            }
 
-                    Logger.LogDebug("[{applicationId}] Waiting for initial draw for for {handler}", _applicationId, _charaHandler);
-                    await _dalamudUtil.WaitWhileCharacterIsDrawing(Logger, _charaHandler!, _applicationId, 30000, token).ConfigureAwait(false);
+            _cachedData = charaData;
 
-                    token.ThrowIfCancellationRequested();
-
-                    if (updateModdedPaths)
-                    {
-                        await _ipcManager.Penumbra.SetTemporaryModsAsync(Logger, _applicationId, _penumbraCollection,
-                            moddedPaths.ToDictionary(k => k.Key.GamePath, k => k.Value, StringComparer.Ordinal)).ConfigureAwait(false);
-                        LastAppliedDataBytes = -1;
-                        foreach (var path in moddedPaths.Values.Distinct(StringComparer.OrdinalIgnoreCase).Select(v => new FileInfo(v)).Where(p => p.Exists))
-                        {
-                            if (LastAppliedDataBytes == -1) LastAppliedDataBytes = 0;
-
-                            LastAppliedDataBytes += path.Length;
-                        }
-                    }
-
-                    if (updateManip)
-                    {
-                        await _ipcManager.Penumbra.SetManipulationDataAsync(Logger, _applicationId, _penumbraCollection, charaData.ManipulationData).ConfigureAwait(false);
-                    }
-
-                    token.ThrowIfCancellationRequested();
-
-                    foreach (var kind in updatedData)
-                    {
-                        await ApplyCustomizationDataAsync(_applicationId, kind, charaData, token).ConfigureAwait(false);
-                        token.ThrowIfCancellationRequested();
-                    }
-
-                    _cachedData = charaData;
-
-                    Logger.LogDebug("[{applicationId}] Application finished", _applicationId);
-                }
-                catch (Exception ex)
-                {
-                    if (ex is AggregateException aggr && aggr.InnerExceptions.Any(e => e is ArgumentNullException))
-                    {
-                        IsVisible = false;
-                        _forceApplyMods = true;
-                        _cachedData = charaData;
-                        Logger.LogDebug("[{applicationId}] Cancelled, player turned null during application", _applicationId);
-                    }
-                    else
-                    {
-                        Logger.LogWarning(ex, "[{applicationId}] Cancelled", _applicationId);
-                    }
-                }
-            }, token);
-        }, downloadToken);
+            Logger.LogDebug("[{applicationId}] Application finished", _applicationId);
+        }
+        catch (Exception ex)
+        {
+            if (ex is AggregateException aggr && aggr.InnerExceptions.Any(e => e is ArgumentNullException))
+            {
+                IsVisible = false;
+                _forceApplyMods = true;
+                _cachedData = charaData;
+                Logger.LogDebug("[{applicationId}] Cancelled, player turned null during application", _applicationId);
+            }
+            else
+            {
+                Logger.LogWarning(ex, "[{applicationId}] Cancelled", _applicationId);
+            }
+        }
     }
 
     private void FrameworkUpdate()
@@ -595,7 +596,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             await _ipcManager.Honorific.ClearTitleAsync(address).ConfigureAwait(false);
             Logger.LogDebug("[{applicationId}] Restoring Moodles for {alias}/{name}", applicationId, Pair.UserData.AliasOrUID, name);
             await _ipcManager.Moodles.RevertStatusAsync(address).ConfigureAwait(false);
-            Logger.LogDebug("[{applicationId}] Restoring Pet Nicknames for {alias}/{name}", applicationId, OnlineUser.User.AliasOrUID, name);
+            Logger.LogDebug("[{applicationId}] Restoring Pet Nicknames for {alias}/{name}", applicationId, Pair.UserData.AliasOrUID, name);
             await _ipcManager.PetNames.ClearPlayerData(address).ConfigureAwait(false);
         }
         else if (objectKind == ObjectKind.MinionOrMount)

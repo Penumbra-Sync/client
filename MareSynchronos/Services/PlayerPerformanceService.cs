@@ -29,6 +29,67 @@ public class PlayerPerformanceService
         _xivDataAnalyzer = xivDataAnalyzer;
     }
 
+    public async Task<bool> CheckBothThresholds(PairHandler pairHandler, CharacterData charaData)
+    {
+        var config = _playerPerformanceConfigService.Current;
+        bool notPausedAfterVram = ComputeAndAutoPauseOnVRAMUsageThresholds(pairHandler, charaData, []);
+        if (!notPausedAfterVram) return false;
+        bool notPausedAfterTris = await CheckTriangleUsageThresholds(pairHandler, charaData).ConfigureAwait(false);
+        if (!notPausedAfterTris) return false;
+
+        if (config.UIDsToIgnore
+            .Exists(uid => string.Equals(uid, pairHandler.Pair.UserData.Alias, StringComparison.Ordinal) || string.Equals(uid, pairHandler.Pair.UserData.UID, StringComparison.Ordinal)))
+            return true;
+
+        var vramUsage = pairHandler.Pair.LastAppliedApproximateVRAMBytes;
+        var triUsage = pairHandler.Pair.LastAppliedDataTris;
+
+        bool isPrefPerm = pairHandler.Pair.UserPair.OwnPermissions.HasFlag(API.Data.Enum.UserPermissions.Sticky);
+
+        bool exceedsTris = CheckForThreshold(config.WarnOnExceedingThresholds, config.TrisWarningThresholdThousands * 1000,
+            triUsage, config.WarnOnPreferredPermissionsExceedingThresholds, isPrefPerm);
+        bool exceedsVram = CheckForThreshold(config.WarnOnExceedingThresholds, config.VRAMSizeWarningThresholdMiB * 1024 * 1024,
+            vramUsage, config.WarnOnPreferredPermissionsExceedingThresholds, isPrefPerm);
+
+        if (exceedsVram)
+        {
+            _mediator.Publish(new EventMessage(new Event(pairHandler.Pair.PlayerName, pairHandler.Pair.UserData, nameof(PlayerPerformanceService), EventSeverity.Warning,
+                $"Exceeds VRAM threshold: ({UiSharedService.ByteToString(vramUsage, addSuffix: true)}/{config.VRAMSizeWarningThresholdMiB} MiB)")));
+        }
+
+        if (exceedsTris)
+        {
+            _mediator.Publish(new EventMessage(new Event(pairHandler.Pair.PlayerName, pairHandler.Pair.UserData, nameof(PlayerPerformanceService), EventSeverity.Warning,
+                $"Exceeds triangle threshold: ({triUsage}/{config.TrisAutoPauseThresholdThousands * 1000} triangles)")));
+        }
+
+        if (exceedsTris || exceedsVram)
+        {
+            string warningText = string.Empty;
+            if (exceedsTris && !exceedsVram)
+            {
+                warningText = $"Player {pairHandler.Pair.PlayerName} exceeds your configured triangle warning threshold (" +
+                    $"{triUsage}/{config.TrisAutoPauseThresholdThousands * 1000} triangles).";
+            }
+            else if (!exceedsTris)
+            {
+                warningText = $"Player {pairHandler.Pair.PlayerName} exceeds your configured VRAM warning threshold (" +
+                    $"{UiSharedService.ByteToString(vramUsage, true)}/{config.VRAMSizeWarningThresholdMiB} MiB).";
+            }
+            else
+            {
+                warningText = $"Player {pairHandler.Pair.PlayerName} exceeds both VRAM warning threshold (" +
+                    $"{UiSharedService.ByteToString(vramUsage, true)}/{config.VRAMSizeWarningThresholdMiB} MiB) and " +
+                    $"triangle warning threshold ({triUsage}/{config.TrisAutoPauseThresholdThousands * 1000} triangles).";
+            }
+
+            _mediator.Publish(new NotificationMessage($"{pairHandler.Pair.PlayerName} ({pairHandler.Pair.UserData.AliasOrUID}) exceeds performance threshold(s)",
+                warningText, MareConfiguration.Models.NotificationType.Warning));
+        }
+
+        return true;
+    }
+
     public async Task<bool> CheckTriangleUsageThresholds(PairHandler pairHandler, CharacterData charaData)
     {
         var config = _playerPerformanceConfigService.Current;
@@ -74,30 +135,17 @@ public class PlayerPerformanceService
                 MareConfiguration.Models.NotificationType.Warning));
 
             _mediator.Publish(new EventMessage(new Event(pair.PlayerName, pair.UserData, nameof(PlayerPerformanceService), EventSeverity.Warning,
-                $"Exceeds triangle threshold: automatically paused ({triUsage}/{triUsage * 1000} triangles)")));
+                $"Exceeds triangle threshold: automatically paused ({triUsage}/{config.TrisAutoPauseThresholdThousands * 1000} triangles)")));
 
             _mediator.Publish(new PauseMessage(pair.UserData));
 
             return false;
         }
 
-        // and fucking warnings
-        if (CheckForThreshold(config.WarnOnExceedingThresholds, config.TrisWarningThresholdThousands * 1000,
-            triUsage, config.WarnOnPreferredPermissionsExceedingThresholds, isPrefPerm))
-        {
-            _mediator.Publish(new NotificationMessage($"{pair.PlayerName} ({pair.UserData.AliasOrUID}) exceeds performance threshold",
-                $"Player {pair.PlayerName} exceeds your configured triangle warning threshold (" +
-                $"{triUsage}/{triUsage * 1000} triangles).",
-                MareConfiguration.Models.NotificationType.Warning));
-
-            _mediator.Publish(new EventMessage(new Event(pair.PlayerName, pair.UserData, nameof(PlayerPerformanceService), EventSeverity.Warning,
-                $"Exceeds triangle threshold: ({triUsage}/{triUsage * 1000} triangles)")));
-        }
-
         return true;
     }
 
-    public bool CheckVRAMUsageThresholds(PairHandler pairHandler, CharacterData charaData, List<DownloadFileTransfer> toDownloadFiles)
+    public bool ComputeAndAutoPauseOnVRAMUsageThresholds(PairHandler pairHandler, CharacterData charaData, List<DownloadFileTransfer> toDownloadFiles)
     {
         var config = _playerPerformanceConfigService.Current;
         var pair = pairHandler.Pair;
@@ -165,22 +213,9 @@ public class PlayerPerformanceService
             _mediator.Publish(new PauseMessage(pair.UserData));
 
             _mediator.Publish(new EventMessage(new Event(pair.PlayerName, pair.UserData, nameof(PlayerPerformanceService), EventSeverity.Warning,
-                $"Exceeds VRAM threshold: automatically paused ({UiSharedService.ByteToString(vramUsage, addSuffix: true)}/{config.VRAMSizeAutoPauseThresholdMiB}MiB)")));
+                $"Exceeds VRAM threshold: automatically paused ({UiSharedService.ByteToString(vramUsage, addSuffix: true)}/{config.VRAMSizeAutoPauseThresholdMiB} MiB)")));
 
             return false;
-        }
-
-        // and fucking warnings
-        if (CheckForThreshold(config.WarnOnExceedingThresholds, config.VRAMSizeWarningThresholdMiB * 1024 * 1024,
-            vramUsage, config.WarnOnPreferredPermissionsExceedingThresholds, isPrefPerm))
-        {
-            _mediator.Publish(new NotificationMessage($"{pair.PlayerName} ({pair.UserData.AliasOrUID}) exceeds performance threshold",
-                $"Player {pair.PlayerName} exceeds your configured VRAM warning threshold (" +
-                $"{UiSharedService.ByteToString(vramUsage, true)}/{config.VRAMSizeWarningThresholdMiB}MiB).",
-                MareConfiguration.Models.NotificationType.Warning));
-
-            _mediator.Publish(new EventMessage(new Event(pair.PlayerName, pair.UserData, nameof(PlayerPerformanceService), EventSeverity.Warning,
-                $"Exceeds triangle threshold: ({UiSharedService.ByteToString(vramUsage, addSuffix: true)}/{config.VRAMSizeAutoPauseThresholdMiB}MiB)")));
         }
 
         return true;

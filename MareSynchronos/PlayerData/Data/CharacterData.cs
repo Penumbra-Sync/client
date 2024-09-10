@@ -8,13 +8,12 @@ public class CharacterData
 {
     public Dictionary<ObjectKind, string> CustomizePlusScale { get; set; } = [];
     public Dictionary<ObjectKind, HashSet<FileReplacement>> FileReplacements { get; set; } = [];
-
     public Dictionary<ObjectKind, string> GlamourerString { get; set; } = [];
-
     public string HeelsData { get; set; } = string.Empty;
     public string HonorificData { get; set; } = string.Empty;
     public string ManipulationString { get; set; } = string.Empty;
     public string MoodlesData { get; set; } = string.Empty;
+    public string PetNamesData { get; set; } = string.Empty;
 
     public API.Data.CharacterData ToAPI()
     {
@@ -44,7 +43,8 @@ public class CharacterData
             HeelsData = HeelsData,
             CustomizePlusData = CustomizePlusScale.ToDictionary(d => d.Key, d => d.Value),
             HonorificData = HonorificData,
-            MoodlesData = MoodlesData
+            MoodlesData = MoodlesData,
+            PetNamesData = PetNamesData
         };
     }
 }
