@@ -75,6 +75,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     private bool _isPenumbraDirectory = false;
     private bool _moodlesExists = false;
     private bool _penumbraExists = false;
+    private bool _petNamesExists = false;
 
     private int _serverSelectionIndex = -1;
 
@@ -107,6 +108,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             _heelsExists = _ipcManager.Heels.APIAvailable;
             _honorificExists = _ipcManager.Honorific.APIAvailable;
             _moodlesExists = _ipcManager.Moodles.APIAvailable;
+            _petNamesExists = _ipcManager.PetNames.APIAvailable;
         });
 
         UidFont = _pluginInterface.UiBuilder.FontAtlas.NewDelegateFontHandle(e =>
@@ -692,6 +694,14 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         IconText(_moodlesExists ? check : cross, GetBoolColor(_moodlesExists));
         ImGui.SameLine();
         AttachToolTip($"Moodles is " + (_moodlesExists ? "available and up to date." : "unavailable or not up to date."));
+        ImGui.Spacing();
+
+        ImGui.SameLine();
+        ImGui.TextUnformatted("PetNicknames");
+        ImGui.SameLine();
+        IconText(_petNamesExists ? check : cross, GetBoolColor(_petNamesExists));
+        ImGui.SameLine();
+        AttachToolTip($"PetNicknames is " + (_petNamesExists ? "available and up to date." : "unavailable or not up to date."));
         ImGui.Spacing();
 
         if (!_penumbraExists || !_glamourerExists)
