@@ -20,6 +20,7 @@ public sealed class XivDataAnalyzer
     private readonly FileCacheManager _fileCacheManager;
     private readonly XivDataStorageService _configService;
     private readonly GameData _luminaGameData;
+    private readonly List<string> _failedCalculatedTris = [];
 
     public XivDataAnalyzer(ILogger<XivDataAnalyzer> logger, FileCacheManager fileCacheManager,
         XivDataStorageService configService, IDataManager gameData)
@@ -153,32 +154,13 @@ public sealed class XivDataAnalyzer
         return output;
     }
 
-    public Task<long> GetTrianglesFromGamePath(string gamePath)
-    {
-        if (_configService.Current.TriangleDictionary.TryGetValue(gamePath, out var cachedTris))
-            return Task.FromResult(cachedTris);
-
-        _logger.LogDebug("Detected Model File {path}, calculating Tris", gamePath);
-        var file = _luminaGameData.GetFile<MdlFile>(gamePath);
-        if (file == null)
-            return Task.FromResult((long)0);
-
-        if (file.FileHeader.LodCount <= 0)
-            return Task.FromResult((long)0);
-        var meshIdx = file.Lods[0].MeshIndex;
-        var meshCnt = file.Lods[0].MeshCount;
-        var tris = file.Meshes.Skip(meshIdx).Take(meshCnt).Sum(p => p.IndexCount) / 3;
-
-        _logger.LogDebug("{filePath} => {tris} triangles", gamePath, tris);
-        _configService.Current.TriangleDictionary[gamePath] = tris;
-        _configService.Save();
-        return Task.FromResult(tris);
-    }
-
     public Task<long> GetTrianglesByHash(string hash)
     {
         if (_configService.Current.TriangleDictionary.TryGetValue(hash, out var cachedTris) && cachedTris > 0)
             return Task.FromResult(cachedTris);
+
+        if (_failedCalculatedTris.Contains(hash, StringComparer.Ordinal))
+            return Task.FromResult((long)0);
 
         var path = _fileCacheManager.GetFileCacheByHash(hash);
         if (path == null || !path.ResolvedFilepath.EndsWith(".mdl", StringComparison.OrdinalIgnoreCase))
@@ -219,6 +201,7 @@ public sealed class XivDataAnalyzer
         }
         catch (Exception e)
         {
+            _failedCalculatedTris.Add(hash);
             _configService.Current.TriangleDictionary[hash] = 0;
             _configService.Save();
             _logger.LogWarning(e, "Could not parse file {file}", filePath);

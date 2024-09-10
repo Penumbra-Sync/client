@@ -115,7 +115,6 @@ public class PlayerDataFactory
     private async Task<CharacterData> CreateCharacterData(CharacterData previousData, GameObjectHandler playerRelatedObject, CancellationToken token)
     {
         var objectKind = playerRelatedObject.ObjectKind;
-        var charaPointer = playerRelatedObject.Address;
 
         _logger.LogDebug("Building character data for {obj}", playerRelatedObject);
 
