@@ -17,6 +17,7 @@ public class PlayerPerformanceService
     private readonly ILogger<PlayerPerformanceService> _logger;
     private readonly MareMediator _mediator;
     private readonly PlayerPerformanceConfigService _playerPerformanceConfigService;
+    private Dictionary<string, bool> _warnedForPlayers = new(StringComparer.Ordinal);
 
     public PlayerPerformanceService(ILogger<PlayerPerformanceService> logger, MareMediator mediator,
         PlayerPerformanceConfigService playerPerformanceConfigService, FileCacheManager fileCacheManager,
@@ -41,6 +42,7 @@ public class PlayerPerformanceService
             .Exists(uid => string.Equals(uid, pairHandler.Pair.UserData.Alias, StringComparison.Ordinal) || string.Equals(uid, pairHandler.Pair.UserData.UID, StringComparison.Ordinal)))
             return true;
 
+
         var vramUsage = pairHandler.Pair.LastAppliedApproximateVRAMBytes;
         var triUsage = pairHandler.Pair.LastAppliedDataTris;
 
@@ -50,6 +52,14 @@ public class PlayerPerformanceService
             triUsage, config.WarnOnPreferredPermissionsExceedingThresholds, isPrefPerm);
         bool exceedsVram = CheckForThreshold(config.WarnOnExceedingThresholds, config.VRAMSizeWarningThresholdMiB * 1024 * 1024,
             vramUsage, config.WarnOnPreferredPermissionsExceedingThresholds, isPrefPerm);
+
+        if (_warnedForPlayers.TryGetValue(pairHandler.Pair.UserData.UID, out bool hadWarning) && hadWarning)
+        {
+            _warnedForPlayers[pairHandler.Pair.UserData.UID] = exceedsTris || exceedsVram;
+            return true;
+        }
+
+        _warnedForPlayers[pairHandler.Pair.UserData.UID] = exceedsTris || exceedsVram;
 
         if (exceedsVram)
         {
