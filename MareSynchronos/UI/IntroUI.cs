@@ -80,6 +80,7 @@ public partial class IntroUi : WindowMediatorSubscriberBase
             if (ImGui.Button("Next##toAgreement"))
             {
                 _readFirstPage = true;
+#if !DEBUG
                 _timeoutTask = Task.Run(async () =>
                 {
                     for (int i = 60; i > 0; i--)
@@ -88,6 +89,9 @@ public partial class IntroUi : WindowMediatorSubscriberBase
                         await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
                     }
                 });
+#else
+                _timeoutTask = Task.CompletedTask;
+#endif
             }
         }
         else if (!_configService.Current.AcceptedAgreement && _readFirstPage)
@@ -276,6 +280,6 @@ public partial class IntroUi : WindowMediatorSubscriberBase
         _tosParagraphs = [Strings.ToS.Paragraph1, Strings.ToS.Paragraph2, Strings.ToS.Paragraph3, Strings.ToS.Paragraph4, Strings.ToS.Paragraph5, Strings.ToS.Paragraph6];
     }
 
-    [GeneratedRegex("^([A-F0-9]{2}\\s+)+")]
+    [GeneratedRegex("^([A-F0-9]{2})+")]
     private static partial Regex HexRegex();
 }
