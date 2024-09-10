@@ -31,7 +31,8 @@ public class PluginWarningNotificationService
                 ShownCustomizePlusWarning = _mareConfigService.Current.DisableOptionalPluginWarnings,
                 ShownHeelsWarning = _mareConfigService.Current.DisableOptionalPluginWarnings,
                 ShownHonorificWarning = _mareConfigService.Current.DisableOptionalPluginWarnings,
-                ShownMoodlesWarning = _mareConfigService.Current.DisableOptionalPluginWarnings
+                ShownMoodlesWarning = _mareConfigService.Current.DisableOptionalPluginWarnings,
+                ShowPetNicknamesWarning = _mareConfigService.Current.DisableOptionalPluginWarnings
             };
         }
 
@@ -57,6 +58,12 @@ public class PluginWarningNotificationService
         {
             missingPluginsForData.Add("Moodles");
             warning.ShownMoodlesWarning = true;
+        }
+
+        if (changes.Contains(PlayerChanges.Moodles) && !warning.ShowPetNicknamesWarning && !_ipcManager.PetNames.APIAvailable)
+        {
+            missingPluginsForData.Add("PetNicknames");
+            warning.ShowPetNicknamesWarning = true;
         }
 
         if (missingPluginsForData.Any())

@@ -21,6 +21,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
     private Task? _cacheCreationTask;
     private CancellationTokenSource _honorificCts = new();
     private CancellationTokenSource _moodlesCts = new();
+    private CancellationTokenSource _petNicknamesCts = new();
     private bool _isZoning = false;
     private readonly Dictionary<ObjectKind, CancellationTokenSource> _glamourerCts = new();
 
@@ -123,6 +124,15 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
                 MoodlesChanged();
             }
         });
+        Mediator.Subscribe<PetNamesMessage>(this, (msg) =>
+        {
+            if (_isZoning) return;
+            if (!string.Equals(msg.PetNicknamesData, _playerData.MoodlesData, StringComparison.Ordinal))
+            {
+                Logger.LogDebug("Received Pet Nicknames change, updating player");
+                PetNicknamesChanged();
+            }
+        });
         Mediator.Subscribe<PenumbraModSettingChangedMessage>(this, (msg) =>
         {
             Logger.LogDebug("Received Penumbra Mod settings change, updating player");
@@ -188,6 +198,20 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         _ = Task.Run(async () =>
         {
             await Task.Delay(TimeSpan.FromSeconds(2), token).ConfigureAwait(false);
+            await AddPlayerCacheToCreate().ConfigureAwait(false);
+        }, token);
+    }
+
+    private void PetNicknamesChanged()
+    {
+        _petNicknamesCts?.Cancel();
+        _petNicknamesCts?.Dispose();
+        _petNicknamesCts = new();
+        var token = _petNicknamesCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(TimeSpan.FromSeconds(3), token).ConfigureAwait(false);
             await AddPlayerCacheToCreate().ConfigureAwait(false);
         }, token);
     }
