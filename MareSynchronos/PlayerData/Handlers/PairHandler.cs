@@ -564,6 +564,13 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
             await _ipcManager.Honorific.SetTitleAsync(PlayerCharacter, _cachedData.HonorificData).ConfigureAwait(false);
         });
 
+        Mediator.Subscribe<PetNamesReadyMessage>(this, async (_) =>
+        {
+            if (string.IsNullOrEmpty(_cachedData?.PetNamesData)) return;
+            Logger.LogTrace("Reapplying Pet Names data for {this}", this);
+            await _ipcManager.PetNames.SetPlayerData(PlayerCharacter, _cachedData.PetNamesData).ConfigureAwait(false);
+        });
+
         _ipcManager.Penumbra.AssignTemporaryCollectionAsync(Logger, _penumbraCollection, _charaHandler.GetGameObject()!.ObjectIndex).GetAwaiter().GetResult();
     }
 

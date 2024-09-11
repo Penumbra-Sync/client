@@ -68,6 +68,7 @@ public sealed class IpcCallerPetNames : IIpcCaller
     private void OnPetNicknamesReady()
     {
         CheckAPI();
+        _mareMediator.Publish(new PetNamesReadyMessage());
     }
 
     private void OnPetNicknamesDispose()
