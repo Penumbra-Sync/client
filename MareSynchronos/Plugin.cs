@@ -102,8 +102,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<FileDownloadManagerFactory>();
             collection.AddSingleton<PairHandlerFactory>();
             collection.AddSingleton<PairFactory>();
-            collection.AddSingleton<XivDataAnalyzer>(s => new(s.GetRequiredService<ILogger<XivDataAnalyzer>>(), s.GetRequiredService<FileCacheManager>(),
-                s.GetRequiredService<XivDataStorageService>(), gameData));
+            collection.AddSingleton<XivDataAnalyzer>();
             collection.AddSingleton<CharacterAnalyzer>();
             collection.AddSingleton<TokenProvider>();
             collection.AddSingleton<PluginWarningNotificationService>();
