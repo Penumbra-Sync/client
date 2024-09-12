@@ -4,6 +4,7 @@ using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.Interop.Ipc;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
@@ -18,6 +19,7 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
     private readonly Progress<(string, int)> _conversionProgress = new();
     private readonly IpcManager _ipcManager;
     private readonly UiSharedService _uiSharedService;
+    private readonly PlayerPerformanceConfigService _playerPerformanceConfig;
     private readonly Dictionary<string, string[]> _texturesToConvert = new(StringComparer.Ordinal);
     private Dictionary<ObjectKind, Dictionary<string, CharacterAnalyzer.FileDataEntry>>? _cachedAnalysis;
     private CancellationTokenSource _conversionCancellationTokenSource = new();
@@ -32,13 +34,16 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
     private ObjectKind _selectedObjectTab;
     private bool _showModal = false;
 
-    public DataAnalysisUi(ILogger<DataAnalysisUi> logger, MareMediator mediator, CharacterAnalyzer characterAnalyzer, IpcManager ipcManager, PerformanceCollectorService performanceCollectorService,
-        UiSharedService uiSharedService)
+    public DataAnalysisUi(ILogger<DataAnalysisUi> logger, MareMediator mediator,
+        CharacterAnalyzer characterAnalyzer, IpcManager ipcManager,
+        PerformanceCollectorService performanceCollectorService, UiSharedService uiSharedService,
+        PlayerPerformanceConfigService playerPerformanceConfig)
         : base(logger, mediator, "Mare Character Data Analysis", performanceCollectorService)
     {
         _characterAnalyzer = characterAnalyzer;
         _ipcManager = ipcManager;
         _uiSharedService = uiSharedService;
+        _playerPerformanceConfig = playerPerformanceConfig;
         Mediator.Subscribe<CharacterDataAnalyzedMessage>(this, (_) =>
         {
             _hasUpdate = true;
@@ -155,10 +160,10 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
                 + ", compressed: " + UiSharedService.ByteToString(f.Sum(v => v.CompressedSize))));
             ImGui.SetTooltip(text);
         }
-        ImGui.TextUnformatted("Total size (uncompressed):");
+        ImGui.TextUnformatted("Total size (actual):");
         ImGui.SameLine();
         ImGui.TextUnformatted(UiSharedService.ByteToString(_cachedAnalysis!.Sum(c => c.Value.Sum(c => c.Value.OriginalSize))));
-        ImGui.TextUnformatted("Total size (compressed):");
+        ImGui.TextUnformatted("Total size (compressed for up/download only):");
         ImGui.SameLine();
         ImGui.TextUnformatted(UiSharedService.ByteToString(_cachedAnalysis!.Sum(c => c.Value.Sum(c => c.Value.CompressedSize))));
         ImGui.TextUnformatted($"Total modded model triangles: {_cachedAnalysis.Sum(c => c.Value.Sum(f => f.Value.Triangles))}");
@@ -173,7 +178,8 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
             using var tab = ImRaii.TabItem(tabText + "###" + kvp.Key.ToString());
             if (tab.Success)
             {
-                var groupedfiles = kvp.Value.Select(v => v.Value).GroupBy(f => f.FileType, StringComparer.Ordinal).OrderBy(k => k.Key, StringComparer.Ordinal).ToList();
+                var groupedfiles = kvp.Value.Select(v => v.Value).GroupBy(f => f.FileType, StringComparer.Ordinal)
+                    .OrderBy(k => k.Key, StringComparer.Ordinal).ToList();
 
                 ImGui.TextUnformatted("Files for " + kvp.Key);
                 ImGui.SameLine();
@@ -192,13 +198,51 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
                         + ", compressed: " + UiSharedService.ByteToString(f.Sum(v => v.CompressedSize))));
                     ImGui.SetTooltip(text);
                 }
-                ImGui.TextUnformatted($"{kvp.Key} size (uncompressed):");
+                ImGui.TextUnformatted($"{kvp.Key} size (actual):");
                 ImGui.SameLine();
                 ImGui.TextUnformatted(UiSharedService.ByteToString(kvp.Value.Sum(c => c.Value.OriginalSize)));
-                ImGui.TextUnformatted($"{kvp.Key} size (compressed):");
+                ImGui.TextUnformatted($"{kvp.Key} size (compressed for up/download only):");
                 ImGui.SameLine();
                 ImGui.TextUnformatted(UiSharedService.ByteToString(kvp.Value.Sum(c => c.Value.CompressedSize)));
-                ImGui.TextUnformatted($"{kvp.Key} modded model triangles: {kvp.Value.Sum(f => f.Value.Triangles)}");
+                ImGui.Separator();
+
+                var vramUsage = groupedfiles.SingleOrDefault(v => string.Equals(v.Key, "tex", StringComparison.Ordinal));
+                if (vramUsage != null)
+                {
+                    var actualVramUsage = vramUsage.Sum(f => f.OriginalSize);
+                    ImGui.TextUnformatted($"{kvp.Key} VRAM usage:");
+                    ImGui.SameLine();
+                    ImGui.TextUnformatted(UiSharedService.ByteToString(actualVramUsage));
+                    if (_playerPerformanceConfig.Current.WarnOnExceedingThresholds
+                        || _playerPerformanceConfig.Current.ShowPerformanceIndicator)
+                    {
+                        using var _ = ImRaii.PushIndent(10f);
+                        var currentVramWarning = _playerPerformanceConfig.Current.VRAMSizeWarningThresholdMiB;
+                        ImGui.TextUnformatted($"Configured VRAM warning threshold: {currentVramWarning} MiB.");
+                        if (currentVramWarning * 1024 * 1024 < actualVramUsage)
+                        {
+                            UiSharedService.ColorText($"You exceed your own threshold by " +
+                                $"{UiSharedService.ByteToString(actualVramUsage - (currentVramWarning * 1024 * 1024))}.",
+                                ImGuiColors.DalamudYellow);
+                        }
+                    }
+                }
+
+                var actualTriCount = kvp.Value.Sum(f => f.Value.Triangles);
+                ImGui.TextUnformatted($"{kvp.Key} modded model triangles: {actualTriCount}");
+                if (_playerPerformanceConfig.Current.WarnOnExceedingThresholds
+                    || _playerPerformanceConfig.Current.ShowPerformanceIndicator)
+                {
+                    using var _ = ImRaii.PushIndent(10f);
+                    var currentTriWarning = _playerPerformanceConfig.Current.TrisWarningThresholdThousands;
+                    ImGui.TextUnformatted($"Configured triangle warning threshold: {currentTriWarning * 1000} triangles.");
+                    if (currentTriWarning * 1000 < actualTriCount)
+                    {
+                        UiSharedService.ColorText($"You exceed your own threshold by " +
+                            $"{actualTriCount - (currentTriWarning * 1000)} triangles.",
+                            ImGuiColors.DalamudYellow);
+                    }
+                }
 
                 ImGui.Separator();
                 if (_selectedObjectTab != kvp.Key)
@@ -242,11 +286,11 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
                     ImGui.SameLine();
                     ImGui.TextUnformatted(fileGroup.Count().ToString());
 
-                    ImGui.TextUnformatted($"{fileGroup.Key} files size (uncompressed):");
+                    ImGui.TextUnformatted($"{fileGroup.Key} files size (actual):");
                     ImGui.SameLine();
                     ImGui.TextUnformatted(UiSharedService.ByteToString(fileGroup.Sum(c => c.OriginalSize)));
 
-                    ImGui.TextUnformatted($"{fileGroup.Key} files size (compressed):");
+                    ImGui.TextUnformatted($"{fileGroup.Key} files size (compressed for up/download only):");
                     ImGui.SameLine();
                     ImGui.TextUnformatted(UiSharedService.ByteToString(fileGroup.Sum(c => c.CompressedSize)));
 
