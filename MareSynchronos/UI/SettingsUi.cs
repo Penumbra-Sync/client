@@ -172,7 +172,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         ImGui.AlignTextToFramePadding();
         ImGui.TextUnformatted("Global Download Speed Limit");
         ImGui.SameLine();
-        ImGui.SetNextItemWidth(100);
+        ImGui.SetNextItemWidth(100 * ImGuiHelpers.GlobalScale);
         if (ImGui.InputInt("###speedlimit", ref downloadSpeedLimit))
         {
             _configService.Current.DownloadSpeedLimitInBytes = downloadSpeedLimit;
@@ -180,7 +180,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             Mediator.Publish(new DownloadLimitChangedMessage());
         }
         ImGui.SameLine();
-        ImGui.SetNextItemWidth(100);
+        ImGui.SetNextItemWidth(100 * ImGuiHelpers.GlobalScale);
         _uiShared.DrawCombo("###speed", [DownloadSpeeds.Bps, DownloadSpeeds.KBps, DownloadSpeeds.MBps],
             (s) => s switch
             {
@@ -1415,7 +1415,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         {
             var vram = _playerPerformanceConfigService.Current.VRAMSizeWarningThresholdMiB;
             var tris = _playerPerformanceConfigService.Current.TrisWarningThresholdThousands;
-            ImGui.SetNextItemWidth(100);
+            ImGui.SetNextItemWidth(100 * ImGuiHelpers.GlobalScale);
             if (ImGui.InputInt("Warning VRAM threshold", ref vram))
             {
                 _playerPerformanceConfigService.Current.VRAMSizeWarningThresholdMiB = vram;
@@ -1425,7 +1425,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             ImGui.Text("(MiB)");
             _uiShared.DrawHelpText("Limit in MiB of approximate VRAM usage to trigger warning or performance indicator on UI." + UiSharedService.TooltipSeparator
                 + "Default: 375 MiB");
-            ImGui.SetNextItemWidth(100);
+            ImGui.SetNextItemWidth(100 * ImGuiHelpers.GlobalScale);
             if (ImGui.InputInt("Warning Triangle threshold", ref tris))
             {
                 _playerPerformanceConfigService.Current.TrisWarningThresholdThousands = tris;
@@ -1459,7 +1459,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 "Warning: this will not automatically unpause those people again, you will have to do this manually.");
             var vramAuto = _playerPerformanceConfigService.Current.VRAMSizeAutoPauseThresholdMiB;
             var trisAuto = _playerPerformanceConfigService.Current.TrisAutoPauseThresholdThousands;
-            ImGui.SetNextItemWidth(100);
+            ImGui.SetNextItemWidth(100 * ImGuiHelpers.GlobalScale);
             if (ImGui.InputInt("Auto Pause VRAM threshold", ref vramAuto))
             {
                 _playerPerformanceConfigService.Current.VRAMSizeAutoPauseThresholdMiB = vramAuto;
@@ -1469,7 +1469,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
             ImGui.Text("(MiB)");
             _uiShared.DrawHelpText("When a loading in player and their VRAM usage exceeds this amount, automatically pauses the synced player." + UiSharedService.TooltipSeparator
                 + "Default: 550 MiB");
-            ImGui.SetNextItemWidth(100);
+            ImGui.SetNextItemWidth(100 * ImGuiHelpers.GlobalScale);
             if (ImGui.InputInt("Auto Pause Triangle threshold", ref trisAuto))
             {
                 _playerPerformanceConfigService.Current.TrisAutoPauseThresholdThousands = trisAuto;
@@ -1484,7 +1484,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _uiShared.BigText("Whitelisted UIDs");
         UiSharedService.TextWrapped("The entries in the list below will be ignored for all warnings and auto pause operations.");
         ImGui.Dummy(new Vector2(10));
-        ImGui.SetNextItemWidth(200);
+        ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
         ImGui.InputText("##ignoreuid", ref _uidToAddForIgnore, 20);
         ImGui.SameLine();
         using (ImRaii.Disabled(string.IsNullOrEmpty(_uidToAddForIgnore)))
@@ -1500,7 +1500,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         }
         _uiShared.DrawHelpText("Hint: UIDs are case sensitive.");
         var playerList = _playerPerformanceConfigService.Current.UIDsToIgnore;
-        ImGui.SetNextItemWidth(200);
+        ImGui.SetNextItemWidth(200 * ImGuiHelpers.GlobalScale);
         using (var lb = ImRaii.ListBox("UID whitelist"))
         {
             if (lb)
