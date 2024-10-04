@@ -226,7 +226,8 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                     Logger.LogError("Detected modified game files on connection");
                     if (!_mareConfigService.Current.DebugStopWhining)
                         Mediator.Publish(new NotificationMessage("Modified Game Files detected",
-                            "Mare has detected modified game files in your FFXIV installation. You will be able to connect, but the synchronization functionality might be (partially) broken. " +
+                            "Dalamud has reported modified game files in your FFXIV installation. " +
+                            "You will be able to connect, but the synchronization functionality might be (partially) broken. " +
                             "Exit the game and repair it through XIVLauncher to get rid of this message.",
                             NotificationType.Error, TimeSpan.FromSeconds(15)));
                 }
