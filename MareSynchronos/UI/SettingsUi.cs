@@ -1494,6 +1494,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 if (!_playerPerformanceConfigService.Current.UIDsToIgnore.Contains(_uidToAddForIgnore, StringComparer.Ordinal))
                 {
                     _playerPerformanceConfigService.Current.UIDsToIgnore.Add(_uidToAddForIgnore);
+                    _playerPerformanceConfigService.Save();
                 }
                 _uidToAddForIgnore = string.Empty;
             }
