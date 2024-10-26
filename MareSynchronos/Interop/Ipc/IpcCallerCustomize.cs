@@ -118,7 +118,7 @@ public sealed class IpcCallerCustomize : IIpcCaller
         try
         {
             var version = _customizePlusApiVersion.InvokeFunc();
-            APIAvailable = (version.Item1 == 5 && version.Item2 >= 0);
+            APIAvailable = (version.Item1 == 6 && version.Item2 >= 0);
         }
         catch
         {
