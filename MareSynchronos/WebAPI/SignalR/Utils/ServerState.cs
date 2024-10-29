@@ -13,4 +13,6 @@ public enum ServerState
     RateLimited,
     NoSecretKey,
     MultiChara,
+    OAuthMisconfigured,
+    OAuthLoginTokenStale
 }

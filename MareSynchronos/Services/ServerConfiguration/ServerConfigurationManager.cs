@@ -1,9 +1,15 @@
-﻿using MareSynchronos.MareConfiguration;
+﻿using Dalamud.Utility;
+using MareSynchronos.API.Routes;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.IdentityModel.Tokens.Jwt;
+using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text.Json;
 
 namespace MareSynchronos.Services.ServerConfiguration;
 
@@ -76,6 +82,45 @@ public class ServerConfigurationManager
         }
     }
 
+    public (string OAuthToken, string UID)? GetOAuth2(out bool hasMulti, int serverIdx = -1)
+    {
+        ServerStorage? currentServer;
+        currentServer = serverIdx == -1 ? CurrentServer : GetServerByIndex(serverIdx);
+        if (currentServer == null)
+        {
+            currentServer = new();
+            Save();
+        }
+        hasMulti = false;
+
+        var charaName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult();
+        var worldId = _dalamudUtil.GetHomeWorldIdAsync().GetAwaiter().GetResult();
+
+        var auth = currentServer.Authentications.FindAll(f => string.Equals(f.CharacterName, charaName) && f.WorldId == worldId);
+        if (auth.Count >= 2)
+        {
+            _logger.LogTrace("GetSecretKey accessed, returning null because multiple ({count}) identical characters.", auth.Count);
+            hasMulti = true;
+            return null;
+        }
+
+        if (auth.Count == 0)
+        {
+            _logger.LogTrace("GetSecretKey accessed, returning null because no set up characters for {chara} on {world}", charaName, worldId);
+            return null;
+        }
+
+        if (!string.IsNullOrEmpty(auth.Single().UID) && !string.IsNullOrEmpty(currentServer.OAuthToken))
+        {
+            _logger.LogTrace("GetSecretKey accessed, returning {key} ({keyValue}) for {chara} on {world}", auth.Single().UID, string.Join("", currentServer.OAuthToken.Take(10)), charaName, worldId);
+            return (currentServer.OAuthToken, auth.Single().UID!);
+        }
+
+        _logger.LogTrace("GetSecretKey accessed, returning null because no UID found for {chara} on {world} or OAuthToken is not configured.", charaName, worldId);
+
+        return null;
+    }
+
     public string? GetSecretKey(out bool hasMulti, int serverIdx = -1)
     {
         ServerStorage? currentServer;
@@ -145,6 +190,14 @@ public class ServerConfigurationManager
         }
     }
 
+    public string GetDiscordUserFromToken(ServerStorage server)
+    {
+        JwtSecurityTokenHandler handler = new JwtSecurityTokenHandler();
+        if (server.OAuthToken == null) return string.Empty;
+        var token = handler.ReadJwtToken(server.OAuthToken);
+        return token.Claims.First(f => string.Equals(f.Type, "discord_user", StringComparison.Ordinal)).Value!;
+    }
+
     public string[] GetServerNames()
     {
         return _configService.Current.ServerStorage.Select(v => v.ServerName).ToArray();
@@ -152,7 +205,7 @@ public class ServerConfigurationManager
 
     public bool HasValidConfig()
     {
-        return CurrentServer != null;
+        return CurrentServer != null && CurrentServer.Authentications.Count > 0;
     }
 
     public void Save()
@@ -181,7 +234,7 @@ public class ServerConfigurationManager
         {
             CharacterName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult(),
             WorldId = _dalamudUtil.GetHomeWorldIdAsync().GetAwaiter().GetResult(),
-            SecretKeyIdx = server.SecretKeys.Last().Key,
+            SecretKeyIdx = !server.UseOAuth2 ? server.SecretKeys.Last().Key : -1,
         });
         Save();
     }
@@ -391,7 +444,7 @@ public class ServerConfigurationManager
     {
         if (_configService.Current.ServerStorage.Count == 0 || !string.Equals(_configService.Current.ServerStorage[0].ServerUri, ApiController.MainServiceUri, StringComparison.OrdinalIgnoreCase))
         {
-            _configService.Current.ServerStorage.Insert(0, new ServerStorage() { ServerUri = ApiController.MainServiceUri, ServerName = ApiController.MainServer });
+            _configService.Current.ServerStorage.Insert(0, new ServerStorage() { ServerUri = ApiController.MainServiceUri, ServerName = ApiController.MainServer, UseOAuth2 = true });
         }
         Save();
     }
@@ -410,5 +463,68 @@ public class ServerConfigurationManager
         {
             _serverTagConfig.Current.ServerTagStorage[CurrentApiUrl] = new();
         }
+    }
+
+    public async Task<Dictionary<string, string>> GetUIDsWithDiscordToken(string serverUri, string token)
+    {
+        using HttpClient client = new HttpClient();
+        try
+        {
+            var baseUri = serverUri.Replace("wss://", "https://").Replace("ws://", "http://");
+            var oauthCheckUri = MareAuth.GetUIDs(new Uri(baseUri));
+            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            var response = await client.GetAsync(oauthCheckUri).ConfigureAwait(false);
+            var responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+            return await JsonSerializer.DeserializeAsync<Dictionary<string, string>>(responseStream).ConfigureAwait(false) ?? [];
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failure getting UIDs");
+            return [];
+        }
+    }
+
+    public async Task<Uri?> CheckDiscordOAuth(string serverUri)
+    {
+        using HttpClient client = new HttpClient();
+        try
+        {
+            var baseUri = serverUri.Replace("wss://", "https://").Replace("ws://", "http://");
+            var oauthCheckUri = MareAuth.GetDiscordOAuthEndpoint(new Uri(baseUri));
+            var response = await client.GetFromJsonAsync<Uri?>(oauthCheckUri).ConfigureAwait(false);
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failure checking for Discord Auth");
+            return null;
+        }
+    }
+
+    public async Task<string?> GetDiscordOAuthToken(Uri discordAuthUri, string serverUri, CancellationToken token)
+    {
+        var sessionId = BitConverter.ToString(RandomNumberGenerator.GetBytes(64)).Replace("-", "").ToLower();
+        Util.OpenLink(discordAuthUri.ToString() + "?sessionId=" + sessionId);
+
+        string? discordToken = null;
+        using HttpClient client = new HttpClient();
+        client.Timeout = TimeSpan.FromSeconds(60);
+        try
+        {
+            var baseUri = serverUri.Replace("wss://", "https://").Replace("ws://", "http://");
+            var oauthCheckUri = MareAuth.GetDiscordOAuthToken(new Uri(baseUri), sessionId);
+            var response = await client.GetAsync(oauthCheckUri, token).ConfigureAwait(false);
+            discordToken = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failure getting Discord Token");
+            return null;
+        }
+
+        if (discordToken == null)
+            return null;
+
+        return discordToken;
     }
 }

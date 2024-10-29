@@ -39,7 +39,7 @@ public partial class ApiController
     {
         CheckConnection();
         await _mareHub!.SendAsync(nameof(UserDelete)).ConfigureAwait(false);
-        await CreateConnections().ConfigureAwait(false);
+        await CreateConnectionsAsync().ConfigureAwait(false);
     }
 
     public async Task<List<OnlineUserIdentDto>> UserGetOnlinePairs(CensusDataDto? censusDataDto)

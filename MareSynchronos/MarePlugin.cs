@@ -1,6 +1,5 @@
 ﻿using MareSynchronos.FileCache;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.PlayerData.Services;
 using MareSynchronos.Services;

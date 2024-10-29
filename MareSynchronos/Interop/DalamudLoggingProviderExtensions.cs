@@ -3,7 +3,6 @@ using MareSynchronos.MareConfiguration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
-using NReco.Logging.File;
 
 namespace MareSynchronos.Interop;
 

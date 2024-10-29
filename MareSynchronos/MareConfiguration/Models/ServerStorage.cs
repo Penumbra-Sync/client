@@ -8,4 +8,6 @@ public class ServerStorage
     public Dictionary<int, SecretKey> SecretKeys { get; set; } = [];
     public string ServerName { get; set; } = string.Empty;
     public string ServerUri { get; set; } = string.Empty;
+    public bool UseOAuth2 { get; set; } = false;
+    public string? OAuthToken { get; set; } = null;
 }

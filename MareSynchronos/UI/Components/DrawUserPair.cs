@@ -93,7 +93,7 @@ public class DrawUserPair
 
         if (_uiSharedService.IconTextButton(FontAwesomeIcon.PlayCircle, "Cycle pause state", _menuWidth, true))
         {
-            _ = _apiController.CyclePause(_pair.UserData);
+            _ = _apiController.CyclePauseAsync(_pair.UserData);
             ImGui.CloseCurrentPopup();
         }
         ImGui.Separator();

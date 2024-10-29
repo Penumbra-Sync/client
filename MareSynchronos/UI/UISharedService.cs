@@ -19,6 +19,7 @@ using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
+using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
@@ -713,7 +714,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return true;
     }
 
-    public int DrawServiceSelection(bool selectOnChange = false)
+    public int DrawServiceSelection(bool selectOnChange = false, bool showConnect = true)
     {
         string[] comboEntries = _serverConfigurationManager.GetServerNames();
 
@@ -753,13 +754,16 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             ImGui.EndCombo();
         }
 
-        ImGui.SameLine();
-        var text = "Connect";
-        if (_serverSelectionIndex == _serverConfigurationManager.CurrentServerIndex) text = "Reconnect";
-        if (IconTextButton(FontAwesomeIcon.Link, text))
+        if (showConnect)
         {
-            _serverConfigurationManager.SelectServer(_serverSelectionIndex);
-            _ = _apiController.CreateConnections();
+            ImGui.SameLine();
+            var text = "Connect";
+            if (_serverSelectionIndex == _serverConfigurationManager.CurrentServerIndex) text = "Reconnect";
+            if (IconTextButton(FontAwesomeIcon.Link, text))
+            {
+                _serverConfigurationManager.SelectServer(_serverSelectionIndex);
+                _ = _apiController.CreateConnectionsAsync();
+            }
         }
 
         if (ImGui.TreeNode("Add Custom Service"))
@@ -776,6 +780,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
                 {
                     ServerName = _customServerName,
                     ServerUri = _customServerUri,
+                    UseOAuth2 = true
                 });
                 _customServerName = string.Empty;
                 _customServerUri = string.Empty;
@@ -854,5 +859,178 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
         UidFont.Dispose();
         GameFont.Dispose();
+    }
+
+    private Task<Uri?>? _discordOAuthCheck;
+    private CancellationTokenSource _discordOAuthGetCts = new();
+    private Task<string?>? _discordOAuthGetCode;
+    private Task<Dictionary<string, string>>? _discordOAuthUIDs;
+
+    public void DrawUpdateOAuthUIDsButton(ServerStorage selectedServer)
+    {
+        using (ImRaii.Disabled(selectedServer.OAuthToken == null))
+        {
+            if ((_discordOAuthUIDs == null || _discordOAuthUIDs.IsCompleted)
+                && IconTextButton(FontAwesomeIcon.ArrowsSpin, "Update UIDs from Service")
+                && selectedServer.OAuthToken != null)
+            {
+                _discordOAuthUIDs = _serverConfigurationManager.GetUIDsWithDiscordToken(selectedServer.ServerUri, selectedServer.OAuthToken);
+            }
+        }
+    }
+
+    public void DrawUIDComboForAuthentication(int indexOffset, Authentication item, string serverUri)
+    {
+        using (ImRaii.Disabled(_discordOAuthUIDs == null))
+        {
+            DrawCombo("UID##" + item.CharacterName + serverUri + indexOffset, _discordOAuthUIDs?.Result ?? new(StringComparer.Ordinal) { { item.UID ?? string.Empty, string.Empty } },
+                (v) =>
+                {
+                    if (!string.IsNullOrEmpty(v.Value))
+                    {
+                        return $"{v.Key} ({v.Value})";
+                    }
+
+                    if (string.IsNullOrEmpty(v.Key))
+                        return "No UID set";
+
+                    return $"{v.Key}";
+                },
+                (v) =>
+                {
+                    if (!string.Equals(v.Key, item.UID, StringComparison.Ordinal))
+                    {
+                        item.UID = v.Key;
+                        _serverConfigurationManager.Save();
+                    }
+                },
+                _discordOAuthUIDs?.Result?.FirstOrDefault(f => string.Equals(f.Key, item.UID, StringComparison.Ordinal)) ?? default);
+        }
+        if (_discordOAuthUIDs == null)
+        {
+            AttachToolTip("Use the button above to update your UIDs from the service before you can assign UIDs to characters.");
+        }
+    }
+
+    public void DrawOAuth(ServerStorage selectedServer)
+    {
+        var oauthToken = selectedServer.OAuthToken;
+        using var _ = ImRaii.PushIndent(10f);
+        if (oauthToken == null)
+        {
+            if (_discordOAuthCheck == null)
+            {
+                if (IconTextButton(FontAwesomeIcon.QuestionCircle, "Check if Server supports Discord OAuth2"))
+                {
+                    _discordOAuthCheck = _serverConfigurationManager.CheckDiscordOAuth(selectedServer.ServerUri);
+                }
+            }
+            else
+            {
+                if (!_discordOAuthCheck.IsCompleted)
+                {
+                    ColorTextWrapped($"Checking OAuth2 compatibility with {selectedServer.ServerUri}", ImGuiColors.DalamudYellow);
+                }
+                else
+                {
+                    if (_discordOAuthCheck.Result != null)
+                    {
+                        ColorTextWrapped("Server is compatible with Discord OAuth2", ImGuiColors.HealerGreen);
+                    }
+                    else
+                    {
+                        ColorTextWrapped("Server is not compatible with Discord OAuth2", ImGuiColors.DalamudRed);
+                    }
+                }
+            }
+
+            if (_discordOAuthCheck != null && _discordOAuthCheck.IsCompleted)
+            {
+                if (IconTextButton(FontAwesomeIcon.ArrowRight, "Authenticate with Server"))
+                {
+                    _discordOAuthGetCode = _serverConfigurationManager.GetDiscordOAuthToken(_discordOAuthCheck.Result!, selectedServer.ServerUri, _discordOAuthGetCts.Token);
+                }
+                else if (_discordOAuthGetCode != null && !_discordOAuthGetCode.IsCompleted)
+                {
+                    TextWrapped("A browser window has been opened, follow it to authenticate. Click the button below if you accidentally closed the window and need to restart the authentication.");
+                    if (IconTextButton(FontAwesomeIcon.Ban, "Cancel Authentication"))
+                    {
+                        _discordOAuthGetCts = _discordOAuthGetCts.CancelRecreate();
+                        _discordOAuthGetCode = null;
+                    }
+                }
+                else if (_discordOAuthGetCode != null && _discordOAuthGetCode.IsCompleted)
+                {
+                    TextWrapped("Discord OAuth is completed, status: ");
+                    ImGui.SameLine();
+                    if (_discordOAuthGetCode.Result != null)
+                    {
+                        selectedServer.OAuthToken = _discordOAuthGetCode.Result;
+                        _discordOAuthGetCode = null;
+                        _serverConfigurationManager.Save();
+                        ColorTextWrapped("Success", ImGuiColors.HealerGreen);
+                    }
+                    else
+                    {
+                        ColorTextWrapped("Failed, please check /xllog for more information", ImGuiColors.DalamudRed);
+                    }
+                }
+            }
+        }
+
+        if (oauthToken != null)
+        {
+            ColorTextWrapped($"OAuth2 is enabled, linked to: Discord User {_serverConfigurationManager.GetDiscordUserFromToken(selectedServer)}", ImGuiColors.HealerGreen);
+            if ((_discordOAuthUIDs == null || _discordOAuthUIDs.IsCompleted)
+                && IconTextButton(FontAwesomeIcon.Question, "Check Discord Connection"))
+            {
+                _discordOAuthUIDs = _serverConfigurationManager.GetUIDsWithDiscordToken(selectedServer.ServerUri, oauthToken);
+            }
+            else if (_discordOAuthUIDs != null)
+            {
+                if (!_discordOAuthUIDs.IsCompleted)
+                {
+                    ColorTextWrapped("Checking UIDs on Server", ImGuiColors.DalamudYellow);
+                }
+                else
+                {
+                    var foundUids = _discordOAuthUIDs.Result?.Count ?? 0;
+                    var primaryUid = _discordOAuthUIDs.Result?.FirstOrDefault() ?? new KeyValuePair<string, string>(string.Empty, string.Empty);
+                    var vanity = string.IsNullOrEmpty(primaryUid.Value) ? "-" : primaryUid.Value;
+                    if (foundUids > 0)
+                    {
+                        ColorTextWrapped($"Found {foundUids} associated UIDs on the server, Primary UID: {primaryUid.Key} (Vanity UID: {vanity})",
+                            ImGuiColors.HealerGreen);
+                    }
+                    else
+                    {
+                        ColorTextWrapped($"Found no UIDs associated to this linked OAuth2 account", ImGuiColors.DalamudRed);
+                    }
+                }
+            }
+            DrawUnlinkOAuthButton(selectedServer);
+        }
+    }
+
+    public void DrawUnlinkOAuthButton(ServerStorage selectedServer)
+    {
+        using (ImRaii.Disabled(!CtrlPressed()))
+        {
+            if (IconTextButton(FontAwesomeIcon.Trash, "Unlink OAuth2 Connection") && UiSharedService.CtrlPressed())
+            {
+                selectedServer.OAuthToken = null;
+                _serverConfigurationManager.Save();
+                RestOAuthTasksState();
+            }
+        }
+        DrawHelpText("Hold CTRL to unlink the current OAuth2 connection.");
+    }
+
+    internal void RestOAuthTasksState()
+    {
+        _discordOAuthCheck = null;
+        _discordOAuthGetCts = _discordOAuthGetCts.CancelRecreate();
+        _discordOAuthGetCode = null;
+        _discordOAuthUIDs = null;
     }
 }

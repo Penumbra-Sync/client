@@ -1,5 +1,4 @@
-﻿using MareSynchronos.API.Dto.User;
-using MareSynchronos.FileCache;
+﻿using MareSynchronos.FileCache;
 using MareSynchronos.Interop.Ipc;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.PlayerData.Pairs;

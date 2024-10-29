@@ -55,11 +55,11 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         Mediator.Subscribe<DalamudLoginMessage>(this, (_) => DalamudUtilOnLogIn());
         Mediator.Subscribe<DalamudLogoutMessage>(this, (_) => DalamudUtilOnLogOut());
         Mediator.Subscribe<HubClosedMessage>(this, (msg) => MareHubOnClosed(msg.Exception));
-        Mediator.Subscribe<HubReconnectedMessage>(this, (msg) => _ = MareHubOnReconnected());
+        Mediator.Subscribe<HubReconnectedMessage>(this, (msg) => _ = MareHubOnReconnectedAsync());
         Mediator.Subscribe<HubReconnectingMessage>(this, (msg) => MareHubOnReconnecting(msg.Exception));
-        Mediator.Subscribe<CyclePauseMessage>(this, (msg) => _ = CyclePause(msg.UserData));
+        Mediator.Subscribe<CyclePauseMessage>(this, (msg) => _ = CyclePauseAsync(msg.UserData));
         Mediator.Subscribe<CensusUpdateMessage>(this, (msg) => _lastCensus = msg);
-        Mediator.Subscribe<PauseMessage>(this, (msg) => _ = Pause(msg.UserData));
+        Mediator.Subscribe<PauseMessage>(this, (msg) => _ = PauseAsync(msg.UserData));
 
         ServerState = ServerState.Offline;
 
@@ -105,7 +105,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         return await _mareHub!.InvokeAsync<bool>(nameof(CheckClientHealth)).ConfigureAwait(false);
     }
 
-    public async Task CreateConnections()
+    public async Task CreateConnectionsAsync()
     {
         if (!_serverManager.ShownCensusPopup)
         {
@@ -122,33 +122,68 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         {
             Logger.LogInformation("Not recreating Connection, paused");
             _connectionDto = null;
-            await StopConnection(ServerState.Disconnected).ConfigureAwait(false);
+            await StopConnectionAsync(ServerState.Disconnected).ConfigureAwait(false);
             _connectionCancellationTokenSource?.Cancel();
             return;
         }
 
-        var secretKey = _serverManager.GetSecretKey(out bool multi);
-        if (multi)
+        if (!_serverManager.CurrentServer.UseOAuth2)
         {
-            Logger.LogWarning("Multiple secret keys for current character");
-            _connectionDto = null;
-            Mediator.Publish(new NotificationMessage("Multiple Identical Characters detected", "Your Service configuration has multiple characters with the same name and world set up. Delete the duplicates in the character management to be able to connect to Mare.",
-                NotificationType.Error));
-            await StopConnection(ServerState.MultiChara).ConfigureAwait(false);
-            _connectionCancellationTokenSource?.Cancel();
-            return;
-        }
+            var secretKey = _serverManager.GetSecretKey(out bool multi);
+            if (multi)
+            {
+                Logger.LogWarning("Multiple secret keys for current character");
+                _connectionDto = null;
+                Mediator.Publish(new NotificationMessage("Multiple Identical Characters detected", "Your Service configuration has multiple characters with the same name and world set up. Delete the duplicates in the character management to be able to connect to Mare.",
+                    NotificationType.Error));
+                await StopConnectionAsync(ServerState.MultiChara).ConfigureAwait(false);
+                _connectionCancellationTokenSource?.Cancel();
+                return;
+            }
 
-        if (secretKey.IsNullOrEmpty())
+            if (secretKey.IsNullOrEmpty())
+            {
+                Logger.LogWarning("No secret key set for current character");
+                _connectionDto = null;
+                await StopConnectionAsync(ServerState.NoSecretKey).ConfigureAwait(false);
+                _connectionCancellationTokenSource?.Cancel();
+                return;
+            }
+        }
+        else
         {
-            Logger.LogWarning("No secret key set for current character");
-            _connectionDto = null;
-            await StopConnection(ServerState.NoSecretKey).ConfigureAwait(false);
-            _connectionCancellationTokenSource?.Cancel();
-            return;
+            var oauth2 = _serverManager.GetOAuth2(out bool multi);
+            if (multi)
+            {
+                Logger.LogWarning("Multiple secret keys for current character");
+                _connectionDto = null;
+                Mediator.Publish(new NotificationMessage("Multiple Identical Characters detected", "Your Service configuration has multiple characters with the same name and world set up. Delete the duplicates in the character management to be able to connect to Mare.",
+                    NotificationType.Error));
+                await StopConnectionAsync(ServerState.MultiChara).ConfigureAwait(false);
+                _connectionCancellationTokenSource?.Cancel();
+                return;
+            }
+
+            if (!oauth2.HasValue)
+            {
+                Logger.LogWarning("No UID/OAuth set for current character");
+                _connectionDto = null;
+                await StopConnectionAsync(ServerState.OAuthMisconfigured).ConfigureAwait(false);
+                _connectionCancellationTokenSource?.Cancel();
+                return;
+            }
+
+            if (!await _tokenProvider.TryUpdateOAuth2LoginTokenAsync().ConfigureAwait(false))
+            {
+                Logger.LogWarning("OAuth2 login token could not be updated");
+                _connectionDto = null;
+                await StopConnectionAsync(ServerState.OAuthLoginTokenStale).ConfigureAwait(false);
+                _connectionCancellationTokenSource?.Cancel();
+                return;
+            }
         }
 
-        await StopConnection(ServerState.Disconnected).ConfigureAwait(false);
+        await StopConnectionAsync(ServerState.Disconnected).ConfigureAwait(false);
 
         Logger.LogInformation("Recreating Connection");
         Mediator.Publish(new EventMessage(new Services.Events.Event(nameof(ApiController), Services.Events.EventSeverity.Informational,
@@ -162,7 +197,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         {
             AuthFailureMessage = string.Empty;
 
-            await StopConnection(ServerState.Disconnected).ConfigureAwait(false);
+            await StopConnectionAsync(ServerState.Disconnected).ConfigureAwait(false);
             ServerState = ServerState.Connecting;
 
             try
@@ -208,7 +243,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                             $"This client version is incompatible and will not be able to connect. Please update your Mare Synchronos client.",
                             NotificationType.Error));
                     }
-                    await StopConnection(ServerState.VersionMisMatch).ConfigureAwait(false);
+                    await StopConnectionAsync(ServerState.VersionMisMatch).ConfigureAwait(false);
                     return;
                 }
 
@@ -232,8 +267,8 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                             NotificationType.Error, TimeSpan.FromSeconds(15)));
                 }
 
-                await LoadIninitialPairs().ConfigureAwait(false);
-                await LoadOnlinePairs().ConfigureAwait(false);
+                await LoadIninitialPairsAsync().ConfigureAwait(false);
+                await LoadOnlinePairsAsync().ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -246,7 +281,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
                 if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
-                    await StopConnection(ServerState.Unauthorized).ConfigureAwait(false);
+                    await StopConnectionAsync(ServerState.Unauthorized).ConfigureAwait(false);
                     return;
                 }
 
@@ -257,7 +292,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
             catch (InvalidOperationException ex)
             {
                 Logger.LogWarning(ex, "InvalidOperationException on connection");
-                await StopConnection(ServerState.Disconnected).ConfigureAwait(false);
+                await StopConnectionAsync(ServerState.Disconnected).ConfigureAwait(false);
                 return;
             }
             catch (Exception ex)
@@ -270,7 +305,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         }
     }
 
-    public Task CyclePause(UserData userData)
+    public Task CyclePauseAsync(UserData userData)
     {
         CancellationTokenSource cts = new();
         cts.CancelAfter(TimeSpan.FromSeconds(5));
@@ -293,7 +328,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         return Task.CompletedTask;
     }
 
-    public async Task Pause(UserData userData)
+    public async Task PauseAsync(UserData userData)
     {
         var pair = _pairManager.GetOnlineUserPairs().Single(p => p.UserPair != null && p.UserData == userData);
         var perm = pair.UserPair!.OwnPermissions;
@@ -301,9 +336,9 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         await UserSetPairPermissions(new UserPermissionsDto(userData, perm)).ConfigureAwait(false);
     }
 
-    public Task<ConnectionDto> GetConnectionDto() => GetConnectionDto(true);
+    public Task<ConnectionDto> GetConnectionDto() => GetConnectionDtoAsync(true);
 
-    public async Task<ConnectionDto> GetConnectionDto(bool publishConnected = true)
+    public async Task<ConnectionDto> GetConnectionDtoAsync(bool publishConnected)
     {
         var dto = await _mareHub!.InvokeAsync<ConnectionDto>(nameof(GetConnectionDto)).ConfigureAwait(false);
         if (publishConnected) Mediator.Publish(new ConnectedMessage(dto));
@@ -315,18 +350,18 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         base.Dispose(disposing);
 
         _healthCheckTokenSource?.Cancel();
-        _ = Task.Run(async () => await StopConnection(ServerState.Disconnected).ConfigureAwait(false));
+        _ = Task.Run(async () => await StopConnectionAsync(ServerState.Disconnected).ConfigureAwait(false));
         _connectionCancellationTokenSource?.Cancel();
     }
 
-    private async Task ClientHealthCheck(CancellationToken ct)
+    private async Task ClientHealthCheckAsync(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested && _mareHub != null)
         {
             await Task.Delay(TimeSpan.FromSeconds(30), ct).ConfigureAwait(false);
             Logger.LogDebug("Checking Client Health State");
 
-            bool requireReconnect = await RefreshToken(ct).ConfigureAwait(false);
+            bool requireReconnect = await RefreshTokenAsync(ct).ConfigureAwait(false);
 
             if (requireReconnect) break;
 
@@ -336,12 +371,12 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
     private void DalamudUtilOnLogIn()
     {
-        _ = Task.Run(() => CreateConnections());
+        _ = Task.Run(() => CreateConnectionsAsync());
     }
 
     private void DalamudUtilOnLogOut()
     {
-        _ = Task.Run(async () => await StopConnection(ServerState.Disconnected).ConfigureAwait(false));
+        _ = Task.Run(async () => await StopConnectionAsync(ServerState.Disconnected).ConfigureAwait(false));
         ServerState = ServerState.Offline;
     }
 
@@ -378,12 +413,12 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         _healthCheckTokenSource?.Cancel();
         _healthCheckTokenSource?.Dispose();
         _healthCheckTokenSource = new CancellationTokenSource();
-        _ = ClientHealthCheck(_healthCheckTokenSource.Token);
+        _ = ClientHealthCheckAsync(_healthCheckTokenSource.Token);
 
         _initialized = true;
     }
 
-    private async Task LoadIninitialPairs()
+    private async Task LoadIninitialPairsAsync()
     {
         foreach (var entry in await GroupsGetAll().ConfigureAwait(false))
         {
@@ -398,7 +433,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         }
     }
 
-    private async Task LoadOnlinePairs()
+    private async Task LoadOnlinePairsAsync()
     {
         CensusDataDto? dto = null;
         if (_serverManager.SendCensusData && _lastCensus != null)
@@ -430,27 +465,27 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
         }
     }
 
-    private async Task MareHubOnReconnected()
+    private async Task MareHubOnReconnectedAsync()
     {
         ServerState = ServerState.Reconnecting;
         try
         {
             InitializeApiHooks();
-            _connectionDto = await GetConnectionDto(publishConnected: false).ConfigureAwait(false);
+            _connectionDto = await GetConnectionDtoAsync(publishConnected: false).ConfigureAwait(false);
             if (_connectionDto.ServerVersion != IMareHub.ApiVersion)
             {
-                await StopConnection(ServerState.VersionMisMatch).ConfigureAwait(false);
+                await StopConnectionAsync(ServerState.VersionMisMatch).ConfigureAwait(false);
                 return;
             }
             ServerState = ServerState.Connected;
-            await LoadIninitialPairs().ConfigureAwait(false);
-            await LoadOnlinePairs().ConfigureAwait(false);
+            await LoadIninitialPairsAsync().ConfigureAwait(false);
+            await LoadOnlinePairsAsync().ConfigureAwait(false);
             Mediator.Publish(new ConnectedMessage(_connectionDto));
         }
         catch (Exception ex)
         {
             Logger.LogCritical(ex, "Failure to obtain data after reconnection");
-            await StopConnection(ServerState.Disconnected).ConfigureAwait(false);
+            await StopConnectionAsync(ServerState.Disconnected).ConfigureAwait(false);
         }
     }
 
@@ -465,7 +500,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
     }
 
-    private async Task<bool> RefreshToken(CancellationToken ct)
+    private async Task<bool> RefreshTokenAsync(CancellationToken ct)
     {
         Logger.LogDebug("Checking token");
 
@@ -478,28 +513,28 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                 Logger.LogDebug("Reconnecting due to updated token");
 
                 _doNotNotifyOnNextInfo = true;
-                await CreateConnections().ConfigureAwait(false);
+                await CreateConnectionsAsync().ConfigureAwait(false);
                 requireReconnect = true;
             }
         }
         catch (MareAuthFailureException ex)
         {
             AuthFailureMessage = ex.Reason;
-            await StopConnection(ServerState.Unauthorized).ConfigureAwait(false);
+            await StopConnectionAsync(ServerState.Unauthorized).ConfigureAwait(false);
             requireReconnect = true;
         }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Could not refresh token, forcing reconnect");
             _doNotNotifyOnNextInfo = true;
-            await CreateConnections().ConfigureAwait(false);
+            await CreateConnectionsAsync().ConfigureAwait(false);
             requireReconnect = true;
         }
 
         return requireReconnect;
     }
 
-    private async Task StopConnection(ServerState state)
+    private async Task StopConnectionAsync(ServerState state)
     {
         ServerState = ServerState.Disconnecting;
 

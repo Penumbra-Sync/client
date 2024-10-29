@@ -79,7 +79,7 @@ public sealed class CommandManagerService : IDisposable
             {
                 _serverConfigurationManager.CurrentServer.FullPause = fullPause;
                 _serverConfigurationManager.Save();
-                _ = _apiController.CreateConnections();
+                _ = _apiController.CreateConnectionsAsync();
             }
         }
         else if (string.Equals(splitArgs[0], "gpose", StringComparison.OrdinalIgnoreCase))
