@@ -54,7 +54,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     private readonly Dalamud.Localization _localization;
     private readonly IDalamudPluginInterface _pluginInterface;
     private readonly ITextureProvider _textureProvider;
-    private readonly Dictionary<string, object> _selectedComboItems = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, object?> _selectedComboItems = new(StringComparer.Ordinal);
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private bool _cacheDirectoryHasOtherFilesThanCache = false;
 
@@ -552,14 +552,14 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         DrawHelpText("The storage is automatically governed by Mare. It will clear itself automatically once it reaches the set capacity by removing the oldest unused files. You typically do not need to clear it yourself.");
     }
 
-    public T? DrawCombo<T>(string comboName, IEnumerable<T> comboItems, Func<T, string> toName,
+    public T? DrawCombo<T>(string comboName, IEnumerable<T> comboItems, Func<T?, string> toName,
         Action<T?>? onSelected = null, T? initialSelectedItem = default)
     {
         if (!comboItems.Any()) return default;
 
         if (!_selectedComboItems.TryGetValue(comboName, out var selectedItem) && selectedItem == null)
         {
-            if (!EqualityComparer<T>.Default.Equals(initialSelectedItem, default))
+            if (!EqualityComparer<T>.Default.Equals(initialSelectedItem, default(T)))
             {
                 selectedItem = initialSelectedItem;
                 _selectedComboItems[comboName] = selectedItem!;
@@ -568,12 +568,12 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             }
             else
             {
-                selectedItem = comboItems.First();
-                _selectedComboItems[comboName] = selectedItem!;
+                selectedItem = null;
+                _selectedComboItems[comboName] = selectedItem;
             }
         }
 
-        if (ImGui.BeginCombo(comboName, toName((T)selectedItem!)))
+        if (ImGui.BeginCombo(comboName, toName((T?)selectedItem)))
         {
             foreach (var item in comboItems)
             {
@@ -588,7 +588,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             ImGui.EndCombo();
         }
 
-        return (T)_selectedComboItems[comboName];
+        return (T?)_selectedComboItems[comboName];
     }
 
     public void DrawFileScanState()
@@ -879,32 +879,40 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         }
     }
 
-    public void DrawUIDComboForAuthentication(int indexOffset, Authentication item, string serverUri)
+    private record UIDAliasPair(string? UID, string? Alias);
+
+    public void DrawUIDComboForAuthentication(int indexOffset, Authentication item, string serverUri, ILogger? logger = null)
     {
         using (ImRaii.Disabled(_discordOAuthUIDs == null))
         {
-            DrawCombo("UID##" + item.CharacterName + serverUri + indexOffset, _discordOAuthUIDs?.Result ?? new(StringComparer.Ordinal) { { item.UID ?? string.Empty, string.Empty } },
+            var aliasPairs = _discordOAuthUIDs?.Result?.Select(t => new UIDAliasPair(t.Key, t.Value)).ToList() ?? [new UIDAliasPair(item.UID ?? null, null)];
+            var uidComboName = "UID###" + item.CharacterName + item.WorldId + serverUri + indexOffset;
+            logger?.LogInformation("Drawing Combo with name {name}", uidComboName);
+            DrawCombo(uidComboName, aliasPairs,
                 (v) =>
                 {
-                    if (!string.IsNullOrEmpty(v.Value))
-                    {
-                        return $"{v.Key} ({v.Value})";
-                    }
-
-                    if (string.IsNullOrEmpty(v.Key))
+                    if (v is null)
                         return "No UID set";
 
-                    return $"{v.Key}";
+                    if (!string.IsNullOrEmpty(v.Alias))
+                    {
+                        return $"{v.UID} ({v.Alias})";
+                    }
+
+                    if (string.IsNullOrEmpty(v.UID))
+                        return "No UID set";
+
+                    return $"{v.UID}";
                 },
                 (v) =>
                 {
-                    if (!string.Equals(v.Key, item.UID, StringComparison.Ordinal))
+                    if (!string.Equals(v.UID, item.UID, StringComparison.Ordinal))
                     {
-                        item.UID = v.Key;
+                        item.UID = v.UID;
                         _serverConfigurationManager.Save();
                     }
                 },
-                _discordOAuthUIDs?.Result?.FirstOrDefault(f => string.Equals(f.Key, item.UID, StringComparison.Ordinal)) ?? default);
+                aliasPairs.Find(f => string.Equals(f.UID, item.UID, StringComparison.Ordinal)) ?? default);
         }
         if (_discordOAuthUIDs == null)
         {

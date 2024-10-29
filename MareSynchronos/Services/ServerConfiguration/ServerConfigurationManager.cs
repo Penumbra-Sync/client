@@ -194,8 +194,18 @@ public class ServerConfigurationManager
     {
         JwtSecurityTokenHandler handler = new JwtSecurityTokenHandler();
         if (server.OAuthToken == null) return string.Empty;
-        var token = handler.ReadJwtToken(server.OAuthToken);
-        return token.Claims.First(f => string.Equals(f.Type, "discord_user", StringComparison.Ordinal)).Value!;
+        try
+        {
+            var token = handler.ReadJwtToken(server.OAuthToken);
+            return token.Claims.First(f => string.Equals(f.Type, "discord_user", StringComparison.Ordinal)).Value!;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not read jwt, resetting it");
+            server.OAuthToken = null;
+            Save();
+            return string.Empty;
+        }
     }
 
     public string[] GetServerNames()

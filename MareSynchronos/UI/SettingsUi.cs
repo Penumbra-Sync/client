@@ -1315,7 +1315,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         }
                         else
                         {
-                            friendlyName = item.UID;
+                            friendlyName = item.UID ?? "-";
                             friendlyNameTranslation = "UID";
                         }
 
@@ -1346,7 +1346,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
                             if (!useOauth)
                             {
-                                _uiShared.DrawCombo("Secret Key##" + item.CharacterName + i, keys, (w) => w.Value.FriendlyName,
+                                _uiShared.DrawCombo("Secret Key###" + item.CharacterName + i, keys, (w) => w.Value.FriendlyName,
                                     (w) =>
                                     {
                                         if (w.Key != item.SecretKeyIdx)
@@ -1358,7 +1358,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                             }
                             else
                             {
-                                _uiShared.DrawUIDComboForAuthentication(i, item, selectedServer.ServerUri);
+                                _uiShared.DrawUIDComboForAuthentication(i, item, selectedServer.ServerUri, _logger);
                             }
                             if (_uiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Character") && UiSharedService.CtrlPressed())
                                 _serverConfigurationManager.RemoveCharacterFromServer(idx, item);
