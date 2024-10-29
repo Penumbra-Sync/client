@@ -260,6 +260,8 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         if (!result.IsSuccessStatusCode)
         {
             _logger.LogWarning("Could not renew OAuth2 Login token, error code {error}", result.StatusCode);
+            _serverManager.CurrentServer.OAuthToken = null;
+            _serverManager.Save();
             return false;
         }
 
