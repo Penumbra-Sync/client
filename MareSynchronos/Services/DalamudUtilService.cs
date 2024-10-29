@@ -6,6 +6,7 @@ using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
+using MareSynchronos.Interop;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
@@ -23,6 +24,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     private readonly IClientState _clientState;
     private readonly ICondition _condition;
     private readonly IDataManager _gameData;
+    private readonly BlockedCharacterHandler _blockedCharacterHandler;
     private readonly IFramework _framework;
     private readonly IGameGui _gameGui;
     private readonly ILogger<DalamudUtilService> _logger;
@@ -37,9 +39,10 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     private readonly List<string> _notUpdatedCharas = [];
     private bool _sentBetweenAreas = false;
 
+
     public DalamudUtilService(ILogger<DalamudUtilService> logger, IClientState clientState, IObjectTable objectTable, IFramework framework,
         IGameGui gameGui, ICondition condition, IDataManager gameData, ITargetManager targetManager,
-        MareMediator mediator, PerformanceCollectorService performanceCollector)
+        BlockedCharacterHandler blockedCharacterHandler, MareMediator mediator, PerformanceCollectorService performanceCollector)
     {
         _logger = logger;
         _clientState = clientState;
@@ -48,6 +51,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         _gameGui = gameGui;
         _condition = condition;
         _gameData = gameData;
+        _blockedCharacterHandler = blockedCharacterHandler;
         Mediator = mediator;
         _performanceCollector = performanceCollector;
         WorldData = new(() =>
@@ -455,6 +459,9 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
                     {
                         var chara = _objectTable[i];
                         if (chara == null || chara.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player)
+                            continue;
+
+                        if (_blockedCharacterHandler.IsCharacterBlocked(chara.Address))
                             continue;
 
                         var charaName = ((GameObject*)chara.Address)->NameString;
