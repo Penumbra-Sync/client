@@ -4,6 +4,7 @@ using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 
 namespace MareSynchronos.Interop.Ipc;
 
@@ -11,7 +12,7 @@ public class RedrawManager
 {
     private readonly MareMediator _mareMediator;
     private readonly DalamudUtilService _dalamudUtil;
-    private readonly Dictionary<nint, bool> _penumbraRedrawRequests = [];
+    private readonly ConcurrentDictionary<nint, bool> _penumbraRedrawRequests = [];
     private CancellationTokenSource _disposalCts = new();
 
     public SemaphoreSlim RedrawSemaphore { get; init; } = new(2, 2);
@@ -22,7 +23,7 @@ public class RedrawManager
         _dalamudUtil = dalamudUtil;
     }
 
-    public async Task PenumbraRedrawInternalAsync(ILogger logger, GameObjectHandler handler, Guid applicationId, Action<ICharacter> action)
+    public async Task PenumbraRedrawInternalAsync(ILogger logger, GameObjectHandler handler, Guid applicationId, Action<ICharacter> action, CancellationToken token)
     {
         _mareMediator.Publish(new PenumbraStartRedrawMessage(handler.Address));
 
@@ -30,12 +31,14 @@ public class RedrawManager
 
         try
         {
-            CancellationTokenSource cancelToken = new CancellationTokenSource();
+            using CancellationTokenSource cancelToken = new CancellationTokenSource();
+            using CancellationTokenSource combinedCts = CancellationTokenSource.CreateLinkedTokenSource(cancelToken.Token, token, _disposalCts.Token);
+            var combinedToken = combinedCts.Token;
             cancelToken.CancelAfter(TimeSpan.FromSeconds(15));
-            await handler.ActOnFrameworkAfterEnsureNoDrawAsync(action, cancelToken.Token).ConfigureAwait(false);
+            await handler.ActOnFrameworkAfterEnsureNoDrawAsync(action, combinedToken).ConfigureAwait(false);
 
             if (!_disposalCts.Token.IsCancellationRequested)
-                await _dalamudUtil.WaitWhileCharacterIsDrawing(logger, handler, applicationId, 30000, _disposalCts.Token).ConfigureAwait(false);
+                await _dalamudUtil.WaitWhileCharacterIsDrawing(logger, handler, applicationId, 30000, combinedToken).ConfigureAwait(false);
         }
         finally
         {

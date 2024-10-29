@@ -253,7 +253,7 @@ public sealed class IpcCallerPenumbra : DisposableMediatorSubscriberBase, IIpcCa
                 logger.LogDebug("[{appid}] Calling on IPC: PenumbraRedraw", applicationId);
                 _penumbraRedraw!.Invoke(chara.ObjectIndex, setting: RedrawType.Redraw);
 
-            }).ConfigureAwait(false);
+            }, token).ConfigureAwait(false);
         }
         finally
         {

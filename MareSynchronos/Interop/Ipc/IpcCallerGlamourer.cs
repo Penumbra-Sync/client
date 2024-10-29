@@ -123,7 +123,7 @@ public sealed class IpcCallerGlamourer : DisposableMediatorSubscriberBase, IIpcC
                 {
                     logger.LogWarning(ex, "[{appid}] Failed to apply Glamourer data", applicationId);
                 }
-            }).ConfigureAwait(false);
+            }, token).ConfigureAwait(false);
         }
         finally
         {
@@ -174,7 +174,7 @@ public sealed class IpcCallerGlamourer : DisposableMediatorSubscriberBase, IIpcC
                 {
                     logger.LogWarning(ex, "[{appid}] Error during GlamourerRevert", applicationId);
                 }
-            }).ConfigureAwait(false);
+            }, token).ConfigureAwait(false);
         }
         finally
         {
