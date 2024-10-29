@@ -29,21 +29,16 @@ public unsafe class BlockedCharacterHandler
         _logger = logger;
     }
 
-    private static ulong GetAccIdFromPlayerPointer(nint ptr)
+    private static (ulong AccId, ulong ContentId) GetIdsFromPlayerPointer(nint ptr)
     {
-        if (ptr == nint.Zero) return 0;
-        return ((BattleChara*)ptr)->Character.AccountId;
-    }
-
-    private static ulong GetContentIdFromPlayerPointer(nint ptr)
-    {
-        if (ptr == nint.Zero) return 0;
-        return ((BattleChara*)ptr)->Character.ContentId;
+        if (ptr == nint.Zero) return (0, 0);
+        var castChar = ((BattleChara*)ptr);
+        return (castChar->Character.AccountId, castChar->Character.ContentId);
     }
 
     public bool IsCharacterBlocked(nint ptr)
     {
-        (ulong AccId, ulong ContentId) combined = (GetAccIdFromPlayerPointer(ptr), GetContentIdFromPlayerPointer(ptr));
+        var combined = GetIdsFromPlayerPointer(ptr);
         if (_blockedCharacterCache.TryGetValue(combined, out var isBlocked))
             return isBlocked;
 
