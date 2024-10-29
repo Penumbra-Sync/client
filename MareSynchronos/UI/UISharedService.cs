@@ -876,7 +876,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         using (ImRaii.Disabled(_discordOAuthUIDs == null))
         {
             var aliasPairs = _discordOAuthUIDs?.Result?.Select(t => new UIDAliasPair(t.Key, t.Value)).ToList() ?? [new UIDAliasPair(item.UID ?? null, null)];
-            var uidComboName = "UID###" + item.CharacterName + item.WorldId + serverUri + indexOffset;
+            var uidComboName = "UID###" + item.CharacterName + item.WorldId + serverUri + indexOffset + aliasPairs.Count;
             DrawCombo(uidComboName, aliasPairs,
                 (v) =>
                 {
@@ -895,9 +895,9 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
                 },
                 (v) =>
                 {
-                    if (!string.Equals(v.UID, item.UID, StringComparison.Ordinal))
+                    if (!string.Equals(v?.UID ?? null, item.UID, StringComparison.Ordinal))
                     {
-                        item.UID = v.UID;
+                        item.UID = v?.UID ?? null;
                         _serverConfigurationManager.Save();
                     }
                 },
