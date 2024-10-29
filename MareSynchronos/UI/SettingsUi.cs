@@ -1325,7 +1325,16 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         {
                             thisIsYou = true;
                         }
-                        if (ImGui.TreeNode($"chara", (thisIsYou ? "[CURRENT] " : "") + $"Character: {item.CharacterName}, World: {worldPreview}, {friendlyNameTranslation}: {friendlyName}"))
+                        bool misManaged = false;
+                        if (selectedServer.UseOAuth2 && !string.IsNullOrEmpty(selectedServer.OAuthToken) && string.IsNullOrEmpty(item.UID))
+                        {
+                            misManaged = true;
+                        }
+                        if (!selectedServer.UseOAuth2 && item.SecretKeyIdx == -1)
+                        {
+                            misManaged = true;
+                        }
+                        if (ImGui.TreeNode($"chara", (misManaged ? "[!! MISMANAGED !!] " : "") + (thisIsYou ? "[CURRENT] " : "") + $"Character: {item.CharacterName}, World: {worldPreview}, {friendlyNameTranslation}: {friendlyName}"))
                         {
                             var charaName = item.CharacterName;
                             if (ImGui.InputText("Character Name", ref charaName, 64))
@@ -1477,6 +1486,12 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 if (useOauth)
                 {
                     _uiShared.DrawOAuth(selectedServer);
+                    if (!string.IsNullOrEmpty(_serverConfigurationManager.GetDiscordUserFromToken(selectedServer))
+                        && selectedServer.Authentications.TrueForAll(u => string.IsNullOrEmpty(u.UID)))
+                    {
+                        UiSharedService.ColorTextWrapped("You have enabled OAuth2 but no characters configured. Set the correct UIDs for your characters in \"Character Management\".",
+                            ImGuiColors.DalamudRed);
+                    }
                 }
 
                 if (!isMain && selectedServer != _serverConfigurationManager.CurrentServer)
