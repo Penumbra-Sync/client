@@ -460,8 +460,11 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
                         if (chara == null || chara.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player)
                             continue;
 
-                        if (_blockedCharacterHandler.IsCharacterBlocked(chara.Address))
+                        if (_blockedCharacterHandler.IsCharacterBlocked(chara.Address, out bool firstTime) && firstTime)
+                        {
+                            _logger.LogTrace("Skipping character {addr}, blocked/muted", chara.Address.ToString("X"));
                             continue;
+                        }
 
                         var charaName = ((GameObject*)chara.Address)->NameString;
                         var hash = GetHashedAccIdFromPlayerPointer(chara.Address);

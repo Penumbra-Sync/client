@@ -8,7 +8,8 @@ namespace MareSynchronos.Interop;
 
 public unsafe class BlockedCharacterHandler
 {
-    private readonly Dictionary<(ulong, ulong), bool> _blockedCharacterCache = new();
+    private sealed record CharaData(ulong AccId, ulong ContentId);
+    private readonly Dictionary<CharaData, bool> _blockedCharacterCache = new();
 
     private enum BlockResultType
     {
@@ -29,15 +30,16 @@ public unsafe class BlockedCharacterHandler
         _logger = logger;
     }
 
-    private static (ulong AccId, ulong ContentId) GetIdsFromPlayerPointer(nint ptr)
+    private static CharaData GetIdsFromPlayerPointer(nint ptr)
     {
-        if (ptr == nint.Zero) return (0, 0);
+        if (ptr == nint.Zero) return new(0, 0);
         var castChar = ((BattleChara*)ptr);
-        return (castChar->Character.AccountId, castChar->Character.ContentId);
+        return new(castChar->Character.AccountId, castChar->Character.ContentId);
     }
 
-    public bool IsCharacterBlocked(nint ptr)
+    public bool IsCharacterBlocked(nint ptr, out bool firstTime)
     {
+        firstTime = false;
         var combined = GetIdsFromPlayerPointer(ptr);
         if (_blockedCharacterCache.TryGetValue(combined, out var isBlocked))
             return isBlocked;
@@ -45,6 +47,7 @@ public unsafe class BlockedCharacterHandler
         if (_getBlockResultType == null)
             return _blockedCharacterCache[combined] = false;
 
+        firstTime = true;
         var infoProxy = InfoProxyBlacklist.Instance();
         var blockStatus = _getBlockResultType(infoProxy, combined.AccId, combined.ContentId);
         _logger.LogTrace("CharaPtr {ptr} is BlockStatus: {status}", ptr, blockStatus);
