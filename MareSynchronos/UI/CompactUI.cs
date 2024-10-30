@@ -328,8 +328,9 @@ public class CompactUi : WindowMediatorSubscriberBase
         {
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() - ((userSize.Y + textSize.Y) / 2 + shardTextSize.Y) / 2 - ImGui.GetStyle().ItemSpacing.Y + buttonSize.Y / 2);
         }
-        var color = UiSharedService.GetBoolColor(!_serverManager.CurrentServer!.FullPause);
-        var connectedIcon = !_serverManager.CurrentServer.FullPause ? FontAwesomeIcon.Link : FontAwesomeIcon.Unlink;
+        bool isConnectingOrConnected = _apiController.ServerState is ServerState.Connected or ServerState.Connecting or ServerState.Reconnecting;
+        var color = UiSharedService.GetBoolColor(!isConnectingOrConnected);
+        var connectedIcon = isConnectingOrConnected ? FontAwesomeIcon.Unlink : FontAwesomeIcon.Link;
 
         ImGui.SameLine(ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth() - buttonSize.X);
         if (printShard)
@@ -343,13 +344,22 @@ public class CompactUi : WindowMediatorSubscriberBase
             {
                 if (_uiSharedService.IconButton(connectedIcon))
                 {
-                    _serverManager.CurrentServer.FullPause = !_serverManager.CurrentServer.FullPause;
-                    _serverManager.Save();
+                    if (isConnectingOrConnected && !_serverManager.CurrentServer.FullPause)
+                    {
+                        _serverManager.CurrentServer.FullPause = true;
+                        _serverManager.Save();
+                    }
+                    else if (!isConnectingOrConnected && _serverManager.CurrentServer.FullPause)
+                    {
+                        _serverManager.CurrentServer.FullPause = false;
+                        _serverManager.Save();
+                    }
+
                     _ = _apiController.CreateConnectionsAsync();
                 }
             }
 
-            UiSharedService.AttachToolTip(!_serverManager.CurrentServer.FullPause ? "Disconnect from " + _serverManager.CurrentServer.ServerName : "Connect to " + _serverManager.CurrentServer.ServerName);
+            UiSharedService.AttachToolTip(isConnectingOrConnected ? "Disconnect from " + _serverManager.CurrentServer.ServerName : "Connect to " + _serverManager.CurrentServer.ServerName);
         }
     }
 
@@ -611,6 +621,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             ServerState.MultiChara => "Your Character Configuration has multiple characters configured with same name and world. You will not be able to connect until you fix this issue. Remove the duplicates from the configuration in Settings -> Service Settings -> Character Management and reconnect manually after.",
             ServerState.OAuthMisconfigured => "OAuth2 is enabled but not fully configured, verify in the Settings -> Service Settings that you have OAuth2 connected and, importantly, a UID assigned to your current character.",
             ServerState.OAuthLoginTokenStale => "Your OAuth2 login token is stale and cannot be used to renew. Go to the Settings -> Service Settings and unlink then relink your OAuth2 configuration.",
+            ServerState.NoAutoLogon => "This character has automatic login into Mare disabled. Press the connect button to connect to Mare.",
             _ => string.Empty
         };
     }
@@ -632,6 +643,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             ServerState.MultiChara => ImGuiColors.DalamudYellow,
             ServerState.OAuthMisconfigured => ImGuiColors.DalamudRed,
             ServerState.OAuthLoginTokenStale => ImGuiColors.DalamudRed,
+            ServerState.NoAutoLogon => ImGuiColors.DalamudYellow,
             _ => ImGuiColors.DalamudRed
         };
     }
@@ -652,6 +664,7 @@ public class CompactUi : WindowMediatorSubscriberBase
             ServerState.MultiChara => "Duplicate Characters",
             ServerState.OAuthMisconfigured => "Misconfigured OAuth2",
             ServerState.OAuthLoginTokenStale => "Stale OAuth2",
+            ServerState.NoAutoLogon => "Auto Login disabled",
             ServerState.Connected => _apiController.DisplayName,
             _ => string.Empty
         };

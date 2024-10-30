@@ -56,6 +56,7 @@ public class MareConfig : IMareConfiguration
     public bool UseAlternativeFileUpload { get; set; } = false;
     public bool UseCompactor { get; set; } = false;
     public bool DebugStopWhining { get; set; } = false;
+    public bool AutoPopulateEmptyNotesFromCharaName { get; set; } = false;
     public int Version { get; set; } = 1;
     public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;
 }

@@ -7,4 +7,5 @@ public record Authentication
     public uint WorldId { get; set; } = 0;
     public int SecretKeyIdx { get; set; } = -1;
     public string? UID { get; set; }
+    public bool AutoLogin { get; set; } = true;
 }

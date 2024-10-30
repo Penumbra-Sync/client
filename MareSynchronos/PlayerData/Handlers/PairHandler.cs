@@ -6,6 +6,7 @@ using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Events;
 using MareSynchronos.Services.Mediator;
+using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI.Files;
 using Microsoft.Extensions.Hosting;
@@ -27,6 +28,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     private readonly IpcManager _ipcManager;
     private readonly IHostApplicationLifetime _lifetime;
     private readonly PlayerPerformanceService _playerPerformanceService;
+    private readonly ServerConfigurationManager _serverConfigManager;
     private readonly PluginWarningNotificationService _pluginWarningNotificationManager;
     private CancellationTokenSource? _applicationCancellationTokenSource = new();
     private Guid _applicationId;
@@ -47,7 +49,8 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         PluginWarningNotificationService pluginWarningNotificationManager,
         DalamudUtilService dalamudUtil, IHostApplicationLifetime lifetime,
         FileCacheManager fileDbManager, MareMediator mediator,
-        PlayerPerformanceService playerPerformanceService) : base(logger, mediator)
+        PlayerPerformanceService playerPerformanceService,
+        ServerConfigurationManager serverConfigManager) : base(logger, mediator)
     {
         Pair = pair;
         _gameObjectHandlerFactory = gameObjectHandlerFactory;
@@ -58,6 +61,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         _lifetime = lifetime;
         _fileDbManager = fileDbManager;
         _playerPerformanceService = playerPerformanceService;
+        _serverConfigManager = serverConfigManager;
         _penumbraCollection = _ipcManager.Penumbra.CreateTemporaryCollectionAsync(logger, Pair.UserData.UID).ConfigureAwait(false).GetAwaiter().GetResult();
 
         Mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => FrameworkUpdate());
@@ -451,7 +455,7 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
         _applicationTask = ApplyCharacterDataAsync(applicationBase, charaData, updatedData, updateModdedPaths, updateManip, moddedPaths, token);
     }
 
-    private async Task ApplyCharacterDataAsync(Guid applicationBase, CharacterData charaData, Dictionary<ObjectKind, HashSet<PlayerChanges>> updatedData, bool updateModdedPaths, bool updateManip, 
+    private async Task ApplyCharacterDataAsync(Guid applicationBase, CharacterData charaData, Dictionary<ObjectKind, HashSet<PlayerChanges>> updatedData, bool updateModdedPaths, bool updateManip,
         Dictionary<(string GamePath, string? Hash), string> moddedPaths, CancellationToken token)
     {
         try
@@ -556,6 +560,8 @@ public sealed class PairHandler : DisposableMediatorSubscriberBase
     {
         PlayerName = name;
         _charaHandler = _gameObjectHandlerFactory.Create(ObjectKind.Player, () => _dalamudUtil.GetPlayerCharacterFromCachedTableByIdent(Pair.Ident), isWatched: false).GetAwaiter().GetResult();
+
+        _serverConfigManager.AutoPopulateNoteForUid(Pair.UserData.UID, name);
 
         Mediator.Subscribe<HonorificReadyMessage>(this, async (_) =>
         {

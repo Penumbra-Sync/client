@@ -14,5 +14,6 @@ public enum ServerState
     NoSecretKey,
     MultiChara,
     OAuthMisconfigured,
-    OAuthLoginTokenStale
+    OAuthLoginTokenStale,
+    NoAutoLogon
 }

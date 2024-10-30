@@ -39,7 +39,6 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     private readonly List<string> _notUpdatedCharas = [];
     private bool _sentBetweenAreas = false;
 
-
     public DalamudUtilService(ILogger<DalamudUtilService> logger, IClientState clientState, IObjectTable objectTable, IFramework framework,
         IGameGui gameGui, ICondition condition, IDataManager gameData, ITargetManager targetManager,
         BlockedCharacterHandler blockedCharacterHandler, MareMediator mediator, PerformanceCollectorService performanceCollector)

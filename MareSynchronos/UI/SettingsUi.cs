@@ -759,6 +759,14 @@ public class SettingsUi : WindowMediatorSubscriberBase
         }
         _uiShared.DrawHelpText("This will open a popup that allows you to set the notes for a user after successfully adding them to your individual pairs.");
 
+        var autoPopulateNotes = _configService.Current.AutoPopulateEmptyNotesFromCharaName;
+        if (ImGui.Checkbox("Automatically populate notes using player names", ref autoPopulateNotes))
+        {
+            _configService.Current.AutoPopulateEmptyNotesFromCharaName = autoPopulateNotes;
+            _configService.Save();
+        }
+        _uiShared.DrawHelpText("This will automatically populate user notes using the first encountered player name if the note was not set prior");
+
         ImGui.Separator();
         _uiShared.BigText("UI");
         var showNameInsteadOfNotes = _configService.Current.ShowCharacterNameInsteadOfNotesForVisible;
@@ -1369,6 +1377,13 @@ public class SettingsUi : WindowMediatorSubscriberBase
                             {
                                 _uiShared.DrawUIDComboForAuthentication(i, item, selectedServer.ServerUri, _logger);
                             }
+                            bool isAutoLogin = item.AutoLogin;
+                            if (ImGui.Checkbox("Automatically login to Mare", ref isAutoLogin))
+                            {
+                                item.AutoLogin = isAutoLogin;
+                                _serverConfigurationManager.Save();
+                            }
+                            _uiShared.DrawHelpText("When enabled and logging into this character in XIV, Mare will automatically connect to the current service.");
                             if (_uiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Character") && UiSharedService.CtrlPressed())
                                 _serverConfigurationManager.RemoveCharacterFromServer(idx, item);
                             UiSharedService.AttachToolTip("Hold CTRL to delete this entry.");

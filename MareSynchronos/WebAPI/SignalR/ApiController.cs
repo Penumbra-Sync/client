@@ -371,7 +371,19 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
     private void DalamudUtilOnLogIn()
     {
-        _ = Task.Run(() => CreateConnectionsAsync());
+        var charaName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult();
+        var worldId = _dalamudUtil.GetHomeWorldIdAsync().GetAwaiter().GetResult();
+        var auth = _serverManager.CurrentServer.Authentications.Find(f => string.Equals(f.CharacterName, charaName, StringComparison.Ordinal) && f.WorldId == worldId);
+        if (auth?.AutoLogin ?? false)
+        {
+            Logger.LogInformation("Logging into {chara}", charaName);
+            _ = Task.Run(CreateConnectionsAsync);
+        }
+        else
+        {
+            Logger.LogInformation("Not logging into {chara}, auto login disabled", charaName);
+            _ = Task.Run(async () => await StopConnectionAsync(ServerState.NoAutoLogon).ConfigureAwait(false));
+        }
     }
 
     private void DalamudUtilOnLogOut()

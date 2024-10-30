@@ -17,6 +17,7 @@ public class ServerConfigurationManager
 {
     private readonly ServerConfigService _configService;
     private readonly DalamudUtilService _dalamudUtil;
+    private readonly MareConfigService _mareConfigService;
     private readonly ILogger<ServerConfigurationManager> _logger;
     private readonly MareMediator _mareMediator;
     private readonly NotesConfigService _notesConfig;
@@ -24,6 +25,7 @@ public class ServerConfigurationManager
 
     public ServerConfigurationManager(ILogger<ServerConfigurationManager> logger, ServerConfigService configService,
         ServerTagConfigService serverTagConfig, NotesConfigService notesConfig, DalamudUtilService dalamudUtil,
+        MareConfigService mareConfigService,
         MareMediator mareMediator)
     {
         _logger = logger;
@@ -31,6 +33,7 @@ public class ServerConfigurationManager
         _serverTagConfig = serverTagConfig;
         _notesConfig = notesConfig;
         _dalamudUtil = dalamudUtil;
+        _mareConfigService = mareConfigService;
         _mareMediator = mareMediator;
         EnsureMainExists();
     }
@@ -436,6 +439,15 @@ public class ServerConfigurationManager
         CurrentNotesStorage().UidServerComments[uid] = note;
         if (save)
             _notesConfig.Save();
+    }
+
+    internal void AutoPopulateNoteForUid(string uid, string note)
+    {
+        if (!_mareConfigService.Current.AutoPopulateEmptyNotesFromCharaName
+            || GetNoteForUid(uid) != null)
+            return;
+
+        SetNoteForUid(uid, note, save: true);
     }
 
     private ServerNotesStorage CurrentNotesStorage()

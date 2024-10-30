@@ -36,7 +36,13 @@ public sealed class CommandManagerService : IDisposable
         _mareConfigService = mareConfigService;
         _commandManager.AddHandler(_commandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Opens the Mare Synchronos UI"
+            HelpMessage = "Opens the Mare Synchronos UI" + Environment.NewLine + Environment.NewLine +
+                "Additionally possible commands:" + Environment.NewLine +
+                "\t /mare toggle - Disconnects from Mare, if connected. Connects to Mare, if disconnected" + Environment.NewLine +
+                "\t /mare toggle on|off - Connects or disconnects to Mare respectively" + Environment.NewLine +
+                "\t /mare gpose - Opens the GPose MCDF import window (only works in GPose)" + Environment.NewLine +
+                "\t /mare analyze - Opens the Mare Character Data Analysis window" + Environment.NewLine +
+                "\t /mare settings - Opens the Mare Settings window"
         });
     }
 
@@ -58,6 +64,9 @@ public sealed class CommandManagerService : IDisposable
                 _mediator.Publish(new UiToggleMessage(typeof(IntroUi)));
             return;
         }
+
+        if (!_mareConfigService.Current.HasValidSetup())
+            return;
 
         if (string.Equals(splitArgs[0], "toggle", StringComparison.OrdinalIgnoreCase))
         {
@@ -108,6 +117,10 @@ public sealed class CommandManagerService : IDisposable
         else if (string.Equals(splitArgs[0], "analyze", StringComparison.OrdinalIgnoreCase))
         {
             _mediator.Publish(new UiToggleMessage(typeof(DataAnalysisUi)));
+        }
+        else if (string.Equals(splitArgs[0], "settings", StringComparison.OrdinalIgnoreCase))
+        {
+            _mediator.Publish(new UiToggleMessage(typeof(SettingsUi)));
         }
     }
 }
