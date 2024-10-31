@@ -493,7 +493,7 @@ public class ServerConfigurationManager
         try
         {
             var baseUri = serverUri.Replace("wss://", "https://").Replace("ws://", "http://");
-            var oauthCheckUri = MareAuth.GetUIDs(new Uri(baseUri));
+            var oauthCheckUri = MareAuth.GetUIDsFullPath(new Uri(baseUri));
             client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
             var response = await client.GetAsync(oauthCheckUri).ConfigureAwait(false);
             var responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
@@ -512,7 +512,7 @@ public class ServerConfigurationManager
         try
         {
             var baseUri = serverUri.Replace("wss://", "https://").Replace("ws://", "http://");
-            var oauthCheckUri = MareAuth.GetDiscordOAuthEndpoint(new Uri(baseUri));
+            var oauthCheckUri = MareAuth.GetDiscordOAuthEndpointFullPath(new Uri(baseUri));
             var response = await client.GetFromJsonAsync<Uri?>(oauthCheckUri).ConfigureAwait(false);
             return response;
         }
@@ -534,7 +534,7 @@ public class ServerConfigurationManager
         try
         {
             var baseUri = serverUri.Replace("wss://", "https://").Replace("ws://", "http://");
-            var oauthCheckUri = MareAuth.GetDiscordOAuthToken(new Uri(baseUri), sessionId);
+            var oauthCheckUri = MareAuth.GetDiscordOAuthTokenFullPath(new Uri(baseUri), sessionId);
             var response = await client.GetAsync(oauthCheckUri, token).ConfigureAwait(false);
             discordToken = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         }

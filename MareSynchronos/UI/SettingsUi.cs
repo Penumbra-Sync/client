@@ -6,6 +6,7 @@ using Dalamud.Utility;
 using ImGuiNET;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Comparer;
+using MareSynchronos.API.Routes;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop.Ipc;
 using MareSynchronos.MareConfiguration;
@@ -16,15 +17,20 @@ using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
+using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.Files.Models;
 using MareSynchronos.WebAPI.SignalR.Utils;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Net.Http.Json;
 using System.Numerics;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MareSynchronos.UI;
 
@@ -121,6 +127,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
     {
         _uiShared.EditTrackerPosition = false;
         _uidToAddForIgnore = string.Empty;
+        _secretKeysConversionCts = _secretKeysConversionCts.CancelRecreate();
 
         base.OnClose();
     }
@@ -1271,6 +1278,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
         if (_lastSelectedServerIndex != idx)
         {
             _uiShared.RestOAuthTasksState();
+            _secretKeysConversionCts = _secretKeysConversionCts.CancelRecreate();
+            _secretKeysConversionTask = null;
             _lastSelectedServerIndex = idx;
         }
 
@@ -1294,6 +1303,53 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         " Make sure to enter the character names correctly or use the 'Add current character' button at the bottom.", ImGuiColors.DalamudYellow);
                     int i = 0;
                     _uiShared.DrawUpdateOAuthUIDsButton(selectedServer);
+                    if (selectedServer.UseOAuth2 && selectedServer.OAuthToken != null)
+                    {
+                        bool hasSetSecretKeysButNoUid = selectedServer.Authentications.Exists(u => u.SecretKeyIdx != -1 && string.IsNullOrEmpty(u.UID));
+                        if (hasSetSecretKeysButNoUid)
+                        {
+                            ImGui.Dummy(new(5f, 5f));
+                            UiSharedService.TextWrapped("Some entries have been detected that have previously been assigned secret keys but not UIDs. " +
+                                "Press this button below to attempt to convert those entries.");
+                            using (ImRaii.Disabled(_secretKeysConversionTask != null && !_secretKeysConversionTask.IsCompleted))
+                            {
+                                if (_uiShared.IconTextButton(FontAwesomeIcon.ArrowsLeftRight, "Try to Convert Secret Keys to UIDs"))
+                                {
+                                    _secretKeysConversionTask = ConvertSecretKeysToUIDs(selectedServer, _secretKeysConversionCts.Token);
+                                }
+                            }
+                            if (_secretKeysConversionTask != null && !_secretKeysConversionTask.IsCompleted)
+                            {
+                                UiSharedService.ColorTextWrapped("Converting Secret Keys to UIDs", ImGuiColors.DalamudYellow);
+                            }
+                            if (_secretKeysConversionTask != null && _secretKeysConversionTask.IsCompletedSuccessfully)
+                            {
+                                Vector4? textColor = null;
+                                if (!_secretKeysConversionTask.Result.PartialSuccess)
+                                {
+                                    textColor = ImGuiColors.DalamudYellow;
+                                }
+                                if (!_secretKeysConversionTask.Result.Success)
+                                {
+                                    textColor = ImGuiColors.DalamudRed;
+                                }
+                                string text = $"Conversion has completed: {_secretKeysConversionTask.Result.Result}";
+                                if (textColor != null)
+                                {
+                                    UiSharedService.TextWrapped(text);
+                                }
+                                else
+                                {
+                                    UiSharedService.ColorTextWrapped(text, textColor!.Value);
+                                }
+                                if (!_secretKeysConversionTask.Result.Success || _secretKeysConversionTask.Result.PartialSuccess)
+                                {
+                                    UiSharedService.TextWrapped("In case of conversion failures, please set the UIDs for the failed conversions manually.");
+                                }
+                            }
+                        }
+                    }
+                    ImGui.Separator();
                     foreach (var item in selectedServer.Authentications.ToList())
                     {
                         using var charaId = ImRaii.PushId("selectedChara" + i);
@@ -1603,7 +1659,79 @@ public class SettingsUi : WindowMediatorSubscriberBase
     }
 
     private int _lastSelectedServerIndex = -1;
+    private Task<(bool Success, bool PartialSuccess, string Result)>? _secretKeysConversionTask = null;
+    private CancellationTokenSource _secretKeysConversionCts = new CancellationTokenSource();
 
+    private async Task<(bool Success, bool partialSuccess, string Result)> ConvertSecretKeysToUIDs(ServerStorage serverStorage, CancellationToken token)
+    {
+        List<Authentication> failedConversions = serverStorage.Authentications.Where(u => u.SecretKeyIdx == -1 && string.IsNullOrEmpty(u.UID)).ToList();
+        List<Authentication> conversionsToAttempt = serverStorage.Authentications.Where(u => u.SecretKeyIdx != -1 && string.IsNullOrEmpty(u.UID)).ToList();
+        List<Authentication> successfulConversions = [];
+        Dictionary<string, List<Authentication>> secretKeyMapping = new(StringComparer.Ordinal);
+        foreach (var authEntry in conversionsToAttempt)
+        {
+            if (!serverStorage.SecretKeys.TryGetValue(authEntry.SecretKeyIdx, out var secretKey))
+            {
+                failedConversions.Add(authEntry);
+                continue;
+            }
+
+            if (!secretKeyMapping.TryGetValue(secretKey.Key, out List<Authentication>? authList))
+            {
+                secretKeyMapping[secretKey.Key] = authList = [];
+            }
+
+            authList.Add(authEntry);
+        }
+
+        if (secretKeyMapping.Count == 0)
+        {
+            return (false, false, $"Failed to convert {failedConversions.Count} entries: " + string.Join(", ", failedConversions.Select(k => k.CharacterName)));
+        }
+
+        using HttpClient client = new();
+        var baseUri = serverStorage.ServerUri.Replace("wss://", "https://").Replace("ws://", "http://");
+        var oauthCheckUri = MareAuth.GetUIDsBasedOnSecretKeyFullPath(new Uri(baseUri));
+        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serverStorage.OAuthToken);
+
+        var requestContent = JsonContent.Create(secretKeyMapping.Select(k => k.Key).ToList());
+        using var response = await client.PostAsync(oauthCheckUri, requestContent, token).ConfigureAwait(false);
+        Dictionary<string, string>? secretKeyUidMapping = await JsonSerializer.DeserializeAsync<Dictionary<string, string>>
+            (await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false), cancellationToken: token).ConfigureAwait(false);
+        if (secretKeyUidMapping == null)
+        {
+            return (false, false, $"Failed to parse the server response. Failed to convert all entries.");
+        }
+
+        foreach (var entry in secretKeyMapping)
+        {
+            if (!secretKeyUidMapping.TryGetValue(entry.Key, out var assignedUid) || string.IsNullOrEmpty(assignedUid))
+            {
+                failedConversions.AddRange(entry.Value);
+                continue;
+            }
+
+            foreach (var auth in entry.Value)
+            {
+                auth.UID = assignedUid;
+                successfulConversions.Add(auth);
+            }
+        }
+
+        if (successfulConversions.Count > 0)
+            _serverConfigurationManager.Save();
+
+        StringBuilder sb = new();
+        sb.Append("Conversion complete. ");
+        sb.Append($"Successfully converted {successfulConversions.Count} entries.");
+        if (failedConversions.Count > 0)
+        {
+            sb.Append($" Failed to convert {successfulConversions.Count} entries, assign those manually: ");
+            sb.Append(string.Join(", ", failedConversions.Select(k => k.CharacterName)));
+        }
+
+        return (true, failedConversions.Count != 0, sb.ToString());
+    }
 
     private void DrawSettingsContent()
     {
