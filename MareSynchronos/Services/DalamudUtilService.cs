@@ -31,7 +31,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     private readonly IObjectTable _objectTable;
     private readonly PerformanceCollectorService _performanceCollector;
     private uint? _classJobId = 0;
-    private DateTime _delayedFrameworkUpdateCheck = DateTime.Now;
+    private DateTime _delayedFrameworkUpdateCheck = DateTime.UtcNow;
     private string _lastGlobalBlockPlayer = string.Empty;
     private string _lastGlobalBlockReason = string.Empty;
     private ushort _lastZone = 0;
@@ -444,7 +444,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
             return;
         }
 
-        bool isNormalFrameworkUpdate = DateTime.Now < _delayedFrameworkUpdateCheck.AddSeconds(1);
+        bool isNormalFrameworkUpdate = DateTime.UtcNow < _delayedFrameworkUpdateCheck.AddSeconds(1);
 
         _performanceCollector.LogPerformance(this, $"FrameworkOnUpdateInternal+{(isNormalFrameworkUpdate ? "Regular" : "Delayed")}", () =>
         {
@@ -597,7 +597,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
 
             Mediator.Publish(new DelayedFrameworkUpdateMessage());
 
-            _delayedFrameworkUpdateCheck = DateTime.Now;
+            _delayedFrameworkUpdateCheck = DateTime.UtcNow;
         });
     }
 }
