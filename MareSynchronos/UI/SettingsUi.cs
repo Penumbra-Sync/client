@@ -1325,7 +1325,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                             if (_secretKeysConversionTask != null && _secretKeysConversionTask.IsCompletedSuccessfully)
                             {
                                 Vector4? textColor = null;
-                                if (!_secretKeysConversionTask.Result.PartialSuccess)
+                                if (_secretKeysConversionTask.Result.PartialSuccess)
                                 {
                                     textColor = ImGuiColors.DalamudYellow;
                                 }
@@ -1334,7 +1334,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                                     textColor = ImGuiColors.DalamudRed;
                                 }
                                 string text = $"Conversion has completed: {_secretKeysConversionTask.Result.Result}";
-                                if (textColor != null)
+                                if (textColor == null)
                                 {
                                     UiSharedService.TextWrapped(text);
                                 }
@@ -1722,11 +1722,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
             _serverConfigurationManager.Save();
 
         StringBuilder sb = new();
-        sb.Append("Conversion complete. ");
-        sb.Append($"Successfully converted {successfulConversions.Count} entries.");
+        sb.Append("Conversion complete." + Environment.NewLine);
+        sb.Append($"Successfully converted {successfulConversions.Count} entries." + Environment.NewLine);
         if (failedConversions.Count > 0)
         {
-            sb.Append($" Failed to convert {successfulConversions.Count} entries, assign those manually: ");
+            sb.Append($"Failed to convert {failedConversions.Count} entries, assign those manually: ");
             sb.Append(string.Join(", ", failedConversions.Select(k => k.CharacterName)));
         }
 
