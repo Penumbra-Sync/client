@@ -164,7 +164,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
             var fileStream = File.Create(tempPath);
             await using (fileStream.ConfigureAwait(false))
             {
-                var bufferSize = response.Content.Headers.ContentLength > 1024 * 1024 ? 4096 : 1024;
+                var bufferSize = response.Content.Headers.ContentLength > 1024 * 1024 ? 65536 : 8196;
                 var buffer = new byte[bufferSize];
 
                 var bytesRead = 0;
