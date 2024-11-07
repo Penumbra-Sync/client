@@ -10,15 +10,15 @@ namespace MareSynchronos.Services.Mediator;
 public sealed class MareMediator : IHostedService
 {
     private readonly object _addRemoveLock = new();
-    private readonly Dictionary<object, DateTime> _lastErrorTime = [];
+    private readonly ConcurrentDictionary<object, DateTime> _lastErrorTime = [];
     private readonly ILogger<MareMediator> _logger;
     private readonly CancellationTokenSource _loopCts = new();
     private readonly ConcurrentQueue<MessageBase> _messageQueue = new();
     private readonly PerformanceCollectorService _performanceCollector;
     private readonly MareConfigService _mareConfigService;
-    private readonly Dictionary<Type, HashSet<SubscriberAction>> _subscriberDict = [];
+    private readonly ConcurrentDictionary<Type, HashSet<SubscriberAction>> _subscriberDict = [];
     private bool _processQueue = false;
-    private readonly Dictionary<Type, MethodInfo?> _genericExecuteMethods = new();
+    private readonly ConcurrentDictionary<Type, MethodInfo?> _genericExecuteMethods = new();
     public MareMediator(ILogger<MareMediator> logger, PerformanceCollectorService performanceCollector, MareConfigService mareConfigService)
     {
         _logger = logger;
