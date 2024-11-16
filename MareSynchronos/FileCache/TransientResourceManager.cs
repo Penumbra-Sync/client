@@ -18,7 +18,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
     private readonly DalamudUtilService _dalamudUtil;
     private readonly string[] _fileTypesToHandle = ["tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk"];
     private readonly HashSet<GameObjectHandler> _playerRelatedPointers = [];
-    private Dictionary<IntPtr, ObjectKind> _cachedFrameAddresses = [];
+    private ConcurrentDictionary<IntPtr, ObjectKind> _cachedFrameAddresses = [];
     private ConcurrentDictionary<ObjectKind, HashSet<string>>? _semiTransientResources = null;
     private uint _lastClassJobId = uint.MaxValue;
 
@@ -174,7 +174,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
 
     private void DalamudUtil_FrameworkUpdate()
     {
-        _cachedFrameAddresses = _playerRelatedPointers.Where(k => k.Address != nint.Zero).ToDictionary(c => c.CurrentAddress(), c => c.ObjectKind);
+        _cachedFrameAddresses = _cachedFrameAddresses = new ConcurrentDictionary<nint, ObjectKind>(_playerRelatedPointers.Where(k => k.Address != nint.Zero).ToDictionary(c => c.CurrentAddress(), c => c.ObjectKind));
         lock (_cacheAdditionLock)
         {
             _cachedHandledPaths.Clear();
