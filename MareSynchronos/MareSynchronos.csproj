@@ -38,7 +38,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.11" />
     <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="8.0.11" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
     <PackageReference Include="Glamourer.Api" Version="2.2.0" />
     <PackageReference Include="NReco.Logging.File" Version="1.2.1" />
     <PackageReference Include="Penumbra.Api" Version="5.3.0" />
