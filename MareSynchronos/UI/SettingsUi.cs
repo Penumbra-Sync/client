@@ -341,6 +341,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
         if (_apiController.IsConnected)
         {
+            ImGuiHelpers.ScaledDummy(5);
+            ImGui.Separator();
             ImGuiHelpers.ScaledDummy(10);
             using var tree = ImRaii.TreeNode("Speed Test to Servers");
             if (tree)
