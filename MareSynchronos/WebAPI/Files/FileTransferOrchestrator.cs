@@ -168,6 +168,10 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
                 return await _httpClient.SendAsync(requestMessage, httpCompletionOption, ct.Value).ConfigureAwait(false);
             return await _httpClient.SendAsync(requestMessage, httpCompletionOption).ConfigureAwait(false);
         }
+        catch (TaskCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Error during SendRequestInternal for {uri}", requestMessage.RequestUri);

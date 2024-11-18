@@ -23,14 +23,13 @@ using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.Files.Models;
 using MareSynchronos.WebAPI.SignalR.Utils;
 using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.Tokens;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http.Json;
 using System.Numerics;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace MareSynchronos.UI;
 
@@ -121,6 +120,9 @@ public class SettingsUi : WindowMediatorSubscriberBase
     public override void OnOpen()
     {
         _uiShared.RestOAuthTasksState();
+        _speedTestCts?.Cancel();
+        _speedTestCts?.Dispose();
+        _speedTestCts = new();
     }
 
     public override void OnClose()
@@ -128,6 +130,10 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _uiShared.EditTrackerPosition = false;
         _uidToAddForIgnore = string.Empty;
         _secretKeysConversionCts = _secretKeysConversionCts.CancelRecreate();
+        _downloadServersTask = null;
+        _speedTestTask = null;
+        _speedTestCts?.Cancel();
+        _speedTestCts?.Dispose();
 
         base.OnClose();
     }
@@ -333,6 +339,62 @@ public class SettingsUi : WindowMediatorSubscriberBase
         if (!showUploading) ImGui.EndDisabled();
         if (!showTransferBars) ImGui.EndDisabled();
 
+        if (_apiController.IsConnected)
+        {
+            ImGuiHelpers.ScaledDummy(10);
+            using var tree = ImRaii.TreeNode("Speed Test to Servers");
+            if (tree)
+            {
+                if (_downloadServersTask == null || ((_downloadServersTask?.IsCompleted ?? false) && (!_downloadServersTask?.IsCompletedSuccessfully ?? false)))
+                {
+                    if (_uiShared.IconTextButton(FontAwesomeIcon.GroupArrowsRotate, "Update Download Server List"))
+                    {
+                        _downloadServersTask = GetDownloadServerList();
+                    }
+                }
+                if (_downloadServersTask != null && _downloadServersTask.IsCompleted && !_downloadServersTask.IsCompletedSuccessfully)
+                {
+                    UiSharedService.ColorTextWrapped("Failed to get download servers from service, see /xllog for more information", ImGuiColors.DalamudRed);
+                }
+                if (_downloadServersTask != null && _downloadServersTask.IsCompleted && _downloadServersTask.IsCompletedSuccessfully)
+                {
+                    if (_speedTestTask == null || _speedTestTask.IsCompleted)
+                    {
+                        if (_uiShared.IconTextButton(FontAwesomeIcon.ArrowRight, "Start Speedtest"))
+                        {
+                            _speedTestTask = RunSpeedTest(_downloadServersTask.Result!, _speedTestCts.Token);
+                        }
+                    }
+                    else if (!_speedTestTask.IsCompleted)
+                    {
+                        UiSharedService.ColorTextWrapped("Running Speedtest to File Servers...", ImGuiColors.DalamudYellow);
+                        UiSharedService.ColorTextWrapped("Please be patient, depending on usage and load this can take a while.", ImGuiColors.DalamudYellow);
+                        if (_uiShared.IconTextButton(FontAwesomeIcon.Ban, "Cancel speedtest"))
+                        {
+                            _speedTestCts.Cancel();
+                            _speedTestCts.Dispose();
+                            _speedTestCts = new();
+                        }
+                    }
+                    if (_speedTestTask != null && _speedTestTask.IsCompleted)
+                    {
+                        if (_speedTestTask.Result != null && _speedTestTask.Result.Count != 0)
+                        {
+                            foreach (var result in _speedTestTask.Result)
+                            {
+                                UiSharedService.TextWrapped(result);
+                            }
+                        }
+                        else
+                        {
+                            UiSharedService.ColorTextWrapped("Speedtest completed with no results", ImGuiColors.DalamudYellow);
+                        }
+                    }
+                }
+            }
+            ImGuiHelpers.ScaledDummy(10);
+        }
+
         ImGui.Separator();
         _uiShared.BigText("Current Transfers");
 
@@ -407,6 +469,87 @@ public class SettingsUi : WindowMediatorSubscriberBase
             }
 
             ImGui.EndTabBar();
+        }
+    }
+
+    private Task<List<string>?>? _downloadServersTask = null;
+    private Task<List<string>?>? _speedTestTask = null;
+    private CancellationTokenSource _speedTestCts = new();
+
+    private async Task<List<string>?> RunSpeedTest(List<string> servers, CancellationToken token)
+    {
+        List<string> speedTestResults = new();
+        foreach (var server in servers)
+        {
+            HttpResponseMessage? result = null;
+            Stopwatch? st = null;
+            try
+            {
+                result = await _fileTransferOrchestrator.SendRequestAsync(HttpMethod.Get, new Uri(new Uri(server), "speedtest/run"), token, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+                result.EnsureSuccessStatusCode();
+                using CancellationTokenSource speedtestTimeCts = new();
+                speedtestTimeCts.CancelAfter(TimeSpan.FromSeconds(10));
+                using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(speedtestTimeCts.Token, token);
+                long readBytes = 0;
+                st = Stopwatch.StartNew();
+                try
+                {
+                    var stream = await result.Content.ReadAsStreamAsync(linkedCts.Token).ConfigureAwait(false);
+                    byte[] buffer = new byte[8192];
+                    while (!speedtestTimeCts.Token.IsCancellationRequested)
+                    {
+                        var currentBytes = await stream.ReadAsync(buffer, linkedCts.Token).ConfigureAwait(false);
+                        if (currentBytes == 0)
+                            break;
+                        readBytes += currentBytes;
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    _logger.LogWarning("Speedtest to {server} cancelled", server);
+                }
+                st.Stop();
+                _logger.LogInformation("Downloaded {bytes} from {server} in {time}", UiSharedService.ByteToString(readBytes), server, st.Elapsed);
+                var bps = (long)((readBytes) / st.Elapsed.TotalSeconds);
+                speedTestResults.Add($"{server}: ~{UiSharedService.ByteToString(bps)}/s");
+            }
+            catch (HttpRequestException ex)
+            {
+                if (result != null)
+                {
+                    var res = await result!.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    speedTestResults.Add($"{server}: {ex.Message} - {res}");
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogWarning("Speedtest on {server} cancelled", server);
+                speedTestResults.Add($"{server}: Cancelled by user");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Some exception");
+            }
+            finally
+            {
+                st?.Stop();
+            }
+        }
+        return speedTestResults;
+    }
+
+    private async Task<List<string>?> GetDownloadServerList()
+    {
+        try
+        {
+            var result = await _fileTransferOrchestrator.SendRequestAsync(HttpMethod.Get, new Uri(_fileTransferOrchestrator.FilesCdnUri!, "files/downloadServers"), CancellationToken.None).ConfigureAwait(false);
+            result.EnsureSuccessStatusCode();
+            return await JsonSerializer.DeserializeAsync<List<string>>(await result.Content.ReadAsStreamAsync().ConfigureAwait(false)).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to get download server list");
+            throw;
         }
     }
 

@@ -451,6 +451,10 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         {
             _zoningCts?.CancelAfter(2500);
         }
+        catch (ObjectDisposedException)
+        {
+            // ignore
+        }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Zoning CTS cancel issue");
