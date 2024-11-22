@@ -120,8 +120,6 @@ public class SettingsUi : WindowMediatorSubscriberBase
     public override void OnOpen()
     {
         _uiShared.RestOAuthTasksState();
-        _speedTestCts?.Cancel();
-        _speedTestCts?.Dispose();
         _speedTestCts = new();
     }
 
@@ -134,6 +132,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _speedTestTask = null;
         _speedTestCts?.Cancel();
         _speedTestCts?.Dispose();
+        _speedTestCts = null;
 
         base.OnClose();
     }
@@ -364,7 +363,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     {
                         if (_uiShared.IconTextButton(FontAwesomeIcon.ArrowRight, "Start Speedtest"))
                         {
-                            _speedTestTask = RunSpeedTest(_downloadServersTask.Result!, _speedTestCts.Token);
+                            _speedTestTask = RunSpeedTest(_downloadServersTask.Result!, _speedTestCts?.Token ?? CancellationToken.None);
                         }
                     }
                     else if (!_speedTestTask.IsCompleted)
@@ -373,8 +372,8 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         UiSharedService.ColorTextWrapped("Please be patient, depending on usage and load this can take a while.", ImGuiColors.DalamudYellow);
                         if (_uiShared.IconTextButton(FontAwesomeIcon.Ban, "Cancel speedtest"))
                         {
-                            _speedTestCts.Cancel();
-                            _speedTestCts.Dispose();
+                            _speedTestCts?.Cancel();
+                            _speedTestCts?.Dispose();
                             _speedTestCts = new();
                         }
                     }
@@ -476,7 +475,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
     private Task<List<string>?>? _downloadServersTask = null;
     private Task<List<string>?>? _speedTestTask = null;
-    private CancellationTokenSource _speedTestCts = new();
+    private CancellationTokenSource? _speedTestCts;
 
     private async Task<List<string>?> RunSpeedTest(List<string> servers, CancellationToken token)
     {
