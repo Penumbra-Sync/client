@@ -10,5 +10,5 @@ public class ServerConfigService : ConfigurationServiceBase<ServerConfig>
     {
     }
 
-    protected override string ConfigurationName => ConfigName;
+    public override string ConfigurationName => ConfigName;
 }

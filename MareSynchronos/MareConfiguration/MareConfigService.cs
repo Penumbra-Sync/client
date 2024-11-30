@@ -10,5 +10,5 @@ public class MareConfigService : ConfigurationServiceBase<MareConfig>
     {
     }
 
-    protected override string ConfigurationName => ConfigName;
+    public override string ConfigurationName => ConfigName;
 }

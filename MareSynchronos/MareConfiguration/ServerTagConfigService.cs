@@ -10,5 +10,5 @@ public class ServerTagConfigService : ConfigurationServiceBase<ServerTagConfig>
     {
     }
 
-    protected override string ConfigurationName => ConfigName;
+    public override string ConfigurationName => ConfigName;
 }

@@ -7,5 +7,5 @@ public class PlayerPerformanceConfigService : ConfigurationServiceBase<PlayerPer
     public const string ConfigName = "playerperformance.json";
     public PlayerPerformanceConfigService(string configDir) : base(configDir) { }
 
-    protected override string ConfigurationName => ConfigName;
+    public override string ConfigurationName => ConfigName;
 }
