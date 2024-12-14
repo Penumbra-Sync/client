@@ -173,7 +173,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                 return;
             }
 
-            if (!await _tokenProvider.TryUpdateOAuth2LoginTokenAsync().ConfigureAwait(false))
+            if (!await _tokenProvider.TryUpdateOAuth2LoginTokenAsync(_serverManager.CurrentServer).ConfigureAwait(false))
             {
                 Logger.LogWarning("OAuth2 login token could not be updated");
                 _connectionDto = null;

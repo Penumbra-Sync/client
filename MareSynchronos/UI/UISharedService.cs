@@ -21,7 +21,9 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
+using MareSynchronos.WebAPI.SignalR;
 using Microsoft.Extensions.Logging;
+using System.IdentityModel.Tokens.Jwt;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -56,6 +58,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     private readonly ITextureProvider _textureProvider;
     private readonly Dictionary<string, object?> _selectedComboItems = new(StringComparer.Ordinal);
     private readonly ServerConfigurationManager _serverConfigurationManager;
+    private readonly TokenProvider _tokenProvider;
     private bool _cacheDirectoryHasOtherFilesThanCache = false;
 
     private bool _cacheDirectoryIsValidPath = true;
@@ -79,13 +82,14 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     private bool _petNamesExists = false;
 
     private int _serverSelectionIndex = -1;
+    private Dictionary<string, DateTime> _oauthTokenExpiry = new();
 
     public UiSharedService(ILogger<UiSharedService> logger, IpcManager ipcManager, ApiController apiController,
         CacheMonitor cacheMonitor, FileDialogManager fileDialogManager,
         MareConfigService configService, DalamudUtilService dalamudUtil, IDalamudPluginInterface pluginInterface,
         ITextureProvider textureProvider,
         Dalamud.Localization localization,
-        ServerConfigurationManager serverManager, MareMediator mediator) : base(logger, mediator)
+        ServerConfigurationManager serverManager, TokenProvider tokenProvider, MareMediator mediator) : base(logger, mediator)
     {
         _ipcManager = ipcManager;
         _apiController = apiController;
@@ -97,6 +101,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         _textureProvider = textureProvider;
         _localization = localization;
         _serverConfigurationManager = serverManager;
+        _tokenProvider = tokenProvider;
         _localization.SetupWithLangCode("en");
 
         _isDirectoryWritable = IsDirectoryWritable(_configService.Current.CacheFolder);
@@ -912,7 +917,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     public void DrawOAuth(ServerStorage selectedServer)
     {
         var oauthToken = selectedServer.OAuthToken;
-        using var _ = ImRaii.PushIndent(10f);
+        _ = ImRaii.PushIndent(10f);
         if (oauthToken == null)
         {
             if (_discordOAuthCheck == null)
@@ -977,34 +982,84 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
         if (oauthToken != null)
         {
-            ColorTextWrapped($"OAuth2 is enabled, linked to: Discord User {_serverConfigurationManager.GetDiscordUserFromToken(selectedServer)}", ImGuiColors.HealerGreen);
-            if ((_discordOAuthUIDs == null || _discordOAuthUIDs.IsCompleted)
-                && IconTextButton(FontAwesomeIcon.Question, "Check Discord Connection"))
+            if (!_oauthTokenExpiry.TryGetValue(oauthToken, out DateTime tokenExpiry))
             {
-                _discordOAuthUIDs = _serverConfigurationManager.GetUIDsWithDiscordToken(selectedServer.ServerUri, oauthToken);
-            }
-            else if (_discordOAuthUIDs != null)
-            {
-                if (!_discordOAuthUIDs.IsCompleted)
+                try
                 {
-                    ColorTextWrapped("Checking UIDs on Server", ImGuiColors.DalamudYellow);
+                    var handler = new JwtSecurityTokenHandler();
+                    var jwt = handler.ReadJwtToken(oauthToken);
+                    tokenExpiry = _oauthTokenExpiry[oauthToken] = jwt.ValidTo;
                 }
-                else
+                catch (Exception ex)
                 {
-                    var foundUids = _discordOAuthUIDs.Result?.Count ?? 0;
-                    var primaryUid = _discordOAuthUIDs.Result?.FirstOrDefault() ?? new KeyValuePair<string, string>(string.Empty, string.Empty);
-                    var vanity = string.IsNullOrEmpty(primaryUid.Value) ? "-" : primaryUid.Value;
-                    if (foundUids > 0)
+                    Logger.LogWarning(ex, "Could not parse OAuth token, deleting");
+                    selectedServer.OAuthToken = null;
+                    _serverConfigurationManager.Save();
+                }
+            }
+
+            if (tokenExpiry > DateTime.UtcNow)
+            {
+                ColorTextWrapped($"OAuth2 is enabled, linked to: Discord User {_serverConfigurationManager.GetDiscordUserFromToken(selectedServer)}", ImGuiColors.HealerGreen);
+                TextWrapped($"The OAuth2 token will expire on {tokenExpiry:yyyy-MM-dd} and automatically renew itself during login on or after {(tokenExpiry - TimeSpan.FromDays(7)):yyyy-MM-dd}.");
+                using (ImRaii.Disabled(!CtrlPressed()))
+                {
+                    if (IconTextButton(FontAwesomeIcon.Exclamation, "Renew OAuth2 token manually") && CtrlPressed())
                     {
-                        ColorTextWrapped($"Found {foundUids} associated UIDs on the server, Primary UID: {primaryUid.Key} (Vanity UID: {vanity})",
-                            ImGuiColors.HealerGreen);
+                        _ = _tokenProvider.TryUpdateOAuth2LoginTokenAsync(selectedServer, forced: true)
+                            .ContinueWith((_) => _apiController.CreateConnectionsAsync());
+                    }
+                }
+                DrawHelpText("Hold CTRL to manually refresh your OAuth2 token. Normally you do not need to do this.");
+                ImGuiHelpers.ScaledDummy(10f);
+
+                if ((_discordOAuthUIDs == null || _discordOAuthUIDs.IsCompleted)
+                    && IconTextButton(FontAwesomeIcon.Question, "Check Discord Connection"))
+                {
+                    _discordOAuthUIDs = _serverConfigurationManager.GetUIDsWithDiscordToken(selectedServer.ServerUri, oauthToken);
+                }
+                else if (_discordOAuthUIDs != null)
+                {
+                    if (!_discordOAuthUIDs.IsCompleted)
+                    {
+                        ColorTextWrapped("Checking UIDs on Server", ImGuiColors.DalamudYellow);
                     }
                     else
                     {
-                        ColorTextWrapped($"Found no UIDs associated to this linked OAuth2 account", ImGuiColors.DalamudRed);
+                        var foundUids = _discordOAuthUIDs.Result?.Count ?? 0;
+                        var primaryUid = _discordOAuthUIDs.Result?.FirstOrDefault() ?? new KeyValuePair<string, string>(string.Empty, string.Empty);
+                        var vanity = string.IsNullOrEmpty(primaryUid.Value) ? "-" : primaryUid.Value;
+                        if (foundUids > 0)
+                        {
+                            ColorTextWrapped($"Found {foundUids} associated UIDs on the server, Primary UID: {primaryUid.Key} (Vanity UID: {vanity})",
+                                ImGuiColors.HealerGreen);
+                        }
+                        else
+                        {
+                            ColorTextWrapped($"Found no UIDs associated to this linked OAuth2 account", ImGuiColors.DalamudRed);
+                        }
                     }
                 }
             }
+            else
+            {
+                ColorTextWrapped("The OAuth2 token is stale and expired. Please renew the OAuth2 connection.", ImGuiColors.DalamudRed);
+                if (IconTextButton(FontAwesomeIcon.Exclamation, "Renew OAuth2 connection"))
+                {
+                    selectedServer.OAuthToken = null;
+                    _serverConfigurationManager.Save();
+                    _ = _serverConfigurationManager.CheckDiscordOAuth(selectedServer.ServerUri)
+                        .ContinueWith(async (urlTask) =>
+                        {
+                            var url = await urlTask.ConfigureAwait(false);
+                            var token = await _serverConfigurationManager.GetDiscordOAuthToken(url!, selectedServer.ServerUri, CancellationToken.None).ConfigureAwait(false);
+                            selectedServer.OAuthToken = token;
+                            _serverConfigurationManager.Save();
+                            await _apiController.CreateConnectionsAsync().ConfigureAwait(false);
+                        });
+                }
+            }
+
             DrawUnlinkOAuthButton(selectedServer);
         }
     }

@@ -235,21 +235,23 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         return await GetNewToken(renewal, jwtIdentifier, ct).ConfigureAwait(false);
     }
 
-    public async Task<bool> TryUpdateOAuth2LoginTokenAsync()
+    public async Task<bool> TryUpdateOAuth2LoginTokenAsync(ServerStorage currentServer, bool forced = false)
     {
         var oauth2 = _serverManager.GetOAuth2(out _);
         if (oauth2 == null) return false;
 
         var handler = new JwtSecurityTokenHandler();
         var jwt = handler.ReadJwtToken(oauth2.Value.OAuthToken);
-        if (jwt.ValidTo == DateTime.MinValue || jwt.ValidTo.Subtract(TimeSpan.FromDays(7)) > DateTime.Now)
-            return true;
+        if (!forced)
+        {
+            if (jwt.ValidTo == DateTime.MinValue || jwt.ValidTo.Subtract(TimeSpan.FromDays(7)) > DateTime.Now)
+                return true;
 
-        if (jwt.ValidTo < DateTime.UtcNow)
-            return false;
+            if (jwt.ValidTo < DateTime.UtcNow)
+                return false;
+        }
 
-
-        var tokenUri = MareAuth.RenewOAuthTokenFullPath(new Uri(_serverManager.CurrentApiUrl
+        var tokenUri = MareAuth.RenewOAuthTokenFullPath(new Uri(currentServer.ServerUri
             .Replace("wss://", "https://", StringComparison.OrdinalIgnoreCase)
             .Replace("ws://", "http://", StringComparison.OrdinalIgnoreCase)));
         HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, tokenUri.ToString());
@@ -260,13 +262,13 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
         if (!result.IsSuccessStatusCode)
         {
             _logger.LogWarning("Could not renew OAuth2 Login token, error code {error}", result.StatusCode);
-            _serverManager.CurrentServer.OAuthToken = null;
+            currentServer.OAuthToken = null;
             _serverManager.Save();
             return false;
         }
 
         var newToken = await result.Content.ReadAsStringAsync().ConfigureAwait(false);
-        _serverManager.CurrentServer.OAuthToken = newToken;
+        currentServer.OAuthToken = newToken;
         _serverManager.Save();
 
         return true;
