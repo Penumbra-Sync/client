@@ -872,6 +872,27 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
                 _discordOAuthUIDs = _serverConfigurationManager.GetUIDsWithDiscordToken(selectedServer.ServerUri, selectedServer.OAuthToken);
             }
         }
+        DateTime tokenExpiry = DateTime.MinValue;
+        if (selectedServer.OAuthToken != null && !_oauthTokenExpiry.TryGetValue(selectedServer.OAuthToken, out tokenExpiry))
+        {
+            try
+            {
+                var handler = new JwtSecurityTokenHandler();
+                var jwt = handler.ReadJwtToken(selectedServer.OAuthToken);
+                tokenExpiry = _oauthTokenExpiry[selectedServer.OAuthToken] = jwt.ValidTo;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Could not parse OAuth token, deleting");
+                selectedServer.OAuthToken = null;
+                _serverConfigurationManager.Save();
+                tokenExpiry = DateTime.MinValue;
+            }
+        }
+        if (selectedServer.OAuthToken == null || tokenExpiry < DateTime.UtcNow)
+        {
+            ColorTextWrapped("You have no OAuth token or the OAuth token is expired. Please use the Service Settings to (re)link your OAuth account.", ImGuiColors.DalamudRed);
+        }
     }
 
     private record UIDAliasPair(string? UID, string? Alias);
@@ -908,6 +929,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
                 },
                 aliasPairs.Find(f => string.Equals(f.UID, item.UID, StringComparison.Ordinal)) ?? default);
         }
+
         if (_discordOAuthUIDs == null)
         {
             AttachToolTip("Use the button above to update your UIDs from the service before you can assign UIDs to characters.");
