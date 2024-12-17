@@ -1447,7 +1447,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         " Make sure to enter the character names correctly or use the 'Add current character' button at the bottom.", ImGuiColors.DalamudYellow);
                     int i = 0;
                     _uiShared.DrawUpdateOAuthUIDsButton(selectedServer);
-                    if (selectedServer.UseOAuth2 && selectedServer.OAuthToken != null)
+                    if (selectedServer.UseOAuth2 && !string.IsNullOrEmpty(selectedServer.OAuthToken))
                     {
                         bool hasSetSecretKeysButNoUid = selectedServer.Authentications.Exists(u => u.SecretKeyIdx != -1 && string.IsNullOrEmpty(u.UID));
                         if (hasSetSecretKeysButNoUid)

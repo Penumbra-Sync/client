@@ -863,17 +863,17 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public void DrawUpdateOAuthUIDsButton(ServerStorage selectedServer)
     {
-        using (ImRaii.Disabled(selectedServer.OAuthToken == null))
+        using (ImRaii.Disabled(string.IsNullOrEmpty(selectedServer.OAuthToken)))
         {
             if ((_discordOAuthUIDs == null || _discordOAuthUIDs.IsCompleted)
                 && IconTextButton(FontAwesomeIcon.ArrowsSpin, "Update UIDs from Service")
-                && selectedServer.OAuthToken != null)
+                && !string.IsNullOrEmpty(selectedServer.OAuthToken))
             {
                 _discordOAuthUIDs = _serverConfigurationManager.GetUIDsWithDiscordToken(selectedServer.ServerUri, selectedServer.OAuthToken);
             }
         }
         DateTime tokenExpiry = DateTime.MinValue;
-        if (selectedServer.OAuthToken != null && !_oauthTokenExpiry.TryGetValue(selectedServer.OAuthToken, out tokenExpiry))
+        if (!string.IsNullOrEmpty(selectedServer.OAuthToken) && !_oauthTokenExpiry.TryGetValue(selectedServer.OAuthToken, out tokenExpiry))
         {
             try
             {
@@ -889,7 +889,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
                 tokenExpiry = DateTime.MinValue;
             }
         }
-        if (selectedServer.OAuthToken == null || tokenExpiry < DateTime.UtcNow)
+        if (string.IsNullOrEmpty(selectedServer.OAuthToken) || tokenExpiry < DateTime.UtcNow)
         {
             ColorTextWrapped("You have no OAuth token or the OAuth token is expired. Please use the Service Settings to (re)link your OAuth account.", ImGuiColors.DalamudRed);
         }

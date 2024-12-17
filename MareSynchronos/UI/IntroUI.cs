@@ -284,7 +284,7 @@ public partial class IntroUi : WindowMediatorSubscriberBase
             }
             else
             {
-                if (selectedServer.OAuthToken == null)
+                if (string.IsNullOrEmpty(selectedServer.OAuthToken))
                 {
                     UiSharedService.TextWrapped("Press the button below to verify the server has OAuth2 capabilities. Afterwards, authenticate using Discord in the Browser window.");
                     _uiShared.DrawOAuth(selectedServer);

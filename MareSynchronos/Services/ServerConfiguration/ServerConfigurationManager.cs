@@ -196,7 +196,7 @@ public class ServerConfigurationManager
     public string GetDiscordUserFromToken(ServerStorage server)
     {
         JwtSecurityTokenHandler handler = new JwtSecurityTokenHandler();
-        if (server.OAuthToken == null) return string.Empty;
+        if (string.IsNullOrEmpty(server.OAuthToken)) return string.Empty;
         try
         {
             var token = handler.ReadJwtToken(server.OAuthToken);
