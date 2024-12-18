@@ -113,6 +113,7 @@ public class ConfigurationSaveService : IHostedService
                 WriteIndented = true
             })).ConfigureAwait(false);
             File.Move(temp, config.ConfigurationPath, true);
+            config.UpdateLastWriteTime();
         }
         catch (Exception ex)
         {

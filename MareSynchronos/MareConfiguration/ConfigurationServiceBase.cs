@@ -37,6 +37,11 @@ public abstract class ConfigurationServiceBase<T> : IConfigService<T> where T : 
         ConfigSave?.Invoke(this, EventArgs.Empty);
     }
 
+    public void UpdateLastWriteTime()
+    {
+        _configLastWriteTime = GetConfigLastWriteTime();
+    }
+
     protected virtual void Dispose(bool disposing)
     {
         if (!disposing || _disposed) return;
