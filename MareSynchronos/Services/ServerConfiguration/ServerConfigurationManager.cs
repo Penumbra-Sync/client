@@ -18,6 +18,7 @@ public class ServerConfigurationManager
     private readonly ServerConfigService _configService;
     private readonly DalamudUtilService _dalamudUtil;
     private readonly MareConfigService _mareConfigService;
+    private readonly HttpClient _httpClient;
     private readonly ILogger<ServerConfigurationManager> _logger;
     private readonly MareMediator _mareMediator;
     private readonly NotesConfigService _notesConfig;
@@ -25,8 +26,7 @@ public class ServerConfigurationManager
 
     public ServerConfigurationManager(ILogger<ServerConfigurationManager> logger, ServerConfigService configService,
         ServerTagConfigService serverTagConfig, NotesConfigService notesConfig, DalamudUtilService dalamudUtil,
-        MareConfigService mareConfigService,
-        MareMediator mareMediator)
+        MareConfigService mareConfigService, HttpClient httpClient, MareMediator mareMediator)
     {
         _logger = logger;
         _configService = configService;
@@ -34,6 +34,7 @@ public class ServerConfigurationManager
         _notesConfig = notesConfig;
         _dalamudUtil = dalamudUtil;
         _mareConfigService = mareConfigService;
+        _httpClient = httpClient;
         _mareMediator = mareMediator;
         EnsureMainExists();
     }
@@ -489,13 +490,12 @@ public class ServerConfigurationManager
 
     public async Task<Dictionary<string, string>> GetUIDsWithDiscordToken(string serverUri, string token)
     {
-        using HttpClient client = new HttpClient();
         try
         {
             var baseUri = serverUri.Replace("wss://", "https://").Replace("ws://", "http://");
             var oauthCheckUri = MareAuth.GetUIDsFullPath(new Uri(baseUri));
-            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
-            var response = await client.GetAsync(oauthCheckUri).ConfigureAwait(false);
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            var response = await _httpClient.GetAsync(oauthCheckUri).ConfigureAwait(false);
             var responseStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
             return await JsonSerializer.DeserializeAsync<Dictionary<string, string>>(responseStream).ConfigureAwait(false) ?? [];
         }
@@ -508,12 +508,11 @@ public class ServerConfigurationManager
 
     public async Task<Uri?> CheckDiscordOAuth(string serverUri)
     {
-        using HttpClient client = new HttpClient();
         try
         {
             var baseUri = serverUri.Replace("wss://", "https://").Replace("ws://", "http://");
             var oauthCheckUri = MareAuth.GetDiscordOAuthEndpointFullPath(new Uri(baseUri));
-            var response = await client.GetFromJsonAsync<Uri?>(oauthCheckUri).ConfigureAwait(false);
+            var response = await _httpClient.GetFromJsonAsync<Uri?>(oauthCheckUri).ConfigureAwait(false);
             return response;
         }
         catch (Exception ex)
@@ -529,13 +528,14 @@ public class ServerConfigurationManager
         Util.OpenLink(discordAuthUri.ToString() + "?sessionId=" + sessionId);
 
         string? discordToken = null;
-        using HttpClient client = new HttpClient();
-        client.Timeout = TimeSpan.FromSeconds(60);
+        using CancellationTokenSource timeOutCts = new();
+        timeOutCts.CancelAfter(TimeSpan.FromSeconds(60));
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(timeOutCts.Token, token);
         try
         {
             var baseUri = serverUri.Replace("wss://", "https://").Replace("ws://", "http://");
             var oauthCheckUri = MareAuth.GetDiscordOAuthTokenFullPath(new Uri(baseUri), sessionId);
-            var response = await client.GetAsync(oauthCheckUri, token).ConfigureAwait(false);
+            var response = await _httpClient.GetAsync(oauthCheckUri, linkedCts.Token).ConfigureAwait(false);
             discordToken = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         }
         catch (Exception ex)

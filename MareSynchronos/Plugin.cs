@@ -27,6 +27,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NReco.Logging.File;
+using System.Net.Http.Headers;
+using System.Net.Http;
+using System.Reflection;
 
 namespace MareSynchronos;
 
@@ -148,6 +151,13 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton((s) => new NotificationService(s.GetRequiredService<ILogger<NotificationService>>(),
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<DalamudUtilService>(),
                 notificationManager, chatGui, s.GetRequiredService<MareConfigService>()));
+            collection.AddSingleton((s) =>
+            {
+                var httpClient = new HttpClient();
+                var ver = Assembly.GetExecutingAssembly().GetName().Version;
+                httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("MareSynchronos", ver!.Major + "." + ver!.Minor + "." + ver!.Build));
+                return httpClient;
+            });
             collection.AddSingleton((s) => new MareConfigService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new ServerConfigService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new NotesConfigService(pluginInterface.ConfigDirectory.FullName));

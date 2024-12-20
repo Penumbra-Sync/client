@@ -20,14 +20,14 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
     private readonly ServerConfigurationManager _serverManager;
     private readonly ConcurrentDictionary<JwtIdentifier, string> _tokenCache = new();
 
-    public TokenProvider(ILogger<TokenProvider> logger, ServerConfigurationManager serverManager, DalamudUtilService dalamudUtil, MareMediator mareMediator)
+    public TokenProvider(ILogger<TokenProvider> logger, ServerConfigurationManager serverManager, DalamudUtilService dalamudUtil, MareMediator mareMediator, HttpClient httpClient)
     {
         _logger = logger;
         _serverManager = serverManager;
         _dalamudUtil = dalamudUtil;
-        _httpClient = new();
         var ver = Assembly.GetExecutingAssembly().GetName().Version;
         Mediator = mareMediator;
+        _httpClient = httpClient;
         Mediator.Subscribe<DalamudLogoutMessage>(this, (_) =>
         {
             _lastJwtIdentifier = null;
@@ -38,7 +38,6 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
             _lastJwtIdentifier = null;
             _tokenCache.Clear();
         });
-        _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("MareSynchronos", ver!.Major + "." + ver!.Minor + "." + ver!.Build));
     }
 
     public MareMediator Mediator { get; }
@@ -48,7 +47,6 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
     public void Dispose()
     {
         Mediator.UnsubscribeAll(this);
-        _httpClient.Dispose();
     }
 
     public async Task<string> GetNewToken(bool isRenewal, JwtIdentifier identifier, CancellationToken ct)

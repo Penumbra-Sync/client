@@ -22,14 +22,11 @@ public class FileTransferOrchestrator : DisposableMediatorSubscriberBase
     private int CurrentlyUsedDownloadSlots => _availableDownloadSlots - _downloadSemaphore.CurrentCount;
 
     public FileTransferOrchestrator(ILogger<FileTransferOrchestrator> logger, MareConfigService mareConfig,
-        MareMediator mediator, TokenProvider tokenProvider) : base(logger, mediator)
+        MareMediator mediator, TokenProvider tokenProvider, HttpClient httpClient) : base(logger, mediator)
     {
         _mareConfig = mareConfig;
         _tokenProvider = tokenProvider;
-        _httpClient = new()
-        {
-            Timeout = TimeSpan.FromSeconds(3000)
-        };
+        _httpClient = httpClient;
         var ver = Assembly.GetExecutingAssembly().GetName().Version;
         _httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("MareSynchronos", ver!.Major + "." + ver!.Minor + "." + ver!.Build));
 
