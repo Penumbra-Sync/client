@@ -863,6 +863,9 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public void DrawUpdateOAuthUIDsButton(ServerStorage selectedServer)
     {
+        if (!selectedServer.UseOAuth2)
+            return;
+
         using (ImRaii.Disabled(string.IsNullOrEmpty(selectedServer.OAuthToken)))
         {
             if ((_discordOAuthUIDs == null || _discordOAuthUIDs.IsCompleted)
