@@ -51,7 +51,7 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
             {
                 if ((await dalamudUtil.RunOnFrameworkThread(() => item.Value.CurrentAddress()).ConfigureAwait(false)) != nint.Zero)
                 {
-                    await _ipcManager.Glamourer.RevertAsync(logger, item.Value.Name, item.Value, Guid.NewGuid(), cts.Token).ConfigureAwait(false);
+                    await _ipcManager.Glamourer.RevertAsync(logger, item.Value, Guid.NewGuid(), cts.Token).ConfigureAwait(false);
                 }
                 else
                 {

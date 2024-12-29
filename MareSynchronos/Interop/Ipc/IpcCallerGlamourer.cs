@@ -152,7 +152,7 @@ public sealed class IpcCallerGlamourer : DisposableMediatorSubscriberBase, IIpcC
         }
     }
 
-    public async Task RevertAsync(ILogger logger, string name, GameObjectHandler handler, Guid applicationId, CancellationToken token)
+    public async Task RevertAsync(ILogger logger, GameObjectHandler handler, Guid applicationId, CancellationToken token)
     {
         if ((!APIAvailable) || _dalamudUtil.IsZoning) return;
         try

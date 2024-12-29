@@ -23,6 +23,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
     private CancellationTokenSource _moodlesCts = new();
     private CancellationTokenSource _petNicknamesCts = new();
     private bool _isZoning = false;
+    private bool _haltCharaDataCreation;
     private readonly Dictionary<ObjectKind, CancellationTokenSource> _glamourerCts = new();
 
     public CacheCreationService(ILogger<CacheCreationService> logger, MareMediator mediator, GameObjectHandlerFactory gameObjectHandlerFactory,
@@ -40,6 +41,11 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
 
         Mediator.Subscribe<ZoneSwitchStartMessage>(this, (msg) => _isZoning = true);
         Mediator.Subscribe<ZoneSwitchEndMessage>(this, (msg) => _isZoning = false);
+
+        Mediator.Subscribe<HaltCharaDataCreation>(this, (msg) =>
+        {
+            _haltCharaDataCreation = !msg.Resume;
+        });
 
         _playerRelatedObjects[ObjectKind.Player] = gameObjectHandlerFactory.Create(ObjectKind.Player, dalamudUtil.GetPlayerPointer, isWatched: true)
             .GetAwaiter().GetResult();
@@ -218,7 +224,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
 
     private void ProcessCacheCreation()
     {
-        if (_isZoning) return;
+        if (_isZoning || _haltCharaDataCreation) return;
 
         if (_cachesToCreate.Any() && (_cacheCreationTask?.IsCompleted ?? true))
         {

@@ -1,6 +1,7 @@
 ﻿using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
+using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
@@ -128,10 +129,15 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         return await RunOnFrameworkThread(() => GetCompanion(playerPointer)).ConfigureAwait(false);
     }
 
-    public Dalamud.Game.ClientState.Objects.Types.ICharacter? GetGposeCharacterFromObjectTableByName(string name, bool onlyGposeCharacters = false)
+    public async Task<ICharacter?> GetGposeCharacterFromObjectTableByNameAsync(string name, bool onlyGposeCharacters = false)
+    {
+        return await RunOnFrameworkThread(() => GetGposeCharacterFromObjectTableByName(name, onlyGposeCharacters)).ConfigureAwait(false);
+    }
+
+    public ICharacter? GetGposeCharacterFromObjectTableByName(string name, bool onlyGposeCharacters = false)
     {
         EnsureIsOnFramework();
-        return (Dalamud.Game.ClientState.Objects.Types.ICharacter?)_objectTable
+        return (ICharacter?)_objectTable
             .FirstOrDefault(i => (!onlyGposeCharacters || i.ObjectIndex >= 200) && string.Equals(i.Name.ToString(), name, StringComparison.Ordinal));
     }
 
@@ -172,6 +178,11 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     public async Task<IntPtr> GetPetAsync(IntPtr? playerPointer = null)
     {
         return await RunOnFrameworkThread(() => GetPet(playerPointer)).ConfigureAwait(false);
+    }
+
+    public async Task<IPlayerCharacter> GetPlayerCharacterAsync()
+    {
+        return await RunOnFrameworkThread(GetPlayerCharacter).ConfigureAwait(false);
     }
 
     public IPlayerCharacter GetPlayerCharacter()
