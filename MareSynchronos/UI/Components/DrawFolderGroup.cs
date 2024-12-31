@@ -171,7 +171,7 @@ public class DrawFolderGroup : DrawFolderBase
         FontAwesomeIcon pauseIcon = _groupFullInfoDto.GroupUserPermissions.IsPaused() ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
         var pauseButtonSize = _uiSharedService.GetIconButtonSize(pauseIcon);
 
-        var userCogButtonSize = _uiSharedService.GetIconData(FontAwesomeIcon.UsersCog);
+        var userCogButtonSize = _uiSharedService.GetIconSize(FontAwesomeIcon.UsersCog);
 
         var individualSoundsDisabled = _groupFullInfoDto.GroupUserPermissions.IsDisableSounds();
         var individualAnimDisabled = _groupFullInfoDto.GroupUserPermissions.IsDisableAnimations();

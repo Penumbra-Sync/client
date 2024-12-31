@@ -76,7 +76,6 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
     public async Task ApplyMareCharaFile(IGameObject? charaTarget, long expectedLength)
     {
         if (charaTarget == null) return;
-        Dictionary<string, string> extractedFiles = new(StringComparer.Ordinal);
         CurrentlyWorking = true;
         try
         {
@@ -84,12 +83,12 @@ public class MareCharaFileManager : DisposableMediatorSubscriberBase
             var unwrapped = File.OpenRead(LoadedCharaFile.FilePath);
             await using (unwrapped.ConfigureAwait(false))
             {
-                CancellationTokenSource disposeCts = new();
+                using CancellationTokenSource disposeCts = new();
                 using var lz4Stream = new LZ4Stream(unwrapped, LZ4StreamMode.Decompress, LZ4StreamFlags.HighCompression);
                 using var reader = new BinaryReader(lz4Stream);
                 MareCharaFileHeader.AdvanceReaderToData(reader);
                 _logger.LogDebug("Applying to {chara}, expected length of contents: {exp}, stream length: {len}", charaTarget.Name.TextValue, expectedLength, reader.BaseStream.Length);
-                extractedFiles = ExtractFilesFromCharaFile(LoadedCharaFile, reader, expectedLength);
+                var extractedFiles = ExtractFilesFromCharaFile(LoadedCharaFile, reader, expectedLength);
                 Dictionary<string, string> fileSwaps = new(StringComparer.Ordinal);
                 foreach (var fileSwap in LoadedCharaFile.CharaFileData.FileSwaps)
                 {

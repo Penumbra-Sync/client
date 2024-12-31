@@ -209,10 +209,10 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.TextUnformatted(text);
     }
 
-    public static void ColorTextWrapped(string text, Vector4 color)
+    public static void ColorTextWrapped(string text, Vector4 color, float wrapPos = 0)
     {
         using var raiicolor = ImRaii.PushColor(ImGuiCol.Text, color);
-        TextWrapped(text);
+        TextWrapped(text, wrapPos);
     }
 
     public static bool CtrlPressed() => (GetKeyState(0xA2) & 0x8000) != 0 || (GetKeyState(0xA3) & 0x8000) != 0;
@@ -418,9 +418,9 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public static bool ShiftPressed() => (GetKeyState(0xA1) & 0x8000) != 0 || (GetKeyState(0xA0) & 0x8000) != 0;
 
-    public static void TextWrapped(string text)
+    public static void TextWrapped(string text, float wrapPos = 0)
     {
-        ImGui.PushTextWrapPos(0);
+        ImGui.PushTextWrapPos(wrapPos);
         ImGui.TextUnformatted(text);
         ImGui.PopTextWrapPos();
     }
@@ -793,7 +793,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return ImGuiHelpers.GetButtonSize(icon.ToIconString());
     }
 
-    public Vector2 GetIconData(FontAwesomeIcon icon)
+    public Vector2 GetIconSize(FontAwesomeIcon icon)
     {
         using var font = IconFont.Push();
         return ImGui.CalcTextSize(icon.ToIconString());
@@ -1109,5 +1109,21 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         _discordOAuthGetCts = _discordOAuthGetCts.CancelRecreate();
         _discordOAuthGetCode = null;
         _discordOAuthUIDs = null;
+    }
+
+    public static void DrawGrouped(Action imguiDrawAction, float rounding = 5f, float? indent = null)
+    {
+        var cursorPos = ImGui.GetCursorPos();
+        var imguiIndent = ImRaii.PushIndent(indent.GetValueOrDefault(), condition: indent != null);
+        using (ImRaii.Group())
+        {
+            imguiDrawAction.Invoke();
+        }
+        imguiIndent.Dispose();
+        if (!cursorPos.Equals(ImGui.GetCursorPos()))
+            ImGui.GetWindowDrawList().AddRect(
+                ImGui.GetItemRectMin() - ImGui.GetStyle().ItemInnerSpacing,
+                ImGui.GetItemRectMax() + ImGui.GetStyle().ItemInnerSpacing,
+                Color(ImGuiColors.DalamudGrey2), rounding);
     }
 }

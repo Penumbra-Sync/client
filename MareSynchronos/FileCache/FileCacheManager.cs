@@ -24,6 +24,7 @@ public sealed class FileCacheManager : IHostedService
     private readonly object _fileWriteLock = new();
     private readonly IpcManager _ipcManager;
     private readonly ILogger<FileCacheManager> _logger;
+    public string CacheFolder => _configService.Current.CacheFolder;
 
     public FileCacheManager(ILogger<FileCacheManager> logger, IpcManager ipcManager, MareConfigService configService, MareMediator mareMediator)
     {

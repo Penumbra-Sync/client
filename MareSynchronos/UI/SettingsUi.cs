@@ -633,7 +633,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         UiSharedService.TextWrapped(") -> \"Character Data Hub\".");
         if (_uiShared.IconTextButton(FontAwesomeIcon.Running, "Open Mare Character Data Hub"))
         {
-            Mediator.Publish(new UiToggleMessage(typeof(CharaDataUi)));
+            Mediator.Publish(new UiToggleMessage(typeof(CharaDataHubUi)));
         }
         UiSharedService.TextWrapped("Note: this entry will be removed in the near future. Please use the Main UI to open the Character Data Hub.");
         ImGuiHelpers.ScaledDummy(5);

@@ -76,7 +76,11 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     }
 
     public bool IsWine { get; init; }
-    public unsafe GameObject* GposeTarget => TargetSystem.Instance()->GPoseTarget;
+    public unsafe GameObject* GposeTarget
+    {
+        get => TargetSystem.Instance()->GPoseTarget;
+        set => TargetSystem.Instance()->GPoseTarget = value;
+    }
     public unsafe Dalamud.Game.ClientState.Objects.Types.IGameObject? GposeTargetGameObject => GposeTarget == null ? null : _objectTable[GposeTarget->ObjectIndex];
     public bool IsAnythingDrawing { get; private set; } = false;
     public bool IsInCutscene { get; private set; } = false;
@@ -139,6 +143,11 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         EnsureIsOnFramework();
         return (ICharacter?)_objectTable
             .FirstOrDefault(i => (!onlyGposeCharacters || i.ObjectIndex >= 200) && string.Equals(i.Name.ToString(), name, StringComparison.Ordinal));
+    }
+
+    public IEnumerable<ICharacter?> GetGposeCharactersFromObjectTable()
+    {
+        return _objectTable.Where(o => o.ObjectIndex > 200 && o.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player).Cast<ICharacter>();
     }
 
     public bool GetIsPlayerPresent()

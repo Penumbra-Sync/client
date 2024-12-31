@@ -88,6 +88,6 @@ public record PenumbraDirectoryChangedMessage(string? ModDirectory) : MessageBas
 public record PenumbraRedrawCharacterMessage(ICharacter Character) : SameThreadMessage;
 public record GameObjectHandlerCreatedMessage(GameObjectHandler GameObjectHandler, bool OwnedObject) : SameThreadMessage;
 public record GameObjectHandlerDestroyedMessage(GameObjectHandler GameObjectHandler, bool OwnedObject) : SameThreadMessage;
-public record HaltCharaDataCreation(bool Resume) : SameThreadMessage;
+public record HaltCharaDataCreation(bool Resume = false) : SameThreadMessage;
 #pragma warning restore S2094
 #pragma warning restore MA0048 // File name must match type name
