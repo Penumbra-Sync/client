@@ -4,7 +4,7 @@ using MareSynchronos.FileCache;
 using System.Text;
 using System.Text.Json;
 
-namespace MareSynchronos.PlayerData.Export;
+namespace MareSynchronos.Services.CharaData.Models;
 
 public record MareCharaFileData
 {

@@ -7,5 +7,6 @@ public class CharaDataConfig : IMareConfiguration
     public bool OpenMareHubOnGposeStart { get; set; } = false;
     public string LastSavedCharaDataLocation { get; set; } = string.Empty;
     public Dictionary<string, CharaDataFavorite> FavoriteCodes { get; set; } = [];
+    public bool DownloadMcdDataOnConnection { get; set; } = true;
     public int Version { get; set; } = 0;
 }

@@ -1,302 +1,34 @@
 ﻿using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
-using Lumina;
 using LZ4;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Dto.CharaData;
 using MareSynchronos.FileCache;
+using MareSynchronos.Interop;
 using MareSynchronos.Interop.Ipc;
 using MareSynchronos.MareConfiguration;
-using MareSynchronos.PlayerData.Export;
 using MareSynchronos.PlayerData.Factories;
 using MareSynchronos.PlayerData.Handlers;
+using MareSynchronos.Services.CharaData;
+using MareSynchronos.Services.CharaData.Models;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files;
 using Microsoft.Extensions.Logging;
-using System.Collections.ObjectModel;
+using System.Numerics;
 using System.Text;
 
 namespace MareSynchronos.Services;
 
-internal sealed class CharaDataManager : DisposableMediatorSubscriberBase
+internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
 {
     public sealed record HandledCharaDataEntry(string Name, bool IsSelf, Guid? CustomizePlus, string DataId);
 
-    public sealed record CharaDataFullExtendedDto : CharaDataFullDto
-    {
-        public CharaDataFullExtendedDto(CharaDataFullDto baseDto) : base(baseDto)
-        {
-            MissingFiles = new ReadOnlyCollection<GamePathEntry>(baseDto.OriginalFiles.Except(baseDto.FileGamePaths).ToList());
-            HasMissingFiles = MissingFiles.Any();
-        }
-
-        public bool HasMissingFiles { get; init; }
-        public IReadOnlyCollection<GamePathEntry> MissingFiles { get; init; }
-    }
-
-    public sealed record CharaDataExtendedUpdateDto : CharaDataUpdateDto
-    {
-        private readonly CharaDataFullDto _charaDataFullDto;
-
-        public CharaDataExtendedUpdateDto(CharaDataUpdateDto dto, CharaDataFullDto charaDataFullDto) : base(dto)
-        {
-            _charaDataFullDto = charaDataFullDto;
-            _userList = charaDataFullDto.AllowedUsers.ToList();
-        }
-
-        public CharaDataUpdateDto BaseDto => new(Id)
-        {
-            AllowedUsers = AllowedUsers,
-            AccessType = base.AccessType,
-            CustomizeData = base.CustomizeData,
-            Description = base.Description,
-            ExpiryDate = base.ExpiryDate,
-            FileGamePaths = base.FileGamePaths,
-            FileSwaps = base.FileSwaps,
-            GlamourerData = base.GlamourerData,
-            ShareType = base.ShareType,
-            ManipulationData = base.ManipulationData
-        };
-
-        public new string ManipulationData
-        {
-            get
-            {
-                return base.ManipulationData ?? _charaDataFullDto.ManipulationData;
-            }
-            set
-            {
-                base.ManipulationData = value;
-                if (string.Equals(base.ManipulationData, _charaDataFullDto.ManipulationData, StringComparison.Ordinal))
-                {
-                    base.ManipulationData = null;
-                }
-            }
-        }
-
-        public new string Description
-        {
-            get
-            {
-                return base.Description ?? _charaDataFullDto.Description;
-            }
-            set
-            {
-                base.Description = value;
-                if (string.Equals(base.Description, _charaDataFullDto.Description, StringComparison.Ordinal))
-                {
-                    base.Description = null;
-                }
-            }
-        }
-
-        public new DateTime ExpiryDate
-        {
-            get
-            {
-                return base.ExpiryDate ?? _charaDataFullDto.ExpiryDate;
-            }
-            private set
-            {
-                base.ExpiryDate = value;
-                if (Equals(base.ExpiryDate, _charaDataFullDto.ExpiryDate))
-                {
-                    base.ExpiryDate = null;
-                }
-            }
-        }
-
-        public new AccessTypeDto AccessType
-        {
-            get
-            {
-                return base.AccessType ?? _charaDataFullDto.AccessType;
-            }
-            set
-            {
-                base.AccessType = value;
-                if (AccessType == AccessTypeDto.Public && ShareType == ShareTypeDto.Shared)
-                {
-                    ShareType = ShareTypeDto.Private;
-                }
-
-                if (Equals(base.AccessType, _charaDataFullDto.AccessType))
-                {
-                    base.AccessType = null;
-                }
-            }
-        }
-
-        public new ShareTypeDto ShareType
-        {
-            get
-            {
-                return base.ShareType ?? _charaDataFullDto.ShareType;
-            }
-            set
-            {
-                base.ShareType = value;
-                if (ShareType == ShareTypeDto.Shared && AccessType == AccessTypeDto.Public)
-                {
-                    base.ShareType = ShareTypeDto.Private;
-                }
-
-                if (Equals(base.ShareType, _charaDataFullDto.ShareType))
-                {
-                    base.ShareType = null;
-                }
-            }
-        }
-
-        public new List<GamePathEntry>? FileGamePaths
-        {
-            get
-            {
-                return base.FileGamePaths ?? _charaDataFullDto.FileGamePaths;
-            }
-            set
-            {
-                base.FileGamePaths = value;
-                if (!(base.FileGamePaths ?? []).Except(_charaDataFullDto.FileGamePaths).Any()
-                    && !_charaDataFullDto.FileGamePaths.Except(base.FileGamePaths ?? []).Any())
-                {
-                    base.FileGamePaths = null;
-                }
-            }
-        }
-
-        public new List<GamePathEntry>? FileSwaps
-        {
-            get
-            {
-                return base.FileSwaps ?? _charaDataFullDto.FileSwaps;
-            }
-            set
-            {
-                base.FileSwaps = value;
-                if (!(base.FileSwaps ?? []).Except(_charaDataFullDto.FileSwaps).Any()
-                    && !_charaDataFullDto.FileSwaps.Except(base.FileSwaps ?? []).Any())
-                {
-                    base.FileSwaps = null;
-                }
-            }
-        }
-
-        public new string? GlamourerData
-        {
-            get
-            {
-                return base.GlamourerData ?? _charaDataFullDto.GlamourerData;
-            }
-            set
-            {
-                base.GlamourerData = value;
-                if (string.Equals(base.GlamourerData, _charaDataFullDto.GlamourerData, StringComparison.Ordinal))
-                {
-                    base.GlamourerData = null;
-                }
-            }
-        }
-
-        public new string? CustomizeData
-        {
-            get
-            {
-                return base.CustomizeData ?? _charaDataFullDto.CustomizeData;
-            }
-            set
-            {
-                base.CustomizeData = value;
-                if (string.Equals(base.CustomizeData, _charaDataFullDto.CustomizeData, StringComparison.Ordinal))
-                {
-                    base.CustomizeData = null;
-                }
-            }
-        }
-
-        public IEnumerable<UserData> UserList => _userList;
-        private readonly List<UserData> _userList;
-
-        public void AddToList(string user)
-        {
-            _userList.Add(new(user, null));
-            UpdateAllowedUsers();
-        }
-
-        private void UpdateAllowedUsers()
-        {
-            AllowedUsers = [.. _userList.Select(u => u.UID)];
-            if (!AllowedUsers.Except(_charaDataFullDto.AllowedUsers.Select(u => u.UID), StringComparer.Ordinal).Any()
-                && !_charaDataFullDto.AllowedUsers.Select(u => u.UID).Except(AllowedUsers, StringComparer.Ordinal).Any())
-            {
-                AllowedUsers = null;
-            }
-        }
-
-        public void RemoveFromList(string user)
-        {
-            _userList.RemoveAll(u => string.Equals(u.UID, user, StringComparison.Ordinal));
-            UpdateAllowedUsers();
-        }
-
-        public void SetExpiry(bool expiring)
-        {
-            if (expiring)
-            {
-                var date = DateTime.UtcNow.AddDays(7);
-                SetExpiry(date.Year, date.Month, date.Day);
-            }
-            else
-            {
-                ExpiryDate = DateTime.MaxValue;
-            }
-        }
-
-        public void SetExpiry(int year, int month, int day)
-        {
-            int daysInMonth = DateTime.DaysInMonth(year, month);
-            if (day > daysInMonth) day = 1;
-            ExpiryDate = new DateTime(year, month, day, 0, 0, 0, DateTimeKind.Utc);
-        }
-
-        internal void UndoChanges()
-        {
-            base.Description = null;
-            base.AccessType = null;
-            base.ShareType = null;
-            base.GlamourerData = null;
-            base.FileSwaps = null;
-            base.FileGamePaths = null;
-            base.CustomizeData = null;
-            base.ManipulationData = null;
-            AllowedUsers = null;
-        }
-
-        public bool HasChanges =>
-                    base.Description != null
-                    || base.ExpiryDate != null
-                    || base.AccessType != null
-                    || base.ShareType != null
-                    || AllowedUsers != null
-                    || base.GlamourerData != null
-                    || base.FileSwaps != null
-                    || base.FileGamePaths != null
-                    || base.CustomizeData != null
-                    || base.ManipulationData != null;
-
-        public bool IsAppearanceEqual =>
-            string.Equals(GlamourerData, _charaDataFullDto.GlamourerData, StringComparison.Ordinal)
-            && string.Equals(CustomizeData, _charaDataFullDto.CustomizeData, StringComparison.Ordinal)
-            && FileGamePaths == _charaDataFullDto.FileGamePaths
-            && FileSwaps == _charaDataFullDto.FileSwaps
-            && string.Equals(ManipulationData, _charaDataFullDto.ManipulationData, StringComparison.Ordinal);
-    }
-
     private readonly ApiController _apiController;
     private readonly CharaDataConfigService _charaDataConfigService;
+    private readonly VfxSpawnManager _vfxSpawnManager;
     private readonly DalamudUtilService _dalamudUtilService;
     private readonly FileCacheManager _fileCacheManager;
     private readonly FileDownloadManager _fileDownloadManager;
@@ -309,7 +41,7 @@ internal sealed class CharaDataManager : DisposableMediatorSubscriberBase
     private readonly Dictionary<string, CharaDataFullExtendedDto> _ownCharaData = [];
     private readonly PlayerDataFactory _playerDataFactory;
     private readonly Dictionary<string, Task> _sharedMetaInfoTimeoutTasks = [];
-    private readonly Dictionary<string, List<CharaDataMetaInfoDto>> _sharedWithYouData = [];
+    private readonly Dictionary<UserData, List<CharaDataMetaInfoDto>> _sharedWithYouData = [];
     private readonly Dictionary<string, CharaDataExtendedUpdateDto> _updateDtos = [];
     private CancellationTokenSource _applicationCts = new();
     private CancellationTokenSource _charaDataCreateCts = new();
@@ -317,12 +49,14 @@ internal sealed class CharaDataManager : DisposableMediatorSubscriberBase
     private CancellationTokenSource _getSharedDataCts = new();
     private int _globalFileCounter = 0;
     private CancellationTokenSource _uploadCts = new();
+    private CancellationTokenSource _connectCts = new();
 
     public CharaDataManager(ILogger<CharaDataManager> logger, ApiController apiController,
         FileUploadManager fileUploadManager, FileCacheManager fileCacheManager,
         MareMediator mareMediator, IpcManager ipcManager, GameObjectHandlerFactory gameObjectHandlerFactory,
         DalamudUtilService dalamudUtilService, FileDownloadManagerFactory fileDownloadManagerFactory,
-        PlayerDataFactory playerDataFactory, CharaDataConfigService charaDataConfigService) : base(logger, mareMediator)
+        PlayerDataFactory playerDataFactory, CharaDataConfigService charaDataConfigService,
+        VfxSpawnManager vfxSpawnManager) : base(logger, mareMediator)
     {
         _fileDownloadManager = fileDownloadManagerFactory.Create();
         _apiController = apiController;
@@ -334,6 +68,7 @@ internal sealed class CharaDataManager : DisposableMediatorSubscriberBase
         _dalamudUtilService = dalamudUtilService;
         _playerDataFactory = playerDataFactory;
         _charaDataConfigService = charaDataConfigService;
+        _vfxSpawnManager = vfxSpawnManager;
         mareMediator.Subscribe<ConnectedMessage>(this, (msg) =>
         {
             _ownCharaData.Clear();
@@ -344,6 +79,12 @@ internal sealed class CharaDataManager : DisposableMediatorSubscriberBase
             MaxCreatableCharaData = string.IsNullOrEmpty(msg.Connection.User.Alias)
                 ? msg.Connection.ServerInfo.MaxCharaData
                 : msg.Connection.ServerInfo.MaxCharaDataVanity;
+            if (_charaDataConfigService.Current.DownloadMcdDataOnConnection)
+            {
+                var token = _connectCts.Token;
+                _ = GetAllData(token);
+                _ = GetAllSharedData(token);
+            }
         });
 
         mareMediator.Subscribe<CutsceneFrameworkUpdateMessage>(this, (_) => HandleCutsceneFrameworkUpdate());
@@ -355,6 +96,8 @@ internal sealed class CharaDataManager : DisposableMediatorSubscriberBase
                 RevertChara(chara.Name);
             }
         });
+
+        mareMediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => HandleFrameworkUpdate());
     }
 
     public Task? AppearanceTask { get; private set; }
@@ -376,7 +119,7 @@ internal sealed class CharaDataManager : DisposableMediatorSubscriberBase
     public Task? McdfApplicationTask { get; private set; }
     public Task<long>? McdfHeaderLoadingTask { get; private set; }
     public IDictionary<string, CharaDataFullExtendedDto> OwnCharaData => _ownCharaData;
-    public IDictionary<string, List<CharaDataMetaInfoDto>> SharedWithYouData => _sharedWithYouData;
+    public IDictionary<UserData, List<CharaDataMetaInfoDto>> SharedWithYouData => _sharedWithYouData;
     public Task? UiBlockingComputation { get; private set; }
     public ValueProgress<string>? UploadProgress { get; private set; }
     public Task<(string Output, bool Success)>? UploadTask { get; private set; }
@@ -429,15 +172,33 @@ internal sealed class CharaDataManager : DisposableMediatorSubscriberBase
         });
     }
 
-    public void ApplyOtherDataToGposeTarget(CharaDataMetaInfoDto dataMetaInfoDto)
-    {
-        // do things
-        var charaName = _dalamudUtilService.GposeTargetGameObject?.Name.TextValue ?? string.Empty;
-        if (string.IsNullOrEmpty(charaName)) return;
+    private Task? _spawnApplicationTask;
 
-        UiBlockingComputation = DataApplicationTask = Task.Run(async () =>
+    public Task SpawnAndApplyOtherDataToGposeTarget(CharaDataMetaInfoDto charaDataMetaInfoDto)
+    {
+        return _spawnApplicationTask = Task.Run(async () =>
         {
-            var download = await _apiController.CharaDataDownload(dataMetaInfoDto.UploaderUID + ":" + dataMetaInfoDto.Id).ConfigureAwait(false);
+            var newActor = await _ipcManager.Brio.SpawnActorAsync().ConfigureAwait(false);
+            if (newActor == null) return;
+            await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
+            unsafe
+            {
+                _dalamudUtilService.GposeTarget = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)newActor.Address;
+            }
+
+            await ApplyOtherDataToGposeTarget(charaDataMetaInfoDto).ConfigureAwait(false);
+        });
+    }
+
+    public Task ApplyOtherDataToGposeTarget(CharaDataMetaInfoDto dataMetaInfoDto)
+    {
+        return UiBlockingComputation = DataApplicationTask = Task.Run(async () =>
+        {
+            var charaName = await _dalamudUtilService.RunOnFrameworkThread(() => _dalamudUtilService.GposeTargetGameObject?.Name.TextValue).ConfigureAwait(false)
+                ?? string.Empty;
+            if (string.IsNullOrEmpty(charaName)) return;
+
+            var download = await _apiController.CharaDataDownload(dataMetaInfoDto.Uploader.UID + ":" + dataMetaInfoDto.Id).ConfigureAwait(false);
             if (download == null)
             {
                 DataApplicationTask = null;
@@ -451,7 +212,7 @@ internal sealed class CharaDataManager : DisposableMediatorSubscriberBase
     public void ApplyOwnDataToGposeTarget(CharaDataFullExtendedDto dataDto)
     {
         var charaName = _dalamudUtilService.GposeTargetGameObject?.Name.TextValue ?? string.Empty;
-        CharaDataDownloadDto downloadDto = new(dataDto.Id, dataDto.UploaderUID)
+        CharaDataDownloadDto downloadDto = new(dataDto.Id, dataDto.Uploader)
         {
             CustomizeData = dataDto.CustomizeData,
             Description = dataDto.Description,
@@ -539,7 +300,7 @@ internal sealed class CharaDataManager : DisposableMediatorSubscriberBase
                     _metaInfoCache[importCode] = null;
                     return ("Failed to download meta info for this code. Check if the code is valid and you have rights to access it.", false);
                 }
-                _metaInfoCache[metaInfo.UploaderUID + ":" + metaInfo.Id] = metaInfo;
+                _metaInfoCache[metaInfo.Uploader.UID + ":" + metaInfo.Id] = metaInfo;
                 if (store)
                 {
                     LastDownloadedMetaInfo = metaInfo;
@@ -556,6 +317,10 @@ internal sealed class CharaDataManager : DisposableMediatorSubscriberBase
 
     public async Task GetAllData(CancellationToken cancelToken)
     {
+        foreach (var data in _ownCharaData)
+        {
+            _metaInfoCache.Remove(data.Key);
+        }
         _ownCharaData.Clear();
         UiBlockingComputation = GetAllDataTask = Task.Run(async () =>
         {
@@ -614,7 +379,7 @@ internal sealed class CharaDataManager : DisposableMediatorSubscriberBase
         });
 
         var result = await GetSharedWithYouTask.ConfigureAwait(false);
-        foreach (var item in result.GroupBy(r => r.UploaderUID, StringComparer.Ordinal))
+        foreach (var item in result.GroupBy(r => r.Uploader))
         {
             _sharedWithYouData[item.Key] = [.. item];
         }
@@ -787,23 +552,25 @@ internal sealed class CharaDataManager : DisposableMediatorSubscriberBase
             var splitKey = key.Split(":");
             if (_ownCharaData.TryGetValue(splitKey[1], out var ownCharaData))
             {
-                _metaInfoCache[key] = metaInfo = new(ownCharaData.Id, ownCharaData.UploaderUID)
+                _metaInfoCache[key] = metaInfo = new(ownCharaData.Id, ownCharaData.Uploader)
                 {
                     Description = ownCharaData.Description,
                     UpdatedDate = ownCharaData.UpdatedDate,
-                    CanBeDownloaded = !string.IsNullOrEmpty(ownCharaData.GlamourerData) && (ownCharaData.OriginalFiles.Count == ownCharaData.FileGamePaths.Count)
+                    CanBeDownloaded = !string.IsNullOrEmpty(ownCharaData.GlamourerData) && (ownCharaData.OriginalFiles.Count == ownCharaData.FileGamePaths.Count),
+                    PoseData = ownCharaData.PoseData,
                 };
                 return true;
             }
             var isShared = _sharedWithYouData.SelectMany(v => v.Value)
-                .FirstOrDefault(f => string.Equals(f.UploaderUID, splitKey[0], StringComparison.Ordinal) && string.Equals(f.Id, splitKey[1], StringComparison.Ordinal));
+                .FirstOrDefault(f => string.Equals(f.Uploader.UID, splitKey[0], StringComparison.Ordinal) && string.Equals(f.Id, splitKey[1], StringComparison.Ordinal));
             if (isShared != null)
             {
-                _metaInfoCache[key] = metaInfo = new(isShared.Id, isShared.UploaderUID)
+                _metaInfoCache[key] = metaInfo = new(isShared.Id, isShared.Uploader)
                 {
                     Description = isShared.Description,
                     UpdatedDate = isShared.UpdatedDate,
-                    CanBeDownloaded = isShared.CanBeDownloaded
+                    CanBeDownloaded = isShared.CanBeDownloaded,
+                    PoseData = isShared.PoseData,
                 };
                 return true;
             }
@@ -849,7 +616,7 @@ internal sealed class CharaDataManager : DisposableMediatorSubscriberBase
     internal void ApplyDataToSelf(CharaDataFullExtendedDto dataDto)
     {
         var chara = _dalamudUtilService.GetPlayerName();
-        CharaDataDownloadDto downloadDto = new(dataDto.Id, dataDto.UploaderUID)
+        CharaDataDownloadDto downloadDto = new(dataDto.Id, dataDto.Uploader)
         {
             CustomizeData = dataDto.CustomizeData,
             Description = dataDto.Description,
@@ -1134,7 +901,7 @@ internal sealed class CharaDataManager : DisposableMediatorSubscriberBase
         if (!_dalamudUtilService.IsInGpose)
             Mediator.Publish(new HaltCharaDataCreation());
 
-        string dataId = charaDataDownloadDto.UploaderUID + ":" + charaDataDownloadDto.Id;
+        string dataId = charaDataDownloadDto.Uploader.UID + ":" + charaDataDownloadDto.Id;
         await ApplyDataAsync(applicationId, tempHandler, isSelf, autoRevert, dataId, modPaths, charaDataDownloadDto.ManipulationData, charaDataDownloadDto.GlamourerData,
             charaDataDownloadDto.CustomizeData, token).ConfigureAwait(false);
     }
@@ -1174,6 +941,68 @@ internal sealed class CharaDataManager : DisposableMediatorSubscriberBase
 
         return gamePathToFilePath;
     }
+
+    private void HandleFrameworkUpdate()
+    {
+        var previousPoses = _nearbyData.Values.SelectMany(k => k).Select(k => k.Id!.Value).ToList();
+        _nearbyData.Clear();
+
+        var map = _dalamudUtilService.GetMapData();
+        var pos = _dalamudUtilService.GetPlayerCharacter().Position;
+        var data = _sharedWithYouData.SelectMany(v => v.Value)
+            .SelectMany(v => v.PoseData, (MetaInfo, PoseData) => (MetaInfo, PoseData))
+            .Where(p => p.PoseData.WorldData != null && p.PoseData.WorldData != default(WorldData)
+                && p.PoseData.WorldData.Value.LocationInfo.MapId == map.MapId && p.PoseData.WorldData.Value.LocationInfo.TerritoryId == map.TerritoryId)
+            .ToList();
+
+        foreach (var entry in data)
+        {
+            var dist = Vector3.Distance(pos, new Vector3(entry.PoseData.WorldData.Value.PositionX, entry.PoseData.WorldData.Value.PositionY, entry.PoseData.WorldData.Value.PositionZ));
+            Logger.LogDebug("Distance from player to data {data} is {dist}", entry.MetaInfo.Id, dist);
+            if (dist < 50)
+            {
+                if (!_nearbyData.TryGetValue(entry.MetaInfo, out var poseList))
+                {
+                    _nearbyData[entry.MetaInfo] = [entry.PoseData];
+
+                }
+                else
+                {
+                    poseList.Add(entry.PoseData);
+                }
+            }
+        }
+
+        foreach (var prevPose in previousPoses.Except(_nearbyData.Values.SelectMany(k => k).Select(k => k.Id!.Value)))
+        {
+            if (_poseVfx.TryGetValue(prevPose, out Guid vfx))
+            {
+                _vfxSpawnManager.DespawnObject(vfx);
+                _poseVfx.Remove(prevPose);
+            }
+        }
+
+        foreach (var newPoseList in _nearbyData)
+        {
+            foreach (var pose in newPoseList.Value)
+            {
+                if (!_poseVfx.TryGetValue(pose.Id!.Value, out Guid vfx))
+                {
+                    var guid = _vfxSpawnManager.SpawnObject(new Vector3(pose.WorldData.Value.PositionX, pose.WorldData.Value.PositionY, pose.WorldData.Value.PositionZ),
+                        new Quaternion(pose.WorldData.Value.RotationX, pose.WorldData.Value.RotationY, pose.WorldData.Value.RotationZ, pose.WorldData.Value.RotationW));
+                    if (guid != null)
+                    {
+                        _poseVfx[pose.Id!.Value] = guid.Value;
+                    }
+                }
+            }
+        }
+    }
+
+    private Dictionary<long, Guid> _poseVfx = [];
+
+    private readonly Dictionary<CharaDataMetaInfoDto, List<PoseEntry>> _nearbyData = [];
+    public IDictionary<CharaDataMetaInfoDto, List<PoseEntry>> NearbyData => _nearbyData;
 
     private void HandleCutsceneFrameworkUpdate()
     {
@@ -1238,5 +1067,112 @@ internal sealed class CharaDataManager : DisposableMediatorSubscriberBase
             UploadTask = null;
             UploadProgress = null;
         }
+    }
+
+    internal void McdfSpawnApplyToGposeTarget()
+    {
+        _ = Task.Run(async () =>
+        {
+            var newActor = await _ipcManager.Brio.SpawnActorAsync().ConfigureAwait(false);
+            if (newActor == null) return;
+            await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
+            unsafe
+            {
+                _dalamudUtilService.GposeTarget = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)newActor.Address;
+            }
+
+            McdfApplyToGposeTarget();
+        });
+    }
+
+    public Task? AttachingPoseTask { get; private set; }
+
+    internal void AttachPoseData(PoseEntry pose, CharaDataExtendedUpdateDto updateDto)
+    {
+        AttachingPoseTask = Task.Run(async () =>
+        {
+            ICharacter? playerChar = await _dalamudUtilService.GetPlayerCharacterAsync().ConfigureAwait(false);
+            if (playerChar == null) return;
+            if (_dalamudUtilService.IsInGpose)
+            {
+                playerChar = await _dalamudUtilService.GetGposeCharacterFromObjectTableByNameAsync(playerChar.Name.TextValue, true).ConfigureAwait(false);
+            }
+            if (playerChar == null) return;
+            var poseData = await _ipcManager.Brio.GetPoseAsync(playerChar.Address).ConfigureAwait(false);
+            if (poseData == null) return;
+
+            var compressedByteData = LZ4Codec.WrapHC(Encoding.UTF8.GetBytes(poseData));
+            pose.PoseData = Convert.ToBase64String(compressedByteData);
+            updateDto.UpdatePoseList();
+        });
+    }
+
+    public Task ApplyPoseData(PoseEntry pose)
+    {
+        string chara = string.Empty;
+        if (string.IsNullOrEmpty(pose.PoseData) || !CanApplyInGpose(out chara)) return Task.CompletedTask;
+        return Task.Run(async () =>
+        {
+            var gposeChara = await _dalamudUtilService.GetGposeCharacterFromObjectTableByNameAsync(chara, true).ConfigureAwait(false);
+            if (gposeChara == null) return;
+
+            var poseJson = Encoding.UTF8.GetString(LZ4Codec.Unwrap(Convert.FromBase64String(pose.PoseData)));
+            if (string.IsNullOrEmpty(poseJson)) return;
+
+            await _ipcManager.Brio.SetPoseAsync(gposeChara.Address, poseJson).ConfigureAwait(false);
+        });
+    }
+
+    public void AttachWorldData(PoseEntry pose, CharaDataExtendedUpdateDto updateDto)
+    {
+        AttachingPoseTask = Task.Run(async () =>
+        {
+            ICharacter? playerChar = await _dalamudUtilService.GetPlayerCharacterAsync().ConfigureAwait(false);
+            if (playerChar == null) return;
+            if (_dalamudUtilService.IsInGpose)
+            {
+                playerChar = await _dalamudUtilService.GetGposeCharacterFromObjectTableByNameAsync(playerChar.Name.TextValue, true).ConfigureAwait(false);
+            }
+            if (playerChar == null) return;
+            var worldData = await _ipcManager.Brio.GetTransformAsync(playerChar.Address).ConfigureAwait(false);
+            if (worldData == default) return;
+
+            Logger.LogTrace("Attaching World data {data}", worldData);
+
+            worldData.LocationInfo = await _dalamudUtilService.GetMapDataAsync().ConfigureAwait(false);
+
+            Logger.LogTrace("World data serialized: {data}", worldData);
+
+            pose.WorldData = worldData;
+
+            updateDto.UpdatePoseList();
+        });
+    }
+
+    public Task ApplyWorldData(PoseEntry pose)
+    {
+        string chara = string.Empty;
+        if (pose.WorldData == default || !CanApplyInGpose(out chara)) return Task.CompletedTask;
+        return Task.Run(async () =>
+        {
+            var gposeChara = await _dalamudUtilService.GetGposeCharacterFromObjectTableByNameAsync(chara, true).ConfigureAwait(false);
+            if (gposeChara == null) return;
+
+            if (pose.WorldData == null || pose.WorldData == default) return;
+
+            Logger.LogDebug("Applying World data {data}", pose.WorldData);
+
+            await _ipcManager.Brio.ApplyTransformAsync(gposeChara.Address, pose.WorldData.Value).ConfigureAwait(false);
+        });
+    }
+
+    internal void SpawnAndApplyWorldTransform(CharaDataMetaInfoDto metaInfo, PoseEntry value)
+    {
+        _ = Task.Run(async () =>
+        {
+            await SpawnAndApplyOtherDataToGposeTarget(metaInfo).ConfigureAwait(false);
+            await ApplyPoseData(value).ConfigureAwait(false);
+            await ApplyWorldData(value).ConfigureAwait(false);
+        });
     }
 }

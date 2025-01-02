@@ -4,9 +4,13 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
+using Lumina.Excel.Sheets;
+using MareSynchronos.API.Dto.CharaData;
 using MareSynchronos.Interop;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services.Mediator;
@@ -15,6 +19,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Text;
 using GameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 namespace MareSynchronos.Services;
@@ -60,6 +65,43 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
                 .Where(w => !w.Name.IsEmpty && w.DataCenter.RowId != 0 && (w.IsPublic || char.IsUpper(w.Name.ToString()[0])))
                 .ToDictionary(w => (ushort)w.RowId, w => w.Name.ToString());
         });
+        TerritoryData = new(() =>
+        {
+            return gameData.GetExcelSheet<Lumina.Excel.Sheets.TerritoryType>(Dalamud.Game.ClientLanguage.English)!
+            .Where(w => w.RowId != 0)
+            .ToDictionary(w => w.RowId, w =>
+            {
+                StringBuilder sb = new();
+                sb.Append(w.PlaceNameRegion.Value.Name);
+                if (w.PlaceName.ValueNullable != null)
+                {
+                    sb.Append(" - ");
+                    sb.Append(w.PlaceName.Value.Name);
+                }
+                return sb.ToString();
+            });
+        });
+        MapData = new(() =>
+        {
+            return gameData.GetExcelSheet<Lumina.Excel.Sheets.Map>(Dalamud.Game.ClientLanguage.English)!
+            .Where(w => w.RowId != 0)
+            .ToDictionary(w => w.RowId, w =>
+            {
+                StringBuilder sb = new();
+                sb.Append(w.PlaceNameRegion.Value.Name);
+                if (w.PlaceName.ValueNullable != null)
+                {
+                    sb.Append(" - ");
+                    sb.Append(w.PlaceName.Value.Name);
+                }
+                if (w.PlaceNameSub.ValueNullable != null && !string.IsNullOrEmpty(w.PlaceNameSub.Value.Name.ToString()))
+                {
+                    sb.Append(" - ");
+                    sb.Append(w.PlaceNameSub.Value.Name);
+                }
+                return (w, sb.ToString());
+            });
+        });
         mediator.Subscribe<TargetPairMessage>(this, (msg) =>
         {
             if (clientState.IsPvP) return;
@@ -92,6 +134,8 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     public bool HasModifiedGameFiles => _gameData.HasModifiedGameDataFiles;
     public uint ClassJobId => _classJobId!.Value;
     public Lazy<Dictionary<ushort, string>> WorldData { get; private set; }
+    public Lazy<Dictionary<uint, string>> TerritoryData { get; private set; }
+    public Lazy<Dictionary<uint, (Lumina.Excel.Sheets.Map Map, string MapName)>> MapData { get; private set; }
 
     public MareMediator Mediator { get; }
 
@@ -251,6 +295,60 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         return _clientState.LocalPlayer!.CurrentWorld.RowId;
     }
 
+    public unsafe LocationInfo GetMapData()
+    {
+        EnsureIsOnFramework();
+        var agentMap = AgentMap.Instance();
+        var houseMan = HousingManager.Instance();
+        uint serverId = 0;
+        if (_clientState.LocalPlayer == null) serverId = 0;
+        else serverId = _clientState.LocalPlayer.CurrentWorld.RowId;
+        uint mapId = agentMap == null ? 0 : agentMap->CurrentMapId;
+        uint territoryId = agentMap == null ? 0 : agentMap->CurrentTerritoryId;
+        uint divisionId = houseMan == null ? 0 : (uint)(houseMan->GetCurrentDivision());
+        uint wardId = houseMan == null ? 0 : (uint)(houseMan->GetCurrentWard() + 1);
+        uint houseId = 0;
+        var tempHouseId = houseMan == null ? 0 : (houseMan->GetCurrentPlot());
+        if (!houseMan->IsInside()) tempHouseId = 0;
+        if (tempHouseId < -1)
+        {
+            divisionId = tempHouseId == -127 ? 2 : (uint)1;
+            tempHouseId = 100;
+        }
+        if (tempHouseId == -1) tempHouseId = 0;
+        houseId = (uint)tempHouseId;
+        if (houseId != 0)
+        {
+            territoryId = HousingManager.GetOriginalHouseTerritoryTypeId();
+        }
+        uint roomId = houseMan == null ? 0 : (uint)(houseMan->GetCurrentRoom());
+
+        return new LocationInfo()
+        {
+            ServerId = serverId,
+            MapId = mapId,
+            TerritoryId = territoryId,
+            DivisionId = divisionId,
+            WardId = wardId,
+            HouseId = houseId,
+            RoomId = roomId
+        };
+    }
+
+    public unsafe void SetMarkerAndOpenMap(Vector3 position, Map map)
+    {
+        EnsureIsOnFramework();
+        var agentMap = AgentMap.Instance();
+        if (agentMap == null) return;
+        agentMap->OpenMapByMapId(map.RowId);
+        agentMap->SetFlagMapMarker(map.TerritoryType.RowId, map.RowId, position);
+    }
+
+    public async Task<LocationInfo> GetMapDataAsync()
+    {
+        return await RunOnFrameworkThread(GetMapData).ConfigureAwait(false);
+    }
+
     public async Task<uint> GetWorldIdAsync()
     {
         return await RunOnFrameworkThread(GetWorldId).ConfigureAwait(false);
@@ -277,7 +375,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         return await RunOnFrameworkThread(() => IsObjectPresent(obj)).ConfigureAwait(false);
     }
 
-    public async Task RunOnFrameworkThread(Action act, [CallerMemberName] string callerMember = "", [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerLineNumber = 0)
+    public async Task RunOnFrameworkThread(System.Action act, [CallerMemberName] string callerMember = "", [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerLineNumber = 0)
     {
         var fileName = Path.GetFileNameWithoutExtension(callerFilePath);
         await _performanceCollector.LogPerformance(this, $"RunOnFramework:Act/{fileName}>{callerMember}:{callerLineNumber}", async () =>
