@@ -8,7 +8,6 @@ using MareSynchronos.Interop;
 using MareSynchronos.Interop.Ipc;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Configurations;
-using MareSynchronos.PlayerData.Export;
 using MareSynchronos.PlayerData.Factories;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.PlayerData.Services;
@@ -95,7 +94,6 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<FileCacheManager>();
             collection.AddSingleton<ServerConfigurationManager>();
             collection.AddSingleton<ApiController>();
-            collection.AddSingleton<MareCharaFileManager>();
             collection.AddSingleton<PerformanceCollectorService>();
             collection.AddSingleton<HubFactory>();
             collection.AddSingleton<FileUploadManager>();
@@ -114,13 +112,18 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<TagHandler>();
             collection.AddSingleton<IdDisplayHandler>();
             collection.AddSingleton<PlayerPerformanceService>();
+
             collection.AddSingleton<CharaDataManager>();
-            collection.AddSingleton<VfxSpawnManager>(s => new VfxSpawnManager(s.GetRequiredService<ILogger<VfxSpawnManager>>(),
+            collection.AddSingleton<CharaDataFileHandler>();
+            collection.AddSingleton<CharaDataCharacterHandler>();
+            collection.AddSingleton<CharaDataNearbyManager>();
+
+            collection.AddSingleton(s => new VfxSpawnManager(s.GetRequiredService<ILogger<VfxSpawnManager>>(),
                 gameInteropProvider, s.GetRequiredService<MareMediator>()));
             collection.AddSingleton((s) => new BlockedCharacterHandler(s.GetRequiredService<ILogger<BlockedCharacterHandler>>(), gameInteropProvider));
             collection.AddSingleton((s) => new IpcProvider(s.GetRequiredService<ILogger<IpcProvider>>(),
                 pluginInterface,
-                s.GetRequiredService<MareCharaFileManager>(), s.GetRequiredService<DalamudUtilService>(),
+                s.GetRequiredService<DalamudUtilService>(),
                 s.GetRequiredService<MareMediator>()));
             collection.AddSingleton<SelectPairForTagUi>();
             collection.AddSingleton((s) => new EventAggregator(pluginInterface.ConfigDirectory.FullName,

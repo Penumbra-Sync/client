@@ -17,11 +17,13 @@ using Microsoft.Extensions.Logging;
 using System.Globalization;
 using System.Text;
 using static MareSynchronos.Services.CharaDataManager;
+using static MareSynchronos.UI.DtrEntry;
 
 namespace MareSynchronos.UI;
 
 internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
 {
+    private const int maxPoses = 10;
     private readonly CharaDataManager _charaDataManager;
     private readonly CharaDataConfigService _configService;
     private readonly DalamudUtilService _dalamudUtilService;
@@ -94,7 +96,7 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
-        _disableUI = !(_charaDataManager.UiBlockingComputation?.IsCompleted ?? true) || _charaDataManager.IsExportingMcdf;
+        _disableUI = !(_charaDataManager.UiBlockingComputation?.IsCompleted ?? true);
         using var disabled = ImRaii.Disabled(_disableUI);
 
         using var tabs = ImRaii.TabBar("Tabs");
@@ -265,165 +267,6 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
         ImGuiHelpers.ScaledDummy(5);
         DrawEditCharaDataPoses(updateDto);
     }
-
-    private const int maxPoses = 10;
-
-    private void DrawEditCharaDataPoses(CharaDataExtendedUpdateDto updateDto)
-    {
-        _uiSharedService.BigText("Poses");
-        var poseCount = updateDto.PoseList.Count();
-        using (ImRaii.Disabled(poseCount >= maxPoses))
-        {
-            if (_uiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add new Pose"))
-            {
-                updateDto.AddPose();
-            }
-        }
-        ImGui.SameLine();
-        using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow, poseCount == maxPoses))
-            ImGui.TextUnformatted($"{poseCount}/{maxPoses} poses attached");
-        ImGuiHelpers.ScaledDummy(5);
-
-        using var indent = ImRaii.PushIndent(10f);
-        int poseNumber = 1;
-        foreach (var pose in updateDto.PoseList)
-        {
-            ImGui.AlignTextToFramePadding();
-            using var id = ImRaii.PushId("pose" + poseNumber);
-            ImGui.TextUnformatted(poseNumber.ToString());
-
-            if (pose.Id == null)
-            {
-                ImGui.SameLine(50);
-                _uiSharedService.IconText(FontAwesomeIcon.Plus, ImGuiColors.DalamudYellow);
-                UiSharedService.AttachToolTip("This pose has not been added to the server yet. Save changes to upload this Pose data.");
-            }
-
-            bool poseHasChanges = updateDto.PoseHasChanges(pose);
-            if (poseHasChanges)
-            {
-                ImGui.SameLine(50);
-                _uiSharedService.IconText(FontAwesomeIcon.ExclamationTriangle, ImGuiColors.DalamudYellow);
-                UiSharedService.AttachToolTip("This pose has changes that have not been saved to the server yet.");
-            }
-
-            ImGui.SameLine(75);
-            if (pose.Description == null && pose.WorldData == null && pose.PoseData == null)
-            {
-                UiSharedService.ColorText("Pose scheduled for deletion", ImGuiColors.DalamudYellow);
-            }
-            else
-            {
-                var desc = pose.Description;
-                if (ImGui.InputTextWithHint("##description", "Description", ref desc, 100))
-                {
-                    pose.Description = desc;
-                    updateDto.UpdatePoseList();
-                }
-                ImGui.SameLine();
-                if (_uiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete"))
-                {
-                    updateDto.RemovePose(pose);
-                }
-
-                ImGui.SameLine();
-                ImGuiHelpers.ScaledDummy(10, 1);
-                ImGui.SameLine();
-                bool hasPoseData = !string.IsNullOrEmpty(pose.PoseData);
-                _uiSharedService.IconText(FontAwesomeIcon.Running, UiSharedService.GetBoolColor(hasPoseData));
-                UiSharedService.AttachToolTip(hasPoseData
-                    ? "This Pose entry has pose data attached"
-                    : "This Pose entry has no pose data attached");
-                ImGui.SameLine();
-                using (ImRaii.Disabled(!_uiSharedService.IsInGpose || !(_charaDataManager.AttachingPoseTask?.IsCompleted ?? true)))
-                {
-                    using var poseid = ImRaii.PushId("poseSet" + poseNumber);
-                    if (_uiSharedService.IconButton(FontAwesomeIcon.Plus))
-                    {
-                        _charaDataManager.AttachPoseData(pose, updateDto);
-                    }
-                    UiSharedService.AttachToolTip("Apply current pose data to pose");
-                }
-                ImGui.SameLine();
-                using (ImRaii.Disabled(!hasPoseData))
-                {
-                    using var poseid = ImRaii.PushId("poseDelete" + poseNumber);
-                    if (_uiSharedService.IconButton(FontAwesomeIcon.Trash))
-                    {
-                        pose.PoseData = string.Empty;
-                        updateDto.UpdatePoseList();
-                    }
-                    UiSharedService.AttachToolTip("Delete current pose data from pose");
-                }
-
-                ImGui.SameLine();
-                ImGuiHelpers.ScaledDummy(10, 1);
-                ImGui.SameLine();
-                bool hasWorldData = pose.WorldData != default(WorldData);
-                _uiSharedService.IconText(FontAwesomeIcon.Globe, UiSharedService.GetBoolColor(hasWorldData));
-                string worldInfo = "This Pose entry has no world position data attached";
-                var coords = hasWorldData ? MapUtil.WorldToMap(new System.Numerics.Vector2(pose.WorldData!.Value.PositionX, pose.WorldData!.Value.PositionY), _dalamudUtilService.MapData.Value[pose.WorldData!.Value.LocationInfo.MapId].Map)
-                    : new System.Numerics.Vector2();
-                if (hasWorldData)
-                {
-                    worldInfo = "Thise pose entry has world position data attached." + UiSharedService.TooltipSeparator
-                        + "Server: " + _dalamudUtilService.WorldData.Value[(ushort)pose.WorldData!.Value.LocationInfo.ServerId] + Environment.NewLine
-                        + "Map: " + _dalamudUtilService.MapData.Value[pose.WorldData!.Value.LocationInfo.MapId].MapName + Environment.NewLine
-                        + "Territory: " + _dalamudUtilService.TerritoryData.Value[pose.WorldData!.Value.LocationInfo.TerritoryId] + Environment.NewLine
-                        + "Ward: " + (pose.WorldData!.Value.LocationInfo.WardId == 0 ? "-" : pose.WorldData!.Value.LocationInfo.WardId) + Environment.NewLine
-                        + "Subdivision: " + pose.WorldData!.Value.LocationInfo.DivisionId switch
-                        {
-                            1 => "No",
-                            2 => "Yes",
-                            _ => "-"
-                        } + Environment.NewLine
-                        + "House: " + (pose.WorldData!.Value.LocationInfo.HouseId == 0 ? "-" : pose.WorldData!.Value.LocationInfo.HouseId == 100 ? "Apartments" : pose.WorldData!.Value.LocationInfo.HouseId) + Environment.NewLine
-                        + "Apartment: " + (pose.WorldData!.Value.LocationInfo.RoomId == 0 ? "-" : pose.WorldData!.Value.LocationInfo.RoomId) + Environment.NewLine
-                        + "Coordinates: X: " + coords.X.ToString("0.0", CultureInfo.InvariantCulture) + ", Y: " + coords.Y.ToString("0.0", CultureInfo.InvariantCulture) + UiSharedService.TooltipSeparator
-                        + "Click to show location on map";
-                }
-                UiSharedService.AttachToolTip(worldInfo);
-                if (hasWorldData && ImGui.IsItemClicked(ImGuiMouseButton.Left))
-                {
-                    _dalamudUtilService.SetMarkerAndOpenMap(new System.Numerics.Vector3(pose.WorldData!.Value.PositionX, pose.WorldData!.Value.PositionY, pose.WorldData!.Value.PositionZ),
-                        _dalamudUtilService.MapData.Value[pose.WorldData!.Value.LocationInfo.MapId].Map);
-                }
-                ImGui.SameLine();
-                using (ImRaii.Disabled(!_uiSharedService.IsInGpose || !(_charaDataManager.AttachingPoseTask?.IsCompleted ?? true)))
-                {
-                    using var worldId = ImRaii.PushId("worldSet" + poseNumber);
-                    if (_uiSharedService.IconButton(FontAwesomeIcon.Plus))
-                    {
-                        _charaDataManager.AttachWorldData(pose, updateDto);
-                    }
-                    UiSharedService.AttachToolTip("Apply current world position data to pose");
-                }
-                ImGui.SameLine();
-                using (ImRaii.Disabled(!hasWorldData))
-                {
-                    using var worldId = ImRaii.PushId("worldDelete" + poseNumber);
-                    if (_uiSharedService.IconButton(FontAwesomeIcon.Trash))
-                    {
-                        pose.WorldData = default(WorldData);
-                        updateDto.UpdatePoseList();
-                    }
-                    UiSharedService.AttachToolTip("Delete current world position data from pose");
-                }
-            }
-
-            if (poseHasChanges)
-            {
-                ImGui.SameLine();
-                if (_uiSharedService.IconTextButton(FontAwesomeIcon.Undo, "Undo"))
-                {
-                    updateDto.RevertDeletion(pose);
-                }
-            }
-
-            poseNumber++;
-        }
-    }
-
     private void DrawEditCharaDataAccessAndSharing(CharaDataExtendedUpdateDto updateDto)
     {
         _uiSharedService.BigText("Access and Sharing");
@@ -707,6 +550,168 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
         }
     }
 
+    private void DrawEditCharaDataPoses(CharaDataExtendedUpdateDto updateDto)
+    {
+        _uiSharedService.BigText("Poses");
+        var poseCount = updateDto.PoseList.Count();
+        using (ImRaii.Disabled(poseCount >= maxPoses))
+        {
+            if (_uiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add new Pose"))
+            {
+                updateDto.AddPose();
+            }
+        }
+        ImGui.SameLine();
+        using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudYellow, poseCount == maxPoses))
+            ImGui.TextUnformatted($"{poseCount}/{maxPoses} poses attached");
+        ImGuiHelpers.ScaledDummy(5);
+
+        using var indent = ImRaii.PushIndent(10f);
+        int poseNumber = 1;
+        foreach (var pose in updateDto.PoseList)
+        {
+            ImGui.AlignTextToFramePadding();
+            using var id = ImRaii.PushId("pose" + poseNumber);
+            ImGui.TextUnformatted(poseNumber.ToString());
+
+            if (pose.Id == null)
+            {
+                ImGui.SameLine(50);
+                _uiSharedService.IconText(FontAwesomeIcon.Plus, ImGuiColors.DalamudYellow);
+                UiSharedService.AttachToolTip("This pose has not been added to the server yet. Save changes to upload this Pose data.");
+            }
+
+            bool poseHasChanges = updateDto.PoseHasChanges(pose);
+            if (poseHasChanges)
+            {
+                ImGui.SameLine(50);
+                _uiSharedService.IconText(FontAwesomeIcon.ExclamationTriangle, ImGuiColors.DalamudYellow);
+                UiSharedService.AttachToolTip("This pose has changes that have not been saved to the server yet.");
+            }
+
+            ImGui.SameLine(75);
+            if (pose.Description == null && pose.WorldData == null && pose.PoseData == null)
+            {
+                UiSharedService.ColorText("Pose scheduled for deletion", ImGuiColors.DalamudYellow);
+            }
+            else
+            {
+                var desc = pose.Description;
+                if (ImGui.InputTextWithHint("##description", "Description", ref desc, 100))
+                {
+                    pose.Description = desc;
+                    updateDto.UpdatePoseList();
+                }
+                ImGui.SameLine();
+                if (_uiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete"))
+                {
+                    updateDto.RemovePose(pose);
+                }
+
+                ImGui.SameLine();
+                ImGuiHelpers.ScaledDummy(10, 1);
+                ImGui.SameLine();
+                bool hasPoseData = !string.IsNullOrEmpty(pose.PoseData);
+                _uiSharedService.IconText(FontAwesomeIcon.Running, UiSharedService.GetBoolColor(hasPoseData));
+                UiSharedService.AttachToolTip(hasPoseData
+                    ? "This Pose entry has pose data attached"
+                    : "This Pose entry has no pose data attached");
+                ImGui.SameLine();
+                using (ImRaii.Disabled(!_uiSharedService.IsInGpose || !(_charaDataManager.AttachingPoseTask?.IsCompleted ?? true)))
+                {
+                    using var poseid = ImRaii.PushId("poseSet" + poseNumber);
+                    if (_uiSharedService.IconButton(FontAwesomeIcon.Plus))
+                    {
+                        _charaDataManager.AttachPoseData(pose, updateDto);
+                    }
+                    UiSharedService.AttachToolTip("Apply current pose data to pose");
+                }
+                ImGui.SameLine();
+                using (ImRaii.Disabled(!hasPoseData))
+                {
+                    using var poseid = ImRaii.PushId("poseDelete" + poseNumber);
+                    if (_uiSharedService.IconButton(FontAwesomeIcon.Trash))
+                    {
+                        pose.PoseData = string.Empty;
+                        updateDto.UpdatePoseList();
+                    }
+                    UiSharedService.AttachToolTip("Delete current pose data from pose");
+                }
+
+                ImGui.SameLine();
+                ImGuiHelpers.ScaledDummy(10, 1);
+                ImGui.SameLine();
+                var worldData = pose.WorldData;
+                bool hasWorldData = worldData != default(WorldData);
+                _uiSharedService.IconText(FontAwesomeIcon.Globe, UiSharedService.GetBoolColor(hasWorldData));
+                var tooltipText = GetWorldDataTooltipText(worldData ?? default);
+                if (hasWorldData)
+                {
+                    tooltipText += UiSharedService.TooltipSeparator + "Click to show location on map";
+                }
+                UiSharedService.AttachToolTip(tooltipText);
+                if (hasWorldData && ImGui.IsItemClicked(ImGuiMouseButton.Left))
+                {
+                    _dalamudUtilService.SetMarkerAndOpenMap(new System.Numerics.Vector3(worldData.Value.PositionX, worldData.Value.PositionY, worldData.Value.PositionZ),
+                        _dalamudUtilService.MapData.Value[worldData.Value.LocationInfo.MapId].Map);
+                }
+                ImGui.SameLine();
+                using (ImRaii.Disabled(!_uiSharedService.IsInGpose || !(_charaDataManager.AttachingPoseTask?.IsCompleted ?? true)))
+                {
+                    using var worldId = ImRaii.PushId("worldSet" + poseNumber);
+                    if (_uiSharedService.IconButton(FontAwesomeIcon.Plus))
+                    {
+                        _charaDataManager.AttachWorldData(pose, updateDto);
+                    }
+                    UiSharedService.AttachToolTip("Apply current world position data to pose");
+                }
+                ImGui.SameLine();
+                using (ImRaii.Disabled(!hasWorldData))
+                {
+                    using var worldId = ImRaii.PushId("worldDelete" + poseNumber);
+                    if (_uiSharedService.IconButton(FontAwesomeIcon.Trash))
+                    {
+                        pose.WorldData = default(WorldData);
+                        updateDto.UpdatePoseList();
+                    }
+                    UiSharedService.AttachToolTip("Delete current world position data from pose");
+                }
+            }
+
+            if (poseHasChanges)
+            {
+                ImGui.SameLine();
+                if (_uiSharedService.IconTextButton(FontAwesomeIcon.Undo, "Undo"))
+                {
+                    updateDto.RevertDeletion(pose);
+                }
+            }
+
+            poseNumber++;
+        }
+    }
+
+    private string GetWorldDataTooltipText(WorldData worldData)
+    {
+        bool hasWorldData = worldData != default;
+        if (!hasWorldData) return "This Pose has no world data attached.";
+        var coords = MapUtil.WorldToMap(new System.Numerics.Vector2(worldData.PositionX, worldData.PositionY), _dalamudUtilService.MapData.Value[worldData.LocationInfo.MapId].Map);
+        return "This pose entry has world position data attached." + UiSharedService.TooltipSeparator
+                + "Server: " + _dalamudUtilService.WorldData.Value[(ushort)worldData.LocationInfo.ServerId] + Environment.NewLine
+                + "Map: " + _dalamudUtilService.MapData.Value[worldData.LocationInfo.MapId].MapName + Environment.NewLine
+                + "Territory: " + _dalamudUtilService.TerritoryData.Value[worldData.LocationInfo.TerritoryId] + Environment.NewLine
+                + "Ward: " + (worldData.LocationInfo.WardId == 0 ? "-" : worldData.LocationInfo.WardId) + Environment.NewLine
+                + "Subdivision: " + worldData.LocationInfo.DivisionId switch
+                {
+                    1 => "No",
+                    2 => "Yes",
+                    _ => "-"
+                } + Environment.NewLine
+                + "House: " + (worldData.LocationInfo.HouseId == 0 ? "-" : worldData.LocationInfo.HouseId == 100 ? "Apartments" : worldData.LocationInfo.HouseId) + Environment.NewLine
+                + "Apartment: " + (worldData.LocationInfo.RoomId == 0 ? "-" : worldData.LocationInfo.RoomId) + Environment.NewLine
+        + "Coordinates: X: " + coords.X.ToString("0.0", CultureInfo.InvariantCulture) + ", Y: " + coords.Y.ToString("0.0", CultureInfo.InvariantCulture);
+    }
+
     private void DrawFavorite(string id)
     {
         bool isFavorite = _configService.Current.FavoriteCodes.TryGetValue(id, out var favorite);
@@ -794,14 +799,19 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                         using (ImRaii.Disabled(handled == null))
                         {
                             _uiSharedService.IconText(FontAwesomeIcon.InfoCircle);
-                            UiSharedService.AttachToolTip($"Applied Data: {handled?.DataId ?? "No data applied"}");
+                            var id = string.IsNullOrEmpty(handled?.MetaInfo.Uploader.UID) ? handled?.MetaInfo.Id : handled.MetaInfo.Uploader.UID + ":" + handled.MetaInfo.Id;
+                            UiSharedService.AttachToolTip($"Applied Data: {id ?? "No data applied"}");
 
                             ImGui.SameLine();
                             if (_uiSharedService.IconButton(FontAwesomeIcon.Undo))
                             {
-                                _charaDataManager.RevertChara(actor.Name.TextValue);
+                                _charaDataManager.RevertChara(handled);
                             }
                             UiSharedService.AttachToolTip($"Revert applied data from {actor.Name.TextValue}");
+                            DrawPoseData(handled?.MetaInfo, (entry) =>
+                            {
+                                _ = _charaDataManager.ApplyPoseDataToTarget(entry, actor.Name.TextValue);
+                            }, (entry) => true, "Click to apply pose to actor");
                         }
                     });
 
@@ -947,12 +957,12 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                         {
                             if (_uiSharedService.IconButton(FontAwesomeIcon.ArrowRight))
                             {
-                                _charaDataManager.ApplyOtherDataToGposeTarget(metaInfo!);
+                                _ = _charaDataManager.ApplyOtherDataToGposeTarget(metaInfo!);
                             }
                             ImGui.SameLine();
                             if (_uiSharedService.IconButton(FontAwesomeIcon.Plus))
                             {
-                                _charaDataManager.SpawnAndApplyOtherDataToGposeTarget(metaInfo!);
+                                _ = _charaDataManager.SpawnAndApplyOtherDataToGposeTarget(metaInfo!);
                             }
                         }
                         if (metaInfo == null)
@@ -979,26 +989,12 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                             _configService.Save();
                         }
 
-                        if (metaInfo?.PoseData != null)
+                        DrawPoseData(metaInfo, (pose) =>
                         {
-                            ImGui.Dummy(new System.Numerics.Vector2(0, 0));
-                            foreach (var item in metaInfo.PoseData)
-                            {
-                                ImGui.SameLine();
-                                _uiSharedService.IconText(FontAwesomeIcon.Running);
-                                if (ImGui.IsItemClicked(ImGuiMouseButton.Left) && !string.IsNullOrEmpty(item.PoseData))
-                                {
-                                    _charaDataManager.ApplyPoseData(item);
-                                }
-
-                                if (ImGui.IsItemClicked(ImGuiMouseButton.Right) && item.WorldData != default)
-                                {
-                                    _charaDataManager.ApplyWorldData(item);
-                                }
-
-                                UiSharedService.AttachToolTip(item.Description ?? "No description set");
-                            }
-                        }
+                            if (pose.WorldData == null || pose.WorldData == default) return;
+                            _dalamudUtilService.SetMarkerAndOpenMap(new System.Numerics.Vector3(pose.WorldData.Value.PositionX, pose.WorldData.Value.PositionY, pose.WorldData.Value.PositionZ),
+                                _dalamudUtilService.MapData.Value[pose.WorldData.Value.LocationInfo.MapId].Map);
+                        }, (entry) => (entry.WorldData ?? default) != default, "Click to show location on map");
                     });
 
                     ImGuiHelpers.ScaledDummy(5);
@@ -1045,7 +1041,7 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                 {
                     if (_uiSharedService.IconTextButton(FontAwesomeIcon.ArrowRight, $"Download and Apply"))
                     {
-                        _charaDataManager.ApplyOtherDataToGposeTarget(_charaDataManager.LastDownloadedMetaInfo!);
+                        _ = _charaDataManager.ApplyOtherDataToGposeTarget(_charaDataManager.LastDownloadedMetaInfo!);
                     }
                 }
                 ImGui.SameLine();
@@ -1232,7 +1228,7 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
 
                 ImGuiHelpers.ScaledDummy(5);
 
-                if (_charaDataManager.McdfHeaderLoadingTask == null || _charaDataManager.McdfHeaderLoadingTask.IsCompleted)
+                if (_charaDataManager.LoadedMcdfHeader == null || _charaDataManager.LoadedMcdfHeader.IsCompleted)
                 {
                     if (_uiSharedService.IconTextButton(FontAwesomeIcon.FolderOpen, "Load MCDF"))
                     {
@@ -1248,14 +1244,14 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                         }, 1, Directory.Exists(_configService.Current.LastSavedCharaDataLocation) ? _configService.Current.LastSavedCharaDataLocation : null);
                     }
                     UiSharedService.AttachToolTip("Load MCDF Metadata into memory");
-                    if (_charaDataManager.LoadedCharaFile != null && (_charaDataManager.McdfHeaderLoadingTask?.IsCompleted ?? false))
+                    if ((_charaDataManager.LoadedMcdfHeader?.IsCompleted ?? false))
                     {
                         ImGui.TextUnformatted("Loaded file");
                         ImGui.SameLine(200);
-                        UiSharedService.TextWrapped(_charaDataManager.LoadedCharaFile.FilePath);
+                        UiSharedService.TextWrapped(_charaDataManager.LoadedMcdfHeader.Result.LoadedFile.FilePath);
                         ImGui.Text("Description");
                         ImGui.SameLine(200);
-                        UiSharedService.TextWrapped(_charaDataManager.LoadedCharaFile.CharaFileData.Description);
+                        UiSharedService.TextWrapped(_charaDataManager.LoadedMcdfHeader.Result.LoadedFile.CharaFileData.Description);
 
                         ImGuiHelpers.ScaledDummy(5);
 
@@ -1273,7 +1269,7 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                             }
                         }
                     }
-                    if ((_charaDataManager.McdfHeaderLoadingTask?.IsFaulted ?? false) || (_charaDataManager.McdfApplicationTask?.IsFaulted ?? false))
+                    if ((_charaDataManager.LoadedMcdfHeader?.IsFaulted ?? false) || (_charaDataManager.McdfApplicationTask?.IsFaulted ?? false))
                     {
                         UiSharedService.ColorTextWrapped("Failure to read MCDF file. MCDF file is possibly corrupt. Re-export the MCDF file and try again.",
                             ImGuiColors.DalamudRed);
@@ -1284,6 +1280,42 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                 else
                 {
                     UiSharedService.ColorTextWrapped("Loading Character...", ImGuiColors.DalamudYellow);
+                }
+            }
+        }
+    }
+
+    private void DrawPoseData(CharaDataMetaInfoDto? metaInfo, Action<PoseEntry> onClick, Func<PoseEntry, bool> canClick, string onClickDescription)
+    {
+        if (metaInfo?.PoseData != null)
+        {
+            ImGui.NewLine();
+            foreach (var item in metaInfo.PoseData)
+            {
+                if (string.IsNullOrEmpty(item.PoseData)) continue;
+
+                bool hasWorldData = item.WorldData!.Value != default;
+                ImGui.SameLine();
+                var posX = ImGui.GetCursorPosX();
+                _uiSharedService.IconText(hasWorldData ? FontAwesomeIcon.Circle : FontAwesomeIcon.Running);
+                if (hasWorldData)
+                {
+                    ImGui.SameLine();
+                    ImGui.SetCursorPosX(posX);
+                    using var col = ImRaii.PushColor(ImGuiCol.Text, ImGui.GetColorU32(ImGuiCol.WindowBg));
+                    _uiSharedService.IconText(FontAwesomeIcon.Running);
+                    ImGui.SameLine();
+                    ImGui.SetCursorPosX(posX);
+                    _uiSharedService.IconText(FontAwesomeIcon.Running);
+                }
+
+                bool canClickItem = canClick(item);
+                var tooltipText = string.IsNullOrEmpty(item.Description) ? "No description set" : "Pose Description: " + item.Description + UiSharedService.TooltipSeparator
+                    + GetWorldDataTooltipText(item.WorldData ?? default) + (canClickItem ? UiSharedService.TooltipSeparator + onClickDescription : string.Empty);
+                UiSharedService.AttachToolTip(tooltipText);
+                if (canClick(item) && ImGui.IsItemClicked(ImGuiMouseButton.Left))
+                {
+                    onClick(item);
                 }
             }
         }
@@ -1321,12 +1353,8 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                         _configService.Current.LastSavedCharaDataLocation = Path.GetDirectoryName(path) ?? string.Empty;
                         _configService.Save();
 
-                        _exportTask = Task.Run(async () =>
-                        {
-                            var desc = _exportDescription;
-                            _exportDescription = string.Empty;
-                            await _charaDataManager.SaveMareCharaFile(desc, path).ConfigureAwait(false);
-                        });
+                        _charaDataManager.SaveMareCharaFile(_exportDescription, path);
+                        _exportDescription = string.Empty;
                     }, Directory.Exists(_configService.Current.LastSavedCharaDataLocation) ? _configService.Current.LastSavedCharaDataLocation : null);
                 }
                 UiSharedService.ColorTextWrapped("Note: For best results make sure you have everything you want to be shared as well as the correct character appearance" +
@@ -1467,7 +1495,7 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
         {
             if (_uiSharedService.IconTextButton(FontAwesomeIcon.Plus, "New Character Data Entry"))
             {
-                _charaDataManager.CreateCharaData(_closalCts.Token);
+                _charaDataManager.CreateCharaDataEntry(_closalCts.Token);
             }
         }
         if (_charaDataManager.DataCreationTask != null)
