@@ -22,13 +22,13 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
     private readonly DalamudUtilService _dalamudUtilService;
     private readonly CharaDataFileHandler _fileHandler;
     private readonly IpcManager _ipcManager;
-    private readonly Dictionary<string, CharaDataMetaInfoDto?> _metaInfoCache = [];
-    private readonly Dictionary<CharaDataMetaInfoDto, List<PoseEntry>> _nearbyData = [];
+    private readonly Dictionary<string, CharaDataMetaInfoExtendedDto?> _metaInfoCache = [];
+    private readonly List<CharaDataMetaInfoExtendedDto> _nearbyData = [];
     private readonly CharaDataNearbyManager _nearbyManager;
     private readonly CharaDataCharacterHandler _characterHandler;
     private readonly Dictionary<string, CharaDataFullExtendedDto> _ownCharaData = [];
     private readonly Dictionary<string, Task> _sharedMetaInfoTimeoutTasks = [];
-    private readonly Dictionary<UserData, List<CharaDataMetaInfoDto>> _sharedWithYouData = [];
+    private readonly Dictionary<UserData, List<CharaDataMetaInfoExtendedDto>> _sharedWithYouData = [];
     private readonly Dictionary<string, CharaDataExtendedUpdateDto> _updateDtos = [];
     private CancellationTokenSource _applicationCts = new();
     private CancellationTokenSource _charaDataCreateCts = new();
@@ -86,9 +86,9 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
     public Task<(MareCharaFileHeader LoadedFile, long ExpectedLength)>? LoadedMcdfHeader { get; private set; }
     public int MaxCreatableCharaData { get; private set; }
     public Task? McdfApplicationTask { get; private set; }
-    public IDictionary<CharaDataMetaInfoDto, List<PoseEntry>> NearbyData => _nearbyData;
+    public List<CharaDataMetaInfoExtendedDto> NearbyData => _nearbyData;
     public IDictionary<string, CharaDataFullExtendedDto> OwnCharaData => _ownCharaData;
-    public IDictionary<UserData, List<CharaDataMetaInfoDto>> SharedWithYouData => _sharedWithYouData;
+    public IDictionary<UserData, List<CharaDataMetaInfoExtendedDto>> SharedWithYouData => _sharedWithYouData;
     public Task? UiBlockingComputation { get; private set; }
     public ValueProgress<string>? UploadProgress { get; private set; }
     public Task<(string Output, bool Success)>? UploadTask { get; private set; }
@@ -249,7 +249,7 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
             if (result == null)
                 return ("Failed to create character data, see log for more information", false);
 
-            AddOrUpdateDto(result);
+            await AddOrUpdateDto(result).ConfigureAwait(false);
 
             return ("Created Character Data", true);
         });
@@ -281,7 +281,7 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
                     _metaInfoCache[importCode] = null;
                     return ("Failed to download meta info for this code. Check if the code is valid and you have rights to access it.", false);
                 }
-                _metaInfoCache[metaInfo.Uploader.UID + ":" + metaInfo.Id] = metaInfo;
+                await CacheData(metaInfo).ConfigureAwait(false);
                 if (store)
                 {
                     LastDownloadedMetaInfo = metaInfo;
@@ -329,7 +329,7 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
         var result = await GetAllDataTask.ConfigureAwait(false);
         foreach (var item in result)
         {
-            AddOrUpdateDto(item);
+            await AddOrUpdateDto(item).ConfigureAwait(false);
         }
 
         foreach (var id in _updateDtos.Keys.Where(r => !result.Exists(res => string.Equals(res.Id, r, StringComparison.Ordinal))).ToList())
@@ -360,9 +360,16 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
         });
 
         var result = await GetSharedWithYouTask.ConfigureAwait(false);
-        foreach (var item in result.GroupBy(r => r.Uploader))
+        foreach (var grouping in result.GroupBy(r => r.Uploader))
         {
-            _sharedWithYouData[item.Key] = [.. item];
+            List<CharaDataMetaInfoExtendedDto> newList = new();
+            foreach (var item in grouping)
+            {
+                var extended = await CharaDataMetaInfoExtendedDto.Create(item, _dalamudUtilService).ConfigureAwait(false);
+                newList.Add(extended);
+                CacheData(extended);
+            }
+            _sharedWithYouData[grouping.Key] = newList;
         }
 
         _nearbyManager.UpdateSharedData(_sharedWithYouData);
@@ -418,7 +425,9 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
 
                 DataApplicationProgress = "Applying MCDF data";
 
-                await ApplyDataAsync(applicationId, tempHandler, isSelf, autoRevert: false, new(charaFile.FilePath, new UserData(string.Empty)),
+                var extended = await CharaDataMetaInfoExtendedDto.Create(new(charaFile.FilePath, new UserData(string.Empty)), _dalamudUtilService)
+                    .ConfigureAwait(false);
+                await ApplyDataAsync(applicationId, tempHandler, isSelf, autoRevert: false, extended,
                     extractedFiles, charaFile.CharaFileData.ManipulationData, charaFile.CharaFileData.GlamourerData,
                     charaFile.CharaFileData.CustomizePlusData, CancellationToken.None).ConfigureAwait(false);
             }
@@ -472,42 +481,37 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
             await ApplyOtherDataToGposeTarget(charaDataMetaInfoDto).ConfigureAwait(false);
         });
     }
-    public bool TryGetMetaInfo(string key, out CharaDataMetaInfoDto? metaInfo)
-    {
-        if (!_metaInfoCache.TryGetValue(key, out metaInfo!))
-        {
-            var splitKey = key.Split(":");
-            if (_ownCharaData.TryGetValue(splitKey[1], out var ownCharaData))
-            {
-                _metaInfoCache[key] = metaInfo = new(ownCharaData.Id, ownCharaData.Uploader)
-                {
-                    Description = ownCharaData.Description,
-                    UpdatedDate = ownCharaData.UpdatedDate,
-                    CanBeDownloaded = !string.IsNullOrEmpty(ownCharaData.GlamourerData) && (ownCharaData.OriginalFiles.Count == ownCharaData.FileGamePaths.Count),
-                    PoseData = ownCharaData.PoseData,
-                };
-                return true;
-            }
-            var isShared = _sharedWithYouData.SelectMany(v => v.Value)
-                .FirstOrDefault(f => string.Equals(f.Uploader.UID, splitKey[0], StringComparison.Ordinal) && string.Equals(f.Id, splitKey[1], StringComparison.Ordinal));
-            if (isShared != null)
-            {
-                _metaInfoCache[key] = metaInfo = new(isShared.Id, isShared.Uploader)
-                {
-                    Description = isShared.Description,
-                    UpdatedDate = isShared.UpdatedDate,
-                    CanBeDownloaded = isShared.CanBeDownloaded,
-                    PoseData = isShared.PoseData,
-                };
-                return true;
-            }
-        }
-        else
-        {
-            return true;
-        }
 
-        return false;
+    private async Task<CharaDataMetaInfoExtendedDto> CacheData(CharaDataFullExtendedDto ownCharaData)
+    {
+        var metaInfo = new CharaDataMetaInfoDto(ownCharaData.Id, ownCharaData.Uploader)
+        {
+            Description = ownCharaData.Description,
+            UpdatedDate = ownCharaData.UpdatedDate,
+            CanBeDownloaded = !string.IsNullOrEmpty(ownCharaData.GlamourerData) && (ownCharaData.OriginalFiles.Count == ownCharaData.FileGamePaths.Count),
+            PoseData = ownCharaData.PoseData,
+        };
+
+        var extended = await CharaDataMetaInfoExtendedDto.Create(metaInfo, _dalamudUtilService).ConfigureAwait(false);
+        _metaInfoCache[ownCharaData.Uploader.UID + ":" + ownCharaData.Id] = extended;
+        return extended;
+    }
+
+    private async Task<CharaDataMetaInfoExtendedDto> CacheData(CharaDataMetaInfoDto metaInfo)
+    {
+        var extended = await CharaDataMetaInfoExtendedDto.Create(metaInfo, _dalamudUtilService).ConfigureAwait(false);
+        _metaInfoCache[metaInfo.Uploader.UID + ":" + metaInfo.Id] = extended;
+        return extended;
+    }
+
+    private void CacheData(CharaDataMetaInfoExtendedDto charaData)
+    {
+        _metaInfoCache[charaData.Uploader.UID + ":" + charaData.Id] = charaData;
+    }
+
+    public bool TryGetMetaInfo(string key, out CharaDataMetaInfoExtendedDto? metaInfo)
+    {
+        return _metaInfoCache.TryGetValue(key, out metaInfo);
     }
 
     public void UploadCharaData(string id)
@@ -536,7 +540,7 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
                 FileGamePaths = newFilePaths
             };
             var res = await _apiController.CharaDataUpdate(updateDto).ConfigureAwait(false);
-            AddOrUpdateDto(res);
+            await AddOrUpdateDto(res).ConfigureAwait(false);
         });
     }
 
@@ -638,16 +642,18 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
         }
     }
 
-    private void AddOrUpdateDto(CharaDataFullDto? dto)
+    private async Task AddOrUpdateDto(CharaDataFullDto? dto)
     {
         if (dto == null) return;
 
         _ownCharaData[dto.Id] = new(dto);
         _updateDtos[dto.Id] = new(new(dto.Id), _ownCharaData[dto.Id]);
+
+        await CacheData(_ownCharaData[dto.Id]).ConfigureAwait(false);
     }
 
     private async Task ApplyDataAsync(Guid applicationId, GameObjectHandler tempHandler, bool isSelf, bool autoRevert,
-        CharaDataMetaInfoDto metaInfo, Dictionary<string, string> modPaths, string? manipData, string? glamourerData, string? customizeData, CancellationToken token)
+        CharaDataMetaInfoExtendedDto metaInfo, Dictionary<string, string> modPaths, string? manipData, string? glamourerData, string? customizeData, CancellationToken token)
     {
         Guid? cPlusId = null;
         Guid penumbraCollection;
@@ -752,7 +758,7 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
         Logger.LogDebug("Pushing update dto to server: {data}", baseUpdateDto);
 
         var res = await _apiController.CharaDataUpdate(baseUpdateDto).ConfigureAwait(false);
-        AddOrUpdateDto(res);
+        await AddOrUpdateDto(res).ConfigureAwait(false);
         CharaUpdateTask = null;
     }
 
@@ -807,7 +813,9 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
         if (!_dalamudUtilService.IsInGpose)
             Mediator.Publish(new HaltCharaDataCreation());
 
-        await ApplyDataAsync(applicationId, tempHandler, isSelf, autoRevert, metaInfo, modPaths, charaDataDownloadDto.ManipulationData, charaDataDownloadDto.GlamourerData,
+        var extendedMetaInfo = await CacheData(metaInfo).ConfigureAwait(false);
+
+        await ApplyDataAsync(applicationId, tempHandler, isSelf, autoRevert, extendedMetaInfo, modPaths, charaDataDownloadDto.ManipulationData, charaDataDownloadDto.GlamourerData,
             charaDataDownloadDto.CustomizeData, token).ConfigureAwait(false);
     }
 

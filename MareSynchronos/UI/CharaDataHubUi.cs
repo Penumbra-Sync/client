@@ -4,20 +4,19 @@ using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Utility;
+using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using ImGuiNET;
-using Lumina.Excel.Sheets;
 using MareSynchronos.API.Dto.CharaData;
 using MareSynchronos.MareConfiguration;
+using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.Services;
 using MareSynchronos.Services.CharaData.Models;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
-using System.Globalization;
-using System.Text;
-using static MareSynchronos.Services.CharaDataManager;
-using static MareSynchronos.UI.DtrEntry;
+using System.Numerics;
 
 namespace MareSynchronos.UI;
 
@@ -25,19 +24,22 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
 {
     private const int maxPoses = 10;
     private readonly CharaDataManager _charaDataManager;
+    private readonly CharaDataNearbyManager _charaDataNearbyManager;
     private readonly CharaDataConfigService _configService;
     private readonly DalamudUtilService _dalamudUtilService;
     private readonly FileDialogManager _fileDialogManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly UiSharedService _uiSharedService;
     private CancellationTokenSource _closalCts = new();
-    private string _codeNoteFilter = string.Empty;
-    private string _customDescFilter = string.Empty;
+    private string _filterCodeNote = string.Empty;
+    private string _filterDescription = string.Empty;
+    private bool _filterPoseOnly = false;
+    private bool _filterWorldOnly = false;
     private bool _disableUI = false;
     private CancellationTokenSource _disposalCts = new();
     private string _exportDescription = string.Empty;
     private Task? _exportTask;
-    private Dictionary<string, List<CharaDataMetaInfoDto>>? _filteredDict;
+    private Dictionary<string, List<CharaDataMetaInfoExtendedDto>>? _filteredDict;
     private string _importCode = string.Empty;
     private bool _readExport;
     private string _selectedDtoId = string.Empty;
@@ -46,8 +48,10 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
     private bool _sharedWithYouDownloadableFilter = false;
     private string _sharedWithYouOwnerFilter = string.Empty;
     private string _specificIndividualAdd = string.Empty;
+    private DateTime _lastFavoriteUpdateTime = DateTime.UtcNow;
+
     public CharaDataHubUi(ILogger<CharaDataHubUi> logger, MareMediator mediator, PerformanceCollectorService performanceCollectorService,
-                         CharaDataManager charaDataManager, CharaDataConfigService configService,
+                         CharaDataManager charaDataManager, CharaDataNearbyManager charaDataNearbyManager, CharaDataConfigService configService,
                          UiSharedService uiSharedService, ServerConfigurationManager serverConfigurationManager,
                          DalamudUtilService dalamudUtilService, FileDialogManager fileDialogManager)
         : base(logger, mediator, "Mare Synchronos Character Data Hub###MareSynchronosCharaDataUI", performanceCollectorService)
@@ -55,6 +59,7 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
         SetWindowSizeConstraints();
 
         _charaDataManager = charaDataManager;
+        _charaDataNearbyManager = charaDataNearbyManager;
         _configService = configService;
         _uiSharedService = uiSharedService;
         _serverConfigurationManager = serverConfigurationManager;
@@ -76,6 +81,7 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
         _filteredDict = null;
         _sharedWithYouOwnerFilter = string.Empty;
         _importCode = string.Empty;
+        _charaDataNearbyManager.ComputeNearbyData = false;
     }
 
     public override void OnOpen()
@@ -97,22 +103,44 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
     protected override void DrawInternal()
     {
         _disableUI = !(_charaDataManager.UiBlockingComputation?.IsCompleted ?? true);
+        if (DateTime.UtcNow.Subtract(_lastFavoriteUpdateTime).TotalSeconds > 2)
+        {
+            _lastFavoriteUpdateTime = DateTime.UtcNow;
+            UpdateFilteredFavorites();
+        }
+
         using var disabled = ImRaii.Disabled(_disableUI);
 
         using var tabs = ImRaii.TabBar("Tabs");
+        bool smallUi = false;
+
+        using (var nearbyPosesTabItem = ImRaii.TabItem("Poses Nearby"))
+        {
+            if (nearbyPosesTabItem)
+            {
+                smallUi |= true;
+                using var id = ImRaii.PushId("nearbyPoseControls");
+                _charaDataNearbyManager.ComputeNearbyData = true;
+
+                DrawNearbyPoses();
+            }
+            else
+            {
+                _charaDataNearbyManager.ComputeNearbyData = false;
+            }
+        }
 
         using (var gposeTabItem = ImRaii.TabItem("GPose Controls"))
         {
-            bool inGposeTab = false;
             if (gposeTabItem)
             {
-                inGposeTab = true;
+                smallUi |= true;
                 using var id = ImRaii.PushId("gposeControls");
                 DrawGPoseControls();
             }
-
-            SetWindowSizeConstraints(inGposeTab);
         }
+
+        SetWindowSizeConstraints(smallUi);
 
         bool isHandlingSelf = _charaDataManager.HandledCharaData.Any(c => c.IsSelf);
         using (ImRaii.Disabled(isHandlingSelf))
@@ -153,6 +181,138 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
             }
         }
     }
+
+    private void DrawNearbyPoses()
+    {
+        _uiSharedService.BigText("Poses Nearby");
+
+        using (var helpTree = ImRaii.TreeNode("What is this? (Explanation / Help)"))
+        {
+            if (helpTree)
+            {
+                UiSharedService.TextWrapped("This tab will show you all Shared World Poses nearby you." + Environment.NewLine + Environment.NewLine
+                    + "Shared World Poses are poses in character data that have world data attached to them and are set to shared. "
+                    + "This means that all data that is in 'Shared with You' that has a pose with world data attached to it will be shown here if you are nearby." + Environment.NewLine
+                    + "By default all poses that are shared will be shown. Poses taken in housing areas will by default only be shown on the correct server and location." + Environment.NewLine + Environment.NewLine
+                    + "Shared World Poses will appear in the world as floating whisps, as well as in the list below. You can mouse over a Shared World Pose in the list for it to get highlighted in the world." + Environment.NewLine + Environment.NewLine
+                    + "You can apply Shared World Poses to yourself or spawn the associated character to pose with them." + Environment.NewLine + Environment.NewLine
+                    + "You can adjust the filter and change further settings in the 'Settings & Filter' foldout.");
+            }
+        }
+
+        using (var tree = ImRaii.TreeNode("Settings & Filters"))
+        {
+            if (tree)
+            {
+                string filterByUser = _charaDataNearbyManager.UserNoteFilter;
+                if (ImGui.InputTextWithHint("##filterbyuser", "Filter by User", ref filterByUser, 50))
+                {
+                    _charaDataNearbyManager.UserNoteFilter = filterByUser;
+                }
+                bool onlyCurrent = _charaDataNearbyManager.OwnServerFilter;
+                if (ImGui.Checkbox("Only show Poses on current server", ref onlyCurrent))
+                {
+                    _charaDataNearbyManager.OwnServerFilter = onlyCurrent;
+                }
+                _uiSharedService.DrawHelpText("Toggling this off will show you the location of all shared Poses with World Data from all Servers");
+                bool ignoreHousing = _charaDataNearbyManager.IgnoreHousingLimitations;
+                if (ImGui.Checkbox("Ignore Housing Limitations", ref ignoreHousing))
+                {
+                    _charaDataNearbyManager.IgnoreHousingLimitations = ignoreHousing;
+                }
+                _uiSharedService.DrawHelpText("This will display all poses in their location regardless of housing limitations." + UiSharedService.TooltipSeparator
+                    + "Note: Poses that utilize housing props, furniture, etc. will not be displayed correctly if not spawned in the right location.");
+                bool showWhisps = _charaDataNearbyManager.DrawWhisps;
+                if (ImGui.Checkbox("Show Pose Whisps in the overworld", ref showWhisps))
+                {
+                    _charaDataNearbyManager.DrawWhisps = showWhisps;
+                }
+                _uiSharedService.DrawHelpText("This setting indicates whether or not to draw floating whisps where other's poses are in the world.");
+                int poseDetectionDistance = _charaDataNearbyManager.DistanceFilter;
+                ImGui.SetNextItemWidth(100);
+                if (ImGui.SliderInt("Detection Distance", ref poseDetectionDistance, 5, 1000))
+                {
+                    _charaDataNearbyManager.DistanceFilter = poseDetectionDistance;
+                }
+                _uiSharedService.DrawHelpText("This setting allows you to change the distance in which poses will be shown. Set it to the maximum if you want to see all poses on the current map.");
+            }
+        }
+
+        UiSharedService.DistanceSeparator();
+
+        using var indent = ImRaii.PushIndent(5f);
+        if (_charaDataNearbyManager.NearbyData.Count == 0)
+        {
+            UiSharedService.DrawGrouped(() =>
+            {
+                UiSharedService.ColorTextWrapped("No Shared World Poses found nearby", ImGuiColors.DalamudYellow);
+            });
+        }
+
+        bool wasAnythingHovered = false;
+        foreach (var pose in _charaDataNearbyManager.NearbyData.OrderBy(v => v.Value.Distance))
+        {
+            var pos = ImGui.GetCursorPos();
+            var circleDiameter = 60f;
+            var circleOriginX = ImGui.GetWindowContentRegionMax().X - circleDiameter;
+            float circleOffsetY = 0;
+
+            UiSharedService.DrawGrouped(() =>
+            {
+                string? note = _serverConfigurationManager.GetNoteForUid(pose.Key.MetaInfo.Uploader.UID);
+                var noteText = note == null ? pose.Key.MetaInfo.Uploader.AliasOrUID : $"{note} ({pose.Key.MetaInfo.Uploader.AliasOrUID})";
+                ImGui.TextUnformatted($"Pose by {noteText}");
+                UiSharedService.ColorText("Character Data Description", ImGuiColors.DalamudGrey);
+                UiSharedService.AttachToolTip(pose.Key.MetaInfo.Description);
+                UiSharedService.ColorText("Description", ImGuiColors.DalamudGrey);
+                ImGui.SameLine();
+                UiSharedService.TextWrapped(pose.Key.Description ?? "No Pose Description was set", circleOriginX);
+                var posAfterGroup = ImGui.GetCursorPos();
+                var groupHeightCenter = (posAfterGroup.Y - pos.Y) / 2;
+                circleOffsetY = (groupHeightCenter - circleDiameter / 2);
+                if (circleOffsetY < 0) circleOffsetY = 0;
+                ImGui.SetCursorPos(new Vector2(circleOriginX, pos.Y));
+                ImGui.Dummy(new Vector2(circleDiameter, circleDiameter));
+                UiSharedService.AttachToolTip("Click to show on map");
+                if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
+                {
+                    _dalamudUtilService.SetMarkerAndOpenMap(pose.Key.Position, pose.Key.Map);
+                }
+                ImGui.SetCursorPos(posAfterGroup);
+            });
+            if (ImGui.IsItemHovered())
+            {
+                wasAnythingHovered = true;
+                _nearbyHovered = pose.Key;
+            }
+            var drawList = ImGui.GetWindowDrawList();
+            var circleRadius = circleDiameter / 2f;
+            var windowPos = ImGui.GetWindowPos();
+            var circleCenter = new Vector2(windowPos.X + circleOriginX + circleRadius, windowPos.Y + pos.Y + circleRadius + circleOffsetY);
+            var rads = pose.Value.Direction * (Math.PI / 180);
+
+            float halfConeAngleRadians = 15f * (float)Math.PI / 180f;
+            Vector2 baseDir1 = new Vector2((float)Math.Sin(rads - halfConeAngleRadians), -(float)Math.Cos(rads - halfConeAngleRadians));
+            Vector2 baseDir2 = new Vector2((float)Math.Sin(rads + halfConeAngleRadians), -(float)Math.Cos(rads + halfConeAngleRadians));
+
+            Vector2 coneBase1 = circleCenter + baseDir1 * circleRadius;
+            Vector2 coneBase2 = circleCenter + baseDir2 * circleRadius;
+
+            // Draw the cone as a filled triangle
+            drawList.AddTriangleFilled(circleCenter, coneBase1, coneBase2, UiSharedService.Color(ImGuiColors.ParsedGreen));
+            drawList.AddCircle(circleCenter, circleDiameter / 2, UiSharedService.Color(ImGuiColors.DalamudWhite), 360, 2);
+            var distance = pose.Value.Distance.ToString("0.0") + "y";
+            var textSize = ImGui.CalcTextSize(distance);
+            drawList.AddText(new Vector2(circleCenter.X - textSize.X / 2, circleCenter.Y + textSize.Y / 3f), UiSharedService.Color(ImGuiColors.DalamudWhite), distance);
+
+            ImGuiHelpers.ScaledDummy(3);
+        }
+
+        if (!wasAnythingHovered) _nearbyHovered = null;
+        _charaDataNearbyManager.SetHoveredVfx(_nearbyHovered);
+    }
+
+    private PoseEntryExtended? _nearbyHovered;
 
     private static string GetAccessTypeString(AccessTypeDto dto) => dto switch
     {
@@ -642,9 +802,9 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                 ImGuiHelpers.ScaledDummy(10, 1);
                 ImGui.SameLine();
                 var worldData = pose.WorldData;
-                bool hasWorldData = worldData != default(WorldData);
+                bool hasWorldData = (worldData ?? default) != default;
                 _uiSharedService.IconText(FontAwesomeIcon.Globe, UiSharedService.GetBoolColor(hasWorldData));
-                var tooltipText = GetWorldDataTooltipText(worldData ?? default);
+                var tooltipText = !hasWorldData ? "This Pose has no world data attached." : "This Pose has world data attached.";
                 if (hasWorldData)
                 {
                     tooltipText += UiSharedService.TooltipSeparator + "Click to show location on map";
@@ -652,7 +812,7 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                 UiSharedService.AttachToolTip(tooltipText);
                 if (hasWorldData && ImGui.IsItemClicked(ImGuiMouseButton.Left))
                 {
-                    _dalamudUtilService.SetMarkerAndOpenMap(new System.Numerics.Vector3(worldData.Value.PositionX, worldData.Value.PositionY, worldData.Value.PositionZ),
+                    _dalamudUtilService.SetMarkerAndOpenMap(position: new System.Numerics.Vector3(worldData.Value.PositionX, worldData.Value.PositionY, worldData.Value.PositionZ),
                         _dalamudUtilService.MapData.Value[worldData.Value.LocationInfo.MapId].Map);
                 }
                 ImGui.SameLine();
@@ -691,25 +851,10 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
         }
     }
 
-    private string GetWorldDataTooltipText(WorldData worldData)
+    private static string GetWorldDataTooltipText(PoseEntryExtended poseEntry)
     {
-        bool hasWorldData = worldData != default;
-        if (!hasWorldData) return "This Pose has no world data attached.";
-        var coords = MapUtil.WorldToMap(new System.Numerics.Vector2(worldData.PositionX, worldData.PositionY), _dalamudUtilService.MapData.Value[worldData.LocationInfo.MapId].Map);
-        return "This pose entry has world position data attached." + UiSharedService.TooltipSeparator
-                + "Server: " + _dalamudUtilService.WorldData.Value[(ushort)worldData.LocationInfo.ServerId] + Environment.NewLine
-                + "Map: " + _dalamudUtilService.MapData.Value[worldData.LocationInfo.MapId].MapName + Environment.NewLine
-                + "Territory: " + _dalamudUtilService.TerritoryData.Value[worldData.LocationInfo.TerritoryId] + Environment.NewLine
-                + "Ward: " + (worldData.LocationInfo.WardId == 0 ? "-" : worldData.LocationInfo.WardId) + Environment.NewLine
-                + "Subdivision: " + worldData.LocationInfo.DivisionId switch
-                {
-                    1 => "No",
-                    2 => "Yes",
-                    _ => "-"
-                } + Environment.NewLine
-                + "House: " + (worldData.LocationInfo.HouseId == 0 ? "-" : worldData.LocationInfo.HouseId == 100 ? "Apartments" : worldData.LocationInfo.HouseId) + Environment.NewLine
-                + "Apartment: " + (worldData.LocationInfo.RoomId == 0 ? "-" : worldData.LocationInfo.RoomId) + Environment.NewLine
-        + "Coordinates: X: " + coords.X.ToString("0.0", CultureInfo.InvariantCulture) + ", Y: " + coords.Y.ToString("0.0", CultureInfo.InvariantCulture);
+        if (!poseEntry.HasWorldData) return "This Pose has no world data attached.";
+        return poseEntry.WorldDataDescriptor;
     }
 
     private void DrawFavorite(string id)
@@ -822,23 +967,6 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
 
         ImGuiHelpers.ScaledDummy(5);
 
-        _uiSharedService.BigText("Nearby Poses");
-        foreach (var pose in _charaDataManager.NearbyData)
-        {
-            foreach (var poseData in pose.Value)
-            {
-                using var poseid = ImRaii.PushId("nearbyId" + pose.Key.Id + pose.Key.Uploader.UID + poseData.Id);
-                ImGui.AlignTextToFramePadding();
-                ImGui.TextUnformatted(pose.Key.Uploader.UID + ":" + pose.Key.Id + " - Pose " + poseData.Description);
-                if (_uiSharedService.IconTextButton(FontAwesomeIcon.PlusCircle, "Spawn and apply pose and position data"))
-                {
-                    _charaDataManager.SpawnAndApplyWorldTransform(pose.Key, poseData);
-                }
-            }
-        }
-
-        ImGuiHelpers.ScaledDummy(5);
-
         _uiSharedService.BigText("Apply Character Appearance");
 
         ImGuiHelpers.ScaledDummy(5);
@@ -871,10 +999,20 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                 {
                     if (tree)
                     {
-                        ImGui.SetNextItemWidth(max.X - ImGui.GetCursorPosX());
-                        ImGui.InputTextWithHint("##ownFilter", "Code/Owner Filter", ref _codeNoteFilter, 100);
-                        ImGui.SetNextItemWidth(max.X - ImGui.GetCursorPosX());
-                        ImGui.InputTextWithHint("##descFilter", "Custom Description Filter", ref _customDescFilter, 100);
+                        var maxIndent = ImGui.GetWindowContentRegionMax();
+                        ImGui.SetNextItemWidth(maxIndent.X - ImGui.GetCursorPosX());
+                        ImGui.InputTextWithHint("##ownFilter", "Code/Owner Filter", ref _filterCodeNote, 100);
+                        ImGui.SetNextItemWidth(maxIndent.X - ImGui.GetCursorPosX());
+                        ImGui.InputTextWithHint("##descFilter", "Custom Description Filter", ref _filterDescription, 100);
+                        ImGui.Checkbox("Only show entries with pose data", ref _filterPoseOnly);
+                        ImGui.Checkbox("Only show entries with world data", ref _filterWorldOnly);
+                        if (_uiSharedService.IconTextButton(FontAwesomeIcon.Ban, "Reset Filter"))
+                        {
+                            _filterCodeNote = string.Empty;
+                            _filterDescription = string.Empty;
+                            _filterPoseOnly = false;
+                            _filterWorldOnly = false;
+                        }
                     }
                 }
 
@@ -885,13 +1023,7 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                 using var totalIndent = ImRaii.PushIndent(5f);
                 var cursorPos = ImGui.GetCursorPos();
                 max = ImGui.GetWindowContentRegionMax();
-                foreach (var favorite in _configService.Current.FavoriteCodes
-                    .Where(c =>
-                        (string.IsNullOrEmpty(_codeNoteFilter)
-                            || ((_serverConfigurationManager.GetNoteForUid(c.Key.Split(":")[0]) ?? string.Empty).Contains(_codeNoteFilter, StringComparison.OrdinalIgnoreCase)
-                                || c.Key.Contains(_codeNoteFilter, StringComparison.OrdinalIgnoreCase)))
-                        && (string.IsNullOrEmpty(_customDescFilter) || c.Value.CustomDescription.Contains(_customDescFilter, StringComparison.OrdinalIgnoreCase)))
-                        .OrderByDescending(c => c.Value.LastDownloaded))
+                foreach (var favorite in _filteredFavorites.OrderByDescending(k => k.Value.Favorite.LastDownloaded))
                 {
                     UiSharedService.DrawGrouped(() =>
                     {
@@ -903,7 +1035,8 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                         var xPos = ImGui.GetCursorPosX();
                         var maxPos = (max.X - cursorPos.X);
 
-                        bool metaInfoDownloaded = _charaDataManager.TryGetMetaInfo(favorite.Key, out var metaInfo);
+                        bool metaInfoDownloaded = favorite.Value.DownloadedMetaInfo;
+                        var metaInfo = favorite.Value.MetaInfo;
 
                         ImGui.AlignTextToFramePadding();
                         using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.DalamudGrey, !metaInfoDownloaded))
@@ -947,6 +1080,7 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                             if (_uiSharedService.IconButton(FontAwesomeIcon.ArrowsSpin))
                             {
                                 _charaDataManager.DownloadMetaInfo(favorite.Key, false);
+                                UpdateFilteredItems();
                             }
                         }
                         UiSharedService.AttachToolTip(isInTimeout ? "Timeout for refreshing active, please wait before refreshing again"
@@ -979,21 +1113,20 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
 
                         ImGui.TextUnformatted("Last Use: ");
                         ImGui.SameLine();
-                        ImGui.TextUnformatted(favorite.Value.LastDownloaded == DateTime.MaxValue ? "Never" : favorite.Value.LastDownloaded.ToString());
+                        ImGui.TextUnformatted(favorite.Value.Favorite.LastDownloaded == DateTime.MaxValue ? "Never" : favorite.Value.Favorite.LastDownloaded.ToString());
 
-                        var desc = favorite.Value.CustomDescription;
+                        var desc = favorite.Value.Favorite.CustomDescription;
                         ImGui.SetNextItemWidth(maxPos - xPos);
                         if (ImGui.InputTextWithHint("##desc", "Custom Description for Favorite", ref desc, 100))
                         {
-                            favorite.Value.CustomDescription = desc;
+                            favorite.Value.Favorite.CustomDescription = desc;
                             _configService.Save();
                         }
 
                         DrawPoseData(metaInfo, (pose) =>
                         {
-                            if (pose.WorldData == null || pose.WorldData == default) return;
-                            _dalamudUtilService.SetMarkerAndOpenMap(new System.Numerics.Vector3(pose.WorldData.Value.PositionX, pose.WorldData.Value.PositionY, pose.WorldData.Value.PositionZ),
-                                _dalamudUtilService.MapData.Value[pose.WorldData.Value.LocationInfo.MapId].Map);
+                            if (!pose.HasWorldData) return;
+                            _dalamudUtilService.SetMarkerAndOpenMap(pose.Position, pose.Map);
                         }, (entry) => (entry.WorldData ?? default) != default, "Click to show location on map");
                     });
 
@@ -1285,12 +1418,49 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
         }
     }
 
-    private void DrawPoseData(CharaDataMetaInfoDto? metaInfo, Action<PoseEntry> onClick, Func<PoseEntry, bool> canClick, string onClickDescription)
+    private Dictionary<string, (CharaDataFavorite Favorite, CharaDataMetaInfoExtendedDto? MetaInfo, bool DownloadedMetaInfo)> _filteredFavorites = [];
+
+    private void UpdateFilteredFavorites()
+    {
+        _ = Task.Run(async () =>
+        {
+            if (_charaDataManager.DownloadMetaInfoTask != null)
+            {
+                await _charaDataManager.DownloadMetaInfoTask.ConfigureAwait(false);
+            }
+            Dictionary<string, (CharaDataFavorite, CharaDataMetaInfoExtendedDto?, bool)> newFiltered = [];
+            foreach (var favorite in _configService.Current.FavoriteCodes)
+            {
+                var uid = favorite.Key.Split(":")[0];
+                var note = _serverConfigurationManager.GetNoteForUid(uid) ?? string.Empty;
+                bool hasMetaInfo = _charaDataManager.TryGetMetaInfo(favorite.Key, out var metaInfo);
+                bool addFavorite =
+                    (string.IsNullOrEmpty(_filterCodeNote)
+                        || (note.Contains(_filterCodeNote, StringComparison.OrdinalIgnoreCase)
+                        || uid.Contains(_filterCodeNote, StringComparison.OrdinalIgnoreCase)))
+                    && (string.IsNullOrEmpty(_filterDescription)
+                        || (favorite.Value.CustomDescription.Contains(_filterDescription, StringComparison.OrdinalIgnoreCase)
+                        || (metaInfo != null && metaInfo!.Description.Contains(_filterDescription, StringComparison.OrdinalIgnoreCase))))
+                    && (!_filterPoseOnly
+                        || (metaInfo != null && metaInfo!.HasPoses))
+                    && (!_filterWorldOnly
+                        || (metaInfo != null && metaInfo!.HasWorldData));
+                if (addFavorite)
+                {
+                    newFiltered[favorite.Key] = (favorite.Value, metaInfo, hasMetaInfo);
+                }
+            }
+
+            _filteredFavorites = newFiltered;
+        });
+    }
+
+    private void DrawPoseData(CharaDataMetaInfoExtendedDto? metaInfo, Action<PoseEntryExtended> onClick, Func<PoseEntryExtended, bool> canClick, string onClickDescription)
     {
         if (metaInfo?.PoseData != null)
         {
             ImGui.NewLine();
-            foreach (var item in metaInfo.PoseData)
+            foreach (var item in metaInfo.PoseExtended)
             {
                 if (string.IsNullOrEmpty(item.PoseData)) continue;
 
@@ -1311,7 +1481,7 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
 
                 bool canClickItem = canClick(item);
                 var tooltipText = string.IsNullOrEmpty(item.Description) ? "No description set" : "Pose Description: " + item.Description + UiSharedService.TooltipSeparator
-                    + GetWorldDataTooltipText(item.WorldData ?? default) + (canClickItem ? UiSharedService.TooltipSeparator + onClickDescription : string.Empty);
+                    + GetWorldDataTooltipText(item) + (canClickItem ? UiSharedService.TooltipSeparator + onClickDescription : string.Empty);
                 UiSharedService.AttachToolTip(tooltipText);
                 if (canClick(item) && ImGui.IsItemClicked(ImGuiMouseButton.Left))
                 {

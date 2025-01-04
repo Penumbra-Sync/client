@@ -1104,4 +1104,11 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
                 ImGui.GetItemRectMax() + ImGui.GetStyle().ItemInnerSpacing,
                 Color(ImGuiColors.DalamudGrey2), rounding);
     }
+
+    internal static void DistanceSeparator()
+    {
+        ImGuiHelpers.ScaledDummy(5);
+        ImGui.Separator();
+        ImGuiHelpers.ScaledDummy(5);
+    }
 }

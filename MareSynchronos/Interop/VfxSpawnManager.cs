@@ -57,7 +57,7 @@ public unsafe class VfxSpawnManager : DisposableMediatorSubscriberBase
 
     private readonly Dictionary<Guid, nint> _spawnedObjects = [];
 
-    private VfxStruct* SpawnStatic(string path, Vector3 pos, Quaternion rotation)
+    private VfxStruct* SpawnStatic(string path, Vector3 pos, Quaternion rotation, float r, float g, float b, float a, Vector3 scale)
     {
         VfxStruct* vfx;
         fixed (byte* terminatedPath = Encoding.UTF8.GetBytes(path).NullTerminate())
@@ -78,32 +78,33 @@ public unsafe class VfxSpawnManager : DisposableMediatorSubscriberBase
 
         vfx->SomeFlags &= 0xF7;
         vfx->Flags |= 2;
-        vfx->Red = 1;
-        vfx->Green = 1;
-        vfx->Blue = 1;
+        vfx->Red = r;
+        vfx->Green = g;
+        vfx->Blue = b;
+        vfx->Scale = scale;
 
-        vfx->Alpha = 0.5f;
+        vfx->Alpha = a;
 
         _staticVfxRun(vfx, 0.0f, -1);
 
         return vfx;
     }
 
-    public Guid? SpawnObject(Vector3 position, Quaternion rotation)
+    public Guid? SpawnObject(Vector3 position, Quaternion rotation, Vector3 scale, float r = 1f, float g = 1f, float b = 1f, float a = 0.5f)
     {
         Logger.LogDebug("Trying to Spawn orb VFX at {pos}, {rot}", position, rotation);
-        var vfx = SpawnStatic("bgcommon/world/common/vfx_for_event/eff/b0150_eext_y.avfx", position, rotation);
+        var vfx = SpawnStatic("bgcommon/world/common/vfx_for_event/eff/b0150_eext_y.avfx", position, rotation, r, g, b, a, scale);
         if (vfx == null || (nint)vfx == nint.Zero)
         {
             Logger.LogDebug("Failed to Spawn VFX at {pos}, {rot}", position, rotation);
             return null;
         }
-        Guid g = Guid.NewGuid();
+        Guid guid = Guid.NewGuid();
         Logger.LogDebug("Spawned VFX at {pos}, {rot}: 0x{ptr:X}", position, rotation, (nint)vfx);
 
-        _spawnedObjects[g] = (nint)vfx;
+        _spawnedObjects[guid] = (nint)vfx;
 
-        return g;
+        return guid;
     }
 
     public void DespawnObject(Guid id)
