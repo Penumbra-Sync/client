@@ -1,7 +1,7 @@
 ﻿using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using MareSynchronos.API.Data;
-using MareSynchronos.API.Dto.CharaData;
 using MareSynchronos.Interop;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.CharaData.Models;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
@@ -22,26 +22,29 @@ internal sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
     private readonly Dictionary<PoseEntryExtended, NearbyCharaDataEntry> _nearbyData = [];
     private readonly Dictionary<PoseEntryExtended, Guid> _poseVfx = [];
     private readonly ServerConfigurationManager _serverConfigurationManager;
+    private readonly CharaDataConfigService _charaDataConfigService;
     private readonly Dictionary<UserData, List<CharaDataMetaInfoExtendedDto>> _sharedWithYouData = [];
     private readonly VfxSpawnManager _vfxSpawnManager;
+    private Task? _filterEntriesRunningTask;
     private (Guid VfxId, PoseEntryExtended Pose)? _hoveredVfx = null;
+    private DateTime _lastExecutionTime = DateTime.UtcNow;
     public CharaDataNearbyManager(ILogger<CharaDataNearbyManager> logger, MareMediator mediator,
         DalamudUtilService dalamudUtilService, VfxSpawnManager vfxSpawnManager,
-        ServerConfigurationManager serverConfigurationManager) : base(logger, mediator)
+        ServerConfigurationManager serverConfigurationManager,
+        CharaDataConfigService charaDataConfigService) : base(logger, mediator)
     {
-        mediator.Subscribe<DelayedFrameworkUpdateMessage>(this, (_) => HandleFrameworkUpdate());
+        mediator.Subscribe<FrameworkUpdateMessage>(this, (_) => HandleFrameworkUpdate());
+        mediator.Subscribe<CutsceneFrameworkUpdateMessage>(this, (_) => HandleFrameworkUpdate());
         _dalamudUtilService = dalamudUtilService;
         _vfxSpawnManager = vfxSpawnManager;
         _serverConfigurationManager = serverConfigurationManager;
+        _charaDataConfigService = charaDataConfigService;
         mediator.Subscribe<GposeStartMessage>(this, (_) => ClearAllVfx());
     }
 
     public bool ComputeNearbyData { get; set; } = false;
-    public int DistanceFilter { get; set; } = 100;
-    public bool DrawWhisps { get; set; } = true;
-    public bool IgnoreHousingLimitations { get; set; } = false;
+
     public IDictionary<PoseEntryExtended, NearbyCharaDataEntry> NearbyData => _nearbyData;
-    public bool OwnServerFilter { get; set; } = true;
 
     public string UserNoteFilter { get; set; } = string.Empty;
 
@@ -53,6 +56,7 @@ internal sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
             _sharedWithYouData[kvp.Key] = kvp.Value;
         }
     }
+
     internal void SetHoveredVfx(PoseEntryExtended? hoveredPose)
     {
         if (hoveredPose == null && _hoveredVfx == null)
@@ -80,6 +84,12 @@ internal sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
             if (vfxGuid != null)
                 _hoveredVfx = (vfxGuid.Value, hoveredPose);
         }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        ClearAllVfx();
     }
 
     private static float CalculateYawDegrees(Vector3 directionXZ)
@@ -155,30 +165,17 @@ internal sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
         _poseVfx.Clear();
     }
 
-    private unsafe void HandleFrameworkUpdate()
+    private async Task FilterEntriesAsync(Vector3 cameraPos, Vector3 cameraLookAt)
     {
-        if (!ComputeNearbyData)
-        {
-            if (_nearbyData.Any())
-                _nearbyData.Clear();
-            if (_poseVfx.Any())
-                ClearAllVfx();
-            return;
-        }
-
-        if (!DrawWhisps)
-            ClearAllVfx();
-
-        var camera = CameraManager.Instance()->CurrentCamera;
-        Vector3 cameraPos = new(camera->Position.X, camera->Position.Y, camera->Position.Z);
-        Vector3 lookAt = new(camera->LookAtVector.X, camera->LookAtVector.Y, camera->LookAtVector.Z);
-        var cameraYaw = GetCameraYaw(cameraPos, lookAt);
         var previousPoses = _nearbyData.Keys.ToList();
         _nearbyData.Clear();
-        var locationInfo = _dalamudUtilService.GetMapData();
-        var player = _dalamudUtilService.GetPlayerCharacter();
-        var playerPos = cameraPos;
+
+        var locationInfo = await _dalamudUtilService.RunOnFrameworkThread(() => _dalamudUtilService.GetMapData()).ConfigureAwait(false);
+        var player = await _dalamudUtilService.RunOnFrameworkThread(() => _dalamudUtilService.GetPlayerCharacter()).ConfigureAwait(false);
         var currentServer = player.CurrentWorld;
+        var playerPos = player.Position;
+
+        var cameraYaw = GetCameraYaw(cameraPos, cameraLookAt);
 
         // initial filter on name
         foreach (var data in _sharedWithYouData.Where(d => (string.IsNullOrWhiteSpace(UserNoteFilter)
@@ -192,22 +189,21 @@ internal sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
                 .Where(p => p.HasPoseData
                     && p.HasWorldData
                     && p.WorldData!.Value.LocationInfo.TerritoryId == locationInfo.TerritoryId
-                    && (!OwnServerFilter || p.WorldData!.Value.LocationInfo.ServerId == currentServer.RowId))
+                    && (!_charaDataConfigService.Current.NearbyOwnServerOnly || p.WorldData!.Value.LocationInfo.ServerId == currentServer.RowId))
                 .ToList())
             {
                 var poseLocation = pose.WorldData!.Value.LocationInfo;
-                bool filterByServer = (!OwnServerFilter || poseLocation.ServerId == currentServer.RowId);
-                if (!filterByServer) continue;
+
                 bool isInHousing = poseLocation.WardId != 0;
                 var distance = Vector3.Distance(playerPos, pose.Position);
-                if (distance > DistanceFilter) continue;
+                if (distance > _charaDataConfigService.Current.NearbyDistanceFilter) continue;
 
                 bool addEntry = (!isInHousing && poseLocation.MapId == locationInfo.MapId)
                     || (isInHousing
                         && ((poseLocation.HouseId == 0 && poseLocation.DivisionId == locationInfo.DivisionId
-                                && (IgnoreHousingLimitations || poseLocation.WardId == locationInfo.WardId))
+                                && (_charaDataConfigService.Current.NearbyIgnoreHousingLimitations || poseLocation.WardId == locationInfo.WardId))
                             || (poseLocation.HouseId > 0
-                                && (IgnoreHousingLimitations || (poseLocation.HouseId == locationInfo.HouseId && poseLocation.WardId == locationInfo.WardId && poseLocation.DivisionId == locationInfo.DivisionId && poseLocation.RoomId == locationInfo.RoomId)))
+                                && (_charaDataConfigService.Current.NearbyIgnoreHousingLimitations || (poseLocation.HouseId == locationInfo.HouseId && poseLocation.WardId == locationInfo.WardId && poseLocation.DivisionId == locationInfo.DivisionId && poseLocation.RoomId == locationInfo.RoomId)))
                            ));
 
                 if (addEntry)
@@ -215,13 +211,35 @@ internal sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
             }
         }
 
-        if (DrawWhisps)
-        {
-            ManageWhispsNearby(previousPoses);
-        }
+        if (_charaDataConfigService.Current.NearbyDrawWisps && !_dalamudUtilService.IsInGpose)
+            await _dalamudUtilService.RunOnFrameworkThread(() => ManageWispsNearby(previousPoses)).ConfigureAwait(false);
     }
 
-    private void ManageWhispsNearby(List<PoseEntryExtended> previousPoses)
+    private unsafe void HandleFrameworkUpdate()
+    {
+        if (_lastExecutionTime.AddSeconds(0.5) > DateTime.UtcNow) return;
+        _lastExecutionTime = DateTime.UtcNow;
+        if (!ComputeNearbyData)
+        {
+            if (_nearbyData.Any())
+                _nearbyData.Clear();
+            if (_poseVfx.Any())
+                ClearAllVfx();
+            return;
+        }
+
+        if (!_charaDataConfigService.Current.NearbyDrawWisps || _dalamudUtilService.IsInGpose)
+            ClearAllVfx();
+
+        var camera = CameraManager.Instance()->CurrentCamera;
+        Vector3 cameraPos = new(camera->Position.X, camera->Position.Y, camera->Position.Z);
+        Vector3 lookAt = new(camera->LookAtVector.X, camera->LookAtVector.Y, camera->LookAtVector.Z);
+
+        if (_filterEntriesRunningTask?.IsCompleted ?? true)
+            _filterEntriesRunningTask = FilterEntriesAsync(cameraPos, lookAt);
+    }
+
+    private void ManageWispsNearby(List<PoseEntryExtended> previousPoses)
     {
         foreach (var data in _nearbyData.Keys)
         {

@@ -73,7 +73,11 @@ internal sealed class CharaDataCharacterHandler : DisposableMediatorSubscriberBa
             .ConfigureAwait(false);
         if (handler.Address != IntPtr.Zero)
         {
+            var poseData = await _ipcManager.Brio.GetPoseAsync(handler.Address).ConfigureAwait(false);
+            var worldData = await _ipcManager.Brio.GetTransformAsync(handler.Address).ConfigureAwait(false);
             await _ipcManager.Penumbra.RedrawAsync(Logger, handler, applicationId, CancellationToken.None).ConfigureAwait(false);
+            await _ipcManager.Brio.SetPoseAsync(handler.Address, poseData ?? "{}").ConfigureAwait(false);
+            await _ipcManager.Brio.ApplyTransformAsync(handler.Address, worldData).ConfigureAwait(false);
         }
     }
 
@@ -86,11 +90,11 @@ internal sealed class CharaDataCharacterHandler : DisposableMediatorSubscriberBa
         return true;
     }
 
-    public void RevertHandledChara(HandledCharaDataEntry? handled)
+    public Task RevertHandledChara(HandledCharaDataEntry? handled)
     {
-        if (handled == null) return;
+        if (handled == null) return Task.CompletedTask;
         _handledCharaData.Remove(handled);
-        _ = _dalamudUtilService.RunOnFrameworkThread(() => RevertChara(handled.Name, handled.CustomizePlus));
+        return _dalamudUtilService.RunOnFrameworkThread(() => RevertChara(handled.Name, handled.CustomizePlus));
     }
 
     internal void AddHandledChara(HandledCharaDataEntry handledCharaDataEntry)

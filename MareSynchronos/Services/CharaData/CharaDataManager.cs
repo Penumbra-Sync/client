@@ -68,6 +68,14 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
                 _ = GetAllSharedData(token);
             }
         });
+        mareMediator.Subscribe<DisconnectedMessage>(this, (msg) =>
+        {
+            _ownCharaData.Clear();
+            _metaInfoCache.Clear();
+            _sharedWithYouData.Clear();
+            _updateDtos.Clear();
+            Initialized = false;
+        });
     }
 
     public Task? AttachingPoseTask { get; private set; }
@@ -92,13 +100,12 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
     public Task? UiBlockingComputation { get; private set; }
     public ValueProgress<string>? UploadProgress { get; private set; }
     public Task<(string Output, bool Success)>? UploadTask { get; private set; }
+    public bool BrioAvailable => _ipcManager.Brio.APIAvailable;
 
-    public Task ApplyOtherDataToGposeTarget(CharaDataMetaInfoDto dataMetaInfoDto)
+    public Task ApplyCharaData(CharaDataMetaInfoDto dataMetaInfoDto, string charaName)
     {
         return UiBlockingComputation = DataApplicationTask = Task.Run(async () =>
         {
-            var charaName = await _dalamudUtilService.RunOnFrameworkThread(() => _dalamudUtilService.GposeTargetGameObject?.Name.TextValue).ConfigureAwait(false)
-                ?? string.Empty;
             if (string.IsNullOrEmpty(charaName)) return;
 
             var download = await _apiController.CharaDataDownload(dataMetaInfoDto.Uploader.UID + ":" + dataMetaInfoDto.Id).ConfigureAwait(false);
@@ -109,6 +116,18 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
             }
 
             await DownloadAndAplyDataAsync(charaName, download, dataMetaInfoDto, false).ConfigureAwait(false);
+        });
+    }
+
+    public Task ApplyCharaDataToGposeTarget(CharaDataMetaInfoDto dataMetaInfoDto)
+    {
+        return UiBlockingComputation = DataApplicationTask = Task.Run(async () =>
+        {
+            var charaName = await _dalamudUtilService.RunOnFrameworkThread(() => _dalamudUtilService.GposeTargetGameObject?.Name.TextValue).ConfigureAwait(false)
+                ?? string.Empty;
+            if (string.IsNullOrEmpty(charaName)) return;
+
+            await ApplyCharaData(dataMetaInfoDto, charaName).ConfigureAwait(false);
         });
     }
 
@@ -137,12 +156,11 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
         UiBlockingComputation = DataApplicationTask = DownloadAndAplyDataAsync(charaName, downloadDto, metaInfoDto, false);
     }
 
-    public Task ApplyPoseDataToTarget(PoseEntry pose, string targetName)
+    public Task ApplyPoseData(PoseEntry pose, string targetName)
     {
         return UiBlockingComputation = Task.Run(async () =>
         {
-            string chara = string.Empty;
-            if (string.IsNullOrEmpty(pose.PoseData) || !CanApplyInGpose(out chara)) return;
+            if (string.IsNullOrEmpty(pose.PoseData) || !CanApplyInGpose(out _)) return;
             var gposeChara = await _dalamudUtilService.GetGposeCharacterFromObjectTableByNameAsync(targetName, true).ConfigureAwait(false);
             if (gposeChara == null) return;
 
@@ -159,18 +177,17 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
         {
             if (CanApplyInGpose(out var chara))
             {
-                await ApplyPoseDataToTarget(pose, chara).ConfigureAwait(false);
+                await ApplyPoseData(pose, chara).ConfigureAwait(false);
             }
         });
     }
 
-    public Task ApplyWorldDataToGPoseTarget(PoseEntry pose)
+    public Task ApplyWorldDataToTarget(PoseEntry pose, string targetName)
     {
         return UiBlockingComputation = Task.Run(async () =>
         {
-            string chara = string.Empty;
-            if (pose.WorldData == default || !CanApplyInGpose(out chara)) return;
-            var gposeChara = await _dalamudUtilService.GetGposeCharacterFromObjectTableByNameAsync(chara, true).ConfigureAwait(false);
+            if (pose.WorldData == default || !CanApplyInGpose(out _)) return;
+            var gposeChara = await _dalamudUtilService.GetGposeCharacterFromObjectTableByNameAsync(targetName, true).ConfigureAwait(false);
             if (gposeChara == null) return;
 
             if (pose.WorldData == null || pose.WorldData == default) return;
@@ -178,6 +195,17 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
             Logger.LogDebug("Applying World data {data}", pose.WorldData);
 
             await _ipcManager.Brio.ApplyTransformAsync(gposeChara.Address, pose.WorldData.Value).ConfigureAwait(false);
+        });
+    }
+
+    public Task ApplyWorldDataToGPoseTarget(PoseEntry pose)
+    {
+        return UiBlockingComputation = Task.Run(async () =>
+        {
+            if (CanApplyInGpose(out var chara))
+            {
+                await ApplyPoseData(pose, chara).ConfigureAwait(false);
+            }
         });
     }
 
@@ -466,20 +494,20 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
         });
     }
 
-    public Task SpawnAndApplyOtherDataToGposeTarget(CharaDataMetaInfoDto charaDataMetaInfoDto)
+    public Task<HandledCharaDataEntry?> SpawnAndApplyData(CharaDataMetaInfoDto charaDataMetaInfoDto)
     {
-        return UiBlockingComputation = Task.Run(async () =>
+        var task = Task.Run(async () =>
         {
             var newActor = await _ipcManager.Brio.SpawnActorAsync().ConfigureAwait(false);
-            if (newActor == null) return;
+            if (newActor == null) return null;
             await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
-            unsafe
-            {
-                _dalamudUtilService.GposeTarget = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)newActor.Address;
-            }
 
-            await ApplyOtherDataToGposeTarget(charaDataMetaInfoDto).ConfigureAwait(false);
+            await ApplyCharaData(charaDataMetaInfoDto, newActor.Name.TextValue).ConfigureAwait(false);
+
+            return _characterHandler.HandledCharaData.FirstOrDefault(f => string.Equals(f.Name, newActor.Name.TextValue, StringComparison.Ordinal));
         });
+        UiBlockingComputation = task;
+        return task;
     }
 
     private async Task<CharaDataMetaInfoExtendedDto> CacheData(CharaDataFullExtendedDto ownCharaData)
@@ -605,13 +633,35 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
         });
     }
 
+    internal void ApplyFullPoseDataToTarget(PoseEntry value, string targetName)
+    {
+        UiBlockingComputation = Task.Run(async () =>
+        {
+            await ApplyPoseData(value, targetName).ConfigureAwait(false);
+            await ApplyWorldDataToTarget(value, targetName).ConfigureAwait(false);
+        });
+    }
+
+    internal void ApplyFullPoseDataToGposeTarget(PoseEntry value)
+    {
+        UiBlockingComputation = Task.Run(async () =>
+        {
+            if (CanApplyInGpose(out var gposeTarget))
+            {
+                await ApplyPoseData(value, gposeTarget).ConfigureAwait(false);
+                await ApplyWorldDataToTarget(value, gposeTarget).ConfigureAwait(false);
+            }
+        });
+    }
+
     internal void SpawnAndApplyWorldTransform(CharaDataMetaInfoDto metaInfo, PoseEntry value)
     {
         UiBlockingComputation = Task.Run(async () =>
         {
-            await SpawnAndApplyOtherDataToGposeTarget(metaInfo).ConfigureAwait(false);
-            await ApplyPoseDataToGPoseTarget(value).ConfigureAwait(false);
-            await ApplyWorldDataToGPoseTarget(value).ConfigureAwait(false);
+            var actor = await SpawnAndApplyData(metaInfo).ConfigureAwait(false);
+            if (actor == null) return;
+            await ApplyPoseData(value, actor.Name).ConfigureAwait(false);
+            await ApplyWorldDataToTarget(value, actor.Name).ConfigureAwait(false);
         });
     }
 
@@ -855,6 +905,18 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
 
     public void RevertChara(HandledCharaDataEntry? handled)
     {
-        _characterHandler.RevertHandledChara(handled);
+        UiBlockingComputation = _characterHandler.RevertHandledChara(handled);
+    }
+
+    internal void RemoveChara(string handledActor)
+    {
+        if (string.IsNullOrEmpty(handledActor)) return;
+        UiBlockingComputation = Task.Run(async () =>
+        {
+            await _characterHandler.RevertHandledChara(handledActor).ConfigureAwait(false);
+            var gposeChara = await _dalamudUtilService.GetGposeCharacterFromObjectTableByNameAsync(handledActor, true).ConfigureAwait(false);
+            if (gposeChara != null)
+                await _ipcManager.Brio.DespawnActorAsync(gposeChara.Address).ConfigureAwait(false);
+        });
     }
 }

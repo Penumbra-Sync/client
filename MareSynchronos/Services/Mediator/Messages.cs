@@ -25,7 +25,7 @@ public record DelayedFrameworkUpdateMessage : SameThreadMessage;
 public record ZoneSwitchStartMessage : MessageBase;
 public record ZoneSwitchEndMessage : MessageBase;
 public record CutsceneStartMessage : MessageBase;
-public record GposeStartMessage : MessageBase;
+public record GposeStartMessage : SameThreadMessage;
 public record GposeEndMessage : MessageBase;
 public record CutsceneEndMessage : MessageBase;
 public record CutsceneFrameworkUpdateMessage : SameThreadMessage;
