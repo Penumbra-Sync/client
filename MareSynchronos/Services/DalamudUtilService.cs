@@ -607,13 +607,13 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
                 _lastGlobalBlockReason = string.Empty;
             }
 
-            if (GposeTarget != null && !IsInGpose)
+            if (_clientState.IsGPosing && !IsInGpose)
             {
                 _logger.LogDebug("Gpose start");
                 IsInGpose = true;
                 Mediator.Publish(new GposeStartMessage());
             }
-            else if (GposeTarget == null && IsInGpose)
+            else if (!_clientState.IsGPosing && IsInGpose)
             {
                 _logger.LogDebug("Gpose end");
                 IsInGpose = false;

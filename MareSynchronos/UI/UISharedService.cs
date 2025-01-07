@@ -138,7 +138,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     public bool HasValidPenumbraModPath => !(_ipcManager.Penumbra.ModDirectory ?? string.Empty).IsNullOrEmpty() && Directory.Exists(_ipcManager.Penumbra.ModDirectory);
 
     public IFontHandle IconFont { get; init; }
-    public bool IsInGpose => _dalamudUtil.IsInCutscene;
+    public bool IsInGpose => _dalamudUtil.IsInGpose;
 
     public string PlayerName => _dalamudUtil.GetPlayerName();
 
@@ -1089,20 +1089,36 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         _discordOAuthUIDs = null;
     }
 
-    public static void DrawGrouped(Action imguiDrawAction, float rounding = 5f, float? indent = null)
+    public static void DrawGrouped(Action imguiDrawAction, float rounding = 5f, float? expectedWidth = null)
     {
         var cursorPos = ImGui.GetCursorPos();
-        var imguiIndent = ImRaii.PushIndent(indent.GetValueOrDefault(), condition: indent != null);
         using (ImRaii.Group())
         {
+            if (expectedWidth != null)
+            {
+                ImGuiHelpers.ScaledDummy(expectedWidth.Value, 0);
+                ImGui.SetCursorPos(cursorPos);
+            }
+
             imguiDrawAction.Invoke();
         }
-        imguiIndent.Dispose();
-        if (!cursorPos.Equals(ImGui.GetCursorPos()))
-            ImGui.GetWindowDrawList().AddRect(
-                ImGui.GetItemRectMin() - ImGui.GetStyle().ItemInnerSpacing,
-                ImGui.GetItemRectMax() + ImGui.GetStyle().ItemInnerSpacing,
-                Color(ImGuiColors.DalamudGrey2), rounding);
+
+        ImGui.GetWindowDrawList().AddRect(
+            ImGui.GetItemRectMin() - ImGui.GetStyle().ItemInnerSpacing,
+            ImGui.GetItemRectMax() + ImGui.GetStyle().ItemInnerSpacing,
+            Color(ImGuiColors.DalamudGrey2), rounding);
+    }
+
+    public static void DrawGroupedCenteredColorText(string text, Vector4 color, float? maxWidth = null)
+    {
+        var availWidth = ImGui.GetContentRegionAvail().X;
+        var textWidth = ImGui.CalcTextSize(text, availWidth).X;
+        if (maxWidth != null && textWidth > maxWidth) textWidth = maxWidth.Value;
+        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + (availWidth / 2f) - (textWidth / 2f));
+        DrawGrouped(() =>
+        {
+            ColorTextWrapped(text, color, ImGui.GetCursorPosX() + textWidth);
+        }, expectedWidth: maxWidth == null ? null : maxWidth);
     }
 
     internal static void DistanceSeparator()

@@ -3,6 +3,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.ImGuiFileDialog;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
+using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using ImGuiNET;
 using MareSynchronos.API.Dto.CharaData;
 using MareSynchronos.MareConfiguration;
@@ -14,6 +15,7 @@ using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
+using System.Text;
 
 namespace MareSynchronos.UI;
 
@@ -28,16 +30,19 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly UiSharedService _uiSharedService;
     private CancellationTokenSource _closalCts = new();
-    private string _filterCodeNote = string.Empty;
-    private string _filterDescription = string.Empty;
-    private bool _filterPoseOnly = false;
-    private bool _filterWorldOnly = false;
     private bool _disableUI = false;
     private CancellationTokenSource _disposalCts = new();
     private string _exportDescription = string.Empty;
     private Task? _exportTask;
+    private string _filterCodeNote = string.Empty;
+    private string _filterDescription = string.Empty;
     private Dictionary<string, List<CharaDataMetaInfoExtendedDto>>? _filteredDict;
+    private Dictionary<string, (CharaDataFavorite Favorite, CharaDataMetaInfoExtendedDto? MetaInfo, bool DownloadedMetaInfo)> _filteredFavorites = [];
+    private bool _filterPoseOnly = false;
+    private bool _filterWorldOnly = false;
     private string _importCode = string.Empty;
+    private DateTime _lastFavoriteUpdateTime = DateTime.UtcNow;
+    private PoseEntryExtended? _nearbyHovered;
     private bool _readExport;
     private string _selectedDtoId = string.Empty;
     private string _selectedSpecificIndividual = string.Empty;
@@ -45,7 +50,6 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
     private bool _sharedWithYouDownloadableFilter = false;
     private string _sharedWithYouOwnerFilter = string.Empty;
     private string _specificIndividualAdd = string.Empty;
-    private DateTime _lastFavoriteUpdateTime = DateTime.UtcNow;
 
     public CharaDataHubUi(ILogger<CharaDataHubUi> logger, MareMediator mediator, PerformanceCollectorService performanceCollectorService,
                          CharaDataManager charaDataManager, CharaDataNearbyManager charaDataNearbyManager, CharaDataConfigService configService,
@@ -104,6 +108,13 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
         {
             _lastFavoriteUpdateTime = DateTime.UtcNow;
             UpdateFilteredFavorites();
+        }
+
+        if (!_charaDataManager.BrioAvailable)
+        {
+            ImGuiHelpers.ScaledDummy(3);
+            UiSharedService.DrawGroupedCenteredColorText("To utilize any features related to posing or spawning characters you require to have Brio installed.", ImGuiColors.DalamudRed);
+            UiSharedService.DistanceSeparator();
         }
 
         using var disabled = ImRaii.Disabled(_disableUI);
@@ -179,190 +190,6 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
         }
     }
 
-    private void DrawNearbyPoses()
-    {
-        _uiSharedService.BigText("Poses Nearby");
-
-        if (!_charaDataManager.BrioAvailable)
-        {
-            UiSharedService.DrawGrouped(() =>
-            {
-                UiSharedService.ColorTextWrapped("To utilize posing you require to have Brio installed.", ImGuiColors.DalamudRed);
-            });
-            UiSharedService.DistanceSeparator();
-        }
-
-        if (!_uiSharedService.IsInGpose)
-        {
-            UiSharedService.DrawGrouped(() =>
-            {
-                UiSharedService.ColorTextWrapped("Spawning and applying pose data is only available in GPose.", ImGuiColors.DalamudYellow);
-            });
-            ImGuiHelpers.ScaledDummy(5);
-        }
-
-        using (var helpTree = ImRaii.TreeNode("What is this? (Explanation / Help)"))
-        {
-            if (helpTree)
-            {
-                UiSharedService.TextWrapped("This tab will show you all Shared World Poses nearby you." + Environment.NewLine + Environment.NewLine
-                    + "Shared World Poses are poses in character data that have world data attached to them and are set to shared. "
-                    + "This means that all data that is in 'Shared with You' that has a pose with world data attached to it will be shown here if you are nearby." + Environment.NewLine
-                    + "By default all poses that are shared will be shown. Poses taken in housing areas will by default only be shown on the correct server and location." + Environment.NewLine + Environment.NewLine
-                    + "Shared World Poses will appear in the world as floating wisps, as well as in the list below. You can mouse over a Shared World Pose in the list for it to get highlighted in the world." + Environment.NewLine + Environment.NewLine
-                    + "You can apply Shared World Poses to yourself or spawn the associated character to pose with them." + Environment.NewLine + Environment.NewLine
-                    + "You can adjust the filter and change further settings in the 'Settings & Filter' foldout.");
-            }
-        }
-
-        using (var tree = ImRaii.TreeNode("Settings & Filters"))
-        {
-            if (tree)
-            {
-                string filterByUser = _charaDataNearbyManager.UserNoteFilter;
-                if (ImGui.InputTextWithHint("##filterbyuser", "Filter by User", ref filterByUser, 50))
-                {
-                    _charaDataNearbyManager.UserNoteFilter = filterByUser;
-                }
-                bool onlyCurrent = _configService.Current.NearbyOwnServerOnly;
-                if (ImGui.Checkbox("Only show Poses on current server", ref onlyCurrent))
-                {
-                    _configService.Current.NearbyOwnServerOnly = onlyCurrent;
-                    _configService.Save();
-                }
-                _uiSharedService.DrawHelpText("Toggling this off will show you the location of all shared Poses with World Data from all Servers");
-                bool ignoreHousing = _configService.Current.NearbyIgnoreHousingLimitations;
-                if (ImGui.Checkbox("Ignore Housing Limitations", ref ignoreHousing))
-                {
-                    _configService.Current.NearbyIgnoreHousingLimitations = ignoreHousing;
-                    _configService.Save();
-                }
-                _uiSharedService.DrawHelpText("This will display all poses in their location regardless of housing limitations." + UiSharedService.TooltipSeparator
-                    + "Note: Poses that utilize housing props, furniture, etc. will not be displayed correctly if not spawned in the right location.");
-                bool showWisps = _configService.Current.NearbyDrawWisps;
-                if (ImGui.Checkbox("Show Pose Wisps in the overworld", ref showWisps))
-                {
-                    _configService.Current.NearbyDrawWisps = showWisps;
-                    _configService.Save();
-                }
-                _uiSharedService.DrawHelpText("This setting indicates whether or not to draw floating whisps where other's poses are in the world.");
-                int poseDetectionDistance = _configService.Current.NearbyDistanceFilter;
-                ImGui.SetNextItemWidth(100);
-                if (ImGui.SliderInt("Detection Distance", ref poseDetectionDistance, 5, 1000))
-                {
-                    _configService.Current.NearbyDistanceFilter = poseDetectionDistance;
-                    _configService.Save();
-                }
-                _uiSharedService.DrawHelpText("This setting allows you to change the distance in which poses will be shown. Set it to the maximum if you want to see all poses on the current map.");
-            }
-        }
-
-        UiSharedService.DistanceSeparator();
-
-        using var child = ImRaii.Child("nearbyPosesChild", new(0, 0), false, ImGuiWindowFlags.AlwaysAutoResize);
-
-        ImGuiHelpers.ScaledDummy(3f);
-
-        using var indent = ImRaii.PushIndent(5f);
-        if (_charaDataNearbyManager.NearbyData.Count == 0)
-        {
-            UiSharedService.DrawGrouped(() =>
-            {
-                UiSharedService.ColorTextWrapped("No Shared World Poses found nearby", ImGuiColors.DalamudYellow);
-            });
-        }
-
-        bool wasAnythingHovered = false;
-        int i = 0;
-        foreach (var pose in _charaDataNearbyManager.NearbyData.OrderBy(v => v.Value.Distance))
-        {
-            using var poseId = ImRaii.PushId("nearbyPose" + (i++));
-            var pos = ImGui.GetCursorPos();
-            var circleDiameter = 60f;
-            var circleOriginX = ImGui.GetWindowContentRegionMax().X - circleDiameter - pos.X;
-            float circleOffsetY = 0;
-
-            UiSharedService.DrawGrouped(() =>
-            {
-                string? userNote = _serverConfigurationManager.GetNoteForUid(pose.Key.MetaInfo.Uploader.UID);
-                var noteText = userNote == null ? pose.Key.MetaInfo.Uploader.AliasOrUID : $"{userNote} ({pose.Key.MetaInfo.Uploader.AliasOrUID})";
-                ImGui.TextUnformatted("Pose by");
-                ImGui.SameLine();
-                UiSharedService.ColorText(noteText, ImGuiColors.ParsedGreen);
-                UiSharedService.ColorText("Character Data Description", ImGuiColors.DalamudGrey);
-                UiSharedService.AttachToolTip(pose.Key.MetaInfo.Description);
-                UiSharedService.ColorText("Description", ImGuiColors.DalamudGrey);
-                ImGui.SameLine();
-                UiSharedService.TextWrapped(pose.Key.Description ?? "No Pose Description was set", circleOriginX);
-                var posAfterGroup = ImGui.GetCursorPos();
-                var groupHeightCenter = (posAfterGroup.Y - pos.Y) / 2;
-                circleOffsetY = (groupHeightCenter - circleDiameter / 2);
-                if (circleOffsetY < 0) circleOffsetY = 0;
-                ImGui.SetCursorPos(new Vector2(circleOriginX, pos.Y));
-                ImGui.Dummy(new Vector2(circleDiameter, circleDiameter));
-                UiSharedService.AttachToolTip("Click to show on map");
-                if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
-                {
-                    _dalamudUtilService.SetMarkerAndOpenMap(pose.Key.Position, pose.Key.Map);
-                }
-                ImGui.SetCursorPos(posAfterGroup);
-                if (_uiSharedService.IsInGpose)
-                {
-                    using (ImRaii.Disabled(!_charaDataManager.BrioAvailable))
-                    {
-                        if (_uiSharedService.IconTextButton(FontAwesomeIcon.ArrowRight, "Apply Pose"))
-                        {
-                            _charaDataManager.ApplyFullPoseDataToGposeTarget(pose.Key);
-                        }
-                    }
-                    ImGui.SameLine();
-                    using (ImRaii.Disabled(!_charaDataManager.BrioAvailable || !pose.Key.MetaInfo.CanBeDownloaded))
-                    {
-                        if (_uiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Spawn and Pose"))
-                        {
-                            _charaDataManager.SpawnAndApplyWorldTransform(pose.Key.MetaInfo, pose.Key);
-                        }
-                    }
-                    if (!pose.Key.MetaInfo.CanBeDownloaded)
-                    {
-                        UiSharedService.AttachToolTip("Cannot spawn character with this pose as it's not downloadable.");
-                    }
-                }
-            });
-            if (ImGui.IsItemHovered())
-            {
-                wasAnythingHovered = true;
-                _nearbyHovered = pose.Key;
-            }
-            var drawList = ImGui.GetWindowDrawList();
-            var circleRadius = circleDiameter / 2f;
-            var windowPos = ImGui.GetWindowPos();
-            var circleCenter = new Vector2(windowPos.X + circleOriginX + circleRadius, windowPos.Y + pos.Y + circleRadius + circleOffsetY);
-            var rads = pose.Value.Direction * (Math.PI / 180);
-
-            float halfConeAngleRadians = 15f * (float)Math.PI / 180f;
-            Vector2 baseDir1 = new Vector2((float)Math.Sin(rads - halfConeAngleRadians), -(float)Math.Cos(rads - halfConeAngleRadians));
-            Vector2 baseDir2 = new Vector2((float)Math.Sin(rads + halfConeAngleRadians), -(float)Math.Cos(rads + halfConeAngleRadians));
-
-            Vector2 coneBase1 = circleCenter + baseDir1 * circleRadius;
-            Vector2 coneBase2 = circleCenter + baseDir2 * circleRadius;
-
-            // Draw the cone as a filled triangle
-            drawList.AddTriangleFilled(circleCenter, coneBase1, coneBase2, UiSharedService.Color(ImGuiColors.ParsedGreen));
-            drawList.AddCircle(circleCenter, circleDiameter / 2, UiSharedService.Color(ImGuiColors.DalamudWhite), 360, 2);
-            var distance = pose.Value.Distance.ToString("0.0") + "y";
-            var textSize = ImGui.CalcTextSize(distance);
-            drawList.AddText(new Vector2(circleCenter.X - textSize.X / 2, circleCenter.Y + textSize.Y / 3f), UiSharedService.Color(ImGuiColors.DalamudWhite), distance);
-
-            ImGuiHelpers.ScaledDummy(3);
-        }
-
-        if (!wasAnythingHovered) _nearbyHovered = null;
-        _charaDataNearbyManager.SetHoveredVfx(_nearbyHovered);
-    }
-
-    private PoseEntryExtended? _nearbyHovered;
-
     private static string GetAccessTypeString(AccessTypeDto dto) => dto switch
     {
         AccessTypeDto.AllPairs => "All Pairs",
@@ -376,6 +203,12 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
         ShareTypeDto.Private => "Private",
         ShareTypeDto.Shared => "Shared"
     };
+
+    private static string GetWorldDataTooltipText(PoseEntryExtended poseEntry)
+    {
+        if (!poseEntry.HasWorldData) return "This Pose has no world data attached.";
+        return poseEntry.WorldDataDescriptor;
+    }
 
     private void DrawAddOrRemoveFavorite(CharaDataFullDto dto)
     {
@@ -476,6 +309,7 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
         ImGuiHelpers.ScaledDummy(5);
         DrawEditCharaDataPoses(updateDto);
     }
+
     private void DrawEditCharaDataAccessAndSharing(CharaDataExtendedUpdateDto updateDto)
     {
         _uiSharedService.BigText("Access and Sharing");
@@ -777,6 +611,20 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
 
         using var indent = ImRaii.PushIndent(10f);
         int poseNumber = 1;
+
+        if (!_uiSharedService.IsInGpose && _charaDataManager.BrioAvailable)
+        {
+            ImGuiHelpers.ScaledDummy(5);
+            UiSharedService.DrawGroupedCenteredColorText("To attach pose and world data you need to be in GPose.", ImGuiColors.DalamudYellow);
+            ImGuiHelpers.ScaledDummy(5);
+        }
+        else if (!_charaDataManager.BrioAvailable)
+        {
+            ImGuiHelpers.ScaledDummy(5);
+            UiSharedService.DrawGroupedCenteredColorText("To attach pose and world data Brio requires to be installed.", ImGuiColors.DalamudRed);
+            ImGuiHelpers.ScaledDummy(5);
+        }
+
         foreach (var pose in updateDto.PoseList)
         {
             ImGui.AlignTextToFramePadding();
@@ -826,7 +674,7 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                     ? "This Pose entry has pose data attached"
                     : "This Pose entry has no pose data attached");
                 ImGui.SameLine();
-                using (ImRaii.Disabled(!_uiSharedService.IsInGpose || !(_charaDataManager.AttachingPoseTask?.IsCompleted ?? true)))
+                using (ImRaii.Disabled(!_uiSharedService.IsInGpose || !(_charaDataManager.AttachingPoseTask?.IsCompleted ?? true) || !_charaDataManager.BrioAvailable))
                 {
                     using var poseid = ImRaii.PushId("poseSet" + poseNumber);
                     if (_uiSharedService.IconButton(FontAwesomeIcon.Plus))
@@ -861,11 +709,11 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                 UiSharedService.AttachToolTip(tooltipText);
                 if (hasWorldData && ImGui.IsItemClicked(ImGuiMouseButton.Left))
                 {
-                    _dalamudUtilService.SetMarkerAndOpenMap(position: new System.Numerics.Vector3(worldData.Value.PositionX, worldData.Value.PositionY, worldData.Value.PositionZ),
+                    _dalamudUtilService.SetMarkerAndOpenMap(position: new Vector3(worldData.Value.PositionX, worldData.Value.PositionY, worldData.Value.PositionZ),
                         _dalamudUtilService.MapData.Value[worldData.Value.LocationInfo.MapId].Map);
                 }
                 ImGui.SameLine();
-                using (ImRaii.Disabled(!_uiSharedService.IsInGpose || !(_charaDataManager.AttachingPoseTask?.IsCompleted ?? true)))
+                using (ImRaii.Disabled(!_uiSharedService.IsInGpose || !(_charaDataManager.AttachingPoseTask?.IsCompleted ?? true) || !_charaDataManager.BrioAvailable))
                 {
                     using var worldId = ImRaii.PushId("worldSet" + poseNumber);
                     if (_uiSharedService.IconButton(FontAwesomeIcon.Plus))
@@ -898,12 +746,6 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
 
             poseNumber++;
         }
-    }
-
-    private static string GetWorldDataTooltipText(PoseEntryExtended poseEntry)
-    {
-        if (!poseEntry.HasWorldData) return "This Pose has no world data attached.";
-        return poseEntry.WorldDataDescriptor;
     }
 
     private void DrawFavorite(string id)
@@ -960,85 +802,88 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
             ImGui.Separator();
         }
 
-        ImGuiHelpers.ScaledDummy(5);
 
-        using (var handledByMare = ImRaii.TreeNode("GPose Actors"))
+        if (_uiSharedService.IsInGpose)
         {
-            if (handledByMare)
+            ImGuiHelpers.ScaledDummy(5);
+            using (var handledByMare = ImRaii.TreeNode("GPose Actors"))
             {
-                ImGuiHelpers.ScaledDummy(5);
-
-                foreach (var actor in _dalamudUtilService.GetGposeCharactersFromObjectTable())
+                if (handledByMare)
                 {
-                    if (actor == null) continue;
-                    using var actorId = ImRaii.PushId(actor.Name.TextValue);
-                    UiSharedService.DrawGrouped(() =>
+                    ImGuiHelpers.ScaledDummy(5);
+
+                    foreach (var actor in _dalamudUtilService.GetGposeCharactersFromObjectTable())
                     {
-                        if (_uiSharedService.IconButton(FontAwesomeIcon.Crosshairs))
+                        if (actor == null) continue;
+                        using var actorId = ImRaii.PushId(actor.Name.TextValue);
+                        UiSharedService.DrawGrouped(() =>
                         {
-                            unsafe
+                            if (_uiSharedService.IconButton(FontAwesomeIcon.Crosshairs))
                             {
-                                _dalamudUtilService.GposeTarget = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)actor.Address;
-                            }
-                        }
-                        ImGui.SameLine();
-                        UiSharedService.AttachToolTip($"Target the GPose Character {actor.Name.TextValue}");
-                        ImGui.AlignTextToFramePadding();
-                        using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.HealerGreen, actor.Address == (_dalamudUtilService.GposeTargetGameObject?.Address ?? nint.Zero)))
-                        {
-                            ImGui.TextUnformatted(actor.Name.TextValue);
-                        }
-                        ImGui.SameLine(250);
-                        var handled = _charaDataManager.HandledCharaData.FirstOrDefault(c => string.Equals(c.Name, actor.Name.TextValue, StringComparison.Ordinal));
-                        using (ImRaii.Disabled(handled == null))
-                        {
-                            _uiSharedService.IconText(FontAwesomeIcon.InfoCircle);
-                            var id = string.IsNullOrEmpty(handled?.MetaInfo.Uploader.UID) ? handled?.MetaInfo.Id : handled.MetaInfo.Uploader.UID + ":" + handled.MetaInfo.Id;
-                            UiSharedService.AttachToolTip($"Applied Data: {id ?? "No data applied"}");
-
-                            ImGui.SameLine();
-                            // maybe do this better, check with brio for handled charas or sth
-                            using (ImRaii.Disabled(!actor.Name.TextValue.StartsWith("Brio ", StringComparison.Ordinal)))
-                            {
-                                if (_uiSharedService.IconButton(FontAwesomeIcon.Trash))
+                                unsafe
                                 {
-                                    _charaDataManager.RemoveChara(actor.Name.TextValue);
+                                    _dalamudUtilService.GposeTarget = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)actor.Address;
                                 }
-                                UiSharedService.AttachToolTip($"Remove character {actor.Name.TextValue}");
                             }
                             ImGui.SameLine();
-                            if (_uiSharedService.IconButton(FontAwesomeIcon.Undo))
+                            UiSharedService.AttachToolTip($"Target the GPose Character {actor.Name.TextValue}");
+                            ImGui.AlignTextToFramePadding();
+                            using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.HealerGreen, actor.Address == (_dalamudUtilService.GposeTargetGameObject?.Address ?? nint.Zero)))
                             {
-                                _charaDataManager.RevertChara(handled);
+                                ImGui.TextUnformatted(actor.Name.TextValue);
                             }
-                            UiSharedService.AttachToolTip($"Revert applied data from {actor.Name.TextValue}");
-                            DrawPoseData(handled?.MetaInfo, (entry) =>
+                            ImGui.SameLine(250);
+                            var handled = _charaDataManager.HandledCharaData.FirstOrDefault(c => string.Equals(c.Name, actor.Name.TextValue, StringComparison.Ordinal));
+                            using (ImRaii.Disabled(handled == null))
                             {
-                                _ = _charaDataManager.ApplyPoseData(entry, actor.Name.TextValue);
-                            }, (entry) => true, "Click to apply pose to actor");
-                        }
-                    });
+                                _uiSharedService.IconText(FontAwesomeIcon.InfoCircle);
+                                var id = string.IsNullOrEmpty(handled?.MetaInfo.Uploader.UID) ? handled?.MetaInfo.Id : handled.MetaInfo.Uploader.UID + ":" + handled.MetaInfo.Id;
+                                UiSharedService.AttachToolTip($"Applied Data: {id ?? "No data applied"}");
 
-                    ImGuiHelpers.ScaledDummy(2);
+                                ImGui.SameLine();
+                                // maybe do this better, check with brio for handled charas or sth
+                                using (ImRaii.Disabled(!actor.Name.TextValue.StartsWith("Brio ", StringComparison.Ordinal)))
+                                {
+                                    if (_uiSharedService.IconButton(FontAwesomeIcon.Trash))
+                                    {
+                                        _charaDataManager.RemoveChara(actor.Name.TextValue);
+                                    }
+                                    UiSharedService.AttachToolTip($"Remove character {actor.Name.TextValue}");
+                                }
+                                ImGui.SameLine();
+                                if (_uiSharedService.IconButton(FontAwesomeIcon.Undo))
+                                {
+                                    _charaDataManager.RevertChara(handled);
+                                }
+                                UiSharedService.AttachToolTip($"Revert applied data from {actor.Name.TextValue}");
+                                DrawPoseData(handled?.MetaInfo, actor.Name.TextValue, true);
+                            }
+                        });
+
+                        ImGuiHelpers.ScaledDummy(2);
+                    }
                 }
             }
+
+            ImGuiHelpers.ScaledDummy(5);
+
         }
-
-        ImGuiHelpers.ScaledDummy(5);
-
         _uiSharedService.BigText("Apply Character Appearance");
 
         ImGuiHelpers.ScaledDummy(5);
 
-        bool canApplyInGpose = _charaDataManager.CanApplyInGpose(out string gposeTargetName);
-        ImGui.TextUnformatted("GPose Target");
-        ImGui.SameLine(200);
-        UiSharedService.ColorText(gposeTargetName, UiSharedService.GetBoolColor(canApplyInGpose));
-
-        if (!canApplyInGpose)
+        bool hasValidGposeTarget = _charaDataManager.CanApplyInGpose(out string gposeTargetName);
+        if (_uiSharedService.IsInGpose)
         {
-            UiSharedService.ColorTextWrapped("To apply any data you must be in GPose and have a valid application target selected. Pets (i.e. Carbunkle) are not counting as valid targets. " +
-                "If more actors are needed, use Brio or other tools to spawn in valid application targets. To see all currently valid targets check the \"GPose Actors\" above.", ImGuiColors.DalamudYellow);
+            ImGui.TextUnformatted("GPose Target");
+            ImGui.SameLine(200);
+            UiSharedService.ColorText(gposeTargetName, UiSharedService.GetBoolColor(hasValidGposeTarget));
+        }
+
+        if (!hasValidGposeTarget)
+        {
+            ImGuiHelpers.ScaledDummy(3);
+            UiSharedService.DrawGroupedCenteredColorText("Applying data is only available in GPose with a valid selected GPose target.", ImGuiColors.DalamudYellow, 350);
         }
 
         ImGuiHelpers.ScaledDummy(10);
@@ -1142,33 +987,43 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                                 UpdateFilteredItems();
                             }
                         }
-                        UiSharedService.AttachToolTip(isInTimeout ? "Timeout for refreshing active, please wait before refreshing again"
-                            : "Refresh data for this entry from Server.");
+                        UiSharedService.AttachToolTip(isInTimeout ? "Timeout for refreshing active, please wait before refreshing again."
+                            : "Refresh data for this entry from the Server.");
 
                         ImGui.SameLine();
-                        using (ImRaii.Disabled(!canApplyInGpose || (!metaInfo?.CanBeDownloaded ?? true)))
+                        GposeMetaInfoAction((meta) =>
                         {
                             if (_uiSharedService.IconButton(FontAwesomeIcon.ArrowRight))
                             {
                                 _ = _charaDataManager.ApplyCharaDataToGposeTarget(metaInfo!);
                             }
-                            ImGui.SameLine();
+                        }, "Apply Character Data to GPose Target", metaInfo, hasValidGposeTarget, false);
+                        ImGui.SameLine();
+                        GposeMetaInfoAction((meta) =>
+                        {
                             if (_uiSharedService.IconButton(FontAwesomeIcon.Plus))
                             {
-                                _ = _charaDataManager.SpawnAndApplyData(metaInfo!);
+                                _ = _charaDataManager.SpawnAndApplyData(meta!);
                             }
-                        }
-                        if (metaInfo == null)
+                        }, "Spawn Actor with Brio and apply Character Data", metaInfo, hasValidGposeTarget, true);
+
+                        string uidText = string.Empty;
+                        var uid = favorite.Key.Split(":")[0];
+                        if (metaInfo != null)
                         {
-                            UiSharedService.AttachToolTip("Cannot apply data before refreshing accessibility (button on the left)");
+                            uidText = metaInfo.Uploader.AliasOrUID;
+                        }
+                        else
+                        {
+                            uidText = uid;
                         }
 
-                        var uid = favorite.Key.Split(":")[0];
                         var note = _serverConfigurationManager.GetNoteForUid(uid);
                         if (note != null)
                         {
-                            ImGui.TextUnformatted($"({note})");
+                            uidText = $"{note} ({uidText})";
                         }
+                        ImGui.TextUnformatted(uidText);
 
                         ImGui.TextUnformatted("Last Use: ");
                         ImGui.SameLine();
@@ -1182,11 +1037,8 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                             _configService.Save();
                         }
 
-                        DrawPoseData(metaInfo, (pose) =>
-                        {
-                            if (!pose.HasWorldData) return;
-                            _dalamudUtilService.SetMarkerAndOpenMap(pose.Position, pose.Map);
-                        }, (entry) => (entry.WorldData ?? default) != default, "Click to show location on map");
+                        ImGui.NewLine();
+                        DrawPoseData(metaInfo, gposeTargetName, hasValidGposeTarget);
                     });
 
                     ImGuiHelpers.ScaledDummy(5);
@@ -1228,14 +1080,21 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                         _charaDataManager.DownloadMetaInfo(_importCode);
                     }
                 }
-                ImGui.SameLine();
-                using (ImRaii.Disabled(!canApplyInGpose || (!_charaDataManager.LastDownloadedMetaInfo?.CanBeDownloaded ?? true)))
+                GposeMetaInfoAction((meta) =>
                 {
                     if (_uiSharedService.IconTextButton(FontAwesomeIcon.ArrowRight, $"Download and Apply"))
                     {
-                        _ = _charaDataManager.ApplyCharaDataToGposeTarget(_charaDataManager.LastDownloadedMetaInfo!);
+                        _ = _charaDataManager.ApplyCharaDataToGposeTarget(meta!);
                     }
-                }
+                }, "Apply this Character Data to the current GPose actor", _charaDataManager.LastDownloadedMetaInfo, hasValidGposeTarget, false);
+                ImGui.SameLine();
+                GposeMetaInfoAction((meta) =>
+                {
+                    if (_uiSharedService.IconTextButton(FontAwesomeIcon.Plus, $"Download and Spawn"))
+                    {
+                        _ = _charaDataManager.SpawnAndApplyData(meta!);
+                    }
+                }, "Spawn a new Brio actor and apply this Character Data", _charaDataManager.LastDownloadedMetaInfo, hasValidGposeTarget, true);
                 ImGui.SameLine();
                 ImGui.AlignTextToFramePadding();
                 DrawAddOrRemoveFavorite(_charaDataManager.LastDownloadedMetaInfo);
@@ -1262,6 +1121,12 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                     ImGui.TextUnformatted("Is Downloadable");
                     ImGui.SameLine(150);
                     _uiSharedService.BooleanToColoredIcon(metaInfo?.CanBeDownloaded ?? false, inline: false);
+                    ImGui.TextUnformatted("Poses");
+                    ImGui.SameLine(150);
+                    if (metaInfo?.HasPoses ?? false)
+                        DrawPoseData(metaInfo, gposeTargetName, hasValidGposeTarget);
+                    else
+                        _uiSharedService.BooleanToColoredIcon(false, false);
                 }
             }
         }
@@ -1303,13 +1168,9 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                 using var indent = ImRaii.PushIndent(10f);
                 foreach (var data in _charaDataManager.OwnCharaData.Values)
                 {
-                    DrawMetaInfoData(canApplyInGpose, new(data.Id, data.Uploader)
-                    {
-                        CanBeDownloaded = !data.HasMissingFiles
-                                && !string.IsNullOrEmpty(data.GlamourerData),
-                        Description = data.Description,
-                        UpdatedDate = data.UpdatedDate,
-                    });
+                    var hasMetaInfo = _charaDataManager.TryGetMetaInfo(data.Uploader.UID + ":" + data.Id, out var metaInfo);
+                    if (!hasMetaInfo) continue;
+                    DrawMetaInfoData(gposeTargetName, hasValidGposeTarget, metaInfo!);
                 }
             }
         }
@@ -1367,7 +1228,6 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                     }
                 }
 
-
                 if (_filteredDict == null && _charaDataManager.GetSharedWithYouTask == null)
                 {
                     _filteredDict = _charaDataManager.SharedWithYouData
@@ -1388,12 +1248,12 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                 ImGuiHelpers.ScaledDummy(5);
                 foreach (var entry in _filteredDict ?? [])
                 {
-                    using var tree = ImRaii.TreeNode(entry.Key);
+                    using var tree = ImRaii.TreeNode($"{entry.Key} - [{entry.Value.Count} Character Data Sets]");
                     if (!tree) continue;
 
                     foreach (var data in entry.Value)
                     {
-                        DrawMetaInfoData(canApplyInGpose, data);
+                        DrawMetaInfoData(gposeTargetName, hasValidGposeTarget, data);
                     }
                 }
             }
@@ -1454,9 +1314,12 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                             }
                             UiSharedService.AttachToolTip($"Apply to {targetName}");
                             ImGui.SameLine();
-                            if (_uiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Spawn Actor and Apply"))
+                            using (ImRaii.Disabled(!_charaDataManager.BrioAvailable))
                             {
-                                _charaDataManager.McdfSpawnApplyToGposeTarget();
+                                if (_uiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Spawn Actor and Apply"))
+                                {
+                                    _charaDataManager.McdfSpawnApplyToGposeTarget();
+                                }
                             }
                         }
                     }
@@ -1471,79 +1334,6 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                 else
                 {
                     UiSharedService.ColorTextWrapped("Loading Character...", ImGuiColors.DalamudYellow);
-                }
-            }
-        }
-    }
-
-    private Dictionary<string, (CharaDataFavorite Favorite, CharaDataMetaInfoExtendedDto? MetaInfo, bool DownloadedMetaInfo)> _filteredFavorites = [];
-
-    private void UpdateFilteredFavorites()
-    {
-        _ = Task.Run(async () =>
-        {
-            if (_charaDataManager.DownloadMetaInfoTask != null)
-            {
-                await _charaDataManager.DownloadMetaInfoTask.ConfigureAwait(false);
-            }
-            Dictionary<string, (CharaDataFavorite, CharaDataMetaInfoExtendedDto?, bool)> newFiltered = [];
-            foreach (var favorite in _configService.Current.FavoriteCodes)
-            {
-                var uid = favorite.Key.Split(":")[0];
-                var note = _serverConfigurationManager.GetNoteForUid(uid) ?? string.Empty;
-                bool hasMetaInfo = _charaDataManager.TryGetMetaInfo(favorite.Key, out var metaInfo);
-                bool addFavorite =
-                    (string.IsNullOrEmpty(_filterCodeNote)
-                        || (note.Contains(_filterCodeNote, StringComparison.OrdinalIgnoreCase)
-                        || uid.Contains(_filterCodeNote, StringComparison.OrdinalIgnoreCase)))
-                    && (string.IsNullOrEmpty(_filterDescription)
-                        || (favorite.Value.CustomDescription.Contains(_filterDescription, StringComparison.OrdinalIgnoreCase)
-                        || (metaInfo != null && metaInfo!.Description.Contains(_filterDescription, StringComparison.OrdinalIgnoreCase))))
-                    && (!_filterPoseOnly
-                        || (metaInfo != null && metaInfo!.HasPoses))
-                    && (!_filterWorldOnly
-                        || (metaInfo != null && metaInfo!.HasWorldData));
-                if (addFavorite)
-                {
-                    newFiltered[favorite.Key] = (favorite.Value, metaInfo, hasMetaInfo);
-                }
-            }
-
-            _filteredFavorites = newFiltered;
-        });
-    }
-
-    private void DrawPoseData(CharaDataMetaInfoExtendedDto? metaInfo, Action<PoseEntryExtended> onClick, Func<PoseEntryExtended, bool> canClick, string onClickDescription)
-    {
-        if (metaInfo?.PoseData != null)
-        {
-            ImGui.NewLine();
-            foreach (var item in metaInfo.PoseExtended)
-            {
-                if (string.IsNullOrEmpty(item.PoseData)) continue;
-
-                bool hasWorldData = item.WorldData!.Value != default;
-                ImGui.SameLine();
-                var posX = ImGui.GetCursorPosX();
-                _uiSharedService.IconText(hasWorldData ? FontAwesomeIcon.Circle : FontAwesomeIcon.Running);
-                if (hasWorldData)
-                {
-                    ImGui.SameLine();
-                    ImGui.SetCursorPosX(posX);
-                    using var col = ImRaii.PushColor(ImGuiCol.Text, ImGui.GetColorU32(ImGuiCol.WindowBg));
-                    _uiSharedService.IconText(FontAwesomeIcon.Running);
-                    ImGui.SameLine();
-                    ImGui.SetCursorPosX(posX);
-                    _uiSharedService.IconText(FontAwesomeIcon.Running);
-                }
-
-                bool canClickItem = canClick(item);
-                var tooltipText = string.IsNullOrEmpty(item.Description) ? "No description set" : "Pose Description: " + item.Description + UiSharedService.TooltipSeparator
-                    + GetWorldDataTooltipText(item) + (canClickItem ? UiSharedService.TooltipSeparator + onClickDescription : string.Empty);
-                UiSharedService.AttachToolTip(tooltipText);
-                if (canClick(item) && ImGui.IsItemClicked(ImGuiMouseButton.Left))
-                {
-                    onClick(item);
                 }
             }
         }
@@ -1764,7 +1554,7 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
         DrawEditCharaData(dto);
     }
 
-    private void DrawMetaInfoData(bool canApplyInGpose, CharaDataMetaInfoDto data)
+    private void DrawMetaInfoData(string selectedGposeActor, bool hasValidGposeTarget, CharaDataMetaInfoExtendedDto data)
     {
         ImGuiHelpers.ScaledDummy(5);
         using var entryId = ImRaii.PushId(data.Uploader.AliasOrUID + ":" + data.Id);
@@ -1786,7 +1576,8 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
                 UiSharedService.AttachToolTip("This data is incomplete on the server and cannot be downloaded. Contact the owner so they can fix it. If you are the owner, review the data in the MCD Online tab.");
             }
 
-            var offsetFromRight = availableWidth - _uiSharedService.GetIconSize(FontAwesomeIcon.Calendar).X - _uiSharedService.GetIconTextButtonSize(FontAwesomeIcon.ArrowRight, "Apply") - ImGui.GetStyle().ItemSpacing.X;
+            var offsetFromRight = availableWidth - _uiSharedService.GetIconSize(FontAwesomeIcon.Calendar).X - _uiSharedService.GetIconButtonSize(FontAwesomeIcon.ArrowRight).X
+                - _uiSharedService.GetIconButtonSize(FontAwesomeIcon.Plus).X - ImGui.GetStyle().ItemSpacing.X * 2;
 
             ImGui.SameLine();
             ImGui.SetCursorPosX(offsetFromRight);
@@ -1794,17 +1585,23 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
             UiSharedService.AttachToolTip($"Last Update: {data.UpdatedDate}");
 
             ImGui.SameLine();
-            using (ImRaii.Disabled(!canApplyInGpose || !data.CanBeDownloaded))
+            GposeMetaInfoAction((meta) =>
             {
-                if (_uiSharedService.IconTextButton(FontAwesomeIcon.ArrowRight, $"Apply"))
+                if (_uiSharedService.IconButton(FontAwesomeIcon.ArrowRight))
                 {
-                    _ = _charaDataManager.ApplyCharaDataToGposeTarget(data);
+                    _ = _charaDataManager.ApplyCharaDataToGposeTarget(meta!);
                 }
-            }
-            UiSharedService.AttachToolTip("Applies the data to selected GPose actor");
+            }, $"Apply Character data to {selectedGposeActor}", data, hasValidGposeTarget, false);
+            ImGui.SameLine();
+            GposeMetaInfoAction((meta) =>
+            {
+                if (_uiSharedService.IconButton(FontAwesomeIcon.Plus))
+                {
+                    _ = _charaDataManager.SpawnAndApplyData(meta!);
+                }
+            }, "Spawn and Apply Character data", data, hasValidGposeTarget, true);
 
-            ImGui.Dummy(new(0, 0));
-            ImGui.SameLine(favPos - startPos);
+            using var indent = ImRaii.PushIndent(favPos - startPos);
 
             if (string.IsNullOrEmpty(data.Description))
             {
@@ -1814,7 +1611,245 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
             {
                 UiSharedService.TextWrapped(data.Description, availableWidth);
             }
+
+            ImGui.NewLine();
+            DrawPoseData(data, selectedGposeActor, hasValidGposeTarget);
         });
+    }
+
+    private void DrawNearbyPoses()
+    {
+        _uiSharedService.BigText("Poses Nearby");
+
+        using (var helpTree = ImRaii.TreeNode("What is this? (Explanation / Help)"))
+        {
+            if (helpTree)
+            {
+                UiSharedService.TextWrapped("This tab will show you all Shared World Poses nearby you." + Environment.NewLine + Environment.NewLine
+                    + "Shared World Poses are poses in character data that have world data attached to them and are set to shared. "
+                    + "This means that all data that is in 'Shared with You' that has a pose with world data attached to it will be shown here if you are nearby." + Environment.NewLine
+                    + "By default all poses that are shared will be shown. Poses taken in housing areas will by default only be shown on the correct server and location." + Environment.NewLine + Environment.NewLine
+                    + "Shared World Poses will appear in the world as floating wisps, as well as in the list below. You can mouse over a Shared World Pose in the list for it to get highlighted in the world." + Environment.NewLine + Environment.NewLine
+                    + "You can apply Shared World Poses to yourself or spawn the associated character to pose with them." + Environment.NewLine + Environment.NewLine
+                    + "You can adjust the filter and change further settings in the 'Settings & Filter' foldout.");
+            }
+        }
+
+        using (var tree = ImRaii.TreeNode("Settings & Filters"))
+        {
+            if (tree)
+            {
+                string filterByUser = _charaDataNearbyManager.UserNoteFilter;
+                if (ImGui.InputTextWithHint("##filterbyuser", "Filter by User", ref filterByUser, 50))
+                {
+                    _charaDataNearbyManager.UserNoteFilter = filterByUser;
+                }
+                bool onlyCurrent = _configService.Current.NearbyOwnServerOnly;
+                if (ImGui.Checkbox("Only show Poses on current server", ref onlyCurrent))
+                {
+                    _configService.Current.NearbyOwnServerOnly = onlyCurrent;
+                    _configService.Save();
+                }
+                _uiSharedService.DrawHelpText("Toggling this off will show you the location of all shared Poses with World Data from all Servers");
+                bool ignoreHousing = _configService.Current.NearbyIgnoreHousingLimitations;
+                if (ImGui.Checkbox("Ignore Housing Limitations", ref ignoreHousing))
+                {
+                    _configService.Current.NearbyIgnoreHousingLimitations = ignoreHousing;
+                    _configService.Save();
+                }
+                _uiSharedService.DrawHelpText("This will display all poses in their location regardless of housing limitations. (Ignoring Ward, Plot, Room etc.)" + UiSharedService.TooltipSeparator
+                    + "Note: Poses that utilize housing props, furniture, etc. will not be displayed correctly if not spawned in the right location.");
+                bool showWisps = _configService.Current.NearbyDrawWisps;
+                if (ImGui.Checkbox("Show Pose Wisps in the overworld", ref showWisps))
+                {
+                    _configService.Current.NearbyDrawWisps = showWisps;
+                    _configService.Save();
+                }
+                _uiSharedService.DrawHelpText("When enabled, Mare will draw floating wisps where other's poses are in the world.");
+                int poseDetectionDistance = _configService.Current.NearbyDistanceFilter;
+                ImGui.SetNextItemWidth(100);
+                if (ImGui.SliderInt("Detection Distance", ref poseDetectionDistance, 5, 1000))
+                {
+                    _configService.Current.NearbyDistanceFilter = poseDetectionDistance;
+                    _configService.Save();
+                }
+                _uiSharedService.DrawHelpText("This setting allows you to change the maximum distance in which poses will be shown. Set it to the maximum if you want to see all poses on the current map.");
+            }
+        }
+
+        if (!_uiSharedService.IsInGpose)
+        {
+            ImGuiHelpers.ScaledDummy(5);
+            UiSharedService.DrawGroupedCenteredColorText("Spawning and applying pose data is only available in GPose.", ImGuiColors.DalamudYellow);
+        }
+
+        UiSharedService.DistanceSeparator();
+
+        using var child = ImRaii.Child("nearbyPosesChild", new(0, 0), false, ImGuiWindowFlags.AlwaysAutoResize);
+
+        ImGuiHelpers.ScaledDummy(3f);
+
+        using var indent = ImRaii.PushIndent(5f);
+        if (_charaDataNearbyManager.NearbyData.Count == 0)
+        {
+            UiSharedService.DrawGroupedCenteredColorText("No Shared World Poses found nearby.", ImGuiColors.DalamudYellow);
+        }
+
+        var hasValidGposeTarget = _charaDataManager.CanApplyInGpose(out string gposeTarget);
+
+        bool wasAnythingHovered = false;
+        int i = 0;
+        foreach (var pose in _charaDataNearbyManager.NearbyData.OrderBy(v => v.Value.Distance))
+        {
+            using var poseId = ImRaii.PushId("nearbyPose" + (i++));
+            var pos = ImGui.GetCursorPos();
+            var circleDiameter = 60f;
+            var circleOriginX = ImGui.GetWindowContentRegionMax().X - circleDiameter - pos.X;
+            float circleOffsetY = 0;
+
+            UiSharedService.DrawGrouped(() =>
+            {
+                string? userNote = _serverConfigurationManager.GetNoteForUid(pose.Key.MetaInfo.Uploader.UID);
+                var noteText = userNote == null ? pose.Key.MetaInfo.Uploader.AliasOrUID : $"{userNote} ({pose.Key.MetaInfo.Uploader.AliasOrUID})";
+                ImGui.TextUnformatted("Pose by");
+                ImGui.SameLine();
+                UiSharedService.ColorText(noteText, ImGuiColors.ParsedGreen);
+                using (ImRaii.Group())
+                {
+                    UiSharedService.ColorText("Character Data Description", ImGuiColors.DalamudGrey);
+                    ImGui.SameLine();
+                    _uiSharedService.IconText(FontAwesomeIcon.ExternalLinkAlt, ImGuiColors.DalamudGrey);
+                }
+                UiSharedService.AttachToolTip(pose.Key.MetaInfo.Description);
+                UiSharedService.ColorText("Description", ImGuiColors.DalamudGrey);
+                ImGui.SameLine();
+                UiSharedService.TextWrapped(pose.Key.Description ?? "No Pose Description was set", circleOriginX);
+                var posAfterGroup = ImGui.GetCursorPos();
+                var groupHeightCenter = (posAfterGroup.Y - pos.Y) / 2;
+                circleOffsetY = (groupHeightCenter - circleDiameter / 2);
+                if (circleOffsetY < 0) circleOffsetY = 0;
+                ImGui.SetCursorPos(new Vector2(circleOriginX, pos.Y));
+                ImGui.Dummy(new Vector2(circleDiameter, circleDiameter));
+                UiSharedService.AttachToolTip("Click to open corresponding map and set map marker" + UiSharedService.TooltipSeparator
+                    + pose.Key.WorldDataDescriptor);
+                if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
+                {
+                    _dalamudUtilService.SetMarkerAndOpenMap(pose.Key.Position, pose.Key.Map);
+                }
+                ImGui.SetCursorPos(posAfterGroup);
+                if (_uiSharedService.IsInGpose)
+                {
+                    GposePoseAction(() =>
+                    {
+                        if (_uiSharedService.IconTextButton(FontAwesomeIcon.ArrowRight, "Apply Pose"))
+                        {
+                            _charaDataManager.ApplyFullPoseDataToGposeTarget(pose.Key);
+                        }
+                    }, $"Apply pose and position to {gposeTarget}", hasValidGposeTarget);
+                    ImGui.SameLine();
+                    GposeMetaInfoAction((_) =>
+                    {
+                        if (_uiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Spawn and Pose"))
+                        {
+                            _charaDataManager.SpawnAndApplyWorldTransform(pose.Key.MetaInfo, pose.Key);
+                        }
+                    }, "Spawn actor and apply pose and position", pose.Key.MetaInfo, hasValidGposeTarget, true);
+                }
+            });
+            if (ImGui.IsItemHovered())
+            {
+                wasAnythingHovered = true;
+                _nearbyHovered = pose.Key;
+            }
+            var drawList = ImGui.GetWindowDrawList();
+            var circleRadius = circleDiameter / 2f;
+            var windowPos = ImGui.GetWindowPos();
+            var circleCenter = new Vector2(windowPos.X + circleOriginX + circleRadius, windowPos.Y + pos.Y + circleRadius + circleOffsetY);
+            var rads = pose.Value.Direction * (Math.PI / 180);
+
+            float halfConeAngleRadians = 15f * (float)Math.PI / 180f;
+            Vector2 baseDir1 = new Vector2((float)Math.Sin(rads - halfConeAngleRadians), -(float)Math.Cos(rads - halfConeAngleRadians));
+            Vector2 baseDir2 = new Vector2((float)Math.Sin(rads + halfConeAngleRadians), -(float)Math.Cos(rads + halfConeAngleRadians));
+
+            Vector2 coneBase1 = circleCenter + baseDir1 * circleRadius;
+            Vector2 coneBase2 = circleCenter + baseDir2 * circleRadius;
+
+            // Draw the cone as a filled triangle
+            drawList.AddTriangleFilled(circleCenter, coneBase1, coneBase2, UiSharedService.Color(ImGuiColors.ParsedGreen));
+            drawList.AddCircle(circleCenter, circleDiameter / 2, UiSharedService.Color(ImGuiColors.DalamudWhite), 360, 2);
+            var distance = pose.Value.Distance.ToString("0.0") + "y";
+            var textSize = ImGui.CalcTextSize(distance);
+            drawList.AddText(new Vector2(circleCenter.X - textSize.X / 2, circleCenter.Y + textSize.Y / 3f), UiSharedService.Color(ImGuiColors.DalamudWhite), distance);
+
+            ImGuiHelpers.ScaledDummy(3);
+        }
+
+        if (!wasAnythingHovered) _nearbyHovered = null;
+        _charaDataNearbyManager.SetHoveredVfx(_nearbyHovered);
+    }
+
+    private void DrawPoseData(CharaDataMetaInfoExtendedDto? metaInfo, string actor, bool hasValidGposeTarget)
+    {
+        if (metaInfo == null || !metaInfo.HasPoses) return;
+
+        bool isInGpose = _uiSharedService.IsInGpose;
+        var start = ImGui.GetCursorPosX();
+        foreach (var item in metaInfo.PoseExtended)
+        {
+            if (!item.HasPoseData) continue;
+
+            ImGui.SameLine();
+
+            float DrawIcon(float s)
+            {
+                ImGui.SetCursorPosX(s);
+                var posX = ImGui.GetCursorPosX();
+                _uiSharedService.IconText(item.HasWorldData ? FontAwesomeIcon.Circle : FontAwesomeIcon.Running);
+                if (item.HasWorldData)
+                {
+                    ImGui.SameLine();
+                    ImGui.SetCursorPosX(posX);
+                    using var col = ImRaii.PushColor(ImGuiCol.Text, ImGui.GetColorU32(ImGuiCol.WindowBg));
+                    _uiSharedService.IconText(FontAwesomeIcon.Running);
+                    ImGui.SameLine();
+                    ImGui.SetCursorPosX(posX);
+                    _uiSharedService.IconText(FontAwesomeIcon.Running);
+                }
+                ImGui.SameLine();
+                return ImGui.GetCursorPosX();
+            }
+
+            string tooltip = string.IsNullOrEmpty(item.Description) ? "No description set" : "Pose Description: " + item.Description + UiSharedService.TooltipSeparator;
+            if (!isInGpose)
+            {
+                start = DrawIcon(start);
+                UiSharedService.AttachToolTip(tooltip + (item.HasWorldData ? GetWorldDataTooltipText(item) + UiSharedService.TooltipSeparator + "Click to show on Map" : string.Empty));
+                if (item.HasWorldData && ImGui.IsItemClicked(ImGuiMouseButton.Left))
+                {
+                    _dalamudUtilService.SetMarkerAndOpenMap(item.Position, item.Map);
+                }
+            }
+            else
+            {
+                tooltip += UiSharedService.TooltipSeparator + $"Left Click: Apply this pose to {actor}";
+                if (item.HasWorldData) tooltip += Environment.NewLine + $"CTRL+Right Click: Apply world position to {actor}."
+                        + UiSharedService.TooltipSeparator + "!!! CAUTION: Applying world position will likely yeet this actor into nirvana. Use at your own risk !!!";
+                ImGui.SameLine();
+                GposePoseAction(() =>
+                {
+                    start = DrawIcon(start);
+                    if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
+                    {
+                        _ = _charaDataManager.ApplyPoseData(item, actor);
+                    }
+                    if (ImGui.IsItemClicked(ImGuiMouseButton.Right) && UiSharedService.CtrlPressed())
+                    {
+                        _ = _charaDataManager.ApplyWorldDataToTarget(item, actor);
+                    }
+
+                }, tooltip, hasValidGposeTarget);
+            }
+        }
     }
 
     private void DrawSettings()
@@ -1897,6 +1932,104 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
         ImGuiHelpers.ScaledDummy(5);
     }
 
+    private void GposeMetaInfoAction(Action<CharaDataMetaInfoExtendedDto?> gposeActionDraw, string actionDescription, CharaDataMetaInfoExtendedDto? dto, bool hasValidGposeTarget, bool isSpawning)
+    {
+        StringBuilder sb = new StringBuilder();
+
+        sb.AppendLine(actionDescription);
+        bool isDisabled = false;
+
+        void AddErrorStart(StringBuilder sb)
+        {
+            sb.Append(UiSharedService.TooltipSeparator);
+            sb.AppendLine("Cannot execute:");
+        }
+
+        if (dto == null)
+        {
+            if (!isDisabled) AddErrorStart(sb);
+            sb.AppendLine("- No metainfo present");
+            isDisabled = true;
+        }
+        if (!dto?.CanBeDownloaded ?? false)
+        {
+            if (!isDisabled) AddErrorStart(sb);
+            sb.AppendLine("- Character is not downloadable");
+            isDisabled = true;
+        }
+        if (!_uiSharedService.IsInGpose)
+        {
+            if (!isDisabled) AddErrorStart(sb);
+            sb.AppendLine("- Requires to be in GPose");
+            isDisabled = true;
+        }
+        if (!hasValidGposeTarget && !isSpawning)
+        {
+            if (!isDisabled) AddErrorStart(sb);
+            sb.AppendLine("- Requires a valid GPose target");
+            isDisabled = true;
+        }
+        if (isSpawning && !_charaDataManager.BrioAvailable)
+        {
+            if (!isDisabled) AddErrorStart(sb);
+            sb.AppendLine("- Requires Brio to be installed.");
+            isDisabled = true;
+        }
+
+        using (ImRaii.Group())
+        {
+            using var dis = ImRaii.Disabled(isDisabled);
+            gposeActionDraw.Invoke(dto);
+        }
+        if (sb.Length > 0)
+        {
+            UiSharedService.AttachToolTip(sb.ToString());
+        }
+    }
+
+    private void GposePoseAction(Action poseActionDraw, string poseDescription, bool hasValidGposeTarget)
+    {
+        StringBuilder sb = new StringBuilder();
+
+        sb.AppendLine(poseDescription);
+        bool isDisabled = false;
+
+        void AddErrorStart(StringBuilder sb)
+        {
+            sb.Append(UiSharedService.TooltipSeparator);
+            sb.AppendLine("Cannot execute:");
+        }
+
+        if (!_uiSharedService.IsInGpose)
+        {
+            if (!isDisabled) AddErrorStart(sb);
+            sb.AppendLine("- Requires to be in GPose");
+            isDisabled = true;
+        }
+        if (!hasValidGposeTarget)
+        {
+            if (!isDisabled) AddErrorStart(sb);
+            sb.AppendLine("- Requires a valid GPose target");
+            isDisabled = true;
+        }
+        if (!_charaDataManager.BrioAvailable)
+        {
+            if (!isDisabled) AddErrorStart(sb);
+            sb.AppendLine("- Requires Brio to be installed.");
+            isDisabled = true;
+        }
+
+        using (ImRaii.Group())
+        {
+            using var dis = ImRaii.Disabled(isDisabled);
+            poseActionDraw.Invoke();
+        }
+        if (sb.Length > 0)
+        {
+            UiSharedService.AttachToolTip(sb.ToString());
+        }
+    }
+
     private void SetWindowSizeConstraints(bool? inGposeTab = null)
     {
         SizeConstraints = new()
@@ -1905,6 +2038,42 @@ internal sealed class CharaDataHubUi : WindowMediatorSubscriberBase
             MaximumSize = new((inGposeTab ?? false) ? 400 : 1000, 2000)
         };
     }
+
+    private void UpdateFilteredFavorites()
+    {
+        _ = Task.Run(async () =>
+        {
+            if (_charaDataManager.DownloadMetaInfoTask != null)
+            {
+                await _charaDataManager.DownloadMetaInfoTask.ConfigureAwait(false);
+            }
+            Dictionary<string, (CharaDataFavorite, CharaDataMetaInfoExtendedDto?, bool)> newFiltered = [];
+            foreach (var favorite in _configService.Current.FavoriteCodes)
+            {
+                var uid = favorite.Key.Split(":")[0];
+                var note = _serverConfigurationManager.GetNoteForUid(uid) ?? string.Empty;
+                bool hasMetaInfo = _charaDataManager.TryGetMetaInfo(favorite.Key, out var metaInfo);
+                bool addFavorite =
+                    (string.IsNullOrEmpty(_filterCodeNote)
+                        || (note.Contains(_filterCodeNote, StringComparison.OrdinalIgnoreCase)
+                        || uid.Contains(_filterCodeNote, StringComparison.OrdinalIgnoreCase)))
+                    && (string.IsNullOrEmpty(_filterDescription)
+                        || (favorite.Value.CustomDescription.Contains(_filterDescription, StringComparison.OrdinalIgnoreCase)
+                        || (metaInfo != null && metaInfo!.Description.Contains(_filterDescription, StringComparison.OrdinalIgnoreCase))))
+                    && (!_filterPoseOnly
+                        || (metaInfo != null && metaInfo!.HasPoses))
+                    && (!_filterWorldOnly
+                        || (metaInfo != null && metaInfo!.HasWorldData));
+                if (addFavorite)
+                {
+                    newFiltered[favorite.Key] = (favorite.Value, metaInfo, hasMetaInfo);
+                }
+            }
+
+            _filteredFavorites = newFiltered;
+        });
+    }
+
     private void UpdateFilteredItems()
     {
         if (_charaDataManager.GetSharedWithYouTask == null)

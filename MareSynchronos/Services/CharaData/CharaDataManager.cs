@@ -90,7 +90,7 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
     public Task? GetSharedWithYouTimeoutTask { get; private set; }
     public IEnumerable<HandledCharaDataEntry> HandledCharaData => _characterHandler.HandledCharaData;
     public bool Initialized { get; private set; }
-    public CharaDataMetaInfoDto? LastDownloadedMetaInfo { get; private set; }
+    public CharaDataMetaInfoExtendedDto? LastDownloadedMetaInfo { get; private set; }
     public Task<(MareCharaFileHeader LoadedFile, long ExpectedLength)>? LoadedMcdfHeader { get; private set; }
     public int MaxCreatableCharaData { get; private set; }
     public Task? McdfApplicationTask { get; private set; }
@@ -312,7 +312,7 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
                 await CacheData(metaInfo).ConfigureAwait(false);
                 if (store)
                 {
-                    LastDownloadedMetaInfo = metaInfo;
+                    LastDownloadedMetaInfo = await CharaDataMetaInfoExtendedDto.Create(metaInfo, _dalamudUtilService).ConfigureAwait(false);
                 }
                 return ("Ok", true);
             }
