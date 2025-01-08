@@ -1,4 +1,4 @@
-﻿using LZ4;
+﻿using K4os.Compression.LZ4.Legacy;
 using MareSynchronos.Interop.Ipc;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services.Mediator;
@@ -143,7 +143,7 @@ public sealed class FileCacheManager : IHostedService
     public async Task<(string, byte[])> GetCompressedFileData(string fileHash, CancellationToken uploadToken)
     {
         var fileCache = GetFileCacheByHash(fileHash)!.ResolvedFilepath;
-        return (fileHash, LZ4Codec.WrapHC(await File.ReadAllBytesAsync(fileCache, uploadToken).ConfigureAwait(false), 0,
+        return (fileHash, LZ4Wrapper.WrapHC(await File.ReadAllBytesAsync(fileCache, uploadToken).ConfigureAwait(false), 0,
             (int)new FileInfo(fileCache).Length));
     }
 

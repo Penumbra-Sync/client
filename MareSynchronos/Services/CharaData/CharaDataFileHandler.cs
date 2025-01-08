@@ -1,5 +1,5 @@
 ﻿using Dalamud.Game.ClientState.Objects.SubKinds;
-using LZ4;
+using K4os.Compression.LZ4.Legacy;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Dto.CharaData;

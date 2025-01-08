@@ -1,5 +1,5 @@
 ﻿using Dalamud.Utility;
-using LZ4;
+using K4os.Compression.LZ4.Legacy;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.Files;
 using MareSynchronos.API.Routes;
@@ -326,7 +326,7 @@ public partial class FileDownloadManager : DisposableMediatorSubscriberBase
                         _ = await fileBlockStream.ReadAsync(compressedFileContent, token).ConfigureAwait(false);
                         MungeBuffer(compressedFileContent);
 
-                        var decompressedFile = LZ4Codec.Unwrap(compressedFileContent);
+                        var decompressedFile = LZ4Wrapper.Unwrap(compressedFileContent);
                         var filePath = _fileDbManager.GetCacheFilePath(fileHash, fileExtension);
                         await _fileCompactor.WriteAllBytesAsync(filePath, decompressedFile, token).ConfigureAwait(false);
 

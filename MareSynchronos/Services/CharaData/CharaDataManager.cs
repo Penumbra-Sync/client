@@ -1,5 +1,5 @@
 ﻿using Dalamud.Game.ClientState.Objects.Types;
-using LZ4;
+using K4os.Compression.LZ4.Legacy;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.CharaData;
 using MareSynchronos.Interop.Ipc;
@@ -164,7 +164,7 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
             var gposeChara = await _dalamudUtilService.GetGposeCharacterFromObjectTableByNameAsync(targetName, true).ConfigureAwait(false);
             if (gposeChara == null) return;
 
-            var poseJson = Encoding.UTF8.GetString(LZ4Codec.Unwrap(Convert.FromBase64String(pose.PoseData)));
+            var poseJson = Encoding.UTF8.GetString(LZ4Wrapper.Unwrap(Convert.FromBase64String(pose.PoseData)));
             if (string.IsNullOrEmpty(poseJson)) return;
 
             await _ipcManager.Brio.SetPoseAsync(gposeChara.Address, poseJson).ConfigureAwait(false);
@@ -611,7 +611,7 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
             var poseData = await _ipcManager.Brio.GetPoseAsync(playerChar.Address).ConfigureAwait(false);
             if (poseData == null) return;
 
-            var compressedByteData = LZ4Codec.WrapHC(Encoding.UTF8.GetBytes(poseData));
+            var compressedByteData = LZ4Wrapper.WrapHC(Encoding.UTF8.GetBytes(poseData));
             pose.PoseData = Convert.ToBase64String(compressedByteData);
             updateDto.UpdatePoseList();
         });

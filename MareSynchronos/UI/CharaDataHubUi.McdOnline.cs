@@ -180,7 +180,7 @@ internal sealed partial class CharaDataHubUi
         if (dataDto == null)
         {
             ImGuiHelpers.ScaledDummy(5);
-            UiSharedService.ColorTextWrapped("Select an entry above to edit its data.", ImGuiColors.DalamudYellow);
+            UiSharedService.DrawGroupedCenteredColorText("Select an entry above to edit its data.", ImGuiColors.DalamudYellow);
             return;
         }
 
@@ -188,7 +188,7 @@ internal sealed partial class CharaDataHubUi
 
         if (updateDto == null)
         {
-            UiSharedService.ColorTextWrapped("Something went awfully wrong and there's no update DTO. Try updating Character Data via the button above.", ImGuiColors.DalamudYellow);
+            UiSharedService.DrawGroupedCenteredColorText("Something went awfully wrong and there's no update DTO. Try updating Character Data via the button above.", ImGuiColors.DalamudYellow);
             return;
         }
 
