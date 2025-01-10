@@ -99,6 +99,8 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
         base.Dispose(disposing);
     }
 
+    private bool _isHandlingSelf = false;
+
     protected override void DrawInternal()
     {
         _disableUI = !(_charaDataManager.UiBlockingComputation?.IsCompleted ?? true);
@@ -150,10 +152,16 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
 
         SetWindowSizeConstraints(smallUi);
 
-        bool isHandlingSelf = _charaDataManager.HandledCharaData.Any(c => c.IsSelf);
-        using (ImRaii.Disabled(isHandlingSelf))
+        _isHandlingSelf = _charaDataManager.HandledCharaData.Any(c => c.IsSelf);
+        using (ImRaii.Disabled(_isHandlingSelf))
         {
-            using (var mcdOnlineTabItem = ImRaii.TabItem("MCD Online"))
+            ImGuiTabItemFlags flags = ImGuiTabItemFlags.None;
+            if (_openMcdOnlineOnNextRun && !_isHandlingSelf)
+            {
+                flags = ImGuiTabItemFlags.SetSelected;
+                _openMcdOnlineOnNextRun = false;
+            }
+            using (var mcdOnlineTabItem = ImRaii.TabItem("MCD Online", flags))
             {
                 if (mcdOnlineTabItem)
                 {
@@ -161,7 +169,7 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
                     DrawMcdOnline();
                 }
             }
-            if (isHandlingSelf)
+            if (_isHandlingSelf)
             {
                 UiSharedService.AttachToolTip("Cannot use MCD Online while having Character Data applied to self.");
             }
@@ -174,7 +182,7 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
                     DrawMcdfExport();
                 }
             }
-            if (isHandlingSelf)
+            if (_isHandlingSelf)
             {
                 UiSharedService.AttachToolTip("Cannot use MCDF Export while having Character Data applied to self.");
             }
@@ -280,6 +288,7 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
                             ImGui.SameLine();
                             UiSharedService.AttachToolTip($"Target the GPose Character {actor.Name.TextValue}");
                             ImGui.AlignTextToFramePadding();
+                            var pos = ImGui.GetCursorPosX();
                             using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.HealerGreen, actor.Address == (_dalamudUtilService.GposeTargetGameObject?.Address ?? nint.Zero)))
                             {
                                 ImGui.TextUnformatted(actor.Name.TextValue);
@@ -308,6 +317,7 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
                                     _charaDataManager.RevertChara(handled);
                                 }
                                 UiSharedService.AttachToolTip($"Revert applied data from {actor.Name.TextValue}");
+                                ImGui.SetCursorPosX(pos);
                                 DrawPoseData(handled?.MetaInfo, actor.Name.TextValue, true);
                             }
                         });
@@ -488,7 +498,6 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
                             _configService.Save();
                         }
 
-                        ImGui.NewLine();
                         DrawPoseData(metaInfo, _gposeTarget, _hasValidGposeTarget);
                     });
 
@@ -621,8 +630,10 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
                 {
                     var hasMetaInfo = _charaDataManager.TryGetMetaInfo(data.Uploader.UID + ":" + data.Id, out var metaInfo);
                     if (!hasMetaInfo) continue;
-                    DrawMetaInfoData(_gposeTarget, _hasValidGposeTarget, metaInfo!);
+                    DrawMetaInfoData(_gposeTarget, _hasValidGposeTarget, metaInfo!, true);
                 }
+
+                ImGuiHelpers.ScaledDummy(5);
             }
         }
 
@@ -644,19 +655,8 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
 
                 ImGuiHelpers.ScaledDummy(5);
 
-                using (ImRaii.Disabled(_charaDataManager.GetAllDataTask != null
-                    || (_charaDataManager.GetSharedWithYouTimeoutTask != null && !_charaDataManager.GetSharedWithYouTimeoutTask.IsCompleted)))
-                {
-                    if (_uiSharedService.IconTextButton(FontAwesomeIcon.ArrowCircleDown, "Download Character Data Shared With You"))
-                    {
-                        _ = _charaDataManager.GetAllSharedData(_disposalCts.Token);
-                        _filteredDict = null;
-                    }
-                }
-                if (_charaDataManager.GetSharedWithYouTimeoutTask != null && !_charaDataManager.GetSharedWithYouTimeoutTask.IsCompleted)
-                {
-                    UiSharedService.AttachToolTip("You can only refresh all character data from server every minute. Please wait.");
-                }
+                DrawUpdateSharedDataButton();
+
                 using (var filterNode = ImRaii.TreeNode("Filters"))
                 {
                     if (filterNode)
@@ -699,13 +699,14 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
                 ImGuiHelpers.ScaledDummy(5);
                 foreach (var entry in _filteredDict ?? [])
                 {
-                    using var tree = ImRaii.TreeNode($"{entry.Key} - [{entry.Value.Count} Character Data Sets]");
+                    using var tree = ImRaii.TreeNode($"{entry.Key} - [{entry.Value.Count} Character Data Sets]##{entry.Key}");
                     if (!tree) continue;
 
                     foreach (var data in entry.Value)
                     {
                         DrawMetaInfoData(_gposeTarget, _hasValidGposeTarget, data);
                     }
+                    ImGuiHelpers.ScaledDummy(5);
                 }
             }
         }
@@ -831,7 +832,7 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
         }
     }
 
-    private void DrawMetaInfoData(string selectedGposeActor, bool hasValidGposeTarget, CharaDataMetaInfoExtendedDto data)
+    private void DrawMetaInfoData(string selectedGposeActor, bool hasValidGposeTarget, CharaDataMetaInfoExtendedDto data, bool canOpen = false)
     {
         ImGuiHelpers.ScaledDummy(5);
         using var entryId = ImRaii.PushId(data.Uploader.AliasOrUID + ":" + data.Id);
@@ -880,6 +881,22 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
 
             using var indent = ImRaii.PushIndent(favPos - startPos);
 
+            if (canOpen)
+            {
+                using (ImRaii.Disabled(_isHandlingSelf))
+                {
+                    if (_uiSharedService.IconTextButton(FontAwesomeIcon.Edit, "Open in MCD Online Editor"))
+                    {
+                        _selectedDtoId = data.Id;
+                        _openMcdOnlineOnNextRun = true;
+                    }
+                }
+                if (_isHandlingSelf)
+                {
+                    UiSharedService.AttachToolTip("Cannot use MCD Online while having Character Data applied to self.");
+                }
+            }
+
             if (string.IsNullOrEmpty(data.Description))
             {
                 UiSharedService.ColorTextWrapped("No description set", ImGuiColors.DalamudGrey, availableWidth);
@@ -889,10 +906,11 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
                 UiSharedService.TextWrapped(data.Description, availableWidth);
             }
 
-            ImGui.NewLine();
             DrawPoseData(data, selectedGposeActor, hasValidGposeTarget);
         });
     }
+
+    private bool _openMcdOnlineOnNextRun = false;
 
     private void DrawPoseData(CharaDataMetaInfoExtendedDto? metaInfo, string actor, bool hasValidGposeTarget)
     {
@@ -903,8 +921,6 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
         foreach (var item in metaInfo.PoseExtended)
         {
             if (!item.HasPoseData) continue;
-
-            ImGui.SameLine();
 
             float DrawIcon(float s)
             {
@@ -925,11 +941,11 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
                 return ImGui.GetCursorPosX();
             }
 
-            string tooltip = string.IsNullOrEmpty(item.Description) ? "No description set" : "Pose Description: " + item.Description + UiSharedService.TooltipSeparator;
+            string tooltip = string.IsNullOrEmpty(item.Description) ? "No description set" : "Pose Description: " + item.Description;
             if (!isInGpose)
             {
                 start = DrawIcon(start);
-                UiSharedService.AttachToolTip(tooltip + (item.HasWorldData ? GetWorldDataTooltipText(item) + UiSharedService.TooltipSeparator + "Click to show on Map" : string.Empty));
+                UiSharedService.AttachToolTip(tooltip + UiSharedService.TooltipSeparator + (item.HasWorldData ? GetWorldDataTooltipText(item) + UiSharedService.TooltipSeparator + "Click to show on Map" : string.Empty));
                 if (item.HasWorldData && ImGui.IsItemClicked(ImGuiMouseButton.Left))
                 {
                     _dalamudUtilService.SetMarkerAndOpenMap(item.Position, item.Map);
@@ -940,7 +956,6 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
                 tooltip += UiSharedService.TooltipSeparator + $"Left Click: Apply this pose to {actor}";
                 if (item.HasWorldData) tooltip += Environment.NewLine + $"CTRL+Right Click: Apply world position to {actor}."
                         + UiSharedService.TooltipSeparator + "!!! CAUTION: Applying world position will likely yeet this actor into nirvana. Use at your own risk !!!";
-                ImGui.SameLine();
                 GposePoseAction(() =>
                 {
                     start = DrawIcon(start);
@@ -952,10 +967,11 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
                     {
                         _ = _charaDataManager.ApplyWorldDataToTarget(item, actor);
                     }
-
                 }, tooltip, hasValidGposeTarget);
+                ImGui.SameLine();
             }
         }
+        if (metaInfo.PoseExtended.Any()) ImGui.NewLine();
     }
 
     private void DrawSettings()

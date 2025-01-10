@@ -122,7 +122,7 @@ internal sealed partial class CharaDataHubUi
                     if (ImGui.IsItemClicked()) _selectedDtoId = entry.Id;
                     if (eIcon != FontAwesomeIcon.None)
                     {
-                        UiSharedService.AttachToolTip($"This entry will expire on {entry.ExpiryDate}");
+                        UiSharedService.AttachToolTip($"This entry will expire on {entry.ExpiryDate.ToLocalTime()}");
                     }
                 }
             }
@@ -199,31 +199,34 @@ internal sealed partial class CharaDataHubUi
         }
 
         var indent = ImRaii.PushIndent(10f);
-        if (canUpdate)
+        if (canUpdate || (!_charaDataManager.UploadTask?.IsCompleted ?? false))
         {
             UiSharedService.DrawGrouped(() =>
             {
-                ImGui.AlignTextToFramePadding();
-                UiSharedService.ColorTextWrapped("Warning: You have unsaved changes!", ImGuiColors.DalamudRed);
-                ImGui.SameLine();
-                using (ImRaii.Disabled(_charaDataManager.CharaUpdateTask != null && !_charaDataManager.CharaUpdateTask.IsCompleted))
+                if (canUpdate)
                 {
-                    if (_uiSharedService.IconTextButton(FontAwesomeIcon.ArrowCircleUp, "Save to Server"))
-                    {
-                        _charaDataManager.UploadCharaData(dataDto.Id);
-                    }
+                    ImGui.AlignTextToFramePadding();
+                    UiSharedService.ColorTextWrapped("Warning: You have unsaved changes!", ImGuiColors.DalamudRed);
                     ImGui.SameLine();
-                    if (_uiSharedService.IconTextButton(FontAwesomeIcon.Undo, "Undo all changes"))
+                    using (ImRaii.Disabled(_charaDataManager.CharaUpdateTask != null && !_charaDataManager.CharaUpdateTask.IsCompleted))
                     {
-                        updateDto.UndoChanges();
+                        if (_uiSharedService.IconTextButton(FontAwesomeIcon.ArrowCircleUp, "Save to Server"))
+                        {
+                            _charaDataManager.UploadCharaData(dataDto.Id);
+                        }
+                        ImGui.SameLine();
+                        if (_uiSharedService.IconTextButton(FontAwesomeIcon.Undo, "Undo all changes"))
+                        {
+                            updateDto.UndoChanges();
+                        }
                     }
-                }
-                if (_charaDataManager.CharaUpdateTask != null && !_charaDataManager.CharaUpdateTask.IsCompleted)
-                {
-                    UiSharedService.ColorTextWrapped("Updating data on server, please wait.", ImGuiColors.DalamudYellow);
+                    if (_charaDataManager.CharaUpdateTask != null && !_charaDataManager.CharaUpdateTask.IsCompleted)
+                    {
+                        UiSharedService.ColorTextWrapped("Updating data on server, please wait.", ImGuiColors.DalamudYellow);
+                    }
                 }
 
-                if (_charaDataManager.UploadTask != null)
+                if (!_charaDataManager.UploadTask?.IsCompleted ?? false)
                 {
                     if (_disableUI) ImGui.EndDisabled();
 
@@ -512,7 +515,7 @@ internal sealed partial class CharaDataHubUi
         _uiSharedService.DrawHelpText("This will download and apply the saved character data to yourself. Once loaded it will automatically revert itself within 15 seconds." + UiSharedService.TooltipSeparator
             + "Note: Weapons will not be displayed correctly unless using the same job as the saved data.");
         if (_disableUI) ImGui.EndDisabled();
-        if (_charaDataManager.DataApplicationTask != null)
+        if ((!_charaDataManager.DataApplicationTask?.IsCompleted ?? false))
         {
             ImGui.SameLine();
             if (_uiSharedService.IconTextButton(FontAwesomeIcon.Ban, "Cancel Application"))
@@ -525,7 +528,7 @@ internal sealed partial class CharaDataHubUi
             ImGui.SameLine();
             UiSharedService.ColorTextWrapped(_charaDataManager.DataApplicationProgress, ImGuiColors.DalamudYellow);
         }
-        if (_charaDataManager.DataApplicationTask != null)
+        if ((!_charaDataManager.DataApplicationTask?.IsCompleted ?? false))
         {
             UiSharedService.ColorTextWrapped("WARNING: During the data application avoid switching zones, doing skills, emotes etc. to prevent potential crashes.", ImGuiColors.DalamudRed);
         }
@@ -538,7 +541,7 @@ internal sealed partial class CharaDataHubUi
         _uiSharedService.BooleanToColoredIcon(hasGlamourerdata, false);
 
         ImGui.TextUnformatted("Contains Files");
-        var hasFiles = (updateDto.FileGamePaths ?? []).Any();
+        var hasFiles = (updateDto.FileGamePaths ?? []).Any() || (dataDto.OriginalFiles.Any());
         ImGui.SameLine(200);
         _uiSharedService.BooleanToColoredIcon(hasFiles, false);
         if (hasFiles && updateDto.IsAppearanceEqual)

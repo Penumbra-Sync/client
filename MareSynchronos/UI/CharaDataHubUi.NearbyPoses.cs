@@ -43,13 +43,20 @@ internal partial class CharaDataHubUi
                     _configService.Save();
                 }
                 _uiSharedService.DrawHelpText("Toggling this off will show you the location of all shared Poses with World Data from all Servers");
+                bool showOwn = _configService.Current.NearbyShowOwnData;
+                if (ImGui.Checkbox("Also show your own data", ref showOwn))
+                {
+                    _configService.Current.NearbyShowOwnData = showOwn;
+                    _configService.Save();
+                }
+                _uiSharedService.DrawHelpText("Toggling this on will also show you the location of your own Poses");
                 bool ignoreHousing = _configService.Current.NearbyIgnoreHousingLimitations;
                 if (ImGui.Checkbox("Ignore Housing Limitations", ref ignoreHousing))
                 {
                     _configService.Current.NearbyIgnoreHousingLimitations = ignoreHousing;
                     _configService.Save();
                 }
-                _uiSharedService.DrawHelpText("This will display all poses in their location regardless of housing limitations. (Ignoring Ward, Plot, Room etc.)" + UiSharedService.TooltipSeparator
+                _uiSharedService.DrawHelpText("This will display all poses in their location regardless of housing limitations. (Ignoring Ward, Plot, Room)" + UiSharedService.TooltipSeparator
                     + "Note: Poses that utilize housing props, furniture, etc. will not be displayed correctly if not spawned in the right location.");
                 bool showWisps = _configService.Current.NearbyDrawWisps;
                 if (ImGui.Checkbox("Show Pose Wisps in the overworld", ref showWisps))
@@ -73,7 +80,10 @@ internal partial class CharaDataHubUi
         {
             ImGuiHelpers.ScaledDummy(5);
             UiSharedService.DrawGroupedCenteredColorText("Spawning and applying pose data is only available in GPose.", ImGuiColors.DalamudYellow);
+            ImGuiHelpers.ScaledDummy(5);
         }
+
+        DrawUpdateSharedDataButton();
 
         UiSharedService.DistanceSeparator();
 
@@ -100,7 +110,7 @@ internal partial class CharaDataHubUi
             UiSharedService.DrawGrouped(() =>
             {
                 string? userNote = _serverConfigurationManager.GetNoteForUid(pose.Key.MetaInfo.Uploader.UID);
-                var noteText = userNote == null ? pose.Key.MetaInfo.Uploader.AliasOrUID : $"{userNote} ({pose.Key.MetaInfo.Uploader.AliasOrUID})";
+                var noteText = pose.Key.MetaInfo.IsOwnData ? "YOU" : (userNote == null ? pose.Key.MetaInfo.Uploader.AliasOrUID : $"{userNote} ({pose.Key.MetaInfo.Uploader.AliasOrUID})");
                 ImGui.TextUnformatted("Pose by");
                 ImGui.SameLine();
                 UiSharedService.ColorText(noteText, ImGuiColors.ParsedGreen);
@@ -176,5 +186,21 @@ internal partial class CharaDataHubUi
 
         if (!wasAnythingHovered) _nearbyHovered = null;
         _charaDataNearbyManager.SetHoveredVfx(_nearbyHovered);
+    }
+
+    private void DrawUpdateSharedDataButton()
+    {
+        using (ImRaii.Disabled(_charaDataManager.GetAllDataTask != null
+            || (_charaDataManager.GetSharedWithYouTimeoutTask != null && !_charaDataManager.GetSharedWithYouTimeoutTask.IsCompleted)))
+        {
+            if (_uiSharedService.IconTextButton(FontAwesomeIcon.ArrowCircleDown, "Update Data Shared With You"))
+            {
+                _ = _charaDataManager.GetAllSharedData(_disposalCts.Token).ContinueWith(u => UpdateFilteredItems());
+            }
+        }
+        if (_charaDataManager.GetSharedWithYouTimeoutTask != null && !_charaDataManager.GetSharedWithYouTimeoutTask.IsCompleted)
+        {
+            UiSharedService.AttachToolTip("You can only refresh all character data from server every minute. Please wait.");
+        }
     }
 }

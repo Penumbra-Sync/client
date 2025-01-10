@@ -53,6 +53,9 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
         _characterHandler = charaDataCharacterHandler;
         mareMediator.Subscribe<ConnectedMessage>(this, (msg) =>
         {
+            _connectCts?.Cancel();
+            _connectCts?.Dispose();
+            _connectCts = new();
             _ownCharaData.Clear();
             _metaInfoCache.Clear();
             _sharedWithYouData.Clear();
@@ -360,6 +363,8 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
             await AddOrUpdateDto(item).ConfigureAwait(false);
         }
 
+        _nearbyManager.UpdateSharedData(_metaInfoCache);
+
         foreach (var id in _updateDtos.Keys.Where(r => !result.Exists(res => string.Equals(res.Id, r, StringComparison.Ordinal))).ToList())
         {
             _updateDtos.Remove(id);
@@ -400,7 +405,7 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
             _sharedWithYouData[grouping.Key] = newList;
         }
 
-        _nearbyManager.UpdateSharedData(_sharedWithYouData);
+        _nearbyManager.UpdateSharedData(_metaInfoCache);
 
         Logger.LogDebug("Finished getting Shared with You Data");
         GetSharedWithYouTask = null;
@@ -520,7 +525,7 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
             PoseData = ownCharaData.PoseData,
         };
 
-        var extended = await CharaDataMetaInfoExtendedDto.Create(metaInfo, _dalamudUtilService).ConfigureAwait(false);
+        var extended = await CharaDataMetaInfoExtendedDto.Create(metaInfo, _dalamudUtilService, isOwnData: true).ConfigureAwait(false);
         _metaInfoCache[ownCharaData.Uploader.UID + ":" + ownCharaData.Id] = extended;
         return extended;
     }
@@ -689,6 +694,8 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
             _uploadCts?.Dispose();
             _applicationCts.Cancel();
             _applicationCts.Dispose();
+            _connectCts?.Cancel();
+            _connectCts?.Dispose();
         }
     }
 
@@ -913,7 +920,7 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
         if (string.IsNullOrEmpty(handledActor)) return;
         UiBlockingComputation = Task.Run(async () =>
         {
-            await _characterHandler.RevertHandledChara(handledActor).ConfigureAwait(false);
+            await _characterHandler.RevertHandledChara(handledActor, false).ConfigureAwait(false);
             var gposeChara = await _dalamudUtilService.GetGposeCharacterFromObjectTableByNameAsync(handledActor, true).ConfigureAwait(false);
             if (gposeChara != null)
                 await _ipcManager.Brio.DespawnActorAsync(gposeChara.Address).ConfigureAwait(false);

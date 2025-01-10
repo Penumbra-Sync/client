@@ -29,7 +29,7 @@ internal sealed class CharaDataCharacterHandler : DisposableMediatorSubscriberBa
         {
             foreach (var chara in _handledCharaData)
             {
-                RevertHandledChara(chara);
+                RevertHandledChara(chara, false);
             }
         });
 
@@ -56,11 +56,11 @@ internal sealed class CharaDataCharacterHandler : DisposableMediatorSubscriberBa
         base.Dispose(disposing);
         foreach (var chara in _handledCharaData)
         {
-            RevertHandledChara(chara);
+            RevertHandledChara(chara, false);
         }
     }
 
-    public async Task RevertChara(string name, Guid? cPlusId)
+    public async Task RevertChara(string name, Guid? cPlusId, bool reapplyPose = true)
     {
         Guid applicationId = Guid.NewGuid();
         await _ipcManager.Glamourer.RevertByNameAsync(Logger, name, applicationId).ConfigureAwait(false);
@@ -73,28 +73,36 @@ internal sealed class CharaDataCharacterHandler : DisposableMediatorSubscriberBa
             .ConfigureAwait(false);
         if (handler.Address != IntPtr.Zero)
         {
-            var poseData = await _ipcManager.Brio.GetPoseAsync(handler.Address).ConfigureAwait(false);
-            var worldData = await _ipcManager.Brio.GetTransformAsync(handler.Address).ConfigureAwait(false);
+            var poseData = string.Empty;
+            API.Dto.CharaData.WorldData? worldData = null;
+            if (_dalamudUtilService.IsInGpose && reapplyPose)
+            {
+                poseData = await _ipcManager.Brio.GetPoseAsync(handler.Address).ConfigureAwait(false);
+                worldData = await _ipcManager.Brio.GetTransformAsync(handler.Address).ConfigureAwait(false);
+            }
             await _ipcManager.Penumbra.RedrawAsync(Logger, handler, applicationId, CancellationToken.None).ConfigureAwait(false);
-            await _ipcManager.Brio.SetPoseAsync(handler.Address, poseData ?? "{}").ConfigureAwait(false);
-            await _ipcManager.Brio.ApplyTransformAsync(handler.Address, worldData).ConfigureAwait(false);
+            if (_dalamudUtilService.IsInGpose && reapplyPose)
+            {
+                await _ipcManager.Brio.SetPoseAsync(handler.Address, poseData ?? "{}").ConfigureAwait(false);
+                await _ipcManager.Brio.ApplyTransformAsync(handler.Address, worldData!.Value).ConfigureAwait(false);
+            }
         }
     }
 
-    public async Task<bool> RevertHandledChara(string name)
+    public async Task<bool> RevertHandledChara(string name, bool reapplyPose = true)
     {
         var handled = _handledCharaData.FirstOrDefault(f => string.Equals(f.Name, name, StringComparison.Ordinal));
         if (handled == null) return false;
         _handledCharaData.Remove(handled);
-        await _dalamudUtilService.RunOnFrameworkThread(() => RevertChara(handled.Name, handled.CustomizePlus)).ConfigureAwait(false);
+        await _dalamudUtilService.RunOnFrameworkThread(() => RevertChara(handled.Name, handled.CustomizePlus, reapplyPose)).ConfigureAwait(false);
         return true;
     }
 
-    public Task RevertHandledChara(HandledCharaDataEntry? handled)
+    public Task RevertHandledChara(HandledCharaDataEntry? handled, bool reapplyPose = true)
     {
         if (handled == null) return Task.CompletedTask;
         _handledCharaData.Remove(handled);
-        return _dalamudUtilService.RunOnFrameworkThread(() => RevertChara(handled.Name, handled.CustomizePlus));
+        return _dalamudUtilService.RunOnFrameworkThread(() => RevertChara(handled.Name, handled.CustomizePlus, reapplyPose));
     }
 
     internal void AddHandledChara(HandledCharaDataEntry handledCharaDataEntry)

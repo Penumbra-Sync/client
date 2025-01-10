@@ -11,8 +11,9 @@ public sealed record CharaDataMetaInfoExtendedDto : CharaDataMetaInfoDto
     public List<PoseEntryExtended> PoseExtended { get; private set; } = [];
     public bool HasPoses => PoseExtended.Count != 0;
     public bool HasWorldData => PoseExtended.Exists(p => p.HasWorldData);
+    public bool IsOwnData { get; private set; }
 
-    public async static Task<CharaDataMetaInfoExtendedDto> Create(CharaDataMetaInfoDto baseMeta, DalamudUtilService dalamudUtilService)
+    public async static Task<CharaDataMetaInfoExtendedDto> Create(CharaDataMetaInfoDto baseMeta, DalamudUtilService dalamudUtilService, bool isOwnData = false)
     {
         CharaDataMetaInfoExtendedDto newDto = new(baseMeta);
 
@@ -20,6 +21,8 @@ public sealed record CharaDataMetaInfoExtendedDto : CharaDataMetaInfoDto
         {
             newDto.PoseExtended.Add(await PoseEntryExtended.Create(pose, newDto, dalamudUtilService).ConfigureAwait(false));
         }
+
+        newDto.IsOwnData = isOwnData;
 
         return newDto;
     }

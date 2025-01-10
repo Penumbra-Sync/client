@@ -6,6 +6,7 @@ using MareSynchronos.Services.CharaData.Models;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics.Eventing.Reader;
 using System.Numerics;
 
 namespace MareSynchronos.Services;
@@ -23,7 +24,7 @@ internal sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
     private readonly Dictionary<PoseEntryExtended, Guid> _poseVfx = [];
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly CharaDataConfigService _charaDataConfigService;
-    private readonly Dictionary<UserData, List<CharaDataMetaInfoExtendedDto>> _sharedWithYouData = [];
+    private readonly Dictionary<UserData, List<CharaDataMetaInfoExtendedDto>> _metaInfoCache = [];
     private readonly VfxSpawnManager _vfxSpawnManager;
     private Task? _filterEntriesRunningTask;
     private (Guid VfxId, PoseEntryExtended Pose)? _hoveredVfx = null;
@@ -48,12 +49,19 @@ internal sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
 
     public string UserNoteFilter { get; set; } = string.Empty;
 
-    public void UpdateSharedData(Dictionary<UserData, List<CharaDataMetaInfoExtendedDto>> newData)
+    public void UpdateSharedData(Dictionary<string, CharaDataMetaInfoExtendedDto?> newData)
     {
-        _sharedWithYouData.Clear();
+        _metaInfoCache.Clear();
         foreach (var kvp in newData)
         {
-            _sharedWithYouData[kvp.Key] = kvp.Value;
+            if (kvp.Value == null) continue;
+
+            if (!_metaInfoCache.TryGetValue(kvp.Value.Uploader, out var list))
+            {
+                _metaInfoCache[kvp.Value.Uploader] = list = [];
+            }
+
+            list.Add(kvp.Value);
         }
     }
 
@@ -170,26 +178,30 @@ internal sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
         var previousPoses = _nearbyData.Keys.ToList();
         _nearbyData.Clear();
 
-        var locationInfo = await _dalamudUtilService.RunOnFrameworkThread(() => _dalamudUtilService.GetMapData()).ConfigureAwait(false);
+        var ownLocation = await _dalamudUtilService.RunOnFrameworkThread(() => _dalamudUtilService.GetMapData()).ConfigureAwait(false);
         var player = await _dalamudUtilService.RunOnFrameworkThread(() => _dalamudUtilService.GetPlayerCharacter()).ConfigureAwait(false);
         var currentServer = player.CurrentWorld;
         var playerPos = player.Position;
 
         var cameraYaw = GetCameraYaw(cameraPos, cameraLookAt);
 
+        bool ignoreHousingLimits = _charaDataConfigService.Current.NearbyIgnoreHousingLimitations;
+        bool onlyCurrentServer = _charaDataConfigService.Current.NearbyOwnServerOnly;
+        bool showOwnData = _charaDataConfigService.Current.NearbyShowOwnData;
+
         // initial filter on name
-        foreach (var data in _sharedWithYouData.Where(d => (string.IsNullOrWhiteSpace(UserNoteFilter)
+        foreach (var data in _metaInfoCache.Where(d => (string.IsNullOrWhiteSpace(UserNoteFilter)
             || ((d.Key.Alias ?? string.Empty).Contains(UserNoteFilter, StringComparison.OrdinalIgnoreCase)
             || d.Key.UID.Contains(UserNoteFilter, StringComparison.OrdinalIgnoreCase)
             || (_serverConfigurationManager.GetNoteForUid(UserNoteFilter) ?? string.Empty).Contains(UserNoteFilter, StringComparison.OrdinalIgnoreCase))))
             .ToDictionary(k => k.Key, k => k.Value))
         {
             // filter all poses based on territory, that always must be correct
-            foreach (var pose in data.Value.Where(v => v.HasPoses && v.HasWorldData).SelectMany(k => k.PoseExtended)
+            foreach (var pose in data.Value.Where(v => v.HasPoses && v.HasWorldData && (showOwnData || !v.IsOwnData))
+                .SelectMany(k => k.PoseExtended)
                 .Where(p => p.HasPoseData
                     && p.HasWorldData
-                    && p.WorldData!.Value.LocationInfo.TerritoryId == locationInfo.TerritoryId
-                    && (!_charaDataConfigService.Current.NearbyOwnServerOnly || p.WorldData!.Value.LocationInfo.ServerId == currentServer.RowId))
+                    && p.WorldData!.Value.LocationInfo.TerritoryId == ownLocation.TerritoryId)
                 .ToList())
             {
                 var poseLocation = pose.WorldData!.Value.LocationInfo;
@@ -198,12 +210,17 @@ internal sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
                 var distance = Vector3.Distance(playerPos, pose.Position);
                 if (distance > _charaDataConfigService.Current.NearbyDistanceFilter) continue;
 
-                bool addEntry = (!isInHousing && poseLocation.MapId == locationInfo.MapId)
+
+                bool addEntry = (!isInHousing && poseLocation.MapId == ownLocation.MapId
+                        && (!onlyCurrentServer || poseLocation.ServerId == currentServer.RowId))
                     || (isInHousing
-                        && ((poseLocation.HouseId == 0 && poseLocation.DivisionId == locationInfo.DivisionId
-                                && (_charaDataConfigService.Current.NearbyIgnoreHousingLimitations || poseLocation.WardId == locationInfo.WardId))
+                        && (((ignoreHousingLimits && !onlyCurrentServer)
+                            || (ignoreHousingLimits && onlyCurrentServer) && poseLocation.ServerId == currentServer.RowId)
+                            || poseLocation.ServerId == currentServer.RowId)
+                        && ((poseLocation.HouseId == 0 && poseLocation.DivisionId == ownLocation.DivisionId
+                                && (ignoreHousingLimits || poseLocation.WardId == ownLocation.WardId))
                             || (poseLocation.HouseId > 0
-                                && (_charaDataConfigService.Current.NearbyIgnoreHousingLimitations || (poseLocation.HouseId == locationInfo.HouseId && poseLocation.WardId == locationInfo.WardId && poseLocation.DivisionId == locationInfo.DivisionId && poseLocation.RoomId == locationInfo.RoomId)))
+                                && (ignoreHousingLimits || (poseLocation.HouseId == ownLocation.HouseId && poseLocation.WardId == ownLocation.WardId && poseLocation.DivisionId == ownLocation.DivisionId && poseLocation.RoomId == ownLocation.RoomId)))
                            ));
 
                 if (addEntry)
@@ -245,7 +262,15 @@ internal sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
         {
             if (_poseVfx.TryGetValue(data, out var _)) continue;
 
-            var vfxGuid = _vfxSpawnManager.SpawnObject(data.Position, data.Rotation, Vector3.One * 2);
+            Guid? vfxGuid;
+            if (data.MetaInfo.IsOwnData)
+            {
+                vfxGuid = _vfxSpawnManager.SpawnObject(data.Position, data.Rotation, Vector3.One * 2, 0.8f, 0.5f, 0.0f, 0.7f);
+            }
+            else
+            {
+                vfxGuid = _vfxSpawnManager.SpawnObject(data.Position, data.Rotation, Vector3.One * 2);
+            }
             if (vfxGuid != null)
             {
                 _poseVfx[data] = vfxGuid.Value;
