@@ -286,13 +286,15 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
         });
     }
 
-    public async Task DeleteCharaData(string id)
+    public async Task DeleteCharaData(CharaDataFullExtendedDto dto)
     {
-        var ret = await _apiController.CharaDataDelete(id).ConfigureAwait(false);
+        var ret = await _apiController.CharaDataDelete(dto.Id).ConfigureAwait(false);
         if (ret)
         {
-            _ownCharaData.Remove(id);
+            _ownCharaData.Remove(dto.Id);
+            _metaInfoCache.Remove(dto.FullId);
         }
+        DistributeMetaInfo();
     }
 
     public void DownloadMetaInfo(string importCode, bool store = true)
@@ -530,9 +532,9 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
         return extended;
     }
 
-    private async Task<CharaDataMetaInfoExtendedDto> CacheData(CharaDataMetaInfoDto metaInfo)
+    private async Task<CharaDataMetaInfoExtendedDto> CacheData(CharaDataMetaInfoDto metaInfo, bool isOwnData = false)
     {
-        var extended = await CharaDataMetaInfoExtendedDto.Create(metaInfo, _dalamudUtilService).ConfigureAwait(false);
+        var extended = await CharaDataMetaInfoExtendedDto.Create(metaInfo, _dalamudUtilService, isOwnData).ConfigureAwait(false);
         _metaInfoCache[extended.FullId] = extended;
         DistributeMetaInfo();
 

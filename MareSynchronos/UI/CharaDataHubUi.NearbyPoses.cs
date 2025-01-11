@@ -136,7 +136,7 @@ internal partial class CharaDataHubUi
                         {
                             _charaDataManager.ApplyFullPoseDataToGposeTarget(pose.Key);
                         }
-                    }, $"Apply pose and position to {_gposeTarget}", _hasValidGposeTarget);
+                    }, $"Apply pose and position to {CharaName(_gposeTarget)}", _hasValidGposeTarget);
                     ImGui.SameLine();
                     GposeMetaInfoAction((_) =>
                     {
@@ -155,7 +155,9 @@ internal partial class CharaDataHubUi
             var drawList = ImGui.GetWindowDrawList();
             var circleRadius = circleDiameter / 2f;
             var windowPos = ImGui.GetWindowPos();
-            var circleCenter = new Vector2(windowPos.X + circleOriginX + circleRadius, windowPos.Y + pos.Y + circleRadius + circleOffsetY);
+            var scrollX = ImGui.GetScrollX();
+            var scrollY = ImGui.GetScrollY();
+            var circleCenter = new Vector2(windowPos.X + circleOriginX + circleRadius - scrollX, windowPos.Y + pos.Y + circleRadius + circleOffsetY - scrollY);
             var rads = pose.Value.Direction * (Math.PI / 180);
 
             float halfConeAngleRadians = 15f * (float)Math.PI / 180f;

@@ -357,7 +357,7 @@ internal sealed partial class CharaDataHubUi
         {
             if (_uiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Character Data"))
             {
-                _ = _charaDataManager.DeleteCharaData(dataDto.Id);
+                _ = _charaDataManager.DeleteCharaData(dataDto);
                 _selectedDtoId = string.Empty;
             }
         }

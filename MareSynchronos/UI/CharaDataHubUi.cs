@@ -50,6 +50,7 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
     private bool _sharedWithYouDownloadableFilter = false;
     private string _sharedWithYouOwnerFilter = string.Empty;
     private string _specificIndividualAdd = string.Empty;
+    private bool _abbreviateCharaName = false;
 
     public CharaDataHubUi(ILogger<CharaDataHubUi> logger, MareMediator mediator, PerformanceCollectorService performanceCollectorService,
                          CharaDataManager charaDataManager, CharaDataNearbyManager charaDataNearbyManager, CharaDataConfigService configService,
@@ -67,6 +68,17 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
         _dalamudUtilService = dalamudUtilService;
         _fileDialogManager = fileDialogManager;
         Mediator.Subscribe<GposeStartMessage>(this, (_) => IsOpen |= _configService.Current.OpenMareHubOnGposeStart);
+    }
+
+    public string CharaName(string name)
+    {
+        if (_abbreviateCharaName)
+        {
+            var split = name.Split(" ");
+            return split[0].First() + ". " + split[1].First() + ".";
+        }
+
+        return name;
     }
 
     public override void OnClose()
@@ -197,6 +209,10 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
                     }
                 }
             }
+            else
+            {
+                _charaDataNearbyManager.ComputeNearbyData = false;
+            }
         }
 
         using (ImRaii.Disabled(_isHandlingSelf))
@@ -311,12 +327,12 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
                     }
                 }
                 ImGui.SameLine();
-                UiSharedService.AttachToolTip($"Target the GPose Character {actor.Name.TextValue}");
+                UiSharedService.AttachToolTip($"Target the GPose Character {CharaName(actor.Name.TextValue)}");
                 ImGui.AlignTextToFramePadding();
                 var pos = ImGui.GetCursorPosX();
                 using (ImRaii.PushColor(ImGuiCol.Text, ImGuiColors.HealerGreen, actor.Address == (_dalamudUtilService.GposeTargetGameObject?.Address ?? nint.Zero)))
                 {
-                    ImGui.TextUnformatted(actor.Name.TextValue);
+                    ImGui.TextUnformatted(CharaName(actor.Name.TextValue));
                 }
                 ImGui.SameLine(250);
                 var handled = _charaDataManager.HandledCharaData.FirstOrDefault(c => string.Equals(c.Name, actor.Name.TextValue, StringComparison.Ordinal));
@@ -334,14 +350,14 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
                         {
                             _charaDataManager.RemoveChara(actor.Name.TextValue);
                         }
-                        UiSharedService.AttachToolTip($"Remove character {actor.Name.TextValue}");
+                        UiSharedService.AttachToolTip($"Remove character {CharaName(actor.Name.TextValue)}");
                     }
                     ImGui.SameLine();
                     if (_uiSharedService.IconButton(FontAwesomeIcon.Undo))
                     {
                         _charaDataManager.RevertChara(handled);
                     }
-                    UiSharedService.AttachToolTip($"Revert applied data from {actor.Name.TextValue}");
+                    UiSharedService.AttachToolTip($"Revert applied data from {CharaName(actor.Name.TextValue)}");
                     ImGui.SetCursorPosX(pos);
                     DrawPoseData(handled?.MetaInfo, actor.Name.TextValue, true);
                 }
@@ -361,7 +377,7 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
         {
             ImGui.TextUnformatted("GPose Target");
             ImGui.SameLine(200);
-            UiSharedService.ColorText(_gposeTarget, UiSharedService.GetBoolColor(_hasValidGposeTarget));
+            UiSharedService.ColorText(CharaName(_gposeTarget), UiSharedService.GetBoolColor(_hasValidGposeTarget));
         }
 
         if (!_hasValidGposeTarget)
@@ -859,7 +875,7 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
                 {
                     _ = _charaDataManager.ApplyCharaDataToGposeTarget(meta!);
                 }
-            }, $"Apply Character data to {selectedGposeActor}", data, hasValidGposeTarget, false);
+            }, $"Apply Character data to {CharaName(selectedGposeActor)}", data, hasValidGposeTarget, false);
             ImGui.SameLine();
             GposeMetaInfoAction((meta) =>
             {
@@ -942,8 +958,8 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
             }
             else
             {
-                tooltip += UiSharedService.TooltipSeparator + $"Left Click: Apply this pose to {actor}";
-                if (item.HasWorldData) tooltip += Environment.NewLine + $"CTRL+Right Click: Apply world position to {actor}."
+                tooltip += UiSharedService.TooltipSeparator + $"Left Click: Apply this pose to {CharaName(actor)}";
+                if (item.HasWorldData) tooltip += Environment.NewLine + $"CTRL+Right Click: Apply world position to {CharaName(actor)}."
                         + UiSharedService.TooltipSeparator + "!!! CAUTION: Applying world position will likely yeet this actor into nirvana. Use at your own risk !!!";
                 GposePoseAction(() =>
                 {
@@ -989,6 +1005,9 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
             _configService.Current.ShowHelpTexts = showHelpTexts;
             _configService.Save();
         }
+
+        ImGui.Checkbox("Abbreviate Chara Names", ref _abbreviateCharaName);
+        _uiSharedService.DrawHelpText("This setting will abbreviate displayed names. This setting is not persistent and will reset between restarts.");
 
         ImGui.AlignTextToFramePadding();
         ImGui.TextUnformatted("Last Export Folder");
