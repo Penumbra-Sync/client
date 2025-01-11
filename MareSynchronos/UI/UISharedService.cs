@@ -1127,4 +1127,13 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.Separator();
         ImGuiHelpers.ScaledDummy(5);
     }
+
+    public static void DrawTree(string leafName, Action drawOnOpened)
+    {
+        using var tree = ImRaii.TreeNode(leafName);
+        if (tree)
+        {
+            drawOnOpened();
+        }
+    }
 }

@@ -13,68 +13,59 @@ internal partial class CharaDataHubUi
     {
         _uiSharedService.BigText("Poses Nearby");
 
-        using (var helpTree = ImRaii.TreeNode("What is this? (Explanation / Help)"))
-        {
-            if (helpTree)
-            {
-                UiSharedService.TextWrapped("This tab will show you all Shared World Poses nearby you." + Environment.NewLine + Environment.NewLine
-                    + "Shared World Poses are poses in character data that have world data attached to them and are set to shared. "
-                    + "This means that all data that is in 'Shared with You' that has a pose with world data attached to it will be shown here if you are nearby." + Environment.NewLine
-                    + "By default all poses that are shared will be shown. Poses taken in housing areas will by default only be shown on the correct server and location." + Environment.NewLine + Environment.NewLine
-                    + "Shared World Poses will appear in the world as floating wisps, as well as in the list below. You can mouse over a Shared World Pose in the list for it to get highlighted in the world." + Environment.NewLine + Environment.NewLine
-                    + "You can apply Shared World Poses to yourself or spawn the associated character to pose with them." + Environment.NewLine + Environment.NewLine
-                    + "You can adjust the filter and change further settings in the 'Settings & Filter' foldout.");
-            }
-        }
+        DrawHelpFoldout("This tab will show you all Shared World Poses nearby you." + Environment.NewLine + Environment.NewLine
+                        + "Shared World Poses are poses in character data that have world data attached to them and are set to shared. "
+                        + "This means that all data that is in 'Shared with You' that has a pose with world data attached to it will be shown here if you are nearby." + Environment.NewLine
+                        + "By default all poses that are shared will be shown. Poses taken in housing areas will by default only be shown on the correct server and location." + Environment.NewLine + Environment.NewLine
+                        + "Shared World Poses will appear in the world as floating wisps, as well as in the list below. You can mouse over a Shared World Pose in the list for it to get highlighted in the world." + Environment.NewLine + Environment.NewLine
+                        + "You can apply Shared World Poses to yourself or spawn the associated character to pose with them." + Environment.NewLine + Environment.NewLine
+                        + "You can adjust the filter and change further settings in the 'Settings & Filter' foldout.");
 
-        using (var tree = ImRaii.TreeNode("Settings & Filters"))
+        UiSharedService.DrawTree("Settings & Filters", () =>
         {
-            if (tree)
+            string filterByUser = _charaDataNearbyManager.UserNoteFilter;
+            if (ImGui.InputTextWithHint("##filterbyuser", "Filter by User", ref filterByUser, 50))
             {
-                string filterByUser = _charaDataNearbyManager.UserNoteFilter;
-                if (ImGui.InputTextWithHint("##filterbyuser", "Filter by User", ref filterByUser, 50))
-                {
-                    _charaDataNearbyManager.UserNoteFilter = filterByUser;
-                }
-                bool onlyCurrent = _configService.Current.NearbyOwnServerOnly;
-                if (ImGui.Checkbox("Only show Poses on current server", ref onlyCurrent))
-                {
-                    _configService.Current.NearbyOwnServerOnly = onlyCurrent;
-                    _configService.Save();
-                }
-                _uiSharedService.DrawHelpText("Toggling this off will show you the location of all shared Poses with World Data from all Servers");
-                bool showOwn = _configService.Current.NearbyShowOwnData;
-                if (ImGui.Checkbox("Also show your own data", ref showOwn))
-                {
-                    _configService.Current.NearbyShowOwnData = showOwn;
-                    _configService.Save();
-                }
-                _uiSharedService.DrawHelpText("Toggling this on will also show you the location of your own Poses");
-                bool ignoreHousing = _configService.Current.NearbyIgnoreHousingLimitations;
-                if (ImGui.Checkbox("Ignore Housing Limitations", ref ignoreHousing))
-                {
-                    _configService.Current.NearbyIgnoreHousingLimitations = ignoreHousing;
-                    _configService.Save();
-                }
-                _uiSharedService.DrawHelpText("This will display all poses in their location regardless of housing limitations. (Ignoring Ward, Plot, Room)" + UiSharedService.TooltipSeparator
-                    + "Note: Poses that utilize housing props, furniture, etc. will not be displayed correctly if not spawned in the right location.");
-                bool showWisps = _configService.Current.NearbyDrawWisps;
-                if (ImGui.Checkbox("Show Pose Wisps in the overworld", ref showWisps))
-                {
-                    _configService.Current.NearbyDrawWisps = showWisps;
-                    _configService.Save();
-                }
-                _uiSharedService.DrawHelpText("When enabled, Mare will draw floating wisps where other's poses are in the world.");
-                int poseDetectionDistance = _configService.Current.NearbyDistanceFilter;
-                ImGui.SetNextItemWidth(100);
-                if (ImGui.SliderInt("Detection Distance", ref poseDetectionDistance, 5, 1000))
-                {
-                    _configService.Current.NearbyDistanceFilter = poseDetectionDistance;
-                    _configService.Save();
-                }
-                _uiSharedService.DrawHelpText("This setting allows you to change the maximum distance in which poses will be shown. Set it to the maximum if you want to see all poses on the current map.");
+                _charaDataNearbyManager.UserNoteFilter = filterByUser;
             }
-        }
+            bool onlyCurrent = _configService.Current.NearbyOwnServerOnly;
+            if (ImGui.Checkbox("Only show Poses on current server", ref onlyCurrent))
+            {
+                _configService.Current.NearbyOwnServerOnly = onlyCurrent;
+                _configService.Save();
+            }
+            _uiSharedService.DrawHelpText("Toggling this off will show you the location of all shared Poses with World Data from all Servers");
+            bool showOwn = _configService.Current.NearbyShowOwnData;
+            if (ImGui.Checkbox("Also show your own data", ref showOwn))
+            {
+                _configService.Current.NearbyShowOwnData = showOwn;
+                _configService.Save();
+            }
+            _uiSharedService.DrawHelpText("Toggling this on will also show you the location of your own Poses");
+            bool ignoreHousing = _configService.Current.NearbyIgnoreHousingLimitations;
+            if (ImGui.Checkbox("Ignore Housing Limitations", ref ignoreHousing))
+            {
+                _configService.Current.NearbyIgnoreHousingLimitations = ignoreHousing;
+                _configService.Save();
+            }
+            _uiSharedService.DrawHelpText("This will display all poses in their location regardless of housing limitations. (Ignoring Ward, Plot, Room)" + UiSharedService.TooltipSeparator
+                + "Note: Poses that utilize housing props, furniture, etc. will not be displayed correctly if not spawned in the right location.");
+            bool showWisps = _configService.Current.NearbyDrawWisps;
+            if (ImGui.Checkbox("Show Pose Wisps in the overworld", ref showWisps))
+            {
+                _configService.Current.NearbyDrawWisps = showWisps;
+                _configService.Save();
+            }
+            _uiSharedService.DrawHelpText("When enabled, Mare will draw floating wisps where other's poses are in the world.");
+            int poseDetectionDistance = _configService.Current.NearbyDistanceFilter;
+            ImGui.SetNextItemWidth(100);
+            if (ImGui.SliderInt("Detection Distance", ref poseDetectionDistance, 5, 1000))
+            {
+                _configService.Current.NearbyDistanceFilter = poseDetectionDistance;
+                _configService.Save();
+            }
+            _uiSharedService.DrawHelpText("This setting allows you to change the maximum distance in which poses will be shown. Set it to the maximum if you want to see all poses on the current map.");
+        });
 
         if (!_uiSharedService.IsInGpose)
         {

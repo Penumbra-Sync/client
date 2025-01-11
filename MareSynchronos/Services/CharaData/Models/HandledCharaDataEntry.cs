@@ -1,5 +1,6 @@
-﻿using MareSynchronos.API.Dto.CharaData;
+﻿namespace MareSynchronos.Services.CharaData.Models;
 
-namespace MareSynchronos.Services.CharaData.Models;
-
-public sealed record HandledCharaDataEntry(string Name, bool IsSelf, Guid? CustomizePlus, CharaDataMetaInfoExtendedDto MetaInfo);
+public sealed record HandledCharaDataEntry(string Name, bool IsSelf, Guid? CustomizePlus, CharaDataMetaInfoExtendedDto MetaInfo)
+{
+    public CharaDataMetaInfoExtendedDto MetaInfo { get; set; } = MetaInfo;
+}

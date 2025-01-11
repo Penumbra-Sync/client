@@ -14,4 +14,5 @@ public class CharaDataConfig : IMareConfiguration
     public bool NearbyDrawWisps { get; set; } = true;
     public int NearbyDistanceFilter { get; set; } = 100;
     public bool NearbyShowOwnData { get; set; } = false;
+    public bool ShowHelpTexts { get; set; } = true;
 }

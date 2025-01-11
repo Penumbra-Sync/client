@@ -110,6 +110,17 @@ internal sealed class CharaDataCharacterHandler : DisposableMediatorSubscriberBa
         _handledCharaData.Add(handledCharaDataEntry);
     }
 
+    public void UpdateHandledData(Dictionary<string, CharaDataMetaInfoExtendedDto?> newData)
+    {
+        foreach (var handledData in _handledCharaData)
+        {
+            if (newData.TryGetValue(handledData.MetaInfo.FullId, out var metaInfo) && metaInfo != null)
+            {
+                handledData.MetaInfo = metaInfo;
+            }
+        }
+    }
+
     public async Task<GameObjectHandler?> TryCreateGameObjectHandler(string name, bool gPoseOnly = false)
     {
         var handler = await _gameObjectHandlerFactory.Create(ObjectKind.Player,

@@ -363,8 +363,6 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
             await AddOrUpdateDto(item).ConfigureAwait(false);
         }
 
-        _nearbyManager.UpdateSharedData(_metaInfoCache);
-
         foreach (var id in _updateDtos.Keys.Where(r => !result.Exists(res => string.Equals(res.Id, r, StringComparison.Ordinal))).ToList())
         {
             _updateDtos.Remove(id);
@@ -405,7 +403,7 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
             _sharedWithYouData[grouping.Key] = newList;
         }
 
-        _nearbyManager.UpdateSharedData(_metaInfoCache);
+        DistributeMetaInfo();
 
         Logger.LogDebug("Finished getting Shared with You Data");
         GetSharedWithYouTask = null;
@@ -526,20 +524,30 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
         };
 
         var extended = await CharaDataMetaInfoExtendedDto.Create(metaInfo, _dalamudUtilService, isOwnData: true).ConfigureAwait(false);
-        _metaInfoCache[ownCharaData.Uploader.UID + ":" + ownCharaData.Id] = extended;
+        _metaInfoCache[extended.FullId] = extended;
+        DistributeMetaInfo();
+
         return extended;
     }
 
     private async Task<CharaDataMetaInfoExtendedDto> CacheData(CharaDataMetaInfoDto metaInfo)
     {
         var extended = await CharaDataMetaInfoExtendedDto.Create(metaInfo, _dalamudUtilService).ConfigureAwait(false);
-        _metaInfoCache[metaInfo.Uploader.UID + ":" + metaInfo.Id] = extended;
+        _metaInfoCache[extended.FullId] = extended;
+        DistributeMetaInfo();
+
         return extended;
+    }
+
+    private void DistributeMetaInfo()
+    {
+        _nearbyManager.UpdateSharedData(_metaInfoCache);
+        _characterHandler.UpdateHandledData(_metaInfoCache);
     }
 
     private void CacheData(CharaDataMetaInfoExtendedDto charaData)
     {
-        _metaInfoCache[charaData.Uploader.UID + ":" + charaData.Id] = charaData;
+        _metaInfoCache[charaData.FullId] = charaData;
     }
 
     public bool TryGetMetaInfo(string key, out CharaDataMetaInfoExtendedDto? metaInfo)
