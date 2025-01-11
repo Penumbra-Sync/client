@@ -1,4 +1,4 @@
-﻿namespace MareSynchronos.PlayerData.Export;
+﻿namespace MareSynchronos.Services.CharaData.Models;
 
 public record MareCharaFileHeader(byte Version, MareCharaFileData CharaFileData)
 {

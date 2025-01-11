@@ -78,17 +78,17 @@ public class PlayerPerformanceService
             string warningText = string.Empty;
             if (exceedsTris && !exceedsVram)
             {
-                warningText = $"Player {pairHandler.Pair.PlayerName} exceeds your configured triangle warning threshold (" +
+                warningText = $"Player {pairHandler.Pair.PlayerName} ({pairHandler.Pair.UserData.AliasOrUID}) exceeds your configured triangle warning threshold (" +
                     $"{triUsage}/{config.TrisWarningThresholdThousands * 1000} triangles).";
             }
             else if (!exceedsTris)
             {
-                warningText = $"Player {pairHandler.Pair.PlayerName} exceeds your configured VRAM warning threshold (" +
+                warningText = $"Player {pairHandler.Pair.PlayerName} ({pairHandler.Pair.UserData.AliasOrUID}) exceeds your configured VRAM warning threshold (" +
                     $"{UiSharedService.ByteToString(vramUsage, true)}/{config.VRAMSizeWarningThresholdMiB} MiB).";
             }
             else
             {
-                warningText = $"Player {pairHandler.Pair.PlayerName} exceeds both VRAM warning threshold (" +
+                warningText = $"Player {pairHandler.Pair.PlayerName} ({pairHandler.Pair.UserData.AliasOrUID}) exceeds both VRAM warning threshold (" +
                     $"{UiSharedService.ByteToString(vramUsage, true)}/{config.VRAMSizeWarningThresholdMiB} MiB) and " +
                     $"triangle warning threshold ({triUsage}/{config.TrisWarningThresholdThousands * 1000} triangles).";
             }
@@ -139,7 +139,7 @@ public class PlayerPerformanceService
             triUsage, config.AutoPausePlayersWithPreferredPermissionsExceedingThresholds, isPrefPerm))
         {
             _mediator.Publish(new NotificationMessage($"{pair.PlayerName} ({pair.UserData.AliasOrUID}) automatically paused",
-                $"Player {pair.PlayerName} exceeded your configured triangle auto pause threshold (" +
+                $"Player {pair.PlayerName} ({pair.UserData.AliasOrUID}) exceeded your configured triangle auto pause threshold (" +
                 $"{triUsage}/{config.TrisAutoPauseThresholdThousands * 1000} triangles)" +
                 $" and has been automatically paused.",
                 MareConfiguration.Models.NotificationType.Warning));
@@ -215,7 +215,7 @@ public class PlayerPerformanceService
             vramUsage, config.AutoPausePlayersWithPreferredPermissionsExceedingThresholds, isPrefPerm))
         {
             _mediator.Publish(new NotificationMessage($"{pair.PlayerName} ({pair.UserData.AliasOrUID}) automatically paused",
-                $"Player {pair.PlayerName} exceeded your configured VRAM auto pause threshold (" +
+                $"Player {pair.PlayerName} ({pair.UserData.AliasOrUID}) exceeded your configured VRAM auto pause threshold (" +
                 $"{UiSharedService.ByteToString(vramUsage, addSuffix: true)}/{config.VRAMSizeAutoPauseThresholdMiB}MiB)" +
                 $" and has been automatically paused.",
                 MareConfiguration.Models.NotificationType.Warning));

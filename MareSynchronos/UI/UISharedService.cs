@@ -80,6 +80,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     private bool _moodlesExists = false;
     private bool _penumbraExists = false;
     private bool _petNamesExists = false;
+    private bool _brioExists = false;
 
     private int _serverSelectionIndex = -1;
     private Dictionary<string, DateTime> _oauthTokenExpiry = new();
@@ -115,6 +116,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             _honorificExists = _ipcManager.Honorific.APIAvailable;
             _moodlesExists = _ipcManager.Moodles.APIAvailable;
             _petNamesExists = _ipcManager.PetNames.APIAvailable;
+            _brioExists = _ipcManager.Brio.APIAvailable;
         });
 
         UidFont = _pluginInterface.UiBuilder.FontAtlas.NewDelegateFontHandle(e =>
@@ -136,7 +138,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     public bool HasValidPenumbraModPath => !(_ipcManager.Penumbra.ModDirectory ?? string.Empty).IsNullOrEmpty() && Directory.Exists(_ipcManager.Penumbra.ModDirectory);
 
     public IFontHandle IconFont { get; init; }
-    public bool IsInGpose => _dalamudUtil.IsInCutscene;
+    public bool IsInGpose => _dalamudUtil.IsInGpose;
 
     public string PlayerName => _dalamudUtil.GetPlayerName();
 
@@ -209,10 +211,10 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGui.TextUnformatted(text);
     }
 
-    public static void ColorTextWrapped(string text, Vector4 color)
+    public static void ColorTextWrapped(string text, Vector4 color, float wrapPos = 0)
     {
         using var raiicolor = ImRaii.PushColor(ImGuiCol.Text, color);
-        TextWrapped(text);
+        TextWrapped(text, wrapPos);
     }
 
     public static bool CtrlPressed() => (GetKeyState(0xA2) & 0x8000) != 0 || (GetKeyState(0xA3) & 0x8000) != 0;
@@ -418,9 +420,9 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public static bool ShiftPressed() => (GetKeyState(0xA1) & 0x8000) != 0 || (GetKeyState(0xA0) & 0x8000) != 0;
 
-    public static void TextWrapped(string text)
+    public static void TextWrapped(string text, float wrapPos = 0)
     {
-        ImGui.PushTextWrapPos(0);
+        ImGui.PushTextWrapPos(wrapPos);
         ImGui.TextUnformatted(text);
         ImGui.PopTextWrapPos();
     }
@@ -643,62 +645,38 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         var cross = FontAwesomeIcon.SquareXmark;
         ImGui.TextUnformatted("Mandatory Plugins:");
 
-        ImGui.SameLine();
-        ImGui.TextUnformatted("Penumbra");
-        ImGui.SameLine();
-        IconText(_penumbraExists ? check : cross, GetBoolColor(_penumbraExists));
-        ImGui.SameLine();
+        ImGui.SameLine(150);
+        ColorText("Penumbra", GetBoolColor(_penumbraExists));
         AttachToolTip($"Penumbra is " + (_penumbraExists ? "available and up to date." : "unavailable or not up to date."));
-        ImGui.Spacing();
 
         ImGui.SameLine();
-        ImGui.TextUnformatted("Glamourer");
-        ImGui.SameLine();
-        IconText(_glamourerExists ? check : cross, GetBoolColor(_glamourerExists));
-        ImGui.SameLine();
+        ColorText("Glamourer", GetBoolColor(_glamourerExists));
         AttachToolTip($"Glamourer is " + (_glamourerExists ? "available and up to date." : "unavailable or not up to date."));
-        ImGui.Spacing();
 
         ImGui.TextUnformatted("Optional Plugins:");
-        ImGui.SameLine();
-        ImGui.TextUnformatted("SimpleHeels");
-        ImGui.SameLine();
-        IconText(_heelsExists ? check : cross, GetBoolColor(_heelsExists));
-        ImGui.SameLine();
+        ImGui.SameLine(150);
+        ColorText("SimpleHeels", GetBoolColor(_heelsExists));
         AttachToolTip($"SimpleHeels is " + (_heelsExists ? "available and up to date." : "unavailable or not up to date."));
-        ImGui.Spacing();
 
         ImGui.SameLine();
-        ImGui.TextUnformatted("Customize+");
-        ImGui.SameLine();
-        IconText(_customizePlusExists ? check : cross, GetBoolColor(_customizePlusExists));
-        ImGui.SameLine();
+        ColorText("Customize+", GetBoolColor(_customizePlusExists));
         AttachToolTip($"Customize+ is " + (_customizePlusExists ? "available and up to date." : "unavailable or not up to date."));
-        ImGui.Spacing();
 
         ImGui.SameLine();
-        ImGui.TextUnformatted("Honorific");
-        ImGui.SameLine();
-        IconText(_honorificExists ? check : cross, GetBoolColor(_honorificExists));
-        ImGui.SameLine();
+        ColorText("Honorific", GetBoolColor(_honorificExists));
         AttachToolTip($"Honorific is " + (_honorificExists ? "available and up to date." : "unavailable or not up to date."));
-        ImGui.Spacing();
 
         ImGui.SameLine();
-        ImGui.TextUnformatted("Moodles");
-        ImGui.SameLine();
-        IconText(_moodlesExists ? check : cross, GetBoolColor(_moodlesExists));
-        ImGui.SameLine();
+        ColorText("Moodles", GetBoolColor(_moodlesExists));
         AttachToolTip($"Moodles is " + (_moodlesExists ? "available and up to date." : "unavailable or not up to date."));
-        ImGui.Spacing();
 
         ImGui.SameLine();
-        ImGui.TextUnformatted("PetNicknames");
-        ImGui.SameLine();
-        IconText(_petNamesExists ? check : cross, GetBoolColor(_petNamesExists));
-        ImGui.SameLine();
+        ColorText("PetNicknames", GetBoolColor(_petNamesExists));
         AttachToolTip($"PetNicknames is " + (_petNamesExists ? "available and up to date." : "unavailable or not up to date."));
-        ImGui.Spacing();
+
+        ImGui.SameLine();
+        ColorText("Brio", GetBoolColor(_brioExists));
+        AttachToolTip($"Brio is " + (_brioExists ? "available and up to date." : "unavailable or not up to date."));
 
         if (!_penumbraExists || !_glamourerExists)
         {
@@ -793,7 +771,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return ImGuiHelpers.GetButtonSize(icon.ToIconString());
     }
 
-    public Vector2 GetIconData(FontAwesomeIcon icon)
+    public Vector2 GetIconSize(FontAwesomeIcon icon)
     {
         using var font = IconFont.Push();
         return ImGui.CalcTextSize(icon.ToIconString());
@@ -1109,5 +1087,53 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         _discordOAuthGetCts = _discordOAuthGetCts.CancelRecreate();
         _discordOAuthGetCode = null;
         _discordOAuthUIDs = null;
+    }
+
+    public static void DrawGrouped(Action imguiDrawAction, float rounding = 5f, float? expectedWidth = null)
+    {
+        var cursorPos = ImGui.GetCursorPos();
+        using (ImRaii.Group())
+        {
+            if (expectedWidth != null)
+            {
+                ImGuiHelpers.ScaledDummy(expectedWidth.Value, 0);
+                ImGui.SetCursorPos(cursorPos);
+            }
+
+            imguiDrawAction.Invoke();
+        }
+
+        ImGui.GetWindowDrawList().AddRect(
+            ImGui.GetItemRectMin() - ImGui.GetStyle().ItemInnerSpacing,
+            ImGui.GetItemRectMax() + ImGui.GetStyle().ItemInnerSpacing,
+            Color(ImGuiColors.DalamudGrey2), rounding);
+    }
+
+    public static void DrawGroupedCenteredColorText(string text, Vector4 color, float? maxWidth = null)
+    {
+        var availWidth = ImGui.GetContentRegionAvail().X;
+        var textWidth = ImGui.CalcTextSize(text, availWidth).X;
+        if (maxWidth != null && textWidth > maxWidth) textWidth = maxWidth.Value;
+        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + (availWidth / 2f) - (textWidth / 2f));
+        DrawGrouped(() =>
+        {
+            ColorTextWrapped(text, color, ImGui.GetCursorPosX() + textWidth);
+        }, expectedWidth: maxWidth == null ? null : maxWidth);
+    }
+
+    internal static void DistanceSeparator()
+    {
+        ImGuiHelpers.ScaledDummy(5);
+        ImGui.Separator();
+        ImGuiHelpers.ScaledDummy(5);
+    }
+
+    public static void DrawTree(string leafName, Action drawOnOpened)
+    {
+        using var tree = ImRaii.TreeNode(leafName);
+        if (tree)
+        {
+            drawOnOpened();
+        }
     }
 }

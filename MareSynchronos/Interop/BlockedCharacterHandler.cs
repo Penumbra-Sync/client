@@ -35,7 +35,7 @@ public unsafe class BlockedCharacterHandler
         firstTime = true;
         var blockStatus = InfoProxyBlacklist.Instance()->GetBlockResultType(combined.AccId, combined.ContentId);
         _logger.LogTrace("CharaPtr {ptr} is BlockStatus: {status}", ptr, blockStatus);
-        if ((int)blockStatus == 0) 
+        if ((int)blockStatus == 0)
             return false;
         return _blockedCharacterCache[combined] = blockStatus != InfoProxyBlacklist.BlockResultType.NotBlocked;
     }

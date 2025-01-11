@@ -11,7 +11,6 @@ using MareSynchronos.FileCache;
 using MareSynchronos.Interop.Ipc;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Models;
-using MareSynchronos.PlayerData.Export;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
@@ -47,7 +46,6 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private readonly FileUploadManager _fileTransferManager;
     private readonly FileTransferOrchestrator _fileTransferOrchestrator;
     private readonly IpcManager _ipcManager;
-    private readonly MareCharaFileManager _mareCharaFileManager;
     private readonly PairManager _pairManager;
     private readonly PerformanceCollectorService _performanceCollector;
     private readonly PlayerPerformanceConfigService _playerPerformanceConfigService;
@@ -57,13 +55,10 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private (int, int, FileCacheEntity) _currentProgress;
     private bool _deleteAccountPopupModalShown = false;
     private bool _deleteFilesPopupModalShown = false;
-    private string _exportDescription = string.Empty;
-    private Task? _exportTask;
     private string _lastTab = string.Empty;
     private bool? _notesSuccessfullyApplied = null;
     private bool _overwriteExistingLabels = false;
     private bool _readClearCache = false;
-    private bool _readExport = false;
     private int _selectedEntry = -1;
     private string _uidToAddForIgnore = string.Empty;
     private CancellationTokenSource? _validationCts;
@@ -71,7 +66,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private bool _wasOpen = false;
     public SettingsUi(ILogger<SettingsUi> logger,
         UiSharedService uiShared, MareConfigService configService,
-        MareCharaFileManager mareCharaFileManager, PairManager pairManager,
+        PairManager pairManager,
         ServerConfigurationManager serverConfigurationManager,
         PlayerPerformanceConfigService playerPerformanceConfigService,
         MareMediator mediator, PerformanceCollectorService performanceCollector,
@@ -83,7 +78,6 @@ public class SettingsUi : WindowMediatorSubscriberBase
         DalamudUtilService dalamudUtilService, HttpClient httpClient) : base(logger, mediator, "Mare Synchronos Settings", performanceCollector)
     {
         _configService = configService;
-        _mareCharaFileManager = mareCharaFileManager;
         _pairManager = pairManager;
         _serverConfigurationManager = serverConfigurationManager;
         _playerPerformanceConfigService = playerPerformanceConfigService;
@@ -627,63 +621,21 @@ public class SettingsUi : WindowMediatorSubscriberBase
 
         _uiShared.BigText("Export MCDF");
 
-        UiSharedService.TextWrapped("This feature allows you to pack your character into a MCDF file and manually send it to other people. MCDF files can officially only be imported during GPose through Mare. " +
-            "Be aware that the possibility exists that people write unofficial custom exporters to extract the containing data.");
+        ImGuiHelpers.ScaledDummy(10);
 
-        ImGui.Checkbox("##readExport", ref _readExport);
+        UiSharedService.ColorTextWrapped("Exporting MCDF has moved.", ImGuiColors.DalamudYellow);
+        ImGuiHelpers.ScaledDummy(5);
+        UiSharedService.TextWrapped("It is now found in the Main UI under \"Your User Menu\" (");
         ImGui.SameLine();
-        UiSharedService.TextWrapped("I understand that by exporting my character data and sending it to other people I am giving away my current character appearance irrevocably. People I am sharing my data with have the ability to share it with other people without limitations.");
-
-        if (_readExport)
+        _uiShared.IconText(FontAwesomeIcon.UserCog);
+        ImGui.SameLine();
+        UiSharedService.TextWrapped(") -> \"Character Data Hub\".");
+        if (_uiShared.IconTextButton(FontAwesomeIcon.Running, "Open Mare Character Data Hub"))
         {
-            ImGui.Indent();
-
-            if (!_mareCharaFileManager.CurrentlyWorking)
-            {
-                ImGui.InputTextWithHint("Export Descriptor", "This description will be shown on loading the data", ref _exportDescription, 255);
-                if (_uiShared.IconTextButton(FontAwesomeIcon.Save, "Export Character as MCDF"))
-                {
-                    string defaultFileName = string.IsNullOrEmpty(_exportDescription)
-                        ? "export.mcdf"
-                        : string.Join('_', $"{_exportDescription}.mcdf".Split(Path.GetInvalidFileNameChars()));
-                    _uiShared.FileDialogManager.SaveFileDialog("Export Character to file", ".mcdf", defaultFileName, ".mcdf", (success, path) =>
-                    {
-                        if (!success) return;
-
-                        _configService.Current.ExportFolder = Path.GetDirectoryName(path) ?? string.Empty;
-                        _configService.Save();
-
-                        _exportTask = Task.Run(() =>
-                        {
-                            var desc = _exportDescription;
-                            _exportDescription = string.Empty;
-                            _mareCharaFileManager.SaveMareCharaFile(LastCreatedCharacterData, desc, path);
-                        });
-                    }, Directory.Exists(_configService.Current.ExportFolder) ? _configService.Current.ExportFolder : null);
-                }
-                UiSharedService.ColorTextWrapped("Note: For best results make sure you have everything you want to be shared as well as the correct character appearance" +
-                    " equipped and redraw your character before exporting.", ImGuiColors.DalamudYellow);
-            }
-            else
-            {
-                UiSharedService.ColorTextWrapped("Export in progress", ImGuiColors.DalamudYellow);
-            }
-
-            if (_exportTask?.IsFaulted ?? false)
-            {
-                UiSharedService.ColorTextWrapped("Export failed, check /xllog for more details.", ImGuiColors.DalamudRed);
-            }
-
-            ImGui.Unindent();
+            Mediator.Publish(new UiToggleMessage(typeof(CharaDataHubUi)));
         }
-        bool openInGpose = _configService.Current.OpenGposeImportOnGposeStart;
-        if (ImGui.Checkbox("Open MCDF import window when GPose loads", ref openInGpose))
-        {
-            _configService.Current.OpenGposeImportOnGposeStart = openInGpose;
-            _configService.Save();
-        }
-        _uiShared.DrawHelpText("This will automatically open the import menu when loading into Gpose. If unchecked you can open the menu manually with /mare gpose");
-
+        UiSharedService.TextWrapped("Note: this entry will be removed in the near future. Please use the Main UI to open the Character Data Hub.");
+        ImGuiHelpers.ScaledDummy(5);
         ImGui.Separator();
 
         _uiShared.BigText("Storage");
@@ -1920,7 +1872,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("Export & Storage"))
+            if (ImGui.BeginTabItem("Storage"))
             {
                 DrawFileStorageSettings();
                 ImGui.EndTabItem();

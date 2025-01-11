@@ -93,7 +93,7 @@ public sealed class CommandManagerService : IDisposable
         }
         else if (string.Equals(splitArgs[0], "gpose", StringComparison.OrdinalIgnoreCase))
         {
-            _mediator.Publish(new UiToggleMessage(typeof(GposeUi)));
+            _mediator.Publish(new UiToggleMessage(typeof(CharaDataHubUi)));
         }
         else if (string.Equals(splitArgs[0], "rescan", StringComparison.OrdinalIgnoreCase))
         {

@@ -8,7 +8,6 @@ using MareSynchronos.Interop;
 using MareSynchronos.Interop.Ipc;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Configurations;
-using MareSynchronos.PlayerData.Export;
 using MareSynchronos.PlayerData.Factories;
 using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.PlayerData.Services;
@@ -95,7 +94,6 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<FileCacheManager>();
             collection.AddSingleton<ServerConfigurationManager>();
             collection.AddSingleton<ApiController>();
-            collection.AddSingleton<MareCharaFileManager>();
             collection.AddSingleton<PerformanceCollectorService>();
             collection.AddSingleton<HubFactory>();
             collection.AddSingleton<FileUploadManager>();
@@ -114,10 +112,18 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<TagHandler>();
             collection.AddSingleton<IdDisplayHandler>();
             collection.AddSingleton<PlayerPerformanceService>();
+
+            collection.AddSingleton<CharaDataManager>();
+            collection.AddSingleton<CharaDataFileHandler>();
+            collection.AddSingleton<CharaDataCharacterHandler>();
+            collection.AddSingleton<CharaDataNearbyManager>();
+
+            collection.AddSingleton(s => new VfxSpawnManager(s.GetRequiredService<ILogger<VfxSpawnManager>>(),
+                gameInteropProvider, s.GetRequiredService<MareMediator>()));
             collection.AddSingleton((s) => new BlockedCharacterHandler(s.GetRequiredService<ILogger<BlockedCharacterHandler>>(), gameInteropProvider));
             collection.AddSingleton((s) => new IpcProvider(s.GetRequiredService<ILogger<IpcProvider>>(),
                 pluginInterface,
-                s.GetRequiredService<MareCharaFileManager>(), s.GetRequiredService<DalamudUtilService>(),
+                s.GetRequiredService<DalamudUtilService>(),
                 s.GetRequiredService<MareMediator>()));
             collection.AddSingleton<SelectPairForTagUi>();
             collection.AddSingleton((s) => new EventAggregator(pluginInterface.ConfigDirectory.FullName,
@@ -144,10 +150,12 @@ public sealed class Plugin : IDalamudPlugin
                 s.GetRequiredService<DalamudUtilService>(), s.GetRequiredService<MareMediator>()));
             collection.AddSingleton((s) => new IpcCallerPetNames(s.GetRequiredService<ILogger<IpcCallerPetNames>>(), pluginInterface,
                 s.GetRequiredService<DalamudUtilService>(), s.GetRequiredService<MareMediator>()));
+            collection.AddSingleton((s) => new IpcCallerBrio(s.GetRequiredService<ILogger<IpcCallerBrio>>(), pluginInterface,
+                s.GetRequiredService<DalamudUtilService>()));
             collection.AddSingleton((s) => new IpcManager(s.GetRequiredService<ILogger<IpcManager>>(),
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<IpcCallerPenumbra>(), s.GetRequiredService<IpcCallerGlamourer>(),
                 s.GetRequiredService<IpcCallerCustomize>(), s.GetRequiredService<IpcCallerHeels>(), s.GetRequiredService<IpcCallerHonorific>(),
-                s.GetRequiredService<IpcCallerMoodles>(), s.GetRequiredService<IpcCallerPetNames>()));
+                s.GetRequiredService<IpcCallerMoodles>(), s.GetRequiredService<IpcCallerPetNames>(), s.GetRequiredService<IpcCallerBrio>()));
             collection.AddSingleton((s) => new NotificationService(s.GetRequiredService<ILogger<NotificationService>>(),
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<DalamudUtilService>(),
                 notificationManager, chatGui, s.GetRequiredService<MareConfigService>()));
@@ -165,6 +173,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton((s) => new TransientConfigService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new XivDataStorageService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton((s) => new PlayerPerformanceConfigService(pluginInterface.ConfigDirectory.FullName));
+            collection.AddSingleton((s) => new CharaDataConfigService(pluginInterface.ConfigDirectory.FullName));
             collection.AddSingleton<IConfigService<IMareConfiguration>>(s => s.GetRequiredService<MareConfigService>());
             collection.AddSingleton<IConfigService<IMareConfiguration>>(s => s.GetRequiredService<ServerConfigService>());
             collection.AddSingleton<IConfigService<IMareConfiguration>>(s => s.GetRequiredService<NotesConfigService>());
@@ -172,6 +181,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<IConfigService<IMareConfiguration>>(s => s.GetRequiredService<TransientConfigService>());
             collection.AddSingleton<IConfigService<IMareConfiguration>>(s => s.GetRequiredService<XivDataStorageService>());
             collection.AddSingleton<IConfigService<IMareConfiguration>>(s => s.GetRequiredService<PlayerPerformanceConfigService>());
+            collection.AddSingleton<IConfigService<IMareConfiguration>>(s => s.GetRequiredService<CharaDataConfigService>());
             collection.AddSingleton((s) => new ConfigurationMigrator(s.GetRequiredService<ILogger<ConfigurationMigrator>>(), pluginInterface));
             collection.AddSingleton<ConfigurationSaveService>();
 
@@ -184,7 +194,6 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddScoped<SelectTagForPairUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, SettingsUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, CompactUi>();
-            collection.AddScoped<WindowMediatorSubscriberBase, GposeUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, IntroUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, DownloadUi>();
             collection.AddScoped<WindowMediatorSubscriberBase, PopoutProfileUi>();
@@ -192,6 +201,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddScoped<WindowMediatorSubscriberBase, JoinSyncshellUI>();
             collection.AddScoped<WindowMediatorSubscriberBase, CreateSyncshellUI>();
             collection.AddScoped<WindowMediatorSubscriberBase, EventViewerUI>();
+            collection.AddScoped<WindowMediatorSubscriberBase, CharaDataHubUi>();
 
             collection.AddScoped<WindowMediatorSubscriberBase, EditProfileUi>((s) => new EditProfileUi(s.GetRequiredService<ILogger<EditProfileUi>>(),
                 s.GetRequiredService<MareMediator>(), s.GetRequiredService<ApiController>(), s.GetRequiredService<UiSharedService>(), s.GetRequiredService<FileDialogManager>(),
