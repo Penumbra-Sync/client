@@ -6,6 +6,7 @@ using MareSynchronos.Interop.Ipc;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Factories;
 using MareSynchronos.PlayerData.Handlers;
+using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services.CharaData.Models;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
@@ -26,6 +27,7 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
     private readonly List<CharaDataMetaInfoExtendedDto> _nearbyData = [];
     private readonly CharaDataNearbyManager _nearbyManager;
     private readonly CharaDataCharacterHandler _characterHandler;
+    private readonly PairManager _pairManager;
     private readonly Dictionary<string, CharaDataFullExtendedDto> _ownCharaData = [];
     private readonly Dictionary<string, Task> _sharedMetaInfoTimeoutTasks = [];
     private readonly Dictionary<UserData, List<CharaDataMetaInfoExtendedDto>> _sharedWithYouData = [];
@@ -42,7 +44,7 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
         MareMediator mareMediator, IpcManager ipcManager, DalamudUtilService dalamudUtilService,
         FileDownloadManagerFactory fileDownloadManagerFactory,
         CharaDataConfigService charaDataConfigService, CharaDataNearbyManager charaDataNearbyManager,
-        CharaDataCharacterHandler charaDataCharacterHandler) : base(logger, mareMediator)
+        CharaDataCharacterHandler charaDataCharacterHandler, PairManager pairManager) : base(logger, mareMediator)
     {
         _apiController = apiController;
         _fileHandler = charaDataFileHandler;
@@ -51,6 +53,7 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
         _configService = charaDataConfigService;
         _nearbyManager = charaDataNearbyManager;
         _characterHandler = charaDataCharacterHandler;
+        _pairManager = pairManager;
         mareMediator.Subscribe<ConnectedMessage>(this, (msg) =>
         {
             _connectCts?.Cancel();
@@ -395,6 +398,8 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
         var result = await GetSharedWithYouTask.ConfigureAwait(false);
         foreach (var grouping in result.GroupBy(r => r.Uploader))
         {
+            var pair = _pairManager.GetPairByUID(grouping.Key.UID);
+            if (pair?.IsPaused ?? false) continue;
             List<CharaDataMetaInfoExtendedDto> newList = new();
             foreach (var item in grouping)
             {
