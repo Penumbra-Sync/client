@@ -45,11 +45,13 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
     private bool _openMcdOnlineOnNextRun = false;
     private bool _readExport;
     private string _selectedDtoId = string.Empty;
-    private string _selectedSpecificIndividual = string.Empty;
+    private string _selectedSpecificUserIndividual = string.Empty;
+    private string _selectedSpecificGroupIndividual = string.Empty;
     private string _sharedWithYouDescriptionFilter = string.Empty;
     private bool _sharedWithYouDownloadableFilter = false;
     private string _sharedWithYouOwnerFilter = string.Empty;
     private string _specificIndividualAdd = string.Empty;
+    private string _specificGroupAdd = string.Empty;
     private bool _abbreviateCharaName = false;
 
     public CharaDataHubUi(ILogger<CharaDataHubUi> logger, MareMediator mediator, PerformanceCollectorService performanceCollectorService,
@@ -588,6 +590,7 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
                 ImGui.AlignTextToFramePadding();
                 DrawAddOrRemoveFavorite(_charaDataManager.LastDownloadedMetaInfo);
 
+                ImGui.NewLine();
                 if (!_charaDataManager.DownloadMetaInfoTask?.IsCompleted ?? false)
                 {
                     UiSharedService.ColorTextWrapped("Downloading meta info. Please wait.", ImGuiColors.DalamudYellow);

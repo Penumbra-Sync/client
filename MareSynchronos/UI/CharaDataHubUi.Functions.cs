@@ -18,7 +18,7 @@ internal sealed partial class CharaDataHubUi
 
 	private static string GetShareTypeString(ShareTypeDto dto) => dto switch
 	{
-		ShareTypeDto.Private => "Private",
+		ShareTypeDto.Private => "Code Only",
 		ShareTypeDto.Shared => "Shared"
 	};
 

@@ -11,6 +11,7 @@ public sealed record CharaDataExtendedUpdateDto : CharaDataUpdateDto
     {
         _charaDataFullDto = charaDataFullDto;
         _userList = charaDataFullDto.AllowedUsers.ToList();
+        _groupList = charaDataFullDto.AllowedGroups.ToList();
         _poseList = charaDataFullDto.PoseData.Select(k => new PoseEntry(k.Id)
         {
             Description = k.Description,
@@ -22,6 +23,7 @@ public sealed record CharaDataExtendedUpdateDto : CharaDataUpdateDto
     public CharaDataUpdateDto BaseDto => new(Id)
     {
         AllowedUsers = AllowedUsers,
+        AllowedGroups = AllowedGroups,
         AccessType = base.AccessType,
         CustomizeData = base.CustomizeData,
         Description = base.Description,
@@ -192,13 +194,23 @@ public sealed record CharaDataExtendedUpdateDto : CharaDataUpdateDto
 
     public IEnumerable<UserData> UserList => _userList;
     private readonly List<UserData> _userList;
+
+    public IEnumerable<GroupData> GroupList => _groupList;
+    private readonly List<GroupData> _groupList;
+
     public IEnumerable<PoseEntry> PoseList => _poseList;
     private readonly List<PoseEntry> _poseList;
 
-    public void AddToList(string user)
+    public void AddUserToList(string user)
     {
         _userList.Add(new(user, null));
         UpdateAllowedUsers();
+    }
+
+    public void AddGroupToList(string group)
+    {
+        _groupList.Add(new(group, null));
+        UpdateAllowedGroups();
     }
 
     private void UpdateAllowedUsers()
@@ -211,10 +223,26 @@ public sealed record CharaDataExtendedUpdateDto : CharaDataUpdateDto
         }
     }
 
-    public void RemoveFromList(string user)
+    private void UpdateAllowedGroups()
+    {
+        AllowedGroups = [.. _groupList.Select(u => u.GID)];
+        if (!AllowedGroups.Except(_charaDataFullDto.AllowedGroups.Select(u => u.GID), StringComparer.Ordinal).Any()
+            && !_charaDataFullDto.AllowedGroups.Select(u => u.GID).Except(AllowedGroups, StringComparer.Ordinal).Any())
+        {
+            AllowedGroups = null;
+        }
+    }
+
+    public void RemoveUserFromList(string user)
     {
         _userList.RemoveAll(u => string.Equals(u.UID, user, StringComparison.Ordinal));
         UpdateAllowedUsers();
+    }
+
+    public void RemoveGroupFromList(string group)
+    {
+        _groupList.RemoveAll(u => string.Equals(u.GID, group, StringComparison.Ordinal));
+        UpdateAllowedGroups();
     }
 
     public void AddPose()
@@ -279,6 +307,7 @@ public sealed record CharaDataExtendedUpdateDto : CharaDataUpdateDto
         base.CustomizeData = null;
         base.ManipulationData = null;
         AllowedUsers = null;
+        AllowedGroups = null;
         Poses = null;
         _poseList.Clear();
         _poseList.AddRange(_charaDataFullDto.PoseData.Select(k => new PoseEntry(k.Id)
@@ -316,6 +345,7 @@ public sealed record CharaDataExtendedUpdateDto : CharaDataUpdateDto
                 || base.AccessType != null
                 || base.ShareType != null
                 || AllowedUsers != null
+                || AllowedGroups != null
                 || base.GlamourerData != null
                 || base.FileSwaps != null
                 || base.FileGamePaths != null
