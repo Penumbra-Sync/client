@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Services;
 
-internal sealed class CharaDataCharacterHandler : DisposableMediatorSubscriberBase
+public sealed class CharaDataCharacterHandler : DisposableMediatorSubscriberBase
 {
     private readonly GameObjectHandlerFactory _gameObjectHandlerFactory;
     private readonly DalamudUtilService _dalamudUtilService;

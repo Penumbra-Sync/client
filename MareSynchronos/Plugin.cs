@@ -123,7 +123,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton((s) => new BlockedCharacterHandler(s.GetRequiredService<ILogger<BlockedCharacterHandler>>(), gameInteropProvider));
             collection.AddSingleton((s) => new IpcProvider(s.GetRequiredService<ILogger<IpcProvider>>(),
                 pluginInterface,
-                s.GetRequiredService<DalamudUtilService>(),
+                s.GetRequiredService<CharaDataManager>(),
                 s.GetRequiredService<MareMediator>()));
             collection.AddSingleton<SelectPairForTagUi>();
             collection.AddSingleton((s) => new EventAggregator(pluginInterface.ConfigDirectory.FullName,

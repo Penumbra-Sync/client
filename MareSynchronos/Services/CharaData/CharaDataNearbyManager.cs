@@ -6,14 +6,13 @@ using MareSynchronos.Services.CharaData.Models;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics.Eventing.Reader;
 using System.Numerics;
 
 namespace MareSynchronos.Services;
 
-internal sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
+public sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
 {
-    internal record NearbyCharaDataEntry
+    public record NearbyCharaDataEntry
     {
         public float Direction { get; init; }
         public float Distance { get; init; }

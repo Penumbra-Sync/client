@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.Services;
 
-internal sealed class CharaDataFileHandler : IDisposable
+public sealed class CharaDataFileHandler : IDisposable
 {
     private readonly DalamudUtilService _dalamudUtilService;
     private readonly FileCacheManager _fileCacheManager;

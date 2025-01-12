@@ -13,7 +13,7 @@ public class IpcProvider : IHostedService, IMediatorSubscriber
 {
     private readonly ILogger<IpcProvider> _logger;
     private readonly IDalamudPluginInterface _pi;
-    private readonly DalamudUtilService _dalamudUtil;
+    private readonly CharaDataManager _charaDataManager;
     private ICallGateProvider<string, IGameObject, bool>? _loadFileProvider;
     private ICallGateProvider<string, IGameObject, Task<bool>>? _loadFileAsyncProvider;
     private ICallGateProvider<List<nint>>? _handledGameAddresses;
@@ -22,15 +22,12 @@ public class IpcProvider : IHostedService, IMediatorSubscriber
     public MareMediator Mediator { get; init; }
 
     public IpcProvider(ILogger<IpcProvider> logger, IDalamudPluginInterface pi,
-         DalamudUtilService dalamudUtil,
-        MareMediator mareMediator)
+        CharaDataManager charaDataManager, MareMediator mareMediator)
     {
         _logger = logger;
         _pi = pi;
-        _dalamudUtil = dalamudUtil;
+        _charaDataManager = charaDataManager;
         Mediator = mareMediator;
-
-        // todo: fix ipc to use CharaDataManager
 
         Mediator.Subscribe<GameObjectHandlerCreatedMessage>(this, (msg) =>
         {
@@ -69,9 +66,6 @@ public class IpcProvider : IHostedService, IMediatorSubscriber
 
     private async Task<bool> LoadMcdfAsync(string path, IGameObject target)
     {
-        //if (_mareCharaFileManager.CurrentlyWorking || !_dalamudUtil.IsInGpose)
-            return false;
-
         await ApplyFileAsync(path, target).ConfigureAwait(false);
 
         return true;
@@ -79,9 +73,6 @@ public class IpcProvider : IHostedService, IMediatorSubscriber
 
     private bool LoadMcdf(string path, IGameObject target)
     {
-        //if (_mareCharaFileManager.CurrentlyWorking || !_dalamudUtil.IsInGpose)
-            return false;
-
         _ = Task.Run(async () => await ApplyFileAsync(path, target).ConfigureAwait(false)).ConfigureAwait(false);
 
         return true;
@@ -89,20 +80,9 @@ public class IpcProvider : IHostedService, IMediatorSubscriber
 
     private async Task ApplyFileAsync(string path, IGameObject target)
     {
-        /*
-        try
-        {
-            var expectedLength = _mareCharaFileManager.LoadMareCharaFile(path);
-            await _mareCharaFileManager.ApplyMareCharaFile(target, expectedLength).ConfigureAwait(false);
-        }
-        catch (Exception e)
-        {
-            _logger.LogError(e, "Failure of IPC call");
-        }
-        finally
-        {
-            _mareCharaFileManager.ClearMareCharaFile();
-        }*/
+        _charaDataManager.LoadMcdf(path);
+        await (_charaDataManager.LoadedMcdfHeader ?? Task.CompletedTask).ConfigureAwait(false);
+        _charaDataManager.McdfApplyToTarget(target.Name.TextValue);
     }
 
     private List<nint> GetHandledAddresses()

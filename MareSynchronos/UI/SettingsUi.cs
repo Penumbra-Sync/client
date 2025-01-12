@@ -1235,7 +1235,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         ImGui.SameLine();
         using (ImRaii.Disabled(string.IsNullOrEmpty(_uidToAddForIgnore)))
         {
-            if (_uiShared.IconTextButton(FontAwesomeIcon.Plus, "Add UID to whitelist"))
+            if (_uiShared.IconTextButton(FontAwesomeIcon.Plus, "Add UID/Vanity ID to whitelist"))
             {
                 if (!_playerPerformanceConfigService.Current.UIDsToIgnore.Contains(_uidToAddForIgnore, StringComparer.Ordinal))
                 {

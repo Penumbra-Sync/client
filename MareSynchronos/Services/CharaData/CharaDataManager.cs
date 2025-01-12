@@ -15,7 +15,7 @@ using System.Text;
 
 namespace MareSynchronos.Services;
 
-internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
+public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
 {
     private readonly ApiController _apiController;
     private readonly CharaDataConfigService _configService;
@@ -429,12 +429,12 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
         LoadedMcdfHeader = _fileHandler.LoadCharaFileHeader(filePath);
     }
 
-    public void McdfApplyToGposeTarget()
+    public void McdfApplyToTarget(string charaName)
     {
         if (LoadedMcdfHeader == null || !LoadedMcdfHeader.IsCompletedSuccessfully) return;
-        var charaName = _dalamudUtilService.GposeTargetGameObject?.Name.TextValue ?? string.Empty;
 
         List<string> actuallyExtractedFiles = [];
+
         UiBlockingComputation = McdfApplicationTask = Task.Run(async () =>
         {
             Guid applicationId = Guid.NewGuid();
@@ -478,6 +478,14 @@ internal sealed partial class CharaDataManager : DisposableMediatorSubscriberBas
                 }
             }
         });
+    }
+
+    public void McdfApplyToGposeTarget()
+    {
+        if (CanApplyInGpose(out string target))
+        {
+            McdfApplyToTarget(target);
+        }
     }
 
     public void SaveMareCharaFile(string description, string filePath)

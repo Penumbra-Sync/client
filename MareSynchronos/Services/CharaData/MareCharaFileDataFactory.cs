@@ -4,7 +4,7 @@ using MareSynchronos.Services.CharaData.Models;
 
 namespace MareSynchronos.Services.CharaData;
 
-internal sealed class MareCharaFileDataFactory
+public sealed class MareCharaFileDataFactory
 {
     private readonly FileCacheManager _fileCacheManager;
 
