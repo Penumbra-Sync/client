@@ -709,28 +709,8 @@ internal sealed partial class CharaDataHubUi
             {
                 using (ImRaii.Group())
                 {
-                    ImGui.SetNextItemWidth(200 - ImGui.GetFrameHeight());
-                    ImGui.InputText("##AliasToAdd", ref _specificIndividualAdd, 20);
-                    ImGui.SameLine(0.0f, 0.0f);
-                    using (var combo = ImRaii.Combo("##AliasToAddPicker", string.Empty, ImGuiComboFlags.NoPreview | ImGuiComboFlags.PopupAlignLeft))
-                    {
-                        if (combo)
-                        {
-                            // Is there a better way to handle this?
-                            var width = 200 - 2 * ImGui.GetStyle().FramePadding.X - (_pairManager.PairsWithGroups.Count > 8 ? ImGui.GetStyle().ScrollbarSize : 0);
-                            foreach (var pair in _pairManager.PairsWithGroups.Keys)
-                            {
-                                var selected = !string.IsNullOrEmpty(_specificIndividualAdd)
-                                    && (string.Equals(pair.UserData.UID, _specificIndividualAdd, StringComparison.Ordinal) || string.Equals(pair.UserData.Alias, _specificIndividualAdd, StringComparison.Ordinal));
-                                var note = pair.GetNote();
-                                using var font = ImRaii.PushFont(UiBuilder.MonoFont, note is null);
-                                if (ImGui.Selectable(note ?? pair.UserData.AliasOrUID, selected, ImGuiSelectableFlags.None, new(width, 0)))
-                                {
-                                    _specificIndividualAdd = pair.UserData.AliasOrUID;
-                                }
-                            }
-                        }
-                    }
+                    InputComboHybrid("##AliasToAdd", "##AliasToAddPicker", ref _specificIndividualAdd, _pairManager.PairsWithGroups.Keys,
+                        static pair => (pair.UserData.UID, pair.UserData.Alias, pair.UserData.AliasOrUID, pair.GetNote()));
                     ImGui.SameLine();
                     using (ImRaii.Disabled(string.IsNullOrEmpty(_specificIndividualAdd)
                         || updateDto.UserList.Any(f => string.Equals(f.UID, _specificIndividualAdd, StringComparison.Ordinal) || string.Equals(f.Alias, _specificIndividualAdd, StringComparison.Ordinal))))
@@ -776,28 +756,8 @@ internal sealed partial class CharaDataHubUi
             {
                 using (ImRaii.Group())
                 {
-                    ImGui.SetNextItemWidth(200 - ImGui.GetFrameHeight());
-                    ImGui.InputText("##GroupAliasToAdd", ref _specificGroupAdd, 20);
-                    ImGui.SameLine(0.0f, 0.0f);
-                    using (var combo = ImRaii.Combo("##GroupAliasToAddPicker", string.Empty, ImGuiComboFlags.NoPreview | ImGuiComboFlags.PopupAlignLeft))
-                    {
-                        if (combo)
-                        {
-                            // Is there a better way to handle this?
-                            var width = 200 - 2 * ImGui.GetStyle().FramePadding.X - (_pairManager.Groups.Count > 8 ? ImGui.GetStyle().ScrollbarSize : 0);
-                            foreach (var group in _pairManager.Groups.Keys)
-                            {
-                                var selected = !string.IsNullOrEmpty(_specificGroupAdd)
-                                    && (string.Equals(group.GID, _specificGroupAdd, StringComparison.Ordinal) || string.Equals(group.Alias, _specificGroupAdd, StringComparison.Ordinal));
-                                var note = _serverConfigurationManager.GetNoteForGid(group.GID);
-                                using var font = ImRaii.PushFont(UiBuilder.MonoFont, note is null);
-                                if (ImGui.Selectable(note ?? group.AliasOrGID, selected, ImGuiSelectableFlags.None, new(width, 0)))
-                                {
-                                    _specificGroupAdd = group.AliasOrGID;
-                                }
-                            }
-                        }
-                    }
+                    InputComboHybrid("##GroupAliasToAdd", "##GroupAliasToAddPicker", ref _specificGroupAdd, _pairManager.Groups.Keys,
+                        group => (group.GID, group.Alias, group.AliasOrGID, _serverConfigurationManager.GetNoteForGid(group.GID)));
                     ImGui.SameLine();
                     using (ImRaii.Disabled(string.IsNullOrEmpty(_specificGroupAdd)
                         || updateDto.GroupList.Any(f => string.Equals(f.GID, _specificGroupAdd, StringComparison.Ordinal) || string.Equals(f.Alias, _specificGroupAdd, StringComparison.Ordinal))))
@@ -839,5 +799,47 @@ internal sealed partial class CharaDataHubUi
             ImGui.Separator();
             ImGuiHelpers.ScaledDummy(5);
         });
+    }
+
+    private void InputComboHybrid<T>(string inputId, string comboId, ref string value, IEnumerable<T> comboEntries,
+        Func<T, (string Id, string? Alias, string AliasOrId, string? Note)> parseEntry)
+    {
+        const float ComponentWidth = 200;
+        ImGui.SetNextItemWidth(ComponentWidth - ImGui.GetFrameHeight());
+        ImGui.InputText(inputId, ref value, 20);
+        ImGui.SameLine(0.0f, 0.0f);
+
+        using var combo = ImRaii.Combo(comboId, string.Empty, ImGuiComboFlags.NoPreview | ImGuiComboFlags.PopupAlignLeft);
+        if (!combo)
+        {
+            return;
+        }
+
+        if (_openComboHybridEntries is null || !string.Equals(_openComboHybridId, comboId, StringComparison.Ordinal))
+        {
+            var valueSnapshot = value;
+            _openComboHybridEntries = comboEntries
+                .Select(parseEntry)
+                .Where(entry => entry.Id.Contains(valueSnapshot, StringComparison.OrdinalIgnoreCase)
+                    || (entry.Alias is not null && entry.Alias.Contains(valueSnapshot, StringComparison.OrdinalIgnoreCase))
+                    || (entry.Note is not null && entry.Note.Contains(valueSnapshot, StringComparison.OrdinalIgnoreCase)))
+                .OrderBy(entry => entry.Note is null ? entry.AliasOrId : $"{entry.Note} ({entry.AliasOrId})", StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            _openComboHybridId = comboId;
+        }
+        _comboHybridUsedLastFrame = true;
+
+        // Is there a better way to handle this?
+        var width = ComponentWidth - 2 * ImGui.GetStyle().FramePadding.X - (_openComboHybridEntries.Length > 8 ? ImGui.GetStyle().ScrollbarSize : 0);
+        foreach (var (id, alias, aliasOrId, note) in _openComboHybridEntries)
+        {
+            var selected = !string.IsNullOrEmpty(value)
+                && (string.Equals(id, value, StringComparison.Ordinal) || string.Equals(alias, value, StringComparison.Ordinal));
+            using var font = ImRaii.PushFont(UiBuilder.MonoFont, note is null);
+            if (ImGui.Selectable(note is null ? aliasOrId : $"{note} ({aliasOrId})", selected, ImGuiSelectableFlags.None, new(width, 0)))
+            {
+                value = aliasOrId;
+            }
+        }
     }
 }

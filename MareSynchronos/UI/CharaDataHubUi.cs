@@ -55,6 +55,9 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
     private string _specificIndividualAdd = string.Empty;
     private string _specificGroupAdd = string.Empty;
     private bool _abbreviateCharaName = false;
+    private string? _openComboHybridId = null;
+    private (string Id, string? Alias, string AliasOrId, string? Note)[]? _openComboHybridEntries = null;
+    private bool _comboHybridUsedLastFrame = false;
 
     public CharaDataHubUi(ILogger<CharaDataHubUi> logger, MareMediator mediator, PerformanceCollectorService performanceCollectorService,
                          CharaDataManager charaDataManager, CharaDataNearbyManager charaDataNearbyManager, CharaDataConfigService configService,
@@ -100,6 +103,8 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
         _sharedWithYouOwnerFilter = string.Empty;
         _importCode = string.Empty;
         _charaDataNearbyManager.ComputeNearbyData = false;
+        _openComboHybridId = null;
+        _openComboHybridEntries = null;
     }
 
     public override void OnOpen()
@@ -120,6 +125,13 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
 
     protected override void DrawInternal()
     {
+        if (!_comboHybridUsedLastFrame)
+        {
+            _openComboHybridId = null;
+            _openComboHybridEntries = null;
+        }
+        _comboHybridUsedLastFrame = false;
+
         _disableUI = !(_charaDataManager.UiBlockingComputation?.IsCompleted ?? true);
         if (DateTime.UtcNow.Subtract(_lastFavoriteUpdateTime).TotalSeconds > 2)
         {
