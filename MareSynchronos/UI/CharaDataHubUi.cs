@@ -7,6 +7,7 @@ using ImGuiNET;
 using MareSynchronos.API.Dto.CharaData;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Models;
+using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
 using MareSynchronos.Services.CharaData.Models;
 using MareSynchronos.Services.Mediator;
@@ -24,6 +25,7 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
     private readonly CharaDataConfigService _configService;
     private readonly DalamudUtilService _dalamudUtilService;
     private readonly FileDialogManager _fileDialogManager;
+    private readonly PairManager _pairManager;
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly UiSharedService _uiSharedService;
     private CancellationTokenSource _closalCts = new();
@@ -57,7 +59,7 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
     public CharaDataHubUi(ILogger<CharaDataHubUi> logger, MareMediator mediator, PerformanceCollectorService performanceCollectorService,
                          CharaDataManager charaDataManager, CharaDataNearbyManager charaDataNearbyManager, CharaDataConfigService configService,
                          UiSharedService uiSharedService, ServerConfigurationManager serverConfigurationManager,
-                         DalamudUtilService dalamudUtilService, FileDialogManager fileDialogManager)
+                         DalamudUtilService dalamudUtilService, FileDialogManager fileDialogManager, PairManager pairManager)
         : base(logger, mediator, "Mare Synchronos Character Data Hub###MareSynchronosCharaDataUI", performanceCollectorService)
     {
         SetWindowSizeConstraints();
@@ -69,6 +71,7 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
         _serverConfigurationManager = serverConfigurationManager;
         _dalamudUtilService = dalamudUtilService;
         _fileDialogManager = fileDialogManager;
+        _pairManager = pairManager;
         Mediator.Subscribe<GposeStartMessage>(this, (_) => IsOpen |= _configService.Current.OpenMareHubOnGposeStart);
     }
 

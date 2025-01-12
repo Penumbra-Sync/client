@@ -709,8 +709,28 @@ internal sealed partial class CharaDataHubUi
             {
                 using (ImRaii.Group())
                 {
-                    ImGui.SetNextItemWidth(200);
+                    ImGui.SetNextItemWidth(200 - ImGui.GetFrameHeight());
                     ImGui.InputText("##AliasToAdd", ref _specificIndividualAdd, 20);
+                    ImGui.SameLine(0.0f, 0.0f);
+                    using (var combo = ImRaii.Combo("##AliasToAddPicker", string.Empty, ImGuiComboFlags.NoPreview | ImGuiComboFlags.PopupAlignLeft))
+                    {
+                        if (combo)
+                        {
+                            // Is there a better way to handle this?
+                            var width = 200 - 2 * ImGui.GetStyle().FramePadding.X - (_pairManager.PairsWithGroups.Count > 8 ? ImGui.GetStyle().ScrollbarSize : 0);
+                            foreach (var pair in _pairManager.PairsWithGroups.Keys)
+                            {
+                                var selected = !string.IsNullOrEmpty(_specificIndividualAdd)
+                                    && (string.Equals(pair.UserData.UID, _specificIndividualAdd, StringComparison.Ordinal) || string.Equals(pair.UserData.Alias, _specificIndividualAdd, StringComparison.Ordinal));
+                                var note = pair.GetNote();
+                                using var font = ImRaii.PushFont(UiBuilder.MonoFont, note is null);
+                                if (ImGui.Selectable(note ?? pair.UserData.AliasOrUID, selected, ImGuiSelectableFlags.None, new(width, 0)))
+                                {
+                                    _specificIndividualAdd = pair.UserData.AliasOrUID;
+                                }
+                            }
+                        }
+                    }
                     ImGui.SameLine();
                     using (ImRaii.Disabled(string.IsNullOrEmpty(_specificIndividualAdd)
                         || updateDto.UserList.Any(f => string.Equals(f.UID, _specificIndividualAdd, StringComparison.Ordinal) || string.Equals(f.Alias, _specificIndividualAdd, StringComparison.Ordinal))))
@@ -756,8 +776,28 @@ internal sealed partial class CharaDataHubUi
             {
                 using (ImRaii.Group())
                 {
-                    ImGui.SetNextItemWidth(200);
+                    ImGui.SetNextItemWidth(200 - ImGui.GetFrameHeight());
                     ImGui.InputText("##GroupAliasToAdd", ref _specificGroupAdd, 20);
+                    ImGui.SameLine(0.0f, 0.0f);
+                    using (var combo = ImRaii.Combo("##GroupAliasToAddPicker", string.Empty, ImGuiComboFlags.NoPreview | ImGuiComboFlags.PopupAlignLeft))
+                    {
+                        if (combo)
+                        {
+                            // Is there a better way to handle this?
+                            var width = 200 - 2 * ImGui.GetStyle().FramePadding.X - (_pairManager.Groups.Count > 8 ? ImGui.GetStyle().ScrollbarSize : 0);
+                            foreach (var group in _pairManager.Groups.Keys)
+                            {
+                                var selected = !string.IsNullOrEmpty(_specificGroupAdd)
+                                    && (string.Equals(group.GID, _specificGroupAdd, StringComparison.Ordinal) || string.Equals(group.Alias, _specificGroupAdd, StringComparison.Ordinal));
+                                var note = _serverConfigurationManager.GetNoteForGid(group.GID);
+                                using var font = ImRaii.PushFont(UiBuilder.MonoFont, note is null);
+                                if (ImGui.Selectable(note ?? group.AliasOrGID, selected, ImGuiSelectableFlags.None, new(width, 0)))
+                                {
+                                    _specificGroupAdd = group.AliasOrGID;
+                                }
+                            }
+                        }
+                    }
                     ImGui.SameLine();
                     using (ImRaii.Disabled(string.IsNullOrEmpty(_specificGroupAdd)
                         || updateDto.GroupList.Any(f => string.Equals(f.GID, _specificGroupAdd, StringComparison.Ordinal) || string.Equals(f.Alias, _specificGroupAdd, StringComparison.Ordinal))))
