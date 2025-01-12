@@ -669,7 +669,8 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
             {
                 DrawHelpFoldout("You can apply character data shared with you implicitly in this tab. Shared Character Data are Character Data entries that have \"Sharing\" set to \"Shared\" and you have access through those by meeting the access restrictions, " +
                                 "i.e. you were specified by your UID to gain access or are paired with the other user according to the Access Restrictions setting." + Environment.NewLine + Environment.NewLine
-                                + "Filter if needed to find a specific entry, then just press on \"Apply to <actor>\" and it will download and apply the Character Data to the currently targeted GPose actor.");
+                                + "Filter if needed to find a specific entry, then just press on \"Apply to <actor>\" and it will download and apply the Character Data to the currently targeted GPose actor." + Environment.NewLine + Environment.NewLine
+                                + "Note: Shared Data of Pairs you have paused will not be shown here.");
 
                 ImGuiHelpers.ScaledDummy(5);
 
