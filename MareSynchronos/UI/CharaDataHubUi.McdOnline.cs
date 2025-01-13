@@ -693,6 +693,7 @@ internal sealed partial class CharaDataHubUi
             _selectedDtoId = _charaDataManager.OwnCharaData.Last().Value.Id;
             _selectNewEntry = false;
         }
+        _dataEntries = _charaDataManager.OwnCharaData.Count;
 
         _ = _charaDataManager.OwnCharaData.TryGetValue(_selectedDtoId, out var dto);
         DrawEditCharaData(dto);
