@@ -71,22 +71,7 @@ public sealed class CharaDataCharacterHandler : DisposableMediatorSubscriberBase
         using var handler = await _gameObjectHandlerFactory.Create(ObjectKind.Player,
             () => _dalamudUtilService.GetGposeCharacterFromObjectTableByName(name, _dalamudUtilService.IsInGpose)?.Address ?? IntPtr.Zero, false)
             .ConfigureAwait(false);
-        if (handler.Address != IntPtr.Zero)
-        {
-            var poseData = string.Empty;
-            API.Dto.CharaData.WorldData? worldData = null;
-            if (_dalamudUtilService.IsInGpose && reapplyPose)
-            {
-                poseData = await _ipcManager.Brio.GetPoseAsync(handler.Address).ConfigureAwait(false);
-                worldData = await _ipcManager.Brio.GetTransformAsync(handler.Address).ConfigureAwait(false);
-            }
-            await _ipcManager.Penumbra.RedrawAsync(Logger, handler, applicationId, CancellationToken.None).ConfigureAwait(false);
-            if (_dalamudUtilService.IsInGpose && reapplyPose)
-            {
-                await _ipcManager.Brio.SetPoseAsync(handler.Address, poseData ?? "{}").ConfigureAwait(false);
-                await _ipcManager.Brio.ApplyTransformAsync(handler.Address, worldData!.Value).ConfigureAwait(false);
-            }
-        }
+        await _ipcManager.Penumbra.RedrawAsync(Logger, handler, applicationId, CancellationToken.None).ConfigureAwait(false);
     }
 
     public async Task<bool> RevertHandledChara(string name, bool reapplyPose = true)
