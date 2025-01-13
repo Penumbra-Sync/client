@@ -11,7 +11,7 @@ internal sealed partial class CharaDataHubUi
 	private static string GetAccessTypeString(AccessTypeDto dto) => dto switch
 	{
 		AccessTypeDto.AllPairs => "All Pairs",
-		AccessTypeDto.ClosePairs => "Close Pairs",
+		AccessTypeDto.ClosePairs => "Direct Pairs",
 		AccessTypeDto.Individuals => "Specified",
 		AccessTypeDto.Public => "Everyone"
 	};

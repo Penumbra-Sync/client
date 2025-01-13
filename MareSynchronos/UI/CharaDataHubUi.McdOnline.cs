@@ -124,11 +124,11 @@ internal sealed partial class CharaDataHubUi
         }
         _uiSharedService.DrawHelpText("You can control who has access to your character data based on the access restrictions." + UiSharedService.TooltipSeparator
             + "Specified: Only people and syncshells you directly specify in 'Specific Individuals / Syncshells' can access this character data" + Environment.NewLine
-            + "Close Pairs: Only people you have directly paired can access this character data" + Environment.NewLine
+            + "Direct Pairs: Only people you have directly paired can access this character data" + Environment.NewLine
             + "All Pairs: All people you have paired can access this character data" + Environment.NewLine
             + "Everyone: Everyone can access this character data" + UiSharedService.TooltipSeparator
             + "Note: To access your character data the person in question requires to have the code. Exceptions for 'Shared' data, see 'Sharing' below." + Environment.NewLine
-            + "Note: For 'Close' and 'All Pairs' the pause state plays a role. Paused people will not be able to access your character data." + Environment.NewLine
+            + "Note: For 'Direct' and 'All Pairs' the pause state plays a role. Paused people will not be able to access your character data." + Environment.NewLine
             + "Note: Directly specified Individuals or Syncshells in the 'Specific Individuals / Syncshells' list will be able to access your character data regardless of pause or pair state.");
 
         DrawSpecific(updateDto);
