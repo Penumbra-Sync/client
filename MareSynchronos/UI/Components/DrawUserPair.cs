@@ -344,11 +344,19 @@ public class DrawUserPair
         if (_uiSharedService.IconButton(pauseIcon))
         {
             var perm = _pair.UserPair!.OwnPermissions;
+
+            if (UiSharedService.CtrlPressed() && !perm.IsPaused())
+            {
+                perm.SetSticky(true);
+            }
             perm.SetPaused(!perm.IsPaused());
             _ = _apiController.UserSetPairPermissions(new(_pair.UserData, perm));
         }
         UiSharedService.AttachToolTip(!_pair.UserPair!.OwnPermissions.IsPaused()
-            ? "Pause pairing with " + _pair.UserData.AliasOrUID
+            ? ("Pause pairing with " + _pair.UserData.AliasOrUID
+                + (_pair.UserPair!.OwnPermissions.IsSticky()
+                    ? string.Empty
+                    : UiSharedService.TooltipSeparator + "Hold CTRL to enable preferred permissions while pausing." + Environment.NewLine + "This will leave this pair paused even if unpausing syncshells including this pair."))
             : "Resume pairing with " + _pair.UserData.AliasOrUID);
 
         if (_pair.IsPaired)
