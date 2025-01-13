@@ -251,7 +251,7 @@ public sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
         Vector3 cameraPos = new(camera->Position.X, camera->Position.Y, camera->Position.Z);
         Vector3 lookAt = new(camera->LookAtVector.X, camera->LookAtVector.Y, camera->LookAtVector.Z);
 
-        if (_filterEntriesRunningTask?.IsCompleted ?? true)
+        if (_filterEntriesRunningTask?.IsCompleted ?? true && _dalamudUtilService.IsLoggedIn)
             _filterEntriesRunningTask = FilterEntriesAsync(cameraPos, lookAt);
     }
 
