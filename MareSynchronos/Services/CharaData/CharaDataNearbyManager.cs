@@ -227,7 +227,7 @@ public sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
             }
         }
 
-        if (_charaDataConfigService.Current.NearbyDrawWisps && !_dalamudUtilService.IsInGpose)
+        if (_charaDataConfigService.Current.NearbyDrawWisps && !_dalamudUtilService.IsInGpose && !_dalamudUtilService.IsInCombatOrPerforming)
             await _dalamudUtilService.RunOnFrameworkThread(() => ManageWispsNearby(previousPoses)).ConfigureAwait(false);
     }
 
@@ -235,7 +235,7 @@ public sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
     {
         if (_lastExecutionTime.AddSeconds(0.5) > DateTime.UtcNow) return;
         _lastExecutionTime = DateTime.UtcNow;
-        if (!ComputeNearbyData)
+        if (!ComputeNearbyData && !_charaDataConfigService.Current.NearbyShowAlways)
         {
             if (_nearbyData.Any())
                 _nearbyData.Clear();
@@ -244,7 +244,7 @@ public sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
             return;
         }
 
-        if (!_charaDataConfigService.Current.NearbyDrawWisps || _dalamudUtilService.IsInGpose)
+        if (!_charaDataConfigService.Current.NearbyDrawWisps || _dalamudUtilService.IsInGpose || _dalamudUtilService.IsInCombatOrPerforming)
             ClearAllVfx();
 
         var camera = CameraManager.Instance()->CurrentCamera;

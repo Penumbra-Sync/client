@@ -65,6 +65,14 @@ internal partial class CharaDataHubUi
                 _configService.Save();
             }
             _uiSharedService.DrawHelpText("This setting allows you to change the maximum distance in which poses will be shown. Set it to the maximum if you want to see all poses on the current map.");
+            bool alwaysShow = _configService.Current.NearbyShowAlways;
+            if (ImGui.Checkbox("Keep active outside Poses Nearby tab", ref alwaysShow))
+            {
+                _configService.Current.NearbyShowAlways = alwaysShow;
+                _configService.Save();
+            }
+            _uiSharedService.DrawHelpText("This will allow Mare to continue the calculation of position of wisps etc. active outside of the 'Poses Nearby' tab." + UiSharedService.TooltipSeparator
+                + "Note: The wisps etc. will disappear during combat and performing.");
         });
 
         if (!_uiSharedService.IsInGpose)
