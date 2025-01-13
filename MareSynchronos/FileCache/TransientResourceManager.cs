@@ -290,7 +290,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
                 _sendTransientCts?.Dispose();
                 _sendTransientCts = new();
                 var token = _sendTransientCts.Token;
-                await Task.Delay(TimeSpan.FromSeconds(2), token).ConfigureAwait(false);
+                await Task.Delay(TimeSpan.FromSeconds(5), token).ConfigureAwait(false);
                 Mediator.Publish(new TransientResourceChangedMessage(gameObject));
             });
         }
