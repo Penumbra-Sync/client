@@ -28,6 +28,7 @@ public sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
     private Task? _filterEntriesRunningTask;
     private (Guid VfxId, PoseEntryExtended Pose)? _hoveredVfx = null;
     private DateTime _lastExecutionTime = DateTime.UtcNow;
+    private SemaphoreSlim _sharedDataUpdateSemaphore = new(1, 1);
     public CharaDataNearbyManager(ILogger<CharaDataNearbyManager> logger, MareMediator mediator,
         DalamudUtilService dalamudUtilService, VfxSpawnManager vfxSpawnManager,
         ServerConfigurationManager serverConfigurationManager,
@@ -50,17 +51,25 @@ public sealed class CharaDataNearbyManager : DisposableMediatorSubscriberBase
 
     public void UpdateSharedData(Dictionary<string, CharaDataMetaInfoExtendedDto?> newData)
     {
-        _metaInfoCache.Clear();
-        foreach (var kvp in newData)
+        _sharedDataUpdateSemaphore.Wait();
+        try
         {
-            if (kvp.Value == null) continue;
-
-            if (!_metaInfoCache.TryGetValue(kvp.Value.Uploader, out var list))
+            _metaInfoCache.Clear();
+            foreach (var kvp in newData)
             {
-                _metaInfoCache[kvp.Value.Uploader] = list = [];
-            }
+                if (kvp.Value == null) continue;
 
-            list.Add(kvp.Value);
+                if (!_metaInfoCache.TryGetValue(kvp.Value.Uploader, out var list))
+                {
+                    _metaInfoCache[kvp.Value.Uploader] = list = [];
+                }
+
+                list.Add(kvp.Value);
+            }
+        }
+        finally
+        {
+            _sharedDataUpdateSemaphore.Release();
         }
     }
 
