@@ -5,6 +5,7 @@ using MareSynchronos.PlayerData.Data;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
+using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 
@@ -17,10 +18,12 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
     private readonly TransientConfigService _configurationService;
     private readonly DalamudUtilService _dalamudUtil;
     private readonly string[] _fileTypesToHandle = ["tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk"];
+    private readonly string[] _fileTypesToHandleRecording = ["tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk", "tex", "mdl", "mtrl"];
     private readonly HashSet<GameObjectHandler> _playerRelatedPointers = [];
     private ConcurrentDictionary<IntPtr, ObjectKind> _cachedFrameAddresses = [];
     private ConcurrentDictionary<ObjectKind, HashSet<string>>? _semiTransientResources = null;
     private uint _lastClassJobId = uint.MaxValue;
+    public bool IsTransientRecording { get; private set; } = false;
 
     public TransientResourceManager(ILogger<TransientResourceManager> logger, TransientConfigService configurationService,
             DalamudUtilService dalamudUtil, MareMediator mediator) : base(logger, mediator)
@@ -220,10 +223,15 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         });
     }
 
+    public void RebuildSemiTransientResources()
+    {
+        _semiTransientResources = null;
+    }
+
     private void Manager_PenumbraResourceLoadEvent(PenumbraResourceLoadMessage msg)
     {
         var gamePath = msg.GamePath.ToLowerInvariant();
-        var gameObject = msg.GameObject;
+        var gameObjectAddress = msg.GameObject;
         var filePath = msg.FilePath;
 
         // ignore files already processed this frame
@@ -247,7 +255,8 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         if (string.Equals(filePath, replacedGamePath, StringComparison.OrdinalIgnoreCase)) return;
 
         // ignore files to not handle
-        if (!_fileTypesToHandle.Any(type => gamePath.EndsWith(type, StringComparison.OrdinalIgnoreCase)))
+        var handledTypes = IsTransientRecording ? _fileTypesToHandleRecording : _fileTypesToHandle;
+        if (!handledTypes.Any(type => gamePath.EndsWith(type, StringComparison.OrdinalIgnoreCase)))
         {
             lock (_cacheAdditionLock)
             {
@@ -257,7 +266,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         }
 
         // ignore files not belonging to anything player related
-        if (!_cachedFrameAddresses.TryGetValue(gameObject, out var objectKind))
+        if (!_cachedFrameAddresses.TryGetValue(gameObjectAddress, out var objectKind))
         {
             lock (_cacheAdditionLock)
             {
@@ -274,27 +283,109 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             TransientResources[objectKind] = value;
         }
 
+        var owner = _playerRelatedPointers.FirstOrDefault(f => f.Address == gameObjectAddress);
+        bool alreadyTransient = false;
+
         if (value.Contains(replacedGamePath)
             || SemiTransientResources.SelectMany(k => k.Value).Any(f => string.Equals(f, gamePath, StringComparison.OrdinalIgnoreCase)))
         {
-            Logger.LogTrace("Not adding {replacedPath} : {filePath}", replacedGamePath, filePath);
+            if (!IsTransientRecording)
+                Logger.LogTrace("Not adding {replacedPath} : {filePath}", replacedGamePath, filePath);
+            alreadyTransient = true;
         }
         else
         {
-            var thing = _playerRelatedPointers.FirstOrDefault(f => f.Address == gameObject);
-            value.Add(replacedGamePath);
-            Logger.LogDebug("Adding {replacedGamePath} for {gameObject} ({filePath})", replacedGamePath, thing?.ToString() ?? gameObject.ToString("X"), filePath);
-            _ = Task.Run(async () =>
+            if (!IsTransientRecording)
             {
-                _sendTransientCts?.Cancel();
-                _sendTransientCts?.Dispose();
-                _sendTransientCts = new();
-                var token = _sendTransientCts.Token;
-                await Task.Delay(TimeSpan.FromSeconds(5), token).ConfigureAwait(false);
-                Mediator.Publish(new TransientResourceChangedMessage(gameObject));
-            });
+                value.Add(replacedGamePath);
+                Logger.LogDebug("Adding {replacedGamePath} for {gameObject} ({filePath})", replacedGamePath, owner?.ToString() ?? gameObjectAddress.ToString("X"), filePath);
+                SendTransients(gameObjectAddress);
+            }
+        }
+
+        if (owner != null && IsTransientRecording)
+        {
+            _recordedTransients.Add(new TransientRecord(owner, replacedGamePath, filePath, alreadyTransient) { AddTransient = !alreadyTransient });
         }
     }
 
+    private void SendTransients(nint gameObject)
+    {
+        _ = Task.Run(async () =>
+        {
+            _sendTransientCts?.Cancel();
+            _sendTransientCts?.Dispose();
+            _sendTransientCts = new();
+            var token = _sendTransientCts.Token;
+            await Task.Delay(TimeSpan.FromSeconds(5), token).ConfigureAwait(false);
+            Mediator.Publish(new TransientResourceChangedMessage(gameObject));
+        });
+    }
+
+    public void StartRecording(CancellationToken token)
+    {
+        if (IsTransientRecording) return;
+        _recordedTransients.Clear();
+        IsTransientRecording = true;
+        RecordTimeRemaining.Value = TimeSpan.FromSeconds(150);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (RecordTimeRemaining.Value > TimeSpan.Zero && !token.IsCancellationRequested)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
+                    RecordTimeRemaining.Value = RecordTimeRemaining.Value.Subtract(TimeSpan.FromSeconds(1));
+                }
+            }
+            finally
+            {
+                IsTransientRecording = false;
+            }
+        });
+    }
+
+    public async Task WaitForRecording(CancellationToken token)
+    {
+        while (IsTransientRecording)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
+        }
+    }
+
+    internal void SaveRecording()
+    {
+        HashSet<nint> addedTransients = [];
+        foreach (var item in _recordedTransients)
+        {
+            if (!item.AddTransient || item.AlreadyTransient) continue;
+            if (!TransientResources.TryGetValue(item.Owner.ObjectKind, out var transient))
+            {
+                TransientResources[item.Owner.ObjectKind] = transient = [];
+            }
+
+            Logger.LogTrace("Adding recorded: {gamePath} => {filePath}", item.GamePath, item.FilePath);
+
+            transient.Add(item.GamePath);
+            addedTransients.Add(item.Owner.Address);
+        }
+
+        _recordedTransients.Clear();
+
+        foreach (var item in addedTransients)
+        {
+            Mediator.Publish(new TransientResourceChangedMessage(item));
+        }
+    }
+
+    private readonly HashSet<TransientRecord> _recordedTransients = [];
+    public IReadOnlySet<TransientRecord> RecordedTransients => _recordedTransients;
+
+    public ValueProgress<TimeSpan> RecordTimeRemaining { get; } = new();
     private CancellationTokenSource _sendTransientCts = new();
+
+    public record TransientRecord(GameObjectHandler Owner, string GamePath, string FilePath, bool AlreadyTransient)
+    {
+        public bool AddTransient { get; set; }
+    }
 }

@@ -1,8 +1,10 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
 using MareSynchronos.API.Data.Enum;
+using MareSynchronos.FileCache;
 using MareSynchronos.Interop.Ipc;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.Services;
@@ -20,6 +22,9 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
     private readonly IpcManager _ipcManager;
     private readonly UiSharedService _uiSharedService;
     private readonly PlayerPerformanceConfigService _playerPerformanceConfig;
+    private readonly TransientResourceManager _transientResourceManager;
+    private readonly TransientConfigService _transientConfigService;
+    private readonly IpcCallerPenumbra _penumbraIpc;
     private readonly Dictionary<string, string[]> _texturesToConvert = new(StringComparer.Ordinal);
     private Dictionary<ObjectKind, Dictionary<string, CharacterAnalyzer.FileDataEntry>>? _cachedAnalysis;
     private CancellationTokenSource _conversionCancellationTokenSource = new();
@@ -33,17 +38,22 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
     private string _selectedHash = string.Empty;
     private ObjectKind _selectedObjectTab;
     private bool _showModal = false;
+    private CancellationTokenSource _transientRecordCts = new();
 
     public DataAnalysisUi(ILogger<DataAnalysisUi> logger, MareMediator mediator,
         CharacterAnalyzer characterAnalyzer, IpcManager ipcManager,
         PerformanceCollectorService performanceCollectorService, UiSharedService uiSharedService,
-        PlayerPerformanceConfigService playerPerformanceConfig)
+        PlayerPerformanceConfigService playerPerformanceConfig, TransientResourceManager transientResourceManager,
+        TransientConfigService transientConfigService, IpcCallerPenumbra penumbraIpc)
         : base(logger, mediator, "Mare Character Data Analysis", performanceCollectorService)
     {
         _characterAnalyzer = characterAnalyzer;
         _ipcManager = ipcManager;
         _uiSharedService = uiSharedService;
         _playerPerformanceConfig = playerPerformanceConfig;
+        _transientResourceManager = transientResourceManager;
+        _transientConfigService = transientConfigService;
+        _penumbraIpc = penumbraIpc;
         Mediator.Subscribe<CharacterDataAnalyzedMessage>(this, (_) =>
         {
             _hasUpdate = true;
@@ -107,7 +117,369 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
             _hasUpdate = false;
         }
 
-        UiSharedService.TextWrapped("This window shows you all files and their sizes that are currently in use through your character and associated entities in Mare");
+        using var tabBar = ImRaii.TabBar("analysisRecordingTabBar");
+        using (var tabItem = ImRaii.TabItem("Analysis"))
+        {
+            if (tabItem)
+            {
+                using var id = ImRaii.PushId("analysis");
+                DrawAnalysis();
+            }
+        }
+        using (var tabItem = ImRaii.TabItem("Transient Files"))
+        {
+            if (tabItem)
+            {
+                using var tabbar = ImRaii.TabBar("transientData");
+
+                using (var transientData = ImRaii.TabItem("Stored Transient File Data"))
+                {
+                    using var id = ImRaii.PushId("data");
+
+                    if (transientData)
+                    {
+                        DrawStoredData();
+                    }
+                }
+                using (var transientRecord = ImRaii.TabItem("Record Transient Data"))
+                {
+                    using var id = ImRaii.PushId("recording");
+
+                    if (transientRecord)
+                    {
+                        DrawRecording();
+                    }
+                }
+            }
+        }
+    }
+
+    private bool _showAlreadyAddedTransients = false;
+    private bool _acknowledgeReview = false;
+    private string _selectedStoredCharacter = string.Empty;
+    private string _selectedJobEntry = string.Empty;
+    private readonly List<string> _storedPathsToRemove = [];
+    private readonly Dictionary<string, string> _filePathResolve = [];
+    private string _filterGamePath = string.Empty;
+    private string _filterFilePath = string.Empty;
+
+    private void DrawStoredData()
+    {
+        UiSharedService.DrawTree("What is this? (Explanation / Help)", () =>
+        {
+            UiSharedService.TextWrapped("This tab allows you to see which transient files are attached to your character.");
+            UiSharedService.TextWrapped("Transient files are files that cannot be resolved to your character permanently. Mare gathers these files in the background while you execute animations, VFX, sound effects, etc.");
+            UiSharedService.TextWrapped("When sending your character data to others, Mare will combine the files listed in \"All Jobs\" and the corresponding currently used job.");
+            UiSharedService.TextWrapped("The purpose of this tab is primarily informational for you to see which files you are carrying with you. You can remove added game paths, however if you are using the animations etc. again, "
+                + "Mare will automatically attach these after using them. If you disable associated mods in Penumbra, the associated entries here will also be deleted automatically.");
+        });
+
+        ImGuiHelpers.ScaledDummy(5);
+
+        var config = _transientConfigService.Current.TransientConfigs;
+        Vector2 availableContentRegion = Vector2.Zero;
+        using (ImRaii.Group())
+        {
+            ImGui.TextUnformatted("Character");
+            ImGui.Separator();
+            ImGuiHelpers.ScaledDummy(3);
+            availableContentRegion = ImGui.GetContentRegionAvail();
+            using (ImRaii.ListBox("##characters", new Vector2(200, availableContentRegion.Y)))
+            {
+                foreach (var entry in config)
+                {
+                    var name = entry.Key.Split("_");
+                    if (!_uiSharedService.WorldData.TryGetValue(ushort.Parse(name[1]), out var worldname))
+                    {
+                        continue;
+                    }
+                    if (ImGui.Selectable(name[0] + " (" + worldname + ")", string.Equals(_selectedStoredCharacter, entry.Key, StringComparison.Ordinal)))
+                    {
+                        _selectedStoredCharacter = entry.Key;
+                        _selectedJobEntry = string.Empty;
+                        _storedPathsToRemove.Clear();
+                        _filePathResolve.Clear();
+                        _filterFilePath = string.Empty;
+                        _filterGamePath = string.Empty;
+                    }
+                }
+            }
+        }
+        ImGui.SameLine();
+        bool selectedData = config.TryGetValue(_selectedStoredCharacter, out var transientStorage) && transientStorage != null;
+        using (ImRaii.Group())
+        {
+            ImGui.TextUnformatted("Job");
+            ImGui.Separator();
+            ImGuiHelpers.ScaledDummy(3);
+            using (ImRaii.ListBox("##data", new Vector2(150, availableContentRegion.Y)))
+            {
+                if (selectedData)
+                {
+                    if (ImGui.Selectable("All Jobs", string.Equals(_selectedJobEntry, "alljobs", StringComparison.Ordinal)))
+                    {
+                        _selectedJobEntry = "alljobs";
+                    }
+                    foreach (var job in transientStorage!.JobSpecificCache)
+                    {
+                        if (!_uiSharedService.JobData.TryGetValue(job.Key, out var jobName)) continue;
+                        if (ImGui.Selectable(jobName, string.Equals(_selectedJobEntry, job.Key.ToString(), StringComparison.Ordinal)))
+                        {
+                            _selectedJobEntry = job.Key.ToString();
+                            _storedPathsToRemove.Clear();
+                            _filePathResolve.Clear();
+                            _filterFilePath = string.Empty;
+                            _filterGamePath = string.Empty;
+                        }
+                    }
+                }
+            }
+        }
+        ImGui.SameLine();
+        using (ImRaii.Group())
+        {
+            var selectedList = string.Equals(_selectedJobEntry, "alljobs", StringComparison.Ordinal)
+                ? config[_selectedStoredCharacter].GlobalPersistentCache
+                : (string.IsNullOrEmpty(_selectedJobEntry) ? [] : config[_selectedStoredCharacter].JobSpecificCache[uint.Parse(_selectedJobEntry)]);
+            ImGui.TextUnformatted($"Attached Files (Total Files: {selectedList.Count})");
+            ImGui.Separator();
+            ImGuiHelpers.ScaledDummy(3);
+            using (ImRaii.Disabled(string.IsNullOrEmpty(_selectedJobEntry)))
+            {
+
+                var restContent = availableContentRegion.X - ImGui.GetCursorPosX();
+                using var group = ImRaii.Group();
+                if (_uiSharedService.IconTextButton(FontAwesomeIcon.ArrowRight, "Resolve Game Paths to used File Paths"))
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        var paths = selectedList.ToArray();
+                        var resolved = await _ipcManager.Penumbra.ResolvePathsAsync(paths, []).ConfigureAwait(false);
+                        _filePathResolve.Clear();
+
+                        for (int i = 0; i < resolved.forward.Length; i++)
+                        {
+                            _filePathResolve[paths[i]] = resolved.forward[i];
+                        }
+                    });
+                }
+                ImGui.SameLine();
+                ImGuiHelpers.ScaledDummy(20, 1);
+                ImGui.SameLine();
+                using (ImRaii.Disabled(!_storedPathsToRemove.Any()))
+                {
+                    if (_uiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Remove selected Game Paths"))
+                    {
+                        foreach (var item in _storedPathsToRemove)
+                        {
+                            selectedList.Remove(item);
+                        }
+
+                        _transientConfigService.Save();
+                        _transientResourceManager.RebuildSemiTransientResources();
+                        _filterFilePath = string.Empty;
+                        _filterGamePath = string.Empty;
+                    }
+                }
+                ImGui.SameLine();
+                using (ImRaii.Disabled(!UiSharedService.CtrlPressed()))
+                {
+                    if (_uiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Clear ALL Game Paths"))
+                    {
+                        selectedList.Clear();
+                        _transientConfigService.Save();
+                        _transientResourceManager.RebuildSemiTransientResources();
+                        _filterFilePath = string.Empty;
+                        _filterGamePath = string.Empty;
+                    }
+                }
+                UiSharedService.AttachToolTip("Hold CTRL to delete all game paths from the displayed list"
+                    + UiSharedService.TooltipSeparator + "You usually do not need to do this. All animation and VFX data will be automatically handled through Mare.");
+                ImGuiHelpers.ScaledDummy(5);
+                ImGuiHelpers.ScaledDummy(30);
+                ImGui.SameLine();
+                ImGui.SetNextItemWidth((restContent - 30) / 2f);
+                ImGui.InputTextWithHint("##filterGamePath", "Filter by Game Path", ref _filterGamePath, 255);
+                ImGui.SameLine();
+                ImGui.SetNextItemWidth((restContent - 30) / 2f);
+                ImGui.InputTextWithHint("##filterFilePath", "Filter by File Path", ref _filterFilePath, 255);
+
+                using (var dataTable = ImRaii.Table("##table", 3, ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.ScrollY | ImGuiTableFlags.RowBg))
+                {
+                    if (dataTable)
+                    {
+                        ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 30);
+                        ImGui.TableSetupColumn("Game Path", ImGuiTableColumnFlags.WidthFixed, (restContent - 30) / 2f);
+                        ImGui.TableSetupColumn("File Path", ImGuiTableColumnFlags.WidthFixed, (restContent - 30) / 2f);
+                        ImGui.TableSetupScrollFreeze(0, 1);
+                        ImGui.TableHeadersRow();
+                        int id = 0;
+                        foreach (var entry in selectedList)
+                        {
+                            if (!string.IsNullOrWhiteSpace(_filterGamePath) && !entry.Contains(_filterGamePath, StringComparison.OrdinalIgnoreCase))
+                                continue;
+                            bool hasFileResolve = _filePathResolve.TryGetValue(entry, out var filePath);
+
+                            if (hasFileResolve && !string.IsNullOrEmpty(_filterFilePath) && !filePath!.Contains(_filterFilePath, StringComparison.OrdinalIgnoreCase))
+                                continue;
+
+                            using var imguiid = ImRaii.PushId(id++);
+                            ImGui.TableNextColumn();
+                            bool isSelected = _storedPathsToRemove.Contains(entry, StringComparer.Ordinal);
+                            if (ImGui.Checkbox("##", ref isSelected))
+                            {
+                                if (isSelected)
+                                    _storedPathsToRemove.Add(entry);
+                                else
+                                    _storedPathsToRemove.Remove(entry);
+                            }
+                            ImGui.TableNextColumn();
+                            ImGui.TextUnformatted(entry);
+                            UiSharedService.AttachToolTip(entry + UiSharedService.TooltipSeparator + "Click to copy to clipboard");
+                            if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
+                            {
+                                ImGui.SetClipboardText(entry);
+                            }
+                            ImGui.TableNextColumn();
+                            if (hasFileResolve)
+                            {
+                                ImGui.TextUnformatted(filePath ?? "Unk");
+                                UiSharedService.AttachToolTip(filePath ?? "Unk" + UiSharedService.TooltipSeparator + "Click to copy to clipboard");
+                                if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
+                                {
+                                    ImGui.SetClipboardText(filePath);
+                                }
+                            }
+                            else
+                            {
+                                ImGui.TextUnformatted("-");
+                                UiSharedService.AttachToolTip("Resolve Game Paths to used File Paths to display the associated file paths.");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void DrawRecording()
+    {
+        UiSharedService.DrawTree("What is this? (Explanation / Help)", () =>
+        {
+            UiSharedService.TextWrapped("This tab allows you to attempt to fix mods that do not sync correctly, especially those with modded models and animations." + Environment.NewLine + Environment.NewLine
+                + "To use this, start the recording, execute one or multiple emotes/animations you want to attempt to fix and check if new data appears in the table below." + Environment.NewLine
+                + "If it doesn't, Mare is not able to catch the data or already has recorded the animation files (check 'Show previously added transient files' to see if not all is already present)." + Environment.NewLine + Environment.NewLine
+                + "For most animations, vfx, etc. it is enough to just run them once unless they have random variations. Longer animations do not require to play out in their entirety to be captured.");
+            ImGuiHelpers.ScaledDummy(5);
+            UiSharedService.DrawGroupedCenteredColorText("Important Note: If you need to fix an animation that should apply across multiple jobs, you need to repeat this process with at least one additional job, " +
+                "otherwise the animation will only be fixed for the currently active job. This goes primarily for emotes that are used across multiple jobs.",
+                ImGuiColors.DalamudYellow, 800);
+            ImGuiHelpers.ScaledDummy(5);
+            UiSharedService.DrawGroupedCenteredColorText("WARNING: WHILE RECORDING TRANSIENT DATA, DO NOT CHANGE YOUR APPEARANCE, ENABLED MODS OR ANYTHING. JUST DO THE ANIMATION(S) OR WHATEVER YOU NEED DOING AND STOP THE RECORDING.",
+                ImGuiColors.DalamudRed, 800);
+            ImGuiHelpers.ScaledDummy(5);
+        });
+        using (ImRaii.Disabled(_transientResourceManager.IsTransientRecording))
+        {
+            if (_uiSharedService.IconTextButton(FontAwesomeIcon.Play, "Start Transient Recording"))
+            {
+                _transientRecordCts.Cancel();
+                _transientRecordCts.Dispose();
+                _transientRecordCts = new();
+                _transientResourceManager.StartRecording(_transientRecordCts.Token);
+                _acknowledgeReview = false;
+            }
+        }
+        ImGui.SameLine();
+        using (ImRaii.Disabled(!_transientResourceManager.IsTransientRecording))
+        {
+            if (_uiSharedService.IconTextButton(FontAwesomeIcon.Stop, "Stop Transient Recording"))
+            {
+                _transientRecordCts.Cancel();
+            }
+        }
+        if (_transientResourceManager.IsTransientRecording)
+        {
+            ImGui.SameLine();
+            UiSharedService.ColorText($"RECORDING - Time Remaining: {_transientResourceManager.RecordTimeRemaining.Value}", ImGuiColors.DalamudYellow);
+            ImGuiHelpers.ScaledDummy(5);
+            UiSharedService.DrawGroupedCenteredColorText("DO NOT CHANGE YOUR APPEARANCE OR MODS WHILE RECORDING, YOU CAN ACCIDENTALLY MAKE SOME OF YOUR APPEARANCE RELATED MODS PERMANENT.", ImGuiColors.DalamudRed, 800);
+        }
+
+        ImGuiHelpers.ScaledDummy(5);
+        ImGui.Checkbox("Show previously added transient files in the recording", ref _showAlreadyAddedTransients);
+        _uiSharedService.DrawHelpText("Use this only if you want to see what was previously already caught by Mare");
+        ImGuiHelpers.ScaledDummy(5);
+
+        using (ImRaii.Disabled(_transientResourceManager.IsTransientRecording || _transientResourceManager.RecordedTransients.All(k => !k.AddTransient) || !_acknowledgeReview))
+        {
+            if (_uiSharedService.IconTextButton(FontAwesomeIcon.Save, "Save Recorded Transient Data"))
+            {
+                _transientResourceManager.SaveRecording();
+                _acknowledgeReview = false;
+            }
+        }
+        ImGui.SameLine();
+        ImGui.Checkbox("I acknowledge I have reviewed the recorded data", ref _acknowledgeReview);
+        if (_transientResourceManager.RecordedTransients.Any(k => !k.AlreadyTransient))
+        {
+            ImGuiHelpers.ScaledDummy(5);
+            UiSharedService.DrawGroupedCenteredColorText("Please review the recorded mod files before saving and deselect files that got into the recording on accident.", ImGuiColors.DalamudYellow);
+            ImGuiHelpers.ScaledDummy(5);
+        }
+
+        ImGuiHelpers.ScaledDummy(5);
+        var width = ImGui.GetContentRegionAvail();
+        using var table = ImRaii.Table("Recorded Transients", 4, ImGuiTableFlags.ScrollY | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.RowBg);
+        if (table)
+        {
+            int id = 0;
+            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 30);
+            ImGui.TableSetupColumn("Owner", ImGuiTableColumnFlags.WidthFixed, 100);
+            ImGui.TableSetupColumn("Game Path", ImGuiTableColumnFlags.WidthFixed, (width.X - 30 - 100) / 2f);
+            ImGui.TableSetupColumn("File Path", ImGuiTableColumnFlags.WidthFixed, (width.X - 30 - 100) / 2f);
+            ImGui.TableSetupScrollFreeze(0, 1);
+            ImGui.TableHeadersRow();
+            var transients = _transientResourceManager.RecordedTransients.ToList();
+            transients.Reverse();
+            foreach (var value in transients)
+            {
+                if (value.AlreadyTransient && !_showAlreadyAddedTransients)
+                    continue;
+
+                using var imguiid = ImRaii.PushId(id++);
+                if (value.AlreadyTransient)
+                {
+                    ImGui.PushStyleColor(ImGuiCol.Text, ImGuiColors.DalamudGrey);
+                }
+                ImGui.TableNextColumn();
+                bool addTransient = value.AddTransient;
+                if (ImGui.Checkbox("##add", ref addTransient))
+                {
+                    value.AddTransient = addTransient;
+                }
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted(value.Owner.Name);
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted(value.GamePath);
+                UiSharedService.AttachToolTip(value.GamePath);
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted(value.FilePath);
+                UiSharedService.AttachToolTip(value.FilePath);
+                if (value.AlreadyTransient)
+                {
+                    ImGui.PopStyleColor();
+                }
+            }
+        }
+    }
+
+    private void DrawAnalysis()
+    {
+        UiSharedService.DrawTree("What is this? (Explanation / Help)", () =>
+        {
+            UiSharedService.TextWrapped("This tab shows you all files and their sizes that are currently in use through your character and associated entities in Mare");
+        });
 
         if (_cachedAnalysis!.Count == 0) return;
 
@@ -168,7 +540,6 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
         ImGui.TextUnformatted(UiSharedService.ByteToString(_cachedAnalysis!.Sum(c => c.Value.Sum(c => c.Value.CompressedSize))));
         ImGui.TextUnformatted($"Total modded model triangles: {_cachedAnalysis.Sum(c => c.Value.Sum(f => f.Value.Triangles))}");
         ImGui.Separator();
-
         using var tabbar = ImRaii.TabBar("objectSelection");
         foreach (var kvp in _cachedAnalysis)
         {

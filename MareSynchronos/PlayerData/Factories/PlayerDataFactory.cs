@@ -162,6 +162,8 @@ public class PlayerDataFactory
             _logger.LogDebug("=> {repl}", replacement);
         }
 
+        await _transientResourceManager.WaitForRecording(token).ConfigureAwait(false);
+
         // if it's pet then it's summoner, if it's summoner we actually want to keep all filereplacements alive at all times
         // or we get into redraw city for every change and nothing works properly
         if (objectKind == ObjectKind.Pet)
