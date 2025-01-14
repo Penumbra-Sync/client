@@ -6,11 +6,16 @@ using Newtonsoft.Json;
 
 namespace MareSynchronos.MareConfiguration;
 
-public class ConfigurationMigrator(ILogger<ConfigurationMigrator> logger, IDalamudPluginInterface pi) : IHostedService
+public class ConfigurationMigrator(ILogger<ConfigurationMigrator> logger, TransientConfigService transientConfigService) : IHostedService
 {
     public void Migrate()
     {
-        // currently nothing to migrate
+        if (transientConfigService.Current.Version == 0)
+        {
+            transientConfigService.Current.TransientConfigs.Clear();
+            transientConfigService.Current.Version = 1;
+            transientConfigService.Save();
+        }
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -23,11 +28,4 @@ public class ConfigurationMigrator(ILogger<ConfigurationMigrator> logger, IDalam
     {
         return Task.CompletedTask;
     }
-
-    private static void SaveConfig(IMareConfiguration config, string path)
-    {
-        File.WriteAllText(path, JsonConvert.SerializeObject(config, Formatting.Indented));
-    }
-
-    private string ConfigurationPath(string configName) => Path.Combine(pi.ConfigDirectory.FullName, configName);
 }

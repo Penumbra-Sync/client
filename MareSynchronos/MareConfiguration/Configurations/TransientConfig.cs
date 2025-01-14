@@ -3,7 +3,7 @@
 public class TransientConfig : IMareConfiguration
 {
     public Dictionary<string, TransientPlayerConfig> TransientConfigs { get; set; } = [];
-    public int Version { get; set; } = 0;
+    public int Version { get; set; } = 1;
 
     public class TransientPlayerConfig
     {
