@@ -356,7 +356,7 @@ public sealed class PairManager : DisposableMediatorSubscriberBase
         Logger.LogDebug("Disposing all Pairs");
         Parallel.ForEach(_allClientPairs, item =>
         {
-            item.Value.MarkOffline();
+            item.Value.MarkOffline(wait: false);
         });
 
         RecreateLazy();
