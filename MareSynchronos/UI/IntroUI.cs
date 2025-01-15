@@ -241,6 +241,13 @@ public partial class IntroUi : WindowMediatorSubscriberBase
                 var buttonText = "Save";
                 var buttonWidth = _secretKey.Length != 64 ? 0 : ImGuiHelpers.GetButtonSize(buttonText).X + ImGui.GetStyle().ItemSpacing.X;
                 var textSize = ImGui.CalcTextSize(text);
+
+                ImGuiHelpers.ScaledDummy(5);
+                UiSharedService.DrawGroupedCenteredColorText("Strongly consider to use OAuth2 to authenticate, if the server supports it (the current main server does). " +
+                    "The authentication flow is simpler and you do not require to store or maintain Secret Keys. " +
+                    "You already implicitly register using Discord, so the OAuth2 method will be cleaner and more straight-forward to use.", ImGuiColors.DalamudYellow, 500);
+                ImGuiHelpers.ScaledDummy(5);
+
                 ImGui.AlignTextToFramePadding();
                 ImGui.TextUnformatted(text);
                 ImGui.SameLine();
