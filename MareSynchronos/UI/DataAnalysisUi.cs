@@ -24,7 +24,6 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
     private readonly PlayerPerformanceConfigService _playerPerformanceConfig;
     private readonly TransientResourceManager _transientResourceManager;
     private readonly TransientConfigService _transientConfigService;
-    private readonly IpcCallerPenumbra _penumbraIpc;
     private readonly Dictionary<string, string[]> _texturesToConvert = new(StringComparer.Ordinal);
     private Dictionary<ObjectKind, Dictionary<string, CharacterAnalyzer.FileDataEntry>>? _cachedAnalysis;
     private CancellationTokenSource _conversionCancellationTokenSource = new();
@@ -44,7 +43,7 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
         CharacterAnalyzer characterAnalyzer, IpcManager ipcManager,
         PerformanceCollectorService performanceCollectorService, UiSharedService uiSharedService,
         PlayerPerformanceConfigService playerPerformanceConfig, TransientResourceManager transientResourceManager,
-        TransientConfigService transientConfigService, IpcCallerPenumbra penumbraIpc)
+        TransientConfigService transientConfigService)
         : base(logger, mediator, "Mare Character Data Analysis", performanceCollectorService)
     {
         _characterAnalyzer = characterAnalyzer;
@@ -53,7 +52,6 @@ public class DataAnalysisUi : WindowMediatorSubscriberBase
         _playerPerformanceConfig = playerPerformanceConfig;
         _transientResourceManager = transientResourceManager;
         _transientConfigService = transientConfigService;
-        _penumbraIpc = penumbraIpc;
         Mediator.Subscribe<CharacterDataAnalyzedMessage>(this, (_) =>
         {
             _hasUpdate = true;
