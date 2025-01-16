@@ -1,5 +1,7 @@
-﻿using MareSynchronos.API.Data.Enum;
+﻿using MareSynchronos.API.Data;
+using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Dto;
+using MareSynchronos.API.Dto.CharaData;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.MareConfiguration.Models;
@@ -186,6 +188,31 @@ public partial class ApiController
         return Task.CompletedTask;
     }
 
+    public Task Client_GposeLobbyJoin(UserData userData)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task Client_GposeLobbyLeave(UserData userData)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task Client_GposeLobbyPushCharacterData(CharaDataDownloadDto charaDataDownload)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task Client_GposeLobbyPushPoseData(UserData userData, PoseData poseData)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task Client_GposeLobbyPushWorldData(UserData userdata, WorldData worldData)
+    {
+        return Task.CompletedTask;
+    }
+
     public void OnDownloadReady(Action<Guid> act)
     {
         if (_initialized) return;
@@ -316,6 +343,36 @@ public partial class ApiController
     {
         if (_initialized) return;
         _mareHub!.On(nameof(Client_UserUpdateSelfPairPermissions), act);
+    }
+
+    public void OnGposeLobbyJoin(Action<UserData> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GposeLobbyJoin), act);
+    }
+
+    public void OnGposeLobbyLeave(Action<UserData> act)
+    {
+        if (!_initialized) return;
+        _mareHub!.On(nameof(Client_GposeLobbyLeave), act);
+    }
+
+    public void OnGposeLobbyPushCharacterData(Action<CharaDataDownloadDto> act)
+    {
+        if (!_initialized) return;
+        _mareHub!.On(nameof(Client_GposeLobbyPushCharacterData), act);
+    }
+
+    public void OnGposeLobbyPushPoseData(Action<UserData, PoseData> act)
+    {
+        if (!_initialized) return;
+        _mareHub!.On(nameof(Client_GposeLobbyPushCharacterData), act);
+    }
+
+    public void OnGposeLobbyPushWorldData(Action<UserData, WorldData> act)
+    {
+        if (!_initialized) return;
+        _mareHub!.On(nameof(Client_GposeLobbyPushWorldData), act);
     }
 
     private void ExecuteSafely(Action act)

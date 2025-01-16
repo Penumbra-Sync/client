@@ -116,4 +116,97 @@ public partial class ApiController
             return null;
         }
     }
+
+    public async Task<string> GposeLobbyCreate()
+    {
+        if (!IsConnected) return string.Empty;
+
+        try
+        {
+            Logger.LogDebug("Creating GPose Lobby");
+            return await _mareHub!.InvokeAsync<string>(nameof(GposeLobbyCreate)).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to create GPose lobby");
+            return string.Empty;
+        }
+    }
+
+    public async Task<bool> GposeLobbyLeave()
+    {
+        if (!IsConnected) return false;
+
+        try
+        {
+            Logger.LogDebug("Leaving current GPose Lobby");
+            return await _mareHub!.InvokeAsync<bool>(nameof(GposeLobbyLeave)).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to leave GPose lobby");
+            return false;
+        }
+    }
+
+    public async Task<bool> GposeLobbyJoin(string lobbyId)
+    {
+        if (!IsConnected) return false;
+
+        try
+        {
+            Logger.LogDebug("Joining GPose Lobby {id}", lobbyId);
+            return await _mareHub!.InvokeAsync<bool>(nameof(GposeLobbyJoin), lobbyId).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to join GPose lobby {id}", lobbyId);
+            return false;
+        }
+    }
+
+    public async Task GposeLobbyPushCharacterData(CharaDataDownloadDto charaDownloadDto)
+    {
+        if (!IsConnected) return;
+
+        try
+        {
+            Logger.LogDebug("Sending Chara Data to GPose Lobby");
+            await _mareHub!.InvokeAsync<bool>(nameof(GposeLobbyPushCharacterData), charaDownloadDto).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to send Chara Data to GPose lobby");
+        }
+    }
+
+    public async Task GposeLobbyPushPoseData(PoseData poseData)
+    {
+        if (!IsConnected) return;
+
+        try
+        {
+            Logger.LogDebug("Sending Pose Data to GPose Lobby");
+            await _mareHub!.InvokeAsync<bool>(nameof(GposeLobbyPushPoseData), poseData).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to send Pose Data to GPose lobby");
+        }
+    }
+
+    public async Task GposeLobbyPushWorldData(WorldData worldData)
+    {
+        if (!IsConnected) return;
+
+        try
+        {
+            Logger.LogDebug("Sending World Data to GPose Lobby");
+            await _mareHub!.InvokeAsync<bool>(nameof(GposeLobbyPushWorldData), worldData).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to send World Data to GPose lobby");
+        }
+    }
 }
