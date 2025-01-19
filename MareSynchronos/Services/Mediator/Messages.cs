@@ -1,6 +1,7 @@
 ﻿using Dalamud.Game.ClientState.Objects.Types;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto;
+using MareSynchronos.API.Dto.CharaData;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.PlayerData.Handlers;
@@ -89,5 +90,10 @@ public record PenumbraRedrawCharacterMessage(ICharacter Character) : SameThreadM
 public record GameObjectHandlerCreatedMessage(GameObjectHandler GameObjectHandler, bool OwnedObject) : SameThreadMessage;
 public record GameObjectHandlerDestroyedMessage(GameObjectHandler GameObjectHandler, bool OwnedObject) : SameThreadMessage;
 public record HaltCharaDataCreation(bool Resume = false) : SameThreadMessage;
+public record GposeLobbyUserJoin(UserData UserData) : MessageBase;
+public record GPoseLobbyUserLeave(UserData UserData) : MessageBase;
+public record GPoseLobbyReceiveCharaData(CharaDataDownloadDto CharaDataDownloadDto) : MessageBase;
+public record GPoseLobbyReceivePoseData(UserData UserData, PoseData PoseData) : MessageBase;
+public record GPoseLobbyReceiveWorldData(UserData UserData, WorldData WorldData) : MessageBase;
 #pragma warning restore S2094
 #pragma warning restore MA0048 // File name must match type name

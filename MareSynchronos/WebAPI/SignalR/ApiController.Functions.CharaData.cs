@@ -1,4 +1,5 @@
-﻿using MareSynchronos.API.Dto.CharaData;
+﻿using MareSynchronos.API.Data;
+using MareSynchronos.API.Dto.CharaData;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
 
@@ -149,19 +150,19 @@ public partial class ApiController
         }
     }
 
-    public async Task<bool> GposeLobbyJoin(string lobbyId)
+    public async Task<List<UserData>> GposeLobbyJoin(string lobbyId)
     {
-        if (!IsConnected) return false;
+        if (!IsConnected) return [];
 
         try
         {
             Logger.LogDebug("Joining GPose Lobby {id}", lobbyId);
-            return await _mareHub!.InvokeAsync<bool>(nameof(GposeLobbyJoin), lobbyId).ConfigureAwait(false);
+            return await _mareHub!.InvokeAsync<List<UserData>>(nameof(GposeLobbyJoin), lobbyId).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Failed to join GPose lobby {id}", lobbyId);
-            return false;
+            return [];
         }
     }
 
@@ -172,7 +173,7 @@ public partial class ApiController
         try
         {
             Logger.LogDebug("Sending Chara Data to GPose Lobby");
-            await _mareHub!.InvokeAsync<bool>(nameof(GposeLobbyPushCharacterData), charaDownloadDto).ConfigureAwait(false);
+            await _mareHub!.InvokeAsync(nameof(GposeLobbyPushCharacterData), charaDownloadDto).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -187,7 +188,7 @@ public partial class ApiController
         try
         {
             Logger.LogDebug("Sending Pose Data to GPose Lobby");
-            await _mareHub!.InvokeAsync<bool>(nameof(GposeLobbyPushPoseData), poseData).ConfigureAwait(false);
+            await _mareHub!.InvokeAsync(nameof(GposeLobbyPushPoseData), poseData).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -201,8 +202,8 @@ public partial class ApiController
 
         try
         {
-            Logger.LogDebug("Sending World Data to GPose Lobby");
-            await _mareHub!.InvokeAsync<bool>(nameof(GposeLobbyPushWorldData), worldData).ConfigureAwait(false);
+            //Logger.LogDebug("Sending World Data to GPose Lobby");
+            await _mareHub!.InvokeAsync(nameof(GposeLobbyPushWorldData), worldData).ConfigureAwait(false);
         }
         catch (Exception ex)
         {

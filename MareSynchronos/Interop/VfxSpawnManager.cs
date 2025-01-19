@@ -35,7 +35,7 @@ public unsafe class VfxSpawnManager : DisposableMediatorSubscriberBase
         });
         mareMediator.Subscribe<GposeEndMessage>(this, (msg) =>
         {
-            ChangeSpawnVisibility(0.5f);
+            RestoreSpawnVisiblity();
         });
         mareMediator.Subscribe<CutsceneStartMessage>(this, (msg) =>
         {
@@ -43,19 +43,27 @@ public unsafe class VfxSpawnManager : DisposableMediatorSubscriberBase
         });
         mareMediator.Subscribe<CutsceneEndMessage>(this, (msg) =>
         {
-            ChangeSpawnVisibility(0.5f);
+            RestoreSpawnVisiblity();
         });
+    }
+
+    private unsafe void RestoreSpawnVisiblity()
+    {
+        foreach (var vfx in _spawnedObjects)
+        {
+            ((VfxStruct*)vfx.Value.Address)->Alpha = vfx.Value.Visibility;
+        }
     }
 
     private unsafe void ChangeSpawnVisibility(float visibility)
     {
         foreach (var vfx in _spawnedObjects)
         {
-            ((VfxStruct*)vfx.Value)->Alpha = visibility;
+            ((VfxStruct*)vfx.Value.Address)->Alpha = visibility;
         }
     }
 
-    private readonly Dictionary<Guid, nint> _spawnedObjects = [];
+    private readonly Dictionary<Guid, (nint Address, float Visibility)> _spawnedObjects = [];
 
     private VfxStruct* SpawnStatic(string path, Vector3 pos, Quaternion rotation, float r, float g, float b, float a, Vector3 scale)
     {
@@ -102,17 +110,29 @@ public unsafe class VfxSpawnManager : DisposableMediatorSubscriberBase
         Guid guid = Guid.NewGuid();
         Logger.LogDebug("Spawned VFX at {pos}, {rot}: 0x{ptr:X}", position, rotation, (nint)vfx);
 
-        _spawnedObjects[guid] = (nint)vfx;
+        _spawnedObjects[guid] = ((nint)vfx, a);
 
         return guid;
     }
 
-    public void DespawnObject(Guid id)
+    public unsafe void MoveObject(Guid id, Vector3 newPosition)
     {
-        if (_spawnedObjects.Remove<Guid, nint>(id, out var vfx))
+        if (_spawnedObjects.TryGetValue(id, out var vfxValue))
         {
-            Logger.LogDebug("Despawning {obj:X}", vfx);
-            _staticVfxRemove((VfxStruct*)vfx);
+            if (vfxValue.Address == nint.Zero) return;
+            var vfx = (VfxStruct*)vfxValue.Address;
+            vfx->Position = newPosition with { Y = newPosition.Y + 1 };
+            vfx->Flags |= 2;
+        }
+    }
+
+    public void DespawnObject(Guid? id)
+    {
+        if (id == null) return;
+        if (_spawnedObjects.Remove(id.Value, out var value))
+        {
+            Logger.LogDebug("Despawning {obj:X}", value.Address);
+            _staticVfxRemove((VfxStruct*)value.Address);
         }
     }
 
@@ -121,7 +141,7 @@ public unsafe class VfxSpawnManager : DisposableMediatorSubscriberBase
         foreach (var obj in _spawnedObjects.Values)
         {
             Logger.LogDebug("Despawning {obj:X}", obj);
-            _staticVfxRemove((VfxStruct*)obj);
+            _staticVfxRemove((VfxStruct*)obj.Address);
         }
     }
 

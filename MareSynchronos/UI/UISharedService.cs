@@ -34,6 +34,7 @@ namespace MareSynchronos.UI;
 public partial class UiSharedService : DisposableMediatorSubscriberBase
 {
     public const string TooltipSeparator = "--SEP--";
+    public static string DoubleNewLine => Environment.NewLine + Environment.NewLine;
 
     public static readonly ImGuiWindowFlags PopupWindowFlags = ImGuiWindowFlags.NoResize |
                                                ImGuiWindowFlags.NoScrollbar |
