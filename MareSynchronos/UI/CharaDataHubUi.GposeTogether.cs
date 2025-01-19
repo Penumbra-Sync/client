@@ -188,7 +188,7 @@ internal sealed partial class CharaDataHubUi
             using (ImRaii.Disabled(!_uiSharedService.IsInGpose))
             {
                 ImGui.SetNextItemWidth(200);
-                using (var combo = ImRaii.Combo("##character", string.IsNullOrEmpty(user.AssociatedCharaName) ? "No character assigned" : user.AssociatedCharaName))
+                using (var combo = ImRaii.Combo("##character", string.IsNullOrEmpty(user.AssociatedCharaName) ? "No character assigned" : CharaName(user.AssociatedCharaName)))
                 {
                     if (combo)
                     {
@@ -196,7 +196,7 @@ internal sealed partial class CharaDataHubUi
                         {
                             if (chara == null) continue;
 
-                            if (ImGui.Selectable(chara.Name.TextValue, chara.Address == user.Address))
+                            if (ImGui.Selectable(CharaName(chara.Name.TextValue), chara.Address == user.Address))
                             {
                                 user.AssociatedCharaName = chara.Name.TextValue;
                                 user.Address = chara.Address;

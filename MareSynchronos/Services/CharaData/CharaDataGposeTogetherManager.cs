@@ -175,6 +175,7 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
             else
             {
                 LeaveGPoseLobby();
+                LastGPoseLobbyId = string.Empty;
             }
         });
     }
@@ -507,11 +508,11 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
 
                 _ = Task.Run(async () =>
                 {
-                    if (hadWorldDataUpdate && kvp.Value.ApplicablePoseData != null)
+                    if (hadPoseDataUpdate && kvp.Value.ApplicablePoseData != null)
                     {
                         await _brio.SetPoseAsync(kvp.Value.Address, CreateJsonFromPoseData(kvp.Value.ApplicablePoseData)).ConfigureAwait(false);
                     }
-                    if (hadPoseDataUpdate && kvp.Value.WorldData != null)
+                    if (hadWorldDataUpdate && kvp.Value.WorldData != null)
                     {
                         await _brio.ApplyTransformAsync(kvp.Value.Address, kvp.Value.WorldData.Value).ConfigureAwait(false);
                     }
