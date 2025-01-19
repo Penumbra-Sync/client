@@ -1,186 +1,20 @@
 ﻿using Dalamud.Game.ClientState.Objects.SubKinds;
-using Dalamud.Utility;
 using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.CharaData;
 using MareSynchronos.Interop;
 using MareSynchronos.Interop.Ipc;
+using MareSynchronos.Services.CharaData.Models;
 using MareSynchronos.Services.Mediator;
-using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
 using System.Numerics;
-using System.Text;
 using System.Text.Json.Nodes;
 
 namespace MareSynchronos.Services.CharaData;
 
 public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
 {
-    public sealed record GposeLobbyUserData(UserData UserData)
-    {
-        public void Reset()
-        {
-            HasWorldDataUpdate = WorldData != null;
-            HasPoseDataUpdate = ApplicablePoseData != null;
-            SpawnedVfxId = null;
-            LastAppliedCharaDataDate = DateTime.MinValue;
-        }
-
-        private WorldData? _worldData;
-        public WorldData? WorldData
-        {
-            get => _worldData; set
-            {
-                _worldData = value;
-                HasWorldDataUpdate = true;
-            }
-        }
-
-        public bool HasWorldDataUpdate { get; set; } = false;
-
-        private PoseData? _fullPoseData;
-        private PoseData? _deltaPoseData;
-
-        public PoseData? FullPoseData
-        {
-            get => _fullPoseData;
-            set
-            {
-                _fullPoseData = value;
-                ApplicablePoseData = CombinePoseData();
-                HasPoseDataUpdate = true;
-            }
-        }
-
-        public PoseData? DeltaPoseData
-        {
-            get => _deltaPoseData;
-            set
-            {
-                _deltaPoseData = value;
-                ApplicablePoseData = CombinePoseData();
-                HasPoseDataUpdate = true;
-            }
-        }
-
-        public PoseData? ApplicablePoseData { get; private set; }
-        public bool HasPoseDataUpdate { get; set; } = false;
-        public Guid? SpawnedVfxId { get; set; }
-        public Vector3? LastWorldPosition { get; set; }
-        public Vector3? TargetWorldPosition { get; set; }
-        public DateTime? UpdateStart { get; set; }
-        private CharaDataDownloadDto? _charaData;
-        public CharaDataDownloadDto? CharaData
-        {
-            get => _charaData; set
-            {
-                _charaData = value;
-                LastUpdatedCharaData = _charaData?.UpdatedDate ?? DateTime.MaxValue;
-            }
-        }
-
-        public DateTime LastUpdatedCharaData { get; private set; } = DateTime.MaxValue;
-        public DateTime LastAppliedCharaDataDate { get; set; } = DateTime.MinValue;
-        public nint Address { get; set; }
-        public string AssociatedCharaName { get; set; } = string.Empty;
-
-        private PoseData? CombinePoseData()
-        {
-            if (DeltaPoseData == null && FullPoseData != null) return FullPoseData;
-            if (FullPoseData == null) return null;
-
-            PoseData output = FullPoseData!.Value.DeepClone();
-            PoseData delta = DeltaPoseData!.Value;
-
-            foreach (var bone in FullPoseData!.Value.Bones)
-            {
-                if (!delta.Bones.TryGetValue(bone.Key, out var data)) continue;
-                if (!data.Exists)
-                {
-                    output.Bones.Remove(bone.Key);
-                }
-                else
-                {
-                    output.Bones[bone.Key] = data;
-                }
-            }
-
-            foreach (var bone in FullPoseData!.Value.MainHand)
-            {
-                if (!delta.MainHand.TryGetValue(bone.Key, out var data)) continue;
-                if (!data.Exists)
-                {
-                    output.MainHand.Remove(bone.Key);
-                }
-                else
-                {
-                    output.MainHand[bone.Key] = data;
-                }
-            }
-
-            foreach (var bone in FullPoseData!.Value.OffHand)
-            {
-                if (!delta.OffHand.TryGetValue(bone.Key, out var data)) continue;
-                if (!data.Exists)
-                {
-                    output.OffHand.Remove(bone.Key);
-                }
-                else
-                {
-                    output.OffHand[bone.Key] = data;
-                }
-            }
-
-            return output;
-        }
-
-        public string WorldDataDescriptor { get; private set; } = string.Empty;
-        public Vector2 MapCoordinates { get; private set; }
-        public Lumina.Excel.Sheets.Map Map { get; private set; }
-
-        public async Task SetWorldDataDescriptor(DalamudUtilService dalamudUtilService)
-        {
-            if (WorldData == null)
-            {
-                WorldDataDescriptor = "No World Data found";
-            }
-
-            var worldData = WorldData!.Value;
-            MapCoordinates = await dalamudUtilService.RunOnFrameworkThread(() =>
-                    MapUtil.WorldToMap(new Vector2(worldData.PositionX, worldData.PositionY), dalamudUtilService.MapData.Value[worldData.LocationInfo.MapId].Map))
-                .ConfigureAwait(false);
-            Map = dalamudUtilService.MapData.Value[worldData.LocationInfo.MapId].Map;
-
-            StringBuilder sb = new();
-            sb.AppendLine("Server: " + dalamudUtilService.WorldData.Value[(ushort)worldData.LocationInfo.ServerId]);
-            sb.AppendLine("Territory: " + dalamudUtilService.TerritoryData.Value[worldData.LocationInfo.TerritoryId]);
-            sb.AppendLine("Map: " + dalamudUtilService.MapData.Value[worldData.LocationInfo.MapId].MapName);
-
-            if (worldData.LocationInfo.WardId != 0)
-                sb.AppendLine("Ward #: " + worldData.LocationInfo.WardId);
-            if (worldData.LocationInfo.DivisionId != 0)
-            {
-                sb.AppendLine("Subdivision: " + worldData.LocationInfo.DivisionId switch
-                {
-                    1 => "No",
-                    2 => "Yes",
-                    _ => "-"
-                });
-            }
-            if (worldData.LocationInfo.HouseId != 0)
-            {
-                sb.AppendLine("House #: " + (worldData.LocationInfo.HouseId == 100 ? "Apartments" : worldData.LocationInfo.HouseId.ToString()));
-            }
-            if (worldData.LocationInfo.RoomId != 0)
-            {
-                sb.AppendLine("Apartment #: " + worldData.LocationInfo.RoomId);
-            }
-            sb.AppendLine("Coordinates: X: " + MapCoordinates.X.ToString("0.0", CultureInfo.InvariantCulture) + ", Y: " + MapCoordinates.Y.ToString("0.0", CultureInfo.InvariantCulture));
-            WorldDataDescriptor = sb.ToString();
-        }
-    }
-
     private readonly ApiController _apiController;
     private readonly IpcCallerBrio _brio;
     private readonly SemaphoreSlim _charaDataCreationSemaphore = new(1, 1);
@@ -189,7 +23,7 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
     private readonly DalamudUtilService _dalamudUtil;
     private readonly Dictionary<string, GposeLobbyUserData> _usersInLobby = [];
     private readonly VfxSpawnManager _vfxSpawnManager;
-    private (API.Data.CharacterData ApiData, CharaDataDownloadDto Dto)? _lastCreatedCharaData;
+    private (CharacterData ApiData, CharaDataDownloadDto Dto)? _lastCreatedCharaData;
     private PoseData? _lastDeltaPoseData;
     private PoseData? _lastFullPoseData;
     private WorldData? _lastWorldData;
@@ -220,11 +54,11 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
         {
             OnReceiveWorldData(msg.UserData, msg.WorldData);
         });
-        Mediator.Subscribe<HubReconnectedMessage>(this, (msg) =>
+        Mediator.Subscribe<ConnectedMessage>(this, (msg) =>
         {
-            if (_usersInLobby.Count > 1 && !string.IsNullOrEmpty(CurrentGPoseLobbyId))
+            if (_usersInLobby.Count > 0 && !string.IsNullOrEmpty(CurrentGPoseLobbyId))
             {
-                JoinGPoseLobby(CurrentGPoseLobbyId);
+                JoinGPoseLobby(CurrentGPoseLobbyId, isReconnecting: true);
             }
         });
         Mediator.Subscribe<GposeStartMessage>(this, (msg) =>
@@ -243,6 +77,10 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
         {
             OnCutsceneFrameworkUpdate();
         });
+        Mediator.Subscribe<DisconnectedMessage>(this, (msg) =>
+        {
+            LeaveGPoseLobby();
+        });
 
         _apiController = apiController;
         _brio = brio;
@@ -253,6 +91,7 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
     }
 
     public string? CurrentGPoseLobbyId { get; private set; }
+    public string? LastGPoseLobbyId { get; private set; }
 
     public IEnumerable<GposeLobbyUserData> UsersInLobby => _usersInLobby.Values;
 
@@ -288,6 +127,9 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
             _lastCreatedCharaData = (playerData, charaDataDownloadDto);
         }
 
+        _lastFullPoseData = null;
+        _lastWorldData = null;
+
         if (_lastCreatedCharaData != null)
             await _apiController.GposeLobbyPushCharacterData(_lastCreatedCharaData.Value.Dto)
                 .ConfigureAwait(false);
@@ -307,7 +149,7 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
         });
     }
 
-    internal void JoinGPoseLobby(string joinLobbyId)
+    internal void JoinGPoseLobby(string joinLobbyId, bool isReconnecting = false)
     {
         _ = Task.Run(async () =>
         {
@@ -315,14 +157,16 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
             ClearLobby();
             if (otherUsers.Any())
             {
+                LastGPoseLobbyId = string.Empty;
+
                 foreach (var user in otherUsers)
                 {
                     OnUserJoinLobby(user);
                 }
+
                 CurrentGPoseLobbyId = joinLobbyId;
                 _ = GposeWorldPositionBackgroundTask(_lobbyCts.Token);
                 _ = GposePoseDataBackgroundTask(_lobbyCts.Token);
-
             }
         });
     }
@@ -334,7 +178,12 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
             var left = await _apiController.GposeLobbyLeave().ConfigureAwait(false);
             if (left)
             {
-                ClearLobby();
+                if (_usersInLobby.Count != 0)
+                {
+                    LastGPoseLobbyId = CurrentGPoseLobbyId;
+                }
+
+                ClearLobby(revertCharas: true);
             }
         });
     }
@@ -344,18 +193,20 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
         base.Dispose(disposing);
         if (disposing)
         {
-            ClearLobby();
+            ClearLobby(revertCharas: true);
         }
     }
 
-    private void ClearLobby()
+    private void ClearLobby(bool revertCharas = false)
     {
         _lobbyCts.Cancel();
         _lobbyCts.Dispose();
         _lobbyCts = new();
         CurrentGPoseLobbyId = string.Empty;
-        foreach (var user in _usersInLobby.ToDictionary(k => k.Key, k => k.Value, StringComparer.Ordinal))
+        foreach (var user in _usersInLobby.ToDictionary())
         {
+            if (revertCharas)
+                _charaDataManager.RevertChara(user.Value.HandledChara);
             OnUserLeaveLobby(user.Value.UserData);
         }
         _usersInLobby.Clear();
@@ -547,7 +398,9 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
         {
             await Task.Delay(TimeSpan.FromSeconds(_dalamudUtil.IsInGpose ? 10 : 1), ct).ConfigureAwait(false);
 
+            // if there are no players in lobby, don't do anything
             if (_usersInLobby.Count == 0) continue;
+
             // get own player data
             var player = (Dalamud.Game.ClientState.Objects.Types.ICharacter?)(await _dalamudUtil.GetPlayerCharacterAsync().ConfigureAwait(false));
             if (player == null) continue;
@@ -631,21 +484,27 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
             if (!string.IsNullOrWhiteSpace(kvp.Value.AssociatedCharaName))
             {
                 kvp.Value.Address = _dalamudUtil.GetGposeCharacterFromObjectTableByName(kvp.Value.AssociatedCharaName, true)?.Address ?? nint.Zero;
+                if (kvp.Value.Address == nint.Zero)
+                {
+                    kvp.Value.AssociatedCharaName = string.Empty;
+                }
             }
 
             if (kvp.Value.Address != nint.Zero && (kvp.Value.HasWorldDataUpdate || kvp.Value.HasPoseDataUpdate))
             {
-                // process
+                bool hadPoseDataUpdate = kvp.Value.HasPoseDataUpdate;
+                bool hadWorldDataUpdate = kvp.Value.HasWorldDataUpdate;
+                kvp.Value.HasPoseDataUpdate = false;
+                kvp.Value.HasWorldDataUpdate = false;
+
                 _ = Task.Run(async () =>
                 {
-                    if (kvp.Value.HasPoseDataUpdate && kvp.Value.ApplicablePoseData != null)
+                    if (hadWorldDataUpdate && kvp.Value.ApplicablePoseData != null)
                     {
-                        kvp.Value.HasPoseDataUpdate = false;
                         await _brio.SetPoseAsync(kvp.Value.Address, CreateJsonFromPoseData(kvp.Value.ApplicablePoseData)).ConfigureAwait(false);
                     }
-                    if (kvp.Value.HasWorldDataUpdate && kvp.Value.WorldData != null)
+                    if (hadPoseDataUpdate && kvp.Value.WorldData != null)
                     {
-                        kvp.Value.HasWorldDataUpdate = false;
                         await _brio.ApplyTransformAsync(kvp.Value.Address, kvp.Value.WorldData.Value).ConfigureAwait(false);
                     }
                 });
@@ -719,7 +578,7 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
 
     public async Task ApplyCharaData(GposeLobbyUserData userData)
     {
-        if (userData.CharaData == null || userData.LastAppliedCharaDataDate == userData.CharaData.UpdatedDate || userData.Address == nint.Zero || string.IsNullOrEmpty(userData.AssociatedCharaName))
+        if (userData.CharaData == null || userData.Address == nint.Zero || string.IsNullOrEmpty(userData.AssociatedCharaName))
             return;
 
         await _charaDataCreationSemaphore.WaitAsync(_lobbyCts.Token).ConfigureAwait(false);
@@ -749,9 +608,10 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
         {
             userData.HasPoseDataUpdate = false;
             userData.HasWorldDataUpdate = false;
-            var charaName = await _charaDataManager.SpawnAndApplyData(userData.CharaData).ConfigureAwait(false);
-            if (string.IsNullOrEmpty(charaName)) return;
-            userData.AssociatedCharaName = charaName;
+            var chara = await _charaDataManager.SpawnAndApplyData(userData.CharaData).ConfigureAwait(false);
+            if (chara == null) return;
+            userData.HandledChara = chara;
+            userData.AssociatedCharaName = chara.Name;
             userData.HasPoseDataUpdate = true;
             userData.HasWorldDataUpdate = true;
         }

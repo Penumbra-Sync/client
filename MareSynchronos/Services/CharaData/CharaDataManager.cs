@@ -115,7 +115,14 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
         {
             if (string.IsNullOrEmpty(charaName)) return;
 
-            await DownloadAndAplyDataAsync(charaName, dataDownloadDto, null, false).ConfigureAwait(false);
+            CharaDataMetaInfoDto metaInfo = new(dataDownloadDto.Id, dataDownloadDto.Uploader)
+            {
+                CanBeDownloaded = true,
+                Description = $"Data from {dataDownloadDto.Uploader.AliasOrUID} for {dataDownloadDto.Id}",
+                UpdatedDate = dataDownloadDto.UpdatedDate,
+            };
+
+            await DownloadAndAplyDataAsync(charaName, dataDownloadDto, metaInfo, false).ConfigureAwait(false);
         });
     }
 
@@ -523,7 +530,7 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
         });
     }
 
-    public Task<string?> SpawnAndApplyData(CharaDataDownloadDto charaDataMetaInfoDto)
+    public Task<HandledCharaDataEntry?> SpawnAndApplyData(CharaDataDownloadDto charaDataDownloadDto)
     {
         var task = Task.Run(async () =>
         {
@@ -531,9 +538,9 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
             if (newActor == null) return null;
             await Task.Delay(TimeSpan.FromSeconds(1)).ConfigureAwait(false);
 
-            await ApplyCharaData(charaDataMetaInfoDto, newActor.Name.TextValue).ConfigureAwait(false);
+            await ApplyCharaData(charaDataDownloadDto, newActor.Name.TextValue).ConfigureAwait(false);
 
-            return newActor.Name.TextValue;
+            return _characterHandler.HandledCharaData.FirstOrDefault(f => string.Equals(f.Name, newActor.Name.TextValue, StringComparison.Ordinal));
         });
         UiBlockingComputation = task;
         return task;
@@ -763,10 +770,8 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
         await CacheData(_ownCharaData[dto.Id]).ConfigureAwait(false);
     }
 
-    private int _applyDataCounter = 0;
-
     private async Task ApplyDataAsync(Guid applicationId, GameObjectHandler tempHandler, bool isSelf, bool autoRevert,
-        CharaDataMetaInfoExtendedDto? metaInfo, Dictionary<string, string> modPaths, string? manipData, string? glamourerData, string? customizeData, CancellationToken token)
+        CharaDataMetaInfoExtendedDto metaInfo, Dictionary<string, string> modPaths, string? manipData, string? glamourerData, string? customizeData, CancellationToken token)
     {
         Guid? cPlusId = null;
         Guid penumbraCollection;
@@ -782,8 +787,7 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
             Logger.LogTrace("[{appId}] Applying data in Penumbra", applicationId);
 
             DataApplicationProgress = "Applying Penumbra information";
-            string tempCollName = metaInfo == null ? (tempHandler.Name + "-anon-" + _applyDataCounter++) : metaInfo.Uploader.UID + metaInfo.Id;
-            penumbraCollection = await _ipcManager.Penumbra.CreateTemporaryCollectionAsync(Logger, tempCollName).ConfigureAwait(false);
+            penumbraCollection = await _ipcManager.Penumbra.CreateTemporaryCollectionAsync(Logger, metaInfo.Uploader.UID + metaInfo.Id).ConfigureAwait(false);
             var idx = await _dalamudUtilService.RunOnFrameworkThread(() => tempHandler.GetGameObject()?.ObjectIndex).ConfigureAwait(false) ?? 0;
             await _ipcManager.Penumbra.AssignTemporaryCollectionAsync(Logger, penumbraCollection, idx).ConfigureAwait(false);
             await _ipcManager.Penumbra.SetTemporaryModsAsync(Logger, applicationId, penumbraCollection, modPaths).ConfigureAwait(false);
@@ -825,8 +829,7 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
             {
                 Logger.LogTrace("[{appId}] Adding {name} to handled objects", applicationId, tempHandler.Name);
 
-                if (metaInfo != null)
-                    _characterHandler.AddHandledChara(new HandledCharaDataEntry(tempHandler.Name, isSelf, cPlusId, metaInfo));
+                _characterHandler.AddHandledChara(new HandledCharaDataEntry(tempHandler.Name, isSelf, cPlusId, metaInfo));
             }
         }
         finally
@@ -877,7 +880,7 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
         CharaUpdateTask = null;
     }
 
-    private async Task DownloadAndAplyDataAsync(string charaName, CharaDataDownloadDto charaDataDownloadDto, CharaDataMetaInfoDto? metaInfo, bool autoRevert = true)
+    private async Task DownloadAndAplyDataAsync(string charaName, CharaDataDownloadDto charaDataDownloadDto, CharaDataMetaInfoDto metaInfo, bool autoRevert = true)
     {
         _applicationCts = _applicationCts.CancelRecreate();
         var token = _applicationCts.Token;
@@ -928,9 +931,7 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
         if (!_dalamudUtilService.IsInGpose)
             Mediator.Publish(new HaltCharaDataCreation());
 
-        CharaDataMetaInfoExtendedDto? extendedMetaInfo = null;
-        if (metaInfo != null)
-            extendedMetaInfo = await CacheData(metaInfo).ConfigureAwait(false);
+        var extendedMetaInfo = await CacheData(metaInfo).ConfigureAwait(false);
 
         await ApplyDataAsync(applicationId, tempHandler, isSelf, autoRevert, extendedMetaInfo, modPaths, charaDataDownloadDto.ManipulationData, charaDataDownloadDto.GlamourerData,
             charaDataDownloadDto.CustomizeData, token).ConfigureAwait(false);

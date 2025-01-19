@@ -136,7 +136,7 @@ public partial class ApiController
 
     public async Task<bool> GposeLobbyLeave()
     {
-        if (!IsConnected) return false;
+        if (!IsConnected) return true;
 
         try
         {
@@ -202,7 +202,6 @@ public partial class ApiController
 
         try
         {
-            //Logger.LogDebug("Sending World Data to GPose Lobby");
             await _mareHub!.InvokeAsync(nameof(GposeLobbyPushWorldData), worldData).ConfigureAwait(false);
         }
         catch (Exception ex)

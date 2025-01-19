@@ -3,6 +3,7 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using ImGuiNET;
+using MareSynchronos.Services.CharaData.Models;
 
 namespace MareSynchronos.UI;
 
@@ -18,6 +19,13 @@ internal sealed partial class CharaDataHubUi
             ImGuiHelpers.ScaledDummy(5);
         }
 
+        if (!_uiSharedService.ApiController.IsConnected)
+        {
+            ImGuiHelpers.ScaledDummy(5);
+            UiSharedService.DrawGroupedCenteredColorText("CANNOT USE GPOSE TOGETHER WHILE DISCONNECTED FROM THE SERVER.", ImGuiColors.DalamudRed);
+            ImGuiHelpers.ScaledDummy(5);
+        }
+
         _uiSharedService.BigText("GPose Together");
         DrawHelpFoldout("GPose together is a way to do multiplayer GPose sessions and collaborations." + UiSharedService.DoubleNewLine
             + "GPose together requires Brio to function. Only Brio is also supported for the actual posing interactions. Attempting to pose using other tools will lead to conflicts and exploding characters." + UiSharedService.DoubleNewLine
@@ -26,7 +34,7 @@ internal sealed partial class CharaDataHubUi
             + "Once you are close to each other you can initiate GPose. You must either assign or spawn characters for each of the lobby users. Their own poses and positions to their character will be automatically applied." + Environment.NewLine
             + "Pose and location data during GPose are updated approximately every 10-20s.");
 
-        using var disabled = ImRaii.Disabled(!_charaDataManager.BrioAvailable);
+        using var disabled = ImRaii.Disabled(!_charaDataManager.BrioAvailable || !_uiSharedService.ApiController.IsConnected);
 
         UiSharedService.DistanceSeparator();
         _uiSharedService.BigText("Lobby Controls");
@@ -43,6 +51,11 @@ internal sealed partial class CharaDataHubUi
             {
                 _charaDataGposeTogetherManager.JoinGPoseLobby(_joinLobbyId);
                 _joinLobbyId = string.Empty;
+            }
+            if (!string.IsNullOrEmpty(_charaDataGposeTogetherManager.LastGPoseLobbyId)
+                && _uiSharedService.IconTextButton(FontAwesomeIcon.LongArrowAltRight, $"Rejoin Last Lobby {_charaDataGposeTogetherManager.LastGPoseLobbyId}"))
+            {
+                _charaDataGposeTogetherManager.JoinGPoseLobby(_charaDataGposeTogetherManager.LastGPoseLobbyId);
             }
         }
         else
@@ -82,6 +95,8 @@ internal sealed partial class CharaDataHubUi
             UiSharedService.DistanceSeparator();
             ImGui.TextUnformatted("Users In Lobby");
             var gposeCharas = _dalamudUtilService.GetGposeCharactersFromObjectTable();
+            var self = _dalamudUtilService.GetPlayerCharacter();
+            gposeCharas = gposeCharas.Where(c => c != null && !string.Equals(c.Name.TextValue, self.Name.TextValue, StringComparison.Ordinal)).ToList();
 
             using (ImRaii.Child("charaChild", new(0, 0), false, ImGuiWindowFlags.AlwaysAutoResize))
             {
@@ -102,7 +117,7 @@ internal sealed partial class CharaDataHubUi
         }
     }
 
-    private void DrawLobbyUser(Services.CharaData.CharaDataGposeTogetherManager.GposeLobbyUserData user,
+    private void DrawLobbyUser(GposeLobbyUserData user,
         IEnumerable<Dalamud.Game.ClientState.Objects.Types.ICharacter?> gposeCharas)
     {
         using var id = ImRaii.PushId(user.UserData.UID);
@@ -121,7 +136,7 @@ internal sealed partial class CharaDataHubUi
             var buttonsize2 = _uiSharedService.GetIconButtonSize(FontAwesomeIcon.Plus).X;
             ImGui.SameLine();
             ImGui.SetCursorPosX(availWidth - (buttonsize + buttonsize2 + ImGui.GetStyle().ItemSpacing.X));
-            using (ImRaii.Disabled(!_uiSharedService.IsInGpose || user.CharaData == null || user.LastUpdatedCharaData == user.LastAppliedCharaDataDate || user.Address == nint.Zero))
+            using (ImRaii.Disabled(!_uiSharedService.IsInGpose || user.CharaData == null || user.Address == nint.Zero))
             {
                 if (_uiSharedService.IconButton(FontAwesomeIcon.ArrowRight))
                 {
@@ -199,6 +214,12 @@ internal sealed partial class CharaDataHubUi
                     }
                 }
                 UiSharedService.AttachToolTip("Unassign Actor for this user");
+                if (_uiSharedService.IsInGpose && user.Address == nint.Zero)
+                {
+                    ImGui.SameLine();
+                    _uiSharedService.IconText(FontAwesomeIcon.ExclamationTriangle, ImGuiColors.DalamudRed);
+                    UiSharedService.AttachToolTip("No valid character assigned for this user. Pose data will not be applied.");
+                }
             }
         }, 5, width);
         ImGuiHelpers.ScaledDummy(5);
