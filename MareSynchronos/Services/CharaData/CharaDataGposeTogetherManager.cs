@@ -60,6 +60,10 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
             {
                 JoinGPoseLobby(CurrentGPoseLobbyId, isReconnecting: true);
             }
+            else
+            {
+                LeaveGPoseLobby();
+            }
         });
         Mediator.Subscribe<GposeStartMessage>(this, (msg) =>
         {
@@ -167,6 +171,10 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
                 CurrentGPoseLobbyId = joinLobbyId;
                 _ = GposeWorldPositionBackgroundTask(_lobbyCts.Token);
                 _ = GposePoseDataBackgroundTask(_lobbyCts.Token);
+            }
+            else
+            {
+                LeaveGPoseLobby();
             }
         });
     }

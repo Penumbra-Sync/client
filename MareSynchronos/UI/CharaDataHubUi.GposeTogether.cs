@@ -86,7 +86,7 @@ internal sealed partial class CharaDataHubUi
             {
                 _ = _charaDataGposeTogetherManager.PushCharacterDownloadDto();
             }
-            UiSharedService.AttachToolTip("This will send your current appearance data to all users in the lobby.");
+            UiSharedService.AttachToolTip("This will send your current appearance, pose and world data to all users in the lobby.");
             if (!_uiSharedService.IsInGpose)
             {
                 ImGuiHelpers.ScaledDummy(5);
