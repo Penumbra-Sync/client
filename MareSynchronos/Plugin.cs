@@ -29,6 +29,7 @@ using NReco.Logging.File;
 using System.Net.Http.Headers;
 using System.Net.Http;
 using System.Reflection;
+using MareSynchronos.Services.CharaData;
 
 namespace MareSynchronos;
 
@@ -117,6 +118,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<CharaDataFileHandler>();
             collection.AddSingleton<CharaDataCharacterHandler>();
             collection.AddSingleton<CharaDataNearbyManager>();
+            collection.AddSingleton<CharaDataGposeTogetherManager>();
 
             collection.AddSingleton(s => new VfxSpawnManager(s.GetRequiredService<ILogger<VfxSpawnManager>>(),
                 gameInteropProvider, s.GetRequiredService<MareMediator>()));

@@ -1,11 +1,14 @@
-﻿using MareSynchronos.API.Data.Enum;
+﻿using MareSynchronos.API.Data;
+using MareSynchronos.API.Data.Enum;
 using MareSynchronos.API.Dto;
+using MareSynchronos.API.Dto.CharaData;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.Services.Mediator;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
+using static FFXIVClientStructs.FFXIV.Client.Game.UI.MapMarkerData.Delegates;
 
 namespace MareSynchronos.WebAPI;
 
@@ -186,6 +189,41 @@ public partial class ApiController
         return Task.CompletedTask;
     }
 
+    public Task Client_GposeLobbyJoin(UserData userData)
+    {
+        Logger.LogDebug("Client_GposeLobbyJoin: {dto}", userData);
+        ExecuteSafely(() => Mediator.Publish(new GposeLobbyUserJoin(userData)));
+        return Task.CompletedTask;
+    }
+
+    public Task Client_GposeLobbyLeave(UserData userData)
+    {
+        Logger.LogDebug("Client_GposeLobbyLeave: {dto}", userData);
+        ExecuteSafely(() => Mediator.Publish(new GPoseLobbyUserLeave(userData)));
+        return Task.CompletedTask;
+    }
+
+    public Task Client_GposeLobbyPushCharacterData(CharaDataDownloadDto charaDownloadDto)
+    {
+        Logger.LogDebug("Client_GposeLobbyPushCharacterData: {dto}", charaDownloadDto.Uploader);
+        ExecuteSafely(() => Mediator.Publish(new GPoseLobbyReceiveCharaData(charaDownloadDto)));
+        return Task.CompletedTask;
+    }
+
+    public Task Client_GposeLobbyPushPoseData(UserData userData, PoseData poseData)
+    {
+        Logger.LogDebug("Client_GposeLobbyPushPoseData: {dto}", userData);
+        ExecuteSafely(() => Mediator.Publish(new GPoseLobbyReceivePoseData(userData, poseData)));
+        return Task.CompletedTask;
+    }
+
+    public Task Client_GposeLobbyPushWorldData(UserData userData, WorldData worldData)
+    {
+        //Logger.LogDebug("Client_GposeLobbyPushWorldData: {dto}", userData);
+        ExecuteSafely(() => Mediator.Publish(new GPoseLobbyReceiveWorldData(userData, worldData)));
+        return Task.CompletedTask;
+    }
+
     public void OnDownloadReady(Action<Guid> act)
     {
         if (_initialized) return;
@@ -316,6 +354,36 @@ public partial class ApiController
     {
         if (_initialized) return;
         _mareHub!.On(nameof(Client_UserUpdateSelfPairPermissions), act);
+    }
+
+    public void OnGposeLobbyJoin(Action<UserData> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GposeLobbyJoin), act);
+    }
+
+    public void OnGposeLobbyLeave(Action<UserData> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GposeLobbyLeave), act);
+    }
+
+    public void OnGposeLobbyPushCharacterData(Action<CharaDataDownloadDto> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GposeLobbyPushCharacterData), act);
+    }
+
+    public void OnGposeLobbyPushPoseData(Action<UserData, PoseData> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GposeLobbyPushPoseData), act);
+    }
+
+    public void OnGposeLobbyPushWorldData(Action<UserData, WorldData> act)
+    {
+        if (_initialized) return;
+        _mareHub!.On(nameof(Client_GposeLobbyPushWorldData), act);
     }
 
     private void ExecuteSafely(Action act)

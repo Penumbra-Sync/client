@@ -40,7 +40,7 @@ public sealed class CommandManagerService : IDisposable
                 "Additionally possible commands:" + Environment.NewLine +
                 "\t /mare toggle - Disconnects from Mare, if connected. Connects to Mare, if disconnected" + Environment.NewLine +
                 "\t /mare toggle on|off - Connects or disconnects to Mare respectively" + Environment.NewLine +
-                "\t /mare gpose - Opens the GPose MCDF import window (only works in GPose)" + Environment.NewLine +
+                "\t /mare gpose - Opens the Mare Character Data Hub window" + Environment.NewLine +
                 "\t /mare analyze - Opens the Mare Character Data Analysis window" + Environment.NewLine +
                 "\t /mare settings - Opens the Mare Settings window"
         });
