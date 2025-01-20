@@ -131,8 +131,7 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
             _lastCreatedCharaData = (playerData, charaDataDownloadDto);
         }
 
-        _lastFullPoseData = null;
-        _lastWorldData = null;
+        ForceResendOwnData();
 
         if (_lastCreatedCharaData != null)
             await _apiController.GposeLobbyPushCharacterData(_lastCreatedCharaData.Value.Dto)
@@ -250,8 +249,6 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
             node["OffHand"]![bone.Key]!["Scale"] = $"{bone.Value.ScaleX.ToString(CultureInfo.InvariantCulture)}, {bone.Value.ScaleY.ToString(CultureInfo.InvariantCulture)}, {bone.Value.ScaleZ.ToString(CultureInfo.InvariantCulture)}";
             node["OffHand"]![bone.Key]!["Rotation"] = $"{bone.Value.RotationX.ToString(CultureInfo.InvariantCulture)}, {bone.Value.RotationY.ToString(CultureInfo.InvariantCulture)}, {bone.Value.RotationZ.ToString(CultureInfo.InvariantCulture)}, {bone.Value.RotationW.ToString(CultureInfo.InvariantCulture)}";
         }
-
-        Logger.LogTrace(node.ToJsonString(new System.Text.Json.JsonSerializerOptions() { WriteIndented = true }));
 
         return node.ToJsonString();
     }
@@ -382,7 +379,10 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
                 var poseJson = await _brio.GetPoseAsync(chara.Address).ConfigureAwait(false);
                 if (string.IsNullOrEmpty(poseJson)) continue;
 
-                var poseData = CreatePoseDataFromJson(poseJson, _poseGenerationExecutions++ >= 12 ? null : _lastFullPoseData);
+                var lastFullData = _poseGenerationExecutions++ >= 12 ? null : _lastFullPoseData;
+                lastFullData = _forceResendFullPose ? _lastFullPoseData : lastFullData;
+
+                var poseData = CreatePoseDataFromJson(poseJson, lastFullData);
                 if (!poseData.IsDelta)
                 {
                     _lastFullPoseData = poseData;
@@ -394,9 +394,12 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
                     (poseData.Bones.Keys.All(k => _lastDeltaPoseData.Value.Bones.ContainsKey(k)
                         && poseData.Bones.Values.All(k => _lastDeltaPoseData.Value.Bones.ContainsValue(k))));
 
-                if ((poseData.Bones.Any() || poseData.MainHand.Any() || poseData.OffHand.Any())
-                    && (!poseData.IsDelta || (poseData.IsDelta && !deltaIsSame)))
+                if (_forceResendFullPose || ((poseData.Bones.Any() || poseData.MainHand.Any() || poseData.OffHand.Any())
+                    && (!poseData.IsDelta || (poseData.IsDelta && !deltaIsSame))))
+                {
+                    _forceResendFullPose = false;
                     await _apiController.GposeLobbyPushPoseData(poseData).ConfigureAwait(false);
+                }
 
                 if (poseData.IsDelta)
                     _lastDeltaPoseData = poseData;
@@ -450,8 +453,9 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
                 var loc = await _dalamudUtil.GetMapDataAsync().ConfigureAwait(false);
                 worldData.LocationInfo = loc;
 
-                if (worldData != _lastWorldData)
+                if (_forceResendWorldData || worldData != _lastWorldData)
                 {
+                    _forceResendWorldData = false;
                     await _apiController.GposeLobbyPushWorldData(worldData).ConfigureAwait(false);
                     _lastWorldData = worldData;
                     Logger.LogTrace("WorldData (gpose: {gpose}): {data}", _dalamudUtil.IsInGpose, worldData);
@@ -537,6 +541,7 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
 
     private void OnEnterGpose()
     {
+        ForceResendOwnData();
         ResetOwnData();
         foreach (var data in _usersInLobby.Values)
         {
@@ -547,6 +552,7 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
 
     private void OnExitGpose()
     {
+        ForceResendOwnData();
         ResetOwnData();
         foreach (var data in _usersInLobby.Values)
         {
@@ -554,10 +560,18 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
         }
     }
 
+
+    private bool _forceResendFullPose = false;
+    private bool _forceResendWorldData = false;
+
+    private void ForceResendOwnData()
+    {
+        _forceResendFullPose = true;
+        _forceResendWorldData = true;
+    }
+
     private void ResetOwnData()
     {
-        _lastFullPoseData = null;
-        _lastDeltaPoseData = null;
         _poseGenerationExecutions = 0;
         _lastCreatedCharaData = null;
     }
@@ -668,8 +682,6 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
         if (_usersInLobby.ContainsKey(userData.UID))
             OnUserLeaveLobby(userData);
         _usersInLobby[userData.UID] = new(userData);
-        _lastFullPoseData = null;
-        _lastWorldData = null;
         _ = PushCharacterDownloadDto();
     }
 

@@ -981,7 +981,7 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
         if (string.IsNullOrEmpty(handledActor)) return;
         UiBlockingComputation = Task.Run(async () =>
         {
-            await _characterHandler.RevertHandledChara(handledActor, false).ConfigureAwait(false);
+            await _characterHandler.RevertHandledChara(handledActor).ConfigureAwait(false);
             var gposeChara = await _dalamudUtilService.GetGposeCharacterFromObjectTableByNameAsync(handledActor, true).ConfigureAwait(false);
             if (gposeChara != null)
                 await _ipcManager.Brio.DespawnActorAsync(gposeChara.Address).ConfigureAwait(false);

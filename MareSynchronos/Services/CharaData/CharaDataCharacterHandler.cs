@@ -29,7 +29,7 @@ public sealed class CharaDataCharacterHandler : DisposableMediatorSubscriberBase
         {
             foreach (var chara in _handledCharaData)
             {
-                RevertHandledChara(chara, false);
+                RevertHandledChara(chara);
             }
         });
 
@@ -56,11 +56,11 @@ public sealed class CharaDataCharacterHandler : DisposableMediatorSubscriberBase
         base.Dispose(disposing);
         foreach (var chara in _handledCharaData)
         {
-            RevertHandledChara(chara, false);
+            RevertHandledChara(chara);
         }
     }
 
-    public async Task RevertChara(string name, Guid? cPlusId, bool reapplyPose = true)
+    public async Task RevertChara(string name, Guid? cPlusId)
     {
         Guid applicationId = Guid.NewGuid();
         await _ipcManager.Glamourer.RevertByNameAsync(Logger, name, applicationId).ConfigureAwait(false);
@@ -75,20 +75,20 @@ public sealed class CharaDataCharacterHandler : DisposableMediatorSubscriberBase
             await _ipcManager.Penumbra.RedrawAsync(Logger, handler, applicationId, CancellationToken.None).ConfigureAwait(false);
     }
 
-    public async Task<bool> RevertHandledChara(string name, bool reapplyPose = true)
+    public async Task<bool> RevertHandledChara(string name)
     {
         var handled = _handledCharaData.FirstOrDefault(f => string.Equals(f.Name, name, StringComparison.Ordinal));
         if (handled == null) return false;
         _handledCharaData.Remove(handled);
-        await _dalamudUtilService.RunOnFrameworkThread(() => RevertChara(handled.Name, handled.CustomizePlus, reapplyPose)).ConfigureAwait(false);
+        await _dalamudUtilService.RunOnFrameworkThread(() => RevertChara(handled.Name, handled.CustomizePlus)).ConfigureAwait(false);
         return true;
     }
 
-    public Task RevertHandledChara(HandledCharaDataEntry? handled, bool reapplyPose = true)
+    public Task RevertHandledChara(HandledCharaDataEntry? handled)
     {
         if (handled == null) return Task.CompletedTask;
         _handledCharaData.Remove(handled);
-        return _dalamudUtilService.RunOnFrameworkThread(() => RevertChara(handled.Name, handled.CustomizePlus, reapplyPose));
+        return _dalamudUtilService.RunOnFrameworkThread(() => RevertChara(handled.Name, handled.CustomizePlus));
     }
 
     internal void AddHandledChara(HandledCharaDataEntry handledCharaDataEntry)
