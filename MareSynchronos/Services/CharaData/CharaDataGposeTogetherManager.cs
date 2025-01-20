@@ -370,34 +370,41 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
             if (!_dalamudUtil.IsInGpose) continue;
             if (_usersInLobby.Count == 0) continue;
 
-            var chara = await _dalamudUtil.GetPlayerCharacterAsync().ConfigureAwait(false);
-            if (_dalamudUtil.IsInGpose)
+            try
             {
-                chara = (IPlayerCharacter?)(await _dalamudUtil.GetGposeCharacterFromObjectTableByNameAsync(chara.Name.TextValue, _dalamudUtil.IsInGpose).ConfigureAwait(false));
+                var chara = await _dalamudUtil.GetPlayerCharacterAsync().ConfigureAwait(false);
+                if (_dalamudUtil.IsInGpose)
+                {
+                    chara = (IPlayerCharacter?)(await _dalamudUtil.GetGposeCharacterFromObjectTableByNameAsync(chara.Name.TextValue, _dalamudUtil.IsInGpose).ConfigureAwait(false));
+                }
+                if (chara == null || chara.Address == nint.Zero) continue;
+
+                var poseJson = await _brio.GetPoseAsync(chara.Address).ConfigureAwait(false);
+                if (string.IsNullOrEmpty(poseJson)) continue;
+
+                var poseData = CreatePoseDataFromJson(poseJson, _poseGenerationExecutions++ >= 12 ? null : _lastFullPoseData);
+                if (!poseData.IsDelta)
+                {
+                    _lastFullPoseData = poseData;
+                    _lastDeltaPoseData = null;
+                    _poseGenerationExecutions = 0;
+                }
+
+                bool deltaIsSame = _lastDeltaPoseData != null &&
+                    (poseData.Bones.Keys.All(k => _lastDeltaPoseData.Value.Bones.ContainsKey(k)
+                        && poseData.Bones.Values.All(k => _lastDeltaPoseData.Value.Bones.ContainsValue(k))));
+
+                if ((poseData.Bones.Any() || poseData.MainHand.Any() || poseData.OffHand.Any())
+                    && (!poseData.IsDelta || (poseData.IsDelta && !deltaIsSame)))
+                    await _apiController.GposeLobbyPushPoseData(poseData).ConfigureAwait(false);
+
+                if (poseData.IsDelta)
+                    _lastDeltaPoseData = poseData;
             }
-            if (chara == null || chara.Address == nint.Zero) continue;
-
-            var poseJson = await _brio.GetPoseAsync(chara.Address).ConfigureAwait(false);
-            if (string.IsNullOrEmpty(poseJson)) continue;
-
-            var poseData = CreatePoseDataFromJson(poseJson, _poseGenerationExecutions++ >= 12 ? null : _lastFullPoseData);
-            if (!poseData.IsDelta)
+            catch (Exception ex)
             {
-                _lastFullPoseData = poseData;
-                _lastDeltaPoseData = null;
-                _poseGenerationExecutions = 0;
+                Logger.LogWarning(ex, "Error during Pose Data Generation");
             }
-
-            bool deltaIsSame = _lastDeltaPoseData != null &&
-                (poseData.Bones.Keys.All(k => _lastDeltaPoseData.Value.Bones.ContainsKey(k)
-                    && poseData.Bones.Values.All(k => _lastDeltaPoseData.Value.Bones.ContainsValue(k))));
-
-            if ((poseData.Bones.Any() || poseData.MainHand.Any() || poseData.OffHand.Any())
-                && (!poseData.IsDelta || (poseData.IsDelta && !deltaIsSame)))
-                await _apiController.GposeLobbyPushPoseData(poseData).ConfigureAwait(false);
-
-            if (poseData.IsDelta)
-                _lastDeltaPoseData = poseData;
         }
     }
 
@@ -410,78 +417,85 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
             // if there are no players in lobby, don't do anything
             if (_usersInLobby.Count == 0) continue;
 
-            // get own player data
-            var player = (Dalamud.Game.ClientState.Objects.Types.ICharacter?)(await _dalamudUtil.GetPlayerCharacterAsync().ConfigureAwait(false));
-            if (player == null) continue;
-            WorldData worldData;
-            if (_dalamudUtil.IsInGpose)
+            try
             {
-                player = await _dalamudUtil.GetGposeCharacterFromObjectTableByNameAsync(player.Name.TextValue, true).ConfigureAwait(false);
+                // get own player data
+                var player = (Dalamud.Game.ClientState.Objects.Types.ICharacter?)(await _dalamudUtil.GetPlayerCharacterAsync().ConfigureAwait(false));
                 if (player == null) continue;
-                worldData = (await _brio.GetTransformAsync(player.Address).ConfigureAwait(false));
-            }
-            else
-            {
-                var rotQuaternion = Quaternion.CreateFromAxisAngle(new Vector3(0, 1, 0), player.Rotation);
-                worldData = new()
+                WorldData worldData;
+                if (_dalamudUtil.IsInGpose)
                 {
-                    PositionX = player.Position.X,
-                    PositionY = player.Position.Y,
-                    PositionZ = player.Position.Z,
-                    RotationW = rotQuaternion.W,
-                    RotationX = rotQuaternion.X,
-                    RotationY = rotQuaternion.Y,
-                    RotationZ = rotQuaternion.Z,
-                    ScaleX = 1,
-                    ScaleY = 1,
-                    ScaleZ = 1
-                };
-            }
-
-            var loc = await _dalamudUtil.GetMapDataAsync().ConfigureAwait(false);
-            worldData.LocationInfo = loc;
-
-            if (worldData != _lastWorldData)
-            {
-                await _apiController.GposeLobbyPushWorldData(worldData).ConfigureAwait(false);
-                _lastWorldData = worldData;
-                Logger.LogTrace("WorldData (gpose: {gpose}): {data}", _dalamudUtil.IsInGpose, worldData);
-            }
-
-            foreach (var entry in _usersInLobby)
-            {
-                if (!entry.Value.HasWorldDataUpdate || _dalamudUtil.IsInGpose) continue;
-
-                var entryWorldData = entry.Value.WorldData!.Value;
-
-                if (worldData.LocationInfo.MapId == entryWorldData.LocationInfo.MapId && worldData.LocationInfo.DivisionId == entryWorldData.LocationInfo.DivisionId
-                    && (worldData.LocationInfo.HouseId != entryWorldData.LocationInfo.HouseId
-                    || worldData.LocationInfo.WardId != entryWorldData.LocationInfo.WardId
-                    || entryWorldData.LocationInfo.ServerId != worldData.LocationInfo.ServerId))
-                {
-                    if (entry.Value.SpawnedVfxId == null)
-                    {
-                        // spawn if it doesn't exist yet
-                        entry.Value.LastWorldPosition = new Vector3(entryWorldData.PositionX, entryWorldData.PositionY, entryWorldData.PositionZ);
-                        entry.Value.SpawnedVfxId = await _dalamudUtil.RunOnFrameworkThread(() => _vfxSpawnManager.SpawnObject(entry.Value.LastWorldPosition.Value,
-                            Quaternion.Identity, Vector3.One, 0.5f, 0.1f, 0.5f, 0.9f)).ConfigureAwait(false);
-                    }
-                    else
-                    {
-                        // move object via lerp if it does exist
-                        var newPosition = new Vector3(entryWorldData.PositionX, entryWorldData.PositionY, entryWorldData.PositionZ);
-                        if (newPosition != entry.Value.LastWorldPosition)
-                        {
-                            entry.Value.UpdateStart = DateTime.UtcNow;
-                            entry.Value.TargetWorldPosition = newPosition;
-                        }
-                    }
+                    player = await _dalamudUtil.GetGposeCharacterFromObjectTableByNameAsync(player.Name.TextValue, true).ConfigureAwait(false);
+                    if (player == null) continue;
+                    worldData = (await _brio.GetTransformAsync(player.Address).ConfigureAwait(false));
                 }
                 else
                 {
-                    await _dalamudUtil.RunOnFrameworkThread(() => _vfxSpawnManager.DespawnObject(entry.Value.SpawnedVfxId)).ConfigureAwait(false);
-                    entry.Value.SpawnedVfxId = null;
+                    var rotQuaternion = Quaternion.CreateFromAxisAngle(new Vector3(0, 1, 0), player.Rotation);
+                    worldData = new()
+                    {
+                        PositionX = player.Position.X,
+                        PositionY = player.Position.Y,
+                        PositionZ = player.Position.Z,
+                        RotationW = rotQuaternion.W,
+                        RotationX = rotQuaternion.X,
+                        RotationY = rotQuaternion.Y,
+                        RotationZ = rotQuaternion.Z,
+                        ScaleX = 1,
+                        ScaleY = 1,
+                        ScaleZ = 1
+                    };
                 }
+
+                var loc = await _dalamudUtil.GetMapDataAsync().ConfigureAwait(false);
+                worldData.LocationInfo = loc;
+
+                if (worldData != _lastWorldData)
+                {
+                    await _apiController.GposeLobbyPushWorldData(worldData).ConfigureAwait(false);
+                    _lastWorldData = worldData;
+                    Logger.LogTrace("WorldData (gpose: {gpose}): {data}", _dalamudUtil.IsInGpose, worldData);
+                }
+
+                foreach (var entry in _usersInLobby)
+                {
+                    if (!entry.Value.HasWorldDataUpdate || _dalamudUtil.IsInGpose) continue;
+
+                    var entryWorldData = entry.Value.WorldData!.Value;
+
+                    if (worldData.LocationInfo.MapId == entryWorldData.LocationInfo.MapId && worldData.LocationInfo.DivisionId == entryWorldData.LocationInfo.DivisionId
+                        && (worldData.LocationInfo.HouseId != entryWorldData.LocationInfo.HouseId
+                        || worldData.LocationInfo.WardId != entryWorldData.LocationInfo.WardId
+                        || entryWorldData.LocationInfo.ServerId != worldData.LocationInfo.ServerId))
+                    {
+                        if (entry.Value.SpawnedVfxId == null)
+                        {
+                            // spawn if it doesn't exist yet
+                            entry.Value.LastWorldPosition = new Vector3(entryWorldData.PositionX, entryWorldData.PositionY, entryWorldData.PositionZ);
+                            entry.Value.SpawnedVfxId = await _dalamudUtil.RunOnFrameworkThread(() => _vfxSpawnManager.SpawnObject(entry.Value.LastWorldPosition.Value,
+                                Quaternion.Identity, Vector3.One, 0.5f, 0.1f, 0.5f, 0.9f)).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            // move object via lerp if it does exist
+                            var newPosition = new Vector3(entryWorldData.PositionX, entryWorldData.PositionY, entryWorldData.PositionZ);
+                            if (newPosition != entry.Value.LastWorldPosition)
+                            {
+                                entry.Value.UpdateStart = DateTime.UtcNow;
+                                entry.Value.TargetWorldPosition = newPosition;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        await _dalamudUtil.RunOnFrameworkThread(() => _vfxSpawnManager.DespawnObject(entry.Value.SpawnedVfxId)).ConfigureAwait(false);
+                        entry.Value.SpawnedVfxId = null;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Error during World Data Generation");
             }
         }
     }
