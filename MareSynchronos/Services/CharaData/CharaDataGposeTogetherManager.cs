@@ -459,7 +459,7 @@ public class CharaDataGposeTogetherManager : DisposableMediatorSubscriberBase
 
                 foreach (var entry in _usersInLobby)
                 {
-                    if (!entry.Value.HasWorldDataUpdate || _dalamudUtil.IsInGpose) continue;
+                    if (!entry.Value.HasWorldDataUpdate || _dalamudUtil.IsInGpose || entry.Value.WorldData == null) continue;
 
                     var entryWorldData = entry.Value.WorldData!.Value;
 
