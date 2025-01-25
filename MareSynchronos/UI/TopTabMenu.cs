@@ -497,7 +497,7 @@ public class TopTabMenu
             _mareMediator.Publish(new UiToggleMessage(typeof(DataAnalysisUi)));
         }
         UiSharedService.AttachToolTip("View and analyze your generated character data");
-        if (_uiSharedService.IconTextButton(FontAwesomeIcon.Running, "Chararacter Data Hub", availableWidth))
+        if (_uiSharedService.IconTextButton(FontAwesomeIcon.Running, "Character Data Hub", availableWidth))
         {
             _mareMediator.Publish(new UiToggleMessage(typeof(CharaDataHubUi)));
         }

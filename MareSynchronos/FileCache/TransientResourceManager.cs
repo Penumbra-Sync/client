@@ -169,8 +169,29 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             }
 
             int removed = set.RemoveWhere(p => list.Contains(p, StringComparer.OrdinalIgnoreCase));
-            Logger.LogInformation("Removed {removed} previously existing paths", removed);
+            Logger.LogInformation("Removed {removed} previously existing transient paths", removed);
         }
+
+        bool reloadSemiTransient = false;
+        if (SemiTransientResources.TryGetValue(objectKind, out var semiset))
+        {
+            foreach (var file in semiset.Where(p => list.Contains(p, StringComparer.OrdinalIgnoreCase)))
+            {
+                Logger.LogTrace("Removing From Transient: {file}", file);
+                PlayerConfig.RemovePath(file);
+            }
+
+            int removed = semiset.RemoveWhere(p => list.Contains(p, StringComparer.OrdinalIgnoreCase));
+            Logger.LogInformation("Removed {removed} previously existing semi transient paths", removed);
+            if (removed > 0)
+            {
+                reloadSemiTransient = true;
+                _configurationService.Save();
+            }
+        }
+
+        if (reloadSemiTransient)
+            _semiTransientResources = null;
     }
 
     protected override void Dispose(bool disposing)
