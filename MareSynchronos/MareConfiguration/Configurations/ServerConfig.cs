@@ -16,5 +16,5 @@ public class ServerConfig : IMareConfiguration
     public bool SendCensusData { get; set; } = false;
     public bool ShownCensusPopup { get; set; } = false;
 
-    public int Version { get; set; } = 1;
+    public int Version { get; set; } = 2;
 }
