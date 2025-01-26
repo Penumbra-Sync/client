@@ -608,11 +608,12 @@ public class SettingsUi : WindowMediatorSubscriberBase
         }
 
         bool stopWhining = _configService.Current.DebugStopWhining;
-        if (ImGui.Checkbox("Do not notify for modified game files", ref stopWhining))
+        if (ImGui.Checkbox("Do not notify for modified game files or enabled LOD", ref stopWhining))
         {
             _configService.Current.DebugStopWhining = stopWhining;
         }
-        _uiShared.DrawHelpText("Having modified game files will still mark your logs with UNSUPPORTED and you will not receive support, message shown or not.");
+        _uiShared.DrawHelpText("Having modified game files will still mark your logs with UNSUPPORTED and you will not receive support, message shown or not." + UiSharedService.TooltipSeparator
+            + "Keeping LOD enabled can lead to more crashes. Use at your own risk.");
     }
 
     private void DrawFileStorageSettings()

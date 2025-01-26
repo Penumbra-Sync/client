@@ -267,6 +267,18 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                             NotificationType.Error, TimeSpan.FromSeconds(15)));
                 }
 
+                if (_dalamudUtil.IsLodEnabled)
+                {
+                    Logger.LogWarning("Model LOD is enabled during connection");
+                    if (!_mareConfigService.Current.DebugStopWhining)
+                    {
+                        Mediator.Publish(new NotificationMessage("Model LOD is enabled",
+                            "You have \"Use low-detail models on distant objects (LOD)\" enabled. Having model LOD enabled is known to be a reason to cause " +
+                            "random crashes when loading in or rendering modded pairs. Disable LOD while using Mare: " +
+                            "Go to XIV Menu -> System Configuration -> Graphics Settings and disable the model LOD option.", NotificationType.Warning, TimeSpan.FromSeconds(15)));
+                    }
+                }
+
                 await LoadIninitialPairsAsync().ConfigureAwait(false);
                 await LoadOnlinePairsAsync().ConfigureAwait(false);
             }
