@@ -173,7 +173,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         }
 
         bool reloadSemiTransient = false;
-        if (SemiTransientResources.TryGetValue(objectKind, out var semiset))
+        if (objectKind == ObjectKind.Player && SemiTransientResources.TryGetValue(objectKind, out var semiset))
         {
             foreach (var file in semiset.Where(p => list.Contains(p, StringComparer.OrdinalIgnoreCase)))
             {
