@@ -9,6 +9,7 @@ public class TransientConfig : IMareConfiguration
     {
         public List<string> GlobalPersistentCache { get; set; } = [];
         public Dictionary<uint, List<string>> JobSpecificCache { get; set; } = [];
+        public Dictionary<uint, List<string>> JobSpecificPetCache { get; set; } = [];
 
         public TransientPlayerConfig()
         {

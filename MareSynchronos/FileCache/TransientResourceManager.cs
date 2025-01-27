@@ -69,6 +69,8 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
                 _semiTransientResources = new();
                 PlayerConfig.JobSpecificCache.TryGetValue(_dalamudUtil.ClassJobId, out var jobSpecificData);
                 _semiTransientResources[ObjectKind.Player] = PlayerConfig.GlobalPersistentCache.Concat(jobSpecificData ?? []).ToHashSet(StringComparer.Ordinal);
+                PlayerConfig.JobSpecificPetCache.TryGetValue(_dalamudUtil.ClassJobId, out var petSpecificData);
+                _semiTransientResources[ObjectKind.Pet] = [.. petSpecificData ?? []];
             }
 
             return _semiTransientResources;
@@ -131,6 +133,20 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
 
             _configurationService.Save();
         }
+        else if (objectKind == ObjectKind.Pet && newlyAddedGamePaths.Any())
+        {
+            foreach (var item in newlyAddedGamePaths.Where(f => !string.IsNullOrEmpty(f)))
+            {
+                if (!PlayerConfig.JobSpecificPetCache.TryGetValue(_dalamudUtil.ClassJobId, out var petPerma))
+                {
+                    PlayerConfig.JobSpecificPetCache[_dalamudUtil.ClassJobId] = petPerma = [];
+                }
+
+                petPerma.Add(item);
+            }
+
+            _configurationService.Save();
+        }
 
         TransientResources[objectKind].Clear();
     }
@@ -148,15 +164,19 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         }
     }
 
-    internal void AddSemiTransientResource(ObjectKind objectKind, string item)
+    internal bool AddTransientResource(ObjectKind objectKind, string item)
     {
-        if (!SemiTransientResources.TryGetValue(objectKind, out HashSet<string>? value))
+        if (SemiTransientResources.TryGetValue(objectKind, out var semiTransient) && semiTransient != null && semiTransient.Contains(item))
+            return false;
+
+        if (!TransientResources.TryGetValue(objectKind, out HashSet<string>? value))
         {
             value = new HashSet<string>(StringComparer.Ordinal);
-            SemiTransientResources[objectKind] = value;
+            TransientResources[objectKind] = value;
         }
 
         value.Add(item.ToLowerInvariant());
+        return true;
     }
 
     internal void ClearTransientPaths(ObjectKind objectKind, List<string> list)
@@ -204,7 +224,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
 
     private void DalamudUtil_FrameworkUpdate()
     {
-        _cachedFrameAddresses = _cachedFrameAddresses = new ConcurrentDictionary<nint, ObjectKind>(_playerRelatedPointers.Where(k => k.Address != nint.Zero).ToDictionary(c => c.CurrentAddress(), c => c.ObjectKind));
+        _cachedFrameAddresses = _cachedFrameAddresses = new(_playerRelatedPointers.Where(k => k.Address != nint.Zero).ToDictionary(c => c.CurrentAddress(), c => c.ObjectKind));
         lock (_cacheAdditionLock)
         {
             _cachedHandledPaths.Clear();
@@ -221,6 +241,8 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             // reload config for current new classjob
             PlayerConfig.JobSpecificCache.TryGetValue(_dalamudUtil.ClassJobId, out var jobSpecificData);
             SemiTransientResources[ObjectKind.Player] = PlayerConfig.GlobalPersistentCache.Concat(jobSpecificData ?? []).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            PlayerConfig.JobSpecificPetCache.TryGetValue(_dalamudUtil.ClassJobId, out var petSpecificData);
+            SemiTransientResources[ObjectKind.Pet] = [.. petSpecificData ?? []];
         }
 
         foreach (var kind in Enum.GetValues(typeof(ObjectKind)))
