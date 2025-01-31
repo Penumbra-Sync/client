@@ -673,7 +673,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
                     _lastZone = zone;
                     if (!_sentBetweenAreas)
                     {
-                        _logger.LogDebug("Zone switch/Gpose start");
+                        _logger.LogDebug("Zone switch start");
                         _sentBetweenAreas = true;
                         Mediator.Publish(new ZoneSwitchStartMessage());
                         Mediator.Publish(new HaltScanMessage(nameof(ConditionFlag.BetweenAreas)));
@@ -685,7 +685,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
 
             if (_sentBetweenAreas)
             {
-                _logger.LogDebug("Zone switch/Gpose end");
+                _logger.LogDebug("Zone switch end");
                 _sentBetweenAreas = false;
                 Mediator.Publish(new ZoneSwitchEndMessage());
                 Mediator.Publish(new ResumeScanMessage(nameof(ConditionFlag.BetweenAreas)));
