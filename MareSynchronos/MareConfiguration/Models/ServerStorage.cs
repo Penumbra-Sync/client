@@ -1,4 +1,6 @@
-﻿namespace MareSynchronos.MareConfiguration.Models;
+﻿using Microsoft.AspNetCore.Http.Connections;
+
+namespace MareSynchronos.MareConfiguration.Models;
 
 [Serializable]
 public class ServerStorage
@@ -10,4 +12,5 @@ public class ServerStorage
     public string ServerUri { get; set; } = string.Empty;
     public bool UseOAuth2 { get; set; } = false;
     public string? OAuthToken { get; set; } = null;
+    public HttpTransportType HttpTransportType { get; set; } = HttpTransportType.WebSockets;
 }

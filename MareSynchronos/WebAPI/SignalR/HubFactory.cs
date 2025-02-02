@@ -57,13 +57,23 @@ public class HubFactory : MediatorSubscriberBase
 
     private HubConnection BuildHubConnection(CancellationToken ct)
     {
-        Logger.LogDebug("Building new HubConnection");
+        var transportType = _serverConfigurationManager.GetTransport() switch
+        {
+            HttpTransportType.None => HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling,
+            HttpTransportType.WebSockets => HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling,
+            HttpTransportType.ServerSentEvents => HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling,
+            HttpTransportType.LongPolling => HttpTransportType.LongPolling,
+            _ => HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling
+        };
+
+        var baseTransport = _serverConfigurationManager.GetTransport();
+        Logger.LogDebug("Building new HubConnection using transport {transport}", baseTransport);
 
         _instance = new HubConnectionBuilder()
             .WithUrl(_serverConfigurationManager.CurrentApiUrl + IMareHub.Path, options =>
             {
                 options.AccessTokenProvider = () => _tokenProvider.GetOrUpdateToken(ct);
-                options.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling;
+                options.Transports = transportType;
             })
             .AddMessagePackProtocol(opt =>
             {

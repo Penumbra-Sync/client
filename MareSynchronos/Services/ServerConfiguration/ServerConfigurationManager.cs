@@ -4,6 +4,7 @@ using MareSynchronos.MareConfiguration;
 using MareSynchronos.MareConfiguration.Models;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.WebAPI;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.IdentityModel.Tokens.Jwt;
@@ -548,5 +549,16 @@ public class ServerConfigurationManager
             return null;
 
         return discordToken;
+    }
+
+    public HttpTransportType GetTransport()
+    {
+        return CurrentServer.HttpTransportType;
+    }
+
+    public void SetTransportType(HttpTransportType httpTransportType)
+    {
+        CurrentServer.HttpTransportType = httpTransportType;
+        Save();
     }
 }

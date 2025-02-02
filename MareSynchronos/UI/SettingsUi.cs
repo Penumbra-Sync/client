@@ -21,6 +21,7 @@ using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files;
 using MareSynchronos.WebAPI.Files.Models;
 using MareSynchronos.WebAPI.SignalR.Utils;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -1649,6 +1650,17 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     _uiShared.DrawHelpText("You cannot edit the name of the main service.");
                 }
 
+                ImGui.SetNextItemWidth(200);
+                var serverTransport = _serverConfigurationManager.GetTransport();
+                _uiShared.DrawCombo("Server Transport Type", Enum.GetValues<HttpTransportType>().Where(t => t != HttpTransportType.None),
+                    (v) => v.ToString(),
+                    onSelected: (t) => _serverConfigurationManager.SetTransportType(t),
+                    serverTransport);
+                _uiShared.DrawHelpText("You normally do not need to change this, if you don't know what this is or what it's for, keep it to WebSockets." + Environment.NewLine
+                    + "If you run into connection issues with e.g. VPNs, try ServerSentEvents first before trying out LongPolling." + UiSharedService.TooltipSeparator
+                    + "Note: if the server does not support a specific Transport Type it will fall through to the next automatically: WebSockets > ServerSentEvents > LongPolling");
+
+
                 if (ImGui.Checkbox("Use Discord OAuth2 Authentication", ref useOauth))
                 {
                     selectedServer.UseOAuth2 = useOauth;
@@ -1675,6 +1687,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     }
                     _uiShared.DrawHelpText("Hold CTRL to delete this service");
                 }
+
                 ImGui.EndTabItem();
             }
 
