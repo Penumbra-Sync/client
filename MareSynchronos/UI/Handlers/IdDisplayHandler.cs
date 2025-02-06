@@ -166,7 +166,7 @@ public class IdDisplayHandler
             ImGui.AlignTextToFramePadding();
 
             ImGui.SetNextItemWidth(editBoxWidth.Invoke());
-            if (ImGui.InputTextWithHint("", "Nick/Notes", ref _editComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
+            if (ImGui.InputTextWithHint("##" + pair.UserData.UID, "Nick/Notes", ref _editComment, 255, ImGuiInputTextFlags.EnterReturnsTrue))
             {
                 _serverManager.SetNoteForUid(pair.UserData.UID, _editComment);
                 _serverManager.SaveNotes();
