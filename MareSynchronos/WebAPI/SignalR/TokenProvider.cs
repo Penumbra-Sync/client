@@ -162,17 +162,22 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
 
             if (_serverManager.CurrentServer.UseOAuth2)
             {
-                var oauthInfo = _serverManager.GetOAuth2(out _)!;
+                var (OAuthToken, UID) = _serverManager.GetOAuth2(out _)
+                    ?? throw new InvalidOperationException("Requested OAuth2 but received null");
+
                 jwtIdentifier = new(_serverManager.CurrentApiUrl,
                     playerIdentifier,
-                    oauthInfo.Value.UID, oauthInfo.Value.OAuthToken);
+                    UID, OAuthToken);
             }
             else
             {
+                var secretKey = _serverManager.GetSecretKey(out _)
+                    ?? throw new InvalidOperationException("Requested SecretKey but received null");
+
                 jwtIdentifier = new(_serverManager.CurrentApiUrl,
                                     playerIdentifier,
                                     string.Empty,
-                                    _serverManager.GetSecretKey(out _)!);
+                                    secretKey);
             }
             _lastJwtIdentifier = jwtIdentifier;
         }
