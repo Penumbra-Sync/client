@@ -1,5 +1,6 @@
 ﻿using MareSynchronos.API.Data;
 using MareSynchronos.API.Dto.CharaData;
+using MareSynchronos.Services.CharaData.Models;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
 
@@ -66,6 +67,22 @@ public partial class ApiController
         catch (Exception ex)
         {
             Logger.LogWarning(ex, "Failed to get meta info for chara data {id}", id);
+            return null;
+        }
+    }
+
+    public async Task<CharaDataFullDto?> CharaDataAttemptRestore(string id)
+    {
+        if (!IsConnected) return null;
+
+        try
+        {
+            Logger.LogDebug("Attempting to restore chara data {id}", id);
+            return await _mareHub!.InvokeAsync<CharaDataFullDto?>(nameof(CharaDataAttemptRestore), id).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to restore chara data for {id}", id);
             return null;
         }
     }
