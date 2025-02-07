@@ -49,6 +49,19 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
     private bool _openMcdOnlineOnNextRun = false;
     private bool _readExport;
     private string _selectedDtoId = string.Empty;
+    private string SelectedDtoId
+    {
+        get => _selectedDtoId;
+        set
+        {
+            if (!string.Equals(_selectedDtoId, value, StringComparison.Ordinal))
+            {
+                _charaDataManager.UploadTask = null;
+                _selectedDtoId = value;
+            }
+
+        }
+    }
     private string _selectedSpecificUserIndividual = string.Empty;
     private string _selectedSpecificGroupIndividual = string.Empty;
     private string _sharedWithYouDescriptionFilter = string.Empty;
@@ -102,7 +115,7 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
         }
 
         _closalCts.Cancel();
-        _selectedDtoId = string.Empty;
+        SelectedDtoId = string.Empty;
         _filteredDict = null;
         _sharedWithYouOwnerFilter = string.Empty;
         _importCode = string.Empty;
@@ -926,7 +939,7 @@ internal sealed partial class CharaDataHubUi : WindowMediatorSubscriberBase
                 {
                     if (_uiSharedService.IconTextButton(FontAwesomeIcon.Edit, "Open in MCD Online Editor"))
                     {
-                        _selectedDtoId = data.Id;
+                        SelectedDtoId = data.Id;
                         _openMcdOnlineOnNextRun = true;
                     }
                 }
