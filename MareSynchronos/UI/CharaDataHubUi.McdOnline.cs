@@ -6,7 +6,6 @@ using ImGuiNET;
 using MareSynchronos.API.Dto.CharaData;
 using MareSynchronos.Services.CharaData.Models;
 using System.Numerics;
-using MareSynchronos.Services;
 
 namespace MareSynchronos.UI;
 
@@ -141,25 +140,22 @@ internal sealed partial class CharaDataHubUi
 
         ImGui.SetNextItemWidth(200);
         var dtoShareType = updateDto.ShareType;
-        using (ImRaii.Disabled(dtoAccessType == AccessTypeDto.Public))
+        if (ImGui.BeginCombo("Sharing", GetShareTypeString(dtoShareType)))
         {
-            if (ImGui.BeginCombo("Sharing", GetShareTypeString(dtoShareType)))
+            foreach (var shareType in Enum.GetValues(typeof(ShareTypeDto)).Cast<ShareTypeDto>())
             {
-                foreach (var shareType in Enum.GetValues(typeof(ShareTypeDto)).Cast<ShareTypeDto>())
+                if (ImGui.Selectable(GetShareTypeString(shareType), shareType == dtoShareType))
                 {
-                    if (ImGui.Selectable(GetShareTypeString(shareType), shareType == dtoShareType))
-                    {
-                        updateDto.ShareType = shareType;
-                    }
+                    updateDto.ShareType = shareType;
                 }
-
-                ImGui.EndCombo();
             }
+
+            ImGui.EndCombo();
         }
         _uiSharedService.DrawHelpText("This regulates how you want to distribute this character data." + UiSharedService.TooltipSeparator
             + "Code Only: People require to have the code to download this character data" + Environment.NewLine
             + "Shared: People that are allowed through 'Access Restrictions' will have this character data entry displayed in 'Shared with You' (it can also be accessed through the code)" + UiSharedService.TooltipSeparator
-            + "Note: Shared is incompatible with Access Restriction 'Everyone'");
+            + "Note: Shared with Access Restriction 'Everyone' is the same as shared with Access Restriction 'All Pairs', it will not show up for everyone but just your pairs.");
 
         ImGuiHelpers.ScaledDummy(10f);
     }

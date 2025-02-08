@@ -93,10 +93,6 @@ public sealed record CharaDataExtendedUpdateDto : CharaDataUpdateDto
         set
         {
             base.AccessType = value;
-            if (AccessType == AccessTypeDto.Public && ShareType == ShareTypeDto.Shared)
-            {
-                ShareType = ShareTypeDto.Private;
-            }
 
             if (Equals(base.AccessType, _charaDataFullDto.AccessType))
             {
@@ -114,10 +110,6 @@ public sealed record CharaDataExtendedUpdateDto : CharaDataUpdateDto
         set
         {
             base.ShareType = value;
-            if (ShareType == ShareTypeDto.Shared && AccessType == AccessTypeDto.Public)
-            {
-                base.ShareType = ShareTypeDto.Private;
-            }
 
             if (Equals(base.ShareType, _charaDataFullDto.ShareType))
             {
