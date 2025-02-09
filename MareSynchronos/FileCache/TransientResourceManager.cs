@@ -93,6 +93,8 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
                 PlayerConfig.RemovePath(replacement);
             }
 
+            // force reload semi transient resources
+            _semiTransientResources = null;
             _configurationService.Save();
         }
     }
@@ -197,7 +199,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         {
             foreach (var file in semiset.Where(p => list.Contains(p, StringComparer.OrdinalIgnoreCase)))
             {
-                Logger.LogTrace("Removing From Transient: {file}", file);
+                Logger.LogTrace("Removing From SemiTransient: {file}", file);
                 PlayerConfig.RemovePath(file);
             }
 
@@ -295,7 +297,10 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
 
         // ignore files that are the same
         var replacedGamePath = gamePath.ToLowerInvariant().Replace("\\", "/", StringComparison.OrdinalIgnoreCase);
-        if (string.Equals(filePath, replacedGamePath, StringComparison.OrdinalIgnoreCase)) return;
+        if (string.Equals(filePath, replacedGamePath, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
 
         // ignore files to not handle
         var handledTypes = IsTransientRecording ? _fileTypesToHandleRecording : _fileTypesToHandle;
@@ -333,16 +338,20 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             || SemiTransientResources.SelectMany(k => k.Value).Any(f => string.Equals(f, gamePath, StringComparison.OrdinalIgnoreCase)))
         {
             if (!IsTransientRecording)
-                Logger.LogTrace("Not adding {replacedPath} : {filePath}", replacedGamePath, filePath);
+                Logger.LogTrace("Not adding {replacedPath} : {filePath}, Reason: Transient: {contains}, SemiTransient: {contains2}", replacedGamePath, filePath,
+                    value.Contains(replacedGamePath), SemiTransientResources.SelectMany(k => k.Value).Any(f => string.Equals(f, gamePath, StringComparison.OrdinalIgnoreCase)));
             alreadyTransient = true;
         }
         else
         {
             if (!IsTransientRecording)
             {
-                value.Add(replacedGamePath);
-                Logger.LogDebug("Adding {replacedGamePath} for {gameObject} ({filePath})", replacedGamePath, owner?.ToString() ?? gameObjectAddress.ToString("X"), filePath);
-                SendTransients(gameObjectAddress);
+                bool isAdded = value.Add(replacedGamePath);
+                if (isAdded)
+                {
+                    Logger.LogDebug("Adding {replacedGamePath} for {gameObject} ({filePath})", replacedGamePath, owner?.ToString() ?? gameObjectAddress.ToString("X"), filePath);
+                    SendTransients(gameObjectAddress);
+                }
             }
         }
 
