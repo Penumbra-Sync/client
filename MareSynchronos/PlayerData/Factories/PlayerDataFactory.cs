@@ -112,22 +112,22 @@ public class PlayerDataFactory
         return ((Character*)playerPointer)->GameObject.DrawObject == null;
     }
 
-    private async Task<CharacterData> CreateCharacterData(CharacterData previousData, GameObjectHandler playerRelatedObject, CancellationToken token)
+    private async Task<CharacterData> CreateCharacterData(CharacterData data, GameObjectHandler playerRelatedObject, CancellationToken token)
     {
         var objectKind = playerRelatedObject.ObjectKind;
 
         _logger.LogDebug("Building character data for {obj}", playerRelatedObject);
 
-        if (!previousData.FileReplacements.TryGetValue(objectKind, out HashSet<FileReplacement>? value))
+        if (!data.FileReplacements.TryGetValue(objectKind, out HashSet<FileReplacement>? value))
         {
-            previousData.FileReplacements[objectKind] = new(FileReplacementComparer.Instance);
+            data.FileReplacements[objectKind] = new(FileReplacementComparer.Instance);
         }
         else
         {
             value.Clear();
         }
 
-        previousData.CustomizePlusScale.Remove(objectKind);
+        data.CustomizePlusScale.Remove(objectKind);
 
         // wait until chara is not drawing and present so nothing spontaneously explodes
         await _dalamudUtil.WaitWhileCharacterIsDrawing(_logger, playerRelatedObject, Guid.NewGuid(), 30000, ct: token).ConfigureAwait(false);
@@ -151,13 +151,13 @@ public class PlayerDataFactory
         resolvedPaths = (await _ipcManager.Penumbra.GetCharacterData(_logger, playerRelatedObject).ConfigureAwait(false));
         if (resolvedPaths == null) throw new InvalidOperationException("Penumbra returned null data");
 
-        previousData.FileReplacements[objectKind] =
+        data.FileReplacements[objectKind] =
                 new HashSet<FileReplacement>(resolvedPaths.Select(c => new FileReplacement([.. c.Value], c.Key)), FileReplacementComparer.Instance)
                 .Where(p => p.HasFileReplacement).ToHashSet();
-        previousData.FileReplacements[objectKind].RemoveWhere(c => c.GamePaths.Any(g => !CacheMonitor.AllowedFileExtensions.Any(e => g.EndsWith(e, StringComparison.OrdinalIgnoreCase))));
+        data.FileReplacements[objectKind].RemoveWhere(c => c.GamePaths.Any(g => !CacheMonitor.AllowedFileExtensions.Any(e => g.EndsWith(e, StringComparison.OrdinalIgnoreCase))));
 
         _logger.LogDebug("== Static Replacements ==");
-        foreach (var replacement in previousData.FileReplacements[objectKind].Where(i => i.HasFileReplacement).OrderBy(i => i.GamePaths.First(), StringComparer.OrdinalIgnoreCase))
+        foreach (var replacement in data.FileReplacements[objectKind].Where(i => i.HasFileReplacement).OrderBy(i => i.GamePaths.First(), StringComparer.OrdinalIgnoreCase))
         {
             _logger.LogDebug("=> {repl}", replacement);
         }
@@ -168,7 +168,7 @@ public class PlayerDataFactory
         // or we get into redraw city for every change and nothing works properly
         if (objectKind == ObjectKind.Pet)
         {
-            foreach (var item in previousData.FileReplacements[ObjectKind.Pet].Where(i => i.HasFileReplacement).SelectMany(p => p.GamePaths))
+            foreach (var item in data.FileReplacements[ObjectKind.Pet].Where(i => i.HasFileReplacement).SelectMany(p => p.GamePaths))
             {
                 if (_transientResourceManager.AddTransientResource(objectKind, item))
                 {
@@ -176,14 +176,14 @@ public class PlayerDataFactory
                 }
             }
 
-            _logger.LogTrace("Clearing {count} Static Replacements for Pet", previousData.FileReplacements[ObjectKind.Pet].Count);
-            previousData.FileReplacements[ObjectKind.Pet].Clear();
+            _logger.LogTrace("Clearing {count} Static Replacements for Pet", data.FileReplacements[ObjectKind.Pet].Count);
+            data.FileReplacements[ObjectKind.Pet].Clear();
         }
 
         _logger.LogDebug("Handling transient update for {obj}", playerRelatedObject);
 
         // remove all potentially gathered paths from the transient resource manager that are resolved through static resolving
-        _transientResourceManager.ClearTransientPaths(objectKind, previousData.FileReplacements[objectKind].SelectMany(c => c.GamePaths).ToList());
+        _transientResourceManager.ClearTransientPaths(objectKind, data.FileReplacements[objectKind].SelectMany(c => c.GamePaths).ToList());
 
         // get all remaining paths and resolve them
         var transientPaths = ManageSemiTransientData(objectKind);
@@ -193,42 +193,43 @@ public class PlayerDataFactory
         foreach (var replacement in resolvedTransientPaths.Select(c => new FileReplacement([.. c.Value], c.Key)).OrderBy(f => f.ResolvedPath, StringComparer.Ordinal))
         {
             _logger.LogDebug("=> {repl}", replacement);
-            previousData.FileReplacements[objectKind].Add(replacement);
+            data.FileReplacements[objectKind].Add(replacement);
         }
 
         // clean up all semi transient resources that don't have any file replacement (aka null resolve)
-        _transientResourceManager.CleanUpSemiTransientResources(objectKind, [.. previousData.FileReplacements[objectKind]]);
+        _transientResourceManager.CleanUpSemiTransientResources(objectKind, [.. data.FileReplacements[objectKind]]);
 
         // make sure we only return data that actually has file replacements
-        foreach (var item in previousData.FileReplacements)
+        foreach (var item in data.FileReplacements)
         {
-            previousData.FileReplacements[item.Key] = new HashSet<FileReplacement>(item.Value.Where(v => v.HasFileReplacement).OrderBy(v => v.ResolvedPath, StringComparer.Ordinal), FileReplacementComparer.Instance);
+            data.FileReplacements[item.Key] = new HashSet<FileReplacement>(item.Value.Where(v => v.HasFileReplacement).OrderBy(v => v.ResolvedPath, StringComparer.Ordinal), FileReplacementComparer.Instance);
         }
 
         // gather up data from ipc
-        previousData.ManipulationString = _ipcManager.Penumbra.GetMetaManipulations();
+        data.ManipulationString = _ipcManager.Penumbra.GetMetaManipulations();
         Task<string> getHeelsOffset = _ipcManager.Heels.GetOffsetAsync();
         Task<string> getGlamourerData = _ipcManager.Glamourer.GetCharacterCustomizationAsync(playerRelatedObject.Address);
         Task<string?> getCustomizeData = _ipcManager.CustomizePlus.GetScaleAsync(playerRelatedObject.Address);
-        previousData.GlamourerString[playerRelatedObject.ObjectKind] = await getGlamourerData.ConfigureAwait(false);
-        _logger.LogDebug("Glamourer is now: {data}", previousData.GlamourerString[playerRelatedObject.ObjectKind]);
+        Task<string> getHonorificTitle = _ipcManager.Honorific.GetTitle();
+        data.GlamourerString[playerRelatedObject.ObjectKind] = await getGlamourerData.ConfigureAwait(false);
+        _logger.LogDebug("Glamourer is now: {data}", data.GlamourerString[playerRelatedObject.ObjectKind]);
         var customizeScale = await getCustomizeData.ConfigureAwait(false);
-        previousData.CustomizePlusScale[playerRelatedObject.ObjectKind] = customizeScale ?? string.Empty;
-        _logger.LogDebug("Customize is now: {data}", previousData.CustomizePlusScale[playerRelatedObject.ObjectKind]);
-        previousData.HonorificData = _ipcManager.Honorific.GetTitle();
-        _logger.LogDebug("Honorific is now: {data}", previousData.HonorificData);
-        previousData.HeelsData = await getHeelsOffset.ConfigureAwait(false);
-        _logger.LogDebug("Heels is now: {heels}", previousData.HeelsData);
+        data.CustomizePlusScale[playerRelatedObject.ObjectKind] = customizeScale ?? string.Empty;
+        _logger.LogDebug("Customize is now: {data}", data.CustomizePlusScale[playerRelatedObject.ObjectKind]);
+        data.HonorificData = await getHonorificTitle.ConfigureAwait(false);
+        _logger.LogDebug("Honorific is now: {data}", data.HonorificData);
+        data.HeelsData = await getHeelsOffset.ConfigureAwait(false);
+        _logger.LogDebug("Heels is now: {heels}", data.HeelsData);
         if (objectKind == ObjectKind.Player)
         {
-            previousData.MoodlesData = await _ipcManager.Moodles.GetStatusAsync(playerRelatedObject.Address).ConfigureAwait(false) ?? string.Empty;
-            _logger.LogDebug("Moodles is now: {moodles}", previousData.MoodlesData);
+            data.MoodlesData = await _ipcManager.Moodles.GetStatusAsync(playerRelatedObject.Address).ConfigureAwait(false) ?? string.Empty;
+            _logger.LogDebug("Moodles is now: {moodles}", data.MoodlesData);
 
-            previousData.PetNamesData = _ipcManager.PetNames.GetLocalNames();
-            _logger.LogDebug("Pet Nicknames is now: {petnames}", previousData.PetNamesData);
+            data.PetNamesData = _ipcManager.PetNames.GetLocalNames();
+            _logger.LogDebug("Pet Nicknames is now: {petnames}", data.PetNamesData);
         }
 
-        if (previousData.FileReplacements.TryGetValue(objectKind, out HashSet<FileReplacement>? fileReplacements))
+        if (data.FileReplacements.TryGetValue(objectKind, out HashSet<FileReplacement>? fileReplacements))
         {
             var toCompute = fileReplacements.Where(f => !f.IsFileSwap).ToArray();
             _logger.LogDebug("Getting Hashes for {amount} Files", toCompute.Length);
@@ -248,7 +249,7 @@ public class PlayerDataFactory
         {
             try
             {
-                await VerifyPlayerAnimationBones(boneIndices, previousData, objectKind).ConfigureAwait(false);
+                await VerifyPlayerAnimationBones(boneIndices, data, objectKind).ConfigureAwait(false);
             }
             catch (Exception e)
             {
@@ -258,7 +259,7 @@ public class PlayerDataFactory
 
         _logger.LogInformation("Building character data for {obj} took {time}ms", objectKind, TimeSpan.FromTicks(DateTime.UtcNow.Ticks - start.Ticks).TotalMilliseconds);
 
-        return previousData;
+        return data;
     }
 
     private async Task VerifyPlayerAnimationBones(Dictionary<string, List<ushort>>? boneIndices, CharacterData previousData, ObjectKind objectKind)
