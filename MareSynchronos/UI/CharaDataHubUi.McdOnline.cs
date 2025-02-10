@@ -568,7 +568,7 @@ internal sealed partial class CharaDataHubUi
                 ImGui.TableSetupColumn("Expires", ImGuiTableColumnFlags.WidthFixed, 18);
                 ImGui.TableSetupScrollFreeze(0, 1);
                 ImGui.TableHeadersRow();
-                foreach (var entry in _charaDataManager.OwnCharaData.Values)
+                foreach (var entry in _charaDataManager.OwnCharaData.Values.OrderBy(b => b.CreatedDate))
                 {
                     var uDto = _charaDataManager.GetUpdateDto(entry.Id);
                     ImGui.TableNextColumn();
