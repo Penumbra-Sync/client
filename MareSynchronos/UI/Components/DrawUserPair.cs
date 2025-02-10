@@ -8,6 +8,7 @@ using MareSynchronos.API.Dto.Group;
 using MareSynchronos.API.Dto.User;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Pairs;
+using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.UI.Handlers;
@@ -28,6 +29,7 @@ public class DrawUserPair
     private readonly ServerConfigurationManager _serverConfigurationManager;
     private readonly UiSharedService _uiSharedService;
     private readonly PlayerPerformanceConfigService _performanceConfigService;
+    private readonly CharaDataManager _charaDataManager;
     private float _menuWidth = -1;
     private bool _wasHovered = false;
 
@@ -36,7 +38,8 @@ public class DrawUserPair
         ApiController apiController, IdDisplayHandler uIDDisplayHandler,
         MareMediator mareMediator, SelectTagForPairUi selectTagForPairUi,
         ServerConfigurationManager serverConfigurationManager,
-        UiSharedService uiSharedService, PlayerPerformanceConfigService performanceConfigService)
+        UiSharedService uiSharedService, PlayerPerformanceConfigService performanceConfigService,
+        CharaDataManager charaDataManager)
     {
         _id = id;
         _pair = entry;
@@ -49,6 +52,7 @@ public class DrawUserPair
         _serverConfigurationManager = serverConfigurationManager;
         _uiSharedService = uiSharedService;
         _performanceConfigService = performanceConfigService;
+        _charaDataManager = charaDataManager;
     }
 
     public Pair Pair => _pair;
@@ -326,7 +330,7 @@ public class DrawUserPair
     private float DrawRightSide()
     {
         var pauseIcon = _pair.UserPair!.OwnPermissions.IsPaused() ? FontAwesomeIcon.Play : FontAwesomeIcon.Pause;
-        var pauseIconSize = _uiSharedService.GetIconButtonSize(pauseIcon);
+        var pauseButtonSize = _uiSharedService.GetIconButtonSize(pauseIcon);
         var barButtonSize = _uiSharedService.GetIconButtonSize(FontAwesomeIcon.EllipsisV);
         var spacingX = ImGui.GetStyle().ItemSpacing.X;
         var windowEndX = ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth();
@@ -339,7 +343,7 @@ public class DrawUserPair
             ImGui.OpenPopup("User Flyout Menu");
         }
 
-        currentRightSide -= (pauseIconSize.X + spacingX);
+        currentRightSide -= (pauseButtonSize.X + spacingX);
         ImGui.SameLine(currentRightSide);
         if (_uiSharedService.IconButton(pauseIcon))
         {
@@ -447,6 +451,19 @@ public class DrawUserPair
 
                     ImGui.EndTooltip();
                 }
+            }
+        }
+
+        if (_charaDataManager.SharedWithYouData.TryGetValue(_pair.UserData, out var sharedData))
+        {
+            currentRightSide -= (_uiSharedService.GetIconSize(FontAwesomeIcon.Running).X + (spacingX / 2f));
+            ImGui.SameLine(currentRightSide);
+            _uiSharedService.IconText(FontAwesomeIcon.Running);
+            UiSharedService.AttachToolTip($"This user has shared {sharedData.Count} Character Data Sets with you." + UiSharedService.TooltipSeparator
+                + "Click to open the Character Data Hub and show the entries.");
+            if (ImGui.IsItemClicked(ImGuiMouseButton.Left))
+            {
+                _mediator.Publish(new OpenCharaDataHubWithFilterMessage(_pair.UserData));
             }
         }
 
