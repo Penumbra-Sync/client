@@ -88,14 +88,19 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
                 return;
             }
 
+            bool removedPaths = false;
             foreach (var replacement in fileReplacement.Where(p => !p.HasFileReplacement).SelectMany(p => p.GamePaths).ToList())
             {
+                removedPaths = true;
                 PlayerConfig.RemovePath(replacement);
             }
 
-            // force reload semi transient resources
-            _semiTransientResources = null;
-            _configurationService.Save();
+            if (removedPaths)
+            {
+                // force reload semi transient resources
+                _semiTransientResources = null;
+                _configurationService.Save();
+            }
         }
     }
 
