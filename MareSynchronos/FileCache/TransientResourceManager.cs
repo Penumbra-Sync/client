@@ -17,8 +17,8 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
     private readonly HashSet<string> _cachedHandledPaths = new(StringComparer.Ordinal);
     private readonly TransientConfigService _configurationService;
     private readonly DalamudUtilService _dalamudUtil;
-    private readonly string[] _fileTypesToHandle = ["tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk"];
-    private readonly string[] _fileTypesToHandleRecording = ["tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk", "tex", "mdl", "mtrl"];
+    private readonly string[] _handledFileTypes = ["tmb", "pap", "avfx", "atex", "sklb", "eid", "phyb", "scd", "skp", "shpk"];
+    private readonly string[] _handledRecordingFileTypes = ["tex", "mdl", "mtrl"];
     private readonly HashSet<GameObjectHandler> _playerRelatedPointers = [];
     private ConcurrentDictionary<IntPtr, ObjectKind> _cachedFrameAddresses = [];
     private ConcurrentDictionary<ObjectKind, HashSet<string>>? _semiTransientResources = null;
@@ -183,6 +183,13 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
 
     internal void ClearTransientPaths(ObjectKind objectKind, List<string> list)
     {
+        // ignore all recording only datatypes
+        int recordingOnlyRemoved = list.RemoveAll(entry => _handledRecordingFileTypes.Any(ext => entry.EndsWith(ext, StringComparison.OrdinalIgnoreCase)));
+        if (recordingOnlyRemoved > 0)
+        {
+            Logger.LogTrace("Ignored {0} game paths when clearing transients", recordingOnlyRemoved);
+        }
+
         if (TransientResources.TryGetValue(objectKind, out var set))
         {
             foreach (var file in set.Where(p => list.Contains(p, StringComparer.OrdinalIgnoreCase)))
@@ -303,7 +310,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         }
 
         // ignore files to not handle
-        var handledTypes = IsTransientRecording ? _fileTypesToHandleRecording : _fileTypesToHandle;
+        var handledTypes = IsTransientRecording ? _handledRecordingFileTypes.Concat(_handledFileTypes) : _handledFileTypes;
         if (!handledTypes.Any(type => gamePath.EndsWith(type, StringComparison.OrdinalIgnoreCase)))
         {
             lock (_cacheAdditionLock)
