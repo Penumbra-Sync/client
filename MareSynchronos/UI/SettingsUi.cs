@@ -1,6 +1,5 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
-using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Utility;
@@ -30,7 +29,6 @@ using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Numerics;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 
