@@ -270,6 +270,18 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         return await RunOnFrameworkThread(GetPlayerName).ConfigureAwait(false);
     }
 
+    public async Task<ulong> GetCIDAsync()
+    {
+        return await RunOnFrameworkThread(GetCID).ConfigureAwait(false);
+    }
+
+    public unsafe ulong GetCID()
+    {
+        EnsureIsOnFramework();
+        var playerChar = GetPlayerCharacter();
+        return ((BattleChara*)playerChar.Address)->Character.ContentId;
+    }
+
     public async Task<string> GetPlayerNameHashedAsync()
     {
         return await RunOnFrameworkThread(() => GetHashedAccIdFromPlayerPointer(GetPlayerPointer())).ConfigureAwait(false);

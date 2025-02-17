@@ -100,6 +100,7 @@ public class ServerConfigurationManager
 
         var charaName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult();
         var worldId = _dalamudUtil.GetHomeWorldIdAsync().GetAwaiter().GetResult();
+        var cid = _dalamudUtil.GetCIDAsync().GetAwaiter().GetResult();
 
         var auth = currentServer.Authentications.FindAll(f => string.Equals(f.CharacterName, charaName) && f.WorldId == worldId);
         if (auth.Count >= 2)
@@ -113,6 +114,13 @@ public class ServerConfigurationManager
         {
             _logger.LogTrace("GetOAuth2 accessed, returning null because no set up characters for {chara} on {world}", charaName, worldId);
             return null;
+        }
+
+        if (auth.Single().LastSeenCID != cid)
+        {
+            auth.Single().LastSeenCID = cid;
+            _logger.LogTrace("GetOAuth2 accessed, updating CID for {chara} on {world} to {cid}", charaName, worldId, cid);
+            Save();
         }
 
         if (!string.IsNullOrEmpty(auth.Single().UID) && !string.IsNullOrEmpty(currentServer.OAuthToken))
@@ -139,12 +147,14 @@ public class ServerConfigurationManager
 
         var charaName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult();
         var worldId = _dalamudUtil.GetHomeWorldIdAsync().GetAwaiter().GetResult();
+        var cid = _dalamudUtil.GetCIDAsync().GetAwaiter().GetResult();
         if (!currentServer.Authentications.Any() && currentServer.SecretKeys.Any())
         {
             currentServer.Authentications.Add(new Authentication()
             {
                 CharacterName = charaName,
                 WorldId = worldId,
+                LastSeenCID = cid,
                 SecretKeyIdx = currentServer.SecretKeys.Last().Key,
             });
 
@@ -163,6 +173,13 @@ public class ServerConfigurationManager
         {
             _logger.LogTrace("GetSecretKey accessed, returning null because no set up characters for {chara} on {world}", charaName, worldId);
             return null;
+        }
+
+        if (auth.Single().LastSeenCID != cid)
+        {
+            auth.Single().LastSeenCID = cid;
+            _logger.LogTrace("GetSecretKey accessed, updating CID for {chara} on {world} to {cid}", charaName, worldId, cid);
+            Save();
         }
 
         if (currentServer.SecretKeys.TryGetValue(auth.Single().SecretKeyIdx, out var secretKey))
@@ -250,6 +267,7 @@ public class ServerConfigurationManager
             CharacterName = _dalamudUtil.GetPlayerNameAsync().GetAwaiter().GetResult(),
             WorldId = _dalamudUtil.GetHomeWorldIdAsync().GetAwaiter().GetResult(),
             SecretKeyIdx = !server.UseOAuth2 ? server.SecretKeys.Last().Key : -1,
+            LastSeenCID = _dalamudUtil.GetCIDAsync().GetAwaiter().GetResult()
         });
         Save();
     }

@@ -1,5 +1,6 @@
 ﻿using Dalamud.Interface;
 using Dalamud.Interface.Colors;
+using Dalamud.Interface.Components;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Utility;
@@ -29,6 +30,7 @@ using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Numerics;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 
@@ -65,6 +67,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
     private CancellationTokenSource? _validationCts;
     private Task<List<FileCacheEntity>>? _validationTask;
     private bool _wasOpen = false;
+
     public SettingsUi(ILogger<SettingsUi> logger,
         UiSharedService uiShared, MareConfigService configService,
         PairManager pairManager,
@@ -1405,6 +1408,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         " Make sure to enter the character names correctly or use the 'Add current character' button at the bottom.", ImGuiColors.DalamudYellow);
                     int i = 0;
                     _uiShared.DrawUpdateOAuthUIDsButton(selectedServer);
+
                     if (selectedServer.UseOAuth2 && !string.IsNullOrEmpty(selectedServer.OAuthToken))
                     {
                         bool hasSetSecretKeysButNoUid = selectedServer.Authentications.Exists(u => u.SecretKeyIdx != -1 && string.IsNullOrEmpty(u.UID));
@@ -1452,6 +1456,35 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         }
                     }
                     ImGui.Separator();
+                    string youName = _dalamudUtilService.GetPlayerName();
+                    uint youWorld = _dalamudUtilService.GetWorldId();
+                    ulong youCid = _dalamudUtilService.GetCID();
+                    if (!selectedServer.Authentications.Exists(a => string.Equals(a.CharacterName, youName, StringComparison.Ordinal) && a.WorldId == youWorld))
+                    {
+                        _uiShared.BigText("Your Character is not Configured", ImGuiColors.DalamudRed);
+                        UiSharedService.ColorTextWrapped("You have currently no character configured that corresponds to your current name and world.", ImGuiColors.DalamudRed);
+                        var authWithCid = selectedServer.Authentications.Find(f => f.LastSeenCID == youCid);
+                        if (authWithCid != null)
+                        {
+                            ImGuiHelpers.ScaledDummy(5);
+                            UiSharedService.ColorText("A potential rename/world change from this character was detected:", ImGuiColors.DalamudYellow);
+                            using (ImRaii.PushIndent(10f))
+                                UiSharedService.ColorText("Entry: " + authWithCid.CharacterName + " - " + _dalamudUtilService.WorldData.Value[(ushort)authWithCid.WorldId], ImGuiColors.ParsedGreen);
+                            UiSharedService.ColorText("Press the button below to adjust that entry to your current character:", ImGuiColors.DalamudYellow);
+                            using (ImRaii.PushIndent(10f))
+                                UiSharedService.ColorText("Current: " + youName + " - " + _dalamudUtilService.WorldData.Value[(ushort)youWorld], ImGuiColors.ParsedGreen);
+                            ImGuiHelpers.ScaledDummy(5);
+                            if (_uiShared.IconTextButton(FontAwesomeIcon.ArrowRight, "Update Entry to Current Character"))
+                            {
+                                authWithCid.CharacterName = youName;
+                                authWithCid.WorldId = youWorld;
+                                _serverConfigurationManager.Save();
+                            }
+                        }
+                        ImGuiHelpers.ScaledDummy(5);
+                        ImGui.Separator();
+                        ImGuiHelpers.ScaledDummy(5);
+                    }
                     foreach (var item in selectedServer.Authentications.ToList())
                     {
                         using var charaId = ImRaii.PushId("selectedChara" + i);
@@ -1463,8 +1496,6 @@ public class SettingsUi : WindowMediatorSubscriberBase
                             worldPreview = data.First().Value;
                         }
 
-                        var friendlyName = string.Empty;
-                        string friendlyNameTranslation = string.Empty;
                         Dictionary<int, SecretKey> keys = [];
 
                         if (!useOauth)
@@ -1475,19 +1506,11 @@ public class SettingsUi : WindowMediatorSubscriberBase
                             {
                                 secretKey = new();
                             }
-
-                            friendlyName = secretKey.FriendlyName;
-                            friendlyNameTranslation = "Secret Key";
-                        }
-                        else
-                        {
-                            friendlyName = item.UID ?? "-";
-                            friendlyNameTranslation = "UID";
                         }
 
                         bool thisIsYou = false;
-                        if (string.Equals(_dalamudUtilService.GetPlayerName(), item.CharacterName, StringComparison.OrdinalIgnoreCase)
-                            && _dalamudUtilService.GetWorldId() == worldIdx)
+                        if (string.Equals(youName, item.CharacterName, StringComparison.OrdinalIgnoreCase)
+                            && youWorld == worldIdx)
                         {
                             thisIsYou = true;
                         }
@@ -1500,61 +1523,84 @@ public class SettingsUi : WindowMediatorSubscriberBase
                         {
                             misManaged = true;
                         }
-                        if (ImGui.TreeNode($"chara", (misManaged ? "[!! MISMANAGED !!] " : "") + (thisIsYou ? "[CURRENT] " : "") + $"Character: {item.CharacterName}, World: {worldPreview}, {friendlyNameTranslation}: {friendlyName}"))
+                        Vector4 color = ImGuiColors.ParsedGreen;
+                        string text = thisIsYou ? "Your Current Character" : string.Empty;
+                        if (misManaged)
                         {
-                            var charaName = item.CharacterName;
-                            if (ImGui.InputText("Character Name", ref charaName, 64))
-                            {
-                                item.CharacterName = charaName;
-                                _serverConfigurationManager.Save();
-                            }
-
-                            _uiShared.DrawCombo("World##" + item.CharacterName + i, data, (w) => w.Value,
-                                (w) =>
-                                {
-                                    if (item.WorldId != w.Key)
-                                    {
-                                        item.WorldId = w.Key;
-                                        _serverConfigurationManager.Save();
-                                    }
-                                }, EqualityComparer<KeyValuePair<ushort, string>>.Default.Equals(data.FirstOrDefault(f => f.Key == worldIdx), default) ? data.First() : data.First(f => f.Key == worldIdx));
-
-                            if (!useOauth)
-                            {
-                                _uiShared.DrawCombo("Secret Key###" + item.CharacterName + i, keys, (w) => w.Value.FriendlyName,
-                                    (w) =>
-                                    {
-                                        if (w.Key != item.SecretKeyIdx)
-                                        {
-                                            item.SecretKeyIdx = w.Key;
-                                            _serverConfigurationManager.Save();
-                                        }
-                                    }, EqualityComparer<KeyValuePair<int, SecretKey>>.Default.Equals(keys.FirstOrDefault(f => f.Key == item.SecretKeyIdx), default) ? keys.First() : keys.First(f => f.Key == item.SecretKeyIdx));
-                            }
-                            else
-                            {
-                                _uiShared.DrawUIDComboForAuthentication(i, item, selectedServer.ServerUri, _logger);
-                            }
-                            bool isAutoLogin = item.AutoLogin;
-                            if (ImGui.Checkbox("Automatically login to Mare", ref isAutoLogin))
-                            {
-                                item.AutoLogin = isAutoLogin;
-                                _serverConfigurationManager.Save();
-                            }
-                            _uiShared.DrawHelpText("When enabled and logging into this character in XIV, Mare will automatically connect to the current service.");
-                            if (_uiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Character") && UiSharedService.CtrlPressed())
-                                _serverConfigurationManager.RemoveCharacterFromServer(idx, item);
-                            UiSharedService.AttachToolTip("Hold CTRL to delete this entry.");
-
-                            ImGui.TreePop();
+                            text += " [MISMANAGED (" + (selectedServer.UseOAuth2 ? "No UID Set" : "No Secret Key Set") + ")]";
+                            color = ImGuiColors.DalamudRed;
+                        }
+                        if (selectedServer.Authentications.Where(e => e != item).Any(e => string.Equals(e.CharacterName, item.CharacterName, StringComparison.Ordinal)
+                            && e.WorldId == item.WorldId))
+                        {
+                            text += " [DUPLICATE]";
+                            color = ImGuiColors.DalamudRed;
                         }
 
+                        if (!string.IsNullOrEmpty(text))
+                        {
+                            text = text.Trim();
+                            _uiShared.BigText(text, color);
+                        }
+
+                        var charaName = item.CharacterName;
+                        if (ImGui.InputText("Character Name", ref charaName, 64))
+                        {
+                            item.CharacterName = charaName;
+                            _serverConfigurationManager.Save();
+                        }
+
+                        _uiShared.DrawCombo("World##" + item.CharacterName + i, data, (w) => w.Value,
+                            (w) =>
+                            {
+                                if (item.WorldId != w.Key)
+                                {
+                                    item.WorldId = w.Key;
+                                    _serverConfigurationManager.Save();
+                                }
+                            }, EqualityComparer<KeyValuePair<ushort, string>>.Default.Equals(data.FirstOrDefault(f => f.Key == worldIdx), default) ? data.First() : data.First(f => f.Key == worldIdx));
+
+                        if (!useOauth)
+                        {
+                            _uiShared.DrawCombo("Secret Key###" + item.CharacterName + i, keys, (w) => w.Value.FriendlyName,
+                                (w) =>
+                                {
+                                    if (w.Key != item.SecretKeyIdx)
+                                    {
+                                        item.SecretKeyIdx = w.Key;
+                                        _serverConfigurationManager.Save();
+                                    }
+                                }, EqualityComparer<KeyValuePair<int, SecretKey>>.Default.Equals(keys.FirstOrDefault(f => f.Key == item.SecretKeyIdx), default) ? keys.First() : keys.First(f => f.Key == item.SecretKeyIdx));
+                        }
+                        else
+                        {
+                            _uiShared.DrawUIDComboForAuthentication(i, item, selectedServer.ServerUri, _logger);
+                        }
+                        bool isAutoLogin = item.AutoLogin;
+                        if (ImGui.Checkbox("Automatically login to Mare", ref isAutoLogin))
+                        {
+                            item.AutoLogin = isAutoLogin;
+                            _serverConfigurationManager.Save();
+                        }
+                        _uiShared.DrawHelpText("When enabled and logging into this character in XIV, Mare will automatically connect to the current service.");
+                        if (_uiShared.IconTextButton(FontAwesomeIcon.Trash, "Delete Character") && UiSharedService.CtrlPressed())
+                            _serverConfigurationManager.RemoveCharacterFromServer(idx, item);
+                        UiSharedService.AttachToolTip("Hold CTRL to delete this entry.");
+
                         i++;
+                        if (item != selectedServer.Authentications.ToList()[^1])
+                        {
+                            ImGuiHelpers.ScaledDummy(5);
+                            ImGui.Separator();
+                            ImGuiHelpers.ScaledDummy(5);
+                        }
                     }
 
-                    ImGui.Separator();
-                    if (!selectedServer.Authentications.Exists(c => string.Equals(c.CharacterName, _uiShared.PlayerName, StringComparison.Ordinal)
-                        && c.WorldId == _uiShared.WorldId))
+                    if (selectedServer.Authentications.Any())
+                        ImGui.Separator();
+
+                    if (!selectedServer.Authentications.Exists(c => string.Equals(c.CharacterName, youName, StringComparison.Ordinal)
+                        && c.WorldId == youWorld))
                     {
                         if (_uiShared.IconTextButton(FontAwesomeIcon.User, "Add current character"))
                         {
@@ -1624,7 +1670,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 ImGui.EndTabItem();
             }
 
-            if (ImGui.BeginTabItem("Service Settings"))
+            if (ImGui.BeginTabItem("Service Configuration"))
             {
                 var serverName = selectedServer.ServerName;
                 var serverUri = selectedServer.ServerUri;
