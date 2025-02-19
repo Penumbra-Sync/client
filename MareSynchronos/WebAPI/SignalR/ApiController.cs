@@ -264,7 +264,7 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                             "Dalamud is reporting your FFXIV installation has modified game files. Any mods installed through TexTools will produce this message. " +
                             "Mare Synchronos, Penumbra, and some other plugins assume your FFXIV installation is unmodified in order to work. " +
                             "Synchronization with pairs/shells can break because of this. Exit the game, open XIVLauncher, click the arrow next to Log In" +
-                            "and select 'repair game files' to resolve this issue. Aftwards, do not install any mods with TexTools. Your plugin configurations will remain, as will mods enabled in Penumbra.",
+                            "and select 'repair game files' to resolve this issue. Afterwards, do not install any mods with TexTools. Your plugin configurations will remain, as will mods enabled in Penumbra.",
                             NotificationType.Error, TimeSpan.FromSeconds(15)));
                 }
 
