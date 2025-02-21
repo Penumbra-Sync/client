@@ -461,12 +461,13 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     {
         if (!_clientState.IsLoggedIn) return;
 
-        logger.LogTrace("[{redrawId}] Starting wait for {handler} to draw", redrawId, handler);
-
         const int tick = 250;
         int curWaitTime = 0;
         try
         {
+            logger.LogTrace("[{redrawId}] Starting wait for {handler} to draw", redrawId, handler);
+            await Task.Delay(tick).ConfigureAwait(true);
+
             while ((!ct?.IsCancellationRequested ?? true)
                    && curWaitTime < timeOut
                    && await handler.IsBeingDrawnRunOnFrameworkAsync().ConfigureAwait(false)) // 0b100000000000 is "still rendering" or something
@@ -731,7 +732,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
                 Mediator.Publish(new DalamudLogoutMessage());
             }
 
-            if (_gameConfig != null 
+            if (_gameConfig != null
                 && _gameConfig.TryGet(Dalamud.Game.Config.SystemConfigOption.LodType_DX11, out bool lodEnabled))
             {
                 IsLodEnabled = lodEnabled;
