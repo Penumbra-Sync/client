@@ -467,6 +467,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         {
             logger.LogTrace("[{redrawId}] Starting wait for {handler} to draw", redrawId, handler);
             await Task.Delay(tick).ConfigureAwait(true);
+            curWaitTime += tick;
 
             while ((!ct?.IsCancellationRequested ?? true)
                    && curWaitTime < timeOut
