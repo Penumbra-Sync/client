@@ -1455,7 +1455,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     }
                     ImGui.Separator();
                     string youName = _dalamudUtilService.GetPlayerName();
-                    uint youWorld = _dalamudUtilService.GetWorldId();
+                    uint youWorld = _dalamudUtilService.GetHomeWorldId();
                     ulong youCid = _dalamudUtilService.GetCID();
                     if (!selectedServer.Authentications.Exists(a => string.Equals(a.CharacterName, youName, StringComparison.Ordinal) && a.WorldId == youWorld))
                     {
