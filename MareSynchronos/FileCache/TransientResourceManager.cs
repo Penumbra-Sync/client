@@ -371,7 +371,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
                 if (isAdded)
                 {
                     Logger.LogDebug("Adding {replacedGamePath} for {gameObject} ({filePath})", replacedGamePath, owner?.ToString() ?? gameObjectAddress.ToString("X"), filePath);
-                    SendTransients(gameObjectAddress);
+                    SendTransients(gameObjectAddress, objectKind);
                 }
             }
         }
@@ -382,7 +382,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         }
     }
 
-    private void SendTransients(nint gameObject)
+    private void SendTransients(nint gameObject, ObjectKind objectKind)
     {
         _ = Task.Run(async () =>
         {
@@ -391,7 +391,14 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             _sendTransientCts = new();
             var token = _sendTransientCts.Token;
             await Task.Delay(TimeSpan.FromSeconds(5), token).ConfigureAwait(false);
-            Mediator.Publish(new TransientResourceChangedMessage(gameObject));
+            foreach (var kvp in TransientResources)
+            {
+                if (TransientResources.TryGetValue(objectKind, out var values) && values.Any())
+                {
+                    Logger.LogTrace("Sending Transients for {kind}", objectKind);
+                    Mediator.Publish(new TransientResourceChangedMessage(gameObject));
+                }
+            }
         });
     }
 

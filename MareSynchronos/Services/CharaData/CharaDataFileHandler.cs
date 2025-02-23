@@ -88,7 +88,8 @@ public sealed class CharaDataFileHandler : IDisposable
         using var tempHandler = await _gameObjectHandlerFactory.Create(ObjectKind.Player,
                         () => _dalamudUtilService.GetCharacterFromObjectTableByIndex(chara.ObjectIndex)?.Address ?? IntPtr.Zero, isWatched: false).ConfigureAwait(false);
         PlayerData.Data.CharacterData newCdata = new();
-        await _playerDataFactory.BuildCharacterData(newCdata, tempHandler, CancellationToken.None).ConfigureAwait(false);
+        var fragment = await _playerDataFactory.BuildCharacterData(tempHandler, CancellationToken.None).ConfigureAwait(false);
+        newCdata.SetFragment(ObjectKind.Player, fragment);
         if (newCdata.FileReplacements.TryGetValue(ObjectKind.Player, out var playerData) && playerData != null)
         {
             foreach (var data in playerData.Select(g => g.GamePaths))

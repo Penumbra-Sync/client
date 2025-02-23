@@ -461,15 +461,18 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     {
         if (!_clientState.IsLoggedIn) return;
 
+        if (ct == null)
+            ct = CancellationToken.None;
+
         const int tick = 250;
         int curWaitTime = 0;
         try
         {
             logger.LogTrace("[{redrawId}] Starting wait for {handler} to draw", redrawId, handler);
-            await Task.Delay(tick).ConfigureAwait(true);
+            await Task.Delay(tick, ct.Value).ConfigureAwait(true);
             curWaitTime += tick;
 
-            while ((!ct?.IsCancellationRequested ?? true)
+            while ((!ct.Value.IsCancellationRequested)
                    && curWaitTime < timeOut
                    && await handler.IsBeingDrawnRunOnFrameworkAsync().ConfigureAwait(false)) // 0b100000000000 is "still rendering" or something
             {

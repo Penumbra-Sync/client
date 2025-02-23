@@ -2,7 +2,6 @@
 using FFXIVClientStructs.FFXIV.Client.Graphics.Scene;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
-using MareSynchronos.Utils;
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
 using static FFXIVClientStructs.FFXIV.Client.Game.Character.DrawDataContainer;
@@ -16,10 +15,8 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
     private readonly Func<IntPtr> _getAddress;
     private readonly bool _isOwnedObject;
     private readonly PerformanceCollectorService _performanceCollector;
-    private CancellationTokenSource? _clearCts = new();
     private Task? _delayedZoningTask;
     private bool _haltProcessing = false;
-    private bool _ignoreSendAfterRedraw = false;
     private int _ptrNullCounter = 0;
     private byte _classJob = 0;
     private CancellationTokenSource _zoningCts = new();
@@ -76,12 +73,6 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             if (msg.Address == Address)
             {
                 _haltProcessing = false;
-                _ = Task.Run(async () =>
-                {
-                    _ignoreSendAfterRedraw = true;
-                    await Task.Delay(500).ConfigureAwait(false);
-                    _ignoreSendAfterRedraw = false;
-                });
             }
         });
 
@@ -90,9 +81,10 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         _dalamudUtil.RunOnFrameworkThread(CheckAndUpdateObject).GetAwaiter().GetResult();
     }
 
-    private enum DrawCondition
+    public enum DrawCondition
     {
         None,
+        ObjectZero,
         DrawObjectZero,
         RenderFlags,
         ModelInSlotLoaded,
@@ -112,11 +104,13 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
     private ushort[] MainHandData { get; set; } = new ushort[3];
     private ushort[] OffHandData { get; set; } = new ushort[3];
 
+    public DrawCondition CurrentDrawCondition { get; set; } = DrawCondition.None;
+
     public async Task ActOnFrameworkAfterEnsureNoDrawAsync(Action<Dalamud.Game.ClientState.Objects.Types.ICharacter> act, CancellationToken token)
     {
         while (await _dalamudUtil.RunOnFrameworkThread(() =>
                {
-                   if (IsBeingDrawn()) return true;
+                   if (CurrentDrawCondition != DrawCondition.None) return true;
                    var gameObj = _dalamudUtil.CreateGameObject(Address);
                    if (gameObj is Dalamud.Game.ClientState.Objects.Types.ICharacter chara)
                    {
@@ -188,11 +182,15 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             _ptrNullCounter = 0;
             var drawObjAddr = (IntPtr)((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)Address)->DrawObject;
             DrawObjectAddress = drawObjAddr;
+            CurrentDrawCondition = DrawCondition.None;
         }
         else
         {
             DrawObjectAddress = IntPtr.Zero;
+            CurrentDrawCondition = DrawCondition.DrawObjectZero;
         }
+
+        CurrentDrawCondition = IsBeingDrawnUnsafe();
 
         if (_haltProcessing) return;
 
@@ -201,12 +199,6 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
         if (Address != IntPtr.Zero && DrawObjectAddress != IntPtr.Zero)
         {
-            if (_clearCts != null)
-            {
-                Logger.LogDebug("[{this}] Cancelling Clear Task", this);
-                _clearCts.CancelDispose();
-                _clearCts = null;
-            }
             var chara = (Character*)Address;
             var name = chara->GameObject.NameString;
             bool nameChange = !string.Equals(name, Name, StringComparison.Ordinal);
@@ -244,7 +236,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
                     Logger.LogTrace("Checking [{this}] equip data from game obj, result: {diff}", this, equipDiff);
             }
 
-            if (equipDiff && !_isOwnedObject && !_ignoreSendAfterRedraw) // send the message out immediately and cancel out, no reason to continue if not self
+            if (equipDiff && !_isOwnedObject) // send the message out immediately and cancel out, no reason to continue if not self
             {
                 Logger.LogTrace("[{this}] Changed", this);
                 Mediator.Publish(new CharacterChangedMessage(this));
@@ -288,24 +280,13 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         }
         else if (addrDiff || drawObjDiff)
         {
+            CurrentDrawCondition = DrawCondition.DrawObjectZero;
             Logger.LogTrace("[{this}] Changed", this);
             if (_isOwnedObject && ObjectKind != ObjectKind.Player)
             {
-                _clearCts?.CancelDispose();
-                _clearCts = new();
-                var token = _clearCts.Token;
-                _ = Task.Run(() => ClearAsync(token), token);
+                Mediator.Publish(new ClearCacheForObjectMessage(this));
             }
         }
-    }
-
-    private async Task ClearAsync(CancellationToken token)
-    {
-        Logger.LogDebug("[{this}] Running Clear Task", this);
-        await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
-        Logger.LogDebug("[{this}] Sending ClearCachedForObjectMessage", this);
-        Mediator.Publish(new ClearCacheForObjectMessage(this));
-        _clearCts = null;
     }
 
     private unsafe bool CompareAndUpdateCustomizeData(Span<byte> customizeData)
@@ -387,7 +368,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         return (IntPtr)((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)curPtr)->DrawObject;
     }
 
-    private bool IsBeingDrawn()
+    public bool IsBeingDrawn()
     {
         var curPtr = _getAddress();
         Logger.LogTrace("[{this}] IsBeingDrawn, CurPtr: {ptr}", this, curPtr.ToString("X"));
@@ -414,27 +395,22 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
             return true;
         }
 
-        var drawObj = GetDrawObjUnsafe(curPtr);
-        Logger.LogTrace("[{this}] IsBeingDrawn, DrawObjPtr: {ptr}", this, drawObj.ToString("X"));
-        var isDrawn = IsBeingDrawnUnsafe(drawObj, curPtr);
-        Logger.LogTrace("[{this}] IsBeingDrawn, Condition: {cond}", this, isDrawn);
-        return isDrawn != DrawCondition.None;
+        return CurrentDrawCondition != DrawCondition.None;
     }
 
-    private unsafe DrawCondition IsBeingDrawnUnsafe(IntPtr drawObj, IntPtr curPtr)
+    private unsafe DrawCondition IsBeingDrawnUnsafe()
     {
-        var drawObjZero = drawObj == IntPtr.Zero;
-        if (drawObjZero) return DrawCondition.DrawObjectZero;
-        var renderFlags = (((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)curPtr)->RenderFlags) != 0x0;
+        if (Address == IntPtr.Zero) return DrawCondition.ObjectZero;
+        if (DrawObjectAddress == IntPtr.Zero) return DrawCondition.DrawObjectZero;
+        var renderFlags = (((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)Address)->RenderFlags) != 0x0;
         if (renderFlags) return DrawCondition.RenderFlags;
 
         if (ObjectKind == ObjectKind.Player)
         {
-            var modelInSlotLoaded = (((CharacterBase*)drawObj)->HasModelInSlotLoaded != 0);
+            var modelInSlotLoaded = (((CharacterBase*)DrawObjectAddress)->HasModelInSlotLoaded != 0);
             if (modelInSlotLoaded) return DrawCondition.ModelInSlotLoaded;
-            var modelFilesInSlotLoaded = (((CharacterBase*)drawObj)->HasModelFilesInSlotLoaded != 0);
+            var modelFilesInSlotLoaded = (((CharacterBase*)DrawObjectAddress)->HasModelFilesInSlotLoaded != 0);
             if (modelFilesInSlotLoaded) return DrawCondition.ModelFilesInSlotLoaded;
-            return DrawCondition.None;
         }
 
         return DrawCondition.None;
@@ -442,11 +418,8 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
     private void ZoneSwitchEnd()
     {
-        if (!_isOwnedObject || _haltProcessing) return;
+        if (!_isOwnedObject) return;
 
-        _clearCts?.Cancel();
-        _clearCts?.Dispose();
-        _clearCts = null;
         try
         {
             _zoningCts?.CancelAfter(2500);
@@ -463,7 +436,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
 
     private void ZoneSwitchStart()
     {
-        if (!_isOwnedObject || _haltProcessing) return;
+        if (!_isOwnedObject) return;
 
         _zoningCts = new();
         Logger.LogDebug("[{obj}] Starting Delay After Zoning", this);

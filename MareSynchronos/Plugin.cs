@@ -112,6 +112,7 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddSingleton<TagHandler>();
             collection.AddSingleton<IdDisplayHandler>();
             collection.AddSingleton<PlayerPerformanceService>();
+            collection.AddSingleton<TransientResourceManager>();
 
             collection.AddSingleton<CharaDataManager>();
             collection.AddSingleton<CharaDataFileHandler>();
@@ -211,7 +212,6 @@ public sealed class Plugin : IDalamudPlugin
             collection.AddScoped<IPopupHandler, BanUserPopupHandler>();
             collection.AddScoped<IPopupHandler, CensusPopupHandler>();
             collection.AddScoped<CacheCreationService>();
-            collection.AddScoped<TransientResourceManager>();
             collection.AddScoped<PlayerDataFactory>();
             collection.AddScoped<OnlinePlayerManager>();
             collection.AddScoped((s) => new UiService(s.GetRequiredService<ILogger<UiService>>(), pluginInterface.UiBuilder, s.GetRequiredService<MareConfigService>(),
