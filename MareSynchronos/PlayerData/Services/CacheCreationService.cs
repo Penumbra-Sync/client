@@ -45,6 +45,15 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         _playerRelatedObjects[ObjectKind.Companion] = gameObjectHandlerFactory.Create(ObjectKind.Companion, () => dalamudUtil.GetCompanion(), isWatched: true)
             .GetAwaiter().GetResult();
 
+        Mediator.Subscribe<ClassJobChangedMessage>(this, (msg) =>
+        {
+            if (msg.GameObjectHandler == _playerRelatedObjects[ObjectKind.Player])
+            {
+                AddCacheToCreate(ObjectKind.Player);
+                AddCacheToCreate(ObjectKind.Pet);
+            }
+        });
+
         Mediator.Subscribe<CreateCacheForObjectMessage>(this, (msg) =>
         {
             Logger.LogDebug("Received CreateCacheForObject for {handler}, updating", msg.ObjectToCreateFor);
@@ -53,6 +62,11 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
 
         Mediator.Subscribe<ClearCacheForObjectMessage>(this, (msg) =>
         {
+            if (msg.ObjectToCreateFor.ObjectKind == ObjectKind.Pet)
+            {
+                Logger.LogTrace("Received clear cache for {obj}, ignoring", msg.ObjectToCreateFor);
+                return;
+            }
             Logger.LogDebug("Clearing cache for {obj}", msg.ObjectToCreateFor);
             AddCacheToCreate(msg.ObjectToCreateFor.ObjectKind);
         });
