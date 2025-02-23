@@ -1098,7 +1098,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         {
             if (expectedWidth != null)
             {
-                ImGuiHelpers.ScaledDummy(expectedWidth.Value, 0);
+                ImGui.Dummy(new(expectedWidth.Value, 0));
                 ImGui.SetCursorPos(cursorPos);
             }
 
@@ -1115,12 +1115,22 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     {
         var availWidth = ImGui.GetContentRegionAvail().X;
         var textWidth = ImGui.CalcTextSize(text, availWidth).X;
-        if (maxWidth != null && textWidth > maxWidth) textWidth = maxWidth.Value;
+        if (maxWidth != null && textWidth > maxWidth * ImGuiHelpers.GlobalScale) textWidth = maxWidth.Value * ImGuiHelpers.GlobalScale;
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + (availWidth / 2f) - (textWidth / 2f));
         DrawGrouped(() =>
         {
             ColorTextWrapped(text, color, ImGui.GetCursorPosX() + textWidth);
-        }, expectedWidth: maxWidth == null ? null : maxWidth);
+        }, expectedWidth: maxWidth == null ? null : maxWidth * ImGuiHelpers.GlobalScale);
+    }
+
+    public static void ScaledSameLine(float offset)
+    {
+        ImGui.SameLine(offset * ImGuiHelpers.GlobalScale);
+    }
+
+    public static void ScaledNextItemWidth(float width)
+    {
+        ImGui.SetNextItemWidth(width * ImGuiHelpers.GlobalScale);
     }
 
     internal static void DistanceSeparator()

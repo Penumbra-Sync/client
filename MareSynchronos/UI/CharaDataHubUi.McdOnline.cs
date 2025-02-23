@@ -113,7 +113,7 @@ internal sealed partial class CharaDataHubUi
     {
         _uiSharedService.BigText("Access and Sharing");
 
-        ImGui.SetNextItemWidth(200);
+        UiSharedService.ScaledNextItemWidth(200);
         var dtoAccessType = updateDto.AccessType;
         if (ImGui.BeginCombo("Access Restrictions", GetAccessTypeString(dtoAccessType)))
         {
@@ -138,7 +138,7 @@ internal sealed partial class CharaDataHubUi
 
         DrawSpecific(updateDto);
 
-        ImGui.SetNextItemWidth(200);
+        UiSharedService.ScaledNextItemWidth(200);
         var dtoShareType = updateDto.ShareType;
         if (ImGui.BeginCombo("Sharing", GetShareTypeString(dtoShareType)))
         {
@@ -183,12 +183,12 @@ internal sealed partial class CharaDataHubUi
         ImGui.TextUnformatted("Contains Glamourer Data");
         ImGui.SameLine();
         bool hasGlamourerdata = !string.IsNullOrEmpty(updateDto.GlamourerData);
-        ImGui.SameLine(200);
+        UiSharedService.ScaledSameLine(200);
         _uiSharedService.BooleanToColoredIcon(hasGlamourerdata, false);
 
         ImGui.TextUnformatted("Contains Files");
         var hasFiles = (updateDto.FileGamePaths ?? []).Any() || (dataDto.OriginalFiles.Any());
-        ImGui.SameLine(200);
+        UiSharedService.ScaledSameLine(200);
         _uiSharedService.BooleanToColoredIcon(hasFiles, false);
         if (hasFiles && updateDto.IsAppearanceEqual)
         {
@@ -232,13 +232,13 @@ internal sealed partial class CharaDataHubUi
 
         ImGui.TextUnformatted("Contains Manipulation Data");
         bool hasManipData = !string.IsNullOrEmpty(updateDto.ManipulationData);
-        ImGui.SameLine(200);
+        UiSharedService.ScaledSameLine(200);
         _uiSharedService.BooleanToColoredIcon(hasManipData, false);
 
         ImGui.TextUnformatted("Contains Customize+ Data");
         ImGui.SameLine();
         bool hasCustomizeData = !string.IsNullOrEmpty(updateDto.CustomizeData);
-        ImGui.SameLine(200);
+        UiSharedService.ScaledSameLine(200);
         _uiSharedService.BooleanToColoredIcon(hasCustomizeData, false);
     }
 
@@ -248,7 +248,7 @@ internal sealed partial class CharaDataHubUi
         string code = dataDto.FullId;
         using (ImRaii.Disabled())
         {
-            ImGui.SetNextItemWidth(200);
+            UiSharedService.ScaledNextItemWidth(200);
             ImGui.InputText("##CharaDataCode", ref code, 255, ImGuiInputTextFlags.ReadOnly);
         }
         ImGui.SameLine();
@@ -265,7 +265,7 @@ internal sealed partial class CharaDataHubUi
         string downloadCount = dataDto.DownloadCount.ToString();
         using (ImRaii.Disabled())
         {
-            ImGui.SetNextItemWidth(200);
+            UiSharedService.ScaledNextItemWidth(200);
             ImGui.InputText("##CreationDate", ref creationTime, 255, ImGuiInputTextFlags.ReadOnly);
         }
         ImGui.SameLine();
@@ -275,7 +275,7 @@ internal sealed partial class CharaDataHubUi
         ImGui.SameLine();
         using (ImRaii.Disabled())
         {
-            ImGui.SetNextItemWidth(200);
+            UiSharedService.ScaledNextItemWidth(200);
             ImGui.InputText("##LastUpdate", ref updateTime, 255, ImGuiInputTextFlags.ReadOnly);
         }
         ImGui.SameLine();
@@ -285,14 +285,14 @@ internal sealed partial class CharaDataHubUi
         ImGui.SameLine();
         using (ImRaii.Disabled())
         {
-            ImGui.SetNextItemWidth(50);
+            UiSharedService.ScaledNextItemWidth(50);
             ImGui.InputText("##DlCount", ref downloadCount, 255, ImGuiInputTextFlags.ReadOnly);
         }
         ImGui.SameLine();
         ImGui.TextUnformatted("Download Count");
 
         string description = updateDto.Description;
-        ImGui.SetNextItemWidth(735);
+        UiSharedService.ScaledNextItemWidth(735);
         if (ImGui.InputText("##Description", ref description, 200))
         {
             updateDto.Description = description;
@@ -312,7 +312,7 @@ internal sealed partial class CharaDataHubUi
         using (ImRaii.Disabled(!isExpiring))
         {
             ImGui.SameLine();
-            ImGui.SetNextItemWidth(100);
+            UiSharedService.ScaledNextItemWidth(100);
             if (ImGui.BeginCombo("Year", expiryDate.Year.ToString()))
             {
                 for (int year = DateTime.UtcNow.Year; year < DateTime.UtcNow.Year + 4; year++)
@@ -327,7 +327,7 @@ internal sealed partial class CharaDataHubUi
             ImGui.SameLine();
 
             int daysInMonth = DateTime.DaysInMonth(expiryDate.Year, expiryDate.Month);
-            ImGui.SetNextItemWidth(100);
+            UiSharedService.ScaledNextItemWidth(100);
             if (ImGui.BeginCombo("Month", expiryDate.Month.ToString()))
             {
                 for (int month = 1; month <= 12; month++)
@@ -341,7 +341,7 @@ internal sealed partial class CharaDataHubUi
             }
             ImGui.SameLine();
 
-            ImGui.SetNextItemWidth(100);
+            UiSharedService.ScaledNextItemWidth(100);
             if (ImGui.BeginCombo("Day", expiryDate.Day.ToString()))
             {
                 for (int day = 1; day <= daysInMonth; day++)
@@ -410,7 +410,7 @@ internal sealed partial class CharaDataHubUi
 
             if (pose.Id == null)
             {
-                ImGui.SameLine(50);
+                UiSharedService.ScaledSameLine(50);
                 _uiSharedService.IconText(FontAwesomeIcon.Plus, ImGuiColors.DalamudYellow);
                 UiSharedService.AttachToolTip("This pose has not been added to the server yet. Save changes to upload this Pose data.");
             }
@@ -418,12 +418,12 @@ internal sealed partial class CharaDataHubUi
             bool poseHasChanges = updateDto.PoseHasChanges(pose);
             if (poseHasChanges)
             {
-                ImGui.SameLine(50);
+                UiSharedService.ScaledSameLine(50);
                 _uiSharedService.IconText(FontAwesomeIcon.ExclamationTriangle, ImGuiColors.DalamudYellow);
                 UiSharedService.AttachToolTip("This pose has changes that have not been saved to the server yet.");
             }
 
-            ImGui.SameLine(75);
+            UiSharedService.ScaledSameLine(75);
             if (pose.Description == null && pose.WorldData == null && pose.PoseData == null)
             {
                 UiSharedService.ColorText("Pose scheduled for deletion", ImGuiColors.DalamudYellow);
@@ -550,22 +550,22 @@ internal sealed partial class CharaDataHubUi
         }
 
         using (var table = ImRaii.Table("Own Character Data", 12, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.ScrollY,
-            new Vector2(ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X, 110)))
+            new Vector2(ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X, 110 * ImGuiHelpers.GlobalScale)))
         {
             if (table)
             {
-                ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 18);
-                ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 18);
+                ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 18 * ImGuiHelpers.GlobalScale);
+                ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 18 * ImGuiHelpers.GlobalScale);
                 ImGui.TableSetupColumn("Code");
                 ImGui.TableSetupColumn("Description", ImGuiTableColumnFlags.WidthStretch);
                 ImGui.TableSetupColumn("Created");
                 ImGui.TableSetupColumn("Updated");
-                ImGui.TableSetupColumn("Download Count", ImGuiTableColumnFlags.WidthFixed, 18);
-                ImGui.TableSetupColumn("Downloadable", ImGuiTableColumnFlags.WidthFixed, 18);
-                ImGui.TableSetupColumn("Files", ImGuiTableColumnFlags.WidthFixed, 32);
-                ImGui.TableSetupColumn("Glamourer", ImGuiTableColumnFlags.WidthFixed, 18);
-                ImGui.TableSetupColumn("Customize+", ImGuiTableColumnFlags.WidthFixed, 18);
-                ImGui.TableSetupColumn("Expires", ImGuiTableColumnFlags.WidthFixed, 18);
+                ImGui.TableSetupColumn("Download Count", ImGuiTableColumnFlags.WidthFixed, 18 * ImGuiHelpers.GlobalScale);
+                ImGui.TableSetupColumn("Downloadable", ImGuiTableColumnFlags.WidthFixed, 18 * ImGuiHelpers.GlobalScale);
+                ImGui.TableSetupColumn("Files", ImGuiTableColumnFlags.WidthFixed, 32 * ImGuiHelpers.GlobalScale);
+                ImGui.TableSetupColumn("Glamourer", ImGuiTableColumnFlags.WidthFixed, 18 * ImGuiHelpers.GlobalScale);
+                ImGui.TableSetupColumn("Customize+", ImGuiTableColumnFlags.WidthFixed, 18 * ImGuiHelpers.GlobalScale);
+                ImGui.TableSetupColumn("Expires", ImGuiTableColumnFlags.WidthFixed, 18 * ImGuiHelpers.GlobalScale);
                 ImGui.TableSetupScrollFreeze(0, 1);
                 ImGui.TableHeadersRow();
                 foreach (var entry in _charaDataManager.OwnCharaData.Values.OrderBy(b => b.CreatedDate))
@@ -808,7 +808,7 @@ internal sealed partial class CharaDataHubUi
         Func<T, (string Id, string? Alias, string AliasOrId, string? Note)> parseEntry)
     {
         const float ComponentWidth = 200;
-        ImGui.SetNextItemWidth(ComponentWidth - ImGui.GetFrameHeight());
+        UiSharedService.ScaledNextItemWidth(ComponentWidth - ImGui.GetFrameHeight());
         ImGui.InputText(inputId, ref value, 20);
         ImGui.SameLine(0.0f, 0.0f);
 
