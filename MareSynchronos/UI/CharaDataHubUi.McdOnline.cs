@@ -692,7 +692,7 @@ internal sealed partial class CharaDataHubUi
         var charaDataEntries = _charaDataManager.OwnCharaData.Count;
         if (charaDataEntries != _dataEntries && _selectNewEntry && _charaDataManager.OwnCharaData.Any())
         {
-            SelectedDtoId = _charaDataManager.OwnCharaData.Last().Value.Id;
+            SelectedDtoId = _charaDataManager.OwnCharaData.OrderBy(o => o.Value.CreatedDate).Last().Value.Id;
             _selectNewEntry = false;
         }
         _dataEntries = _charaDataManager.OwnCharaData.Count;
