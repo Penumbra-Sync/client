@@ -11,6 +11,11 @@ namespace MareSynchronos.UI;
 
 internal sealed partial class CharaDataHubUi
 {
+    private string _createDescFilter = string.Empty;
+    private string _createCodeFilter = string.Empty;
+    private bool _createOnlyShowFav = false;
+    private bool _createOnlyShowNotDownloadable = false;
+
     private void DrawEditCharaData(CharaDataFullExtendedDto? dataDto)
     {
         using var imguiid = ImRaii.PushId(dataDto?.Id ?? "NoData");
@@ -30,8 +35,17 @@ internal sealed partial class CharaDataHubUi
             return;
         }
 
+        int otherUpdates = 0;
+        foreach (var item in _charaDataManager.OwnCharaData.Values.Where(v => !string.Equals(v.Id, dataDto.Id, StringComparison.Ordinal)))
+        {
+            if (_charaDataManager.GetUpdateDto(item.Id)?.HasChanges ?? false)
+            {
+                otherUpdates++;
+            }
+        }
+
         bool canUpdate = updateDto.HasChanges;
-        if (canUpdate || _charaDataManager.CharaUpdateTask != null)
+        if (canUpdate || otherUpdates > 0 || (!_charaDataManager.CharaUpdateTask?.IsCompleted ?? false))
         {
             ImGuiHelpers.ScaledDummy(5);
         }
@@ -91,9 +105,27 @@ internal sealed partial class CharaDataHubUi
                 }
             });
         }
+
+        if (otherUpdates > 0)
+        {
+            ImGuiHelpers.ScaledDummy(5);
+            UiSharedService.DrawGrouped(() =>
+            {
+                ImGui.AlignTextToFramePadding();
+                UiSharedService.ColorTextWrapped($"You have {otherUpdates} other entries with unsaved changes.", ImGuiColors.DalamudYellow);
+                ImGui.SameLine();
+                using (ImRaii.Disabled(_charaDataManager.CharaUpdateTask != null && !_charaDataManager.CharaUpdateTask.IsCompleted))
+                {
+                    if (_uiSharedService.IconTextButton(FontAwesomeIcon.ArrowAltCircleUp, "Save all to server"))
+                    {
+                        _charaDataManager.UploadAllCharaData();
+                    }
+                }
+            });
+        }
         indent.Dispose();
 
-        if (canUpdate || _charaDataManager.CharaUpdateTask != null)
+        if (canUpdate || otherUpdates > 0 || (!_charaDataManager.CharaUpdateTask?.IsCompleted ?? false))
         {
             ImGuiHelpers.ScaledDummy(5);
         }
@@ -550,7 +582,7 @@ internal sealed partial class CharaDataHubUi
         }
 
         using (var table = ImRaii.Table("Own Character Data", 12, ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit | ImGuiTableFlags.ScrollY,
-            new Vector2(ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X, 110 * ImGuiHelpers.GlobalScale)))
+            new Vector2(ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X, 140 * ImGuiHelpers.GlobalScale)))
         {
             if (table)
             {
@@ -566,9 +598,64 @@ internal sealed partial class CharaDataHubUi
                 ImGui.TableSetupColumn("Glamourer", ImGuiTableColumnFlags.WidthFixed, 18 * ImGuiHelpers.GlobalScale);
                 ImGui.TableSetupColumn("Customize+", ImGuiTableColumnFlags.WidthFixed, 18 * ImGuiHelpers.GlobalScale);
                 ImGui.TableSetupColumn("Expires", ImGuiTableColumnFlags.WidthFixed, 18 * ImGuiHelpers.GlobalScale);
-                ImGui.TableSetupScrollFreeze(0, 1);
+                ImGui.TableSetupScrollFreeze(0, 2);
                 ImGui.TableHeadersRow();
-                foreach (var entry in _charaDataManager.OwnCharaData.Values.OrderBy(b => b.CreatedDate))
+
+                ImGui.TableNextColumn();
+                ImGui.Dummy(new(0, 0));
+                ImGui.TableNextColumn();
+                ImGui.Checkbox("###createOnlyShowfav", ref _createOnlyShowFav);
+                UiSharedService.AttachToolTip("Filter by favorites");
+                ImGui.TableNextColumn();
+                var x1 = ImGui.GetContentRegionAvail().X;
+                ImGui.SetNextItemWidth(x1);
+                ImGui.InputTextWithHint("###createFilterCode", "Filter by code", ref _createCodeFilter, 200);
+                ImGui.TableNextColumn();
+                var x2 = ImGui.GetContentRegionAvail().X;
+                ImGui.SetNextItemWidth(x2);
+                ImGui.InputTextWithHint("###createFilterDesc", "Filter by description", ref _createDescFilter, 200);
+                ImGui.TableNextColumn();
+                ImGui.Dummy(new(0, 0));
+                ImGui.TableNextColumn();
+                ImGui.Dummy(new(0, 0));
+                ImGui.TableNextColumn();
+                ImGui.Dummy(new(0, 0));
+                ImGui.TableNextColumn();
+                ImGui.Checkbox("###createShowNotDl", ref _createOnlyShowNotDownloadable);
+                UiSharedService.AttachToolTip("Filter by not downloadable");
+                ImGui.TableNextColumn();
+                ImGui.Dummy(new(0, 0));
+                ImGui.TableNextColumn();
+                ImGui.Dummy(new(0, 0));
+                ImGui.TableNextColumn();
+                ImGui.Dummy(new(0, 0));
+                ImGui.TableNextColumn();
+                ImGui.Dummy(new(0, 0));
+
+
+                foreach (var entry in _charaDataManager.OwnCharaData.Values
+                    .Where(v =>
+                    {
+                        bool show = true;
+                        if (!string.IsNullOrWhiteSpace(_createCodeFilter))
+                        {
+                            show &= v.FullId.Contains(_createCodeFilter, StringComparison.OrdinalIgnoreCase);
+                        }
+                        if (!string.IsNullOrWhiteSpace(_createDescFilter))
+                        {
+                            show &= v.Description.Contains(_createDescFilter, StringComparison.OrdinalIgnoreCase);
+                        }
+                        if (_createOnlyShowFav)
+                        {
+                            show &= _configService.Current.FavoriteCodes.ContainsKey(v.FullId);
+                        }
+                        if (_createOnlyShowNotDownloadable)
+                        {
+                            show &= !(!v.HasMissingFiles && !string.IsNullOrEmpty(v.GlamourerData));
+                        }
+
+                        return show;
+                    }).OrderBy(b => b.CreatedDate))
                 {
                     var uDto = _charaDataManager.GetUpdateDto(entry.Id);
                     ImGui.TableNextColumn();
@@ -729,7 +816,7 @@ internal sealed partial class CharaDataHubUi
                     _uiSharedService.DrawHelpText("Users added to this list will be able to access this character data regardless of your pause or pair state with them." + UiSharedService.TooltipSeparator
                         + "Note: Mistyped entries will be automatically removed on updating data to server.");
 
-                    using (var lb = ImRaii.ListBox("Allowed Individuals", new(200, 200)))
+                    using (var lb = ImRaii.ListBox("Allowed Individuals", new(200 * ImGuiHelpers.GlobalScale, 200 * ImGuiHelpers.GlobalScale)))
                     {
                         foreach (var user in updateDto.UserList)
                         {
@@ -749,6 +836,28 @@ internal sealed partial class CharaDataHubUi
                             _selectedSpecificUserIndividual = string.Empty;
                         }
                     }
+
+                    using (ImRaii.Disabled(!UiSharedService.CtrlPressed()))
+                    {
+                        if (_uiSharedService.IconTextButton(FontAwesomeIcon.ExclamationTriangle, "Apply current Allowed Individuals to all MCDO entries"))
+                        {
+                            foreach (var own in _charaDataManager.OwnCharaData.Values.Where(k => !string.Equals(k.Id, updateDto.Id, StringComparison.Ordinal)))
+                            {
+                                var otherUpdateDto = _charaDataManager.GetUpdateDto(own.Id);
+                                if (otherUpdateDto == null) continue;
+                                foreach (var user in otherUpdateDto.UserList.Select(k => k.UID).Concat(otherUpdateDto.AllowedUsers ?? []).Distinct(StringComparer.Ordinal).ToList())
+                                {
+                                    otherUpdateDto.RemoveUserFromList(user);
+                                }
+                                foreach (var user in updateDto.UserList.Select(k => k.UID).Concat(updateDto.AllowedUsers ?? []).Distinct(StringComparer.Ordinal).ToList())
+                                {
+                                    otherUpdateDto.AddUserToList(user);
+                                }
+                            }
+                        }
+                    }
+                    UiSharedService.AttachToolTip("This will apply the current list of allowed specific individuals to ALL of your MCDO entries." + UiSharedService.TooltipSeparator
+                        + "Hold CTRL to enable.");
                 }
             }
             ImGui.SameLine();
@@ -776,7 +885,7 @@ internal sealed partial class CharaDataHubUi
                     _uiSharedService.DrawHelpText("Users in Syncshells added to this list will be able to access this character data regardless of your pause or pair state with them." + UiSharedService.TooltipSeparator
                         + "Note: Mistyped entries will be automatically removed on updating data to server.");
 
-                    using (var lb = ImRaii.ListBox("Allowed Syncshells", new(200, 200)))
+                    using (var lb = ImRaii.ListBox("Allowed Syncshells", new(200 * ImGuiHelpers.GlobalScale, 200 * ImGuiHelpers.GlobalScale)))
                     {
                         foreach (var group in updateDto.GroupList)
                         {
@@ -796,6 +905,28 @@ internal sealed partial class CharaDataHubUi
                             _selectedSpecificGroupIndividual = string.Empty;
                         }
                     }
+
+                    using (ImRaii.Disabled(!UiSharedService.CtrlPressed()))
+                    {
+                        if (_uiSharedService.IconTextButton(FontAwesomeIcon.ExclamationTriangle, "Apply current Allowed Syncshells to all MCDO entries"))
+                        {
+                            foreach (var own in _charaDataManager.OwnCharaData.Values.Where(k => !string.Equals(k.Id, updateDto.Id, StringComparison.Ordinal)))
+                            {
+                                var otherUpdateDto = _charaDataManager.GetUpdateDto(own.Id);
+                                if (otherUpdateDto == null) continue;
+                                foreach (var group in otherUpdateDto.GroupList.Select(k => k.GID).Concat(otherUpdateDto.AllowedGroups ?? []).Distinct(StringComparer.Ordinal).ToList())
+                                {
+                                    otherUpdateDto.RemoveGroupFromList(group);
+                                }
+                                foreach (var group in updateDto.GroupList.Select(k => k.GID).Concat(updateDto.AllowedGroups ?? []).Distinct(StringComparer.Ordinal).ToList())
+                                {
+                                    otherUpdateDto.AddGroupToList(group);
+                                }
+                            }
+                        }
+                    }
+                    UiSharedService.AttachToolTip("This will apply the current list of allowed specific syncshells to ALL of your MCDO entries." + UiSharedService.TooltipSeparator
+                        + "Hold CTRL to enable.");
                 }
             }
 

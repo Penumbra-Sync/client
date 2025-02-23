@@ -45,7 +45,7 @@ internal sealed partial class CharaDataHubUi
                 _charaDataGposeTogetherManager.CreateNewLobby();
             }
             ImGuiHelpers.ScaledDummy(5);
-            ImGui.SetNextItemWidth(250);
+            UiSharedService.ScaledNextItemWidth(250);
             ImGui.InputTextWithHint("##lobbyId", "GPose Lobby Id", ref _joinLobbyId, 30);
             if (_uiSharedService.IconTextButton(FontAwesomeIcon.ArrowRight, "Join GPose Together Lobby"))
             {
@@ -187,7 +187,7 @@ internal sealed partial class CharaDataHubUi
 
             using (ImRaii.Disabled(!_uiSharedService.IsInGpose))
             {
-                ImGui.SetNextItemWidth(200);
+                UiSharedService.ScaledNextItemWidth(200);
                 using (var combo = ImRaii.Combo("##character", string.IsNullOrEmpty(user.AssociatedCharaName) ? "No character assigned" : CharaName(user.AssociatedCharaName)))
                 {
                     if (combo)

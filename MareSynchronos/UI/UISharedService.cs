@@ -34,58 +34,45 @@ namespace MareSynchronos.UI;
 public partial class UiSharedService : DisposableMediatorSubscriberBase
 {
     public const string TooltipSeparator = "--SEP--";
-    public static string DoubleNewLine => Environment.NewLine + Environment.NewLine;
-
     public static readonly ImGuiWindowFlags PopupWindowFlags = ImGuiWindowFlags.NoResize |
                                                ImGuiWindowFlags.NoScrollbar |
                                            ImGuiWindowFlags.NoScrollWithMouse;
 
     public readonly FileDialogManager FileDialogManager;
-
     private const string _notesEnd = "##MARE_SYNCHRONOS_USER_NOTES_END##";
-
     private const string _notesStart = "##MARE_SYNCHRONOS_USER_NOTES_START##";
-
     private readonly ApiController _apiController;
-
     private readonly CacheMonitor _cacheMonitor;
-
     private readonly MareConfigService _configService;
-
     private readonly DalamudUtilService _dalamudUtil;
     private readonly IpcManager _ipcManager;
     private readonly Dalamud.Localization _localization;
     private readonly IDalamudPluginInterface _pluginInterface;
-    private readonly ITextureProvider _textureProvider;
     private readonly Dictionary<string, object?> _selectedComboItems = new(StringComparer.Ordinal);
     private readonly ServerConfigurationManager _serverConfigurationManager;
+    private readonly ITextureProvider _textureProvider;
     private readonly TokenProvider _tokenProvider;
+    private bool _brioExists = false;
     private bool _cacheDirectoryHasOtherFilesThanCache = false;
-
     private bool _cacheDirectoryIsValidPath = true;
-
     private bool _customizePlusExists = false;
-
     private string _customServerName = "";
-
     private string _customServerUri = "";
-
+    private Task<Uri?>? _discordOAuthCheck;
+    private Task<string?>? _discordOAuthGetCode;
+    private CancellationTokenSource _discordOAuthGetCts = new();
+    private Task<Dictionary<string, string>>? _discordOAuthUIDs;
     private bool _glamourerExists = false;
-
     private bool _heelsExists = false;
-
     private bool _honorificExists = false;
     private bool _isDirectoryWritable = false;
     private bool _isOneDrive = false;
     private bool _isPenumbraDirectory = false;
     private bool _moodlesExists = false;
+    private Dictionary<string, DateTime> _oauthTokenExpiry = new();
     private bool _penumbraExists = false;
     private bool _petNamesExists = false;
-    private bool _brioExists = false;
-
     private int _serverSelectionIndex = -1;
-    private Dictionary<string, DateTime> _oauthTokenExpiry = new();
-
     public UiSharedService(ILogger<UiSharedService> logger, IpcManager ipcManager, ApiController apiController,
         CacheMonitor cacheMonitor, FileDialogManager fileDialogManager,
         MareConfigService configService, DalamudUtilService dalamudUtil, IDalamudPluginInterface pluginInterface,
@@ -131,6 +118,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         IconFont = _pluginInterface.UiBuilder.IconFontFixedWidthHandle;
     }
 
+    public static string DoubleNewLine => Environment.NewLine + Environment.NewLine;
     public ApiController ApiController => _apiController;
 
     public bool EditTrackerPosition { get; set; }
@@ -141,12 +129,11 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     public IFontHandle IconFont { get; init; }
     public bool IsInGpose => _dalamudUtil.IsInGpose;
 
+    public Dictionary<uint, string> JobData => _dalamudUtil.JobData.Value;
     public string PlayerName => _dalamudUtil.GetPlayerName();
 
     public IFontHandle UidFont { get; init; }
     public Dictionary<ushort, string> WorldData => _dalamudUtil.WorldData.Value;
-    public Dictionary<uint, string> JobData => _dalamudUtil.JobData.Value;
-
     public uint WorldId => _dalamudUtil.GetHomeWorldId();
 
     public static void AttachToolTip(string text)
@@ -221,6 +208,38 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
     public static bool CtrlPressed() => (GetKeyState(0xA2) & 0x8000) != 0 || (GetKeyState(0xA3) & 0x8000) != 0;
 
+    public static void DrawGrouped(Action imguiDrawAction, float rounding = 5f, float? expectedWidth = null)
+    {
+        var cursorPos = ImGui.GetCursorPos();
+        using (ImRaii.Group())
+        {
+            if (expectedWidth != null)
+            {
+                ImGui.Dummy(new(expectedWidth.Value, 0));
+                ImGui.SetCursorPos(cursorPos);
+            }
+
+            imguiDrawAction.Invoke();
+        }
+
+        ImGui.GetWindowDrawList().AddRect(
+            ImGui.GetItemRectMin() - ImGui.GetStyle().ItemInnerSpacing,
+            ImGui.GetItemRectMax() + ImGui.GetStyle().ItemInnerSpacing,
+            Color(ImGuiColors.DalamudGrey2), rounding);
+    }
+
+    public static void DrawGroupedCenteredColorText(string text, Vector4 color, float? maxWidth = null)
+    {
+        var availWidth = ImGui.GetContentRegionAvail().X;
+        var textWidth = ImGui.CalcTextSize(text, availWidth).X;
+        if (maxWidth != null && textWidth > maxWidth * ImGuiHelpers.GlobalScale) textWidth = maxWidth.Value * ImGuiHelpers.GlobalScale;
+        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + (availWidth / 2f) - (textWidth / 2f));
+        DrawGrouped(() =>
+        {
+            ColorTextWrapped(text, color, ImGui.GetCursorPosX() + textWidth);
+        }, expectedWidth: maxWidth == null ? null : maxWidth * ImGuiHelpers.GlobalScale);
+    }
+
     public static void DrawOutlinedFont(string text, Vector4 fontColor, Vector4 outlineColor, int thickness)
     {
         var original = ImGui.GetCursorPos();
@@ -277,18 +296,16 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         drawList.AddText(textPos, fontColor, text);
     }
 
-    public static Vector4 GetBoolColor(bool input) => input ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
-
-    public float GetIconTextButtonSize(FontAwesomeIcon icon, string text)
+    public static void DrawTree(string leafName, Action drawOnOpened, ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags.None)
     {
-        Vector2 vector;
-        using (IconFont.Push())
-            vector = ImGui.CalcTextSize(icon.ToIconString());
-
-        Vector2 vector2 = ImGui.CalcTextSize(text);
-        float num = 3f * ImGuiHelpers.GlobalScale;
-        return vector.X + vector2.X + ImGui.GetStyle().FramePadding.X * 2f + num;
+        using var tree = ImRaii.TreeNode(leafName, flags);
+        if (tree)
+        {
+            drawOnOpened();
+        }
     }
+
+    public static Vector4 GetBoolColor(bool input) => input ? ImGuiColors.ParsedGreen : ImGuiColors.DalamudRed;
 
     public static string GetNotes(List<Pair> pairs)
     {
@@ -311,69 +328,6 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         return ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
     }
 
-    public bool IconButton(FontAwesomeIcon icon, float? height = null)
-    {
-        string text = icon.ToIconString();
-
-        ImGui.PushID(text);
-        Vector2 vector;
-        using (IconFont.Push())
-            vector = ImGui.CalcTextSize(text);
-        ImDrawListPtr windowDrawList = ImGui.GetWindowDrawList();
-        Vector2 cursorScreenPos = ImGui.GetCursorScreenPos();
-        float x = vector.X + ImGui.GetStyle().FramePadding.X * 2f;
-        float frameHeight = height ?? ImGui.GetFrameHeight();
-        bool result = ImGui.Button(string.Empty, new Vector2(x, frameHeight));
-        Vector2 pos = new Vector2(cursorScreenPos.X + ImGui.GetStyle().FramePadding.X,
-            cursorScreenPos.Y + (height ?? ImGui.GetFrameHeight()) / 2f - (vector.Y / 2f));
-        using (IconFont.Push())
-            windowDrawList.AddText(pos, ImGui.GetColorU32(ImGuiCol.Text), text);
-        ImGui.PopID();
-
-        return result;
-    }
-
-    private bool IconTextButtonInternal(FontAwesomeIcon icon, string text, Vector4? defaultColor = null, float? width = null)
-    {
-        int num = 0;
-        if (defaultColor.HasValue)
-        {
-            ImGui.PushStyleColor(ImGuiCol.Button, defaultColor.Value);
-            num++;
-        }
-
-        ImGui.PushID(text);
-        Vector2 vector;
-        using (IconFont.Push())
-            vector = ImGui.CalcTextSize(icon.ToIconString());
-        Vector2 vector2 = ImGui.CalcTextSize(text);
-        ImDrawListPtr windowDrawList = ImGui.GetWindowDrawList();
-        Vector2 cursorScreenPos = ImGui.GetCursorScreenPos();
-        float num2 = 3f * ImGuiHelpers.GlobalScale;
-        float x = width ?? vector.X + vector2.X + ImGui.GetStyle().FramePadding.X * 2f + num2;
-        float frameHeight = ImGui.GetFrameHeight();
-        bool result = ImGui.Button(string.Empty, new Vector2(x, frameHeight));
-        Vector2 pos = new Vector2(cursorScreenPos.X + ImGui.GetStyle().FramePadding.X, cursorScreenPos.Y + ImGui.GetStyle().FramePadding.Y);
-        using (IconFont.Push())
-            windowDrawList.AddText(pos, ImGui.GetColorU32(ImGuiCol.Text), icon.ToIconString());
-        Vector2 pos2 = new Vector2(pos.X + vector.X + num2, cursorScreenPos.Y + ImGui.GetStyle().FramePadding.Y);
-        windowDrawList.AddText(pos2, ImGui.GetColorU32(ImGuiCol.Text), text);
-        ImGui.PopID();
-        if (num > 0)
-        {
-            ImGui.PopStyleColor(num);
-        }
-
-        return result;
-    }
-
-    public bool IconTextButton(FontAwesomeIcon icon, string text, float? width = null, bool isInPopup = false)
-    {
-        return IconTextButtonInternal(icon, text,
-            isInPopup ? ColorHelpers.RgbaUintToVector4(ImGui.GetColorU32(ImGuiCol.PopupBg)) : null,
-            width <= 0 ? null : width);
-    }
-
     public static bool IsDirectoryWritable(string dirPath, bool throwIfFails = false)
     {
         try
@@ -394,6 +348,16 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
             return false;
         }
+    }
+
+    public static void ScaledNextItemWidth(float width)
+    {
+        ImGui.SetNextItemWidth(width * ImGuiHelpers.GlobalScale);
+    }
+
+    public static void ScaledSameLine(float offset)
+    {
+        ImGui.SameLine(offset * ImGuiHelpers.GlobalScale);
     }
 
     public static void SetScaledWindowSize(float width, bool centerWindow = true)
@@ -641,284 +605,6 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         AttachToolTip(helpText);
     }
 
-    public bool DrawOtherPluginState()
-    {
-        var check = FontAwesomeIcon.Check;
-        var cross = FontAwesomeIcon.SquareXmark;
-        ImGui.TextUnformatted("Mandatory Plugins:");
-
-        ImGui.SameLine(150);
-        ColorText("Penumbra", GetBoolColor(_penumbraExists));
-        AttachToolTip($"Penumbra is " + (_penumbraExists ? "available and up to date." : "unavailable or not up to date."));
-
-        ImGui.SameLine();
-        ColorText("Glamourer", GetBoolColor(_glamourerExists));
-        AttachToolTip($"Glamourer is " + (_glamourerExists ? "available and up to date." : "unavailable or not up to date."));
-
-        ImGui.TextUnformatted("Optional Plugins:");
-        ImGui.SameLine(150);
-        ColorText("SimpleHeels", GetBoolColor(_heelsExists));
-        AttachToolTip($"SimpleHeels is " + (_heelsExists ? "available and up to date." : "unavailable or not up to date."));
-
-        ImGui.SameLine();
-        ColorText("Customize+", GetBoolColor(_customizePlusExists));
-        AttachToolTip($"Customize+ is " + (_customizePlusExists ? "available and up to date." : "unavailable or not up to date."));
-
-        ImGui.SameLine();
-        ColorText("Honorific", GetBoolColor(_honorificExists));
-        AttachToolTip($"Honorific is " + (_honorificExists ? "available and up to date." : "unavailable or not up to date."));
-
-        ImGui.SameLine();
-        ColorText("Moodles", GetBoolColor(_moodlesExists));
-        AttachToolTip($"Moodles is " + (_moodlesExists ? "available and up to date." : "unavailable or not up to date."));
-
-        ImGui.SameLine();
-        ColorText("PetNicknames", GetBoolColor(_petNamesExists));
-        AttachToolTip($"PetNicknames is " + (_petNamesExists ? "available and up to date." : "unavailable or not up to date."));
-
-        ImGui.SameLine();
-        ColorText("Brio", GetBoolColor(_brioExists));
-        AttachToolTip($"Brio is " + (_brioExists ? "available and up to date." : "unavailable or not up to date."));
-
-        if (!_penumbraExists || !_glamourerExists)
-        {
-            ImGui.TextColored(ImGuiColors.DalamudRed, "You need to install both Penumbra and Glamourer and keep them up to date to use Mare Synchronos.");
-            return false;
-        }
-
-        return true;
-    }
-
-    public int DrawServiceSelection(bool selectOnChange = false, bool showConnect = true)
-    {
-        string[] comboEntries = _serverConfigurationManager.GetServerNames();
-
-        if (_serverSelectionIndex == -1)
-        {
-            _serverSelectionIndex = Array.IndexOf(_serverConfigurationManager.GetServerApiUrls(), _serverConfigurationManager.CurrentApiUrl);
-        }
-        if (_serverSelectionIndex == -1 || _serverSelectionIndex >= comboEntries.Length)
-        {
-            _serverSelectionIndex = 0;
-        }
-        for (int i = 0; i < comboEntries.Length; i++)
-        {
-            if (string.Equals(_serverConfigurationManager.CurrentServer?.ServerName, comboEntries[i], StringComparison.OrdinalIgnoreCase))
-                comboEntries[i] += " [Current]";
-        }
-        if (ImGui.BeginCombo("Select Service", comboEntries[_serverSelectionIndex]))
-        {
-            for (int i = 0; i < comboEntries.Length; i++)
-            {
-                bool isSelected = _serverSelectionIndex == i;
-                if (ImGui.Selectable(comboEntries[i], isSelected))
-                {
-                    _serverSelectionIndex = i;
-                    if (selectOnChange)
-                    {
-                        _serverConfigurationManager.SelectServer(i);
-                    }
-                }
-
-                if (isSelected)
-                {
-                    ImGui.SetItemDefaultFocus();
-                }
-            }
-
-            ImGui.EndCombo();
-        }
-
-        if (showConnect)
-        {
-            ImGui.SameLine();
-            var text = "Connect";
-            if (_serverSelectionIndex == _serverConfigurationManager.CurrentServerIndex) text = "Reconnect";
-            if (IconTextButton(FontAwesomeIcon.Link, text))
-            {
-                _serverConfigurationManager.SelectServer(_serverSelectionIndex);
-                _ = _apiController.CreateConnectionsAsync();
-            }
-        }
-
-        if (ImGui.TreeNode("Add Custom Service"))
-        {
-            ImGui.SetNextItemWidth(250);
-            ImGui.InputText("Custom Service URI", ref _customServerUri, 255);
-            ImGui.SetNextItemWidth(250);
-            ImGui.InputText("Custom Service Name", ref _customServerName, 255);
-            if (IconTextButton(FontAwesomeIcon.Plus, "Add Custom Service")
-                && !string.IsNullOrEmpty(_customServerUri)
-                && !string.IsNullOrEmpty(_customServerName))
-            {
-                _serverConfigurationManager.AddServer(new ServerStorage()
-                {
-                    ServerName = _customServerName,
-                    ServerUri = _customServerUri,
-                    UseOAuth2 = true
-                });
-                _customServerName = string.Empty;
-                _customServerUri = string.Empty;
-                _configService.Save();
-            }
-            ImGui.TreePop();
-        }
-
-        return _serverSelectionIndex;
-    }
-
-    public Vector2 GetIconButtonSize(FontAwesomeIcon icon)
-    {
-        using var font = IconFont.Push();
-        return ImGuiHelpers.GetButtonSize(icon.ToIconString());
-    }
-
-    public Vector2 GetIconSize(FontAwesomeIcon icon)
-    {
-        using var font = IconFont.Push();
-        return ImGui.CalcTextSize(icon.ToIconString());
-    }
-
-    public void IconText(FontAwesomeIcon icon, uint color)
-    {
-        FontText(icon.ToIconString(), IconFont, color);
-    }
-
-    public void IconText(FontAwesomeIcon icon, Vector4? color = null)
-    {
-        IconText(icon, color == null ? ImGui.GetColorU32(ImGuiCol.Text) : ImGui.GetColorU32(color.Value));
-    }
-
-    public IDalamudTextureWrap LoadImage(byte[] imageData)
-    {
-        return _textureProvider.CreateFromImageAsync(imageData).Result;
-    }
-
-    public void LoadLocalization(string languageCode)
-    {
-        _localization.SetupWithLangCode(languageCode);
-        Strings.ToS = new Strings.ToSStrings();
-    }
-
-    [LibraryImport("user32")]
-    internal static partial short GetKeyState(int nVirtKey);
-
-    private static void CenterWindow(float width, float height, ImGuiCond cond = ImGuiCond.None)
-    {
-        var center = ImGui.GetMainViewport().GetCenter();
-        ImGui.SetWindowPos(new Vector2(center.X - width / 2, center.Y - height / 2), cond);
-    }
-
-    [GeneratedRegex(@"^(?:[a-zA-Z]:\\[\w\s\-\\]+?|\/(?:[\w\s\-\/])+?)$", RegexOptions.ECMAScript, 5000)]
-    private static partial Regex PathRegex();
-
-    private void FontText(string text, IFontHandle font, Vector4? color = null)
-    {
-        FontText(text, font, color == null ? ImGui.GetColorU32(ImGuiCol.Text) : ImGui.GetColorU32(color.Value));
-    }
-
-    private void FontText(string text, IFontHandle font, uint color)
-    {
-        using var pushedFont = font.Push();
-        using var pushedColor = ImRaii.PushColor(ImGuiCol.Text, color);
-        ImGui.TextUnformatted(text);
-    }
-
-    public sealed record IconScaleData(Vector2 IconSize, Vector2 NormalizedIconScale, float OffsetX, float IconScaling);
-
-    protected override void Dispose(bool disposing)
-    {
-        if (!disposing) return;
-
-        base.Dispose(disposing);
-
-        UidFont.Dispose();
-        GameFont.Dispose();
-    }
-
-    private Task<Uri?>? _discordOAuthCheck;
-    private CancellationTokenSource _discordOAuthGetCts = new();
-    private Task<string?>? _discordOAuthGetCode;
-    private Task<Dictionary<string, string>>? _discordOAuthUIDs;
-
-    public void DrawUpdateOAuthUIDsButton(ServerStorage selectedServer)
-    {
-        if (!selectedServer.UseOAuth2)
-            return;
-
-        using (ImRaii.Disabled(string.IsNullOrEmpty(selectedServer.OAuthToken)))
-        {
-            if ((_discordOAuthUIDs == null || _discordOAuthUIDs.IsCompleted)
-                && IconTextButton(FontAwesomeIcon.ArrowsSpin, "Update UIDs from Service")
-                && !string.IsNullOrEmpty(selectedServer.OAuthToken))
-            {
-                _discordOAuthUIDs = _serverConfigurationManager.GetUIDsWithDiscordToken(selectedServer.ServerUri, selectedServer.OAuthToken);
-            }
-        }
-        DateTime tokenExpiry = DateTime.MinValue;
-        if (!string.IsNullOrEmpty(selectedServer.OAuthToken) && !_oauthTokenExpiry.TryGetValue(selectedServer.OAuthToken, out tokenExpiry))
-        {
-            try
-            {
-                var handler = new JwtSecurityTokenHandler();
-                var jwt = handler.ReadJwtToken(selectedServer.OAuthToken);
-                tokenExpiry = _oauthTokenExpiry[selectedServer.OAuthToken] = jwt.ValidTo;
-            }
-            catch (Exception ex)
-            {
-                Logger.LogWarning(ex, "Could not parse OAuth token, deleting");
-                selectedServer.OAuthToken = null;
-                _serverConfigurationManager.Save();
-                tokenExpiry = DateTime.MinValue;
-            }
-        }
-        if (string.IsNullOrEmpty(selectedServer.OAuthToken) || tokenExpiry < DateTime.UtcNow)
-        {
-            ColorTextWrapped("You have no OAuth token or the OAuth token is expired. Please use the Service Settings to (re)link your OAuth account.", ImGuiColors.DalamudRed);
-        }
-    }
-
-    private record UIDAliasPair(string? UID, string? Alias);
-
-    public void DrawUIDComboForAuthentication(int indexOffset, Authentication item, string serverUri, ILogger? logger = null)
-    {
-        using (ImRaii.Disabled(_discordOAuthUIDs == null))
-        {
-            var aliasPairs = _discordOAuthUIDs?.Result?.Select(t => new UIDAliasPair(t.Key, t.Value)).ToList() ?? [new UIDAliasPair(item.UID ?? null, null)];
-            var uidComboName = "UID###" + item.CharacterName + item.WorldId + serverUri + indexOffset + aliasPairs.Count;
-            DrawCombo(uidComboName, aliasPairs,
-                (v) =>
-                {
-                    if (v is null)
-                        return "No UID set";
-
-                    if (!string.IsNullOrEmpty(v.Alias))
-                    {
-                        return $"{v.UID} ({v.Alias})";
-                    }
-
-                    if (string.IsNullOrEmpty(v.UID))
-                        return "No UID set";
-
-                    return $"{v.UID}";
-                },
-                (v) =>
-                {
-                    if (!string.Equals(v?.UID ?? null, item.UID, StringComparison.Ordinal))
-                    {
-                        item.UID = v?.UID ?? null;
-                        _serverConfigurationManager.Save();
-                    }
-                },
-                aliasPairs.Find(f => string.Equals(f.UID, item.UID, StringComparison.Ordinal)) ?? default);
-        }
-
-        if (_discordOAuthUIDs == null)
-        {
-            AttachToolTip("Use the button above to update your UIDs from the service before you can assign UIDs to characters.");
-        }
-    }
-
     public void DrawOAuth(ServerStorage selectedServer)
     {
         var oauthToken = selectedServer.OAuthToken;
@@ -1069,6 +755,169 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         }
     }
 
+    public bool DrawOtherPluginState()
+    {
+        ImGui.TextUnformatted("Mandatory Plugins:");
+
+        ImGui.SameLine(150);
+        ColorText("Penumbra", GetBoolColor(_penumbraExists));
+        AttachToolTip($"Penumbra is " + (_penumbraExists ? "available and up to date." : "unavailable or not up to date."));
+
+        ImGui.SameLine();
+        ColorText("Glamourer", GetBoolColor(_glamourerExists));
+        AttachToolTip($"Glamourer is " + (_glamourerExists ? "available and up to date." : "unavailable or not up to date."));
+
+        ImGui.TextUnformatted("Optional Plugins:");
+        ImGui.SameLine(150);
+        ColorText("SimpleHeels", GetBoolColor(_heelsExists));
+        AttachToolTip($"SimpleHeels is " + (_heelsExists ? "available and up to date." : "unavailable or not up to date."));
+
+        ImGui.SameLine();
+        ColorText("Customize+", GetBoolColor(_customizePlusExists));
+        AttachToolTip($"Customize+ is " + (_customizePlusExists ? "available and up to date." : "unavailable or not up to date."));
+
+        ImGui.SameLine();
+        ColorText("Honorific", GetBoolColor(_honorificExists));
+        AttachToolTip($"Honorific is " + (_honorificExists ? "available and up to date." : "unavailable or not up to date."));
+
+        ImGui.SameLine();
+        ColorText("Moodles", GetBoolColor(_moodlesExists));
+        AttachToolTip($"Moodles is " + (_moodlesExists ? "available and up to date." : "unavailable or not up to date."));
+
+        ImGui.SameLine();
+        ColorText("PetNicknames", GetBoolColor(_petNamesExists));
+        AttachToolTip($"PetNicknames is " + (_petNamesExists ? "available and up to date." : "unavailable or not up to date."));
+
+        ImGui.SameLine();
+        ColorText("Brio", GetBoolColor(_brioExists));
+        AttachToolTip($"Brio is " + (_brioExists ? "available and up to date." : "unavailable or not up to date."));
+
+        if (!_penumbraExists || !_glamourerExists)
+        {
+            ImGui.TextColored(ImGuiColors.DalamudRed, "You need to install both Penumbra and Glamourer and keep them up to date to use Mare Synchronos.");
+            return false;
+        }
+
+        return true;
+    }
+
+    public int DrawServiceSelection(bool selectOnChange = false, bool showConnect = true)
+    {
+        string[] comboEntries = _serverConfigurationManager.GetServerNames();
+
+        if (_serverSelectionIndex == -1)
+        {
+            _serverSelectionIndex = Array.IndexOf(_serverConfigurationManager.GetServerApiUrls(), _serverConfigurationManager.CurrentApiUrl);
+        }
+        if (_serverSelectionIndex == -1 || _serverSelectionIndex >= comboEntries.Length)
+        {
+            _serverSelectionIndex = 0;
+        }
+        for (int i = 0; i < comboEntries.Length; i++)
+        {
+            if (string.Equals(_serverConfigurationManager.CurrentServer?.ServerName, comboEntries[i], StringComparison.OrdinalIgnoreCase))
+                comboEntries[i] += " [Current]";
+        }
+        if (ImGui.BeginCombo("Select Service", comboEntries[_serverSelectionIndex]))
+        {
+            for (int i = 0; i < comboEntries.Length; i++)
+            {
+                bool isSelected = _serverSelectionIndex == i;
+                if (ImGui.Selectable(comboEntries[i], isSelected))
+                {
+                    _serverSelectionIndex = i;
+                    if (selectOnChange)
+                    {
+                        _serverConfigurationManager.SelectServer(i);
+                    }
+                }
+
+                if (isSelected)
+                {
+                    ImGui.SetItemDefaultFocus();
+                }
+            }
+
+            ImGui.EndCombo();
+        }
+
+        if (showConnect)
+        {
+            ImGui.SameLine();
+            var text = "Connect";
+            if (_serverSelectionIndex == _serverConfigurationManager.CurrentServerIndex) text = "Reconnect";
+            if (IconTextButton(FontAwesomeIcon.Link, text))
+            {
+                _serverConfigurationManager.SelectServer(_serverSelectionIndex);
+                _ = _apiController.CreateConnectionsAsync();
+            }
+        }
+
+        if (ImGui.TreeNode("Add Custom Service"))
+        {
+            ImGui.SetNextItemWidth(250);
+            ImGui.InputText("Custom Service URI", ref _customServerUri, 255);
+            ImGui.SetNextItemWidth(250);
+            ImGui.InputText("Custom Service Name", ref _customServerName, 255);
+            if (IconTextButton(FontAwesomeIcon.Plus, "Add Custom Service")
+                && !string.IsNullOrEmpty(_customServerUri)
+                && !string.IsNullOrEmpty(_customServerName))
+            {
+                _serverConfigurationManager.AddServer(new ServerStorage()
+                {
+                    ServerName = _customServerName,
+                    ServerUri = _customServerUri,
+                    UseOAuth2 = true
+                });
+                _customServerName = string.Empty;
+                _customServerUri = string.Empty;
+                _configService.Save();
+            }
+            ImGui.TreePop();
+        }
+
+        return _serverSelectionIndex;
+    }
+
+    public void DrawUIDComboForAuthentication(int indexOffset, Authentication item, string serverUri, ILogger? logger = null)
+    {
+        using (ImRaii.Disabled(_discordOAuthUIDs == null))
+        {
+            var aliasPairs = _discordOAuthUIDs?.Result?.Select(t => new UIDAliasPair(t.Key, t.Value)).ToList() ?? [new UIDAliasPair(item.UID ?? null, null)];
+            var uidComboName = "UID###" + item.CharacterName + item.WorldId + serverUri + indexOffset + aliasPairs.Count;
+            DrawCombo(uidComboName, aliasPairs,
+                (v) =>
+                {
+                    if (v is null)
+                        return "No UID set";
+
+                    if (!string.IsNullOrEmpty(v.Alias))
+                    {
+                        return $"{v.UID} ({v.Alias})";
+                    }
+
+                    if (string.IsNullOrEmpty(v.UID))
+                        return "No UID set";
+
+                    return $"{v.UID}";
+                },
+                (v) =>
+                {
+                    if (!string.Equals(v?.UID ?? null, item.UID, StringComparison.Ordinal))
+                    {
+                        item.UID = v?.UID ?? null;
+                        _serverConfigurationManager.Save();
+                    }
+                },
+                aliasPairs.Find(f => string.Equals(f.UID, item.UID, StringComparison.Ordinal)) ?? default);
+        }
+
+        if (_discordOAuthUIDs == null)
+        {
+            AttachToolTip("Use the button above to update your UIDs from the service before you can assign UIDs to characters.");
+        }
+    }
+
     public void DrawUnlinkOAuthButton(ServerStorage selectedServer)
     {
         using (ImRaii.Disabled(!CtrlPressed()))
@@ -1083,54 +932,114 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         DrawHelpText("Hold CTRL to unlink the current OAuth2 connection.");
     }
 
-    internal void RestOAuthTasksState()
+    public void DrawUpdateOAuthUIDsButton(ServerStorage selectedServer)
     {
-        _discordOAuthCheck = null;
-        _discordOAuthGetCts = _discordOAuthGetCts.CancelRecreate();
-        _discordOAuthGetCode = null;
-        _discordOAuthUIDs = null;
-    }
+        if (!selectedServer.UseOAuth2)
+            return;
 
-    public static void DrawGrouped(Action imguiDrawAction, float rounding = 5f, float? expectedWidth = null)
-    {
-        var cursorPos = ImGui.GetCursorPos();
-        using (ImRaii.Group())
+        using (ImRaii.Disabled(string.IsNullOrEmpty(selectedServer.OAuthToken)))
         {
-            if (expectedWidth != null)
+            if ((_discordOAuthUIDs == null || _discordOAuthUIDs.IsCompleted)
+                && IconTextButton(FontAwesomeIcon.ArrowsSpin, "Update UIDs from Service")
+                && !string.IsNullOrEmpty(selectedServer.OAuthToken))
             {
-                ImGui.Dummy(new(expectedWidth.Value, 0));
-                ImGui.SetCursorPos(cursorPos);
+                _discordOAuthUIDs = _serverConfigurationManager.GetUIDsWithDiscordToken(selectedServer.ServerUri, selectedServer.OAuthToken);
             }
-
-            imguiDrawAction.Invoke();
         }
-
-        ImGui.GetWindowDrawList().AddRect(
-            ImGui.GetItemRectMin() - ImGui.GetStyle().ItemInnerSpacing,
-            ImGui.GetItemRectMax() + ImGui.GetStyle().ItemInnerSpacing,
-            Color(ImGuiColors.DalamudGrey2), rounding);
-    }
-
-    public static void DrawGroupedCenteredColorText(string text, Vector4 color, float? maxWidth = null)
-    {
-        var availWidth = ImGui.GetContentRegionAvail().X;
-        var textWidth = ImGui.CalcTextSize(text, availWidth).X;
-        if (maxWidth != null && textWidth > maxWidth * ImGuiHelpers.GlobalScale) textWidth = maxWidth.Value * ImGuiHelpers.GlobalScale;
-        ImGui.SetCursorPosX(ImGui.GetCursorPosX() + (availWidth / 2f) - (textWidth / 2f));
-        DrawGrouped(() =>
+        DateTime tokenExpiry = DateTime.MinValue;
+        if (!string.IsNullOrEmpty(selectedServer.OAuthToken) && !_oauthTokenExpiry.TryGetValue(selectedServer.OAuthToken, out tokenExpiry))
         {
-            ColorTextWrapped(text, color, ImGui.GetCursorPosX() + textWidth);
-        }, expectedWidth: maxWidth == null ? null : maxWidth * ImGuiHelpers.GlobalScale);
+            try
+            {
+                var handler = new JwtSecurityTokenHandler();
+                var jwt = handler.ReadJwtToken(selectedServer.OAuthToken);
+                tokenExpiry = _oauthTokenExpiry[selectedServer.OAuthToken] = jwt.ValidTo;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Could not parse OAuth token, deleting");
+                selectedServer.OAuthToken = null;
+                _serverConfigurationManager.Save();
+                tokenExpiry = DateTime.MinValue;
+            }
+        }
+        if (string.IsNullOrEmpty(selectedServer.OAuthToken) || tokenExpiry < DateTime.UtcNow)
+        {
+            ColorTextWrapped("You have no OAuth token or the OAuth token is expired. Please use the Service Settings to (re)link your OAuth account.", ImGuiColors.DalamudRed);
+        }
     }
 
-    public static void ScaledSameLine(float offset)
+    public Vector2 GetIconButtonSize(FontAwesomeIcon icon)
     {
-        ImGui.SameLine(offset * ImGuiHelpers.GlobalScale);
+        using var font = IconFont.Push();
+        return ImGuiHelpers.GetButtonSize(icon.ToIconString());
     }
 
-    public static void ScaledNextItemWidth(float width)
+    public Vector2 GetIconSize(FontAwesomeIcon icon)
     {
-        ImGui.SetNextItemWidth(width * ImGuiHelpers.GlobalScale);
+        using var font = IconFont.Push();
+        return ImGui.CalcTextSize(icon.ToIconString());
+    }
+
+    public float GetIconTextButtonSize(FontAwesomeIcon icon, string text)
+    {
+        Vector2 vector;
+        using (IconFont.Push())
+            vector = ImGui.CalcTextSize(icon.ToIconString());
+
+        Vector2 vector2 = ImGui.CalcTextSize(text);
+        float num = 3f * ImGuiHelpers.GlobalScale;
+        return vector.X + vector2.X + ImGui.GetStyle().FramePadding.X * 2f + num;
+    }
+
+    public bool IconButton(FontAwesomeIcon icon, float? height = null)
+    {
+        string text = icon.ToIconString();
+
+        ImGui.PushID(text);
+        Vector2 vector;
+        using (IconFont.Push())
+            vector = ImGui.CalcTextSize(text);
+        ImDrawListPtr windowDrawList = ImGui.GetWindowDrawList();
+        Vector2 cursorScreenPos = ImGui.GetCursorScreenPos();
+        float x = vector.X + ImGui.GetStyle().FramePadding.X * 2f;
+        float frameHeight = height ?? ImGui.GetFrameHeight();
+        bool result = ImGui.Button(string.Empty, new Vector2(x, frameHeight));
+        Vector2 pos = new Vector2(cursorScreenPos.X + ImGui.GetStyle().FramePadding.X,
+            cursorScreenPos.Y + (height ?? ImGui.GetFrameHeight()) / 2f - (vector.Y / 2f));
+        using (IconFont.Push())
+            windowDrawList.AddText(pos, ImGui.GetColorU32(ImGuiCol.Text), text);
+        ImGui.PopID();
+
+        return result;
+    }
+
+    public void IconText(FontAwesomeIcon icon, uint color)
+    {
+        FontText(icon.ToIconString(), IconFont, color);
+    }
+
+    public void IconText(FontAwesomeIcon icon, Vector4? color = null)
+    {
+        IconText(icon, color == null ? ImGui.GetColorU32(ImGuiCol.Text) : ImGui.GetColorU32(color.Value));
+    }
+
+    public bool IconTextButton(FontAwesomeIcon icon, string text, float? width = null, bool isInPopup = false)
+    {
+        return IconTextButtonInternal(icon, text,
+            isInPopup ? ColorHelpers.RgbaUintToVector4(ImGui.GetColorU32(ImGuiCol.PopupBg)) : null,
+            width <= 0 ? null : width);
+    }
+
+    public IDalamudTextureWrap LoadImage(byte[] imageData)
+    {
+        return _textureProvider.CreateFromImageAsync(imageData).Result;
+    }
+
+    public void LoadLocalization(string languageCode)
+    {
+        _localization.SetupWithLangCode(languageCode);
+        Strings.ToS = new Strings.ToSStrings();
     }
 
     internal static void DistanceSeparator()
@@ -1140,12 +1049,81 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         ImGuiHelpers.ScaledDummy(5);
     }
 
-    public static void DrawTree(string leafName, Action drawOnOpened, ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags.None)
+    [LibraryImport("user32")]
+    internal static partial short GetKeyState(int nVirtKey);
+
+    internal void RestOAuthTasksState()
     {
-        using var tree = ImRaii.TreeNode(leafName, flags);
-        if (tree)
-        {
-            drawOnOpened();
-        }
+        _discordOAuthCheck = null;
+        _discordOAuthGetCts = _discordOAuthGetCts.CancelRecreate();
+        _discordOAuthGetCode = null;
+        _discordOAuthUIDs = null;
     }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (!disposing) return;
+
+        base.Dispose(disposing);
+
+        UidFont.Dispose();
+        GameFont.Dispose();
+    }
+
+    private static void CenterWindow(float width, float height, ImGuiCond cond = ImGuiCond.None)
+    {
+        var center = ImGui.GetMainViewport().GetCenter();
+        ImGui.SetWindowPos(new Vector2(center.X - width / 2, center.Y - height / 2), cond);
+    }
+
+    [GeneratedRegex(@"^(?:[a-zA-Z]:\\[\w\s\-\\]+?|\/(?:[\w\s\-\/])+?)$", RegexOptions.ECMAScript, 5000)]
+    private static partial Regex PathRegex();
+
+    private static void FontText(string text, IFontHandle font, Vector4? color = null)
+    {
+        FontText(text, font, color == null ? ImGui.GetColorU32(ImGuiCol.Text) : ImGui.GetColorU32(color.Value));
+    }
+
+    private static void FontText(string text, IFontHandle font, uint color)
+    {
+        using var pushedFont = font.Push();
+        using var pushedColor = ImRaii.PushColor(ImGuiCol.Text, color);
+        ImGui.TextUnformatted(text);
+    }
+
+    private bool IconTextButtonInternal(FontAwesomeIcon icon, string text, Vector4? defaultColor = null, float? width = null)
+    {
+        int num = 0;
+        if (defaultColor.HasValue)
+        {
+            ImGui.PushStyleColor(ImGuiCol.Button, defaultColor.Value);
+            num++;
+        }
+
+        ImGui.PushID(text);
+        Vector2 vector;
+        using (IconFont.Push())
+            vector = ImGui.CalcTextSize(icon.ToIconString());
+        Vector2 vector2 = ImGui.CalcTextSize(text);
+        ImDrawListPtr windowDrawList = ImGui.GetWindowDrawList();
+        Vector2 cursorScreenPos = ImGui.GetCursorScreenPos();
+        float num2 = 3f * ImGuiHelpers.GlobalScale;
+        float x = width ?? vector.X + vector2.X + ImGui.GetStyle().FramePadding.X * 2f + num2;
+        float frameHeight = ImGui.GetFrameHeight();
+        bool result = ImGui.Button(string.Empty, new Vector2(x, frameHeight));
+        Vector2 pos = new Vector2(cursorScreenPos.X + ImGui.GetStyle().FramePadding.X, cursorScreenPos.Y + ImGui.GetStyle().FramePadding.Y);
+        using (IconFont.Push())
+            windowDrawList.AddText(pos, ImGui.GetColorU32(ImGuiCol.Text), icon.ToIconString());
+        Vector2 pos2 = new Vector2(pos.X + vector.X + num2, cursorScreenPos.Y + ImGui.GetStyle().FramePadding.Y);
+        windowDrawList.AddText(pos2, ImGui.GetColorU32(ImGuiCol.Text), text);
+        ImGui.PopID();
+        if (num > 0)
+        {
+            ImGui.PopStyleColor(num);
+        }
+
+        return result;
+    }
+    public sealed record IconScaleData(Vector2 IconSize, Vector2 NormalizedIconScale, float OffsetX, float IconScaling);
+    private record UIDAliasPair(string? UID, string? Alias);
 }

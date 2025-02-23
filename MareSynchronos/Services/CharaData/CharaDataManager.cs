@@ -608,6 +608,18 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
         return _metaInfoCache.TryGetValue(key, out metaInfo);
     }
 
+    public void UploadAllCharaData()
+    {
+        UiBlockingComputation = Task.Run(async () =>
+        {
+            foreach (var updateDto in _updateDtos.Values.Where(u => u.HasChanges))
+            {
+                CharaUpdateTask = CharaUpdateAsync(updateDto);
+                await CharaUpdateTask.ConfigureAwait(false);
+            }
+        });
+    }
+
     public void UploadCharaData(string id)
     {
         var hasUpdateDto = _updateDtos.TryGetValue(id, out var updateDto);
@@ -903,7 +915,6 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
 
         var res = await _apiController.CharaDataUpdate(baseUpdateDto).ConfigureAwait(false);
         await AddOrUpdateDto(res).ConfigureAwait(false);
-        CharaUpdateTask = null;
     }
 
     private async Task DownloadAndAplyDataAsync(string charaName, CharaDataDownloadDto charaDataDownloadDto, CharaDataMetaInfoDto metaInfo, bool autoRevert = true)

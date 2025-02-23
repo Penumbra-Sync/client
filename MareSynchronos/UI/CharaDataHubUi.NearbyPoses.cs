@@ -58,7 +58,7 @@ internal partial class CharaDataHubUi
             }
             _uiSharedService.DrawHelpText("When enabled, Mare will draw floating wisps where other's poses are in the world.");
             int poseDetectionDistance = _configService.Current.NearbyDistanceFilter;
-            ImGui.SetNextItemWidth(100);
+            UiSharedService.ScaledNextItemWidth(100);
             if (ImGui.SliderInt("Detection Distance", ref poseDetectionDistance, 5, 1000))
             {
                 _configService.Current.NearbyDistanceFilter = poseDetectionDistance;
