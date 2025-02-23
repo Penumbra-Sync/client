@@ -92,6 +92,7 @@ public sealed class MareMediator : IHostedService
     {
         _messageQueue.Clear();
         _loopCts.Cancel();
+        _loopCts.Dispose();
         return Task.CompletedTask;
     }
 
@@ -105,8 +106,6 @@ public sealed class MareMediator : IHostedService
             {
                 throw new InvalidOperationException("Already subscribed");
             }
-
-            _logger.LogDebug("Subscriber added for message {message}: {sub}", typeof(T).Name, subscriber.GetType().Name);
         }
     }
 
@@ -143,7 +142,7 @@ public sealed class MareMediator : IHostedService
         List<SubscriberAction> subscribersCopy = [];
         lock (_addRemoveLock)
         {
-            subscribersCopy = subscribers?.Where(s => s.Subscriber != null).ToList() ?? [];
+            subscribersCopy = subscribers?.Where(s => s.Subscriber != null).OrderBy(k => k.Subscriber is IHighPriorityMediatorSubscriber ? 0 : 1).ToList() ?? [];
         }
 
 #pragma warning disable S3011 // Reflection should not be used to increase accessibility of classes, methods, or fields
@@ -151,7 +150,7 @@ public sealed class MareMediator : IHostedService
         if (!_genericExecuteMethods.TryGetValue(msgType, out var methodInfo))
         {
             _genericExecuteMethods[msgType] = methodInfo = GetType()
-                 .GetMethod(nameof(ExecuteReflected), System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?
+                 .GetMethod(nameof(ExecuteReflected), BindingFlags.NonPublic | BindingFlags.Instance)?
                  .MakeGenericMethod(msgType);
         }
 

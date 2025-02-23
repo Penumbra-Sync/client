@@ -9,16 +9,15 @@ using ObjectKind = MareSynchronos.API.Data.Enum.ObjectKind;
 
 namespace MareSynchronos.PlayerData.Handlers;
 
-public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
+public sealed class GameObjectHandler : DisposableMediatorSubscriberBase, IHighPriorityMediatorSubscriber
 {
     private readonly DalamudUtilService _dalamudUtil;
     private readonly Func<IntPtr> _getAddress;
     private readonly bool _isOwnedObject;
     private readonly PerformanceCollectorService _performanceCollector;
+    private byte _classJob = 0;
     private Task? _delayedZoningTask;
     private bool _haltProcessing = false;
-    private int _ptrNullCounter = 0;
-    private byte _classJob = 0;
     private CancellationTokenSource _zoningCts = new();
 
     public GameObjectHandler(ILogger<GameObjectHandler> logger, PerformanceCollectorService performanceCollector,
@@ -91,20 +90,18 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         ModelFilesInSlotLoaded
     }
 
-    public byte RaceId { get; private set; }
-    public byte Gender { get; private set; }
-    public byte TribeId { get; private set; }
-
     public IntPtr Address { get; private set; }
+    public DrawCondition CurrentDrawCondition { get; set; } = DrawCondition.None;
+    public byte Gender { get; private set; }
     public string Name { get; private set; }
     public ObjectKind ObjectKind { get; }
+    public byte RaceId { get; private set; }
+    public byte TribeId { get; private set; }
     private byte[] CustomizeData { get; set; } = new byte[26];
     private IntPtr DrawObjectAddress { get; set; }
     private byte[] EquipSlotData { get; set; } = new byte[40];
     private ushort[] MainHandData { get; set; } = new ushort[3];
     private ushort[] OffHandData { get; set; } = new ushort[3];
-
-    public DrawCondition CurrentDrawCondition { get; set; } = DrawCondition.None;
 
     public async Task ActOnFrameworkAfterEnsureNoDrawAsync(Action<Dalamud.Game.ClientState.Objects.Types.ICharacter> act, CancellationToken token)
     {
@@ -133,12 +130,6 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         {
             throw new InvalidOperationException("Player pointer is zero, pointer invalid");
         }
-    }
-
-    public IntPtr CurrentAddress()
-    {
-        _dalamudUtil.EnsureIsOnFramework();
-        return _getAddress.Invoke();
     }
 
     public Dalamud.Game.ClientState.Objects.Types.IGameObject? GetGameObject()
@@ -179,7 +170,6 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         Address = _getAddress();
         if (Address != IntPtr.Zero)
         {
-            _ptrNullCounter = 0;
             var drawObjAddr = (IntPtr)((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)Address)->DrawObject;
             DrawObjectAddress = drawObjAddr;
             CurrentDrawCondition = DrawCondition.None;
@@ -363,38 +353,15 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase
         }
     }
 
-    private unsafe IntPtr GetDrawObjUnsafe(nint curPtr)
+    private bool IsBeingDrawn()
     {
-        return (IntPtr)((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)curPtr)->DrawObject;
-    }
-
-    public bool IsBeingDrawn()
-    {
-        var curPtr = _getAddress();
-        Logger.LogTrace("[{this}] IsBeingDrawn, CurPtr: {ptr}", this, curPtr.ToString("X"));
-
-        if (curPtr == IntPtr.Zero && _ptrNullCounter < 2)
-        {
-            Logger.LogTrace("[{this}] IsBeingDrawn, CurPtr is ZERO, counter is {cnt}", this, _ptrNullCounter);
-            _ptrNullCounter++;
-            return true;
-        }
-
-        if (curPtr == IntPtr.Zero)
-        {
-            Logger.LogTrace("[{this}] IsBeingDrawn, CurPtr is ZERO, returning", this);
-
-            Address = IntPtr.Zero;
-            DrawObjectAddress = IntPtr.Zero;
-            throw new ArgumentNullException($"CurPtr for {this} turned ZERO");
-        }
-
         if (_dalamudUtil.IsAnythingDrawing)
         {
             Logger.LogTrace("[{this}] IsBeingDrawn, Global draw block", this);
             return true;
         }
 
+        Logger.LogTrace("[{this}] IsBeingDrawn, Condition: {cond}", this, CurrentDrawCondition);
         return CurrentDrawCondition != DrawCondition.None;
     }
 

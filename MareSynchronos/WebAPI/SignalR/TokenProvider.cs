@@ -222,7 +222,6 @@ public sealed class TokenProvider : IDisposable, IMediatorSubscriber
             var jwt = handler.ReadJwtToken(token);
             if (jwt.ValidTo == DateTime.MinValue || jwt.ValidTo.Subtract(TimeSpan.FromMinutes(5)) > DateTime.UtcNow)
             {
-                _logger.LogTrace("GetOrUpdate: Returning token from cache");
                 return token;
             }
 

@@ -268,16 +268,22 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
                             NotificationType.Error, TimeSpan.FromSeconds(15)));
                 }
 
-                if (_dalamudUtil.IsLodEnabled)
+                if (_dalamudUtil.IsLodEnabled && !_naggedAboutLod)
                 {
+                    _naggedAboutLod = true;
                     Logger.LogWarning("Model LOD is enabled during connection");
                     if (!_mareConfigService.Current.DebugStopWhining)
                     {
                         Mediator.Publish(new NotificationMessage("Model LOD is enabled",
                             "You have \"Use low-detail models on distant objects (LOD)\" enabled. Having model LOD enabled is known to be a reason to cause " +
-                            "random crashes when loading in or rendering modded pairs. Disable LOD while using Mare: " +
+                            "random crashes when loading in or rendering modded pairs. Disabling LOD has a very low performance impact. Disable LOD while using Mare: " +
                             "Go to XIV Menu -> System Configuration -> Graphics Settings and disable the model LOD option.", NotificationType.Warning, TimeSpan.FromSeconds(15)));
                     }
+                }
+
+                if (_naggedAboutLod && !_dalamudUtil.IsLodEnabled)
+                {
+                    _naggedAboutLod = false;
                 }
 
                 await LoadIninitialPairsAsync().ConfigureAwait(false);
@@ -317,6 +323,8 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
             }
         }
     }
+
+    private bool _naggedAboutLod = false;
 
     public Task CyclePauseAsync(UserData userData)
     {
@@ -533,8 +541,6 @@ public sealed partial class ApiController : DisposableMediatorSubscriberBase, IM
 
     private async Task<bool> RefreshTokenAsync(CancellationToken ct)
     {
-        Logger.LogDebug("Checking token");
-
         bool requireReconnect = false;
         try
         {

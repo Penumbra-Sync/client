@@ -13,13 +13,15 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
     private readonly SemaphoreSlim _cacheCreateLock = new(1);
     private readonly HashSet<ObjectKind> _cachesToCreate = [];
     private readonly PlayerDataFactory _characterDataFactory;
-    private readonly CancellationTokenSource _runtimeCts = new();
+    private readonly HashSet<ObjectKind> _currentlyCreating = [];
+    private readonly HashSet<ObjectKind> _debouncedObjectCache = [];
     private readonly CharacterData _playerData = new();
     private readonly Dictionary<ObjectKind, GameObjectHandler> _playerRelatedObjects = [];
+    private readonly CancellationTokenSource _runtimeCts = new();
+    private CancellationTokenSource _creationCts = new();
     private CancellationTokenSource _debounceCts = new();
-    private readonly HashSet<ObjectKind> _debouncedObjectCache = [];
-    private bool _isZoning = false;
     private bool _haltCharaDataCreation;
+    private bool _isZoning = false;
 
     public CacheCreationService(ILogger<CacheCreationService> logger, MareMediator mediator, GameObjectHandlerFactory gameObjectHandlerFactory,
         PlayerDataFactory characterDataFactory, DalamudUtilService dalamudUtil) : base(logger, mediator)
@@ -103,7 +105,6 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
             {
                 Logger.LogDebug("Received Moodles change, updating player");
                 AddCacheToCreate(ObjectKind.Player);
-
             }
         });
 
@@ -153,7 +154,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         _ = Task.Run(async () =>
         {
             await Task.Delay(TimeSpan.FromSeconds(1), token).ConfigureAwait(false);
-            Logger.LogWarning("Debounce complete, inserting objects to create for: {obj}", string.Join(", ", _debouncedObjectCache));
+            Logger.LogTrace("Debounce complete, inserting objects to create for: {obj}", string.Join(", ", _debouncedObjectCache));
             await _cacheCreateLock.WaitAsync(token).ConfigureAwait(false);
             foreach (var item in _debouncedObjectCache)
             {
@@ -163,9 +164,6 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
             _cacheCreateLock.Release();
         });
     }
-
-    private readonly HashSet<ObjectKind> _currentlyCreating = [];
-    private CancellationTokenSource _creationCts = new();
 
     private void ProcessCacheCreation()
     {
