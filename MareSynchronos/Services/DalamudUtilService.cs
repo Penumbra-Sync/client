@@ -172,18 +172,18 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         return (Dalamud.Game.ClientState.Objects.Types.ICharacter)objTableObj;
     }
 
-    public unsafe IntPtr GetCompanion(IntPtr? playerPointer = null)
+    public unsafe IntPtr GetCompanionPtr(IntPtr? playerPointer = null)
     {
         EnsureIsOnFramework();
         var mgr = CharacterManager.Instance();
-        playerPointer ??= GetPlayerPointer();
+        playerPointer ??= GetPlayerPtr();
         if (playerPointer == IntPtr.Zero || (IntPtr)mgr == IntPtr.Zero) return IntPtr.Zero;
         return (IntPtr)mgr->LookupBuddyByOwnerObject((BattleChara*)playerPointer);
     }
 
     public async Task<IntPtr> GetCompanionAsync(IntPtr? playerPointer = null)
     {
-        return await RunOnFrameworkThread(() => GetCompanion(playerPointer)).ConfigureAwait(false);
+        return await RunOnFrameworkThread(() => GetCompanionPtr(playerPointer)).ConfigureAwait(false);
     }
 
     public async Task<ICharacter?> GetGposeCharacterFromObjectTableByNameAsync(string name, bool onlyGposeCharacters = false)
@@ -214,32 +214,32 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         return await RunOnFrameworkThread(GetIsPlayerPresent).ConfigureAwait(false);
     }
 
-    public unsafe IntPtr GetMinionOrMount(IntPtr? playerPointer = null)
+    public unsafe IntPtr GetMinionOrMountPtr(IntPtr? playerPointer = null)
     {
         EnsureIsOnFramework();
-        playerPointer ??= GetPlayerPointer();
+        playerPointer ??= GetPlayerPtr();
         if (playerPointer == IntPtr.Zero) return IntPtr.Zero;
         return _objectTable.GetObjectAddress(((GameObject*)playerPointer)->ObjectIndex + 1);
     }
 
     public async Task<IntPtr> GetMinionOrMountAsync(IntPtr? playerPointer = null)
     {
-        return await RunOnFrameworkThread(() => GetMinionOrMount(playerPointer)).ConfigureAwait(false);
+        return await RunOnFrameworkThread(() => GetMinionOrMountPtr(playerPointer)).ConfigureAwait(false);
     }
 
-    public unsafe IntPtr GetPet(IntPtr? playerPointer = null)
+    public unsafe IntPtr GetPetPtr(IntPtr? playerPointer = null)
     {
         EnsureIsOnFramework();
         if (_classJobIdsIgnoredForPets.Contains(_classJobId ?? 0)) return IntPtr.Zero;
         var mgr = CharacterManager.Instance();
-        playerPointer ??= GetPlayerPointer();
+        playerPointer ??= GetPlayerPtr();
         if (playerPointer == IntPtr.Zero || (IntPtr)mgr == IntPtr.Zero) return IntPtr.Zero;
         return (IntPtr)mgr->LookupPetByOwnerObject((BattleChara*)playerPointer);
     }
 
     public async Task<IntPtr> GetPetAsync(IntPtr? playerPointer = null)
     {
-        return await RunOnFrameworkThread(() => GetPet(playerPointer)).ConfigureAwait(false);
+        return await RunOnFrameworkThread(() => GetPetPtr(playerPointer)).ConfigureAwait(false);
     }
 
     public async Task<IPlayerCharacter> GetPlayerCharacterAsync()
@@ -284,7 +284,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
 
     public async Task<string> GetPlayerNameHashedAsync()
     {
-        return await RunOnFrameworkThread(() => GetHashedAccIdFromPlayerPointer(GetPlayerPointer())).ConfigureAwait(false);
+        return await RunOnFrameworkThread(() => GetHashedAccIdFromPlayerPointer(GetPlayerPtr())).ConfigureAwait(false);
     }
 
     private unsafe static string GetHashedAccIdFromPlayerPointer(nint ptr)
@@ -293,7 +293,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         return ((BattleChara*)ptr)->Character.AccountId.ToString().GetHash256();
     }
 
-    public IntPtr GetPlayerPointer()
+    public IntPtr GetPlayerPtr()
     {
         EnsureIsOnFramework();
         return _clientState.LocalPlayer?.Address ?? IntPtr.Zero;
@@ -301,7 +301,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
 
     public async Task<IntPtr> GetPlayerPointerAsync()
     {
-        return await RunOnFrameworkThread(GetPlayerPointer).ConfigureAwait(false);
+        return await RunOnFrameworkThread(GetPlayerPtr).ConfigureAwait(false);
     }
 
     public uint GetHomeWorldId()

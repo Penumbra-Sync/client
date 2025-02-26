@@ -230,7 +230,6 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase, IHighP
             if (equipDiff && !_isOwnedObject) // send the message out immediately and cancel out, no reason to continue if not self
             {
                 Logger.LogTrace("[{this}] Changed", this);
-                Mediator.Publish(new CharacterChangedMessage(this));
                 return;
             }
 
