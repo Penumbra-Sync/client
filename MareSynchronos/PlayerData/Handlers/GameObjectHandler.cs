@@ -107,6 +107,7 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase, IHighP
     {
         while (await _dalamudUtil.RunOnFrameworkThread(() =>
                {
+                   if (_haltProcessing) CheckAndUpdateObject();
                    if (CurrentDrawCondition != DrawCondition.None) return true;
                    var gameObj = _dalamudUtil.CreateGameObject(Address);
                    if (gameObj is Dalamud.Game.ClientState.Objects.Types.ICharacter chara)
@@ -355,6 +356,8 @@ public sealed class GameObjectHandler : DisposableMediatorSubscriberBase, IHighP
 
     private bool IsBeingDrawn()
     {
+        if (_haltProcessing) CheckAndUpdateObject();
+
         if (_dalamudUtil.IsAnythingDrawing)
         {
             Logger.LogTrace("[{this}] IsBeingDrawn, Global draw block", this);
