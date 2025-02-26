@@ -36,6 +36,12 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
             _haltCharaDataCreation = !msg.Resume;
         });
 
+        Mediator.Subscribe<CreateCacheForObjectMessage>(this, (msg) =>
+        {
+            Logger.LogDebug("Received CreateCacheForObject for {handler}, updating", msg.ObjectToCreateFor);
+            AddCacheToCreate(msg.ObjectToCreateFor.ObjectKind);
+        });
+
         _playerRelatedObjects[ObjectKind.Player] = gameObjectHandlerFactory.Create(ObjectKind.Player, dalamudUtil.GetPlayerPointer, isWatched: true)
             .GetAwaiter().GetResult();
         _playerRelatedObjects[ObjectKind.MinionOrMount] = gameObjectHandlerFactory.Create(ObjectKind.MinionOrMount, () => dalamudUtil.GetMinionOrMount(), isWatched: true)
@@ -52,12 +58,6 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
                 AddCacheToCreate(ObjectKind.Player);
                 AddCacheToCreate(ObjectKind.Pet);
             }
-        });
-
-        Mediator.Subscribe<CreateCacheForObjectMessage>(this, (msg) =>
-        {
-            Logger.LogDebug("Received CreateCacheForObject for {handler}, updating", msg.ObjectToCreateFor);
-            AddCacheToCreate(msg.ObjectToCreateFor.ObjectKind);
         });
 
         Mediator.Subscribe<ClearCacheForObjectMessage>(this, (msg) =>
