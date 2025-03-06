@@ -4,7 +4,6 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
 using MareSynchronos.WebAPI;
 using MareSynchronos.WebAPI.Files;
-using MessagePack.Formatters;
 using Microsoft.Extensions.Logging;
 
 namespace MareSynchronos.PlayerData.Pairs;
@@ -16,9 +15,13 @@ public class VisibleUserDataDistributor : DisposableMediatorSubscriberBase
     private readonly FileUploadManager _fileTransferManager;
     private readonly PairManager _pairManager;
     private CharacterData? _lastCreatedData;
+    private CharacterData? _uploadingCharacterData = null;
     private readonly List<UserData> _previouslyVisiblePlayers = [];
     private Task<CharacterData>? _fileUploadTask = null;
     private readonly HashSet<UserData> _usersToPushDataTo = [];
+    private readonly SemaphoreSlim _pushDataSemaphore = new(1, 1);
+    private readonly CancellationTokenSource _runtimeCts = new();
+
 
     public VisibleUserDataDistributor(ILogger<VisibleUserDataDistributor> logger, ApiController apiController, DalamudUtilService dalamudUtil,
         PairManager pairManager, MareMediator mediator, FileUploadManager fileTransferManager) : base(logger, mediator)
@@ -45,6 +48,17 @@ public class VisibleUserDataDistributor : DisposableMediatorSubscriberBase
 
         Mediator.Subscribe<ConnectedMessage>(this, (_) => PushToAllVisibleUsers());
         Mediator.Subscribe<DisconnectedMessage>(this, (_) => _previouslyVisiblePlayers.Clear());
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _runtimeCts.Cancel();
+            _runtimeCts.Dispose();
+        }
+
+        base.Dispose(disposing);
     }
 
     private void PushToAllVisibleUsers(bool forced = false)
@@ -80,16 +94,31 @@ public class VisibleUserDataDistributor : DisposableMediatorSubscriberBase
 
         _ = Task.Run(async () =>
         {
+            forced |= _uploadingCharacterData?.DataHash != _lastCreatedData.DataHash;
+
             if (_fileUploadTask == null || (_fileUploadTask?.IsCompleted ?? false) || forced)
             {
-                _fileUploadTask = _fileTransferManager.UploadFiles(_lastCreatedData.DeepClone(), [.. _usersToPushDataTo]);
+                _uploadingCharacterData = _lastCreatedData.DeepClone();
+                Logger.LogDebug("Starting UploadTask for {hash}, Reason: TaskIsNull: {task}, TaskIsCompleted: {taskCpl}, Forced: {frc}",
+                    _lastCreatedData.DataHash, _fileUploadTask == null, _fileUploadTask?.IsCompleted ?? false, false);
+                _fileUploadTask = _fileTransferManager.UploadFiles(_uploadingCharacterData, [.. _usersToPushDataTo]);
             }
 
             if (_fileUploadTask != null)
             {
                 var dataToSend = await _fileUploadTask.ConfigureAwait(false);
-                await _apiController.PushCharacterData(dataToSend, [.. _usersToPushDataTo]).ConfigureAwait(false);
-                _usersToPushDataTo.Clear();
+                await _pushDataSemaphore.WaitAsync(_runtimeCts.Token).ConfigureAwait(false);
+                try
+                {
+                    if (!_usersToPushDataTo.Any()) return;
+                    Logger.LogDebug("Pushing {data} to {users}", dataToSend.DataHash, string.Join(", ", _usersToPushDataTo.Select(k => k.AliasOrUID)));
+                    await _apiController.PushCharacterData(dataToSend, [.. _usersToPushDataTo]).ConfigureAwait(false);
+                    _usersToPushDataTo.Clear();
+                }
+                finally
+                {
+                    _pushDataSemaphore.Release();
+                }
             }
         });
     }
