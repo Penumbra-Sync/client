@@ -92,8 +92,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
         int removedPaths = 0;
         foreach (var replacement in fileReplacement.Where(p => !p.HasFileReplacement).SelectMany(p => p.GamePaths).ToList())
         {
-            removedPaths++;
-            PlayerConfig.RemovePath(replacement);
+            removedPaths += PlayerConfig.RemovePath(replacement, objectKind);
             value.Remove(replacement);
         }
 
@@ -172,7 +171,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             resources.RemoveWhere(f => string.Equals(path, f, StringComparison.Ordinal));
             if (objectKind == ObjectKind.Player)
             {
-                PlayerConfig.RemovePath(path);
+                PlayerConfig.RemovePath(path, objectKind);
                 Logger.LogTrace("Saving transient.json from {method}", nameof(RemoveTransientResource));
                 _configurationService.Save();
             }
@@ -219,7 +218,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             foreach (var file in semiset.Where(p => list.Contains(p, StringComparer.OrdinalIgnoreCase)))
             {
                 Logger.LogTrace("Removing From SemiTransient: {file}", file);
-                PlayerConfig.RemovePath(file);
+                PlayerConfig.RemovePath(file, objectKind);
             }
 
             int removed = semiset.RemoveWhere(p => list.Contains(p, StringComparer.OrdinalIgnoreCase));

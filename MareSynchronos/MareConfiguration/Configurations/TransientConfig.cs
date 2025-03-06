@@ -1,4 +1,6 @@
-﻿namespace MareSynchronos.MareConfiguration.Configurations;
+﻿using MareSynchronos.API.Data.Enum;
+
+namespace MareSynchronos.MareConfiguration.Configurations;
 
 public class TransientConfig : IMareConfiguration
 {
@@ -35,13 +37,25 @@ public class TransientConfig : IMareConfiguration
             return false;
         }
 
-        public void RemovePath(string gamePath)
+        public int RemovePath(string gamePath, ObjectKind objectKind)
         {
-            GlobalPersistentCache.Remove(gamePath);
-            foreach (var kvp in JobSpecificCache)
+            int removedEntries = 0;
+            if (objectKind == ObjectKind.Player)
             {
-                kvp.Value.Remove(gamePath);
+                if (GlobalPersistentCache.Remove(gamePath)) removedEntries++;
+                foreach (var kvp in JobSpecificCache)
+                {
+                    if (kvp.Value.Remove(gamePath)) removedEntries++;
+                }
             }
+            if (objectKind == ObjectKind.Pet)
+            {
+                foreach (var kvp in JobSpecificPetCache)
+                {
+                    if (kvp.Value.Remove(gamePath)) removedEntries++;
+                }
+            }
+            return removedEntries;
         }
 
         public void AddOrElevate(uint jobId, string gamePath)
