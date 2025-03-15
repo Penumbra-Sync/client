@@ -239,11 +239,18 @@ public class PlayerDataFactory
             _logger.LogDebug("Removed {amount} of invalid files", removed);
         }
 
+        ct.ThrowIfCancellationRequested();
+
         if (objectKind == ObjectKind.Player)
         {
             try
             {
                 await VerifyPlayerAnimationBones(boneIndices, (fragment as CharacterDataFragmentPlayer)!, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException e)
+            {
+                _logger.LogDebug(e, "Cancelled during player animation verification");
+                throw;
             }
             catch (Exception e)
             {
