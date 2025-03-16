@@ -216,23 +216,33 @@ public partial class IntroUi : WindowMediatorSubscriberBase
 
             UiSharedService.TextWrapped("For all other non official services you will have to contact the appropriate service provider how to obtain a secret key.");
 
-            ImGui.Separator();
+            UiSharedService.DistanceSeparator();
 
-            UiSharedService.TextWrapped("Once you have received a secret key you can connect to the service using the tools provided below.");
+            UiSharedService.TextWrapped("Once you have registered you can connect to the service using the tools provided below.");
 
-            var serverIdx = _uiShared.DrawServiceSelection(selectOnChange: true, showConnect: false);
-            if (serverIdx != _prevIdx)
-            {
-                _uiShared.RestOAuthTasksState();
-                _prevIdx = serverIdx;
-            }
+            int serverIdx = 0;
             var selectedServer = _serverConfigurationManager.GetServerByIndex(serverIdx);
-            _useLegacyLogin = !selectedServer.UseOAuth2;
 
-            if (ImGui.Checkbox("Use Legacy Login with Secret Key", ref _useLegacyLogin))
+            using (var node = ImRaii.TreeNode("Advanced Options"))
             {
-                _serverConfigurationManager.GetServerByIndex(serverIdx).UseOAuth2 = !_useLegacyLogin;
-                _serverConfigurationManager.Save();
+                if (node)
+                {
+                    serverIdx = _uiShared.DrawServiceSelection(selectOnChange: true, showConnect: false);
+                    if (serverIdx != _prevIdx)
+                    {
+                        _uiShared.ResetOAuthTasksState();
+                        _prevIdx = serverIdx;
+                    }
+
+                    selectedServer = _serverConfigurationManager.GetServerByIndex(serverIdx);
+                    _useLegacyLogin = !selectedServer.UseOAuth2;
+
+                    if (ImGui.Checkbox("Use Legacy Login with Secret Key", ref _useLegacyLogin))
+                    {
+                        _serverConfigurationManager.GetServerByIndex(serverIdx).UseOAuth2 = !_useLegacyLogin;
+                        _serverConfigurationManager.Save();
+                    }
+                }
             }
 
             if (_useLegacyLogin)
@@ -298,7 +308,7 @@ public partial class IntroUi : WindowMediatorSubscriberBase
                 }
                 else
                 {
-                    UiSharedService.ColorTextWrapped($"OAuth2 is enabled, linked to: Discord User {_serverConfigurationManager.GetDiscordUserFromToken(selectedServer)}", ImGuiColors.HealerGreen);
+                    UiSharedService.ColorTextWrapped($"OAuth2 is connected. Linked to: Discord User {_serverConfigurationManager.GetDiscordUserFromToken(selectedServer)}", ImGuiColors.HealerGreen);
                     UiSharedService.TextWrapped("Now press the update UIDs button to get a list of all of your UIDs on the server.");
                     _uiShared.DrawUpdateOAuthUIDsButton(selectedServer);
                     var playerName = _dalamudUtilService.GetPlayerName();
@@ -310,28 +320,26 @@ public partial class IntroUi : WindowMediatorSubscriberBase
                     var auth = selectedServer.Authentications.Find(a => string.Equals(a.CharacterName, playerName, StringComparison.Ordinal) && a.WorldId == playerWorld);
                     if (auth == null)
                     {
-                        selectedServer.Authentications.Add(new Authentication()
+                        auth = new Authentication()
                         {
                             CharacterName = playerName,
                             WorldId = playerWorld
-                        });
+                        };
+                        selectedServer.Authentications.Add(auth);
                         _serverConfigurationManager.Save();
                     }
 
-                    if (auth != null)
-                    {
-                        _uiShared.DrawUIDComboForAuthentication(0, auth, selectedServer.ServerUri);
+                    _uiShared.DrawUIDComboForAuthentication(0, auth, selectedServer.ServerUri);
 
-                        using (ImRaii.Disabled(string.IsNullOrEmpty(auth.UID)))
+                    using (ImRaii.Disabled(string.IsNullOrEmpty(auth.UID)))
+                    {
+                        if (_uiShared.IconTextButton(Dalamud.Interface.FontAwesomeIcon.Link, "Connect to Service"))
                         {
-                            if (_uiShared.IconTextButton(Dalamud.Interface.FontAwesomeIcon.Link, "Connect to Service"))
-                            {
-                                _ = Task.Run(() => _uiShared.ApiController.CreateConnectionsAsync());
-                            }
+                            _ = Task.Run(() => _uiShared.ApiController.CreateConnectionsAsync());
                         }
-                        if (string.IsNullOrEmpty(auth.UID))
-                            UiSharedService.AttachToolTip("Select a UID to be able to connect to the service");
                     }
+                    if (string.IsNullOrEmpty(auth.UID))
+                        UiSharedService.AttachToolTip("Select a UID to be able to connect to the service");
                 }
             }
         }

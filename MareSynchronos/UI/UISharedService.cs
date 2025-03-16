@@ -926,7 +926,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
             {
                 selectedServer.OAuthToken = null;
                 _serverConfigurationManager.Save();
-                RestOAuthTasksState();
+                ResetOAuthTasksState();
             }
         }
         DrawHelpText("Hold CTRL to unlink the current OAuth2 connection.");
@@ -1052,7 +1052,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     [LibraryImport("user32")]
     internal static partial short GetKeyState(int nVirtKey);
 
-    internal void RestOAuthTasksState()
+    internal void ResetOAuthTasksState()
     {
         _discordOAuthCheck = null;
         _discordOAuthGetCts = _discordOAuthGetCts.CancelRecreate();
