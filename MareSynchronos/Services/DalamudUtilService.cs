@@ -1,4 +1,5 @@
-﻿using Dalamud.Game.ClientState.Conditions;
+﻿using Dalamud.Game;
+using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
@@ -45,9 +46,11 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     private readonly Dictionary<string, (string Name, nint Address)> _playerCharas = new(StringComparer.Ordinal);
     private readonly List<string> _notUpdatedCharas = [];
     private bool _sentBetweenAreas = false;
+    private readonly Dictionary<ulong, string> _aidCache = [];
+    private readonly Lazy<uint> _aid;
 
     public DalamudUtilService(ILogger<DalamudUtilService> logger, IClientState clientState, IObjectTable objectTable, IFramework framework,
-        IGameGui gameGui, ICondition condition, IDataManager gameData, ITargetManager targetManager, IGameConfig gameConfig,
+        IGameGui gameGui, ICondition condition, IDataManager gameData, ITargetManager targetManager, IGameConfig gameConfig, ISigScanner sigScanner,
         BlockedCharacterHandler blockedCharacterHandler, MareMediator mediator, PerformanceCollectorService performanceCollector)
     {
         _logger = logger;
@@ -74,7 +77,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         });
         TerritoryData = new(() =>
         {
-            return gameData.GetExcelSheet<Lumina.Excel.Sheets.TerritoryType>(Dalamud.Game.ClientLanguage.English)!
+            return gameData.GetExcelSheet<TerritoryType>(Dalamud.Game.ClientLanguage.English)!
             .Where(w => w.RowId != 0)
             .ToDictionary(w => w.RowId, w =>
             {
@@ -90,7 +93,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         });
         MapData = new(() =>
         {
-            return gameData.GetExcelSheet<Lumina.Excel.Sheets.Map>(Dalamud.Game.ClientLanguage.English)!
+            return gameData.GetExcelSheet<Map>(Dalamud.Game.ClientLanguage.English)!
             .Where(w => w.RowId != 0)
             .ToDictionary(w => w.RowId, w =>
             {
@@ -122,15 +125,25 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
             }).ConfigureAwait(false);
         });
         IsWine = Util.IsWine();
+
+        _aid = new(() =>
+        {
+            unsafe
+            {
+                var address = sigScanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 4C 8B CA");
+                return (uint)(address != nint.Zero ? (*(ulong**)address)[1] : 0u);
+            }
+        });
     }
 
     public bool IsWine { get; init; }
+
     public unsafe GameObject* GposeTarget
     {
         get => TargetSystem.Instance()->GPoseTarget;
         set => TargetSystem.Instance()->GPoseTarget = value;
     }
-    public unsafe Dalamud.Game.ClientState.Objects.Types.IGameObject? GposeTargetGameObject => GposeTarget == null ? null : _objectTable[GposeTarget->ObjectIndex];
+    public unsafe IGameObject? GposeTargetGameObject => GposeTarget == null ? null : _objectTable[GposeTarget->ObjectIndex];
     public bool IsAnythingDrawing { get; private set; } = false;
     public bool IsInCutscene { get; private set; } = false;
     public bool IsInGpose { get; private set; } = false;
@@ -143,18 +156,18 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     public Lazy<Dictionary<uint, string>> JobData { get; private set; }
     public Lazy<Dictionary<ushort, string>> WorldData { get; private set; }
     public Lazy<Dictionary<uint, string>> TerritoryData { get; private set; }
-    public Lazy<Dictionary<uint, (Lumina.Excel.Sheets.Map Map, string MapName)>> MapData { get; private set; }
+    public Lazy<Dictionary<uint, (Map Map, string MapName)>> MapData { get; private set; }
     public bool IsLodEnabled { get; private set; }
 
     public MareMediator Mediator { get; }
 
-    public Dalamud.Game.ClientState.Objects.Types.IGameObject? CreateGameObject(IntPtr reference)
+    public IGameObject? CreateGameObject(IntPtr reference)
     {
         EnsureIsOnFramework();
         return _objectTable.CreateObjectReference(reference);
     }
 
-    public async Task<Dalamud.Game.ClientState.Objects.Types.IGameObject?> CreateGameObjectAsync(IntPtr reference)
+    public async Task<IGameObject?> CreateGameObjectAsync(IntPtr reference)
     {
         return await RunOnFrameworkThread(() => _objectTable.CreateObjectReference(reference)).ConfigureAwait(false);
     }
@@ -164,12 +177,12 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         if (!_framework.IsInFrameworkUpdateThread) throw new InvalidOperationException("Can only be run on Framework");
     }
 
-    public Dalamud.Game.ClientState.Objects.Types.ICharacter? GetCharacterFromObjectTableByIndex(int index)
+    public ICharacter? GetCharacterFromObjectTableByIndex(int index)
     {
         EnsureIsOnFramework();
         var objTableObj = _objectTable[index];
         if (objTableObj!.ObjectKind != Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player) return null;
-        return (Dalamud.Game.ClientState.Objects.Types.ICharacter)objTableObj;
+        return (ICharacter)objTableObj;
     }
 
     public unsafe IntPtr GetCompanionPtr(IntPtr? playerPointer = null)
@@ -284,13 +297,18 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
 
     public async Task<string> GetPlayerNameHashedAsync()
     {
-        return await RunOnFrameworkThread(() => GetHashedAccIdFromPlayerPointer(GetPlayerPtr())).ConfigureAwait(false);
+        return await RunOnFrameworkThread(() => _aid.Value.ToString().GetHash256()).ConfigureAwait(false);
     }
 
-    private unsafe static string GetHashedAccIdFromPlayerPointer(nint ptr)
+    private unsafe string GetHashedAccIdFromPlayerPointer(nint ptr)
     {
         if (ptr == nint.Zero) return string.Empty;
-        return ((BattleChara*)ptr)->Character.AccountId.ToString().GetHash256();
+        var aid = ((BattleChara*)ptr)->Character.AccountId;
+        if (!_aidCache.TryGetValue(aid, out string? hash))
+        {
+            _aidCache[aid] = hash = unchecked((uint)(((((BattleChara*)GetPlayerCharacter().Address)->Character.AccountId ^ aid) >> 31) ^ _aid.Value)).ToString().GetHash256();
+        }
+        return hash;
     }
 
     public IntPtr GetPlayerPtr()
@@ -385,13 +403,13 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         return _objectTable.Any(f => f.Address == key);
     }
 
-    public bool IsObjectPresent(Dalamud.Game.ClientState.Objects.Types.IGameObject? obj)
+    public bool IsObjectPresent(IGameObject? obj)
     {
         EnsureIsOnFramework();
         return obj != null && obj.IsValid();
     }
 
-    public async Task<bool> IsObjectPresentAsync(Dalamud.Game.ClientState.Objects.Types.IGameObject? obj)
+    public async Task<bool> IsObjectPresentAsync(IGameObject? obj)
     {
         return await RunOnFrameworkThread(() => IsObjectPresent(obj)).ConfigureAwait(false);
     }
@@ -510,7 +528,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         Thread.Sleep(tick * 2);
     }
 
-    public Vector2 WorldToScreen(Dalamud.Game.ClientState.Objects.Types.IGameObject? obj)
+    public Vector2 WorldToScreen(IGameObject? obj)
     {
         if (obj == null) return Vector2.Zero;
         return _gameGui.WorldToScreen(obj.Position, out var screenPos) ? screenPos : Vector2.Zero;
