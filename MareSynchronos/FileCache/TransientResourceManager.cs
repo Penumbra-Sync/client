@@ -209,7 +209,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             }
 
             int removed = set.RemoveWhere(p => list.Contains(p, StringComparer.OrdinalIgnoreCase));
-            Logger.LogInformation("Removed {removed} previously existing transient paths", removed);
+            Logger.LogDebug("Removed {removed} previously existing transient paths", removed);
         }
 
         bool reloadSemiTransient = false;
@@ -222,7 +222,7 @@ public sealed class TransientResourceManager : DisposableMediatorSubscriberBase
             }
 
             int removed = semiset.RemoveWhere(p => list.Contains(p, StringComparer.OrdinalIgnoreCase));
-            Logger.LogInformation("Removed {removed} previously existing semi transient paths", removed);
+            Logger.LogDebug("Removed {removed} previously existing semi transient paths", removed);
             if (removed > 0)
             {
                 reloadSemiTransient = true;
