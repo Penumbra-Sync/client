@@ -36,13 +36,13 @@ public class VisibleUserDataDistributor : DisposableMediatorSubscriberBase
             var newData = msg.CharacterData;
             if (_lastCreatedData == null || (!string.Equals(newData.DataHash.Value, _lastCreatedData.DataHash.Value, StringComparison.Ordinal)))
             {
-                Logger.LogDebug("Pushing data for visible players");
                 _lastCreatedData = newData;
+                Logger.LogTrace("Storing new data hash {hash}", newData.DataHash.Value);
                 PushToAllVisibleUsers(forced: true);
             }
             else
             {
-                Logger.LogDebug("Not sending data for {hash}", newData.DataHash.Value);
+                Logger.LogTrace("Data hash {hash} equal to stored data", newData.DataHash.Value);
             }
         });
 
@@ -67,7 +67,12 @@ public class VisibleUserDataDistributor : DisposableMediatorSubscriberBase
         {
             _usersToPushDataTo.Add(user);
         }
-        PushCharacterData(forced);
+
+        if (_usersToPushDataTo.Count > 0)
+        {
+            Logger.LogDebug("Pushing data {hash} for {count} visible players", _lastCreatedData?.DataHash.Value ?? "UNKNOWN", _usersToPushDataTo.Count);
+            PushCharacterData(forced);
+        }
     }
 
     private void FrameworkOnUpdate()
@@ -80,7 +85,9 @@ public class VisibleUserDataDistributor : DisposableMediatorSubscriberBase
         _previouslyVisiblePlayers.AddRange(allVisibleUsers);
         if (newVisibleUsers.Count == 0) return;
 
-        Logger.LogTrace("Has new visible players, pushing character data to {users}", string.Join(", ", newVisibleUsers.Select(k => k.AliasOrUID)));
+        Logger.LogDebug("Scheduling character data push of {data} to {users}",
+            _lastCreatedData?.DataHash.Value ?? string.Empty,
+            string.Join(", ", newVisibleUsers.Select(k => k.AliasOrUID)));
         foreach (var user in newVisibleUsers)
         {
             _usersToPushDataTo.Add(user);
@@ -90,7 +97,7 @@ public class VisibleUserDataDistributor : DisposableMediatorSubscriberBase
 
     private void PushCharacterData(bool forced = false)
     {
-        if (_lastCreatedData == null) return;
+        if (_lastCreatedData == null || _usersToPushDataTo.Count == 0) return;
 
         _ = Task.Run(async () =>
         {
@@ -110,7 +117,7 @@ public class VisibleUserDataDistributor : DisposableMediatorSubscriberBase
                 await _pushDataSemaphore.WaitAsync(_runtimeCts.Token).ConfigureAwait(false);
                 try
                 {
-                    if (!_usersToPushDataTo.Any()) return;
+                    if (_usersToPushDataTo.Count == 0) return;
                     Logger.LogDebug("Pushing {data} to {users}", dataToSend.DataHash, string.Join(", ", _usersToPushDataTo.Select(k => k.AliasOrUID)));
                     await _apiController.PushCharacterData(dataToSend, [.. _usersToPushDataTo]).ConfigureAwait(false);
                     _usersToPushDataTo.Clear();
