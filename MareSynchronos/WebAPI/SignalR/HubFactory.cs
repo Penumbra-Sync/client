@@ -1,4 +1,5 @@
 ﻿using MareSynchronos.API.SignalR;
+using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Services.ServerConfiguration;
 using MareSynchronos.WebAPI.SignalR.Utils;
@@ -18,14 +19,17 @@ public class HubFactory : MediatorSubscriberBase
     private readonly TokenProvider _tokenProvider;
     private HubConnection? _instance;
     private bool _isDisposed = false;
+    private readonly bool _isWine = false;
 
     public HubFactory(ILogger<HubFactory> logger, MareMediator mediator,
         ServerConfigurationManager serverConfigurationManager,
-        TokenProvider tokenProvider, ILoggerProvider pluginLog) : base(logger, mediator)
+        TokenProvider tokenProvider, ILoggerProvider pluginLog,
+        DalamudUtilService dalamudUtilService) : base(logger, mediator)
     {
         _serverConfigurationManager = serverConfigurationManager;
         _tokenProvider = tokenProvider;
         _loggingProvider = pluginLog;
+        _isWine = dalamudUtilService.IsWine;
     }
 
     public async Task DisposeHubAsync()
@@ -66,8 +70,14 @@ public class HubFactory : MediatorSubscriberBase
             _ => HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling
         };
 
-        var baseTransport = _serverConfigurationManager.GetTransport();
-        Logger.LogDebug("Building new HubConnection using transport {transport}", baseTransport);
+        if (_isWine && !_serverConfigurationManager.CurrentServer.ForceWebSockets
+            && transportType.HasFlag(HttpTransportType.WebSockets))
+        {
+            Logger.LogDebug("Wine detected, falling back to ServerSentEvents / LongPolling");
+            transportType = HttpTransportType.ServerSentEvents | HttpTransportType.LongPolling;
+        }
+
+        Logger.LogDebug("Building new HubConnection using transport {transport}", transportType);
 
         _instance = new HubConnectionBuilder()
             .WithUrl(_serverConfigurationManager.CurrentApiUrl + IMareHub.Path, options =>

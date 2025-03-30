@@ -1704,6 +1704,21 @@ public class SettingsUi : WindowMediatorSubscriberBase
                     + "If you run into connection issues with e.g. VPNs, try ServerSentEvents first before trying out LongPolling." + UiSharedService.TooltipSeparator
                     + "Note: if the server does not support a specific Transport Type it will fall through to the next automatically: WebSockets > ServerSentEvents > LongPolling");
 
+                if (_dalamudUtilService.IsWine)
+                {
+                    bool forceWebSockets = selectedServer.ForceWebSockets;
+                    if (ImGui.Checkbox("[wine only] Force WebSockets", ref forceWebSockets))
+                    {
+                        selectedServer.ForceWebSockets = forceWebSockets;
+                        _serverConfigurationManager.Save();
+                    }
+                    _uiShared.DrawHelpText("On wine, Mare will automatically fall back to ServerSentEvents/LongPolling, even if WebSockets is selected. "
+                        + "WebSockets are known to crash XIV entirely on wine 8.5 shipped with Dalamud. "
+                        + "Only enable this if you are not running wine 8.5." + Environment.NewLine
+                        + "Note: If the issue gets resolved at some point this option will be removed.");
+                }
+
+                ImGuiHelpers.ScaledDummy(5);
 
                 if (ImGui.Checkbox("Use Discord OAuth2 Authentication", ref useOauth))
                 {
