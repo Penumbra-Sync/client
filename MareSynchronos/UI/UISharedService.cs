@@ -468,9 +468,26 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
 
                     _isOneDrive = path.Contains("onedrive", StringComparison.OrdinalIgnoreCase);
                     _isPenumbraDirectory = string.Equals(path.ToLowerInvariant(), _ipcManager.Penumbra.ModDirectory?.ToLowerInvariant(), StringComparison.Ordinal);
+                    var files = Directory.GetFiles(path, "*", SearchOption.AllDirectories);
+                    _cacheDirectoryHasOtherFilesThanCache = false;
+                    foreach (var file in files)
+                    {
+                        var fileName = Path.GetFileNameWithoutExtension(file);
+                        if (fileName.Length != 40 && !string.Equals(fileName, "desktop", StringComparison.OrdinalIgnoreCase))
+                        {
+                            _cacheDirectoryHasOtherFilesThanCache = true;
+                            Logger.LogWarning("Found illegal file in {path}: {file}", path, file);
+                            break;
+                        }
+                    }
+                    var dirs = Directory.GetDirectories(path);
+                    if (dirs.Any())
+                    {
+                        _cacheDirectoryHasOtherFilesThanCache = true;
+                        Logger.LogWarning("Found folders in {path} not belonging to Mare: {dirs}", path, string.Join(", ", dirs));
+                    }
+
                     _isDirectoryWritable = IsDirectoryWritable(path);
-                    _cacheDirectoryHasOtherFilesThanCache = Directory.GetFiles(path, "*", SearchOption.AllDirectories).Any(f => Path.GetFileNameWithoutExtension(f).Length != 40)
-                        || Directory.GetDirectories(path).Any();
                     _cacheDirectoryIsValidPath = PathRegex().IsMatch(path);
 
                     if (!string.IsNullOrEmpty(path)
