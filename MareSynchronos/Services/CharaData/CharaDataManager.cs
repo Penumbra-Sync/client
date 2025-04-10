@@ -147,17 +147,18 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
     {
         return UiBlockingComputation = DataApplicationTask = Task.Run(async () =>
         {
-            var charaName = await _dalamudUtilService.RunOnFrameworkThread(() => _dalamudUtilService.GposeTargetGameObject?.Name.TextValue).ConfigureAwait(false)
-                ?? string.Empty;
+            var obj = await _dalamudUtilService.GetGposeTargetGameObjectAsync().ConfigureAwait(false);
+            var charaName = obj?.Name.TextValue ?? string.Empty;
             if (string.IsNullOrEmpty(charaName)) return;
 
             await ApplyCharaData(dataMetaInfoDto, charaName).ConfigureAwait(false);
         });
     }
 
-    public void ApplyOwnDataToGposeTarget(CharaDataFullExtendedDto dataDto)
+    public async Task ApplyOwnDataToGposeTarget(CharaDataFullExtendedDto dataDto)
     {
-        var charaName = _dalamudUtilService.GposeTargetGameObject?.Name.TextValue ?? string.Empty;
+        var chara = await _dalamudUtilService.GetGposeTargetGameObjectAsync().ConfigureAwait(false);
+        var charaName = chara?.Name.TextValue ?? string.Empty;
         CharaDataDownloadDto downloadDto = new(dataDto.Id, dataDto.Uploader)
         {
             CustomizeData = dataDto.CustomizeData,
@@ -184,7 +185,7 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
     {
         return UiBlockingComputation = Task.Run(async () =>
         {
-            if (string.IsNullOrEmpty(pose.PoseData) || !CanApplyInGpose(out _)) return;
+            if (string.IsNullOrEmpty(pose.PoseData) || !(await CanApplyInGpose().ConfigureAwait(false)).CanApply) return;
             var gposeChara = await _dalamudUtilService.GetGposeCharacterFromObjectTableByNameAsync(targetName, true).ConfigureAwait(false);
             if (gposeChara == null) return;
 
@@ -199,9 +200,11 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
     {
         return UiBlockingComputation = Task.Run(async () =>
         {
-            if (CanApplyInGpose(out var chara))
+            var apply = await CanApplyInGpose().ConfigureAwait(false);
+
+            if (apply.CanApply)
             {
-                await ApplyPoseData(pose, chara).ConfigureAwait(false);
+                await ApplyPoseData(pose, apply.TargetName).ConfigureAwait(false);
             }
         });
     }
@@ -210,7 +213,8 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
     {
         return UiBlockingComputation = Task.Run(async () =>
         {
-            if (pose.WorldData == default || !CanApplyInGpose(out _)) return;
+            var apply = await CanApplyInGpose().ConfigureAwait(false);
+            if (pose.WorldData == default || !(await CanApplyInGpose().ConfigureAwait(false)).CanApply) return;
             var gposeChara = await _dalamudUtilService.GetGposeCharacterFromObjectTableByNameAsync(targetName, true).ConfigureAwait(false);
             if (gposeChara == null) return;
 
@@ -226,9 +230,10 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
     {
         return UiBlockingComputation = Task.Run(async () =>
         {
-            if (CanApplyInGpose(out var chara))
+            var apply = await CanApplyInGpose().ConfigureAwait(false);
+            if (apply.CanApply)
             {
-                await ApplyPoseData(pose, chara).ConfigureAwait(false);
+                await ApplyPoseData(pose, apply.TargetName).ConfigureAwait(false);
             }
         });
     }
@@ -259,19 +264,21 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
         });
     }
 
-    public bool CanApplyInGpose(out string targetName)
+    public async Task<(bool CanApply, string TargetName)> CanApplyInGpose()
     {
-        bool canApply = _dalamudUtilService.IsInGpose && _dalamudUtilService.GposeTargetGameObject != null
-            && _dalamudUtilService.GposeTargetGameObject.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player;
+        var obj = await _dalamudUtilService.GetGposeTargetGameObjectAsync().ConfigureAwait(false);
+        string targetName = string.Empty;
+        bool canApply = _dalamudUtilService.IsInGpose && obj != null
+            && obj.ObjectKind == Dalamud.Game.ClientState.Objects.Enums.ObjectKind.Player;
         if (canApply)
         {
-            targetName = _dalamudUtilService.GposeTargetGameObject!.Name.TextValue;
+            targetName = obj!.Name.TextValue;
         }
         else
         {
             targetName = "Invalid Target";
         }
-        return canApply;
+        return (canApply, targetName);
     }
 
     public void CancelDataApplication()
@@ -503,11 +510,12 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
         });
     }
 
-    public void McdfApplyToGposeTarget()
+    public async Task McdfApplyToGposeTarget()
     {
-        if (CanApplyInGpose(out string target))
+        var apply = await CanApplyInGpose().ConfigureAwait(false);
+        if (apply.CanApply)
         {
-            McdfApplyToTarget(target);
+            McdfApplyToTarget(apply.TargetName);
         }
     }
 
@@ -733,7 +741,7 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
                 _dalamudUtilService.GposeTarget = (FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)newActor.Address;
             }
 
-            McdfApplyToGposeTarget();
+            await McdfApplyToGposeTarget().ConfigureAwait(false);
         });
     }
 
@@ -750,10 +758,11 @@ public sealed partial class CharaDataManager : DisposableMediatorSubscriberBase
     {
         UiBlockingComputation = Task.Run(async () =>
         {
-            if (CanApplyInGpose(out var gposeTarget))
+            var apply = await CanApplyInGpose().ConfigureAwait(false);
+            if (apply.CanApply)
             {
-                await ApplyPoseData(value, gposeTarget).ConfigureAwait(false);
-                await ApplyWorldDataToTarget(value, gposeTarget).ConfigureAwait(false);
+                await ApplyPoseData(value, apply.TargetName).ConfigureAwait(false);
+                await ApplyWorldDataToTarget(value, apply.TargetName).ConfigureAwait(false);
             }
         });
     }

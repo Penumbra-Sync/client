@@ -144,7 +144,17 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         get => TargetSystem.Instance()->GPoseTarget;
         set => TargetSystem.Instance()->GPoseTarget = value;
     }
-    public unsafe IGameObject? GposeTargetGameObject => GposeTarget == null ? null : _objectTable[GposeTarget->ObjectIndex];
+
+    private unsafe bool HasGposeTarget => GposeTarget != null;
+    private unsafe int GPoseTargetIdx => !HasGposeTarget ? -1 : GposeTarget->ObjectIndex;
+
+    public async Task<IGameObject?> GetGposeTargetGameObjectAsync()
+    {
+        if (!HasGposeTarget)
+            return null;
+
+        return await _framework.RunOnFrameworkThread(() => _objectTable[GPoseTargetIdx]).ConfigureAwait(true);
+    }
     public bool IsAnythingDrawing { get; private set; } = false;
     public bool IsInCutscene { get; private set; } = false;
     public bool IsInGpose { get; private set; } = false;
