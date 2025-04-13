@@ -982,7 +982,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
         }
         if (string.IsNullOrEmpty(selectedServer.OAuthToken) || tokenExpiry < DateTime.UtcNow)
         {
-            ColorTextWrapped("You have no OAuth token or the OAuth token is expired. Please use the Service Settings to (re)link your OAuth account.", ImGuiColors.DalamudRed);
+            ColorTextWrapped("You have no OAuth token or the OAuth token is expired. Please use the Service Configuration to link your OAuth2 account or refresh the token.", ImGuiColors.DalamudRed);
         }
     }
 

@@ -1729,9 +1729,15 @@ public class SettingsUi : WindowMediatorSubscriberBase
                 if (useOauth)
                 {
                     _uiShared.DrawOAuth(selectedServer);
+                    if (string.IsNullOrEmpty(_serverConfigurationManager.GetDiscordUserFromToken(selectedServer)))
+                    {
+                        ImGuiHelpers.ScaledDummy(10f);
+                        UiSharedService.ColorTextWrapped("You have enabled OAuth2 but it is not linked. Press the buttons Check, then Authenticate to link properly.", ImGuiColors.DalamudRed);
+                    }
                     if (!string.IsNullOrEmpty(_serverConfigurationManager.GetDiscordUserFromToken(selectedServer))
                         && selectedServer.Authentications.TrueForAll(u => string.IsNullOrEmpty(u.UID)))
                     {
+                        ImGuiHelpers.ScaledDummy(10f);
                         UiSharedService.ColorTextWrapped("You have enabled OAuth2 but no characters configured. Set the correct UIDs for your characters in \"Character Management\".",
                             ImGuiColors.DalamudRed);
                     }

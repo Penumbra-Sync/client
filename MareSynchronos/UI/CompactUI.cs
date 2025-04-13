@@ -242,35 +242,6 @@ public class CompactUi : WindowMediatorSubscriberBase
         }
     }
 
-    private void DrawAddCharacter()
-    {
-        ImGuiHelpers.ScaledDummy(10f);
-        var keys = _serverManager.CurrentServer!.SecretKeys;
-        if (keys.Any())
-        {
-            if (_secretKeyIdx == -1) _secretKeyIdx = keys.First().Key;
-            if (_uiSharedService.IconTextButton(FontAwesomeIcon.Plus, "Add current character with secret key"))
-            {
-                _serverManager.CurrentServer!.Authentications.Add(new MareConfiguration.Models.Authentication()
-                {
-                    CharacterName = _uiSharedService.PlayerName,
-                    WorldId = _uiSharedService.WorldId,
-                    SecretKeyIdx = _secretKeyIdx
-                });
-
-                _serverManager.Save();
-
-                _ = _apiController.CreateConnectionsAsync();
-            }
-
-            _uiSharedService.DrawCombo("Secret Key##addCharacterSecretKey", keys, (f) => f.Value.FriendlyName, (f) => _secretKeyIdx = f.Key);
-        }
-        else
-        {
-            UiSharedService.ColorTextWrapped("No secret keys are configured for the current server.", ImGuiColors.DalamudYellow);
-        }
-    }
-
     private void DrawPairs()
     {
         var ySize = _transferPartHeight == 0
@@ -452,21 +423,7 @@ public class CompactUi : WindowMediatorSubscriberBase
         else
         {
             UiSharedService.ColorTextWrapped(GetServerError(), GetUidColor());
-            if (_apiController.ServerState is ServerState.NoSecretKey)
-            {
-                DrawAddCharacter();
-            }
-            if (_apiController.ServerState is ServerState.OAuthLoginTokenStale)
-            {
-                DrawRenewOAuth2();
-            }
         }
-    }
-
-    private void DrawRenewOAuth2()
-    {
-        ImGuiHelpers.ScaledDummy(10f);
-        // add some text and a button to restart discord authentication
     }
 
     private IEnumerable<IDrawFolder> GetDrawFolders()
@@ -617,7 +574,7 @@ public class CompactUi : WindowMediatorSubscriberBase
                 "Your plugin or the server you are connecting to is out of date. Please update your plugin now. If you already did so, contact the server provider to update their server to the latest version.",
             ServerState.RateLimited => "You are rate limited for (re)connecting too often. Disconnect, wait 10 minutes and try again.",
             ServerState.Connected => string.Empty,
-            ServerState.NoSecretKey => "You have no secret key set for this current character. Use the button below or open the settings and set a secret key for the current character. You can reuse the same secret key for multiple characters.",
+            ServerState.NoSecretKey => "You have no secret key set for this current character. Open Settings -> Service Settings and set a secret key for the current character. You can reuse the same secret key for multiple characters.",
             ServerState.MultiChara => "Your Character Configuration has multiple characters configured with same name and world. You will not be able to connect until you fix this issue. Remove the duplicates from the configuration in Settings -> Service Settings -> Character Management and reconnect manually after.",
             ServerState.OAuthMisconfigured => "OAuth2 is enabled but not fully configured, verify in the Settings -> Service Settings that you have OAuth2 connected and, importantly, a UID assigned to your current character.",
             ServerState.OAuthLoginTokenStale => "Your OAuth2 login token is stale and cannot be used to renew. Go to the Settings -> Service Settings and unlink then relink your OAuth2 configuration.",
