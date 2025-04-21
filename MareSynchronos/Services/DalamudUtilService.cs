@@ -37,6 +37,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     private readonly IGameGui _gameGui;
     private readonly ILogger<DalamudUtilService> _logger;
     private readonly IObjectTable _objectTable;
+    private readonly ISigScanner _sigScanner;
     private readonly PerformanceCollectorService _performanceCollector;
     private uint? _classJobId = 0;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.UtcNow;
@@ -173,11 +174,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     public Lazy<Dictionary<uint, string>> TerritoryData { get; private set; }
     public Lazy<Dictionary<uint, (Map Map, string MapName)>> MapData { get; private set; }
     public bool IsLodEnabled { get; private set; }
-
     public MareMediator Mediator { get; }
-
-    private readonly ISigScanner _sigScanner;
-
 
     public IGameObject? CreateGameObject(IntPtr reference)
     {
