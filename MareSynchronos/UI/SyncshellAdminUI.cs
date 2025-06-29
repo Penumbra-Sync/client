@@ -27,6 +27,7 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
     private int _multiInvites;
     private string _newPassword;
     private bool _pwChangeSuccess;
+    private string _description;
     private Task<int>? _pruneTestTask;
     private Task<int>? _pruneTask;
     private int _pruneDays = 14;
@@ -42,6 +43,7 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
         _isOwner = string.Equals(GroupFullInfo.OwnerUID, _apiController.UID, StringComparison.Ordinal);
         _isModerator = GroupFullInfo.GroupUserInfo.IsModerator();
         _newPassword = string.Empty;
+        _description = GroupFullInfo.GrouDescription
         _multiInvites = 30;
         _pwChangeSuccess = true;
         IsOpen = true;
