@@ -43,7 +43,8 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
         _isOwner = string.Equals(GroupFullInfo.OwnerUID, _apiController.UID, StringComparison.Ordinal);
         _isModerator = GroupFullInfo.GroupUserInfo.IsModerator();
         _newPassword = string.Empty;
-        _description = GroupFullInfo.GrouDescription
+        byte[] decodedDescBytes = Convert.FromBase64String(GroupFullInfo.GrouDescription);
+        _description = Encoding.UTF8.GetString(decodedDescBytes);
         _multiInvites = 30;
         _pwChangeSuccess = true;
         IsOpen = true;
@@ -462,7 +463,11 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
                     ImGui.NewLine();
                     if (_uiSharedService.IconTextButton(FontAwesomeIcon.Save, "Set Description") && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())
                     {
-                        var updateDescSuccess = _apiController.GroupChangeDescription(new(GroupFullInfo.Group), _description).Result;
+                         // Convert the string to a byte array using UTF-8 encoding
+                        byte[] utf8Bytes = Encoding.UTF8.GetBytes(_description);
+                        // Encode the byte array to a Base64 string
+                        string base64String = Convert.ToBase64String(utf8Bytes);
+                        var updateDescSuccess = _apiController.GroupChangeDescription(new(GroupFullInfo.Group), base64String).Result;
                         ImGui.NewLine();
                     }
                     UiSharedService.AttachToolTip("Hold CTRL and Shift and click to update the description of this Syncshell." + Environment.NewLine + "WARNING: this action is irreversible.");
