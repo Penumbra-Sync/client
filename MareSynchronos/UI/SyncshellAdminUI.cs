@@ -452,7 +452,7 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
                     var textDimension = ImGui.CalcTextSize("Set Description");
                     var inputWidth = availableWidth - buttonSize - textDimension.X - (spacing * 2);
                     var availableHeight = ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y;
-                    var spacingDescY = ImGui.GetStyle().ItemSpacing.Y * 4;
+                    var spacingDescY = ImGui.GetStyle().ItemSpacing.Y * 6;
                     var inputHeight = availableHeight - textDimension.Y - spacingDescY;
 
                     ImGui.SameLine();
@@ -460,6 +460,12 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
                     var inputSize = new Vector2(inputWidth, inputHeight);
                     ImGui.InputTextMultiline("##change_desc", ref _description, 50, inputSize);
                     ImGui.NewLine();
+                    if (_uiSharedService.IconTextButton(FontAwesomeIcon.Save, "Set Description") && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())
+                    {
+                        var updateDescSuccess = _apiController.GroupChangeDescription(new(GroupFullInfo.Group), _description).Result;
+                        ImGui.NewLine();
+                    }
+                    UiSharedService.AttachToolTip("Hold CTRL and Shift and click to update the description of this Syncshell." + Environment.NewLine + "WARNING: this action is irreversible.");
                     
                     //delete section
                     if (_uiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Syncshell") && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())
