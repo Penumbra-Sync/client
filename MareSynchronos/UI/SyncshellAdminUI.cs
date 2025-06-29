@@ -413,6 +413,7 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
                 var ownerTab = ImRaii.TabItem("Owner Settings");
                 if (ownerTab)
                 {
+                    // password section
                     ImGui.AlignTextToFramePadding();
                     ImGui.TextUnformatted("New Password");
                     var availableWidth = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
@@ -439,6 +440,28 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
                         UiSharedService.ColorTextWrapped("Failed to change the password. Password requires to be at least 10 characters long.", ImGuiColors.DalamudYellow);
                     }
 
+                    //description section
+                    ImGui.NewLine();
+                    ImGui.NewLine();
+                    ImGui.AlignTextToFramePadding();
+                    ImGui.TextUnformatted("Description");
+
+                    availableWidth = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
+                    buttonSize = _uiSharedService.GetIconTextButtonSize(FontAwesomeIcon.Save, "Set Description");
+                    spacing = ImGui.GetStyle().ItemSpacing.X;
+                    var textDimension = ImGui.CalcTextSize("Set Description");
+                    var inputWidth = availableWidth - buttonSize - textDimension.X - (spacing * 2);
+                    var availableHeight = ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y;
+                    var spacingDescY = ImGui.GetStyle().ItemSpacing.Y * 4;
+                    var inputHeight = availableHeight - textDimension.Y - spacingDescY;
+
+                    ImGui.SameLine();
+                    ImGui.SetNextItemWidth(inputWidth);
+                    var inputSize = new Vector2(inputWidth, inputHeight);
+                    ImGui.InputTextMultiline("##change_desc", ref _description, 50, inputSize);
+                    ImGui.NewLine();
+                    
+                    //delete section
                     if (_uiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Syncshell") && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())
                     {
                         IsOpen = false;
