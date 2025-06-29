@@ -92,6 +92,13 @@ public class DrawFolderGroup : DrawFolderBase
         }
         UiSharedService.AttachToolTip("Copy Syncshell ID to Clipboard");
 
+        if (_uiSharedService.IconTextButton(FontAwesomeIcon.AddressCard, "View Description", menuWidth, true))
+        {
+            ImGui.CloseCurrentPopup();
+            ImGui.SetClipboardText(_groupFullInfoDto.GrouDescription); // TODO: popup window
+        }
+        UiSharedService.AttachToolTip("Copy Syncshell Description to Clipboard");
+
         if (_uiSharedService.IconTextButton(FontAwesomeIcon.StickyNote, "Copy Notes", menuWidth, true))
         {
             ImGui.CloseCurrentPopup();
