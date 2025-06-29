@@ -459,9 +459,9 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
                     ImGui.SameLine();
                     ImGui.SetNextItemWidth(inputWidth);
                     var inputSize = new Vector2(inputWidth, inputHeight);
-                    ImGui.InputTextMultiline("##change_desc", ref _description, 50, inputSize);
+                    ImGui.InputTextMultiline("##change_desc", ref _description, 512, inputSize);
                     ImGui.NewLine();
-                    if (_uiSharedService.IconTextButton(FontAwesomeIcon.Save, "Set Description") && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())
+                    if (_uiSharedService.IconTextButton(FontAwesomeIcon.Save, "Set Description") && (_description == null || _description.Length < 512) && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())
                     {
                          // Convert the string to a byte array using UTF-8 encoding
                         byte[] utf8Bytes = Encoding.UTF8.GetBytes(_description);

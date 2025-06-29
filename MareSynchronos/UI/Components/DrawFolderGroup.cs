@@ -95,9 +95,9 @@ public class DrawFolderGroup : DrawFolderBase
         if (_uiSharedService.IconTextButton(FontAwesomeIcon.AddressCard, "View Description", menuWidth, true))
         {
             ImGui.CloseCurrentPopup();
-            ImGui.SetClipboardText(_groupFullInfoDto.GrouDescription); // TODO: popup window
+            base.DrawRightSideMultilineInfo(_groupFullInfoDto.GrouDescription);
         }
-        UiSharedService.AttachToolTip("Copy Syncshell Description to Clipboard");
+        UiSharedService.AttachToolTip("Show Syncshell Description in side window");
 
         if (_uiSharedService.IconTextButton(FontAwesomeIcon.StickyNote, "Copy Notes", menuWidth, true))
         {
