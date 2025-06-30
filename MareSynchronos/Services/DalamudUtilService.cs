@@ -37,6 +37,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     private readonly IGameGui _gameGui;
     private readonly ILogger<DalamudUtilService> _logger;
     private readonly IObjectTable _objectTable;
+    private readonly ISigScanner _sigScanner;
     private readonly PerformanceCollectorService _performanceCollector;
     private uint? _classJobId = 0;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.UtcNow;
@@ -47,7 +48,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     private readonly List<string> _notUpdatedCharas = [];
     private bool _sentBetweenAreas = false;
     private readonly Dictionary<ulong, string> _aidCache = [];
-    private readonly Lazy<uint> _aid;
+    private Lazy<uint> _aid;
     private int _aidCounter = 0;
 
     public DalamudUtilService(ILogger<DalamudUtilService> logger, IClientState clientState, IObjectTable objectTable, IFramework framework,
@@ -64,6 +65,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         _gameConfig = gameConfig;
         _blockedCharacterHandler = blockedCharacterHandler;
         Mediator = mediator;
+        _sigScanner = sigScanner;
         _performanceCollector = performanceCollector;
         WorldData = new(() =>
         {
@@ -126,12 +128,15 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
             }).ConfigureAwait(false);
         });
         IsWine = Util.IsWine();
+        _aid = RebuildAid();
+    }
 
-        _aid = new(() =>
+    private Lazy<uint> RebuildAid() {
+        return new(() =>
         {
             unsafe
             {
-                var address = sigScanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 4C 8B CA");
+                var address = _sigScanner.GetStaticAddressFromSig("48 8B 0D ?? ?? ?? ?? 4C 8B CA");
                 return (uint)(address != nint.Zero ? (*(ulong**)address)[1] : 0u);
             }
         });
@@ -169,7 +174,6 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     public Lazy<Dictionary<uint, string>> TerritoryData { get; private set; }
     public Lazy<Dictionary<uint, (Map Map, string MapName)>> MapData { get; private set; }
     public bool IsLodEnabled { get; private set; }
-
     public MareMediator Mediator { get; }
 
     public IGameObject? CreateGameObject(IntPtr reference)
@@ -758,6 +762,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
                 _logger.LogDebug("Logged in");
                 IsLoggedIn = true;
                 _lastZone = _clientState.TerritoryType;
+                _aid = RebuildAid();
                 Mediator.Publish(new DalamudLoginMessage());
             }
             else if (localPlayer == null && IsLoggedIn)
