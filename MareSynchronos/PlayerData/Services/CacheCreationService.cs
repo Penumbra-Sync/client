@@ -195,7 +195,7 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         _creationCts.Cancel();
         _creationCts.Dispose();
         _creationCts = new();
-        _cacheCreateLock.Wait();
+        _cacheCreateLock.Wait(_creationCts.Token);
         var objectKindsToCreate = _cachesToCreate.ToList();
         foreach (var creationObj in objectKindsToCreate)
         {
@@ -208,12 +208,14 @@ public sealed class CacheCreationService : DisposableMediatorSubscriberBase
         {
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_creationCts.Token, _runtimeCts.Token);
 
+            await Task.Delay(TimeSpan.FromSeconds(1), linkedCts.Token).ConfigureAwait(false);
+
             Logger.LogDebug("Creating Caches for {objectKinds}", string.Join(", ", objectKindsToCreate));
 
             try
             {
                 Dictionary<ObjectKind, CharacterDataFragment?> createdData = [];
-                foreach (var objectKind in objectKindsToCreate)
+                foreach (var objectKind in _currentlyCreating)
                 {
                     createdData[objectKind] = await _characterDataFactory.BuildCharacterData(_playerRelatedObjects[objectKind], linkedCts.Token).ConfigureAwait(false);
                 }

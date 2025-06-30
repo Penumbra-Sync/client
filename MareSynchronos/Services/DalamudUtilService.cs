@@ -614,7 +614,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
 
     private unsafe void FrameworkOnUpdateInternal()
     {
-        if (_clientState.LocalPlayer?.IsDead ?? false)
+        if ((_clientState.LocalPlayer?.IsDead ?? false) && _condition[ConditionFlag.BoundByDuty])
         {
             return;
         }
