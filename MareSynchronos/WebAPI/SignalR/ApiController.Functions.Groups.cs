@@ -39,6 +39,12 @@ public partial class ApiController
         return await _mareHub!.InvokeAsync<bool>(nameof(GroupChangePassword), groupPassword).ConfigureAwait(false);
     }
 
+    public async Task<bool> GroupChangeDescription(GroupDto dto, string? newGroupDescriptionBase64utf8)
+    {
+        CheckConnection();
+        return await _mareHub!.InvokeAsync<bool>(nameof(GroupChangeDescription), dto, newGroupDescriptionBase64utf8).ConfigureAwait(false);
+    }
+
     public async Task GroupClear(GroupDto group)
     {
         CheckConnection();

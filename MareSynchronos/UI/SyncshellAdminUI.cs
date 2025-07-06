@@ -12,6 +12,8 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
+using System.Numerics;
+using System.Text;
 
 namespace MareSynchronos.UI.Components.Popup;
 
@@ -43,8 +45,7 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
         _isOwner = string.Equals(GroupFullInfo.OwnerUID, _apiController.UID, StringComparison.Ordinal);
         _isModerator = GroupFullInfo.GroupUserInfo.IsModerator();
         _newPassword = string.Empty;
-        byte[] decodedDescBytes = Convert.FromBase64String(GroupFullInfo.GrouDescription);
-        _description = Encoding.UTF8.GetString(decodedDescBytes);
+        _description = "";
         _multiInvites = 30;
         _pwChangeSuccess = true;
         IsOpen = true;
@@ -53,6 +54,17 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
             MinimumSize = new(700, 500),
             MaximumSize = new(700, 2000),
         };
+
+        decodeGroupDescription(GroupFullInfo);
+    }
+
+    protected void decodeGroupDescription(GroupFullInfoDto groupFullInfo)
+    {
+        if (GroupFullInfo.GroupDescription != null)
+        {
+            byte[] decodedDescBytes = Convert.FromBase64String(GroupFullInfo.GroupDescription);
+            _description = Encoding.UTF8.GetString(decodedDescBytes);
+        }
     }
 
     public GroupFullInfoDto GroupFullInfo { get; private set; }
@@ -443,24 +455,21 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
 
                     //description section
                     ImGui.NewLine();
-                    ImGui.NewLine();
                     ImGui.AlignTextToFramePadding();
+                    var nextWidth = Math.Max(ImGui.CalcTextSize("Description").X, textSize);
+                    ImGui.SetNextItemWidth(nextWidth);
                     ImGui.TextUnformatted("Description");
 
-                    availableWidth = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
-                    buttonSize = _uiSharedService.GetIconTextButtonSize(FontAwesomeIcon.Save, "Set Description");
-                    spacing = ImGui.GetStyle().ItemSpacing.X;
                     var textDimension = ImGui.CalcTextSize("Set Description");
-                    var inputWidth = availableWidth - buttonSize - textDimension.X - (spacing * 2);
+                    var inputWidth = availableWidth - nextWidth - (spacing * 2);
                     var availableHeight = ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y;
-                    var spacingDescY = ImGui.GetStyle().ItemSpacing.Y * 6;
-                    var inputHeight = availableHeight - textDimension.Y - spacingDescY;
+                    var spacingDescY = ImGui.GetStyle().ItemSpacing.Y * 28; // curently getting no height from CalcTextSize, so workaround with spacing value
+                    var inputHeight = availableHeight - (textDimension.Y * 6) - spacingDescY; // substarct including header lines
 
                     ImGui.SameLine();
                     ImGui.SetNextItemWidth(inputWidth);
                     var inputSize = new Vector2(inputWidth, inputHeight);
                     ImGui.InputTextMultiline("##change_desc", ref _description, 512, inputSize);
-                    ImGui.NewLine();
                     if (_uiSharedService.IconTextButton(FontAwesomeIcon.Save, "Set Description") && (_description == null || _description.Length < 512) && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())
                     {
                          // Convert the string to a byte array using UTF-8 encoding
@@ -468,9 +477,9 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
                         // Encode the byte array to a Base64 string
                         string base64String = Convert.ToBase64String(utf8Bytes);
                         var updateDescSuccess = _apiController.GroupChangeDescription(new(GroupFullInfo.Group), base64String).Result;
-                        ImGui.NewLine();
                     }
                     UiSharedService.AttachToolTip("Hold CTRL and Shift and click to update the description of this Syncshell." + Environment.NewLine + "WARNING: this action is irreversible.");
+                    ImGui.NewLine();
                     
                     //delete section
                     if (_uiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Syncshell") && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())

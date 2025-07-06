@@ -10,6 +10,7 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
 using System.Collections.Immutable;
+using System.Numerics;
 
 namespace MareSynchronos.UI.Components;
 
