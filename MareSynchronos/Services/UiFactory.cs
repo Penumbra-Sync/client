@@ -40,6 +40,12 @@ public class UiFactory
             _apiController, _uiSharedService, _pairManager, dto, _performanceCollectorService);
     }
 
+    public StandaloneSyncshellProfileUi CreateStandaloneSyncshellProfileUi(GroupFullInfoDto dto)
+    {
+        return new StandaloneSyncshellProfileUi(_loggerFactory.CreateLogger<StandaloneSyncshellProfileUi>(), _mareMediator,
+            _uiSharedService, dto, _performanceCollectorService);
+    }
+
     public StandaloneProfileUi CreateStandaloneProfileUi(Pair pair)
     {
         return new StandaloneProfileUi(_loggerFactory.CreateLogger<StandaloneProfileUi>(), _mareMediator,

@@ -96,7 +96,7 @@ public class DrawFolderGroup : DrawFolderBase
         if (_uiSharedService.IconTextButton(FontAwesomeIcon.AddressCard, "View Description", menuWidth, true))
         {
             ImGui.CloseCurrentPopup();
-            base.DrawRightSideMultilineInfo(_groupFullInfoDto.GroupDescription);
+            _mareMediator.Publish(new OpenSyncshellProfile(_groupFullInfoDto));
         }
         UiSharedService.AttachToolTip("Show Syncshell Description in side window");
 

@@ -126,49 +126,4 @@ public abstract class DrawFolderBase : IDrawFolder
 
         return DrawRightSide(rightSideStart);
     }
-
-    protected float DrawRightSideMultilineInfo(string multilinetext)
-    {
-        var spacingX = ImGui.GetStyle().ItemSpacing.X;
-        var windowEndX = ImGui.GetWindowContentRegionMin().X + UiSharedService.GetWindowContentRegionWidth();
-
-        // Flyout Menu
-        var rightSideStart = windowEndX - spacingX;
-
-        ImGui.SameLine(windowEndX);
-        ImGui.OpenPopup("Group Flyout Menu");
-        if (ImGui.BeginPopup("Group Flyout Menu"))
-        {
-            using (ImRaii.PushId($"buttons-{_id}")) DrawMenu(_menuWidth);
-            _menuWidth = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
-
-            ImGui.AlignTextToFramePadding();
-            ImGui.TextUnformatted("Description");
-            
-            var textDimension = ImGui.CalcTextSize("Description");
-            var inputWidth = _menuWidth - textDimension.X - spacingX;
-            var availableHeight = ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y;
-            var spacingDescY = ImGui.GetStyle().ItemSpacing.Y * 2;
-            var inputHeight = availableHeight - textDimension.Y - spacingDescY;
-
-            ImGui.SameLine();
-            ImGui.SetNextItemWidth(inputWidth);
-            var inputSize = new Vector2(inputWidth, inputHeight);
-            ImGui.InputTextMultiline("##view_text", ref multilinetext, 512, inputSize);
-            ImGui.NewLine();
-            if (_uiSharedService.IconTextButton(FontAwesomeIcon.Copy, "Copy Text"))
-            {
-                    ImGui.SetClipboardText(multilinetext);
-            }
-            UiSharedService.AttachToolTip("Copy Text to Clipboard");
-
-            ImGui.EndPopup();
-        }
-        else
-        {
-            _menuWidth = 0;
-        }
-
-        return DrawRightSide(rightSideStart);
-    }
 }
