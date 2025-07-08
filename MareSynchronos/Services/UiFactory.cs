@@ -43,7 +43,7 @@ public class UiFactory
     public StandaloneSyncshellProfileUi CreateStandaloneSyncshellProfileUi(GroupFullInfoDto dto)
     {
         return new StandaloneSyncshellProfileUi(_loggerFactory.CreateLogger<StandaloneSyncshellProfileUi>(), _mareMediator,
-            _uiSharedService, dto, _performanceCollectorService);
+            _uiSharedService, _pairManager, dto, _performanceCollectorService);
     }
 
     public StandaloneProfileUi CreateStandaloneProfileUi(Pair pair)

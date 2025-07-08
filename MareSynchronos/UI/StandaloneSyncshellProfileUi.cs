@@ -2,28 +2,32 @@ using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using ImGuiNET;
 using MareSynchronos.API.Dto.Group;
+using MareSynchronos.PlayerData.Pairs;
 using MareSynchronos.Services;
 using MareSynchronos.Services.Mediator;
 using Microsoft.Extensions.Logging;
 using System.Numerics;
 using System.Text;
+using static FFXIVClientStructs.FFXIV.Component.GUI.AtkResNode.Delegates;
 
 namespace MareSynchronos.UI;
 
 public class StandaloneSyncshellProfileUi : WindowMediatorSubscriberBase
 {
     private readonly UiSharedService _uiSharedService;
+    private readonly PairManager _pairManager;
     private bool _adjustedForScrollBars = false;
 
     private string _description;
 
     public StandaloneSyncshellProfileUi(ILogger<StandaloneSyncshellProfileUi> logger, MareMediator mediator, UiSharedService uiBuilder,
-        GroupFullInfoDto groupFullInfo,
+        PairManager pairManager, GroupFullInfoDto groupFullInfo,
         PerformanceCollectorService performanceCollector)
         : base(logger, mediator, "Mare Syncshell Profile of " + groupFullInfo.GroupAliasOrGID + "##MareSynchronosStandaloneProfileUI" + groupFullInfo.Group.GID, performanceCollector)
     {
         _description = "";
         _uiSharedService = uiBuilder;
+        _pairManager = pairManager;
         GroupFullInfo = groupFullInfo;
         Flags = ImGuiWindowFlags.NoResize | ImGuiWindowFlags.AlwaysAutoResize;
 
@@ -67,7 +71,36 @@ public class StandaloneSyncshellProfileUi : WindowMediatorSubscriberBase
                 UiSharedService.ColorText(GroupFullInfo.GroupAliasOrGID, ImGuiColors.HealerGreen);
 
             ImGuiHelpers.ScaledDummy(new Vector2(spacing.Y, spacing.Y));
-            var textPos = ImGui.GetCursorPosY() - headerSize;
+            ImGui.Separator();
+
+            Pair? ownerPair = _pairManager.GetPairByUID(GroupFullInfo.OwnerUID);
+            
+            Vector4 oStatusColor = ImGuiColors.DalamudGrey3;
+            string oStatus = "Unknown";
+            string? oNote = null; 
+            if (ownerPair != null)
+            {
+                oNote = ownerPair.GetNote();
+                if (ownerPair.IsVisible)
+                {
+                    oStatus = "Visible";
+                    oStatusColor = ImGuiColors.ParsedGreen;
+                } else
+                {
+                    oStatus = ownerPair.IsOnline ? "Online" : "Offline";
+                    oStatusColor = ownerPair.IsOnline ? ImGuiColors.HealerGreen : ImGuiColors.DalamudRed;
+                }
+            }
+
+            UiSharedService.ColorText("Owner: " + GroupFullInfo.OwnerAliasOrUID, oStatusColor);
+            ImGui.SameLine();
+            UiSharedService.ColorText(oStatus, oStatusColor);
+            if (oNote != null)
+            {
+                ImGui.NewLine();
+                ImGui.TextUnformatted("your Note: " + oNote);
+            }
+
             ImGui.Separator();
             var pos = ImGui.GetCursorPos() with { Y = ImGui.GetCursorPosY() - headerSize };
             ImGui.SameLine();
