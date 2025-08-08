@@ -43,8 +43,8 @@ public sealed class XivDataAnalyzer
                 if ((nint)handle == nint.Zero) continue;
                 var curBones = handle->BoneCount;
                 // this is unrealistic, the filename shouldn't ever be that long
-                if (handle->ResourceHandle.FileName.Length > 1024) continue;
-                var skeletonName = handle->ResourceHandle.FileName.ToString();
+                if (handle->FileName.Length > 1024) continue;
+                var skeletonName = handle->FileName.ToString();
                 if (string.IsNullOrEmpty(skeletonName)) continue;
                 outputIndices[skeletonName] = new();
                 for (ushort boneIdx = 0; boneIdx < curBones; boneIdx++)

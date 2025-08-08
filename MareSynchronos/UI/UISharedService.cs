@@ -1,4 +1,5 @@
-﻿using Dalamud.Interface;
+﻿using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.GameFonts;
 using Dalamud.Interface.ImGuiFileDialog;
@@ -9,7 +10,6 @@ using Dalamud.Interface.Utility.Raii;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using Dalamud.Utility;
-using ImGuiNET;
 using MareSynchronos.FileCache;
 using MareSynchronos.Interop.Ipc;
 using MareSynchronos.Localization;
@@ -231,7 +231,7 @@ public partial class UiSharedService : DisposableMediatorSubscriberBase
     public static void DrawGroupedCenteredColorText(string text, Vector4 color, float? maxWidth = null)
     {
         var availWidth = ImGui.GetContentRegionAvail().X;
-        var textWidth = ImGui.CalcTextSize(text, availWidth).X;
+        var textWidth = ImGui.CalcTextSize(text, wrapWidth: availWidth).X;
         if (maxWidth != null && textWidth > maxWidth * ImGuiHelpers.GlobalScale) textWidth = maxWidth.Value * ImGuiHelpers.GlobalScale;
         ImGui.SetCursorPosX(ImGui.GetCursorPosX() + (availWidth / 2f) - (textWidth / 2f));
         DrawGrouped(() =>

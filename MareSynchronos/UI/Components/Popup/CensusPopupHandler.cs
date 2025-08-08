@@ -1,5 +1,5 @@
-﻿using Dalamud.Interface.Utility;
-using ImGuiNET;
+﻿using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Utility;
 using MareSynchronos.Services.ServerConfiguration;
 using System.Numerics;
 
