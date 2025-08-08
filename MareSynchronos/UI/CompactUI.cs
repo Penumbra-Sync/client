@@ -1,9 +1,9 @@
-﻿using Dalamud.Interface;
+﻿using Dalamud.Bindings.ImGui;
+using Dalamud.Interface;
 using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Utility;
-using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.API.Dto.Group;
 using MareSynchronos.Interop.Ipc;

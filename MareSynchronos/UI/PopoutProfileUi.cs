@@ -1,7 +1,7 @@
-﻿using Dalamud.Interface.Colors;
+﻿using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.Interface.Utility;
-using ImGuiNET;
 using MareSynchronos.API.Data.Extensions;
 using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Pairs;
@@ -159,12 +159,12 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
             var font = _uiSharedService.GameFont.Push();
             var remaining = ImGui.GetWindowContentRegionMax().Y - ImGui.GetCursorPosY();
             var descText = mareProfile.Description;
-            var textSize = ImGui.CalcTextSize(descText, 256f * ImGuiHelpers.GlobalScale);
+            var textSize = ImGui.CalcTextSize(descText, wrapWidth: 256f * ImGuiHelpers.GlobalScale);
             bool trimmed = textSize.Y > remaining;
             while (textSize.Y > remaining && descText.Contains(' '))
             {
                 descText = descText[..descText.LastIndexOf(' ')].TrimEnd();
-                textSize = ImGui.CalcTextSize(descText + $"...{Environment.NewLine}[Open Full Profile for complete description]", 256f * ImGuiHelpers.GlobalScale);
+                textSize = ImGui.CalcTextSize(descText + $"...{Environment.NewLine}[Open Full Profile for complete description]", wrapWidth: 256f * ImGuiHelpers.GlobalScale);
             }
             UiSharedService.TextWrapped(trimmed ? descText + $"...{Environment.NewLine}[Open Full Profile for complete description]" : mareProfile.Description);
             font.Dispose();
@@ -176,12 +176,12 @@ public class PopoutProfileUi : WindowMediatorSubscriberBase
             var newHeight = _textureWrap.Height * stretchFactor;
             var remainingWidth = (256f * ImGuiHelpers.GlobalScale - newWidth) / 2f;
             var remainingHeight = (256f * ImGuiHelpers.GlobalScale - newHeight) / 2f;
-            drawList.AddImage(_textureWrap.ImGuiHandle, new Vector2(rectMin.X + padding + remainingWidth, rectMin.Y + spacing.Y + imagePos.Y + remainingHeight),
+            drawList.AddImage(_textureWrap.Handle, new Vector2(rectMin.X + padding + remainingWidth, rectMin.Y + spacing.Y + imagePos.Y + remainingHeight),
                 new Vector2(rectMin.X + padding + remainingWidth + newWidth, rectMin.Y + spacing.Y + imagePos.Y + remainingHeight + newHeight));
             if (_supporterTextureWrap != null)
             {
                 const float iconSize = 38;
-                drawList.AddImage(_supporterTextureWrap.ImGuiHandle,
+                drawList.AddImage(_supporterTextureWrap.Handle,
                     new Vector2(rectMax.X - iconSize - spacing.X, rectMin.Y + (textPos / 2) - (iconSize / 2)),
                     new Vector2(rectMax.X - spacing.X, rectMin.Y + iconSize + (textPos / 2) - (iconSize / 2)));
             }

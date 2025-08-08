@@ -1,8 +1,8 @@
-﻿using Dalamud.Interface.Colors;
+﻿using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Colors;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Utility;
-using ImGuiNET;
 using MareSynchronos.FileCache;
 using MareSynchronos.Localization;
 using MareSynchronos.MareConfiguration;
