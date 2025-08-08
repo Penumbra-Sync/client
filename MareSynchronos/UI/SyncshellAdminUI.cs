@@ -12,6 +12,8 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.WebAPI;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
+using System.Numerics;
+using System.Text;
 
 namespace MareSynchronos.UI.Components.Popup;
 
@@ -27,6 +29,7 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
     private int _multiInvites;
     private string _newPassword;
     private bool _pwChangeSuccess;
+    private string _description;
     private Task<int>? _pruneTestTask;
     private Task<int>? _pruneTask;
     private int _pruneDays = 14;
@@ -42,6 +45,7 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
         _isOwner = string.Equals(GroupFullInfo.OwnerUID, _apiController.UID, StringComparison.Ordinal);
         _isModerator = GroupFullInfo.GroupUserInfo.IsModerator();
         _newPassword = string.Empty;
+        _description = "";
         _multiInvites = 30;
         _pwChangeSuccess = true;
         IsOpen = true;
@@ -50,6 +54,17 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
             MinimumSize = new(700, 500),
             MaximumSize = new(700, 2000),
         };
+
+        decodeGroupDescription(GroupFullInfo);
+    }
+
+    protected void decodeGroupDescription(GroupFullInfoDto groupFullInfo)
+    {
+        if (GroupFullInfo.GroupDescription != null)
+        {
+            byte[] decodedDescBytes = Convert.FromBase64String(GroupFullInfo.GroupDescription);
+            _description = Encoding.UTF8.GetString(decodedDescBytes);
+        }
     }
 
     public GroupFullInfoDto GroupFullInfo { get; private set; }
@@ -411,6 +426,7 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
                 var ownerTab = ImRaii.TabItem("Owner Settings");
                 if (ownerTab)
                 {
+                    // password section
                     ImGui.AlignTextToFramePadding();
                     ImGui.TextUnformatted("New Password");
                     var availableWidth = ImGui.GetWindowContentRegionMax().X - ImGui.GetWindowContentRegionMin().X;
@@ -437,6 +453,35 @@ public class SyncshellAdminUI : WindowMediatorSubscriberBase
                         UiSharedService.ColorTextWrapped("Failed to change the password. Password requires to be at least 10 characters long.", ImGuiColors.DalamudYellow);
                     }
 
+                    //description section
+                    ImGui.NewLine();
+                    ImGui.AlignTextToFramePadding();
+                    var nextWidth = Math.Max(ImGui.CalcTextSize("Description").X, textSize);
+                    ImGui.SetNextItemWidth(nextWidth);
+                    ImGui.TextUnformatted("Description");
+
+                    var textDimension = ImGui.CalcTextSize("Set Description");
+                    var inputWidth = availableWidth - nextWidth - (spacing * 2);
+                    var availableHeight = ImGui.GetWindowContentRegionMax().Y - ImGui.GetWindowContentRegionMin().Y;
+                    var spacingDescY = ImGui.GetStyle().ItemSpacing.Y * 28; // curently getting no height from CalcTextSize, so workaround with spacing value
+                    var inputHeight = availableHeight - (textDimension.Y * 6) - spacingDescY; // substarct including header lines
+
+                    ImGui.SameLine();
+                    ImGui.SetNextItemWidth(inputWidth);
+                    var inputSize = new Vector2(inputWidth, inputHeight);
+                    ImGui.InputTextMultiline("##change_desc", ref _description, 512, inputSize);
+                    if (_uiSharedService.IconTextButton(FontAwesomeIcon.Save, "Set Description") && (_description == null || _description.Length < 512) && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())
+                    {
+                         // Convert the string to a byte array using UTF-8 encoding
+                        byte[] utf8Bytes = Encoding.UTF8.GetBytes(_description);
+                        // Encode the byte array to a Base64 string
+                        string base64String = Convert.ToBase64String(utf8Bytes);
+                        var updateDescSuccess = _apiController.GroupChangeDescription(new(GroupFullInfo.Group), base64String).Result;
+                    }
+                    UiSharedService.AttachToolTip("Hold CTRL and Shift and click to update the description of this Syncshell." + Environment.NewLine + "WARNING: this action is irreversible.");
+                    ImGui.NewLine();
+                    
+                    //delete section
                     if (_uiSharedService.IconTextButton(FontAwesomeIcon.Trash, "Delete Syncshell") && UiSharedService.CtrlPressed() && UiSharedService.ShiftPressed())
                     {
                         IsOpen = false;

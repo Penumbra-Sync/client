@@ -10,6 +10,7 @@ using MareSynchronos.Services.Mediator;
 using MareSynchronos.UI.Handlers;
 using MareSynchronos.WebAPI;
 using System.Collections.Immutable;
+using System.Numerics;
 
 namespace MareSynchronos.UI.Components;
 
@@ -91,6 +92,13 @@ public class DrawFolderGroup : DrawFolderBase
             ImGui.SetClipboardText(_groupFullInfoDto.GroupAliasOrGID);
         }
         UiSharedService.AttachToolTip("Copy Syncshell ID to Clipboard");
+
+        if (_uiSharedService.IconTextButton(FontAwesomeIcon.AddressCard, "View Description", menuWidth, true))
+        {
+            ImGui.CloseCurrentPopup();
+            _mareMediator.Publish(new OpenSyncshellProfile(_groupFullInfoDto));
+        }
+        UiSharedService.AttachToolTip("Show Syncshell Description in side window");
 
         if (_uiSharedService.IconTextButton(FontAwesomeIcon.StickyNote, "Copy Notes", menuWidth, true))
         {
