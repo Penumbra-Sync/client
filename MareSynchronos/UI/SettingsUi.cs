@@ -895,6 +895,7 @@ public class SettingsUi : WindowMediatorSubscriberBase
         var dtrColorsNotConnected = _configService.Current.DtrColorsNotConnected;
         var dtrColorsPairsInRange = _configService.Current.DtrColorsPairsInRange;
         var preferNotesInsteadOfName = _configService.Current.PreferNotesOverNamesForVisible;
+        var useFocusTarget = _configService.Current.UseFocusTarget;
         var groupUpSyncshells = _configService.Current.GroupUpSyncshells;
         var groupInVisible = _configService.Current.ShowSyncshellUsersInVisible;
         var syncshellOfflineSeparate = _configService.Current.ShowSyncshellOfflineUsersSeparately;
@@ -1024,6 +1025,12 @@ public class SettingsUi : WindowMediatorSubscriberBase
         _uiShared.DrawHelpText("If you set a note for a player it will be shown instead of the player name");
         if (!_configService.Current.ShowCharacterNameInsteadOfNotesForVisible) ImGui.EndDisabled();
         ImGui.Unindent();
+
+        if (ImGui.Checkbox("Set visible pairs as focus targets when clicking the eye", ref useFocusTarget))
+        {
+            _configService.Current.UseFocusTarget = useFocusTarget;
+            _configService.Save();
+        }
 
         if (ImGui.Checkbox("Show Mare Profiles on Hover", ref showProfiles))
         {
