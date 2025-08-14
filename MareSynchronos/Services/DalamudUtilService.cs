@@ -13,6 +13,7 @@ using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using Lumina.Excel.Sheets;
 using MareSynchronos.API.Dto.CharaData;
 using MareSynchronos.Interop;
+using MareSynchronos.MareConfiguration;
 using MareSynchronos.PlayerData.Handlers;
 using MareSynchronos.Services.Mediator;
 using MareSynchronos.Utils;
@@ -38,6 +39,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
     private readonly ILogger<DalamudUtilService> _logger;
     private readonly IObjectTable _objectTable;
     private readonly PerformanceCollectorService _performanceCollector;
+    private readonly MareConfigService _configService;
     private uint? _classJobId = 0;
     private DateTime _delayedFrameworkUpdateCheck = DateTime.UtcNow;
     private string _lastGlobalBlockPlayer = string.Empty;
@@ -50,7 +52,8 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
 
     public DalamudUtilService(ILogger<DalamudUtilService> logger, IClientState clientState, IObjectTable objectTable, IFramework framework,
         IGameGui gameGui, ICondition condition, IDataManager gameData, ITargetManager targetManager, IGameConfig gameConfig,
-        BlockedCharacterHandler blockedCharacterHandler, MareMediator mediator, PerformanceCollectorService performanceCollector)
+        BlockedCharacterHandler blockedCharacterHandler, MareMediator mediator, PerformanceCollectorService performanceCollector,
+        MareConfigService configService)
     {
         _logger = logger;
         _clientState = clientState;
@@ -63,6 +66,7 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
         _blockedCharacterHandler = blockedCharacterHandler;
         Mediator = mediator;
         _performanceCollector = performanceCollector;
+        _configService = configService;
         WorldData = new(() =>
         {
             return gameData.GetExcelSheet<Lumina.Excel.Sheets.World>(Dalamud.Game.ClientLanguage.English)!
@@ -118,9 +122,13 @@ public class DalamudUtilService : IHostedService, IMediatorSubscriber
             if (string.IsNullOrEmpty(name)) return;
             var addr = _playerCharas.FirstOrDefault(f => string.Equals(f.Value.Name, name, StringComparison.Ordinal)).Value.Address;
             if (addr == nint.Zero) return;
+            var useFocusTarget = _configService.Current.UseFocusTarget;
             _ = RunOnFrameworkThread(() =>
             {
-                targetManager.Target = CreateGameObject(addr);
+                if (useFocusTarget)
+                    targetManager.FocusTarget = CreateGameObject(addr);
+                else
+                    targetManager.Target = CreateGameObject(addr);
             }).ConfigureAwait(false);
         });
         IsWine = Util.IsWine();

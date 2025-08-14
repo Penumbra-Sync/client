@@ -59,4 +59,5 @@ public class MareConfig : IMareConfiguration
     public bool AutoPopulateEmptyNotesFromCharaName { get; set; } = false;
     public int Version { get; set; } = 1;
     public NotificationLocation WarningNotification { get; set; } = NotificationLocation.Both;
+    public bool UseFocusTarget { get; set; } = false;
 }
